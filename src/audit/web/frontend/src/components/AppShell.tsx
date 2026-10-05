@@ -180,16 +180,27 @@ export default function AppShell({ children }: { children: ReactNode }) {
   // depend on whether anyone was watching it load.
   useScrollRestoration();
 
+  // While Search is open, everything behind it is `inert`: it cannot take
+  // focus, be clicked or be read, as behind a native modal <dialog>. Search
+  // only said it was modal (aria-modal), so the page behind could still take
+  // focus. A page whose code loaded late, after Search was open again, moved
+  // focus to <main> or to its own first field; Enter then did nothing, or
+  // submitted New scan's form. Checking for an open dialog before each focus
+  // move was rejected: every page that sets focus would need the check, and
+  // `inert` is the HTML that means "not now". WAI-ARIA APG Dialog (Modal)
+  // pattern, https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/ (content
+  // outside the dialog is inert); SC 2.4.3 Focus Order, Level A.
   return (
     <div className="min-h-screen bg-surface-subtle">
       <a
+        inert={commandOpen}
         href="#main"
         className="sr-only-focusable fixed left-2 top-2 z-50 rounded-xs bg-umich-blue px-3 py-1.5 text-fg-inverse"
       >
         Skip to main content
       </a>
 
-      <div className="flex min-h-screen items-start">
+      <div inert={commandOpen} className="flex min-h-screen items-start">
         <Sidebar
           collapsed={sidebarCollapsed}
           onToggle={toggleSidebar}
@@ -227,11 +238,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
         </div>
       </div>
 
-      <CommandPalette
-        open={commandOpen}
-        onClose={() => setCommandOpen(false)}
-        scanId={reportMatch?.scanId ?? null}
-      />
+      {/* Mounted only while open, so each opening starts with an empty search
+          and the first result selected (CommandPalette.tsx). */}
+      {commandOpen && (
+        <CommandPalette open onClose={() => setCommandOpen(false)} scanId={reportMatch?.scanId ?? null} />
+      )}
       <ShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       <PreferenceEffects />
     </div>
@@ -257,9 +268,18 @@ const SIDEBAR_ROW_IDLE = "text-fg-muted hover:bg-umich-blue/10 hover:text-umich-
  * scan button's colour, so the place you were in read as another button. No
  * border keeps it apart from the bordered Search button, and the bar on its
  * edge marks it by shape as well as by colour.
+ *
+ * Dark theme: the "white card" is the dark surface there, the same as the
+ * sidebar, so the card vanished and its shadow could not show; and the blue
+ * text (light blue in this theme) was dimmer than the idle rows' grey, so the
+ * current place looked quieter than the rest. In dark it is a light-blue tint,
+ * clearly lighter than the sidebar, with the brightest text (16:1 on the
+ * sidebar, about 10:1 on the tint) and the same bar. SC 1.4.11 Non-text
+ * Contrast and SC 1.4.6 Contrast (Enhanced); the current place is also
+ * aria-current="page", so it never rests on colour alone.
  */
 const SIDEBAR_ROW_ACTIVE =
-  "bg-surface text-umich-blue shadow-[0_2px_10px_rgba(0,39,76,0.10)] before:absolute before:inset-y-2.5 before:left-0 before:w-1 before:rounded-r-full before:bg-umich-blue";
+  "bg-surface text-umich-blue shadow-[0_2px_10px_rgba(0,39,76,0.10)] before:absolute before:inset-y-2.5 before:left-0 before:w-1 before:rounded-r-full before:bg-umich-blue dark:bg-umich-blue/20 dark:text-fg dark:shadow-none";
 
 /**
  * Search and feedback: reachable from every screen, so they live in the

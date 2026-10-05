@@ -1,4 +1,5 @@
 import type { LocalLoginScanPayload, NewScanPayload, ScanSettingsSnapshot } from "../../api/types";
+import { withScheme } from "../../lib/webAddress";
 import { ERRORS, FIXED_NOTE_LOGIN, NUMBERS, SUBMIT, URL_COPY } from "./copy";
 
 /**
@@ -115,9 +116,12 @@ export const LOGIN_DEFAULTS: ScanSettings = {
   skip_ocr: true,
 };
 
+// The address as it will be scanned: a scheme typed or not, it is completed
+// first (lib/webAddress.ts), so validation, the summary and the payloads all
+// see the same address.
 function parseUrl(raw: string): URL | null {
   try {
-    return new URL(raw.trim());
+    return new URL(withScheme(raw));
   } catch {
     return null;
   }

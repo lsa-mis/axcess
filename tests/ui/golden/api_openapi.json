@@ -695,14 +695,129 @@
     "/api/local-login-scans": {
       "post": {
         "summary": "Api Create Local Login Scan",
-        "description": "Open a headed, memory-only login browser on the Axcess computer.\n\nThis is the direct local equivalent of the reference crawler's\n``requires login`` mode. Unlike that implementation it does not use a\nmarker file or serialize ``storageState``; the subsequent crawl uses\nthe same live Playwright context.",
+        "description": "Open a headed, memory-only sign-in browser on the Axcess computer.\n\nThis creates a sign-in in progress, not a scan: no ``scans`` row, no\nReports entry, and no crawl lock. The scan row is created, and the\ncrawl started, by ``POST /api/local-sign-ins/{id}/start``. Only one\nsign-in waits at a time; asking again returns the one that waits\n(200, ``already_waiting``) and never opens a second browser.\n\nThis is the direct local equivalent of the reference crawler's\n``requires login`` mode. Unlike that implementation it does not use a\nmarker file or serialize ``storageState``; the session keeps the\nsigned-in state in memory only.",
         "operationId": "api_create_local_login_scan_api_local_login_scans_post",
         "requestBody": {
           "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LocalLoginScanRequest"}}},
           "required": true
         },
         "responses": {
-          "201": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "201": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LocalSignInResponse"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/local-sign-ins/current": {
+      "get": {
+        "summary": "Api Current Local Sign In",
+        "description": "The sign-in waiting on this computer, so New scan can return to it.",
+        "operationId": "api_current_local_sign_in_api_local_sign_ins_current_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {"schema": {"$ref": "#/components/schemas/CurrentLocalSignInResponse"}}
+            }
+          }
+        }
+      }
+    },
+    "/api/local-sign-ins/{sign_in_id}": {
+      "get": {
+        "summary": "Api Local Sign In Status",
+        "description": "One sign-in's state, or the one word for why it ended.",
+        "operationId": "api_local_sign_in_status_api_local_sign_ins__sign_in_id__get",
+        "parameters": [
+          {
+            "name": "sign_in_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string", "title": "Sign In Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LocalSignInResponse"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/local-sign-ins/{sign_in_id}/start": {
+      "post": {
+        "summary": "Api Start Local Sign In Scan",
+        "description": "\"I'm signed in, start scan\": create the scan row and start the crawl.\n\nThe crawl lock is taken here and only here. If another scan is\nrunning, the start is refused and the sign-in stays waiting, so the\nperson can start once that scan finishes.",
+        "operationId": "api_start_local_sign_in_scan_api_local_sign_ins__sign_in_id__start_post",
+        "parameters": [
+          {
+            "name": "sign_in_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string", "title": "Sign In Id"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/local-sign-ins/{sign_in_id}/reopen": {
+      "post": {
+        "summary": "Api Reopen Local Sign In",
+        "description": "Open a new sign-in window from the kept sign-in, on the last page.",
+        "operationId": "api_reopen_local_sign_in_api_local_sign_ins__sign_in_id__reopen_post",
+        "parameters": [
+          {
+            "name": "sign_in_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string", "title": "Sign In Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LocalSignInResponse"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/local-sign-ins/{sign_in_id}/cancel": {
+      "post": {
+        "summary": "Api Cancel Local Sign In",
+        "description": "Close every sign-in window, erase the kept sign-in, record nothing.",
+        "operationId": "api_cancel_local_sign_in_api_local_sign_ins__sign_in_id__cancel_post",
+        "parameters": [
+          {
+            "name": "sign_in_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string", "title": "Sign In Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LocalSignInResponse"}}}
+          },
           "422": {
             "description": "Validation Error",
             "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
@@ -715,28 +830,6 @@
         "summary": "Api Local Login Scan Status",
         "description": "Return operational state only; never browser URLs or session data.",
         "operationId": "api_local_login_scan_status_api_local_login_scans__scan_id__get",
-        "parameters": [
-          {
-            "name": "scan_id",
-            "in": "path",
-            "required": true,
-            "schema": {"type": "integer", "title": "Scan Id"}
-          }
-        ],
-        "responses": {
-          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
-          "422": {
-            "description": "Validation Error",
-            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
-          }
-        }
-      }
-    },
-    "/api/local-login-scans/{scan_id}/confirm": {
-      "post": {
-        "summary": "Api Confirm Local Login",
-        "description": "Human confirmation signal; the server independently verifies target scope.",
-        "operationId": "api_confirm_local_login_api_local_login_scans__scan_id__confirm_post",
         "parameters": [
           {
             "name": "scan_id",
@@ -1828,6 +1921,15 @@
         "required": ["pipeline", "before", "after"],
         "title": "CoveragePair"
       },
+      "CurrentLocalSignInResponse": {
+        "properties": {
+          "sign_in": {"anyOf": [{"$ref": "#/components/schemas/LocalSignInResponse"}, {"type": "null"}]}
+        },
+        "type": "object",
+        "required": ["sign_in"],
+        "title": "CurrentLocalSignInResponse",
+        "description": "``GET /api/local-sign-ins/current``: the waiting sign-in, if any."
+      },
       "DataClassification": {
         "type": "string",
         "enum": ["internal", "sensitive", "restricted"],
@@ -1987,6 +2089,27 @@
         "required": ["seed_url", "authorization_acknowledged"],
         "title": "LocalLoginScanRequest",
         "description": "Local-only manual-login scan input, never credentials or browser state."
+      },
+      "LocalSignInResponse": {
+        "properties": {
+          "sign_in_id": {"type": "string", "title": "Sign In Id"},
+          "status": {
+            "type": "string",
+            "enum": ["opening_browser", "awaiting_authentication", "cancelled", "expired", "failed"],
+            "title": "Status"
+          },
+          "site": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Site"},
+          "window_open": {"type": "boolean", "title": "Window Open", "default": false},
+          "error": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Error"},
+          "keep_minutes": {"type": "integer", "title": "Keep Minutes", "default": 30},
+          "forget_in_seconds": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "Forget In Seconds"},
+          "already_waiting": {"type": "boolean", "title": "Already Waiting", "default": false},
+          "settings": {"anyOf": [{"$ref": "#/components/schemas/ScanFormSettings"}, {"type": "null"}]}
+        },
+        "type": "object",
+        "required": ["sign_in_id", "status"],
+        "title": "LocalSignInResponse",
+        "description": "A sign-in in progress, before any scan exists. Never session data.\n\n``site`` is the host being signed in to and ``settings`` the New scan\nform's own fields (the same allow-list as ``/api/scans/{id}/settings``),\nso the form can be refilled. No URL the browser visited, no cookie, no\nstorage, no credential."
       },
       "ManualCheckUpdate": {
         "properties": {
@@ -2202,6 +2325,62 @@
         "type": "object",
         "required": ["id", "seed_url", "started_at"],
         "title": "ReportIdentity"
+      },
+      "ScanFormSettings": {
+        "properties": {
+          "url": {"type": "string", "title": "Url"},
+          "search": {"anyOf": [{"$ref": "#/components/schemas/SearchConfig"}, {"type": "null"}]},
+          "max_pages": {"type": "integer", "title": "Max Pages"},
+          "all_pages": {"type": "boolean", "title": "All Pages", "default": false},
+          "max_depth": {"type": "integer", "title": "Max Depth"},
+          "rps": {"type": "number", "title": "Rps"},
+          "workers": {"type": "integer", "title": "Workers"},
+          "include_subdomain": {"type": "boolean", "title": "Include Subdomain"},
+          "whole_host": {"type": "boolean", "title": "Whole Host"},
+          "ignore_robots": {"type": "boolean", "title": "Ignore Robots"},
+          "skip_ocr": {"type": "boolean", "title": "Skip Ocr"},
+          "skip_vlm": {"type": "boolean", "title": "Skip Vlm"},
+          "static_only": {"type": "boolean", "title": "Static Only"},
+          "show_browser": {"type": "boolean", "title": "Show Browser"},
+          "scan_engine": {"type": "string", "enum": ["axe", "alfa", "both"], "title": "Scan Engine"},
+          "skip_interaction": {"type": "boolean", "title": "Skip Interaction"},
+          "skip_keyboard": {"type": "boolean", "title": "Skip Keyboard"},
+          "skip_responsive": {"type": "boolean", "title": "Skip Responsive"},
+          "skip_semantic": {"type": "boolean", "title": "Skip Semantic"},
+          "skip_focus": {"type": "boolean", "title": "Skip Focus"},
+          "skip_visual": {"type": "boolean", "title": "Skip Visual"},
+          "skip_rendered_storage": {"type": "boolean", "title": "Skip Rendered Storage"},
+          "axe_level": {"type": "string", "enum": ["A", "AA", "AAA"], "title": "Axe Level"},
+          "wcag_version": {"type": "string", "enum": ["2.1", "2.2"], "title": "Wcag Version"}
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "url",
+          "max_pages",
+          "max_depth",
+          "rps",
+          "workers",
+          "include_subdomain",
+          "whole_host",
+          "ignore_robots",
+          "skip_ocr",
+          "skip_vlm",
+          "static_only",
+          "show_browser",
+          "scan_engine",
+          "skip_interaction",
+          "skip_keyboard",
+          "skip_responsive",
+          "skip_semantic",
+          "skip_focus",
+          "skip_visual",
+          "skip_rendered_storage",
+          "axe_level",
+          "wcag_version"
+        ],
+        "title": "ScanFormSettings",
+        "description": "The New scan form's fields (``NewScanPayload`` in the SPA)."
       },
       "SearchConfig": {
         "properties": {

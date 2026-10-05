@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router";
+import { withScheme } from "../lib/webAddress";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
+import type { NewScanPayload } from "../api/types";
 import { Checkbox, PageHeader } from "../components/ui";
-import LocalLoginScan from "../components/LocalLoginScan";
-import { AUTHORIZATION, IMAGE_ACK, RECOVERY } from "../components/newScan/copy";
+import { LocalLoginHandoff, LocalSignInCard, type SignInEnd } from "../components/LocalLoginScan";
+import { AUTHORIZATION, IMAGE_ACK, RECOVERY, SIGN_IN } from "../components/newScan/copy";
 import ScanForm, { SCAN_FORM_ID } from "../components/newScan/ScanForm";
 import SubmitBar from "../components/newScan/SubmitBar";
-import ScanTypeTabs from "../components/newScan/ScanTypeTabs";
+import ScanTypeTabs, { SCAN_PANEL_ID, scanTabId } from "../components/newScan/ScanTypeTabs";
 import {
   applyPolicy,
   policyFor,
@@ -43,6 +45,14 @@ function positiveId(raw: string | null): number | null {
   return Number.isInteger(value) && value > 0 ? value : null;
 }
 
+/** A sign-in ID as the server issues it; anything else is ignored. */
+function signInIdFrom(raw: string | null): string | null {
+  return raw && /^[A-Za-z0-9_-]{16,64}$/.test(raw) ? raw : null;
+}
+
+/** What the page says after a sign-in ended without a scan. */
+type EndNotice = { reason: SignInEnd; minutes: number };
+
 /**
  * Start a scan: two tabs, one form.
  *
@@ -51,8 +61,18 @@ function positiveId(raw: string | null): number | null {
  * hands them to `ScanForm` under the policy for the selected tab. The tab is
  * `?mode=`, so it is bookmarkable and the topbar trail is the way back; a
  * change re-keys the form so it drops in fresh with that mode's defaults.
- * Once a login scan has been created, `?scan=` hands over to the sign-in
- * flow, which is its own screen.
+ * `?sign_in=` shows the card for a sign-in in progress, before any scan
+ * exists, and `?scan=` the card for a sign-in scan once it has started.
+ *
+ * New scan opened with neither a tab nor a card in its address (the
+ * sidebar's New scan link, for one) asks the server whether a sign-in is
+ * waiting, and if so replaces the address with that sign-in's card. The
+ * card used to live only in the address, so leaving the page lost it, and
+ * the sign-in window sat open with no way back to its start button. The
+ * address is replaced, not pushed, so Back still leaves New scan in one
+ * step. The check runs once per visit: choosing the "Public website" tab
+ * from the card shows the public form and stays there, so a waiting
+ * sign-in never blocks a public scan.
  *
  * `?from=<scan id>` starts again from a scan that failed or was stopped:
  * its settings are fetched from the server and laid over the tab's
@@ -68,12 +88,26 @@ export default function NewScanRoute() {
   const policy = policyFor(mode);
   const handoffScanId = Number(searchParams.get("scan"));
   const inHandoff = mode === "login" && Number.isInteger(handoffScanId) && handoffScanId > 0;
+  const signInId = mode === "login" && !inHandoff ? signInIdFrom(searchParams.get("sign_in")) : null;
+  const inCard = inHandoff || signInId !== null;
+  const location = useLocation();
+  const alreadyWaiting = Boolean((location.state as { alreadyWaiting?: boolean } | null)?.alreadyWaiting);
+  const [endNotice, setEndNotice] = useState<EndNotice | null>(null);
 
   const selectMode = (next: ScanMode) => {
     const params = new URLSearchParams(searchParams);
     params.delete("scan");
-    if (next === "login") params.set("mode", "login");
-    else params.delete("mode");
+    params.delete("sign_in");
+    setEndNotice(null);
+    if (next === "login") {
+      params.set("mode", "login");
+      // Back on the sign-in tab, a sign-in that is still waiting comes back
+      // as its card, in whatever state it is in (window open or closed),
+      // instead of the empty form: it was only hidden by the other tab.
+      // Same check as a fresh visit (below), so there is one way it works.
+      checkAskedAt.current = Date.now();
+      setCheckSignIn(true);
+    } else params.delete("mode");
     setSearchParams(params);
   };
 
@@ -106,12 +140,14 @@ export default function NewScanRoute() {
   const appliedFrom = useRef<number | null>(null);
   const snapshot = previousSettings.data;
   useEffect(() => {
-    if (!snapshot || appliedFrom.current === snapshot.scan_id) return;
+    // Not while a card is shown: switching tabs would leave the card.
+    if (!snapshot || appliedFrom.current === snapshot.scan_id || inCard) return;
     if (snapshot.mode !== mode) {
       // A link that named the wrong tab: move to the scan's own tab first.
       setSearchParams((previous) => {
         const params = new URLSearchParams(previous);
         params.delete("scan");
+        params.delete("sign_in");
         if (snapshot.mode === "login") params.set("mode", "login");
         else params.delete("mode");
         return params;
@@ -121,7 +157,7 @@ export default function NewScanRoute() {
     appliedFrom.current = snapshot.scan_id;
     setSettings(settingsFromSnapshot(snapshot, policyFor(mode)));
     setErrors([]);
-  }, [snapshot, mode, setSearchParams]);
+  }, [snapshot, mode, setSearchParams, inCard]);
 
   const update = (patch: Partial<ScanSettings>) => {
     setSettings((previous) => applyPolicy({ ...previous, ...patch }, policy));
@@ -157,6 +193,57 @@ export default function NewScanRoute() {
     protectedCapability.data?.available || protectedCapability.data?.local_available,
   );
 
+  // Once per visit when the address names no tab and no card, and again
+  // each time the reader returns to the sign-in tab (selectMode).
+  // Until the answer comes the form is held back, so it does not appear and
+  // then vanish under the reader's pointer or focus. The request is local
+  // and answers at once; an error (a browser that is not on this computer
+  // cannot have a sign-in here) shows the form.
+  const [checkSignIn, setCheckSignIn] = useState(
+    () => !searchParams.get("mode") && !searchParams.get("scan") && !searchParams.get("sign_in"),
+  );
+  // When the current check was asked for. The query keeps its last answer
+  // while the check is off, so returning to the sign-in tab found the answer
+  // from the first visit ("no sign-in yet") already there, acted on it before
+  // the fresh request came back, and showed the empty form; the next return
+  // then found the right answer, so it worked every second time. Only an
+  // answer newer than this, with no request in flight, is acted on.
+  const checkAskedAt = useRef(0);
+  const waitingSignIn = useQuery({
+    queryKey: ["local-sign-in", "current"],
+    queryFn: api.getCurrentLocalSignIn,
+    enabled: checkSignIn,
+    retry: false,
+    staleTime: 0,
+    gcTime: 0,
+  });
+  useEffect(() => {
+    if (!checkSignIn || waitingSignIn.isPending || waitingSignIn.isFetching) return;
+    const answeredAt = Math.max(waitingSignIn.dataUpdatedAt, waitingSignIn.errorUpdatedAt);
+    if (answeredAt < checkAskedAt.current) return; // the last visit's answer; a fresh one is coming
+    setCheckSignIn(false);
+    const found = waitingSignIn.data?.sign_in;
+    if (!found || (found.status !== "opening_browser" && found.status !== "awaiting_authentication")) return;
+    setSearchParams(
+      (previous) => {
+        const params = new URLSearchParams(previous);
+        params.set("mode", "login");
+        params.delete("scan");
+        params.set("sign_in", found.sign_in_id);
+        return params;
+      },
+      { replace: true },
+    );
+  }, [
+    checkSignIn,
+    waitingSignIn.isPending,
+    waitingSignIn.isFetching,
+    waitingSignIn.data,
+    waitingSignIn.dataUpdatedAt,
+    waitingSignIn.errorUpdatedAt,
+    setSearchParams,
+  ]);
+
   // What the server cannot run, the form does not offer: fall back rather
   // than let a scan start with an engine or a model that is not there.
   useEffect(() => {
@@ -189,26 +276,75 @@ export default function NewScanRoute() {
     onError: (reason: unknown) =>
       setErrors([{ field: "form", message: reason instanceof Error ? reason.message : String(reason) }]),
   });
+  // Opening the sign-in window creates no scan, so the scan list is not
+  // touched here; it is when the sign-in scan starts (`onScanStarted`).
   const createLogin = useMutation({
     mutationFn: (payload: ScanSettings) =>
-      api.createLocalLoginScan(toLocalLoginPayload(payload, { imageAck })),
-    onSuccess: ({ scan_id }) => {
-      void queryClient.invalidateQueries({ queryKey: ["scans"] });
-      navigate(`/scans/new?mode=login&scan=${scan_id}`, { replace: true });
+      api.createLocalSignIn(toLocalLoginPayload(payload, { imageAck })),
+    onSuccess: (signIn) => {
+      setEndNotice(null);
+      navigate(`/scans/new?mode=login&sign_in=${encodeURIComponent(signIn.sign_in_id)}`, {
+        replace: true,
+        state: { alreadyWaiting: signIn.already_waiting },
+      });
     },
     onError: (reason: unknown) =>
       setErrors([{ field: "form", message: reason instanceof Error ? reason.message : String(reason) }]),
   });
   const pending = createPublic.isPending || createLogin.isPending;
 
+  const onScanStarted = (scanId: number) => {
+    void queryClient.invalidateQueries({ queryKey: ["scans"] });
+    navigate(`/scans/new?mode=login&scan=${scanId}`, { replace: true });
+  };
+  // Back to the form, with the reader's entries as they left them
+  // (SC 3.3.7 Redundant Entry, Level A). This route kept them while the
+  // card was shown. If the route was opened afresh on the card (the New
+  // scan link, after leaving the page), its form starts empty, so it is
+  // refilled from the sign-in's own settings, which the server sent while
+  // the sign-in waited. A refilled form leaves the confirmations unticked:
+  // as for `from=`, they are the person's to give for each run, and this
+  // route no longer holds the ticks they gave.
+  const onSignInEnded = (reason: SignInEnd, signInSettings: NewScanPayload | null, minutes: number) => {
+    if (signInSettings && !settings.url.trim()) {
+      setSettings(applyPolicy({ ...policyFor("login").defaults, ...signInSettings }, policyFor("login")));
+    }
+    setEndNotice({ reason, minutes });
+    setSearchParams(
+      (previous) => {
+        const params = new URLSearchParams(previous);
+        params.set("mode", "login");
+        params.delete("sign_in");
+        params.delete("scan");
+        return params;
+      },
+      { replace: true },
+    );
+  };
+  // The notice takes focus when it appears: the card, and the button the
+  // reader pressed, are gone, and focus would otherwise fall to the page top
+  // (SC 2.4.3 Focus Order, Level A). It is also a polite live region, so an
+  // expiry that happens while the reader is elsewhere is announced without
+  // interrupting them (SC 4.1.3 Status Messages, Level AA).
+  const endNoticeRef = useRef<HTMLParagraphElement>(null);
+  // After the card has gone: the address changes a render after the
+  // notice is set. Runs after the form's own autofocus on its address field,
+  // so the reader hears what happened first; the next Tab reaches that field.
+  useEffect(() => {
+    if (endNotice && !inCard) endNoticeRef.current?.focus();
+  }, [endNotice, inCard]);
+
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (pending) return;
     const found = validateScan(settings, policy, { authorized, imageAck });
     setErrors(found);
+    setEndNotice(null);
     if (found.length) return;
     if (mode === "login") createLogin.mutate(settings);
-    else createPublic.mutate(settings);
+    // The public payload sends the address as typed, so complete it here; the
+    // sign-in payload completes it in toLocalLoginPayload (parseUrl).
+    else createPublic.mutate({ ...settings, url: withScheme(settings.url) });
   };
 
   const loginDisabledReason =
@@ -218,6 +354,7 @@ export default function NewScanRoute() {
   const loginModeHref = (() => {
     const params = new URLSearchParams(searchParams);
     params.delete("scan");
+    params.delete("sign_in");
     params.set("mode", "login");
     return `/scans/new?${params.toString()}`;
   })();
@@ -227,7 +364,7 @@ export default function NewScanRoute() {
       {/* No `crumbs` here: the trail lives in the topbar, same as every report
           view. Passing it again would print the breadcrumb twice on this one
           route and in a different place from the rest of the app. */}
-      {/* No actions here: Start and Cancel are at the foot of the summary
+      {/* No actions here: Start is at the foot of the summary
           rail, after the form (see SubmitBar for why). */}
       <PageHeader title="New scan" />
 
@@ -243,7 +380,7 @@ export default function NewScanRoute() {
         )}
       </div>
 
-      {fromScanId !== null && !inHandoff && (
+      {fromScanId !== null && !inCard && (
         // Mounted before the fetch settles, so the result is announced.
         <p
           role="status"
@@ -262,9 +399,40 @@ export default function NewScanRoute() {
         </p>
       )}
 
-      {inHandoff ? (
-        <LocalLoginScan showSteps={false} />
-      ) : (
+      {endNotice && !inCard && (
+        <p
+          ref={endNoticeRef}
+          tabIndex={-1}
+          role="status"
+          className="mb-5 rounded-xs border border-umich-blue/30 bg-umich-blue/[0.04] px-4 py-3 text-sm text-fg focus:outline-none focus-visible:ring-2 focus-visible:ring-umich-blue"
+        >
+          {endNotice.reason === "expired"
+            ? SIGN_IN.ended.expired(endNotice.minutes)
+            : SIGN_IN.ended[endNotice.reason]}
+        </p>
+      )}
+
+      {inCard ? (
+        // The card is what the "Site with a sign-in" tab shows while a
+        // sign-in or a sign-in scan is under way, so it is that tab's panel,
+        // the element the tab's aria-controls names (WAI-ARIA Authoring
+        // Practices, Tabs pattern: https://www.w3.org/WAI/ARIA/apg/patterns/tabs/).
+        // Without the wrapper the tab pointed at a panel that was not there,
+        // an invalid aria-controls (axe: aria-valid-attr-value).
+        <div id={SCAN_PANEL_ID} role="tabpanel" aria-labelledby={scanTabId("login")}>
+          {inHandoff ? (
+            <LocalLoginHandoff scanId={handoffScanId} />
+          ) : (
+            <LocalSignInCard
+              key={signInId}
+              signInId={signInId ?? ""}
+              alreadyWaiting={alreadyWaiting}
+              onEnded={onSignInEnded}
+              onStarted={onScanStarted}
+            />
+          )}
+        </div>
+      ) : checkSignIn ? null : (
         <ScanForm
           key={mode}
           policy={policy}
@@ -284,7 +452,6 @@ export default function NewScanRoute() {
               pendingLabel={policy.submitPendingLabel}
               pending={pending}
               hasNote={Boolean(policy.submitNote)}
-              onCancel={() => navigate("/scans")}
             />
           }
           beforeGroups={

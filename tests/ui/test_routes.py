@@ -27,6 +27,16 @@ from audit.db import repo
 from audit.db.schema import connect
 from audit.web import issues
 
+from ._fake_sign_in import (
+    LOCAL_ORIGIN,
+    SIGN_IN_BODY,
+    FakeSignInSession,
+    local_client,
+    open_sign_in,
+    start_sign_in_scan,
+    wait_for_sign_in,
+)
+
 pytestmark = pytest.mark.ui
 
 
@@ -375,12 +385,8 @@ def test_local_login_scan_starts_from_same_loopback_origin(
     ) -> None:
         captured["config"] = config
 
-    class _NoNetworkSession:
-        def __init__(self, **_kwargs: object) -> None:
-            pass
-
     monkeypatch.setattr(server, "_run_local_login_background", _no_browser_run)
-    monkeypatch.setattr(server, "ManualAuthenticationSession", _NoNetworkSession)
+    monkeypatch.setattr(server, "ManualAuthenticationSession", FakeSignInSession)
     monkeypatch.setattr(
         server,
         "alfa_availability",
@@ -416,13 +422,21 @@ def test_local_login_scan_starts_from_same_loopback_origin(
                 "skip_vlm": True,
             },
         )
+        # Opening the window is a sign-in, not a scan: the scan, and its
+        # config, come with "I'm signed in, start scan".
+        assert "config" not in captured
+        sign_in_id = response.json()["sign_in_id"]
+        assert wait_for_sign_in(local_client, sign_in_id)["status"] == "awaiting_authentication"
+        started = start_sign_in_scan(local_client, sign_in_id)
 
     assert capability.status_code == 200
     assert capability.json()["local_available"] is True
     assert response.status_code == 201
     assert response.json()["status"] == "opening_browser"
-    assert isinstance(response.json()["scan_id"], int)
-    assert response.json()["scan_id"] != interrupted_scan_id
+    assert "scan_id" not in response.json()
+    assert started.status_code == 201, started.text
+    assert isinstance(started.json()["scan_id"], int)
+    assert started.json()["scan_id"] != interrupted_scan_id
     config = captured["config"]
     assert isinstance(config, server.CrawlConfig)
     assert config.browser_headless is (not show_browser)
@@ -467,12 +481,8 @@ def test_local_login_screenshots_follow_the_rendered_storage_opt_out(
     ) -> None:
         captured["config"] = config
 
-    class _NoNetworkSession:
-        def __init__(self, **_kwargs: object) -> None:
-            pass
-
     monkeypatch.setattr(server, "_run_local_login_background", _no_browser_run)
-    monkeypatch.setattr(server, "ManualAuthenticationSession", _NoNetworkSession)
+    monkeypatch.setattr(server, "ManualAuthenticationSession", FakeSignInSession)
     app = server.create_app(db_path=db_path, blob_dir=blob_dir)
     with TestClient(
         app,
@@ -488,8 +498,11 @@ def test_local_login_screenshots_follow_the_rendered_storage_opt_out(
                 "skip_rendered_storage": True,
             },
         )
+        wait_for_sign_in(local_client, response.json()["sign_in_id"])
+        started = start_sign_in_scan(local_client, response.json()["sign_in_id"])
 
     assert response.status_code == 201
+    assert started.status_code == 201, started.text
     config = captured["config"]
     assert isinstance(config, server.CrawlConfig)
     assert config.store_rendered_html is False
@@ -556,12 +569,8 @@ def test_local_login_scan_enables_acknowledged_local_image_analysis(
     ) -> None:
         captured["config"] = config
 
-    class _NoNetworkSession:
-        def __init__(self, **_kwargs: object) -> None:
-            pass
-
     monkeypatch.setattr(server, "_run_local_login_background", _no_browser_run)
-    monkeypatch.setattr(server, "ManualAuthenticationSession", _NoNetworkSession)
+    monkeypatch.setattr(server, "ManualAuthenticationSession", FakeSignInSession)
     app = server.create_app(db_path=db_path, blob_dir=blob_dir)
     with TestClient(
         app,
@@ -580,8 +589,11 @@ def test_local_login_scan_enables_acknowledged_local_image_analysis(
                 "image_analysis_acknowledged": True,
             },
         )
+        wait_for_sign_in(local_client, response.json()["sign_in_id"])
+        started = start_sign_in_scan(local_client, response.json()["sign_in_id"])
 
     assert response.status_code == 201
+    assert started.status_code == 201, started.text
     config = captured["config"]
     assert isinstance(config, server.CrawlConfig)
     assert config.browser_only is True
@@ -1724,6 +1736,9 @@ async def test_login_handoff_starts_the_crawl_where_sign_in_landed(
         return CrawlSummary(scan_id=1, seed_url=config.seed_url)
 
     class _FakeSession:
+        # The sign-in window is still open at the start.
+        window_open = True
+
         async def start(self):  # type: ignore[no-untyped-def]
             return None
 
@@ -1758,8 +1773,7 @@ async def test_login_handoff_starts_the_crawl_where_sign_in_landed(
         semantic_enabled=False,
         workers=1,
     )
-    run = srv._LocalLoginRun(scan_id=1, session=_FakeSession(), confirmation=asyncio.Event())
-    run.confirmation.set()
+    run = srv._LocalLoginRun(scan_id=1, session=_FakeSession())
 
     await srv._run_local_login_background(db_path, tmp_path, config, run)
 
@@ -1854,6 +1868,9 @@ async def test_login_handoff_gives_its_fetcher_an_interaction_probe(
         return CrawlSummary(scan_id=1, seed_url=config.seed_url)
 
     class _FakeSession:
+        # The sign-in window is still open at the start.
+        window_open = True
+
         async def start(self):  # type: ignore[no-untyped-def]
             return None
 
@@ -1882,8 +1899,7 @@ async def test_login_handoff_gives_its_fetcher_an_interaction_probe(
         semantic_enabled=False,
         workers=1,
     )
-    run = srv._LocalLoginRun(scan_id=1, session=_FakeSession(), confirmation=asyncio.Event())
-    run.confirmation.set()
+    run = srv._LocalLoginRun(scan_id=1, session=_FakeSession())
 
     await srv._run_local_login_background(db_path, tmp_path, config, run)
 
@@ -1919,6 +1935,9 @@ async def test_login_handoff_says_so_when_interaction_cannot_run(
         return CrawlSummary(scan_id=1, seed_url=config.seed_url)
 
     class _FakeSession:
+        # The sign-in window is still open at the start.
+        window_open = True
+
         async def start(self):  # type: ignore[no-untyped-def]
             return None
 
@@ -1947,8 +1966,7 @@ async def test_login_handoff_says_so_when_interaction_cannot_run(
         semantic_enabled=False,
         workers=1,
     )
-    run = srv._LocalLoginRun(scan_id=1, session=_FakeSession(), confirmation=asyncio.Event())
-    run.confirmation.set()
+    run = srv._LocalLoginRun(scan_id=1, session=_FakeSession())
 
     await srv._run_local_login_background(db_path, tmp_path, config, run)
 
@@ -1975,6 +1993,18 @@ def test_stopping_a_scan_clears_its_queue_so_a_retry_starts_fresh(
             "VALUES ('https://stop.example.test/', 'running', 5, 0, '{}')"
         )
         scan_id = int(cur.lastrowid or 0)
+        # The five pages the row counts. Stopping now counts the saved pages
+        # into the row in the same write, so the pages have to exist.
+        for number in range(5):
+            repo.upsert_page(
+                conn,
+                scan_id=scan_id,
+                url_normalized=f"https://stop.example.test/{number}",
+                status_code=200,
+                title=f"Page {number}",
+                render_mode="static",
+                html_hash=f"{number}" * 64,
+            )
         for state in ("pending", "leased"):
             conn.execute(
                 "INSERT INTO jobs (kind, payload_json, state, dedupe_key) VALUES "
@@ -2007,8 +2037,89 @@ def test_stopping_a_scan_clears_its_queue_so_a_retry_starts_fresh(
         assert (
             conn.execute("SELECT page_count FROM scans WHERE id = ?", (scan_id,)).fetchone()[0] == 5
         )
+        assert (
+            conn.execute("SELECT COUNT(*) FROM pages WHERE scan_id = ?", (scan_id,)).fetchone()[0]
+            == 5
+        )
     finally:
         conn.close()
+
+
+def _running_scan_with_pages(db_path: Path, pages: int) -> int:
+    """A running public scan whose row still says 0 pages, with ``pages`` saved."""
+    conn = connect(db_path)
+    try:
+        cur = conn.execute(
+            "INSERT INTO scans (seed_url, status, page_count, finding_count, config_json) "
+            "VALUES ('https://live.example.test/', 'running', 0, 0, '{}')"
+        )
+        scan_id = int(cur.lastrowid or 0)
+        for number in range(pages):
+            repo.upsert_page(
+                conn,
+                scan_id=scan_id,
+                url_normalized=f"https://live.example.test/{number}",
+                status_code=200,
+                title=f"Page {number}",
+                render_mode="static",
+                html_hash=f"{number}" * 64,
+            )
+        conn.commit()
+        return scan_id
+    finally:
+        conn.close()
+
+
+def test_stopping_a_scan_counts_its_saved_pages_at_once(
+    client: TestClient, seeded_db: tuple[Path, Path, int]
+) -> None:
+    """Stop writes the page count with the status, not 15 seconds later.
+
+    The crawl wrote ``page_count`` only when its task wound down. Until then
+    the row said "interrupted, 0 pages", and the stopped-scan page said "No
+    report was produced" over three saved pages.
+    """
+    db_path, _, _ = seeded_db
+    scan_id = _running_scan_with_pages(db_path, 3)
+
+    assert client.post(f"/api/scans/{scan_id}/cancel").status_code == 200
+
+    conn = connect(db_path)
+    try:
+        row = conn.execute(
+            "SELECT status, page_count FROM scans WHERE id = ?", (scan_id,)
+        ).fetchone()
+    finally:
+        conn.close()
+    assert (row["status"], row["page_count"]) == ("interrupted", 3)
+    body = client.get(f"/api/scans/{scan_id}").json()
+    assert (body["status"], body["page_count"]) == ("interrupted", 3)
+
+
+@pytest.mark.parametrize("status", ["running", "interrupted", "failed"])
+def test_scan_detail_counts_saved_pages_live_until_the_scan_completes(
+    client: TestClient, seeded_db: tuple[Path, Path, int], status: str
+) -> None:
+    db_path, _, _ = seeded_db
+    scan_id = _running_scan_with_pages(db_path, 4)
+    with connect(db_path) as conn:
+        conn.execute("UPDATE scans SET status = ? WHERE id = ?", (status, scan_id))
+
+    assert client.get(f"/api/scans/{scan_id}").json()["page_count"] == 4
+
+
+def test_scan_detail_keeps_a_completed_scans_stored_page_count(
+    client: TestClient, seeded_db: tuple[Path, Path, int]
+) -> None:
+    """A completed report is not recounted: its row is the record."""
+    db_path, _, _ = seeded_db
+    scan_id = _running_scan_with_pages(db_path, 4)
+    with connect(db_path) as conn:
+        conn.execute(
+            "UPDATE scans SET status = 'completed', page_count = 2 WHERE id = ?", (scan_id,)
+        )
+
+    assert client.get(f"/api/scans/{scan_id}").json()["page_count"] == 2
 
 
 # ---------------------------------------------------------------------------
@@ -2074,12 +2185,8 @@ def _local_login_post(
     ) -> None:
         captured["config"] = config
 
-    class _NoNetworkSession:
-        def __init__(self, **_kwargs: object) -> None:
-            pass
-
     monkeypatch.setattr(server, "_run_local_login_background", _no_browser_run)
-    monkeypatch.setattr(server, "ManualAuthenticationSession", _NoNetworkSession)
+    monkeypatch.setattr(server, "ManualAuthenticationSession", FakeSignInSession)
     app = server.create_app(db_path=db_path, blob_dir=blob_dir)
     with TestClient(
         app, base_url="http://127.0.0.1:8765", client=("127.0.0.1", 45678)
@@ -2094,6 +2201,11 @@ def _local_login_post(
                 **fields,
             },
         )
+        if response.status_code == 201:
+            # The config reaches the crawl when the sign-in scan starts.
+            sign_in_id = response.json()["sign_in_id"]
+            wait_for_sign_in(local_client, sign_in_id)
+            assert start_sign_in_scan(local_client, sign_in_id).status_code == 201
     return response.status_code, captured
 
 
@@ -2138,3 +2250,351 @@ def test_scan_detail_reports_the_chosen_wcag_version(
     assert body["wcag_version"] == "2.1"
     axe = next(method for method in body["methods_used"] if method["key"] == "axe")
     assert axe["label"] == "Rule check (axe), WCAG 2.1 Level AA"
+
+
+# ---------------------------------------------------------------------------
+# Sign-in before the scan: no scan row until "I'm signed in, start scan".
+
+
+def _scan_count(db_path: Path) -> int:
+    with connect(db_path) as conn:
+        return int(conn.execute("SELECT COUNT(*) FROM scans").fetchone()[0])
+
+
+def _sign_in_app(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch
+) -> tuple[object, list[tuple[object, object]]]:
+    """An app with the fake sign-in browser and a crawl that only records itself."""
+    from audit.web import server
+
+    db_path, blob_dir, _ = seeded_db
+    runs: list[tuple[object, object]] = []
+
+    async def _recorded_run(_db: object, _blobs: object, config: object, run: object) -> None:
+        runs.append((config, run))
+
+    monkeypatch.setattr(server, "_run_local_login_background", _recorded_run)
+    return server.create_app(db_path=db_path, blob_dir=blob_dir), runs
+
+
+def test_a_sign_in_makes_no_scan_row_and_no_report(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch, fake_sign_in: type
+) -> None:
+    db_path, _, _ = seeded_db
+    before = _scan_count(db_path)
+    app, runs = _sign_in_app(seeded_db, monkeypatch)
+    with local_client(app) as client:
+        state = open_sign_in(client)
+        scans = client.get("/api/scans").json()
+        current = client.get("/api/local-sign-ins/current").json()
+
+    assert _scan_count(db_path) == before
+    assert len(scans) == before, "Reports listed a sign-in that is not a scan"
+    assert runs == []
+    assert state["site"] == "app.example.test"
+    assert state["window_open"] is True
+    assert state["forget_in_seconds"] is None
+    assert state["keep_minutes"] == 30
+    assert state["settings"]["url"] == "https://app.example.test/secure/"
+    assert current["sign_in"]["sign_in_id"] == state["sign_in_id"]
+    # Nothing the browser holds reaches the page.
+    assert set(state) == {
+        "sign_in_id",
+        "status",
+        "site",
+        "window_open",
+        "error",
+        "keep_minutes",
+        "forget_in_seconds",
+        "already_waiting",
+        "settings",
+    }
+
+
+def test_starting_creates_the_scan_row_and_starts_the_crawl(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch, fake_sign_in: type
+) -> None:
+    db_path, _, _ = seeded_db
+    before = _scan_count(db_path)
+    app, runs = _sign_in_app(seeded_db, monkeypatch)
+    with local_client(app) as client:
+        state = open_sign_in(client)
+        started = start_sign_in_scan(client, state["sign_in_id"])
+        after_start = client.get("/api/local-sign-ins/current").json()
+        scan_status = client.get(f"/api/local-login-scans/{started.json()['scan_id']}")
+
+    assert started.status_code == 201, started.text
+    scan_id = started.json()["scan_id"]
+    assert started.json()["status"] == "verifying_authentication"
+    assert _scan_count(db_path) == before + 1
+    with connect(db_path) as conn:
+        row = conn.execute("SELECT status, seed_url FROM scans WHERE id = ?", (scan_id,)).fetchone()
+    assert row["status"] == "running"
+    assert row["seed_url"] == "https://app.example.test/secure/"
+    assert len(runs) == 1
+    config, run = runs[0]
+    assert getattr(config, "scan_id", None) == scan_id
+    # The scan uses the very session the person signed in with.
+    assert getattr(run, "session", None) is fake_sign_in.instances[0]
+    assert not fake_sign_in.instances[0].closed
+    # The sign-in has become the scan; none is waiting any more.
+    assert after_start == {"sign_in": None}
+    assert scan_status.json()["status"] == "verifying_authentication"
+
+
+def test_start_waits_for_the_sign_in_window(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch, fake_sign_in: type
+) -> None:
+    db_path, _, _ = seeded_db
+    before = _scan_count(db_path)
+    app, _runs = _sign_in_app(seeded_db, monkeypatch)
+    with local_client(app) as client:
+        state = open_sign_in(client)
+        registry = app.state.local_sign_ins  # type: ignore[attr-defined]
+        pending = registry.get(state["sign_in_id"])
+        pending.status = "opening_browser"
+        refused = start_sign_in_scan(client, state["sign_in_id"])
+
+    assert refused.status_code == 409
+    assert "Wait for the sign-in window" in refused.json()["detail"]
+    assert _scan_count(db_path) == before
+
+
+def test_cancel_closes_the_window_erases_the_sign_in_and_records_nothing(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch, fake_sign_in: type
+) -> None:
+    db_path, _, _ = seeded_db
+    before = _scan_count(db_path)
+    app, runs = _sign_in_app(seeded_db, monkeypatch)
+    with local_client(app) as client:
+        state = open_sign_in(client)
+        sign_in_id = state["sign_in_id"]
+        cancelled = client.post(f"/api/local-sign-ins/{sign_in_id}/cancel", headers=LOCAL_ORIGIN)
+        polled = client.get(f"/api/local-sign-ins/{sign_in_id}").json()
+        current = client.get("/api/local-sign-ins/current").json()
+        start = start_sign_in_scan(client, sign_in_id)
+
+    assert cancelled.status_code == 200
+    assert cancelled.json()["status"] == "cancelled"
+    session = fake_sign_in.instances[0]
+    assert session.closed and session.kept is None
+    # Only the reason is left, for the page that asks: no site, no settings.
+    assert polled["status"] == "cancelled"
+    assert polled["site"] is None and polled["settings"] is None
+    assert current == {"sign_in": None}
+    assert start.status_code == 404
+    assert _scan_count(db_path) == before
+    assert runs == []
+
+
+def test_closing_the_window_keeps_the_sign_in_and_reopen_restores_it(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch, fake_sign_in: type
+) -> None:
+    app, _runs = _sign_in_app(seeded_db, monkeypatch)
+    with local_client(app) as client:
+        state = open_sign_in(client)
+        sign_in_id = state["sign_in_id"]
+        session = fake_sign_in.instances[0]
+        session.close_window()
+        closed = client.get(f"/api/local-sign-ins/{sign_in_id}").json()
+        kept_while_closed = not session.closed and session.kept is not None
+        reopened = client.post(f"/api/local-sign-ins/{sign_in_id}/reopen", headers=LOCAL_ORIGIN)
+        again = client.post(f"/api/local-sign-ins/{sign_in_id}/reopen", headers=LOCAL_ORIGIN)
+
+    assert closed["status"] == "awaiting_authentication"
+    assert closed["window_open"] is False
+    assert closed["forget_in_seconds"] == 30 * 60
+    assert kept_while_closed
+    assert reopened.status_code == 200, reopened.text
+    assert reopened.json()["window_open"] is True
+    assert reopened.json()["forget_in_seconds"] is None
+    assert session.reopened == 1
+    # An open window is not opened twice.
+    assert again.status_code == 409
+    assert session.reopened == 1
+
+
+def test_start_still_works_after_the_window_closed(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch, fake_sign_in: type
+) -> None:
+    app, runs = _sign_in_app(seeded_db, monkeypatch)
+    with local_client(app) as client:
+        state = open_sign_in(client)
+        fake_sign_in.instances[0].close_window()
+        client.get(f"/api/local-sign-ins/{state['sign_in_id']}")
+        started = start_sign_in_scan(client, state["sign_in_id"])
+
+    assert started.status_code == 201, started.text
+    assert len(runs) == 1
+
+
+def test_a_sign_in_is_forgotten_thirty_minutes_after_its_window_closed(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch, fake_sign_in: type
+) -> None:
+    db_path, _, _ = seeded_db
+    before = _scan_count(db_path)
+    app, _runs = _sign_in_app(seeded_db, monkeypatch)
+    now = [5000.0]
+    app.state.local_sign_ins.clock = lambda: now[0]  # type: ignore[attr-defined]
+    with local_client(app) as client:
+        state = open_sign_in(client)
+        sign_in_id = state["sign_in_id"]
+        # The clock does not run while the window is open.
+        now[0] += 3 * 60 * 60
+        assert client.get(f"/api/local-sign-ins/{sign_in_id}").json()["window_open"] is True
+        fake_sign_in.instances[0].close_window()
+        assert client.get(f"/api/local-sign-ins/{sign_in_id}").json()["forget_in_seconds"] == 1800
+        now[0] += 30 * 60 - 1
+        still = client.get(f"/api/local-sign-ins/{sign_in_id}").json()
+        now[0] += 1
+        expired = client.get(f"/api/local-sign-ins/{sign_in_id}").json()
+        current = client.get("/api/local-sign-ins/current").json()
+        start = start_sign_in_scan(client, sign_in_id)
+
+    assert still["status"] == "awaiting_authentication"
+    assert still["forget_in_seconds"] == 1
+    assert expired["status"] == "expired"
+    assert expired["site"] is None and expired["settings"] is None
+    session = fake_sign_in.instances[0]
+    assert session.closed and session.kept is None
+    assert current == {"sign_in": None}
+    assert start.status_code == 404
+    assert "30 minutes" in start.json()["detail"]
+    assert _scan_count(db_path) == before
+
+
+def test_a_second_sign_in_returns_the_one_waiting(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch, fake_sign_in: type
+) -> None:
+    app, _runs = _sign_in_app(seeded_db, monkeypatch)
+    with local_client(app) as client:
+        first = open_sign_in(client)
+        second = client.post(
+            "/api/local-login-scans",
+            headers=LOCAL_ORIGIN,
+            json={**SIGN_IN_BODY, "seed_url": "https://other.example.test/"},
+        )
+
+    assert second.status_code == 200
+    assert second.json()["sign_in_id"] == first["sign_in_id"]
+    assert second.json()["already_waiting"] is True
+    assert second.json()["site"] == "app.example.test"
+    assert len(fake_sign_in.instances) == 1, "a second browser was opened"
+
+
+def test_start_is_refused_while_another_scan_runs_and_the_sign_in_is_kept(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch, fake_sign_in: type
+) -> None:
+    from audit.web import server
+
+    db_path, _, _ = seeded_db
+
+    async def _long_crawl(_db: object, _config: object) -> None:
+        await asyncio.sleep(3600)
+
+    monkeypatch.setattr(server, "_run_background_crawl", _long_crawl)
+    app, runs = _sign_in_app(seeded_db, monkeypatch)
+    with local_client(app) as client:
+        state = open_sign_in(client)
+        public = client.post("/api/scans", json={"url": "https://public.example.test/"})
+        before = _scan_count(db_path)
+        refused = start_sign_in_scan(client, state["sign_in_id"])
+        kept = client.get(f"/api/local-sign-ins/{state['sign_in_id']}").json()
+        session_open = not fake_sign_in.instances[0].closed
+
+    assert public.status_code == 201
+    assert refused.status_code == 409
+    assert refused.json()["error"] == (
+        "A scan is already running. Axcess has kept your sign-in, so you can start "
+        "this scan when that scan finishes."
+    )
+    assert refused.json()["running_scan_id"] == public.json()["scan_id"]
+    assert kept["status"] == "awaiting_authentication"
+    assert session_open
+    assert _scan_count(db_path) == before
+    assert runs == []
+
+
+def test_a_waiting_sign_in_does_not_block_a_public_scan(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch, fake_sign_in: type
+) -> None:
+    from audit.web import server
+
+    started: list[object] = []
+
+    async def _recorded_crawl(_db: object, config: object) -> None:
+        started.append(config)
+
+    monkeypatch.setattr(server, "_run_background_crawl", _recorded_crawl)
+    app, _runs = _sign_in_app(seeded_db, monkeypatch)
+    with local_client(app) as client:
+        state = open_sign_in(client)
+        public = client.post("/api/scans", json={"url": "https://public.example.test/"})
+        kept = client.get(f"/api/local-sign-ins/{state['sign_in_id']}").json()
+
+    assert public.status_code == 201, public.text
+    assert len(started) == 1
+    assert kept["status"] == "awaiting_authentication"
+
+
+def test_a_window_that_cannot_open_ends_the_sign_in_without_a_trace(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch, fake_sign_in: type
+) -> None:
+    db_path, _, _ = seeded_db
+    before = _scan_count(db_path)
+    fake_sign_in.fail_start = True
+    app, _runs = _sign_in_app(seeded_db, monkeypatch)
+    with local_client(app) as client:
+        created = client.post("/api/local-login-scans", headers=LOCAL_ORIGIN, json=SIGN_IN_BODY)
+        failed = wait_for_sign_in(client, created.json()["sign_in_id"], status="failed")
+
+    assert failed["status"] == "failed"
+    assert "could not open the sign-in window" in failed["error"]
+    assert "private.example.test" not in failed["error"]
+    assert fake_sign_in.instances[0].closed
+    assert _scan_count(db_path) == before
+
+
+def test_sign_in_routes_are_only_for_this_computer(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch, fake_sign_in: type
+) -> None:
+    from audit.web import server
+
+    db_path, blob_dir, _ = seeded_db
+    app = server.create_app(db_path=db_path, blob_dir=blob_dir)
+    with local_client(app) as client:
+        sign_in_id = open_sign_in(client)["sign_in_id"]
+    with TestClient(app) as remote:
+        responses = [
+            remote.get("/api/local-sign-ins/current"),
+            remote.get(f"/api/local-sign-ins/{sign_in_id}"),
+            remote.post(f"/api/local-sign-ins/{sign_in_id}/start"),
+            remote.post(f"/api/local-sign-ins/{sign_in_id}/reopen"),
+            remote.post(f"/api/local-sign-ins/{sign_in_id}/cancel"),
+        ]
+    assert [response.status_code for response in responses] == [403] * 5
+
+
+def test_an_unknown_sign_in_is_not_found(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch, fake_sign_in: type
+) -> None:
+    app, _runs = _sign_in_app(seeded_db, monkeypatch)
+    with local_client(app) as client:
+        open_sign_in(client)
+        missing = client.get("/api/local-sign-ins/AAAAAAAAAAAAAAAAAAAAAA")
+        malformed = client.get("/api/local-sign-ins/not a real id")
+
+    assert missing.status_code == 404
+    assert malformed.status_code == 404
+
+
+def test_quitting_axcess_ends_a_waiting_sign_in(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch, fake_sign_in: type
+) -> None:
+    app, _runs = _sign_in_app(seeded_db, monkeypatch)
+    with local_client(app) as client:
+        open_sign_in(client)
+    # Leaving the client's context runs the app's shutdown.
+    session = fake_sign_in.instances[0]
+    assert session.closed and session.kept is None
+    assert app.state.local_sign_ins.current() is None  # type: ignore[attr-defined]

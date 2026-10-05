@@ -217,6 +217,7 @@ export default function ComparedIssuesTable({
       >
         <TableSearch label="Search issues" value={q} onChange={onQuery} />
         <FilterMenu
+          label="Filter issues"
           groups={groups}
           onChange={(key, value) => {
             if (key === "change") onChange(parseChanges(value));

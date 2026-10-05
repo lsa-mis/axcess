@@ -577,9 +577,14 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
               <Link
                 to={`/scans/${completed.id}/issues`}
                 className="report-link inline-flex min-h-target items-center px-1 font-semibold"
-                aria-label={`${(site.most_recent_completed_issue_count ?? 0).toLocaleString()} issues in Report #${completed.id}`}
               >
-                {(site.most_recent_completed_issue_count ?? 0).toLocaleString()}
+                {/* Real words instead of an aria-label: "2 issues" shows, and
+                    "in Report #12" is read out with it, so the link says what it
+                    opens (SC 2.4.4 Link Purpose (In Context), Level AA; W3C
+                    "Using ARIA", rule 1). */}
+                {(site.most_recent_completed_issue_count ?? 0).toLocaleString()}{" "}
+                {site.most_recent_completed_issue_count === 1 ? "issue" : "issues"}
+                <span className="sr-only"> in Report #{completed.id}</span>
               </Link>
             </Cell>
             <Cell numeric className="text-fg">

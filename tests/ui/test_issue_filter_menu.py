@@ -298,7 +298,7 @@ async def test_keyboard_only(enriched, live_server, new_page) -> None:
     await pw.expect(button).to_be_focused()
     # Done does the same.
     await page.keyboard.press("Enter")
-    await page.get_by_role("button", name="Done", exact=True).click()
+    await page.get_by_role("button", name="Close filters", exact=True).click()
     await pw.expect(button).to_be_focused()
 
 
@@ -309,7 +309,7 @@ async def test_clear_all_and_clear_filters_reset_every_group(
     page = await new_page(viewport={"width": 1280, "height": 900})
     await _open(page, base, scan_id, "?conformance=A,AA&type=likely_barrier&finding_type=wcag")
     await _open_menu(page)
-    await page.get_by_role("button", name="Clear all", exact=True).click()
+    await page.get_by_role("button", name="Clear all filters", exact=True).click()
     await page.wait_for_url(lambda url: not re.search(r"conformance|type=", url))
     assert len(await _assert_matches_api(page, base, scan_id)) == 5
     for group in ("Level", "Type", "Found by"):

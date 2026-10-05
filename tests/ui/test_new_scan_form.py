@@ -326,6 +326,44 @@ async def test_wcag_version_defaults_to_21_and_rides_in_the_payload(
     ).to_be_visible()
 
 
+@pytest.mark.parametrize(
+    ("typed", "completed"),
+    [
+        ("example.edu/section/", "https://example.edu/section/"),
+        ("localhost:8000", "http://localhost:8000"),
+        ("192.168.1.10/app", "http://192.168.1.10/app"),
+        ("http://example.edu/", "http://example.edu/"),
+    ],
+)
+async def test_an_address_without_a_scheme_is_completed(
+    live_server: tuple[str, int], new_page: Any, typed: str, completed: str
+) -> None:
+    """No "Add https://" error: New scan adds the scheme (lib/webAddress.ts),
+    shows it in the box on leaving it, and sends it, even on Enter."""
+    base, _ = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+
+    async def refuse(route: Any) -> None:
+        # Refuse politely so the form stays put and no crawl starts.
+        await route.fulfill(status=409, json={"error": "A crawl is already running."})
+
+    await page.route("**/api/scans", refuse)
+    await page.goto(f"{base}/app/scans/new", wait_until="networkidle")
+    field = page.get_by_role("textbox", name="Website address", exact=True)
+
+    # Leaving the box shows the address as it will be scanned.
+    await field.fill(typed)
+    await page.keyboard.press("Tab")
+    await playwright_async.expect(field).to_have_value(completed)
+    await playwright_async.expect(field).not_to_have_attribute("aria-invalid", "true")
+
+    # Enter submits without leaving the box; what is sent is still complete.
+    await field.fill(typed)
+    async with page.expect_request("**/api/scans") as sent:
+        await field.press("Enter")
+    assert (await sent.value).post_data_json["url"] == completed
+
+
 @pytest.mark.parametrize("mode", ["public", "login"])
 async def test_settings_are_closed_accordions_and_start_is_top_right(
     live_server: tuple[str, int], new_page: Any, mode: str
@@ -362,9 +400,9 @@ async def test_settings_are_closed_accordions_and_start_is_top_right(
         page.get_by_role("spinbutton", name="Maximum pages")
     ).to_be_visible()
 
-    # Start and Cancel are at the foot of the summary rail, beside the form,
-    # not in the page header; they come after the fields in keyboard order,
-    # and they stay in view as the page scrolls. Start still names the form.
+    # Start is at the foot of the summary rail, beside the form, not in the
+    # page header; it comes after the fields in keyboard order, and it stays
+    # in view as the page scrolls. Start still names the form.
     heading = await page.get_by_role("heading", name="New scan", level=1).bounding_box()
     start_button = page.get_by_role("button", name=re.compile(r"^(Start scan|Open browser)"))
     start = await start_button.bounding_box()
@@ -386,9 +424,11 @@ async def test_settings_are_closed_accordions_and_start_is_top_right(
     await page.evaluate("window.scrollTo(0, 0)")
     await playwright_async.expect(start_button).to_be_in_viewport()
     await playwright_async.expect(start_button).to_have_attribute("form", "scan-form")
+    # Start is the only button there: leaving is the sidebar's Reports link
+    # or Back, not a Cancel beside Start (SubmitBar.tsx).
     await playwright_async.expect(
-        page.get_by_role("button", name="Cancel", exact=True)
-    ).to_be_visible()
+        page.get_by_role("button", name=re.compile(r"^Cancel"))
+    ).to_have_count(0)
 
 
 @pytest.mark.parametrize(

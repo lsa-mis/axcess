@@ -424,7 +424,8 @@ function IssueToolbar({
         value={q}
         onChange={(value) => onParam("q", value)}
       />
-      <FilterMenu groups={groups} onChange={onParam} onReset={onResetFilters} />
+      <FilterMenu
+          label="Filter issues" groups={groups} onChange={onParam} onReset={onResetFilters} />
     </TableBar>
   );
 }

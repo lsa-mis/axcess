@@ -6,6 +6,14 @@ window. No method exports Playwright storage state, cookies, credentials, or
 MFA material to callers. Local login scans transfer supported state in memory
 to a new headless browser; closing the session destroys both browsers.
 
+Before the auditor confirms, the session also keeps a copy of the signed-in
+state in memory (cookies, local storage, IndexedDB and the tab's
+sessionStorage, the same capture the headless handoff uses), refreshed as the
+auditor moves between pages. If the sign-in window closes, that copy lets the
+scan start anyway, or a new sign-in window reopen where the auditor was. It
+is never written to disk, never returned to a caller, and erased when the
+session closes.
+
 It is intentionally independent of FastAPI, the public crawler, the CLI, and
 database persistence. A future paired companion can use it as the narrow
 boundary between manual sign-in and a shared-context accessibility fetcher.
@@ -47,7 +55,11 @@ from audit.protected.egress import (
     PublicHttpsManualAuthPolicy,
     ValidatedUrl,
 )
-from audit.protected.handoff import capture_session_storage, restore_session_storage
+from audit.protected.handoff import (
+    SessionStorage,
+    capture_session_storage,
+    restore_session_storage,
+)
 from audit.wcag_version import LEGACY_WCAG_VERSION, WcagVersion
 
 if TYPE_CHECKING:
@@ -70,6 +82,14 @@ _BROWSER_ARGS = [
 log = get_logger(__name__)
 
 _SETUP_METHODS = frozenset({"GET", "HEAD", "OPTIONS", "POST"})
+# How often the kept sign-in is refreshed while the window is open, besides
+# on every page change. A sign-in can update its tokens without navigating
+# (a background token refresh), and the copy is only as good as its last
+# refresh when the window closes.
+_KEEP_REFRESH_S = 5.0
+# A capture that takes longer than this is abandoned and the previous copy
+# kept; the window may be closing underneath it.
+_KEEP_CAPTURE_TIMEOUT_S = 15.0
 _EPHEMERAL_PROFILE_PREFIX = "axcess-protected-browser-"
 _WEBRTC_BLOCK_INIT_SCRIPT = """
 // Protected scans must not establish a direct UDP/STUN path around the
@@ -99,6 +119,73 @@ class ManualAuthState(StrEnum):
 
 class ManualAuthenticationError(RuntimeError):
     """Manual authentication did not reach a safe, approved target page."""
+
+
+@dataclass(frozen=True, slots=True)
+class _KeptSignIn:
+    """The newest in-memory copy of the signed-in state. Never on disk.
+
+    ``storage`` is in Playwright's storage-state shape: every cookie, and the
+    local storage of each site seen in an open tab. ``tab_storage`` is the
+    current tab's sessionStorage by origin, and ``url`` the page the auditor
+    was last on. IndexedDB is not kept here (see :func:`_quiet_storage`); the
+    full capture at confirmation, with the window open, still includes it.
+    """
+
+    storage: dict[str, Any]
+    tab_storage: SessionStorage
+    url: str
+
+
+# Local storage of the site in one frame, read in place. Same limits as the
+# sessionStorage capture (handoff.py).
+_LOCAL_STORAGE_JS = """() => {
+    if (!/^https?:$/.test(location.protocol) || self.origin === 'null') return null;
+    const localStorage = Object.entries(window.localStorage)
+        .map(([name, value]) => ({name, value}));
+    if (JSON.stringify(localStorage).length > 8 * 1024 * 1024)
+        throw new Error('Local storage exceeds the handoff limit');
+    return {origin: location.origin, localStorage};
+}"""
+
+
+async def _quiet_storage(context: BrowserContext, previous: _KeptSignIn | None) -> dict[str, Any]:
+    """The signed-in state, read without opening a tab.
+
+    Playwright's ``storage_state()`` reads each site the browser has visited;
+    for one that is not open in a tab (the U-M or Duo sign-in page the person
+    was sent through), it opens a tab, loads that site, reads it and closes
+    the tab. In the visible sign-in window that showed as a tab flashing open
+    and shut every few seconds while the kept copy refreshed. So the refresh
+    reads only what needs no tab: every cookie (``context.cookies()``), where
+    most sign-ins live, and the local storage of each site in an open tab,
+    read inside that tab. A site's local storage read earlier is kept when
+    its tab is gone. IndexedDB, which only ``storage_state()`` can read, is
+    left to the full capture at confirmation, made while the window is open.
+    """
+    origins: dict[str, list[dict[str, str]]] = {}
+    if previous is not None:
+        for entry in previous.storage.get("origins", []):
+            if entry.get("localStorage"):
+                origins[entry["origin"]] = entry["localStorage"]
+    for page in context.pages:
+        for frame in page.frames:
+            try:
+                snapshot = await frame.evaluate(_LOCAL_STORAGE_JS)
+            except Exception:  # noqa: S112 - a frame mid-navigation keeps its last copy
+                continue
+            if snapshot:
+                origins[snapshot["origin"]] = snapshot["localStorage"]
+    return {
+        "cookies": await context.cookies(),
+        "origins": [
+            {"origin": origin, "localStorage": items} for origin, items in origins.items() if items
+        ],
+    }
+
+
+def _is_web_url(url: str) -> bool:
+    return url.startswith(("https://", "http://"))
 
 
 @dataclass(frozen=True, slots=True)
@@ -378,6 +465,7 @@ class ManualAuthenticationSession:
         nav_timeout_ms: int = _DEFAULT_NAV_TIMEOUT_MS,
         playwright_start: Callable[[], Awaitable[Playwright]] | None = None,
         allow_any_public_auth_origin: bool = False,
+        keep_refresh_s: float | None = _KEEP_REFRESH_S,
     ) -> None:
         self._policies = build_manual_auth_policies(
             approved_target_origins=approved_target_origins,
@@ -403,10 +491,39 @@ class ManualAuthenticationSession:
         self._auth_pages: list[Page] = []
         self._egress_proxy = LoopbackEgressProxy(self._policies.setup)
         self._profile_dir: str | None = None
+        # The kept sign-in and what keeps it fresh. See the module docstring.
+        self._kept: _KeptSignIn | None = None
+        self._keep_refresh_s = keep_refresh_s
+        self._keep_lock = asyncio.Lock()
+        self._keep_tasks: set[asyncio.Task[Any]] = set()
+        self._keep_loop: asyncio.Task[None] | None = None
+        # Set while a reopened tab is seeded with sessionStorage: its page
+        # changes are placeholders and must not replace the kept copy.
+        self._restoring = False
+        self._window_open = False
+        self._window_listeners: list[Callable[[bool], None]] = []
+        self._retiring: asyncio.Task[None] | None = None
+        # A headed browser launched to reopen the sign-in window. The first
+        # window is a persistent context and has no separate browser object.
+        self._login_browser: Browser | None = None
 
     @property
     def state(self) -> ManualAuthState:
         return self._state
+
+    @property
+    def window_open(self) -> bool:
+        """Whether a sign-in window is open on this computer."""
+        return self._window_open
+
+    @property
+    def has_kept_sign_in(self) -> bool:
+        """Whether a copy of the signed-in state is kept in memory."""
+        return self._kept is not None
+
+    def on_window_change(self, callback: Callable[[bool], None]) -> None:
+        """Call ``callback(open)`` when the sign-in window opens or closes."""
+        self._window_listeners.append(callback)
 
     @property
     def page(self) -> Page:
@@ -460,6 +577,10 @@ class ManualAuthenticationSession:
             await self._context.add_init_script(_WEBRTC_BLOCK_INIT_SCRIPT)
             self._route_guard.observe_auth_pages(self._adopt_auth_page)
             await self._route_guard.install_on_context(self._context)
+            # Closing the window of a persistent context ends the browser, and
+            # with it the context; that is the window closing.
+            first_context = self._context
+            first_context.on("close", lambda _ctx: self._login_context_closed(first_context))
             self._page = await self._context.new_page()
             # The context's page event can already have adopted this tab
             # before new_page returns. Register it idempotently: a duplicate
@@ -477,12 +598,16 @@ class ManualAuthenticationSession:
                     with contextlib.suppress(Exception):
                         await startup_page.close(run_before_unload=False)
             self._state = ManualAuthState.AWAITING_MANUAL_AUTHENTICATION
-            await self._page.goto(
+            page = self._page
+            await page.goto(
                 self._seed_url,
                 timeout=self._nav_timeout_ms,
                 wait_until="domcontentloaded",
             )
-            return self._page
+            self._set_window_open(True)
+            await self.refresh_kept_state()
+            self._start_keep_loop()
+            return page
         except Exception as exc:
             await self.close()
             raise ManualAuthenticationError(
@@ -503,6 +628,14 @@ class ManualAuthenticationSession:
         self._auth_pages.append(page)
         self._page = page
         page.on("close", self._forget_auth_page)
+        # Keep the copy of the sign-in fresh as the auditor moves between
+        # pages, including same-document moves (history.pushState), which
+        # single-page sign-ins use after storing their tokens.
+        page.on("load", lambda _page: self._schedule_keep(page))
+        page.on(
+            "framenavigated",
+            lambda frame: self._schedule_keep(page) if frame.parent_frame is None else None,
+        )
 
     def _forget_auth_page(self, page: Page) -> None:
         """Fall back to the newest surviving tab when one closes.
@@ -516,6 +649,8 @@ class ManualAuthenticationSession:
             self._auth_pages.remove(page)
         if self._page is page:
             self._page = self._auth_pages[-1] if self._auth_pages else None
+        if not self._auth_pages:
+            self._sign_in_window_closed()
 
     def enter_scan_mode(self) -> str:
         """Switch the session from sign-in to scanning. Returns where it landed.
@@ -528,10 +663,19 @@ class ManualAuthenticationSession:
         were signed in perfectly well and there was no way past it.
         """
         self._require_started()
+        # With the window closed, the scan starts where the kept copy says
+        # the auditor last was.
+        if self._page is not None:
+            landed = self._page.url
+        elif self._kept is not None:
+            landed = self._kept.url
+        else:
+            raise ManualAuthenticationError("The manual authentication browser is not running.")
+        self._stop_keeping()
         self._route_guard.activate_scan_mode()
         self._egress_proxy.set_policy(self._policies.scan)
         self._state = ManualAuthState.AUTHENTICATED
-        return self.page.url
+        return landed
 
     async def switch_to_headless(self, count: int) -> tuple[Page, ...]:
         """Restore transferable login state in a new, normal headless Chromium.
@@ -547,15 +691,25 @@ class ManualAuthenticationSession:
             raise ManualAuthenticationError("The headless scan browser is already running.")
         if not 1 <= count <= 16:
             raise ValueError("Headless scan page count must be between 1 and 16.")
-        login_context = self.context
+        await self._await_retired_window()
+        # The sign-in window may have closed before confirmation. Then the
+        # scan starts from the copy kept while it was open.
+        login_context = self._context if self._page is not None else None
+        kept = self._kept
+        if login_context is None and kept is None:
+            raise ManualAuthenticationError("The manual authentication browser is not running.")
         browser: Browser | None = None
         try:
             async with asyncio.timeout(60):
-                # IndexedDB is opt-in in Playwright; some authentication SDKs
-                # keep their tokens there rather than in cookies/localStorage.
-                login_page = self.page
-                tab_storage = await capture_session_storage(login_page)
-                storage = await login_context.storage_state(indexed_db=True)
+                if login_context is not None:
+                    # IndexedDB is opt-in in Playwright; some authentication SDKs
+                    # keep their tokens there rather than in cookies/localStorage.
+                    login_page = self.page
+                    tab_storage = await capture_session_storage(login_page)
+                    storage: Any = await login_context.storage_state(indexed_db=True)
+                elif kept is not None:
+                    tab_storage = kept.tab_storage
+                    storage = kept.storage
                 browser = await self._playwright.chromium.launch(
                     headless=True,
                     args=_BROWSER_ARGS,
@@ -576,11 +730,15 @@ class ManualAuthenticationSession:
                     await restore_session_storage(page, tab_storage)
                     pages.append(page)
                 # Only retire the login browser after the new context is ready.
-                await login_context.close()
+                if login_context is not None:
+                    await login_context.close()
+                await self._close_login_browser()
                 self._context = context
                 self._browser = browser
                 self._auth_pages.clear()
                 self._page = None
+                # The scan has its own signed-in context now.
+                self._kept = None
                 return tuple(pages)
         except BaseException:
             if browser is not None:
@@ -611,6 +769,8 @@ class ManualAuthenticationSession:
         # keep their session there. Retain that tab and serialize the pool
         # instead of exporting or copying any authentication material.
         auth_page = self.page
+        # The scan uses this live window; the kept copy has no further use.
+        self._kept = None
         if await auth_page.evaluate("() => sessionStorage.length > 0"):
             self._auth_pages.remove(auth_page)
             self._page = None
@@ -837,20 +997,28 @@ class ManualAuthenticationSession:
         if self._state is ManualAuthState.CLOSED:
             return
         self._state = ManualAuthState.CLOSED
+        # Erase the kept sign-in first: nothing may read it from here on.
+        self._kept = None
+        self._stop_keeping()
+        self._window_open = False
         context = self._context
         browser = self._browser
+        login_browser = self._login_browser
         playwright = self._playwright
         self._page = None
         self._auth_pages.clear()
         self._context = None
         self._browser = None
+        self._login_browser = None
         self._playwright = None
+        await self._await_retired_window()
         if context is not None:
             with contextlib.suppress(Exception):
                 await context.close()
-        if browser is not None:
-            with contextlib.suppress(Exception):
-                await browser.close()
+        for owned in (browser, login_browser):
+            if owned is not None:
+                with contextlib.suppress(Exception):
+                    await owned.close()
         if playwright is not None:
             with contextlib.suppress(Exception):
                 await playwright.stop()
@@ -860,6 +1028,221 @@ class ManualAuthenticationSession:
         if profile_dir is not None:
             with contextlib.suppress(Exception):
                 shutil.rmtree(profile_dir)
+
+    # ------------------------------------------------- the kept sign-in
+
+    async def refresh_kept_state(self) -> bool:
+        """Copy the signed-in state into memory now. False if it could not.
+
+        Uses the same capture as :meth:`switch_to_headless`: the context's
+        cookies, local storage and IndexedDB, and the current tab's
+        sessionStorage. A failed capture keeps the previous copy.
+        """
+        if not self._keeping():
+            return False
+        page = self._page
+        context = self._context
+        if page is None or context is None:
+            return False
+        async with self._keep_lock:
+            try:
+                async with asyncio.timeout(_KEEP_CAPTURE_TIMEOUT_S):
+                    tab_storage = await capture_session_storage(page)
+                    storage = await _quiet_storage(context, self._kept)
+                url = page.url
+            except Exception:
+                return False
+            # The window may have closed, or the scan started, meanwhile.
+            if not self._keeping() or self._context is not context:
+                return False
+            if not _is_web_url(url):
+                url = self._kept.url if self._kept is not None else self._seed_url
+            self._kept = _KeptSignIn(storage=dict(storage), tab_storage=tab_storage, url=url)
+            return True
+
+    def _keeping(self) -> bool:
+        """Whether page changes should refresh the kept sign-in right now."""
+        return self._state is ManualAuthState.AWAITING_MANUAL_AUTHENTICATION and not self._restoring
+
+    def forget_kept_state(self) -> None:
+        """Erase the kept sign-in from memory."""
+        self._kept = None
+
+    async def reopen_window(self) -> Page:
+        """Open a new sign-in window restored from the kept sign-in.
+
+        It lands on the last page the auditor was on. The window is a normal
+        headed Chromium with the same egress policy, init script and route
+        guard as the first one. Some sites tie a sign-in to the exact browser
+        window, so the site may ask the auditor to sign in again.
+        """
+        if self._state is not ManualAuthState.AWAITING_MANUAL_AUTHENTICATION:
+            raise ManualAuthenticationError("The sign-in has ended.")
+        if self._window_open and self._page is not None:
+            return self._page
+        if self._playwright is None:
+            raise ManualAuthenticationError("The manual authentication browser is not running.")
+        await self._await_retired_window()
+        kept = self._kept
+        browser: Browser | None = None
+        try:
+            browser = await self._playwright.chromium.launch(headless=False, args=_BROWSER_ARGS)
+            context = await browser.new_context(
+                storage_state=kept.storage if kept is not None else None,  # type: ignore[arg-type]
+                user_agent=self._user_agent,
+                accept_downloads=False,
+                service_workers="block",
+                proxy={"server": self._egress_proxy.server_url, "bypass": ""},
+            )
+            await context.add_init_script(_WEBRTC_BLOCK_INIT_SCRIPT)
+            await self._route_guard.install_on_context(context)
+        except Exception as exc:
+            if browser is not None:
+                with contextlib.suppress(Exception):
+                    await browser.close()
+            raise ManualAuthenticationError("Could not reopen the sign-in window.") from exc
+        self._context = context
+        self._login_browser = browser
+        self._restoring = True
+        try:
+            page = await context.new_page()
+            self._adopt_auth_page(page)
+            if kept is not None and kept.tab_storage:
+                # The tab's sessionStorage goes back before the site loads,
+                # the way the headless handoff seeds its scan tab.
+                await restore_session_storage(page, kept.tab_storage)
+        except Exception as exc:
+            self._auth_pages.clear()
+            self._page = None
+            self._context = None
+            self._login_browser = None
+            with contextlib.suppress(Exception):
+                await browser.close()
+            raise ManualAuthenticationError("Could not reopen the sign-in window.") from exc
+        finally:
+            self._restoring = False
+        self._set_window_open(True)
+        # The window is open and usable even if the site does not answer;
+        # the auditor can retry or navigate in it, as in any browser.
+        with contextlib.suppress(Exception):
+            await page.goto(
+                kept.url if kept is not None else self._seed_url,
+                timeout=self._nav_timeout_ms,
+                wait_until="domcontentloaded",
+            )
+        self._start_keep_loop()
+        return page
+
+    def _schedule_keep(self, page: Page) -> None:
+        """Refresh the kept copy after a page change in the current tab."""
+        if (
+            self._state is not ManualAuthState.AWAITING_MANUAL_AUTHENTICATION
+            or self._restoring
+            or page is not self._page
+        ):
+            return
+        try:
+            task = asyncio.get_running_loop().create_task(self.refresh_kept_state())
+        except RuntimeError:
+            return
+        self._keep_tasks.add(task)
+        task.add_done_callback(self._keep_tasks.discard)
+
+    def _start_keep_loop(self) -> None:
+        if self._keep_refresh_s is None or (
+            self._keep_loop is not None and not self._keep_loop.done()
+        ):
+            return
+        self._keep_loop = asyncio.get_running_loop().create_task(self._keep_fresh())
+
+    async def _keep_fresh(self) -> None:
+        interval = self._keep_refresh_s or _KEEP_REFRESH_S
+        while self._state is ManualAuthState.AWAITING_MANUAL_AUTHENTICATION and self._window_open:
+            await asyncio.sleep(interval)
+            if self._window_open:
+                await self.refresh_kept_state()
+
+    def _stop_keeping(self) -> None:
+        loop_task, self._keep_loop = self._keep_loop, None
+        if loop_task is not None and not loop_task.done():
+            loop_task.cancel()
+        for task in list(self._keep_tasks):
+            task.cancel()
+        self._keep_tasks.clear()
+
+    def _set_window_open(self, value: bool) -> None:
+        if self._window_open == value:
+            return
+        self._window_open = value
+        for callback in list(self._window_listeners):
+            with contextlib.suppress(Exception):
+                callback(value)
+
+    def _login_context_closed(self, context: BrowserContext) -> None:
+        if context is self._context:
+            self._sign_in_window_closed()
+
+    def _sign_in_window_closed(self) -> None:
+        """The last sign-in window closed before confirmation: keep the sign-in.
+
+        Nothing ends. The browser that held the window is shut and its
+        temporary profile removed, so the kept copy in memory is the only
+        copy left, and the auditor can start the scan from it or reopen the
+        window.
+        """
+        if (
+            self._state is not ManualAuthState.AWAITING_MANUAL_AUTHENTICATION
+            or self._restoring
+            or not self._window_open
+        ):
+            return
+        loop_task, self._keep_loop = self._keep_loop, None
+        if loop_task is not None and not loop_task.done():
+            loop_task.cancel()
+        context = self._context
+        browser = self._login_browser
+        profile_dir = self._profile_dir
+        self._context = None
+        self._login_browser = None
+        self._profile_dir = None
+        self._page = None
+        self._auth_pages.clear()
+        self._set_window_open(False)
+        try:
+            self._retiring = asyncio.get_running_loop().create_task(
+                self._retire_window(context, browser, profile_dir)
+            )
+        except RuntimeError:
+            self._retiring = None
+
+    async def _retire_window(
+        self,
+        context: BrowserContext | None,
+        browser: Browser | None,
+        profile_dir: str | None,
+    ) -> None:
+        if context is not None:
+            with contextlib.suppress(Exception):
+                await context.close()
+        if browser is not None:
+            with contextlib.suppress(Exception):
+                await browser.close()
+        if profile_dir is not None:
+            with contextlib.suppress(Exception):
+                shutil.rmtree(profile_dir)
+
+    async def _await_retired_window(self) -> None:
+        retiring = self._retiring
+        if retiring is not None and not retiring.done():
+            # ``wait`` rather than ``await``: it never raises the retiring
+            # task's own outcome, so a failed cleanup cannot abort a start.
+            await asyncio.wait({retiring})
+
+    async def _close_login_browser(self) -> None:
+        browser, self._login_browser = self._login_browser, None
+        if browser is not None:
+            with contextlib.suppress(Exception):
+                await browser.close()
 
     def _require_started(self) -> None:
         if self._state not in {

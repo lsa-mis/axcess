@@ -14,6 +14,7 @@ and target-size regressions fail here, not just AA.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 import sqlite3
@@ -1115,6 +1116,66 @@ async def test_search_finds_every_sidebar_place(
         await page.keyboard.press("Enter")
         await playwright_async.expect(dialog).to_have_count(0)
         await playwright_async.expect(page).to_have_url(re.compile(re.escape(path) + r"$"))
+
+
+@pytest.mark.parametrize(
+    ("chunk", "query", "heading"),
+    [
+        # The shell moves focus to <main> when the page changes.
+        ("About", "about", "About Axcess"),
+        # New scan also puts focus in its web address box; Enter there
+        # submitted the scan form instead of choosing the Search result.
+        ("NewScan", "new scan", "New scan"),
+    ],
+)
+async def test_a_late_page_change_leaves_focus_in_search(
+    live_server: tuple[str, int],
+    new_page: Any,
+    chunk: str,
+    query: str,
+    heading: str,
+) -> None:
+    """A page that finishes loading while Search is open does not take its focus.
+
+    Each page's code loads on first visit, so on a slow machine the page
+    change finishes after Search has closed and been opened again. The page
+    then took focus out of the open Search, and Enter did nothing (the CI
+    failure of the test above). Holding back the page's code makes that order
+    certain.
+    """
+    base, _scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    release = asyncio.Event()
+
+    async def hold(route: Any) -> None:
+        await release.wait()
+        await route.continue_()
+
+    await page.route(re.compile(rf"/assets/{chunk}-[^/]*\.js$"), hold)
+    await page.goto(f"{base}/app/scans", wait_until="networkidle")
+    search = page.get_by_role("complementary", name="Primary").get_by_role(
+        "button", name="Search everything (Cmd+K)", exact=True
+    )
+    dialog = page.get_by_role("dialog", name="Search everything")
+    box = dialog.get_by_role("textbox", name="Search")
+
+    await search.click()
+    await box.fill(query)
+    await page.keyboard.press("Enter")
+    await playwright_async.expect(dialog).to_have_count(0)
+
+    await search.click()
+    await box.fill("settings")
+    release.set()
+    # Behind the open Search the page is inert, out of the accessibility tree,
+    # so find its heading by tag, not by role.
+    await playwright_async.expect(page.locator("main h1")).to_have_text(heading)
+    # The shell moves focus a frame after the page changes: let two pass.
+    await page.evaluate("new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))")
+    await playwright_async.expect(box).to_be_focused()
+    await page.keyboard.press("Enter")
+    await playwright_async.expect(dialog).to_have_count(0)
+    await playwright_async.expect(page).to_have_url(re.compile(r"/app/settings$"))
 
 
 async def test_search_changes_a_setting_from_its_results(

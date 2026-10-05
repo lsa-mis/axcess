@@ -100,6 +100,7 @@ from audit.wcag_version import (
     is_wcag_version,
     stored_wcag_version,
 )
+from audit.web import local_sign_in
 from audit.web.comparison import (
     MAX_PAGE_SIZE,
     Category,
@@ -120,12 +121,20 @@ from audit.web.export_readiness import (
     label_draft_export,
     public_export_filename,
 )
+from audit.web.local_sign_in import (
+    SIGN_IN_KEEP_MINUTES,
+    EndedReason,
+    PendingSignIn,
+    SignInInProgressError,
+    SignInRegistry,
+)
 from audit.web.protected_api import build_protected_router
 from audit.web.protected_auth import (
     require_protected_identity,
     require_protected_report_owner,
     require_same_origin,
 )
+from audit.web.scan_settings import ScanFormSettings
 
 log = get_logger(__name__)
 
@@ -228,15 +237,63 @@ class LocalLoginScanRequest(BaseModel):
 
 @dataclass
 class _LocalLoginRun:
-    """One browser session owned by this loopback Axcess process."""
+    """One sign-in scan, from "I'm signed in, start scan" until it ends.
+
+    Before that press the sign-in is a ``PendingSignIn`` in the sign-in
+    registry, with no scan row; this run exists only once the scan does.
+    """
 
     scan_id: int
     session: ManualAuthenticationSession
-    confirmation: asyncio.Event
-    status: str = "opening_browser"
+    status: str = "verifying_authentication"
     error: str | None = None
     browser_backgrounded: bool = False
     task: asyncio.Task[Any] | None = None
+
+
+# A sign-in ID as ``SignInRegistry`` issues it (``secrets.token_urlsafe``).
+_SIGN_IN_ID_RE = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
+# How often, at most, the server checks a closed sign-in window's clock when
+# no page is asking. Pages that poll also check it on every request.
+_SIGN_IN_WATCH_S = 5.0
+_SIGN_IN_FAILED_MESSAGE = (
+    "Axcess could not open the sign-in window. Check the website address and "
+    "that Chromium for Playwright is installed, then try again."
+)
+_SIGN_IN_ENDED_MESSAGE: dict[str, str] = {
+    "expired": (
+        f"Your sign-in was kept for {SIGN_IN_KEEP_MINUTES} minutes without use, so Axcess "
+        "forgot it. Open the browser to sign in again."
+    ),
+    "cancelled": "This sign-in was cancelled. Open the browser to sign in again.",
+    "failed": _SIGN_IN_FAILED_MESSAGE,
+}
+
+
+class LocalSignInResponse(BaseModel):
+    """A sign-in in progress, before any scan exists. Never session data.
+
+    ``site`` is the host being signed in to and ``settings`` the New scan
+    form's own fields (the same allow-list as ``/api/scans/{id}/settings``),
+    so the form can be refilled. No URL the browser visited, no cookie, no
+    storage, no credential.
+    """
+
+    sign_in_id: str
+    status: Literal["opening_browser", "awaiting_authentication", "cancelled", "expired", "failed"]
+    site: str | None = None
+    window_open: bool = False
+    error: str | None = None
+    keep_minutes: int = SIGN_IN_KEEP_MINUTES
+    forget_in_seconds: int | None = None
+    already_waiting: bool = False
+    settings: ScanFormSettings | None = None
+
+
+class CurrentLocalSignInResponse(BaseModel):
+    """``GET /api/local-sign-ins/current``: the waiting sign-in, if any."""
+
+    sign_in: LocalSignInResponse | None
 
 
 class _ProtectedRequestBodyTooLargeError(Exception):
@@ -741,6 +798,14 @@ def create_app(
     # a password, OTP, cookie, or reusable Playwright state never crosses the
     # HTTP boundary or reaches SQLite.
     local_login_runs: dict[int, _LocalLoginRun] = {}
+    # Sign-ins before "I'm signed in, start scan": memory only, one at a
+    # time, outside the crawl lock. See audit.web.local_sign_in. The limit is
+    # read here, not bound at import, so a test can shorten it.
+    sign_ins: SignInRegistry[ManualAuthenticationSession] = SignInRegistry(
+        keep_for_s=local_sign_in.SIGN_IN_KEEP_SECONDS
+    )
+    app.state.local_sign_ins = sign_ins
+    sign_in_watch: dict[str, asyncio.Task[None] | None] = {"task": None}
 
     # Startup sweep: any scan left in 'running' when the server boots is
     # stale by definition, its live asyncio task is gone. Flip those to
@@ -821,6 +886,14 @@ def create_app(
         nonlocal retention_task
         if retention_task is None or retention_task.done():
             retention_task = asyncio.create_task(_protected_retention_worker())
+
+    @app.on_event("shutdown")
+    async def _end_waiting_sign_ins() -> None:
+        """Quitting Axcess ends a waiting sign-in at once. Memory only."""
+        watcher = sign_in_watch.get("task")
+        if watcher is not None and not watcher.done():
+            watcher.cancel()
+        await sign_ins.close_all()
 
     @app.on_event("shutdown")
     async def _stop_protected_retention_worker() -> None:
@@ -1003,6 +1076,12 @@ def create_app(
     def api_scan_detail(scan_id: int) -> JSONResponse:
         with get_conn() as conn:
             scan = _load_scan_or_404(conn, scan_id)
+            if scan["status"] != "completed":
+                # ``scans.page_count`` is written when a crawl finishes, so
+                # for a scan that is running, stopped or failed it can lag
+                # behind the pages already saved. Count them here so no view
+                # reads a stale 0. A completed scan keeps its stored count.
+                scan["page_count"] = _saved_page_count(conn, scan_id)
             protection = _get_protected_scan_compat(conn, scan_id=scan_id)
             breakdown = _severity_breakdown(conn, scan_id)
             prev = previous_scan_id(conn, scan)
@@ -1181,29 +1260,133 @@ def create_app(
             }
         )
 
-    @app.post("/api/local-login-scans", status_code=201)
+    def _sign_in_form_settings(config: CrawlConfig) -> ScanFormSettings:
+        """The New scan form's fields for a waiting sign-in, by allow-list."""
+        from audit.crawler.orchestrator import config_json_for_scan
+        from audit.web.scan_settings import snapshot_from_config
+
+        return snapshot_from_config(
+            scan_id=0, seed_url=config.seed_url, config_json=config_json_for_scan(config)
+        ).settings
+
+    def _sync_sign_in_window(pending: PendingSignIn[ManualAuthenticationSession]) -> None:
+        """Bring the registry in line with the session's own window state."""
+        if pending.status != "awaiting_authentication":
+            return
+        open_now = bool(pending.session.window_open)
+        if open_now and not pending.window_open:
+            sign_ins.window_opened(pending.id)
+        elif not open_now and pending.window_open:
+            sign_ins.window_closed(pending.id)
+
+    async def _refresh_sign_in() -> None:
+        current = sign_ins.current()
+        if current is not None:
+            _sync_sign_in_window(current)
+        await sign_ins.expire_due()
+
+    def _sign_in_state(
+        pending: PendingSignIn[ManualAuthenticationSession], *, already_waiting: bool = False
+    ) -> LocalSignInResponse:
+        left = sign_ins.seconds_left(pending.id)
+        return LocalSignInResponse(
+            sign_in_id=pending.id,
+            status=pending.status,
+            site=pending.site,
+            window_open=pending.window_open,
+            forget_in_seconds=None if left is None else math.ceil(left),
+            already_waiting=already_waiting,
+            settings=_sign_in_form_settings(pending.payload),
+        )
+
+    def _ended_sign_in_state(sign_in_id: str, reason: EndedReason) -> LocalSignInResponse:
+        return LocalSignInResponse(
+            sign_in_id=sign_in_id,
+            status=reason,
+            error=_SIGN_IN_FAILED_MESSAGE if reason == "failed" else None,
+        )
+
+    def _sign_in_json(state: LocalSignInResponse, status_code: int = 200) -> JSONResponse:
+        return JSONResponse(
+            state.model_dump(mode="json"),
+            status_code=status_code,
+            headers={"Cache-Control": "no-store"},
+        )
+
+    def _sign_in_or_ended(sign_in_id: str) -> LocalSignInResponse:
+        pending = sign_ins.get(sign_in_id) if _SIGN_IN_ID_RE.fullmatch(sign_in_id) else None
+        if pending is not None:
+            return _sign_in_state(pending)
+        reason = sign_ins.ended_reason(sign_in_id)
+        if reason is not None:
+            return _ended_sign_in_state(sign_in_id, reason)
+        raise HTTPException(status_code=404, detail="This sign-in has ended.")
+
+    def _waiting_sign_in_or_error(sign_in_id: str) -> PendingSignIn[ManualAuthenticationSession]:
+        pending = sign_ins.get(sign_in_id) if _SIGN_IN_ID_RE.fullmatch(sign_in_id) else None
+        if pending is not None:
+            return pending
+        reason = sign_ins.ended_reason(sign_in_id)
+        raise HTTPException(
+            status_code=404,
+            detail=_SIGN_IN_ENDED_MESSAGE.get(reason or "", "This sign-in has ended."),
+        )
+
+    def _watch_sign_in_expiry() -> None:
+        task = sign_in_watch.get("task")
+        if task is not None and not task.done():
+            return
+        sign_in_watch["task"] = asyncio.create_task(_sign_in_expiry_loop())
+
+    async def _sign_in_expiry_loop() -> None:
+        """Forget a sign-in on time even when no page is asking about it."""
+        while (current := sign_ins.current()) is not None:
+            left = sign_ins.seconds_left(current.id)
+            await asyncio.sleep(
+                _SIGN_IN_WATCH_S if left is None else min(_SIGN_IN_WATCH_S, max(left, 0.05))
+            )
+            await _refresh_sign_in()
+
+    async def _open_local_sign_in(pending: PendingSignIn[ManualAuthenticationSession]) -> None:
+        """Open the sign-in window; a failure ends the sign-in, recording nothing."""
+        try:
+            await pending.session.start()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            # The exception can carry a private URL; log only that it failed.
+            log.warning("web.local_sign_in_open_failed")
+            this_task = asyncio.current_task()
+            if this_task in pending.tasks:
+                pending.tasks.remove(this_task)
+            await sign_ins.fail(pending.id)
+            return
+        sign_ins.window_opened(pending.id)
+
+    @app.post("/api/local-login-scans", status_code=201, response_model=LocalSignInResponse)
     async def api_create_local_login_scan(
         request: Request, body: LocalLoginScanRequest
     ) -> JSONResponse:
-        """Open a headed, memory-only login browser on the Axcess computer.
+        """Open a headed, memory-only sign-in browser on the Axcess computer.
+
+        This creates a sign-in in progress, not a scan: no ``scans`` row, no
+        Reports entry, and no crawl lock. The scan row is created, and the
+        crawl started, by ``POST /api/local-sign-ins/{id}/start``. Only one
+        sign-in waits at a time; asking again returns the one that waits
+        (200, ``already_waiting``) and never opens a second browser.
 
         This is the direct local equivalent of the reference crawler's
         ``requires login`` mode. Unlike that implementation it does not use a
-        marker file or serialize ``storageState``; the subsequent crawl uses
-        the same live Playwright context.
+        marker file or serialize ``storageState``; the session keeps the
+        signed-in state in memory only.
         """
 
         _require_local_login_request(request, mutation=True)
-        task = crawl_state.get("task")
-        if isinstance(task, asyncio.Task) and not task.done():
-            scan_id_val = crawl_state.get("scan_id")
-            return JSONResponse(
-                {
-                    "error": "A crawl or login browser is already running.",
-                    "running_scan_id": (int(scan_id_val) if isinstance(scan_id_val, int) else None),
-                },
-                status_code=409,
-            )
+        await _refresh_sign_in()
+        existing = sign_ins.current()
+        if existing is not None:
+            _sync_sign_in_window(existing)
+            return _sign_in_json(_sign_in_state(existing, already_waiting=True))
 
         local_vlm_url = _local_login_ollama_url(settings.ollama_base_url)
         if not body.skip_vlm and local_vlm_url is None:
@@ -1291,14 +1474,6 @@ def create_app(
             # report and rewriting the config that identified it as one.
             resumable=False,
         )
-        # A manual-login session is deliberately memory-only and cannot be
-        # resumed after interruption. Always allocate a fresh report and job
-        # frontier even when the auditor scans the same URL again.
-        scan_id = _prepare_scan_row(resolved_db, config, resume_interrupted=False)
-        # Hand the crawler the row rather than letting it search: an
-        # unresumable row is invisible to seed-based discovery, including its
-        # own run's.
-        config = replace(config, scan_id=scan_id)
         session = ManualAuthenticationSession(
             seed_url=body.seed_url,
             approved_target_origins=(body.target_origin,),
@@ -1309,11 +1484,92 @@ def create_app(
             # target origin before any page evidence is collected.
             allow_any_public_auth_origin=True,
         )
-        run = _LocalLoginRun(
-            scan_id=scan_id,
-            session=session,
-            confirmation=asyncio.Event(),
+        try:
+            pending = sign_ins.add(
+                site=urlsplit(body.seed_url).hostname or body.target_origin,
+                session=session,
+                payload=config,
+            )
+        except SignInInProgressError as exc:
+            return _sign_in_json(_sign_in_state(exc.existing, already_waiting=True))
+        sign_in_id = pending.id
+        session.on_window_change(
+            lambda is_open: (
+                sign_ins.window_opened(sign_in_id)
+                if is_open
+                else sign_ins.window_closed(sign_in_id)
+            )
         )
+        pending.tasks.append(asyncio.create_task(_open_local_sign_in(pending)))
+        _watch_sign_in_expiry()
+        return _sign_in_json(_sign_in_state(pending), status_code=201)
+
+    @app.get("/api/local-sign-ins/current", response_model=CurrentLocalSignInResponse)
+    async def api_current_local_sign_in(request: Request) -> JSONResponse:
+        """The sign-in waiting on this computer, so New scan can return to it."""
+
+        _require_local_login_request(request, mutation=False)
+        await _refresh_sign_in()
+        current = sign_ins.current()
+        payload = CurrentLocalSignInResponse(
+            sign_in=_sign_in_state(current) if current is not None else None
+        )
+        return JSONResponse(payload.model_dump(mode="json"), headers={"Cache-Control": "no-store"})
+
+    @app.get("/api/local-sign-ins/{sign_in_id}", response_model=LocalSignInResponse)
+    async def api_local_sign_in_status(request: Request, sign_in_id: str) -> JSONResponse:
+        """One sign-in's state, or the one word for why it ended."""
+
+        _require_local_login_request(request, mutation=False)
+        await _refresh_sign_in()
+        return _sign_in_json(_sign_in_or_ended(sign_in_id))
+
+    @app.post("/api/local-sign-ins/{sign_in_id}/start")
+    async def api_start_local_sign_in_scan(request: Request, sign_in_id: str) -> JSONResponse:
+        """ "I'm signed in, start scan": create the scan row and start the crawl.
+
+        The crawl lock is taken here and only here. If another scan is
+        running, the start is refused and the sign-in stays waiting, so the
+        person can start once that scan finishes.
+        """
+
+        _require_local_login_request(request, mutation=True)
+        await _refresh_sign_in()
+        pending = _waiting_sign_in_or_error(sign_in_id)
+        if pending.status != "awaiting_authentication":
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Wait for the sign-in window to open, and sign in, before you start the scan."
+                ),
+            )
+        task = crawl_state.get("task")
+        if isinstance(task, asyncio.Task) and not task.done():
+            scan_id_val = crawl_state.get("scan_id")
+            return JSONResponse(
+                {
+                    "error": (
+                        "A scan is already running. Axcess has kept your sign-in, so you "
+                        "can start this scan when that scan finishes."
+                    ),
+                    "running_scan_id": (int(scan_id_val) if isinstance(scan_id_val, int) else None),
+                },
+                status_code=409,
+                headers={"Cache-Control": "no-store"},
+            )
+        taken = sign_ins.take(pending.id)
+        if taken is None:  # pragma: no cover - checked just above, same event-loop turn
+            raise HTTPException(status_code=404, detail="This sign-in has ended.")
+        config: CrawlConfig = taken.payload
+        # A manual-login session is deliberately memory-only and cannot be
+        # resumed after interruption. Always allocate a fresh report and job
+        # frontier even when the auditor scans the same URL again.
+        scan_id = _prepare_scan_row(resolved_db, config, resume_interrupted=False)
+        # Hand the crawler the row rather than letting it search: an
+        # unresumable row is invisible to seed-based discovery, including its
+        # own run's.
+        config = replace(config, scan_id=scan_id)
+        run = _LocalLoginRun(scan_id=scan_id, session=taken.session)
         local_login_runs[scan_id] = run
         crawl_state["scan_id"] = scan_id
         run.task = asyncio.create_task(
@@ -1324,11 +1580,54 @@ def create_app(
             {
                 "scan_id": scan_id,
                 "status": run.status,
-                "message": "Opening a visible Chromium window for manual sign-in.",
+                "error": None,
+                "browser_backgrounded": False,
             },
             status_code=201,
             headers={"Cache-Control": "no-store"},
         )
+
+    @app.post("/api/local-sign-ins/{sign_in_id}/reopen", response_model=LocalSignInResponse)
+    async def api_reopen_local_sign_in(request: Request, sign_in_id: str) -> JSONResponse:
+        """Open a new sign-in window from the kept sign-in, on the last page."""
+
+        _require_local_login_request(request, mutation=True)
+        await _refresh_sign_in()
+        pending = _waiting_sign_in_or_error(sign_in_id)
+        if pending.status != "awaiting_authentication":
+            raise HTTPException(status_code=409, detail="Wait for the sign-in window to open.")
+        if pending.window_open:
+            raise HTTPException(status_code=409, detail="The sign-in window is already open.")
+        # Reopening restarts the clock: stopped now, from zero if this fails.
+        sign_ins.reopening(pending.id)
+        try:
+            await pending.session.reopen_window()
+        except Exception:
+            log.warning("web.local_sign_in_reopen_failed")
+            if sign_ins.get(pending.id) is not None:
+                sign_ins.window_closed(pending.id)
+                return JSONResponse(
+                    {
+                        "error": (
+                            "Axcess could not reopen the sign-in window. Your sign-in is "
+                            "still kept. Try again, or start the scan."
+                        )
+                    },
+                    status_code=503,
+                    headers={"Cache-Control": "no-store"},
+                )
+        if sign_ins.get(pending.id) is not None:
+            sign_ins.window_opened(pending.id)
+        return _sign_in_json(_sign_in_or_ended(pending.id))
+
+    @app.post("/api/local-sign-ins/{sign_in_id}/cancel", response_model=LocalSignInResponse)
+    async def api_cancel_local_sign_in(request: Request, sign_in_id: str) -> JSONResponse:
+        """Close every sign-in window, erase the kept sign-in, record nothing."""
+
+        _require_local_login_request(request, mutation=True)
+        if _SIGN_IN_ID_RE.fullmatch(sign_in_id) and await sign_ins.cancel(sign_in_id):
+            return _sign_in_json(_ended_sign_in_state(sign_in_id, "cancelled"))
+        return _sign_in_json(_sign_in_or_ended(sign_in_id))
 
     @app.get("/api/local-login-scans/{scan_id:int}")
     async def api_local_login_scan_status(request: Request, scan_id: int) -> JSONResponse:
@@ -1367,25 +1666,6 @@ def create_app(
                 ),
                 "browser_backgrounded": False,
             },
-            headers={"Cache-Control": "no-store"},
-        )
-
-    @app.post("/api/local-login-scans/{scan_id:int}/confirm")
-    async def api_confirm_local_login(request: Request, scan_id: int) -> JSONResponse:
-        """Human confirmation signal; the server independently verifies target scope."""
-
-        _require_local_login_request(request, mutation=True)
-        run = local_login_runs.get(scan_id)
-        if run is None:
-            raise HTTPException(status_code=404, detail="Login browser is not available.")
-        if run.status != "awaiting_authentication":
-            raise HTTPException(
-                status_code=409,
-                detail="Wait for the visible browser before confirming sign-in.",
-            )
-        run.confirmation.set()
-        return JSONResponse(
-            {"scan_id": scan_id, "status": "verifying_authentication"},
             headers={"Cache-Control": "no-store"},
         )
 
@@ -1536,10 +1816,17 @@ def create_app(
             if existing is None:
                 raise HTTPException(status_code=404, detail="Scan not found")
             if existing["status"] == "running":
+                # The page count goes in the same write as the status. Only
+                # ``_finalize_scan`` used to set it, once the crawl task had
+                # wound down, often 15 seconds later. In between the row said
+                # "interrupted, 0 pages", and the stopped-scan page told the
+                # reader "No report was produced" over pages it had saved.
                 conn.execute(
                     "UPDATE scans SET status = 'interrupted', "
-                    "finished_at = CURRENT_TIMESTAMP WHERE id = ?",
-                    (scan_id,),
+                    "finished_at = CURRENT_TIMESTAMP, "
+                    "page_count = (SELECT COUNT(*) FROM pages WHERE scan_id = ?) "
+                    "WHERE id = ?",
+                    (scan_id, scan_id),
                 )
                 # Both states, for every scan. A leased job is one a worker
                 # had checked out when the stop arrived; leaving it behind
@@ -3212,7 +3499,11 @@ async def _run_local_login_background(
     config: CrawlConfig,
     run: _LocalLoginRun,
 ) -> None:
-    """Own one visible sign-in and reuse its context for the standard report.
+    """Run a sign-in scan once the person has pressed "I'm signed in, start scan".
+
+    The sign-in window was opened, and kept, by the sign-in registry flow; it
+    may have closed since, in which case the session starts from its kept
+    copy of the signed-in state.
 
     Session material exists only inside ``ManualAuthenticationSession``. The
     user-facing report still stores the rendered accessibility evidence in the
@@ -3222,11 +3513,14 @@ async def _run_local_login_background(
 
     conn: sqlite3.Connection | None = None
     try:
-        run.status = "opening_browser"
-        await run.session.start()
-        run.status = "awaiting_authentication"
-        await run.confirmation.wait()
         run.status = "verifying_authentication"
+        if not config.browser_headless and not run.session.window_open:
+            # "Show the scanning browser window" is on, and the sign-in window
+            # closed before the start. Open a visible window restored from the
+            # copy of the sign-in kept in memory; the scan runs there. With
+            # the setting off, the headless handoff below reads the kept copy
+            # itself.
+            await run.session.reopen_window()
         # Sign-in almost always ends somewhere other than where it began: an
         # SSO round trip, then a dashboard or landing page. Start the crawl
         # from where the auditor actually is rather than from the pre-login
@@ -4119,6 +4413,12 @@ def _split_csv(value: str) -> list[str]:
     if not value:
         return []
     return [part.strip() for part in value.split(",") if part.strip()]
+
+
+def _saved_page_count(conn: sqlite3.Connection, scan_id: int) -> int:
+    """How many pages this scan has saved so far, counted from ``pages``."""
+    row = conn.execute("SELECT COUNT(*) AS n FROM pages WHERE scan_id = ?", (scan_id,)).fetchone()
+    return int(row["n"]) if row is not None else 0
 
 
 def _load_scan_or_404(conn: sqlite3.Connection, scan_id: int) -> dict[str, Any]:

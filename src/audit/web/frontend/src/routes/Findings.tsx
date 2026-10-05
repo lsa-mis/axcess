@@ -180,7 +180,8 @@ export default function FindingsRoute() {
             value={filter.q ?? ""}
             onChange={(v) => setParam("q", v)}
           />
-          <FilterMenu groups={filters} onChange={setParam} onReset={resetFilters} />
+          <FilterMenu
+          label="Filter images" groups={filters} onChange={setParam} onReset={resetFilters} />
         </TableBar>
         <TableStatus className={empty ? "border-b-0" : undefined}>
           {data
@@ -237,8 +238,8 @@ function FindingsTable({
         role="row"
         className="grid grid-cols-[6rem_5.5rem_minmax(0,1fr)_minmax(0,1fr)_8rem_minmax(0,1fr)_8rem] items-center gap-3 border-b border-border bg-surface-muted px-4 py-2 text-2xs font-semibold text-fg-muted"
       >
-        <span role="columnheader">Severity</span>
         <span role="columnheader">Image</span>
+        <span role="columnheader">Preview</span>
         <span role="columnheader">Text read from image (OCR)</span>
         <span role="columnheader">Alt text</span>
         <span role="columnheader">Image type</span>
@@ -262,13 +263,16 @@ function FindingsTable({
                 }}
                 className="absolute inset-x-0 grid grid-cols-[6rem_5.5rem_minmax(0,1fr)_minmax(0,1fr)_8rem_minmax(0,1fr)_8rem] items-center gap-3 border-b border-border px-4 py-1.5 transition-colors hover:bg-surface-muted/60"
               >
-                <div role="cell">
-                  <Link
-                    to={`/findings/${f.id}`}
-                    className="inline-block no-underline"
-                  >
-                    <SeverityChip value={f.severity} />
+                {/* The link names its destination, "Image #12" (the detail page's
+                    own title); the severity chip sits under it as plain text.
+                    The chip alone used to be the link, so its words were
+                    "critical" or "info": a severity, not where the link goes
+                    (SC 2.4.4 Link Purpose (In Context), Level AA). */}
+                <div role="cell" className="flex flex-col items-start gap-1">
+                  <Link to={`/findings/${f.id}`} className="text-xs font-semibold">
+                    Image #{f.id}
                   </Link>
+                  <SeverityChip value={f.severity} />
                 </div>
                 <div role="cell">
                   {f.has_svg_text ? (

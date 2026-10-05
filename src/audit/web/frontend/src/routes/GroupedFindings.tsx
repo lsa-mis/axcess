@@ -157,6 +157,7 @@ export default function GroupedFindingsRoute() {
           footer={<ActiveFilters items={activeFilterItems(filters)} onClear={() => setStatusParam("")} />}
         >
           <FilterMenu
+          label="Filter images"
             groups={filters}
             onChange={(_key, value) => setStatusParam(value as FindingStatus | "")}
             onReset={() => setStatusParam("")}
@@ -477,8 +478,11 @@ function FindingRow({ finding, index }: { finding: GroupedFinding; index: number
           aria-expanded={showPages}
           className="text-xs text-umich-blue underline underline-offset-2"
         >
+          {/* "2 pages with this image": what the list holds, not a bare count.
+              The words stay the same open or closed; aria-expanded says which
+              (WAI-ARIA APG Disclosure pattern). */}
           <span aria-hidden>{showPages ? "▾" : "▸"}</span> {finding.occurrences.length} page
-          {finding.occurrences.length !== 1 ? "s" : ""}
+          {finding.occurrences.length !== 1 ? "s" : ""} with this image
         </button>
         {showPages && (
           <ul className="mt-2 space-y-1 text-xs">

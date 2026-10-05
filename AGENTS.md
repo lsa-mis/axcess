@@ -222,6 +222,16 @@ Rules:
    layout at 320 px or 1280 px.
 7. When you change wording, update the UI tests that pin it, without
    weakening any assertion. Update `docs/glossary.md` if a term changes.
+8. Every button and link says what it does in its own words: a verb and
+   an object, or the place it goes. "Cancel sign-in", not "Cancel";
+   "Filter issues", not "Filter"; "Image #12", not "info". Never "Read
+   more", "Download", "Done", "Click here" or a bare count such as
+   "2 pages". The words are real text: what the control shows, plus
+   screen-reader-only text inside it where a visible phrase would be
+   repetitive (WCAG technique C7). Do not add an `aria-label` to fix
+   vague words; no ARIA is better than bad ARIA, so write better text.
+   `tests/ui/test_control_text_purpose.py` checks every screen and
+   ignores `aria-label`.
 
 ## UX rationale and accessibility review
 

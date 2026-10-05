@@ -30,8 +30,13 @@ readers; this page tells contributors which words to use.
 7. **Spell out abbreviations** the first time they appear on a screen:
    "Web Content Accessibility Guidelines (WCAG)". Well-known file formats
    (PDF, CSV) and "URL" do not need it.
-8. **Buttons say what they do**: a verb and an object, such as "Delete
-   report", never "OK" or "Submit".
+8. **Buttons and links say what they do**: a verb and an object, such as
+   "Delete report", or the place a link goes, such as "Image #12". Never
+   "OK", "Submit", "Cancel", "Done", "Read more", "Download", "Click here"
+   or a bare count such as "2 pages": cancel what, download which file?
+   The words are the control's own text, visible or screen-reader-only
+   inside it, never an `aria-label`. `tests/ui/test_control_text_purpose.py`
+   checks every screen.
 9. **Messages say what happened and what to do**, without blame: "This page
    could not be loaded. Open the live page, or try again later."
 10. **Concrete examples** for anything abstract: "for example, a menu that

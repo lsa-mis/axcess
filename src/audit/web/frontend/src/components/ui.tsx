@@ -208,7 +208,17 @@ export function EmptyState({
 
 /**
  * Shared chrome for ``Button`` and ``LinkButton`` so a primary <button>
- * and a primary <Link>-styled-as-button look identical. Keeping this in
+ * and a primary <Link>-styled-as-button look identical.
+ *
+ * **Words.** Each one says what it does in its own text: a verb and an
+ * object ("Cancel sign-in", "Filter issues") or the place it goes. Never a
+ * bare "Cancel", "Done", "Read more" or "Download". The words are real text,
+ * visible or screen-reader-only inside the control (WCAG technique C7), not
+ * an `aria-label`: no ARIA is better than bad ARIA (W3C "Using ARIA", rule 1,
+ * https://www.w3.org/TR/using-aria/#rule1). SC 2.4.4 Link Purpose (In
+ * Context) and SC 2.4.6 Headings and Labels, both Level AA;
+ * docs/plain-language.md rule 8. `tests/ui/test_control_text_purpose.py`
+ * checks every screen. Keeping this in
  * one place is the single source of truth for action affordances, if a
  * designer changes "primary" to a different blue, both elements update.
  *
