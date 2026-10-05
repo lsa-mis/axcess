@@ -105,6 +105,7 @@ export default function NewScanRoute() {
       // as its card, in whatever state it is in (window open or closed),
       // instead of the empty form: it was only hidden by the other tab.
       // Same check as a fresh visit (below), so there is one way it works.
+      checkAskedAt.current = Date.now();
       setCheckSignIn(true);
     } else params.delete("mode");
     setSearchParams(params);
@@ -201,6 +202,13 @@ export default function NewScanRoute() {
   const [checkSignIn, setCheckSignIn] = useState(
     () => !searchParams.get("mode") && !searchParams.get("scan") && !searchParams.get("sign_in"),
   );
+  // When the current check was asked for. The query keeps its last answer
+  // while the check is off, so returning to the sign-in tab found the answer
+  // from the first visit ("no sign-in yet") already there, acted on it before
+  // the fresh request came back, and showed the empty form; the next return
+  // then found the right answer, so it worked every second time. Only an
+  // answer newer than this, with no request in flight, is acted on.
+  const checkAskedAt = useRef(0);
   const waitingSignIn = useQuery({
     queryKey: ["local-sign-in", "current"],
     queryFn: api.getCurrentLocalSignIn,
@@ -210,7 +218,9 @@ export default function NewScanRoute() {
     gcTime: 0,
   });
   useEffect(() => {
-    if (!checkSignIn || waitingSignIn.isPending) return;
+    if (!checkSignIn || waitingSignIn.isPending || waitingSignIn.isFetching) return;
+    const answeredAt = Math.max(waitingSignIn.dataUpdatedAt, waitingSignIn.errorUpdatedAt);
+    if (answeredAt < checkAskedAt.current) return; // the last visit's answer; a fresh one is coming
     setCheckSignIn(false);
     const found = waitingSignIn.data?.sign_in;
     if (!found || (found.status !== "opening_browser" && found.status !== "awaiting_authentication")) return;
@@ -224,7 +234,15 @@ export default function NewScanRoute() {
       },
       { replace: true },
     );
-  }, [checkSignIn, waitingSignIn.isPending, waitingSignIn.data, setSearchParams]);
+  }, [
+    checkSignIn,
+    waitingSignIn.isPending,
+    waitingSignIn.isFetching,
+    waitingSignIn.data,
+    waitingSignIn.dataUpdatedAt,
+    waitingSignIn.errorUpdatedAt,
+    setSearchParams,
+  ]);
 
   // What the server cannot run, the form does not offer: fall back rather
   // than let a scan start with an engine or a model that is not there.

@@ -133,6 +133,37 @@ async def test_a_sign_in_address_without_https_is_completed(
     assert (await sent.value).post_data_json["seed_url"] == SEED
 
 
+async def test_switching_tabs_keeps_a_sign_in_started_after_the_first_visit(
+    fake_sign_in: type, live_server: tuple[str, int], new_page: Any
+) -> None:
+    """The first trip back must show the card, not an answer from before the sign-in.
+
+    New scan's first visit learns "no sign-in yet"; that answer stayed in the
+    page and was used on the next return to the sign-in tab, so the empty form
+    showed and only the second return found the card.
+    """
+    base, _ = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(f"{base}/app/scans/new", wait_until="networkidle")
+    await expect(page.get_by_role("textbox", name="Website address", exact=True)).to_be_visible()
+
+    sign_in_tab = page.get_by_role("tab", name="Site with a sign-in or two-step sign-in (2FA)")
+    await sign_in_tab.click()
+    await page.get_by_role("textbox", name=re.compile(r"^Website address to scan")).fill(SEED)
+    await page.get_by_role("checkbox", name=re.compile(r"^The site owner allows this scan")).check()
+    await page.get_by_role("button", name="Open browser to sign in").click()
+    await expect(page.get_by_role("heading", name=OPEN_TITLE)).to_be_visible()
+
+    await page.get_by_role("tab", name="Public website").click()
+    await expect(page.get_by_role("textbox", name="Website address", exact=True)).to_be_visible()
+    await sign_in_tab.click()
+
+    await expect(page.get_by_role("heading", name=OPEN_TITLE)).to_be_visible()
+    await expect(
+        page.get_by_role("textbox", name=re.compile(r"^Website address to scan"))
+    ).to_have_count(0)
+
+
 async def test_new_scan_shows_the_form_when_no_sign_in_waits(
     fake_sign_in: type, live_server: tuple[str, int], new_page: Any
 ) -> None:
