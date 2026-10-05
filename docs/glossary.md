@@ -360,6 +360,10 @@ A scan of pages behind a sign-in. Axcess opens a browser window, you sign in
 yourself (including any two-factor step), and Axcess then scans the site as
 you, signed in, without ever seeing your password.
 
+Until you select **I'm signed in, start scan**, it is a sign-in in progress,
+not a scan: it has no report number and is not in Reports. If you close the
+sign-in window first, Axcess keeps your sign-in in memory for 30 minutes.
+
 ### Rescan comparison
 
 Two reports of the same [scope](#scope) lined up on a report's **Compare

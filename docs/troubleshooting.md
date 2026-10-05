@@ -63,6 +63,20 @@ and the page title.
   image at a time (`AUDIT_VLM_CONCURRENCY`, default 1), and raising that can
   back up the Ollama service on a small machine.
 
+## I closed the sign-in window before starting
+
+Nothing is lost yet. Axcess keeps your sign-in in memory for 30 minutes after
+the window closes. Go back to **New scan**: it shows your sign-in in progress.
+Then select **I'm signed in, start scan**, or **Reopen sign-in window** to
+open the window again on the page you were on.
+
+- Some sites tie a sign-in to the exact browser window, or end it quickly.
+  After you reopen the window, such a site may ask you to sign in again.
+- After 30 minutes with the window closed, Axcess forgets the sign-in. Sign
+  in again with **Open browser to sign in**. Your settings are still filled
+  in.
+- Axcess keeps one sign-in at a time, and quitting Axcess ends it.
+
 ## The local AI checks aren't running
 
 A [local AI model](./glossary.md#local-ai-model) runs through Ollama, which

@@ -58,6 +58,27 @@ merge.
 
 ### Changed
 
+- **Sign-in scans start when you start them.** "Open browser to sign in"
+  no longer creates a scan. Until you select "I'm signed in, start scan",
+  New scan shows a "Sign-in" card, not "Sign-in scan #N", and Reports
+  shows nothing, so an abandoned sign-in no longer leaves a stopped, empty
+  report. If another scan is running when you start, Axcess says so and
+  keeps your sign-in. Axcess keeps one sign-in at a time, and a waiting
+  sign-in does not stop you running a public scan.
+- **Closing the sign-in window keeps your sign-in.** Axcess keeps a copy of
+  it in memory only, never on disk. You can still start the scan, or select
+  "Reopen sign-in window" to open it again on the page you were on. Some
+  sites tie a sign-in to the exact window, so they may ask you to sign in
+  again. After 30 minutes with the window closed, Axcess forgets the
+  sign-in and says so, with your settings still filled in. Quitting Axcess
+  ends it at once.
+- **"Cancel sign-in"** next to "I'm signed in, start scan" closes the
+  window, forgets the sign-in, and takes you back to the form with your
+  entries kept.
+- **New scan returns to a waiting sign-in.** The New scan link shows the
+  card for your sign-in in progress, with the site's name, instead of an
+  empty form. The "Public website" tab is still one click away.
+
 - Versions: 0.2.0 starts a release line the team chooses, and each release
   counts up the last part (0.2.1, 0.2.2 ...). The previews 0.60 to 0.63
   numbered each merge instead and would have reached 1.00 by themselves.

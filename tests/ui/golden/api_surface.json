@@ -302,19 +302,59 @@
       },
       {
         "type": "APIRoute",
-        "path": "/api/local-login-scans/{scan_id:int}",
+        "path": "/api/local-sign-ins/current",
         "methods": ["GET"],
-        "name": "api_local_login_scan_status",
+        "name": "api_current_local_sign_in",
         "async": true,
-        "params": {"path": ["scan_id"]},
+        "params": {},
         "request_param": "request",
         "background_tasks_param": null
       },
       {
         "type": "APIRoute",
-        "path": "/api/local-login-scans/{scan_id:int}/confirm",
+        "path": "/api/local-sign-ins/{sign_in_id}",
+        "methods": ["GET"],
+        "name": "api_local_sign_in_status",
+        "async": true,
+        "params": {"path": ["sign_in_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/local-sign-ins/{sign_in_id}/start",
         "methods": ["POST"],
-        "name": "api_confirm_local_login",
+        "name": "api_start_local_sign_in_scan",
+        "async": true,
+        "params": {"path": ["sign_in_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/local-sign-ins/{sign_in_id}/reopen",
+        "methods": ["POST"],
+        "name": "api_reopen_local_sign_in",
+        "async": true,
+        "params": {"path": ["sign_in_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/local-sign-ins/{sign_in_id}/cancel",
+        "methods": ["POST"],
+        "name": "api_cancel_local_sign_in",
+        "async": true,
+        "params": {"path": ["sign_in_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/local-login-scans/{scan_id:int}",
+        "methods": ["GET"],
+        "name": "api_local_login_scan_status",
         "async": true,
         "params": {"path": ["scan_id"]},
         "request_param": "request",
@@ -699,7 +739,7 @@
       "starlette.exceptions.HTTPException": "http_exception_handler"
     },
     "on_startup": ["_configure_scan_logging", "_start_protected_retention_worker"],
-    "on_shutdown": ["_stop_protected_retention_worker"]
+    "on_shutdown": ["_end_waiting_sign_ins", "_stop_protected_retention_worker"]
   },
   "token-set/dist-built": {
     "routes": [
@@ -1018,19 +1058,59 @@
       },
       {
         "type": "APIRoute",
-        "path": "/api/local-login-scans/{scan_id:int}",
+        "path": "/api/local-sign-ins/current",
         "methods": ["GET"],
-        "name": "api_local_login_scan_status",
+        "name": "api_current_local_sign_in",
         "async": true,
-        "params": {"path": ["scan_id"]},
+        "params": {},
         "request_param": "request",
         "background_tasks_param": null
       },
       {
         "type": "APIRoute",
-        "path": "/api/local-login-scans/{scan_id:int}/confirm",
+        "path": "/api/local-sign-ins/{sign_in_id}",
+        "methods": ["GET"],
+        "name": "api_local_sign_in_status",
+        "async": true,
+        "params": {"path": ["sign_in_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/local-sign-ins/{sign_in_id}/start",
         "methods": ["POST"],
-        "name": "api_confirm_local_login",
+        "name": "api_start_local_sign_in_scan",
+        "async": true,
+        "params": {"path": ["sign_in_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/local-sign-ins/{sign_in_id}/reopen",
+        "methods": ["POST"],
+        "name": "api_reopen_local_sign_in",
+        "async": true,
+        "params": {"path": ["sign_in_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/local-sign-ins/{sign_in_id}/cancel",
+        "methods": ["POST"],
+        "name": "api_cancel_local_sign_in",
+        "async": true,
+        "params": {"path": ["sign_in_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/local-login-scans/{scan_id:int}",
+        "methods": ["GET"],
+        "name": "api_local_login_scan_status",
         "async": true,
         "params": {"path": ["scan_id"]},
         "request_param": "request",
@@ -1415,7 +1495,7 @@
       "starlette.exceptions.HTTPException": "http_exception_handler"
     },
     "on_startup": ["_configure_scan_logging", "_start_protected_retention_worker"],
-    "on_shutdown": ["_stop_protected_retention_worker"]
+    "on_shutdown": ["_end_waiting_sign_ins", "_stop_protected_retention_worker"]
   },
   "token-unset/dist-absent": {
     "routes": [
@@ -1720,19 +1800,59 @@
       },
       {
         "type": "APIRoute",
-        "path": "/api/local-login-scans/{scan_id:int}",
+        "path": "/api/local-sign-ins/current",
         "methods": ["GET"],
-        "name": "api_local_login_scan_status",
+        "name": "api_current_local_sign_in",
         "async": true,
-        "params": {"path": ["scan_id"]},
+        "params": {},
         "request_param": "request",
         "background_tasks_param": null
       },
       {
         "type": "APIRoute",
-        "path": "/api/local-login-scans/{scan_id:int}/confirm",
+        "path": "/api/local-sign-ins/{sign_in_id}",
+        "methods": ["GET"],
+        "name": "api_local_sign_in_status",
+        "async": true,
+        "params": {"path": ["sign_in_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/local-sign-ins/{sign_in_id}/start",
         "methods": ["POST"],
-        "name": "api_confirm_local_login",
+        "name": "api_start_local_sign_in_scan",
+        "async": true,
+        "params": {"path": ["sign_in_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/local-sign-ins/{sign_in_id}/reopen",
+        "methods": ["POST"],
+        "name": "api_reopen_local_sign_in",
+        "async": true,
+        "params": {"path": ["sign_in_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/local-sign-ins/{sign_in_id}/cancel",
+        "methods": ["POST"],
+        "name": "api_cancel_local_sign_in",
+        "async": true,
+        "params": {"path": ["sign_in_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/local-login-scans/{scan_id:int}",
+        "methods": ["GET"],
+        "name": "api_local_login_scan_status",
         "async": true,
         "params": {"path": ["scan_id"]},
         "request_param": "request",
@@ -2116,7 +2236,7 @@
       "starlette.exceptions.HTTPException": "http_exception_handler"
     },
     "on_startup": ["_configure_scan_logging", "_start_protected_retention_worker"],
-    "on_shutdown": ["_stop_protected_retention_worker"]
+    "on_shutdown": ["_end_waiting_sign_ins", "_stop_protected_retention_worker"]
   },
   "token-unset/dist-built": {
     "routes": [
@@ -2435,19 +2555,59 @@
       },
       {
         "type": "APIRoute",
-        "path": "/api/local-login-scans/{scan_id:int}",
+        "path": "/api/local-sign-ins/current",
         "methods": ["GET"],
-        "name": "api_local_login_scan_status",
+        "name": "api_current_local_sign_in",
         "async": true,
-        "params": {"path": ["scan_id"]},
+        "params": {},
         "request_param": "request",
         "background_tasks_param": null
       },
       {
         "type": "APIRoute",
-        "path": "/api/local-login-scans/{scan_id:int}/confirm",
+        "path": "/api/local-sign-ins/{sign_in_id}",
+        "methods": ["GET"],
+        "name": "api_local_sign_in_status",
+        "async": true,
+        "params": {"path": ["sign_in_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/local-sign-ins/{sign_in_id}/start",
         "methods": ["POST"],
-        "name": "api_confirm_local_login",
+        "name": "api_start_local_sign_in_scan",
+        "async": true,
+        "params": {"path": ["sign_in_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/local-sign-ins/{sign_in_id}/reopen",
+        "methods": ["POST"],
+        "name": "api_reopen_local_sign_in",
+        "async": true,
+        "params": {"path": ["sign_in_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/local-sign-ins/{sign_in_id}/cancel",
+        "methods": ["POST"],
+        "name": "api_cancel_local_sign_in",
+        "async": true,
+        "params": {"path": ["sign_in_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/local-login-scans/{scan_id:int}",
+        "methods": ["GET"],
+        "name": "api_local_login_scan_status",
         "async": true,
         "params": {"path": ["scan_id"]},
         "request_param": "request",
@@ -2831,6 +2991,6 @@
       "starlette.exceptions.HTTPException": "http_exception_handler"
     },
     "on_startup": ["_configure_scan_logging", "_start_protected_retention_worker"],
-    "on_shutdown": ["_stop_protected_retention_worker"]
+    "on_shutdown": ["_end_waiting_sign_ins", "_stop_protected_retention_worker"]
   }
 }

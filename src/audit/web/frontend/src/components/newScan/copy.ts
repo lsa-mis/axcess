@@ -241,6 +241,55 @@ export const ERRORS = {
 } as const;
 
 /**
+ * The sign-in card: what New scan says while someone signs in, before any
+ * scan exists. "Sign-in", not "Sign-in scan #N": there is no scan, and so no
+ * number, until "I'm signed in, start scan" creates one. The limit of a kept
+ * sign-in and the 30 minutes are stated, never dropped for length (rule 12
+ * in docs/plain-language.md).
+ */
+export const SIGN_IN = {
+  eyebrow: "Sign-in",
+  scanEyebrow: (scanId: number) => `Sign-in scan #${scanId}`,
+  site: (host: string) => `You have a sign-in in progress for ${host}.`,
+  alreadyWaiting:
+    "Axcess keeps one sign-in at a time, so it shows the one in progress instead of opening another window.",
+  opening: {
+    title: "Opening the sign-in window",
+    detail: "A Chromium browser window should open on this computer.",
+  },
+  open: {
+    title: "Sign in using the Chromium window",
+    detail: "Finish every sign-in step, including two-step sign-in (2FA). Then come back here.",
+  },
+  closed: {
+    title: "The sign-in window is closed",
+    detail: "Axcess has kept your sign-in, so you can start the scan or reopen the window.",
+  },
+  limit:
+    "Some sites tie a sign-in to the exact browser window, or end it quickly. If yours does, the site may ask you to sign in again after you reopen the window.",
+  keep: (minutes: number) =>
+    `Axcess keeps your sign-in in memory only. If you do not start the scan or reopen the window within ${minutes} minutes, Axcess forgets it.`,
+  keepOpen: (minutes: number) =>
+    `If you close the sign-in window before you start, Axcess keeps your sign-in for ${minutes} minutes, in memory only.`,
+  start: "I’m signed in, start scan",
+  starting: "Starting the scan…",
+  reopen: "Reopen sign-in window",
+  reopening: "Reopening the window…",
+  cancel: "Cancel sign-in",
+  cancelling: "Cancelling…",
+  ended: {
+    expired: (minutes: number) =>
+      `Your sign-in was kept for ${minutes} minutes without use, so Axcess forgot it. Select “${SUBMIT.login.label}” to sign in again.`,
+    cancelled:
+      "You cancelled the sign-in. Axcess closed the sign-in window and forgot your sign-in. Your settings are still filled in.",
+    failed:
+      "Axcess could not open the sign-in window. Check the website address and that Chromium for Playwright is installed, then try again.",
+    gone:
+      "This sign-in has ended. Axcess keeps a sign-in only in memory, so it ends when Axcess quits. Sign in again to start a scan.",
+  },
+} as const;
+
+/**
  * Starting again after a scan failed or was stopped. Settings come back;
  * sign-in and the confirmations never do, and the notice says so.
  */

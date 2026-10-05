@@ -15,6 +15,8 @@ from audit.db import repo
 from audit.db.schema import connect
 from audit.web import server
 
+from ._fake_sign_in import FakeSignInSession, start_sign_in_scan, wait_for_sign_in
+
 pytestmark = pytest.mark.ui
 SEARCH = {
     "confirmed": True,
@@ -40,7 +42,7 @@ def test_search_configuration_reaches_both_scan_modes(
 
     monkeypatch.setattr(server, "_run_background_crawl", capture)
     monkeypatch.setattr(server, "_run_local_login_background", capture_login)
-    monkeypatch.setattr(server, "ManualAuthenticationSession", lambda **kwargs: object())
+    monkeypatch.setattr(server, "ManualAuthenticationSession", FakeSignInSession)
     app = server.create_app(db_path=db_path, blob_dir=blob_dir)
     with TestClient(app, base_url="http://127.0.0.1:8765", client=("127.0.0.1", 45000)) as client:
         body = {
@@ -53,6 +55,11 @@ def test_search_configuration_reaches_both_scan_modes(
             json=body,
             headers={"origin": "http://127.0.0.1:8765"},
         )
+        assert response.status_code == 201, response.text
+        if login:
+            # A sign-in has no scan until "I'm signed in, start scan".
+            wait_for_sign_in(client, response.json()["sign_in_id"])
+            response = start_sign_in_scan(client, response.json()["sign_in_id"])
     assert response.status_code == 201, response.text
     assert len(captured) == 1
     assert captured[0].search is not None

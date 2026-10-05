@@ -425,9 +425,45 @@ export interface LocalLoginScanPayload {
   image_analysis_acknowledged: boolean;
 }
 
-export type LocalLoginScanStatus =
+/**
+ * A sign-in in progress: the person is signing in, and no scan exists yet.
+ * `cancelled`, `expired` and `failed` say why one ended; the server keeps
+ * only that word for a few recent IDs, never the site or the sign-in.
+ */
+export type LocalSignInStatus =
   | "opening_browser"
   | "awaiting_authentication"
+  | "cancelled"
+  | "expired"
+  | "failed";
+
+/** `GET /api/local-sign-ins/{id}` and the create, cancel and reopen responses. */
+export interface LocalSignInState {
+  /** The sign-in's own ID. It is not a scan ID. */
+  sign_in_id: string;
+  status: LocalSignInStatus;
+  /** The host the person is signing in to, for example "accessibility.umich.edu". */
+  site: string | null;
+  /** Whether a sign-in window is open on this computer. */
+  window_open: boolean;
+  error: string | null;
+  /** How long Axcess keeps the sign-in after its window closes. */
+  keep_minutes: number;
+  /** Seconds until Axcess forgets it; null while the window is open. */
+  forget_in_seconds: number | null;
+  /** True when a create request found this sign-in already waiting. */
+  already_waiting: boolean;
+  /** The settings this sign-in will scan with, to refill New scan. */
+  settings: NewScanPayload | null;
+}
+
+/** `GET /api/local-sign-ins/current`. */
+export interface CurrentLocalSignIn {
+  sign_in: LocalSignInState | null;
+}
+
+/** A sign-in scan that has started, from "I'm signed in, start scan" on. */
+export type LocalLoginScanStatus =
   | "verifying_authentication"
   | "scanning"
   | "completed"

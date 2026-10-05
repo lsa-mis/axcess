@@ -320,3 +320,18 @@ def choose_filter() -> Callable[..., Awaitable[None]]:
         await page.mouse.move(0, 0)
 
     return choose
+
+
+@pytest.fixture
+def fake_sign_in(monkeypatch: pytest.MonkeyPatch) -> Any:
+    """Swap the sign-in browser for ``FakeSignInSession`` in apps made after this.
+
+    List it before ``live_server`` or ``create_app`` so the app is built with
+    the fake. Returns the class; ``instances`` holds each session it made.
+    """
+    from ._fake_sign_in import FakeSignInSession
+
+    monkeypatch.setattr(FakeSignInSession, "instances", [])
+    monkeypatch.setattr(FakeSignInSession, "fail_start", False)
+    monkeypatch.setattr(web_server, "ManualAuthenticationSession", FakeSignInSession)
+    return FakeSignInSession

@@ -425,7 +425,9 @@ async def test_manual_session_is_headed_ephemeral_and_scans_after_verification()
     assert context.web_socket_route_calls == [
         ("**/*", session._route_guard._auxiliary.handle_web_socket)
     ]
-    assert set(context.event_handlers) == {"page"}
+    # "close": closing the sign-in window ends a persistent context, and the
+    # session keeps the sign-in when that happens before confirmation.
+    assert set(context.event_handlers) == {"page", "close"}
     assert session.state is ManualAuthState.AWAITING_MANUAL_AUTHENTICATION
 
     with pytest.raises(ManualAuthenticationError):

@@ -92,6 +92,50 @@ limit it to the auditor account, and ensure backup/synchronization products do
 not capture it. Treat a crash before cleanup as a potential session exposure
 under the deployment's incident procedure.
 
+### Local sign-in scans: the kept sign-in
+
+This section is about the local sign-in scan on the Axcess computer
+(`POST /api/local-login-scans`), not the companion.
+
+Until the auditor presses **I'm signed in, start scan**, a local sign-in is
+a sign-in in progress, not a scan. It lives only in process memory
+(`audit.web.local_sign_in.SignInRegistry`), with its own ID. There is no
+`scans` row, no Reports entry and no history, and it does not take the
+one-crawl lock. One waits at a time; a second request returns it.
+
+While the sign-in window is open, `ManualAuthenticationSession` keeps a copy
+of the signed-in state in memory: the same capture the headless handoff uses
+(cookies, local storage, IndexedDB, and the current tab's sessionStorage),
+plus the last page URL. It is refreshed on every page change in the current
+tab and every 5 seconds. It is never written to disk, logged, or returned
+through the API; the API reports only the host name, the form settings and
+whether the window is open.
+
+- **Window closed before the start.** Nothing ends. The browser and its
+  dedicated profile directory are closed and removed at once, so the kept
+  copy is the only copy left. The scan can start from it: with **Show the
+  scanning browser window** off, through the headless handoff; with it on,
+  in a visible window restored from it.
+- **Reopen.** `POST /api/local-sign-ins/{id}/reopen` opens a normal headed
+  Chromium (Playwright `launch`, a nonpersistent context, like the headless
+  handoff's) restored from the kept copy, on the last page. It has the same
+  egress policy, init script and route guard as the first window. Some
+  sites bind a session to the exact browser or end it quickly, so the site
+  may ask the auditor to sign in again.
+- **Expiry.** After 30 minutes with the window closed
+  (`SIGN_IN_KEEP_MINUTES`), the session is closed and the kept copy erased.
+  Nothing is recorded. The clock runs only while the window is closed;
+  reopening restarts it. With the window open the sign-in lives until the
+  auditor starts, cancels or quits Axcess.
+- **Cancel** (`POST /api/local-sign-ins/{id}/cancel`) and **quitting Axcess**
+  close every window and erase the kept copy. The registry remembers only
+  the ID and one word ("cancelled", "expired", "failed") for its 16 most
+  recent sign-ins, so the page can say why one ended.
+- **Start** (`POST /api/local-sign-ins/{id}/start`) creates the `scans` row
+  and takes the crawl lock. If another scan is running it is refused and
+  the sign-in kept. Once the scan has its own browser, the kept copy is
+  erased.
+
 ## Required deployment controls
 
 This mode is disabled by default (`AUDIT_PROTECTED_SCANS_ENABLED=false`). A
