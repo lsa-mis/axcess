@@ -180,16 +180,27 @@ export default function AppShell({ children }: { children: ReactNode }) {
   // depend on whether anyone was watching it load.
   useScrollRestoration();
 
+  // While Search is open, everything behind it is `inert`: it cannot take
+  // focus, be clicked or be read, as behind a native modal <dialog>. Search
+  // only said it was modal (aria-modal), so the page behind could still take
+  // focus. A page whose code loaded late, after Search was open again, moved
+  // focus to <main> or to its own first field; Enter then did nothing, or
+  // submitted New scan's form. Checking for an open dialog before each focus
+  // move was rejected: every page that sets focus would need the check, and
+  // `inert` is the HTML that means "not now". WAI-ARIA APG Dialog (Modal)
+  // pattern, https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/ (content
+  // outside the dialog is inert); SC 2.4.3 Focus Order, Level A.
   return (
     <div className="min-h-screen bg-surface-subtle">
       <a
+        inert={commandOpen}
         href="#main"
         className="sr-only-focusable fixed left-2 top-2 z-50 rounded-xs bg-umich-blue px-3 py-1.5 text-fg-inverse"
       >
         Skip to main content
       </a>
 
-      <div className="flex min-h-screen items-start">
+      <div inert={commandOpen} className="flex min-h-screen items-start">
         <Sidebar
           collapsed={sidebarCollapsed}
           onToggle={toggleSidebar}
