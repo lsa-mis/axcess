@@ -227,11 +227,11 @@ export default function AppShell({ children }: { children: ReactNode }) {
         </div>
       </div>
 
-      <CommandPalette
-        open={commandOpen}
-        onClose={() => setCommandOpen(false)}
-        scanId={reportMatch?.scanId ?? null}
-      />
+      {/* Mounted only while open, so each opening starts with an empty search
+          and the first result selected (CommandPalette.tsx). */}
+      {commandOpen && (
+        <CommandPalette open onClose={() => setCommandOpen(false)} scanId={reportMatch?.scanId ?? null} />
+      )}
       <ShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
       <PreferenceEffects />
     </div>

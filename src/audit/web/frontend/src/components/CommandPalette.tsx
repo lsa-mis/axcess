@@ -94,17 +94,15 @@ export default function CommandPalette({
     enabled: open && !!scanId,
   });
 
+  // Fresh state is the mount's: AppShell mounts Search only while it is
+  // open, so each opening starts empty. Resetting in an effect after opening
+  // (as this used to) ran late on a slow machine, after the first keys were
+  // typed, and left the list and the selection out of step; Enter then chose
+  // nothing (seen in CI, reproduced with the CPU slowed 8x).
   useEffect(() => {
     if (!open) return;
-    setQuery("");
-    setActive(0);
-    setMessage("");
     window.requestAnimationFrame(() => inputRef.current?.focus());
   }, [open]);
-  useEffect(() => {
-    setActive(0);
-    setMessage("");
-  }, [query]);
 
   const act = (item: Item | undefined) => {
     if (!item) return;
@@ -198,7 +196,7 @@ export default function CommandPalette({
       setActive((a) => Math.max(a - 1, 0));
     } else if (event.key === "Enter") {
       event.preventDefault();
-      act(items[active]);
+      act(items[Math.min(active, items.length - 1)]);
     } else if (event.key === "Escape") {
       onClose();
     }
@@ -243,7 +241,14 @@ export default function CommandPalette({
           <input
             ref={inputRef}
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            // The selection moves back to the first result in the same update
+            // as the text, never an effect later, so Enter always acts on a
+            // result in the list being shown.
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setActive(0);
+              setMessage("");
+            }}
             onKeyDown={onKeyDown}
             placeholder="Search reports, issues, and settings…"
             aria-label="Search"
@@ -282,7 +287,11 @@ export default function CommandPalette({
                     role="option"
                     aria-selected={index === active}
                     onClick={() => act(item)}
-                    onMouseEnter={() => setActive(index)}
+                    // On a real mouse movement only. onMouseEnter also fired when
+                    // the list moved under a still pointer (opening, filtering),
+                    // so the pointer took the selection away from the keyboard
+                    // (WAI-ARIA APG Listbox: the keyboard owns the selection).
+                    onMouseMove={() => index !== active && setActive(index)}
                     className={cn(
                       "block w-full px-4 py-2 text-left",
                       index === active ? "bg-umich-blue/10" : "hover:bg-surface-muted",
