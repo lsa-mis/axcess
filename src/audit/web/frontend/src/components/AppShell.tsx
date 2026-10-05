@@ -257,9 +257,18 @@ const SIDEBAR_ROW_IDLE = "text-fg-muted hover:bg-umich-blue/10 hover:text-umich-
  * scan button's colour, so the place you were in read as another button. No
  * border keeps it apart from the bordered Search button, and the bar on its
  * edge marks it by shape as well as by colour.
+ *
+ * Dark theme: the "white card" is the dark surface there, the same as the
+ * sidebar, so the card vanished and its shadow could not show; and the blue
+ * text (light blue in this theme) was dimmer than the idle rows' grey, so the
+ * current place looked quieter than the rest. In dark it is a light-blue tint,
+ * clearly lighter than the sidebar, with the brightest text (16:1 on the
+ * sidebar, about 10:1 on the tint) and the same bar. SC 1.4.11 Non-text
+ * Contrast and SC 1.4.6 Contrast (Enhanced); the current place is also
+ * aria-current="page", so it never rests on colour alone.
  */
 const SIDEBAR_ROW_ACTIVE =
-  "bg-surface text-umich-blue shadow-[0_2px_10px_rgba(0,39,76,0.10)] before:absolute before:inset-y-2.5 before:left-0 before:w-1 before:rounded-r-full before:bg-umich-blue";
+  "bg-surface text-umich-blue shadow-[0_2px_10px_rgba(0,39,76,0.10)] before:absolute before:inset-y-2.5 before:left-0 before:w-1 before:rounded-r-full before:bg-umich-blue dark:bg-umich-blue/20 dark:text-fg dark:shadow-none";
 
 /**
  * Search and feedback: reachable from every screen, so they live in the
