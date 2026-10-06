@@ -25,7 +25,8 @@ export const MAIN_NAV = [
 /** Product pages that are Astro pages rather than guides from docs/. */
 export const PRODUCT_PAGES = [
   { href: "/", title: "Home" },
-  { href: "/get-started/", title: "Download and install" },
+  { href: "/get-started/", title: "Get started" },
+  { href: "/sign-in-scan/", title: "Scan a site behind a sign-in" },
   { href: "/how-it-works/", title: "How Axcess works" },
   { href: "/coverage/", title: "What Axcess checks" },
   { href: "/who-its-for/", title: "Who Axcess is for" },

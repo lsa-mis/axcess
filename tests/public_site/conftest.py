@@ -21,6 +21,7 @@ BASE = "/axcess/"
 PRODUCT_ROUTES = (
     "",
     "get-started/",
+    "sign-in-scan/",
     "how-it-works/",
     "coverage/",
     "who-its-for/",

@@ -259,6 +259,20 @@ def test_setup_drawings_use_the_installer_words(pages: dict[str, str]) -> None:
     assert finish_last_line in page
 
 
+def test_get_started_keeps_the_first_launch_steps_link(pages: dict[str, str]) -> None:
+    """Shipped desktop apps link to get-started/#first-launch; it must lead to the steps.
+
+    The update message in desktop/src/main.cjs, the README and the release
+    notes send Mac users there for the first-launch steps, and an app that
+    is already installed can't be changed.
+    """
+    page = pages["get-started/"]
+    assert 'id="first-launch"' in page
+    for anchor in ("install", "mac", "windows", "linux", "from-source"):
+        assert f'id="{anchor}"' in page, anchor
+    assert "Open Anyway" in _parse(page).text
+
+
 def test_install_drawings_are_named_pictures(pages: dict[str, str]) -> None:
     doc = _parse(pages["get-started/"])
     named = ("Drawing of", "Two drawings of")
@@ -268,9 +282,13 @@ def test_install_drawings_are_named_pictures(pages: dict[str, str]) -> None:
 
 
 def test_step_screenshots_have_alt_text_and_size(pages: dict[str, str]) -> None:
-    imgs = _parse(pages["get-started/"]).imgs
-    shots = [img for img in imgs if "/screens/" in (img.get("src") or "")]
-    assert len(shots) == 7
+    # Four on Get started (the first scan), three with the sign-in steps.
+    shots = []
+    for route, count in (("get-started/", 4), ("sign-in-scan/", 3)):
+        imgs = _parse(pages[route]).imgs
+        found = [img for img in imgs if "/screens/" in (img.get("src") or "")]
+        assert len(found) == count, route
+        shots += found
     for img in shots:
         name = Path(urlsplit(img["src"] or "").path).name
         assert (ROOT / "site" / "public" / "screens" / name).is_file(), name
@@ -279,8 +297,8 @@ def test_step_screenshots_have_alt_text_and_size(pages: dict[str, str]) -> None:
 
 
 def test_first_scan_steps_use_the_app_words(pages: dict[str, str]) -> None:
-    """The first-scan steps name what the New scan screen shows (newScan/copy.ts)."""
-    page = _parse(pages["get-started/"]).text
+    """The first-scan and sign-in steps name what New scan shows (newScan/copy.ts)."""
+    page = _parse(pages["get-started/"]).text + _parse(pages["sign-in-scan/"]).text
     for words in (
         "Website address",
         "Scan the whole website",

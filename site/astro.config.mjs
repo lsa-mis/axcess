@@ -58,7 +58,7 @@ export default defineConfig({
         {
           label: "Start here",
           items: [
-            { label: "Download and install", link: "/get-started/" },
+            { label: "Get started", link: "/get-started/" },
             { label: "How Axcess works", link: "/how-it-works/" },
             { label: "Using the desktop app", link: "/docs/desktop-app/" },
           ],
@@ -67,6 +67,7 @@ export default defineConfig({
           label: "Use Axcess",
           items: [
             { label: "Reading your report", link: "/docs/reading-your-report/" },
+            { label: "Scan a site behind a sign-in", link: "/sign-in-scan/" },
             { label: "Scanning search-driven sites", link: "/docs/spa-search-scans/" },
             { label: "Troubleshooting", link: "/docs/troubleshooting/" },
           ],

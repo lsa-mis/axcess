@@ -195,6 +195,6 @@ export const QUESTIONS: Question[] = [
     id: "platforms",
     q: "Which computers does it run on?",
     a: "The desktop app runs on a Mac with Apple silicon, on Windows 10 and 11 (64-bit), and on 64-bit Linux. There is no version for Mac computers with Intel processors. The app doesn't yet carry the signatures Mac and Windows look for, so they warn you the first time you open it. To run Axcess from its source code, use macOS, Linux, or Windows with WSL (Windows Subsystem for Linux).",
-    links: [{ href: "/get-started/", text: "Download and install, with the first-launch steps" }],
+    links: [{ href: "/get-started/#first-launch", text: "Get started: install and open it" }],
   },
 ];
