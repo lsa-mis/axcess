@@ -11,7 +11,7 @@
   var toggle = document.querySelector(".nav-toggle");
   var nav = document.getElementById("site-nav");
   if (toggle && nav) {
-    var mq = window.matchMedia("(max-width: 880px)");
+    var mq = window.matchMedia("(max-width: 62.5em)");
     function sync() {
       if (mq.matches) {
         nav.hidden = toggle.getAttribute("aria-expanded") !== "true";
