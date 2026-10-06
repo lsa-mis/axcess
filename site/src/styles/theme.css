@@ -198,6 +198,14 @@ starlight-toc h2,
 mobile-starlight-toc summary {
   font-size: var(--sl-text-base);
 }
+/* The section you are reading, in "On this page": a bar on its left and
+ * semibold, not only Starlight's colour change (SC 1.4.1 Use of Color,
+ * Level A). The same cue as the sidebar's current page. Drawn as an inset
+ * shadow so the text does not shift when the current section changes. */
+starlight-toc a[aria-current="true"] {
+  box-shadow: inset 3px 0 0 var(--ax-link);
+  font-weight: 600;
+}
 /* The code copy button and the "Edit this page on GitHub" link. */
 .expressive-code .copy button {
   width: var(--ax-target) !important;
@@ -225,6 +233,20 @@ site-search > button,
  * darkens and the name is underlined, so the change is not colour alone
  * (SC 1.4.1 Use of Color, Level A). The whole box stays the link, at least
  * 44 px tall (SC 2.5.5 Target Size (Enhanced), Level AAA). */
+/* Two equal columns, Previous always left and Next always right, so a lone
+ * link takes half the width, not all of it. One column on a narrow
+ * screen. */
+.pagination-links {
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 40rem) {
+  .pagination-links {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .pagination-links a[rel="next"] {
+    grid-column: 2;
+  }
+}
 .pagination-links a {
   align-items: flex-end;
   gap: 0.75rem;
