@@ -248,6 +248,12 @@ button.sl-menu-button {
  * is #475263 instead of the artifact's #4a5b6e (6.5:1), so it clears 7:1.
  * The artifact has no dark theme; the dark values follow the app's.
  *
+ * Changed from the artifact on 2026-10-06, by the developer's direction, to
+ * look calmer: a lighter hero heading, the facts as a 2 by 2 grid, the two
+ * report panels on one left edge, and a paler saved-copy area (#e6ecf2
+ * with #173f7a text, 8.7:1, instead of #b3c0cc, the heaviest block on the
+ * page). See overrides/Hero.astro.
+ *
  * The page keeps the sidebar for the phone menu and between 50 and 72rem,
  * where the header has no room for its links, so at every width there is
  * one way to every page. From 72rem the header links take over and the
@@ -308,8 +314,8 @@ button.sl-menu-button {
   --h-cta-fg: #ffffff;
   --h-cta-muted: #d4deea;
   --h-cta-line: #5d7a9e;
-  --h-saved: #b3c0cc;
-  --h-saved-link: #1a4fa0;
+  --h-saved: #e6ecf2;
+  --h-saved-link: #173f7a;
   --h-shadow-soft: 0 10px 30px -20px rgb(10 38 71 / 0.3);
   --h-shadow: 0 30px 70px -30px rgb(10 38 71 / 0.45);
 }
@@ -338,8 +344,8 @@ button.sl-menu-button {
   --h-cta-fg: #ffffff;
   --h-cta-muted: #d4deea;
   --h-cta-line: #5d7a9e;
-  --h-saved: #b3c0cc;
-  --h-saved-link: #1a4fa0;
+  --h-saved: #e6ecf2;
+  --h-saved-link: #173f7a;
   --h-shadow-soft: 0 10px 30px -20px rgb(10 38 71 / 0.3);
   --h-shadow: 0 30px 70px -30px rgb(10 38 71 / 0.45);
   }

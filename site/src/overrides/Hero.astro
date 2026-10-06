@@ -5,8 +5,8 @@
  * Left: what Axcess is and the two next steps. Right: a picture of a report,
  * drawn in HTML rather than a screenshot so it stays sharp, follows the
  * light and dark theme, and can be kept in step with the app's wording.
- * Sizes, spacing, layering and shadows copy the v3 design artifact exactly
- * (see the home page section in theme.css for what differs and why).
+ * Sizes, spacing, layering and shadows started from the v3 design artifact;
+ * the home page section in theme.css lists what differs and why.
  *
  * Choices and why:
  * - One filled button ("Download Axcess"). It goes to the download section
@@ -25,6 +25,25 @@
  * - "WCAG" links to its glossary entry, which spells it out (SC 3.1.4
  *   Abbreviations, Level AAA, technique G55). The badge says only "Free and
  *   open source" so it stays one line at 320 px.
+ *
+ * Calmer, by the developer's direction (2026-10-06):
+ * - The heading is semibold (650), not bold, and a little smaller, and the
+ *   paragraph is held to about 60 characters a line. At full weight the
+ *   heading, the name in the header and the button all competed.
+ * - No arrow on "Download Axcess": the words already say it, and the "↓"
+ *   character drew clumsily in this font.
+ * - The four facts are a 2 by 2 grid, each with a check mark, instead of a
+ *   wrapping line that left one fact alone on the second row. All four stay,
+ *   including the WCAG version, because it is a limit (docs/plain-language.md
+ *   rule 12). At 320 px they become one column.
+ * - The two report panels have one width, and the front one is offset 40
+ *   px to the right and down. The old front panel stuck out 28 px to the
+ *   left, toward the text, and was wider, so it read as a mistake. Tried
+ *   and rejected: an inset front panel (the back card's corner showed) and
+ *   a flush one (it read as one tall card with a seam). The offset is big
+ *   enough to look meant and points away from the text. Below 30rem the
+ *   panels go flush, so nothing needs sideways scrolling (SC 1.4.10
+ *   Reflow, Level AA).
  */
 import { url } from "../lib/site";
 
@@ -38,21 +57,21 @@ const { hero, title } = Astro.locals.starlightRoute.entry.data;
       <h1 id="_top">{hero?.title ?? title}</h1>
       {hero?.tagline && <p class="tagline">{hero.tagline}</p>}
       <div class="actions">
-        <a class="button primary" href={url("/get-started/#download")}>Download Axcess <span aria-hidden="true">↓</span></a>
+        <a class="button primary" href={url("/get-started/#download")}>Download Axcess</a>
         <a class="button secondary" href={url("/coverage/")}>See what it checks</a>
       </div>
       <ul class="facts">
-        <li>Runs on your own computer</li>
-        <li>No account needed</li>
-        <li>Mac, Windows and Linux</li>
-        <li>Checks <a href={url("/docs/glossary/#wcag")}>WCAG</a> 2.1 AA, or 2.2 if you choose</li>
+        <li><span>Runs on your own computer</span></li>
+        <li><span>No account needed</span></li>
+        <li><span>Mac, Windows and Linux</span></li>
+        <li><span>Checks <a href={url("/docs/glossary/#wcag")}>WCAG</a> 2.1 AA, or 2.2 if you choose</span></li>
       </ul>
     </div>
 
     <div
       class="mockup"
       role="img"
-      aria-label="Example of an Axcess report for www.example.org: 194 pages, 1,171 page states opened by clicking, and 12 barriers. In front of it, the saved copy of a page outlines the first of 19 flagged elements, a link, and lists what it is, its text, its size and its element locator."
+      aria-label="Example of an Axcess report for www.example.org: 194 pages, 1,171 page states opened by clicking, and 12 Mostly sure issues. In front of it, the saved copy of a page outlines the first of 19 flagged elements, a link, and lists what it is, its text, its size and its element locator."
     >
       <div class="panel summary" aria-hidden="true">
         <p class="meta">Example report</p>
@@ -60,13 +79,13 @@ const { hero, title } = Astro.locals.starlightRoute.entry.data;
         <div class="stats">
           <div><span class="n">194</span><span class="l">Pages</span></div>
           <div><span class="n">1,171</span><span class="l">Page states opened by clicking</span></div>
-          <div><span class="n">12</span><span class="l">Mostly sure</span></div>
+          <div><span class="n">12</span><span class="l">Mostly sure issues</span></div>
         </div>
       </div>
       <div class="panel inspector" aria-hidden="true">
         <div class="bar">
           <span>Flagged element 1 of 19</span>
-          <span class="chips"><span class="chip muted">Previous</span><span class="chip">Next ⌄</span></span>
+          <span class="chips"><span class="chip muted">Previous</span><span class="chip">Next</span></span>
         </div>
         <dl class="facts-list">
           <dt>What it is</dt><dd>Link</dd>
@@ -115,17 +134,17 @@ const { hero, title } = Astro.locals.starlightRoute.entry.data;
   h1 {
     margin: 22px 0 20px;
     color: var(--h-text);
-    font-size: clamp(40px, 5.2vw, 64px);
-    font-weight: 700;
-    line-height: 1.03;
-    letter-spacing: -0.028em;
+    font-size: clamp(38px, 4.6vw, 56px);
+    font-weight: 650;
+    line-height: 1.06;
+    letter-spacing: -0.024em;
     text-wrap: balance;
   }
   .tagline {
-    max-width: 540px;
+    max-width: 32rem;
     margin: 0 0 32px;
     color: var(--h-muted);
-    font-size: 20px;
+    font-size: 19px;
     line-height: 1.55;
     text-wrap: pretty;
   }
@@ -168,15 +187,30 @@ const { hero, title } = Astro.locals.starlightRoute.entry.data;
     border-color: var(--h-accent);
   }
   .facts {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px 22px;
-    margin: 26px 0 0;
+    display: grid;
+    grid-template-columns: repeat(2, max-content);
+    gap: 10px 28px;
+    margin: 28px 0 0;
     padding: 0;
     list-style: none;
     color: var(--h-muted);
     font-size: 15px;
     font-weight: 500;
+  }
+  .facts li {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  /* A check mark drawn in CSS, so it is decoration a screen reader skips. */
+  .facts li::before {
+    content: "";
+    flex-shrink: 0;
+    width: 10px;
+    height: 5px;
+    border-bottom: 2px solid var(--h-accent);
+    border-left: 2px solid var(--h-accent);
+    transform: translateY(-3px) rotate(-45deg);
   }
   .facts a {
     color: var(--h-accent);
@@ -186,15 +220,17 @@ const { hero, title } = Astro.locals.starlightRoute.entry.data;
   /* Mockup */
   .mockup {
     position: relative;
-    padding: 0 0 0 28px;
   }
   .panel {
     border: 1px solid var(--h-card-line);
     border-radius: 14px;
     background: var(--h-band);
   }
+  /* Two panels of one width, offset 40 px right and down, so the front
+     one reads as a closer look laid on the report. */
   .summary {
-    padding: 20px 22px 64px;
+    margin-inline-end: 40px;
+    padding: 20px 22px 52px;
     box-shadow: var(--h-shadow-soft);
   }
   .meta {
@@ -233,7 +269,7 @@ const { hero, title } = Astro.locals.starlightRoute.entry.data;
   }
   .inspector {
     position: relative;
-    margin: -44px 0 0 -28px;
+    margin: -32px 0 0 40px;
     overflow: hidden;
     box-shadow: var(--h-shadow);
   }
@@ -297,9 +333,9 @@ const { hero, title } = Astro.locals.starlightRoute.entry.data;
     background: var(--h-saved);
   }
   .page-heading {
-    margin: 0 0 18px;
+    margin: 0 0 16px;
     color: var(--h-saved-link);
-    font-size: clamp(20px, 2.2vw, 26px);
+    font-size: clamp(18px, 1.9vw, 22px);
     font-weight: 700;
     line-height: 1.15;
   }
@@ -330,19 +366,30 @@ const { hero, title } = Astro.locals.starlightRoute.entry.data;
   }
   .page-sub {
     color: var(--h-saved-link);
-    font-size: clamp(18px, 2vw, 24px);
+    font-size: clamp(16px, 1.7vw, 20px);
     font-weight: 700;
   }
   @media (max-width: 30rem) {
     .wrap {
       padding: 56px 20px 64px;
     }
-    .mockup {
-      padding-inline-start: 0;
+    .facts {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .summary {
+      margin-inline-end: 0;
     }
     .inspector {
-      margin: -44px 0 0;
+      margin-inline-start: 0;
     }
+    /* Stacked buttons at one width, not two ragged widths. */
+    .actions {
+      flex-direction: column;
+    }
+    .button {
+      justify-content: center;
+    }
+
     .facts-list {
       grid-template-columns: minmax(0, 1fr);
       gap: 2px;
