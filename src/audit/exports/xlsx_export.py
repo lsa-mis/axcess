@@ -74,7 +74,7 @@ from audit.exports.audit_report import (
     plain_text,
 )
 from audit.exports.collector import ExportScan
-from audit.labels import CLICK_THROUGH, CLICK_THROUGH_STATES_LABEL
+from audit.labels import CLICK_THROUGH, CLICK_THROUGH_STATES_LABEL, REVIEW_LANE_LABELS
 from audit.logging import get_logger
 from audit.web import issues
 
@@ -124,13 +124,21 @@ _OWNER_DISPLAY = {
     "content": "Content author",
 }
 
+# Names the How sure column's own words (REVIEW_LANE_LABELS), so the
+# guidance points at a column the sheet really has. It used to name an
+# "Evidence decision" column and the old "Likely Barrier" / "Expert Review"
+# words, neither of which the workbook showed.
 _GUIDANCE_TEMPLATE = (
-    "Prioritization Guidance, Start with rows whose Evidence decision is "
-    "Likely Barrier. Rows marked Expert Review require a human decision before "
-    "they are described as barriers; Informational rows are not worklist items. "
-    "Within the Likely Barrier lane, fix issues in conformance-level order. "
+    "Prioritization Guidance, Start with rows marked "
+    f"{REVIEW_LANE_LABELS['likely_barrier']} in the How sure column: a rule "
+    "check failed, so check each one on the page, then fix it. Rows marked "
+    f"{REVIEW_LANE_LABELS['expert_review']} need a person to decide whether "
+    "they are real problems before you report them. Rows marked "
+    f"{REVIEW_LANE_LABELS['informational']} are not problems to fix. Among "
+    f"the {REVIEW_LANE_LABELS['likely_barrier']} rows, fix issues in "
+    "conformance-level order. "
     "Level A flags the most significant barriers that block people with "
-    "disabilities outright; remediate these first. Level AA issues are "
+    "disabilities outright; fix these first. Level AA issues are "
     "required for WCAG {wcag_version} AA conformance (the standard most policies and "
     "laws reference) and should follow. Items marked S are best-practice "
     "recommendations that go beyond the success criteria, address them "
@@ -149,6 +157,9 @@ def _guidance(wcag_version: str) -> str:
 _ISSUE_HEADERS = (
     "ID",
     "Issue",
+    # How sure Axcess is that the issue is a real problem, as the app's Issues
+    # table says it, so the guidance above can point readers at it.
+    "How sure",
     "Severity",
     "Conformance Level",
     "Remediation Ownership",
@@ -157,7 +168,7 @@ _ISSUE_HEADERS = (
     "Pages",
     "Details",
 )
-_ISSUE_WIDTHS = (8.0, 46.0, 12.0, 17.5, 19.13, 15.38, 11.0, 9.0, 22.0)
+_ISSUE_WIDTHS = (8.0, 46.0, 15.0, 12.0, 17.5, 19.13, 15.38, 11.0, 9.0, 22.0)
 
 # One issue's own tab: the instance table that the index links into.
 _INSTANCE_HEADERS = (
@@ -538,6 +549,7 @@ def _build_issue_index_sheet(
         values: tuple[Any, ...] = (
             ticket.id,
             ticket.row.title,
+            REVIEW_LANE_LABELS[ticket.row.review_lane],
             ticket.severity,
             _CONFORMANCE_DISPLAY.get(ticket.row.conformance, ticket.row.conformance),
             _OWNER_DISPLAY.get(ticket.row.responsibility, ticket.row.responsibility.title()),
@@ -548,7 +560,7 @@ def _build_issue_index_sheet(
         )
         for c, v in enumerate(values, start=1):
             cell = ws.cell(row=r, column=c, value=v)
-            cell.alignment = _WRAP_TOP_CENTER if c in (1, 3, 4, 5, 6, 7, 8) else _WRAP_TOP
+            cell.alignment = _WRAP_TOP_CENTER if c not in (2, ncols) else _WRAP_TOP
             cell.border = _BORDER
             if ticket.index % 2 == 1:
                 cell.fill = _BAND_FILL
@@ -568,7 +580,8 @@ def _build_issue_index_sheet(
     dv = DataValidation(type="list", formula1=f'"{",".join(_STATUS_CHOICES)}"', allow_blank=True)
     ws.add_data_validation(dv)
     if r > header_row:
-        dv.add(f"F{header_row + 1}:F{last_row}")
+        status = get_column_letter(_ISSUE_HEADERS.index("Status") + 1)
+        dv.add(f"{status}{header_row + 1}:{status}{last_row}")
 
 
 _FIX_OPTION_HEADERS = ("Option", "Applies to", "Approach", "Watch out for")
@@ -976,17 +989,20 @@ def _build_summary_sheet(
     likely_occurrences = sum(c.affected_finding_count for c in cards)
     review_occurrences = sum(int(row.occurrence_count) for row in best_practice)
     section("Issue counts")
-    metric("Likely-barrier issue groups", len(cards))
-    metric("Likely-barrier occurrences", likely_occurrences)
-    metric("Review-only / informational groups", len(best_practice))
-    metric("Review-only / informational occurrences", review_occurrences)
+    # "Issues to fix" are the written report's issue cards: open Mostly sure
+    # issues tied to a WCAG criterion, plus Not sure issues a person confirmed
+    # (In progress). Not "Mostly sure": that would miss the confirmed ones.
+    metric("Issues to fix", len(cards))
+    metric("Occurrences to fix", likely_occurrences)
+    metric("Other issues (to check, best practice, or for information)", len(best_practice))
+    metric("Other occurrences", review_occurrences)
     metric("Already-triaged issue types", len(dropped))
     r += 1
 
     by_sev: dict[str, int] = {}
     for c in cards:
         by_sev[c.severity] = by_sev.get(c.severity, 0) + 1
-    section("Likely barriers by severity")
+    section("Issues to fix, by severity")
     for sev in _SEVERITY_ORDER:
         metric(sev, by_sev.get(sev, 0))
     r += 1
@@ -994,7 +1010,7 @@ def _build_summary_sheet(
     by_level: dict[str, int] = {}
     for c in cards:
         by_level[c.wcag_level or "n/a"] = by_level.get(c.wcag_level or "n/a", 0) + 1
-    section("Likely barriers by WCAG level")
+    section("Issues to fix, by WCAG level")
     for lvl in ("A", "AA", "AAA"):
         if by_level.get(lvl):
             metric(f"Level {lvl}", by_level[lvl])
@@ -1004,7 +1020,7 @@ def _build_summary_sheet(
     for c in cards:
         p = _principle_for(c.wcag_sc)
         by_principle[p] = by_principle.get(p, 0) + 1
-    section("Likely barriers by WCAG principle (POUR)")
+    section("Issues to fix, by WCAG principle (POUR)")
     for principle in ("Perceivable", "Operable", "Understandable", "Robust"):
         if by_principle.get(principle):
             metric(principle, by_principle[principle])
