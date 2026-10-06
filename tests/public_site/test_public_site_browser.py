@@ -223,7 +223,7 @@ def test_without_scripts_the_phone_menu_and_all_pages_link_work(
 
     assert page.locator("a.all-pages").is_visible()
     assert not page.locator("site-search > button").first.is_visible()
-    assert not page.locator("starlight-theme-select").first.is_visible()
+    assert not page.locator("ax-theme-toggle").first.is_visible()
 
     menu = page.locator("button.sl-menu-button")
     menu.focus()
@@ -351,4 +351,31 @@ def test_install_drawings_fit_at_320_px(site_browser: Browser, dist: Path) -> No
              .filter(d => d.scrollWidth > d.clientWidth + 1).length"""
     )
     assert overflow == 0
+    ctx.close()
+
+
+def test_the_day_and_night_switch_turns_dark_mode_on_and_off(
+    site_browser: Browser, dist: Path
+) -> None:
+    """One button named "Dark mode": pressed means dark, and the choice is kept.
+
+    Until someone chooses, the page follows the computer (here, light). The
+    name stays the same and only aria-pressed changes (the APG toggle button
+    pattern). The choice is stored, so the next page opens in it.
+    """
+    ctx = _context(site_browser, dist, color_scheme="light")
+    page = _open(ctx, "docs/glossary/")
+    switch = page.locator("header").get_by_role("button", name="Dark mode", exact=True)
+    assert switch.get_attribute("aria-pressed") == "false"
+    assert page.evaluate("document.documentElement.dataset.theme") == "light"
+
+    switch.focus()
+    page.keyboard.press("Enter")
+    assert switch.get_attribute("aria-pressed") == "true"
+    assert page.evaluate("document.documentElement.dataset.theme") == "dark"
+
+    page = _open(ctx, "faq/")
+    switch = page.locator("header").get_by_role("button", name="Dark mode", exact=True)
+    assert page.evaluate("document.documentElement.dataset.theme") == "dark"
+    assert switch.get_attribute("aria-pressed") == "true"
     ctx.close()

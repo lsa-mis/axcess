@@ -1,7 +1,7 @@
 ---
 /**
- * Site header: name, search, the three main destinations, GitHub, the theme
- * switch, and Download.
+ * Site header: name, search, the three main destinations, GitHub, the day and
+ * night switch, and Download.
  *
  * Why these three links: they are the questions a first-time visitor asks
  * (how do I use it, what does it check, where does my data go). Everything
@@ -16,12 +16,18 @@
  * much of the page at 320 px and at 400% zoom (SC 1.4.10 Reflow, Level AA;
  * SC 2.4.11 Focus Not Obscured (Minimum), Level AA). The order of items is
  * the same on every page (SC 3.2.3 Consistent Navigation, Level AA).
+ *
+ * The search box gets room to grow (up to 18rem) rather than shrinking to
+ * its words: a short box read as a button, not a place to type, and
+ * "Search" plus the shortcut barely fit. The GitHub mark is centred in the
+ * same 44 px box as the links beside it; Starlight's own box sat it a few
+ * pixels high.
  */
 // Public component paths, not Starlight's virtual modules, so `astro check`
 // can type them. Search and SiteTitle are this site's own overrides.
 import SocialIcons from "@astrojs/starlight/components/SocialIcons.astro";
-import ThemeSelect from "@astrojs/starlight/components/ThemeSelect.astro";
 import Search from "./Search.astro";
+import ThemeToggle from "./ThemeToggle.astro";
 import SiteTitle from "./SiteTitle.astro";
 import { MAIN_NAV, url } from "../lib/site";
 
@@ -52,7 +58,7 @@ const path = Astro.url.pathname;
     <div class="social-icons">
       <SocialIcons />
     </div>
-    <ThemeSelect />
+    <ThemeToggle />
     <a class="download" href={url("/get-started/#download")}>Download</a>
   </div>
 </div>
@@ -74,6 +80,13 @@ const path = Astro.url.pathname;
   .search {
     display: flex;
   }
+  @media (min-width: 50rem) {
+    .search {
+      flex: 1 1 auto;
+      max-width: 18rem;
+      margin-inline-end: auto;
+    }
+  }
   .main-nav,
   .right-group {
     display: none;
@@ -83,6 +96,7 @@ const path = Astro.url.pathname;
       gap: 1.5rem;
     }
     .search {
+      flex: 0 1 18rem;
       margin-inline-end: auto;
     }
     .main-nav {
@@ -123,12 +137,22 @@ const path = Astro.url.pathname;
   @media (min-width: 50rem) {
     .right-group {
       display: flex;
-      gap: 1rem;
+      gap: 0.5rem;
       align-items: center;
     }
     .social-icons {
       display: flex;
       align-items: center;
+    }
+    .social-icons :global(a) {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+    .social-icons :global(svg) {
+      width: 1.375rem;
+      height: 1.375rem;
     }
   }
   .download {

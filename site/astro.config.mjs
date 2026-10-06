@@ -47,6 +47,9 @@ export default defineConfig({
         Footer: "./src/overrides/Footer.astro",
         ThemeProvider: "./src/overrides/ThemeProvider.astro",
         Hero: "./src/overrides/Hero.astro",
+        // A day and night switch in place of the three-way theme menu, in
+        // the header and the phone menu alike (see the file for why).
+        ThemeSelect: "./src/overrides/ThemeToggle.astro",
       },
       // One list for every page, product and documentation alike, grouped by
       // what the reader is trying to do (COGA "Making Content Usable":

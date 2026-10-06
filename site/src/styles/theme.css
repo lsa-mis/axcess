@@ -176,12 +176,6 @@ mobile-starlight-toc a {
   display: flex;
   align-items: center;
 }
-/* Starlight fixes the theme menu at 6.25em, which cuts off "Same as my
- * computer". The width is an inline style, so only !important can widen it.
- * 15em because the select's icon and arrow padding come out of this width. */
-starlight-theme-select label {
-  --sl-select-width: 15em !important;
-}
 /* The code copy button and the "Edit this page on GitHub" link. */
 .expressive-code .copy button {
   width: var(--ax-target) !important;
@@ -193,12 +187,23 @@ footer .meta a {
   min-height: var(--ax-target);
 }
 .social-icons a,
-starlight-theme-select label,
 site-search > button,
 .pagination-links a,
 .sl-skip-link {
   min-height: var(--ax-target);
   min-width: var(--ax-target);
+}
+
+/* The phone menu button, flat and centred like the search icon beside it.
+ * Starlight draws it as a floating white circle with a shadow below, which
+ * next to the flat search icon read as sitting high and clipped. The open
+ * state keeps Starlight's grey fill, so open and closed still differ. */
+button.sl-menu-button {
+  align-items: center;
+  justify-content: center;
+  background-color: transparent;
+  color: var(--ax-fg);
+  box-shadow: none;
 }
 
 /* ---------------------------------------------------------------------
@@ -216,7 +221,7 @@ site-search > button,
   display: revert;
 }
 :root:not(.ax-js) site-search > button[data-open-modal],
-:root:not(.ax-js) starlight-theme-select,
+:root:not(.ax-js) ax-theme-toggle,
 :root:not(.ax-js) .expressive-code .copy {
   display: none;
 }
