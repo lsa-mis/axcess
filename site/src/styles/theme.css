@@ -198,12 +198,20 @@ starlight-toc h2,
 mobile-starlight-toc summary {
   font-size: var(--sl-text-base);
 }
-/* The section you are reading, in "On this page": a bar on its left and
- * semibold, not only Starlight's colour change (SC 1.4.1 Use of Color,
- * Level A). The same cue as the sidebar's current page. Drawn as an inset
- * shadow so the text does not shift when the current section changes. */
+/* The section you are reading, in "On this page": a thin grey rail runs
+ * down the whole list, and the current section's part of it is a straight
+ * bar in the link colour, with the name in semibold, not only Starlight's
+ * colour change (SC 1.4.1 Use of Color, Level A). The same idea as the
+ * sidebar's current page. A bar drawn inside each link's rounded corners
+ * was tried first and read as a curved bracket (developer's review). The
+ * rail is a border of the same width on every link, so nothing shifts when
+ * the current section changes. */
+starlight-toc a {
+  border-inline-start: 2px solid var(--ax-border);
+  border-radius: 0;
+}
 starlight-toc a[aria-current="true"] {
-  box-shadow: inset 3px 0 0 var(--ax-link);
+  border-inline-start-color: var(--ax-link);
   font-weight: 600;
 }
 /* The code copy button and the "Edit this page on GitHub" link. */
