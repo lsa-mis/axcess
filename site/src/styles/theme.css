@@ -216,6 +216,45 @@ site-search > button,
   min-width: var(--ax-target);
 }
 
+/* Previous and next page links, at the foot of each page: a quiet way on,
+ * not a second headline. Starlight draws them with a drop shadow and the
+ * page name at 24 px, larger than most headings on the page, with the arrow
+ * centred on both lines. Here: a light border and no shadow, the page name
+ * at 18 px in the link colour, the "Previous" or "Next" label small and
+ * muted above it, and the arrow on the name's line. On hover the border
+ * darkens and the name is underlined, so the change is not colour alone
+ * (SC 1.4.1 Use of Color, Level A). The whole box stays the link, at least
+ * 44 px tall (SC 2.5.5 Target Size (Enhanced), Level AAA). */
+.pagination-links a {
+  align-items: flex-end;
+  gap: 0.75rem;
+  padding: 0.875rem 1.125rem;
+  border-color: var(--ax-border);
+  border-radius: 0.75rem;
+  box-shadow: none;
+  color: var(--ax-fg-muted);
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+.pagination-links a:hover {
+  border-color: var(--ax-fg);
+}
+.pagination-links .link-title {
+  color: var(--ax-link);
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.pagination-links a:hover .link-title {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.pagination-links svg {
+  width: 1.125rem;
+  height: 1.125rem;
+  margin-bottom: 0.2rem;
+}
+
 /* The phone menu button, flat and centred like the search icon beside it.
  * Starlight draws it as a floating white circle with a shadow below, which
  * next to the flat search icon read as sitting high and clipped. The open
