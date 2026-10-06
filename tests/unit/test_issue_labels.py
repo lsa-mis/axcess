@@ -20,7 +20,8 @@ def test_every_key_has_a_label_and_help() -> None:
 
 def test_click_through_is_the_feature_name() -> None:
     assert labels.CLICK_THROUGH == "Click-Through"
-    assert labels.FINDING_TYPE_LABELS["click_through"] == labels.CLICK_THROUGH
+    # The badge says when it was found; the feature keeps its name.
+    assert labels.FINDING_TYPE_LABELS["click_through"] == "After clicking"
     assert labels.click_through_states(1) == "1 page state opened by clicking"
     assert labels.click_through_states(3) == "3 page states opened by clicking"
     for text in (*labels.FINDING_TYPE_HELP.values(), *labels.REVIEW_LANE_HELP.values()):

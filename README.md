@@ -37,9 +37,9 @@ and the developers who fix what it finds.
   [Reflow](./docs/glossary.md#reflow) at phone width, text cut off at [200% zoom](./docs/glossary.md#resize-text)
   or with wider [text spacing](./docs/glossary.md#text-spacing), [keyboard traps](./docs/glossary.md#keyboard-trap),
   and [text inside images](./docs/glossary.md#image-of-text).
-- **Honest about certainty.** Every result is a
-  [Barrier](./docs/glossary.md#barrier), [Needs review](./docs/glossary.md#needs-review),
-  or [Informational](./docs/glossary.md#informational), so you know what to fix
+- **Honest about certainty.** Every result is marked
+  [Mostly sure](./docs/glossary.md#mostly-sure), [Not sure](./docs/glossary.md#not-sure),
+  or [For information](./docs/glossary.md#for-information), so you know what to fix
   now and what a person should confirm first.
 - **[Local-first](./docs/glossary.md#local-first).** Your reports,
   screenshots, and decisions stay on your computer.
@@ -68,14 +68,14 @@ without it. Release notes and earlier builds are on the
 
 ## Read your report
 
-![Diagram of the three report groups. Barrier holds rule-engine failures from axe-core and Siteimprove Alfa, including problems found after clicking or after a configured search; confirm them on the page, fix, and rescan. Needs review holds browser checks, the keyboard trap check, motion checks, text in images whose alt text is missing or does not match, AI checks, and Alfa "cannot tell" results; a person tests and records a decision. Informational holds images whose alt text already matches and older records kept for history; no action is needed.](./docs/images/diagrams/report-groups.png)
+![Diagram of the three report groups in the How sure column. Mostly sure holds rule-engine failures from axe-core and Siteimprove Alfa, including problems found after clicking or after a configured search; confirm them on the page, fix, and rescan. Not sure holds browser checks, the keyboard trap check, motion checks, text in images whose alt text is missing or does not match, AI checks, and Alfa "cannot tell" results; a person tests and records a decision. For information holds images whose alt text already matches and older records kept for history; no action is needed.](./docs/images/diagrams/report-groups.png)
 
 Terms in the diagram: [alt text](./docs/glossary.md#alt-text), [configured search](./docs/glossary.md#configured-search),
 [browser checks](./docs/glossary.md#browser-check), [motion checks](./docs/glossary.md#motion-check),
 and Alfa ["cannot tell"](./docs/glossary.md#siteimprove-alfa).
 
-Every result lands in one of three groups. Start with Barriers, test and decide
-on Needs review items, and leave Informational records alone.
+Every result lands in one of three groups. Start with Mostly sure issues, test
+and decide on Not sure items, and leave For information records alone.
 [Reading your Axcess report](./docs/reading-your-report.md) walks through every
 screen, column, and export, including how to find a problem in your code and
 fix it.

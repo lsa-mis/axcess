@@ -418,14 +418,14 @@ async def test_issue_card_answers_what_why_fix_and_where(
     base, scan_id = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
-    await choose_filter(page, "Type", "expert_review")
+    await choose_filter(page, "How sure", "expert_review")
     await page.wait_for_url("**type=expert_review*")
     issues = page.get_by_role("table", name="Accessibility issues")
     # Contains, not equals: the sorted header also carries its direction chip.
     await playwright_async.expect(issues.get_by_role("columnheader")).to_contain_text(
         [
             "Issue",
-            "Type",
+            "How sure",
             "WCAG",
             "Priority",
             "Pages",
@@ -445,9 +445,9 @@ async def test_issue_card_answers_what_why_fix_and_where(
     await playwright_async.expect(page.get_by_role("heading", name=title, level=1)).to_be_visible()
     # The header names the type in the Issues table's word, the same one the
     # guidance dialog uses.
-    await playwright_async.expect(page.locator("main h1 + p")).to_contain_text("Needs review")
+    await playwright_async.expect(page.locator("main h1 + p")).to_contain_text("Not sure")
     # The guidance opens from the top right, every section expanded at once;
-    # the Needs review caution (an expert checks it first) sits under What it is.
+    # the Not sure caution (a person checks it first) sits under What it is.
     guidance = page.get_by_role("button", name="Issue guidance", exact=True)
     await guidance.click()
     dialog = page.get_by_role("dialog", name="Issue guidance")
@@ -458,7 +458,7 @@ async def test_issue_card_answers_what_why_fix_and_where(
     await playwright_async.expect(
         dialog.get_by_role("heading", name=re.compile("^Why it matters"), level=3)
     ).to_be_visible()
-    caution = dialog.get_by_text("an expert checks it", exact=False)
+    caution = dialog.get_by_text("a person checks it", exact=False)
     await playwright_async.expect(caution).to_be_visible()
     violations = await _run_axe(page)
     assert not violations, _render_violations(violations)
@@ -505,7 +505,7 @@ async def test_issue_list_reaches_exact_locations_without_sideways_scrolling(
     base, scan_id = live_server
     page = await new_page(viewport={"width": 320, "height": 800})
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
-    await choose_filter(page, "Type", "expert_review")
+    await choose_filter(page, "How sure", "expert_review")
     await page.wait_for_url("**type=expert_review*")
     issues = page.get_by_role("table", name="Accessibility issues")
     await playwright_async.expect(issues).to_be_visible()
@@ -570,7 +570,7 @@ async def test_informational_evidence_is_read_only_and_not_barrier_language(
     row_link = issues.get_by_role("rowheader").get_by_role("link", name=logo_title, exact=False)
     informational_row = row_link.locator("xpath=ancestor::tr[1]")
     await playwright_async.expect(
-        informational_row.get_by_text("Informational", exact=True)
+        informational_row.get_by_text("For information", exact=True)
     ).to_be_visible()
     # Informational evidence never inherits triage or remediation
     # controls: the row has no buttons at all, only its links.
@@ -588,10 +588,10 @@ async def test_informational_evidence_is_read_only_and_not_barrier_language(
         )
     ).to_be_visible()
     await playwright_async.expect(
-        page.get_by_role("heading", name="Informational", exact=True)
+        page.get_by_role("heading", name="For information", exact=True)
     ).to_be_visible()
     await playwright_async.expect(
-        page.get_by_text("This check found no barrier.", exact=False)
+        page.get_by_text("This check found no problem.", exact=False)
     ).to_be_visible()
     assert await page.get_by_role("link", name="Audit report").count() == 0
     assert await page.get_by_role("heading", name="Fix (do this)").count() == 0
@@ -694,8 +694,8 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     await coverage.focus()
     await page.keyboard.press("Enter")
     await playwright_async.expect(ledger).to_be_visible()
-    # Scoped to the ledger panel: "Click-Through" is also a "Found by" label
-    # elsewhere on the report, and exact text must match one element.
+    # Scoped to the ledger panel: "Click-Through" may appear elsewhere on the
+    # report, and exact text must match one element.
     await playwright_async.expect(ledger.get_by_text("Click-Through", exact=True)).to_be_visible()
 
     # The subtitle names the report without repeating a stat card's count.

@@ -38,11 +38,30 @@ export const STATUS_OPTION_LABEL: Record<FindingStatus, string> = {
   false_positive: "Not a problem (false positive)",
 };
 
-/** The three types of issue, as the Issues table's "Type" column names them. */
+/**
+ * The three types of issue, as the Issues table's "How sure" column names
+ * them: how sure Axcess is that the issue is a real problem.
+ *
+ * "Mostly sure" and "Not sure" are opposites in short, common words, so the
+ * two cannot be read as the same thing (SC 3.1.5 Reading Level, Level AAA).
+ * Rejected: "Barrier" and "Needs review" (a column called "Type", jargon,
+ * and no "who reviews"); "Likely problem" and "Possible problem" (both mean
+ * "maybe", and readers could not tell them apart); "Fairly certain" and
+ * "Pretty certain" (longer words, and "fairly" and "pretty" have other
+ * meanings that trip up translation). Not "Very sure" or "Sure": a fixed
+ * rule can still be wrong about a page, so each one is still checked on the
+ * page (docs/glossary.md, "Zero false positive goal"), and "Very sure"
+ * invites skipping that check. "For information", not
+ * "Not a problem": that is already the false positive status above, and one
+ * phrase names one thing (W3C COGA "Making Content Usable",
+ * https://www.w3.org/TR/coga-usable/: use the same word for the same thing;
+ * docs/plain-language.md). The full reasoning is in docs/plain-language.md,
+ * "Why Mostly sure, Not sure, and For information".
+ */
 export const REVIEW_TYPE_LABEL: Record<ReviewLane, string> = {
-  likely_barrier: "Barrier",
-  expert_review: "Needs review",
-  informational: "Informational",
+  likely_barrier: "Mostly sure",
+  expert_review: "Not sure",
+  informational: "For information",
 };
 
 /** Each check by its interface name, with the tool in parentheses where it helps. */

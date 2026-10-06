@@ -16,23 +16,23 @@ Before you write any code, decide which report group your check's results
 belong in. The group decides where people act first, so it matters more than
 any threshold.
 
-- **[Barrier](../glossary.md#barrier) (`likely_barrier`)** is only for a rule
+- **[Mostly sure](../glossary.md#mostly-sure) (`likely_barrier`)** is only for a rule
   engine that failed a fixed, machine-testable rule. Today that means axe-core
   violations and Siteimprove Alfa `failed` outcomes.
-- **[Needs review](../glossary.md#needs-review) (`expert_review`)** is for
+- **[Not sure](../glossary.md#not-sure) (`expert_review`)** is for
   anything a person has to confirm: browser measurements, heuristics, anything
   a model judged, and engine results such as Alfa `cantTell`. Almost every new
   check belongs here.
-- **[Informational](../glossary.md#informational) (`informational`)** is for
+- **[For information](../glossary.md#for-information) (`informational`)** is for
   records that show a check ran and found nothing to fix, such as an image
   whose alt text already matches its words.
 
 A useful test: if you cannot name a fixed rule whose failure is a real
-barrier every time, the check goes to Needs review. Browser probes repeat
+barrier every time, the check goes to Not sure. Browser probes repeat
 reliably, but they do not see every interaction state or how assistive
 technology behaves, which is why the keyboard, focus, responsive, and visual
-probes all go to Needs review.
-Keeping Barrier this narrow is how we work toward the
+probes all go to Not sure.
+Keeping Mostly sure this narrow is how we work toward the
 [zero false positive goal](../glossary.md#zero-false-positive-goal).
 
 ### Why the default for an unknown pipeline is dangerous
@@ -44,7 +44,7 @@ branch falls into that `else` and is treated exactly like axe: issue key
 "Deterministic axe-core rule failure; verify after remediation."
 
 So the moment your migration allows a new `pipeline` value, every row it
-writes shows up as a Barrier. It counts toward the dashboard's Barriers tile,
+writes is marked Mostly sure. It counts toward the dashboard's Mostly sure tile,
 sorts to the top of the Issues table, and can become an issue card in the audit
 report and the workbook. Meanwhile the issue page looks for its card and its
 pages in the image tables, because `rule_meta_for` and `_pages_for_issue`
@@ -205,7 +205,7 @@ the focus probe is the example instead. Replace `x` with your pipeline name.
      today's values differ. The responsive criteria (1.4.4, 1.4.10, and
      1.4.12) are `automated` with `high` confidence, while the keyboard and
      focus criteria (2.1.2, 2.4.3, and 2.4.11) are `partial` with `medium`,
-     although all of these rows land in Needs review. Agree on the values in
+     although all of these rows land in Not sure. Agree on the values in
      review, and never claim more than the probe can show.
    - Three different fields are called confidence. The matrix `confidence`
      here is what the public site's coverage page shows ("Confidence: high").
@@ -308,7 +308,7 @@ the focus probe is the example instead. Replace `x` with your pipeline name.
       a sample to make the gate pass.
 15. **Glossary.** If the check introduces a term people will see in the app or
     a report, add it to [the glossary](../glossary.md) and link to it
-    everywhere else. Check that the Needs review and Browser check entries
+    everywhere else. Check that the Not sure and Browser check entries
     still describe what goes there.
 16. **Public site.** `site/build.py` renders the
     [What Axcess checks](https://lsa-mis.github.io/axcess/coverage/) page from
@@ -317,7 +317,7 @@ the focus probe is the example instead. Replace `x` with your pipeline name.
       and to `PIPELINE_NAMES` in `site/volume.py`.
     - Update the hand-written copy that lists the checks. It is spread over
       several pages in `site/build.py`: `home()`, `how_it_works()` (the check
-      cards and the Needs review text), the `CHECKS` table that
+      cards and the Not sure text), the `CHECKS` table that
       `checks_sections()` renders (including its Siteimprove and axe
       DevTools columns), and `faq()`.
     - Run `make site` and commit the regenerated `site/**/index.html`, as
@@ -359,7 +359,7 @@ apply, so experimental and deprecated rules never run.
   update the `producers` entry in the precision corpus and bump
   `corpus_version`, as [DETECTION_EFFICACY.md](../../DETECTION_EFFICACY.md)
   asks.
-- **Cards.** Every axe rule already lands in Barrier; a card makes it
+- **Cards.** Every axe rule already lands in Mostly sure; a card makes it
   readable. Every rule a scan can run has one under `axe_rules:` in
   `audit_report.yaml`, keyed by rule id, and so does every Alfa rule the
   runner selects, under `alfa_rules:`. After an axe or Alfa upgrade,
@@ -388,7 +388,7 @@ everything downstream:
 - Outcome subgroups in `grouped_by_rule` (`src/audit/web/a11y_queries.py`),
   so a failure and a "cannot tell" result never share an issue group. Today
   only Alfa gets subgroups.
-- An explicit branch in `_axe_issue_rows`. The Alfa branch sets Barrier only
+- An explicit branch in `_axe_issue_rows`. The Alfa branch sets Mostly sure only
   for `failed`.
 - The per-page hook in `_process_job` and engine selection through
   `scan_engine` in the server and the form.
@@ -450,7 +450,7 @@ also corrects the places where they have drifted.
      the topics covered.
 10. **Precision corpus.** Add labeled samples for `semantic:<sc>` to the
     `semantic` layer and bump `corpus_version`.
-11. **Report group.** Nothing to do: semantic rows always go to Needs review.
+11. **Report group.** Nothing to do: semantic rows always go to Not sure.
 12. **Desktop build.** `desktop/backend.spec` lists data folders by hand. It
     includes `analyzer/vlm/prompts` but not `analyzer/semantic/prompts`, so
     check that a packaged build can load your prompt.

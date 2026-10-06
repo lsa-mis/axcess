@@ -1,6 +1,6 @@
 """Words that need explaining say what they mean on hover.
 
-The Issues table's Type and Found by tags carry the glossary's own sentences,
+The Issues table's How sure and Where it shows tags carry the glossary's own sentences,
 the column headers say what their column counts, the priority band says what
 it ranks, a level badge names its level, and a status chip says whose
 decision it is. The glossary, where each meaning is printed beside its tag,
@@ -20,31 +20,34 @@ pytestmark = [pytest.mark.ui, pytest.mark.asyncio(loop_scope="module")]
 playwright_async = pytest.importorskip("playwright.async_api")
 
 LANE_HELP = {
-    "Barrier": (
-        "A rule check (axe or Alfa) failed a fixed rule, so this is likely to block someone. "
-        "Fix it, test the fix, then scan again to see if it is still found."
+    "Mostly sure": (
+        "A rule check (axe or Alfa) failed. These checks follow fixed rules, so they give the "
+        "same result every time. Look at the issue on the page, fix it, test the fix, then "
+        "scan again to see if it is still found."
     ),
-    "Needs review": (
-        "A possible problem from a less certain check, such as the AI review or a rule check "
-        "that cannot tell. A person must confirm it before you report it as a barrier."
+    "Not sure": (
+        "Axcess found a possible problem, but it cannot be certain. This happens with checks "
+        "such as the AI review, the browser checks, or a rule check that cannot decide. A "
+        "person must decide whether it is a real problem before you report it."
     ),
-    "Informational": (
-        "Recorded for context, not a problem to fix, such as an image whose alt text already "
-        "says the same words."
+    "For information": (
+        "Recorded for context. This is not a problem to fix. For example, an image whose text "
+        "description (alt text) already matches the words in the image."
     ),
 }
 FOUND_BY_HELP = {
-    "WCAG": (
-        "Found at page load, by a rule check (axe or Alfa), a browser check such as the "
-        "keyboard check, or the AI review."
+    "At page load": (
+        "Found when the page first loads. It can come from a rule check, a browser check "
+        "(such as the keyboard check), or the AI review."
     ),
-    "Click-Through": (
-        "Found only in a page state opened by clicking a control, such as a menu, tab, or "
-        "dialog. Use that control first to see it."
+    "After clicking": (
+        "Found only after Axcess clicked something that opens more of the page, such as a "
+        "menu, a tab, or a pop-up window (dialog). To see the problem yourself, click the "
+        "same thing. Axcess never clicks links."
     ),
-    "Alt Text": (
-        "Found by the image text check: text in an image, and whether its alt text (what a "
-        "screen reader reads) says the same."
+    "In an image": (
+        "Found by the image text check. It looks at words inside an image and compares them "
+        "to the image's text description (alt text), which a screen reader reads aloud."
     ),
 }
 
@@ -79,8 +82,13 @@ async def test_issue_tags_headers_and_bands_explain_themselves(
         assert all(title == FOUND_BY_HELP[word] for word, title in found_by), found_by
 
         headers = {
-            "Type": "How sure the evidence is: Barrier, Needs review, or Informational.",
-            "Found by": "Which group of checks found the issue.",
+            "How sure": (
+                "How sure Axcess is that the issue is a real problem: "
+                "Mostly sure, Not sure, or For information."
+            ),
+            "Where it shows": (
+                "Where the issue shows up: at page load, after clicking, or in an image."
+            ),
         }
         # On the sort button, the header's focusable part, so a screen reader
         # reads it as the button's description.
@@ -110,10 +118,10 @@ async def test_issue_tags_headers_and_bands_explain_themselves(
         # The glossary prints each meaning beside its tag, so its tags add none,
         # and it spells out the priority bands for those who cannot hover.
         await page.get_by_role(
-            "button", name="What Barrier, Needs review and the other labels mean", exact=True
+            "button", name='What "Mostly sure", "Not sure" and the other labels mean', exact=True
         ).click()
         terms = page.get_by_role("term")
-        await playwright_async.expect(terms.filter(has_text="Needs review")).to_be_visible()
+        await playwright_async.expect(terms.filter(has_text="Not sure")).to_be_visible()
         assert await terms.locator("[title]").count() == 0
         await playwright_async.expect(
             page.get_by_role("heading", name="Priority: which issues to look at first", level=3)
@@ -156,8 +164,13 @@ async def test_keyboard_focus_keeps_the_hint_as_the_description(
     try:
         await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
         table = page.get_by_role("table", name="Accessibility issues")
-        button = table.get_by_role("columnheader", name="Type", exact=False).get_by_role("button")
-        hint = "How sure the evidence is: Barrier, Needs review, or Informational."
+        button = table.get_by_role("columnheader", name="How sure", exact=False).get_by_role(
+            "button"
+        )
+        hint = (
+            "How sure Axcess is that the issue is a real problem: "
+            "Mostly sure, Not sure, or For information."
+        )
         await button.focus()
         await playwright_async.expect(page.get_by_text(hint, exact=True)).to_be_visible()
         await playwright_async.expect(button).to_have_attribute("title", hint)
@@ -182,8 +195,13 @@ async def test_hovering_keeps_the_hint_as_the_description(
     try:
         await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
         table = page.get_by_role("table", name="Accessibility issues")
-        button = table.get_by_role("columnheader", name="Type", exact=False).get_by_role("button")
-        hint = "How sure the evidence is: Barrier, Needs review, or Informational."
+        button = table.get_by_role("columnheader", name="How sure", exact=False).get_by_role(
+            "button"
+        )
+        hint = (
+            "How sure Axcess is that the issue is a real problem: "
+            "Mostly sure, Not sure, or For information."
+        )
         await button.hover()
         await playwright_async.expect(page.get_by_text(hint, exact=True)).to_be_visible()
         await playwright_async.expect(button).not_to_have_attribute("title", hint)

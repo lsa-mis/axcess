@@ -237,7 +237,7 @@ def board_groups() -> str:
                     height=632)
 
     barrier = column(
-        "Barrier", "octagon", NAVY, "#FFFFFF", "A rule engine reported a failure.",
+        "Mostly sure", "octagon", NAVY, "#FFFFFF", "A rule engine reported a failure.",
         ["axe-core rule failures",
          "axe-core failures found after clicking menus, tabs, and dialogs, or after a "
          "configured search",
@@ -245,7 +245,7 @@ def board_groups() -> str:
         "Confirm on the page, fix, then rescan.",
     )
     review = column(
-        "Needs review", "search", MAIZE, NAVY, "A lead that a person must confirm.",
+        "Not sure", "search", MAIZE, NAVY, "A possible problem a person must confirm.",
         ["Browser checks: reflow, zoom, text spacing, focus",
          "Keyboard trap check",
          "Motion checks",
@@ -253,11 +253,9 @@ def board_groups() -> str:
          "AI checks: reading order, link purpose, headings, labels, transcripts",
          "Siteimprove Alfa “cannot tell” results"],
         "Test on the page and record a decision.",
-        note="Called “Needs confirmation” on the issue page and “Review leads” on the "
-             "dashboard.",
     )
     info = column(
-        "Informational", "info", SLATE_BG, NAVY, "No barrier was detected.",
+        "For information", "info", SLATE_BG, NAVY, "No problem was found.",
         ["Images whose alt text already matches the text in them",
          "Older records kept for history"],
         "Nothing required.",
@@ -266,14 +264,14 @@ def board_groups() -> str:
                grid_template_columns="repeat(3, 1fr)", gap=28, margin_top=26)
     footer = div(
         icon("user", 28, MAIZE)
-        + span("Only rule-engine failures become Barriers. Anything that needs judgment "
-               "waits for a person."),
+        + span("Only rule-engine failures are marked Mostly sure. Anything that needs "
+               "judgment waits for a person."),
         display="flex", align_items="center", gap=14, background=NAVY, color="#FFFFFF",
         font_size=22, font_weight=700, border_radius=14, padding="14px 26px", margin_top=18,
     )
     content = header(
         "Where each result goes",
-        "Every issue group gets one of three labels, shown in the Type column of the "
+        "Every issue gets one of three labels, shown in the How sure column of the "
         "Issues table.",
     ) + cols + footer
     return page("Report groups", w, h, content)

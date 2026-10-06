@@ -23,18 +23,19 @@ it never proves [WCAG](glossary.md#wcag) conformance or legal compliance.
 
 ## The three report groups at a glance
 
-![Diagram of the three report groups. Barrier holds rule-engine failures from axe-core and Siteimprove Alfa, including problems found after clicking or after a configured search; confirm them on the page, fix, and rescan. Needs review holds browser checks, the keyboard trap check, motion checks, text in images whose alt text is missing or does not match, AI checks, and Alfa "cannot tell" results; a person tests and records a decision. Informational holds images whose alt text already matches and older records kept for history; no action is needed.](images/diagrams/report-groups.png)
+![Diagram of the three report groups in the How sure column. Mostly sure holds rule-engine failures from axe-core and Siteimprove Alfa, including problems found after clicking or after a configured search; confirm them on the page, fix, and rescan. Not sure holds browser checks, the keyboard trap check, motion checks, text in images whose alt text is missing or does not match, AI checks, and Alfa "cannot tell" results; a person tests and records a decision. For information holds images whose alt text already matches and older records kept for history; no action is needed.](images/diagrams/report-groups.png)
 
 Each [issue](glossary.md#issue) lands in one report group, based on the check
-that found it and its result. Only rule-engine failures become Barriers;
-anything a person has to judge waits in Needs review. The app calls the report
-group an issue's **Type**.
+that found it and its result. Only rule-engine failures are marked Mostly sure;
+anything a person has to judge is marked Not sure. The app shows the report
+group in the Issues table's **How sure** column: how sure Axcess is that the
+issue is a real problem.
 
 | Report group | What to do |
 | --- | --- |
-| [Barrier](glossary.md#barrier) | Start here. Confirm it on the page, fix it, and rescan. |
-| [Needs review](glossary.md#needs-review) | Test it on the page and record a decision before anyone calls it a barrier. |
-| [Informational](glossary.md#informational) | Nothing to fix. It shows you what was checked. |
+| [Mostly sure](glossary.md#mostly-sure) | Start here. Confirm it on the page, fix it, and rescan. |
+| [Not sure](glossary.md#not-sure) | Test it on the page and record a decision before anyone calls it a problem. |
+| [For information](glossary.md#for-information) | Nothing to fix. It shows you what was checked. |
 
 ## Find a problem and fix it (for developers)
 
@@ -52,7 +53,7 @@ On the **Issues** tab, select an issue's name to open its
 **Issue guidance**, at the top right of the issue page, opens the issue's
 guidance in one dialog, with every section open: **What it is**, **How to fix
 it** with **Done when**, and **Why it matters, and how to test the fix** with
-**How to test the fix**. For Needs review, **How to confirm it** comes second,
+**How to test the fix**. For Not sure, **How to confirm it** comes second,
 and the fix is under **How it should work** in **Why it matters, and how to
 fix it if it is confirmed**.
 
@@ -105,7 +106,7 @@ report** menu sits at the top right. Four numbers above the table count:
 | Number | What it counts |
 | --- | --- |
 | Pages checked | Every page the scan recorded, including pages that answered with an error and most pages that failed to load. Beside it, in parentheses, is the number of [errors while scanning](glossary.md#pages-not-reached), and most of those pages are already in this number. |
-| Occurrences found | [Occurrences](glossary.md#occurrence) in every issue, including Needs review and Informational, so it is not a count of confirmed problems. |
+| Occurrences found | [Occurrences](glossary.md#occurrence) in every issue, including Not sure and For information, so it is not a count of confirmed problems. |
 | Issues found | Rows in the Issues table, across all three report groups. |
 | Page states opened by clicking | [Page states](glossary.md#page-state) the scan reached by using menus, tabs, dialogs, and other controls. |
 
@@ -117,9 +118,9 @@ Partly ran, Did not run, or Not recorded, with a check mark for Ran and Partly
 ran. **Result** says what the check ran on and what it found. **About this
 check** says in one line each what the check does and its limit, and **More
 about this check** opens its card on the Axcess website. The focus and visual
-checks have no row here. The second row, **What Barrier, Needs review
-and the other labels mean**, explains the words in the **Type** and **Found
-by** columns.
+checks have no row here. The second row, **What "Mostly sure", "Not sure"
+and the other labels mean**, explains the words in the **How sure** and **Where it shows**
+columns.
 
 The error count says how many pages failed, not which ones. See
 [pages not reached](glossary.md#pages-not-reached) for what the report does and
@@ -133,24 +134,24 @@ order:
 | Column | What it shows |
 | --- | --- |
 | Issue | The issue's name. Select it to open the issue page. |
-| Type | The report group: Barrier, Needs review, or Informational. |
-| Found by | Which kind of check found it: WCAG, Click-Through, or Alt Text (see [Found by](glossary.md#found-by)). One issue can show both WCAG and Click-Through. |
+| How sure | The report group: Mostly sure, Not sure, or For information. |
+| Where it shows | Where the issue shows up: At page load, After clicking, or In an image (see [Where it shows](glossary.md#where-it-shows)). One issue can show both At page load and After clicking. |
 | WCAG | The [success criterion](glossary.md#success-criterion) number with its [level](glossary.md#conformance-level) badge, or "Best practice" (see [best practice](glossary.md#best-practice)). |
-| Priority | High, Medium, or Low (see [priority](glossary.md#priority)); "Does not apply" for Informational rows. |
+| Priority | High, Medium, or Low (see [priority](glossary.md#priority)); "Does not apply" for rows marked For information. |
 | Pages | How many pages have it, linked to the list of those pages. |
 | Occurrences | How many places it appears. |
 
 Search with the **Search issues** box (an issue name or a WCAG number, such as
 1.4.3). The **Filter** menu narrows the table by **Level** (Level A, AA, AAA,
-or Best practice), **Type** (a report group), and **Found by**. When you choose
-one **Found by** value, a link to its detailed view appears above the table:
-**Rule check issues by WCAG criterion**, or **Images** for Alt Text.
+or Best practice), **How sure** (a report group), and **Where it shows**. When you choose
+one **Where it shows** value, a link to its detailed view appears above the table:
+**Rule check issues by WCAG criterion**, or **Images** for In an image.
 
-The table opens in the recommended order: Barriers, then Needs review, then
-Informational, each by priority. Select a column header to sort by that
+The table opens in the recommended order: Mostly sure, then Not sure, then
+For information, each by priority. Select a column header to sort by that
 column, and **Back to recommended order** to return. As the filters change, a
 screen reader hears how many issues show and how many of each type, such as
-"12 of 40 issues shown, filtered: Barrier 3, Needs review 7, Informational 2".
+"12 of 40 issues shown, filtered: Mostly sure 3, Not sure 7, For information 2".
 
 Each issue's title opens its [issue page](#the-full-evidence-record).
 **Delete report**, at the end of the Issues page, is described under
@@ -161,20 +162,20 @@ Each issue's title opens its [issue page](#the-full-evidence-record).
 The issue page is the full evidence record for one issue. It leads with
 **Pages with this issue**: page title (opens the inspector), Page URL,
 Occurrences, Screenshots, and Status. Its header names the WCAG criterion and
-the issue's type, in the same words as the Issues table's **Type** column.
+the issue's report group, in the same words as the Issues table's **How sure** column.
 
 **Issue guidance**, at the top right, opens a dialog with every section open:
 
-1. **What it is** (**What Axcess found** for Informational): the type and
+1. **What it is** (**What Axcess found** for an issue marked For information): the type and
    what it means, the confidence (high, medium, or low), and **About this
    rule**, then "Why it was flagged", a one-line summary such as
    "Deterministic axe-core rule failure; verify after remediation." Then the
    facts (WCAG level, Priority, Occurrences across its pages, and who it
    affects) and the rule's description.
-2. **How to fix it**, with **Done when** (for Needs review, **How to confirm
+2. **How to fix it**, with **Done when** (for Not sure, **How to confirm
    it**).
 3. **Why it matters, and how to test the fix**, with **How to test the fix**
-   (for Needs review, **Why it matters, and how to fix it if it is
+   (for Not sure, **Why it matters, and how to fix it if it is
    confirmed**, with **How it should work** and **Done when**).
 
 Escape or the close button returns you to the page.
@@ -218,13 +219,13 @@ but does not show again.
 You cannot change status in the Issues table or on the issue page. Instead:
 
 1. On the report's **Issues** tab, open the **Filter** menu and choose one
-   **Found by** value.
+   **Where it shows** value.
 2. For page results, select **Rule check issues by WCAG criterion** (use
    **Group by rule** to change a whole rule). For image results, select
    **Images** (use **Group by issue** to change a whole issue).
 
 Fixed, Accepted risk, and Not a problem results move to the written report's
-Appendix A and leave the Jira CSV; a Needs review issue marked In progress
+Appendix A and leave the Jira CSV; a Not sure issue marked In progress
 becomes an issue card. Status never changes a result's report group.
 
 ## Exports
@@ -241,7 +242,7 @@ or `.../export/markdown`) or the command line (`audit export -f jira` or
 | Occurrence list (CSV, `.csv`) | Filtering in a spreadsheet | One row per occurrence (per page for an image), 24 columns such as `severity`, `status`, `wcag_criterion`, `page_url`, `target_selector`, and `revealed_by` |
 | All report data (JSON, `.json`) | Scripts and other tools | `scan`, `findings` (image results), and `a11y_findings` (everything else) |
 | Jira CSV (`.jira.csv`) | Importing tickets | Summary, Description, Priority, Issue Type, Labels, Component; one row per occurrence not marked Fixed, Accepted risk, or Not a problem |
-| Markdown evidence inventory (`.md`) | A raw list of every result | Every result with its status, including Needs review results |
+| Markdown evidence inventory (`.md`) | A raw list of every result | Every result with its status, including Not sure results |
 
 Sheets in the issue list with fixes (Excel):
 
@@ -278,20 +279,20 @@ Notes on the exports:
   review) onto the row for every occurrence. It is general advice, not advice
   for that one occurrence, and it is blank when the rule has none. **How to
   reproduce** holds the steps to test the fix, not steps to reproduce.
-- Written report issue cards cover open Barrier issues tied to a WCAG
-  criterion and Needs review issues marked In progress; other open results,
-  including other Needs review results, go to Appendix B. The workbook
+- Written report issue cards cover open Mostly sure issues tied to a WCAG
+  criterion and Not sure issues marked In progress; other open results,
+  including other Not sure results, go to Appendix B. The workbook
   Summary's "Likely-barrier" counts follow these cards, so they can differ
   from the Issues table.
 - The workbook's Issues Overview, the CSV, the JSON, and the Jira CSV have no
-  report group column. The Jira CSV also includes Needs review and
-  Informational results, so check it before you import. Edits to a downloaded
+  report group column. The Jira CSV also includes Not sure and
+  For information results, so check it before you import. Edits to a downloaded
   file never flow back to Axcess.
 
 ### Draft labels
 
 Export menu downloads are labeled a [draft](glossary.md#draft-export) until
-the report's expert review is complete and every Barrier and Needs review
+the report's expert review is complete and every Mostly sure and Not sure
 occurrence has a status other than New or Reviewing. A draft has `_DRAFT` in
 its file name and a notice inside, such as a "DRAFT NOTICE" sheet or an
 "Axcess export state" CSV column. The app has no screen for completing the
@@ -328,10 +329,10 @@ the end of the page, before you trust a result. See
 A long list is normal for a first scan, and nobody clears it in one sitting.
 Progress Over Perfection: each barrier you fix helps someone use the site today.
 
-1. **Barriers first.** They top the Issues table; confirm each one, then fix
+1. **Mostly sure first.** They top the Issues table; confirm each one, then fix
    it. [Priority](glossary.md#priority) favors spread, so also check the
    workbook's Severity column for a severe problem on a single page.
-2. **Then Needs review.** Check each one on the page and record a decision.
+2. **Then Not sure.** Check each one on the page and record a decision.
 3. **Batch shared fixes.** Axcess groups by check, not by
    [root cause](glossary.md#root-cause), so look for one template or component
    behind an issue on many pages, and route the fix to whoever owns it.

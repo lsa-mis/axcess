@@ -47,23 +47,24 @@ FindingType = Literal["wcag", "click_through", "alt_text"]
 FINDING_TYPES: tuple[FindingType, ...] = ("wcag", "click_through", "alt_text")
 
 FINDING_TYPE_LABELS: dict[FindingType, str] = {
-    "wcag": "WCAG",
-    "click_through": CLICK_THROUGH,
-    "alt_text": "Alt Text",
+    "wcag": "At page load",
+    "click_through": "After clicking",
+    "alt_text": "In an image",
 }
 
 FINDING_TYPE_HELP: dict[FindingType, str] = {
     "wcag": (
-        "Found at page load, by a rule check (axe or Alfa), a browser check such "
-        "as the keyboard check, or the AI review."
+        "Found when the page first loads. It can come from a rule check, a browser check "
+        "(such as the keyboard check), or the AI review."
     ),
     "click_through": (
-        "Found only in a page state opened by clicking a control, such as a menu, "
-        "tab, or dialog. Use that control first to see it."
+        "Found only after Axcess clicked something that opens more of the page, such as a "
+        "menu, a tab, or a pop-up window (dialog). To see the problem yourself, click the "
+        "same thing. Axcess never clicks links."
     ),
     "alt_text": (
-        "Found by the image text check: text in an image, and whether its alt text "
-        "(what a screen reader reads) says the same."
+        "Found by the image text check. It looks at words inside an image and compares them "
+        "to the image's text description (alt text), which a screen reader reads aloud."
     ),
 }
 
@@ -75,23 +76,24 @@ ReviewLane = Literal["likely_barrier", "expert_review", "informational"]
 REVIEW_LANES: tuple[ReviewLane, ...] = ("likely_barrier", "expert_review", "informational")
 
 REVIEW_LANE_LABELS: dict[ReviewLane, str] = {
-    "likely_barrier": "Barrier",
-    "expert_review": "Needs review",
-    "informational": "Informational",
+    "likely_barrier": "Mostly sure",
+    "expert_review": "Not sure",
+    "informational": "For information",
 }
 
 REVIEW_LANE_HELP: dict[ReviewLane, str] = {
     "likely_barrier": (
-        "A rule check (axe or Alfa) failed a fixed rule, so this is likely to block someone. "
-        "Fix it, test the fix, then scan again to see if it is still found."
+        "A rule check (axe or Alfa) failed. These checks follow fixed rules, so they give "
+        "the same result every time. Look at the issue on the page, fix it, test the fix, "
+        "then scan again to see if it is still found."
     ),
     "expert_review": (
-        "A possible problem from a less certain check, such as the AI review or a "
-        "rule check that cannot tell. A person must confirm it before you report it "
-        "as a barrier."
+        "Axcess found a possible problem, but it cannot be certain. This happens with "
+        "checks such as the AI review, the browser checks, or a rule check that cannot "
+        "decide. A person must decide whether it is a real problem before you report it."
     ),
     "informational": (
-        "Recorded for context, not a problem to fix, such as an image whose alt text "
-        "already says the same words."
+        "Recorded for context. This is not a problem to fix. For example, an image whose "
+        "text description (alt text) already matches the words in the image."
     ),
 }

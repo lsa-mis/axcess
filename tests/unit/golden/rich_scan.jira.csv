@@ -118,7 +118,7 @@ Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-73",Highest,Bu
 
 Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-5",Highest,Bug,accessibility axe-image-alt impact-critical wcag-1-1-1 wcag-level-a,Accessibility
 "WCAG keyboard-trap-stuck, SC 2.1.2: https://example.org/","**Source:** Keyboard probe
-**Outcome:** Needs expert review (observed lead; not a conformance failure)
+**Outcome:** Not sure: a person must decide (a check that cannot be sure; not a WCAG failure)
 **Rule:** keyboard-trap-stuck
 **Impact:** critical
 **WCAG SC:** 2.1.2 (Level A)
@@ -728,7 +728,7 @@ Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-65",Medium,Bug
 
 Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-20",Medium,Bug,accessibility axe-page-has-heading-one impact-moderate axe-best-practice,Accessibility
 "WCAG semantic:2.4.4, SC 2.4.4: https://example.org/","**Source:** Semantic analyzer
-**Outcome:** Needs expert review (observed lead; not a conformance failure)
+**Outcome:** Not sure: a person must decide (a check that cannot be sure; not a WCAG failure)
 **Rule:** semantic:2.4.4
 **Impact:** moderate
 **WCAG SC:** 2.4.4 (Level A)
@@ -810,7 +810,7 @@ Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-66",Medium,Bug
 
 Review locally: http://127.0.0.1:8765/app/scans/1/pages/2#finding-21",Medium,Bug,accessibility axe-page-has-heading-one impact-moderate axe-best-practice,Accessibility
 "WCAG semantic:2.4.4, SC 2.4.4: https://example.org/about","**Source:** Semantic analyzer
-**Outcome:** Needs expert review (observed lead; not a conformance failure)
+**Outcome:** Not sure: a person must decide (a check that cannot be sure; not a WCAG failure)
 **Rule:** semantic:2.4.4
 **Impact:** moderate
 **WCAG SC:** 2.4.4 (Level A)
@@ -904,7 +904,7 @@ Review locally: http://127.0.0.1:8765/app/scans/1/pages/3#finding-28",Medium,Bug
 
 Review locally: http://127.0.0.1:8765/app/scans/1/pages/3#finding-55",Medium,Bug,accessibility axe-fixture-rule-22 impact-moderate wcag-3-3-2 wcag-level-a,Accessibility
 "WCAG semantic:2.4.4, SC 2.4.4: https://example.org/contact","**Source:** Semantic analyzer
-**Outcome:** Barrier confirmed by expert; remediation planned
+**Outcome:** Confirmed as a problem; fix planned
 **Rule:** semantic:2.4.4
 **Impact:** moderate
 **WCAG SC:** 2.4.4 (Level A)
@@ -1115,7 +1115,7 @@ Review locally: http://127.0.0.1:8765/app/scans/1/pages/4#finding-56",Low,Bug,ac
 
 Review locally: http://127.0.0.1:8765/app/scans/1/pages/1#finding-79",Low,Bug,accessibility alfa-sia-r2 wcag-1-1-1 wcag-level-a,Accessibility
 "WCAG sia-r111, SC 2.5.8: https://example.org/about","**Source:** Siteimprove Alfa
-**Outcome:** Needs expert review (Alfa cantTell; not a conformance failure)
+**Outcome:** Not sure: a person must decide (Alfa could not tell; not a WCAG failure)
 **Rule:** sia-r111
 **WCAG SC:** 2.5.8 (Level AA)
 **Description:** 2.5.8 Target Size (Minimum)

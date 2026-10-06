@@ -13,7 +13,7 @@ _Generated 2026-04-22 12:00 UTC by Axcess._
 - **Pages crawled:** 2
 - **Image-analysis evidence records:** 3
 - **axe-core failed-rule evidence:** 0 (scanned 0 of 2 pages)
-- **Siteimprove Alfa outcomes:** 0 failed; 0 need expert review (evaluated 0 of 2 pages)
+- **Siteimprove Alfa outcomes:** 0 failed; 0 marked Not sure (evaluated 0 of 2 pages)
 
 ## Executive summary
 

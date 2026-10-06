@@ -13,7 +13,7 @@ _Generated 2026-04-22 12:00 UTC by Axcess._
 - **Pages crawled:** 5
 - **Image-analysis evidence records:** 4
 - **axe-core failed-rule evidence:** 74 (scanned 5 of 5 pages)
-- **Siteimprove Alfa outcomes:** 1 failed; 1 need expert review (evaluated 2 of 5 pages)
+- **Siteimprove Alfa outcomes:** 1 failed; 1 marked Not sure (evaluated 2 of 5 pages)
 - **Errors:** 1
 
 ## Executive summary
@@ -155,7 +155,7 @@ axe-core found 74 violation(s) across 5 page(s); Siteimprove Alfa returned 1 fai
 
 ### [critical] keyboard-trap-stuck, SC 2.1.2 (Level A)
 - **Source:** Keyboard probe
-- **Outcome:** Needs expert review (observed lead)
+- **Outcome:** Not sure: a person must decide (a check that cannot be sure)
 - **Rule:** Keyboard users must be able to leave the component.
 - **Page:** https://example.org/
 - **Target:** `#menu-trap`
@@ -232,7 +232,7 @@ axe-core found 74 violation(s) across 5 page(s); Siteimprove Alfa returned 1 fai
 
 ### [critical] label, SC 4.1.2 (Level A)
 - **Source:** axe-core
-- **Outcome:** Barrier confirmed by expert, risk accepted
+- **Outcome:** Confirmed as a problem, risk accepted
 - **Rule:** Form elements must have labels
 - **Page:** https://example.org/contact
 - **Target:** `input[type=text]`
@@ -437,14 +437,14 @@ axe-core found 74 violation(s) across 5 page(s); Siteimprove Alfa returned 1 fai
 | 57 | axe-core | Failed automated rule outcome | critical | 1.3.1 | A | `fixture-rule-24` | https://example.org/ |
 | 73 | axe-core | Failed automated rule outcome | critical | 1.3.1 | A | `fixture-rule-36` | https://example.org/ |
 | 5 | axe-core | Failed automated rule outcome | critical | 1.1.1 | A | `image-alt` | https://example.org/ |
-| 78 | Keyboard probe | Needs expert review (observed lead) | critical | 2.1.2 | A | `keyboard-trap-stuck` | https://example.org/ |
+| 78 | Keyboard probe | Not sure: a person must decide (a check that cannot be sure) | critical | 2.1.2 | A | `keyboard-trap-stuck` | https://example.org/ |
 | 42 | axe-core | Failed automated rule outcome | critical | 1.3.1 | A | `fixture-rule-12` | https://example.org/about |
 | 47 | axe-core | Failed automated rule outcome | critical | 1.3.1 | A | `fixture-rule-16` | https://example.org/about |
 | 58 | axe-core | Failed automated rule outcome | critical | 1.3.1 | A | `fixture-rule-24` | https://example.org/about |
 | 74 | axe-core | Failed automated rule outcome | critical | 1.3.1 | A | `fixture-rule-36` | https://example.org/about |
 | 31 | axe-core | Failed automated rule outcome | critical | 1.3.1 | A | `fixture-rule-04` | https://example.org/blog |
 | 68 | axe-core | Failed automated rule outcome | critical | 1.3.1 | A | `fixture-rule-32` | https://example.org/contact |
-| 18 | axe-core | Barrier confirmed by expert, risk accepted | critical | 4.1.2 | A | `label` | https://example.org/contact |
+| 18 | axe-core | Confirmed as a problem, risk accepted | critical | 4.1.2 | A | `label` | https://example.org/contact |
 | 36 | axe-core | Failed automated rule outcome | critical | 1.3.1 | A | `fixture-rule-08` | https://example.org/products |
 | 63 | axe-core | Failed automated rule outcome | critical | 1.3.1 | A | `fixture-rule-28` | https://example.org/products |
 | 1 | axe-core | Failed automated rule outcome | serious | 1.4.3 | AA | `color-contrast` | https://example.org/ |
@@ -473,7 +473,7 @@ axe-core found 74 violation(s) across 5 page(s); Siteimprove Alfa returned 1 fai
 | 54 | axe-core | Failed automated rule outcome | serious | 2.4.7 | AA | `fixture-rule-21` | https://example.org/about |
 | 70 | axe-core | Failed automated rule outcome | serious | 2.4.7 | AA | `fixture-rule-33` | https://example.org/about |
 | 64 | axe-core | Failed automated rule outcome | serious | 2.4.7 | AA | `fixture-rule-29` | https://example.org/blog |
-| 4 | axe-core | Reviewed, not a barrier | serious | 1.4.3 | AA | `color-contrast` | https://example.org/contact |
+| 4 | axe-core | Checked, not a problem | serious | 1.4.3 | AA | `color-contrast` | https://example.org/contact |
 | 48 | axe-core | Failed automated rule outcome | serious | 2.4.7 | AA | `fixture-rule-17` | https://example.org/contact |
 | 43 | axe-core | Failed automated rule outcome | serious | 2.4.7 | AA | `fixture-rule-13` | https://example.org/products |
 | 25 | axe-core | Failed automated rule outcome | moderate | 1.3.1 | A | `fixture-empty-help` | https://example.org/ |
@@ -482,20 +482,20 @@ axe-core found 74 violation(s) across 5 page(s); Siteimprove Alfa returned 1 fai
 | 49 | axe-core | Failed automated rule outcome | moderate | 3.3.2 | A | `fixture-rule-18` | https://example.org/ |
 | 65 | axe-core | Failed automated rule outcome | moderate | 3.3.2 | A | `fixture-rule-30` | https://example.org/ |
 | 20 | axe-core | Failed automated rule outcome | moderate | n/a | n/a | `page-has-heading-one` | https://example.org/ |
-| 75 | Semantic analyzer | Needs expert review (observed lead) | moderate | 2.4.4 | A | `semantic:2.4.4` | https://example.org/ |
+| 75 | Semantic analyzer | Not sure: a person must decide (a check that cannot be sure) | moderate | 2.4.4 | A | `semantic:2.4.4` | https://example.org/ |
 | 34 | axe-core | Failed automated rule outcome | moderate | 3.3.2 | A | `fixture-rule-06` | https://example.org/about |
 | 50 | axe-core | Failed automated rule outcome | moderate | 3.3.2 | A | `fixture-rule-18` | https://example.org/about |
 | 60 | axe-core | Failed automated rule outcome | moderate | 3.3.2 | A | `fixture-rule-26` | https://example.org/about |
 | 66 | axe-core | Failed automated rule outcome | moderate | 3.3.2 | A | `fixture-rule-30` | https://example.org/about |
 | 21 | axe-core | Failed automated rule outcome | moderate | n/a | n/a | `page-has-heading-one` | https://example.org/about |
-| 76 | Semantic analyzer | Needs expert review (observed lead) | moderate | 2.4.4 | A | `semantic:2.4.4` | https://example.org/about |
+| 76 | Semantic analyzer | Not sure: a person must decide (a check that cannot be sure) | moderate | 2.4.4 | A | `semantic:2.4.4` | https://example.org/about |
 | 26 | axe-core | Failed automated rule outcome | moderate | 1.3.1 | A | `fixture-empty-help` | https://example.org/blog |
 | 44 | axe-core | Failed automated rule outcome | moderate | 3.3.2 | A | `fixture-rule-14` | https://example.org/blog |
 | 71 | axe-core | Failed automated rule outcome | moderate | 3.3.2 | A | `fixture-rule-34` | https://example.org/blog |
 | 24 | axe-core | Failed automated rule outcome | moderate | n/a | n/a | `region` | https://example.org/blog |
 | 28 | axe-core | Failed automated rule outcome | moderate | 3.3.2 | A | `fixture-rule-02` | https://example.org/contact |
 | 55 | axe-core | Failed automated rule outcome | moderate | 3.3.2 | A | `fixture-rule-22` | https://example.org/contact |
-| 77 | Semantic analyzer | Barrier confirmed by expert, remediation planned | moderate | 2.4.4 | A | `semantic:2.4.4` | https://example.org/contact |
+| 77 | Semantic analyzer | Confirmed as a problem, fix planned | moderate | 2.4.4 | A | `semantic:2.4.4` | https://example.org/contact |
 | 22 | axe-core | Failed automated rule outcome | moderate | n/a | n/a | `page-has-heading-one` | https://example.org/products |
 | 23 | axe-core | Failed automated rule outcome | moderate | n/a | n/a | `region` | https://example.org/products |
 | 29 | axe-core | Failed automated rule outcome | minor | 2.5.8 | AA | `fixture-rule-03` | https://example.org/ |
@@ -511,4 +511,4 @@ axe-core found 74 violation(s) across 5 page(s); Siteimprove Alfa returned 1 fai
 | 35 | axe-core | Failed automated rule outcome | minor | 2.5.8 | AA | `fixture-rule-07` | https://example.org/contact |
 | 56 | axe-core | Failed automated rule outcome | minor | 2.5.8 | AA | `fixture-rule-23` | https://example.org/products |
 | 79 | Siteimprove Alfa | Failed automated rule outcome | n/a | 1.1.1 | A | `sia-r2` | https://example.org/ |
-| 80 | Siteimprove Alfa | Needs expert review (Alfa cantTell) | n/a | 2.5.8 | AA | `sia-r111` | https://example.org/about |
+| 80 | Siteimprove Alfa | Not sure: a person must decide (Alfa could not tell) | n/a | 2.5.8 | AA | `sia-r111` | https://example.org/about |

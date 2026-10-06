@@ -44,7 +44,8 @@ readers; this page tells contributors which words to use.
 11. **Sentence case** for everything. No "please", no double negatives.
     Buttons and controls too: "Start a scan", not "Start A Scan". Names
     keep their capitals ("Axcess", "Excel"), and so do the named terms in
-    the table below ("Needs review", "Best practice", "Click-Through").
+    the table below ("Mostly sure", "Not sure", "Best practice",
+    "Click-Through").
     Two tests enforce this: `tests/ui/test_control_label_case.py` reads
     every control on the main screens of the review app, and
     `desktop/test/installer-wording.test.cjs` reads every string of the
@@ -64,7 +65,8 @@ Use the word in the first column, and never the words in the last.
 | issue | One kind of problem found, shown as one row in the Issues table. | issue group, evidence group, evidence record |
 | occurrence | One place an issue appears: one element on one page. | instance, violation, result, finding, hit |
 | image | One image the image text check looked at: "Image #12". | finding (for an image) |
-| Barrier / Needs review / Informational | The three types of issue, in the "Type" column. An Alfa "cannot tell" result is Needs review. | likely barrier, needs confirmation, review lead, lead, expert decision, cantTell |
+| Mostly sure / Not sure / For information | The three types of issue, in the "How sure" column: how sure Axcess is that the issue is a real problem. An Alfa "cannot tell" result is Not sure. | Barrier, Needs review, Informational, likely barrier, likely problem, possible problem, needs confirmation, review lead, lead, expert decision, cantTell, "Type" (for this column) |
+| At page load / After clicking / In an image | The values of the Issues table's "Where it shows" column: where the issue shows up. "At page load" and "After clicking" match the page state names. | Found by, Found (as the header), WCAG (as a value), Click-Through (as a value; it stays the feature's name), Alt Text (as a value), finding type |
 | status | Where an occurrence stands in review. Values: New, Reviewing, In progress, Fixed, Accepted risk, Not a problem (false positive). | triage status, review status, remediated, raw values like `in_progress` |
 | check | One way Axcess tests pages. See the check names below. | engine, pipeline, probe, method, detector, source |
 | page state | How a page looked at one moment: "At page load" or "After clicking Menu". | DOM state, interaction state, captured state |
@@ -83,6 +85,22 @@ Use the word in the first column, and never the words in the last.
 | element locator (CSS selector) | The text that finds an element in the page code. | selector (alone) |
 | element locator (XPath) | The path that finds an element in the page code, as the rule check (Alfa) records it. | selector, path (alone) |
 | Does not apply | A table cell with no value for this row. | n/a |
+
+### Why "Mostly sure", "Not sure", and "For information"
+
+The "How sure" column answers one question: how sure is Axcess that this
+issue is a real problem? Each word was chosen against these alternatives.
+
+| Choice | Rejected | Why |
+| --- | --- | --- |
+| "How sure" (column) | "Type" | "Type" names no question, so the badges under it had nothing to answer. |
+| "Mostly sure" | "Barrier" | Jargon, and it sounds certain. |
+| "Mostly sure" | "Very sure", "Sure" | A fixed rule gives the same result every time, but it can still misjudge a page, such as contrast on text over a picture. We tell people to check each one on the page first ("Zero false positive goal" in the glossary). "Very sure" invites them to skip that check, and AGENTS.md says never to claim more than the evidence shows. |
+| "Mostly sure" | "Fairly certain", "Pretty certain", "High chance" | Longer words. "Fairly" and "pretty" have other meanings that confuse translation, and "High chance" does not say of what. |
+| "Not sure" | "Needs review" | It did not say who reviews, or that the problem may not be real. |
+| "Mostly sure" / "Not sure" | "Likely problem" / "Possible problem" | Both mean "maybe", so readers could not tell them apart. Badges in one column are read against each other, so they need to be clear opposites. |
+| "For information" | "Informational" | A longer word for the same idea. |
+| "For information" | "Not a problem" | Already the status for a false positive. One phrase names one thing. |
 
 ### Check names
 

@@ -17,6 +17,7 @@ import io
 
 from audit.exports.collector import ExportA11yFinding, ExportFinding, ExportScan
 from audit.exports.interaction_coverage import reproduction_step
+from audit.labels import REVIEW_LANE_LABELS
 
 JIRA_COLUMNS = (
     "Summary",
@@ -117,11 +118,17 @@ def _a11y_description(af: ExportA11yFinding) -> str:
     lines: list[str] = []
     lines.append(f"**Source:** {_a11y_source_label(af)}")
     if af.status == "in_progress":
-        lines.append("**Outcome:** Barrier confirmed by expert; remediation planned")
+        lines.append("**Outcome:** Confirmed as a problem; fix planned")
     elif af.pipeline == "alfa" and af.engine_outcome == "cant_tell":
-        lines.append("**Outcome:** Needs expert review (Alfa cantTell; not a conformance failure)")
+        lines.append(
+            f"**Outcome:** {REVIEW_LANE_LABELS['expert_review']}: a person must decide "
+            "(Alfa could not tell; not a WCAG failure)"
+        )
     elif af.pipeline not in {"axe", "alfa"}:
-        lines.append("**Outcome:** Needs expert review (observed lead; not a conformance failure)")
+        lines.append(
+            f"**Outcome:** {REVIEW_LANE_LABELS['expert_review']}: a person must decide "
+            "(a check that cannot be sure; not a WCAG failure)"
+        )
     else:
         lines.append("**Outcome:** Failed automated rule outcome")
     lines.append(f"**Rule:** {af.rule_id}")

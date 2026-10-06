@@ -56,7 +56,7 @@ This audit used multiple detection methods. Each sees different things; together
 | **Bidirectional keyboard-exit probe** | ✅ found issues | WCAG 2.1.2 review leads, both directions must remain blocked. Normal wrapping, two-control cycles, modal containment, and opaque embedded contexts are not counted as traps. | Medium, repeatable browser-observed evidence with exact attempt counts. Manually check for documented or state-specific exit commands before recording a failure. |
 | **Responsive & zoom probe** | n/a | SC 1.4.10 reflow at 320px, SC 1.4.4 text clipping at 200% zoom, SC 1.4.12 clipping under user text-spacing. | Medium, deterministic geometry is useful evidence, but designed truncation and state-specific clipping need an expert decision. |
 | **Live-page focus probe** | n/a | SC 2.4.11, focus hidden behind sticky headers / cookie banners / overlays. | Medium, catches elements whose centre is covered; partial-overlap and post-click overlays still need a human. |
-| **Click-Through** | n/a | Barriers that a page load never shows because the content only exists after a control is operated. Links are never clicked, and controls labelled sign out, delete, remove, or unsubscribe are refused. | Same deterministic rule evidence as a load-state pass, on states a load-state pass cannot reach. Coverage is bounded per page, so absence of a finding is not evidence that a state is clean. |
+| **Click-Through** | n/a | Problems that a page load never shows because the content only exists after a control is operated. Links are never clicked, and controls labelled sign out, delete, remove, or unsubscribe are refused. | Same deterministic rule evidence as a load-state pass, on states a load-state pass cannot reach. Coverage is bounded per page, so absence of a finding is not evidence that a state is clean. |
 | **Visual (VLM) probe** | n/a | SC 1.3.2, content visually reordered by CSS so screen readers get a different, confusing sequence. | Medium, a vision-model judgement; treat as a lead and confirm. Only runs when a local vision model is available. |
 
 _A “n/a” means this method produced no findings on this scan, it may have been disabled for the run, or it ran and found nothing. axe-core and Alfa record definitive ran-clean signals when selected._
@@ -313,10 +313,10 @@ These issue types *were* detected but every finding in them has already been tri
 
 These results are preserved for transparency but are not included in the remediation scorecard. They are AI-assisted or ambiguous review leads, informational/pass evidence, or best-practice observations with no criterion mapping. An expert decision is required before a review lead can be described as a barrier.
 
-- **The page has no main heading (h1)** (`page-has-heading-one`), 1 finding(s) on 1 page; **likely barrier / high confidence**. The rule check (axe) found the page code breaks this rule.
-- **Keyboard focus may be stuck on one element** (`keyboard-trap-stuck`), 1 finding(s) on 1 page; **expert review / medium confidence**. Pressing Tab and pressing Shift+Tab both left focus on the same element. Check by hand whether another key, such as Escape, moves focus out.
-- **Images with important text have no alt text** (`essential_missing`), 1 finding(s) on 1 page; **expert review / medium confidence**. Text recognition (OCR) and a vision model found text in this image. Check what the image is for and whether its alt text says the same.
-- **Link text may not say where the link goes** (`2.4.4`), 1 finding(s) on 1 page; **expert review / medium confidence**. The AI review (a language model on this computer) judged this. Check it on the page before you report it.
+- **The page has no main heading (h1)** (`page-has-heading-one`), 1 finding(s) on 1 page; **Mostly sure / high confidence**. The rule check (axe) found the page code breaks this rule.
+- **Keyboard focus may be stuck on one element** (`keyboard-trap-stuck`), 1 finding(s) on 1 page; **Not sure / medium confidence**. Pressing Tab and pressing Shift+Tab both left focus on the same element. Check by hand whether another key, such as Escape, moves focus out.
+- **Images with important text have no alt text** (`essential_missing`), 1 finding(s) on 1 page; **Not sure / medium confidence**. Text recognition (OCR) and a vision model found text in this image. Check what the image is for and whether its alt text says the same.
+- **Link text may not say where the link goes** (`2.4.4`), 1 finding(s) on 1 page; **Not sure / medium confidence**. The AI review (a language model on this computer) judged this. Check it on the page before you report it.
 
 ---
 
