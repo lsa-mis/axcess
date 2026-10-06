@@ -282,9 +282,10 @@ def test_install_drawings_are_named_pictures(pages: dict[str, str]) -> None:
 
 
 def test_step_screenshots_have_alt_text_and_size(pages: dict[str, str]) -> None:
-    # Four on Get started (the first scan), three with the sign-in steps.
+    # Six on Get started (four first-scan steps, two of the report), three
+    # with the sign-in steps.
     shots = []
-    for route, count in (("get-started/", 4), ("sign-in-scan/", 3)):
+    for route, count in (("get-started/", 6), ("sign-in-scan/", 3)):
         imgs = _parse(pages[route]).imgs
         found = [img for img in imgs if "/screens/" in (img.get("src") or "")]
         assert len(found) == count, route

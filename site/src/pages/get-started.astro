@@ -66,9 +66,9 @@ const shots = {
     alt: "The top of the Axcess sidebar. The dark blue New scan button, with a plus sign, is on the left, beside Search. Reports is below them.",
   },
   "new-scan-public": {
-    w: 1007,
-    h: 452,
-    alt: "The top of the New scan page. The Public website tab is chosen, beside the tab Site with a sign-in or two-step sign-in (2FA). Below the tabs is the Website address box, showing the example https://example.edu/section/ in grey.",
+    w: 1000,
+    h: 424,
+    alt: "The top of the New scan page. The Public website tab is chosen, beside the tab Site with a sign-in or two-step sign-in (2FA). Below the tabs is the Website address box, showing the example example.edu/section/ in grey. The hint under it says Axcess adds https:// for you, or http:// for localhost and IP addresses.",
   },
   "maximum-pages": {
     w: 995,
@@ -76,9 +76,19 @@ const shots = {
     alt: "The Limits and rule check tool group. At the top, the Scan every page it finds switch is off. Below it, Maximum pages is set to 25, on the left, beside Maximum link depth.",
   },
   "start-scan": {
-    w: 454,
-    h: 180,
-    alt: "The Cancel and Start scan buttons. Start scan is the dark blue button on the right. Below them: Watch the progress, or come back later. Axcess saves the report as it goes.",
+    w: 406,
+    h: 152,
+    alt: "The dark blue Start scan button. Below it: Watch the progress, or come back later. Axcess saves the report as it goes.",
+  },
+  "issues-tab": {
+    w: 1104,
+    h: 524,
+    alt: "The Issues tab of an Axcess report. Above the table are the search box Issue name or WCAG number and the Filter issues button, and the line Recommended order: Mostly sure, then Not sure, then For information. The table has the columns Issue, How sure, Where it shows, WCAG, Priority, Pages and Occurrences. The first row is Buttons or links are too small and too close together: Mostly sure, After clicking, WCAG 2.5.8 Level AA, High priority, 27 pages and 73 occurrences.",
+  },
+  "inspector-flagged": {
+    w: 1453,
+    h: 710,
+    alt: "The Page inspector in an Axcess report. The bar at the top says Flagged element 1 of 19, with the buttons Previous, Next and Hide highlights. Below it are the element\u2019s details: a link with the text \u201cCopy link to this heading\u201d, 30 pixels wide and 30 pixels tall, and its element locator with a Copy element locator button. Under that, the saved copy of the page outlines the element in yellow and dark blue, with a 1 of 19 tag, just left of the heading Creating a Title for Your Post.",
   },
 } as const;
 type Shot = keyof typeof shots;
@@ -623,7 +633,7 @@ const SMARTSCREEN_TEXT =
     <li>
       <h3>Enter the address of one section</h3>
       <p>
-        In <em>Website address</em>, enter something like <code>https://www.example.edu/admissions/</code>. The scan
+        In <em>Website address</em>, enter something like <code>www.example.edu/admissions/</code>. Axcess adds https:// for you. The scan
         stays inside <em>/admissions/</em>. Leave <em>Scan the whole website</em>, under <em>Pages to scan</em>,
         turned off.
       </p>
@@ -654,6 +664,22 @@ const SMARTSCREEN_TEXT =
   <p>
     Every issue is marked <strong>Mostly sure</strong>, <strong>Not sure</strong> or <strong>For information</strong>, to show how sure Axcess is that it is a real problem. <a href={url("/docs/glossary/")}>The glossary explains each one</a>.
   </p>
+  {
+    /* Two real screenshots, in the order the report is read: the Issues
+       tab, then one flagged element, so "issue" and "occurrence" have a
+       picture before the cards explain them (COGA "Making
+       Content Usable": use images to help understanding, paraphrased). The
+       cards still say everything in words; the alt text describes what the
+       screen shows and where (SC 1.1.1 Non-text Content, Level A). */
+  }
+  <figure class="not-content report-shot">
+    <img class="step-shot" loading="lazy" {...shot("issues-tab")} />
+    <figcaption>The Issues tab: one row per kind of problem, with how sure Axcess is and where it shows.</figcaption>
+  </figure>
+  <figure class="not-content report-shot">
+    <img class="step-shot" loading="lazy" {...shot("inspector-flagged")} />
+    <figcaption>A flagged element in the Page inspector: its details on top, and the saved copy of the page below with the element outlined.</figcaption>
+  </figure>
   <div class="not-content ax-prose facts">
     <Card heading="Start at the Issues tab">
       <p>
@@ -908,6 +934,14 @@ const SMARTSCREEN_TEXT =
   .gs > h3 {
     padding-top: 2rem;
     border-top: 1px solid var(--ax-border);
+  }
+  .report-shot {
+    margin: 1.5rem 0;
+  }
+  .report-shot figcaption {
+    margin-top: 0.5rem;
+    color: var(--ax-fg-muted);
+    font-size: 0.9375rem;
   }
   /* The step menu: four numbered links in a row, wrapping on a phone. */
   .step-nav ol {
