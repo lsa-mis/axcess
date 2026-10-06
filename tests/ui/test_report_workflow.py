@@ -695,6 +695,17 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
     assert re.sub(r"\s+", " ", await mixed.locator(finding_type).inner_text()).strip() == (
         "At page load After clicking"
     )
+    # Stacked, one per line, at one width: the two pills' edges line up.
+    first, second = [
+        await pill.bounding_box()
+        for pill in await mixed.locator(finding_type).locator("[title]").all()
+    ]
+    assert first and second
+    assert second["y"] >= first["y"] + first["height"], (first, second)
+    assert abs(first["x"] - second["x"]) < 1 and abs(first["width"] - second["width"]) < 1, (
+        first,
+        second,
+    )
     assert (await row("Only behind a dialog").locator(finding_type).inner_text()).strip() == (
         "After clicking"
     )

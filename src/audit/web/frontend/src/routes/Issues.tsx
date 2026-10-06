@@ -786,7 +786,6 @@ const IssueTableRow = memo(function IssueTableRow({
       <Cell className={cn(cell, "whitespace-nowrap")}>
         <LaneTag lane={row.review_lane} />
       </Cell>
-      {/* May wrap: a mixed group's two pills stack when the table is tight. */}
       <Cell className={cell}>
         <FindingTypeCell row={row} />
       </Cell>
@@ -873,14 +872,23 @@ function LaneTag({ lane, hint = true }: { lane: ReviewLane; hint?: boolean }) {
 /**
  * The row's finding types as outlined pills, a different shape from the
  * filled review-lane tag beside them so the two columns do not read as one.
- * "Click-Through" appears only when at least one of the group's errors was
- * found after operating a control; a group seen both at load and behind a
- * control shows "WCAG" and "Click-Through" together.
+ * "After clicking" appears only when at least one of the group's errors was
+ * found after clicking; a group seen both at page load and after clicking
+ * shows "At page load" and "After clicking" together.
+ *
+ * Two pills always stack, one per line, at one width, so their edges line up
+ * and the pair stays centred under the heading. They used to wrap only when
+ * the table was tight, and two pills of different widths then centred one by
+ * one, edges out of line (seen once the labels grew from "WCAG" and
+ * "Click-Through"). Side by side on one line was rejected: it widens the
+ * column and pushes the table past nine columns in view at 1280 px (see
+ * `cell` in IssueTableRow). Stacking also keeps one row looking the same at every
+ * width.
  */
 function FindingTypeCell({ row }: { row: IssueRow }) {
   const types = row.finding_types ?? ["wcag"];
   return (
-    <span className="inline-flex flex-wrap items-center gap-1">
+    <span className="inline-flex flex-col items-stretch gap-1">
       {types.map((type) => (
         <FindingTypePill key={type} type={type} />
       ))}
@@ -893,7 +901,7 @@ function FindingTypePill({ type, hint = true }: { type: FindingType; hint?: bool
   return (
     <span
       title={hint ? FINDING_TYPE_HELP[type] : undefined}
-      className="inline-flex items-center whitespace-nowrap rounded-full border border-border-strong px-1.5 py-px text-2xs font-semibold text-fg"
+      className="inline-flex items-center justify-center whitespace-nowrap rounded-full border border-border-strong px-1.5 py-px text-2xs font-semibold text-fg"
     >
       {FINDING_TYPE_LABELS[type]}
     </span>
