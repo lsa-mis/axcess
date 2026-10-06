@@ -1,18 +1,19 @@
 ---
 /**
- * Site header: name, search, the four main destinations, GitHub, the day and
- * night switch, and Download.
+ * Site header: name, search, the three main destinations, GitHub, the day and
+ * night switch, and Get started.
  *
- * Why these four links: they are the questions a first-time visitor asks
- * (how do I start, how do I use it, what does it check, where does my data
- * go). Everything else is one level down in the sidebar, which lists every
- * page. Download is the one filled button, so there is a single primary
- * action per screen. "Get started" and Download both lead to the Get
- * started page, by the developer's choice (2026-10-06): the link opens the
- * whole path (download, install, first scan), the button jumps straight to
- * the files. Two ways to one page is a cost (COGA: one way to do one
- * thing), accepted because the two answer different needs: "show me how"
- * and "I know, give me the file".
+ * Why these three links: they are the questions a first-time visitor asks
+ * (how do I use it, what does it check, where does my data go). Everything
+ * else is one level down in the sidebar, which lists every page. "Get
+ * started" is the one filled button, so there is a single primary action
+ * per screen. It replaced both a Download button and a separate "Get
+ * started" link (developer's review, 2026-10-06): the two led to the same
+ * page, two controls for one thing (W3C COGA "Making Content Usable": one
+ * way to do one thing, https://www.w3.org/TR/coga-usable/, paraphrased),
+ * and "Get started" says more than "Download" while the download comes
+ * first on that page anyway. On that page the button carries
+ * aria-current="page" and an underline, like the links.
  *
  * Below 72rem the three links are left to the sidebar, which lists them
  * too. Below 50rem the GitHub and theme controls also move into
@@ -65,7 +66,11 @@ const path = Astro.url.pathname;
       <SocialIcons />
     </div>
     <ThemeToggle />
-    <a class="download" href={url("/get-started/#download")}>Download</a>
+    <a
+      class="download"
+      href={url("/get-started/")}
+      aria-current={path.startsWith(url("/get-started/")) ? "page" : undefined}>Get started</a
+    >
   </div>
 </div>
 
@@ -178,6 +183,10 @@ const path = Astro.url.pathname;
     font-weight: 700;
     text-decoration: none;
     white-space: nowrap;
+  }
+  .download[aria-current="page"] {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
   }
   .download:hover {
     text-decoration: underline;
