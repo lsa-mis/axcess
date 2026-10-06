@@ -2,7 +2,7 @@
 
 This page is for people who build and maintain Axcess. It lists every
 detection pipeline, shows how each result is assigned to a report group, and
-describes the safeguards that keep uncertain results out of the Barrier group.
+describes the safeguards that keep uncertain results out of the Mostly sure group.
 When you are ready to add or tune a check, continue with
 [Adding or tuning a check](adding-a-check.md).
 
@@ -18,17 +18,17 @@ pipelines write rows to the `page_a11y_findings` table and tag each row with a
 
 | Pipeline | What it detects | WCAG criteria | Source module | Stored `pipeline` value | Report group (code lane value) | Key limits |
 | --- | --- | --- | --- | --- | --- | --- |
-| [axe-core](../glossary.md#axe-core) | Rule violations in the rendered page: missing names, alt text, and labels, ARIA misuse, contrast, language, landmarks, [target size](../glossary.md#target-size), and more. | A and AA rules at the default level (or A only, or AAA, when chosen), plus best-practice rules with no criterion (shown as BP). | `src/audit/analyzer/axe.py`, running the committed bundle `src/audit/web/static/axe.min.js` (axe-core 4.10.2). | `axe` | Barrier (`likely_barrier`), including best-practice rules. | Stores axe `violations` only; axe's `incomplete` results are dropped. Experimental and deprecated rules never run, so `label-content-name-mismatch` (2.5.3) is never checked. HTML snippets are capped at 4,000 characters. |
-| [Siteimprove Alfa](../glossary.md#siteimprove-alfa) | Failed and "cannot tell" outcomes from Alfa's [ACT rules](../glossary.md#act-rule), on its own capture of the page. | Per ACT rule, at the level chosen for axe. | `src/audit/analyzer/alfa.py` and the Node runner in `src/audit/alfa_runner/`. | `alfa`, with `engine_outcome` set to `failed` or `cant_tell`. | `failed`: Barrier (`likely_barrier`). `cantTell`: Needs review (`expert_review`). | Needs `make alfa-install` and Node 22 or later. Separate headless capture at 1440 x 900, 75 seconds per page. At most 200 findings per page, failures first. `passed` and `inapplicable` outcomes are counted, not stored. |
-| Keyboard | A [keyboard trap](../glossary.md#keyboard-trap): focus that stays on one element through repeated Tab and Shift+Tab presses. | 2.1.2 (A), rule `keyboard-trap-stuck`. | `src/audit/analyzer/keyboard/` | `keyboard` | Needs review (`expert_review`). Rows from older probe versions: Informational (`informational`). | Up to `max_focusable * 2 + 4` Tab presses (104 at the default of 50). Flags an element only when 4 Tabs and then 4 Shift+Tabs all stay on it. Stops at the first trap, so at most one finding per page. Does not test focus order, focus visibility, or reachability. |
-| Focus | A focused control hidden behind a sticky or fixed header or overlay ([focus not obscured](../glossary.md#focus-not-obscured)), and elements with a positive `tabindex`. | 2.4.11 (AA) `focus-not-obscured`; 2.4.3 (A) `focus-order-positive-tabindex`. | `src/audit/analyzer/focus/` | `focus` | Needs review (`expert_review`). | Tests the first 150 focusable elements and the first 150 `[tabindex]` elements. Samples only the centre point of each element, and only when that point is inside the 1440 x 900 viewport. No model. |
-| Responsive | Sideways scrolling at 320 CSS px ([reflow](../glossary.md#reflow)), text cut off at about 200% zoom ([resize text](../glossary.md#resize-text)), and text cut off with wider spacing ([text spacing](../glossary.md#text-spacing)). | 1.4.10 (AA) `responsive-reflow-overflow`; 1.4.4 (AA) `responsive-text-clipped`; 1.4.12 (AA) `responsive-text-spacing-clipped`. | `src/audit/analyzer/responsive/` | `responsive` | Needs review (`expert_review`). | Reflow at 320 x 900 with an 8 px tolerance; zoom uses a 640 x 450 viewport as a stand-in for 200%. Clipping means more than 4 px hidden by `overflow: hidden`, skipping `text-overflow: ellipsis`. Up to 5 offenders per check and 2,000 elements scanned. Runs last because it resizes the viewport. |
-| Visual | Audio that plays by itself with no control, autoplaying video or `<marquee>` with no pause, and a visual reading order that differs from the DOM order. | 1.4.2 (A) `visual-autoplay-audio-no-control`; 2.2.2 (A) `visual-motion-no-pause`; 1.3.2 (A) `visual-meaningful-sequence`. | `src/audit/analyzer/visual/` | `visual` | Needs review (`expert_review`). Older markup-only motion rows: Informational. | Measures 350 ms of playback instead of trusting `autoplay` markup; audio must last over 3 seconds and video over 5, and every `<marquee>` is a lead. Reading order needs a reachable vision model: one screenshot and one call per page, up to 60 text blocks, at most one finding per page. No flashing (2.3.1) check exists, even though the New scan form hint mentions flashing. |
-| Interaction (click-through) | Problems that appear only after a control is used, such as an open menu, dialog, tab, or disclosure (a [DOM state](../glossary.md#page-state)). | Whatever the axe rule maps to. | `src/audit/analyzer/interaction/` | `axe`, with `revealed_by` set to the operated control's name. | Barrier (`likely_barrier`), because the rows are axe rows. | Needs axe. Up to 100 clicks, 20 per repeated control shape, 5 levels deep, and 120 seconds per page. Only axe re-runs in a revealed state, and problems already present at load are not reported again. Skips controls with destructive names and blocks navigation, non-GET/HEAD/OPTIONS requests, and cross-origin requests. |
-| Configured search journeys | Problems on search results pages that exist only after a query is entered. | Whatever the axe rule maps to. | `src/audit/crawler/search.py` | `axe`, with `revealed_by` set to `Configured search`. | Barrier (`likely_barrier`). | Runs only when the scan carries a confirmed search configuration (1 to 6 fields). Defaults to 3 result pages (at most 5) and 20 results (at most 50), within 120 seconds. Needs axe and browser rendering. |
-| [Image of text](../glossary.md#image-of-text): [OCR](../glossary.md#ocr), optional vision model, inline SVG text | Words inside images, how the alt text compares with them, and text drawn inside inline `<svg>`. | 1.4.5 (AA) for `essential` images; 1.1.1 (A) for `informational`, `logo`, and `decorative` images with missing alt; otherwise none (BP). Adequate and unclassified groups get no criterion. | `src/audit/extractor/` (including `svg_text.py`), `src/audit/analyzer/ocr/`, `src/audit/analyzer/vlm/`, `src/audit/synthesizer/` | None. Rows live in `images`, `page_images`, `analyses`, and `findings`; issue rows use `image`. | Adequate alt: Informational (`informational`). Otherwise Needs review (`expert_review`), with low confidence when unclassified. | Reads `<img>` and `<picture><source>` only (not CSS backgrounds or `<canvas>`), up to 25 MB per image. An OCR text candidate needs mean word confidence of at least 60 and at least 3 words; SVG and icon files are not OCR'd, and inline SVG text is flagged with no OCR or model. The vision model sees OCR candidates only, and alt adequacy is a string comparison, not a model. Synthesis writes the findings after a completed crawl. |
-| Semantic analyzers | Wording that rule engines cannot judge: audio with no transcript, vague link text, vague headings, and missing or vague form labels. | 1.2.1 (A), 2.4.4 (A), 2.4.6 (AA), 3.3.2 (A); rule id `semantic:<sc>`. | `src/audit/analyzer/semantic/` | `semantic` | Needs review (`expert_review`). | Reads the page HTML, so rows have no screenshots; per page it sends at most 40 audio elements, 50 links, 60 headings, and 50 form fields, and drops the rest with only a log line. The whole pass is skipped unless the text default model (`gemma2:9b`) is installed. Only 4 of the 11 default criteria have an analyzer. 2.4.4 drops low-confidence flags; the others keep them as `minor`. |
-| Protected image leads | Text in images on protected-scan pages, found in memory by the protected-scan companion. | Stored as 1.4.5 (AA). | `src/audit/protected/companion.py` | `protected_image` | Needs review (`expert_review`). | Protected scans only (see [Protected scans](protected-scans.md)). Image bytes and OCR text are not retained. |
+| [axe-core](../glossary.md#axe-core) | Rule violations in the rendered page: missing names, alt text, and labels, ARIA misuse, contrast, language, landmarks, [target size](../glossary.md#target-size), and more. | A and AA rules at the default level (or A only, or AAA, when chosen), plus best-practice rules with no criterion (shown as BP). | `src/audit/analyzer/axe.py`, running the committed bundle `src/audit/web/static/axe.min.js` (axe-core 4.10.2). | `axe` | Mostly sure (`likely_barrier`), including best-practice rules. | Stores axe `violations` only; axe's `incomplete` results are dropped. Experimental and deprecated rules never run, so `label-content-name-mismatch` (2.5.3) is never checked. HTML snippets are capped at 4,000 characters. |
+| [Siteimprove Alfa](../glossary.md#siteimprove-alfa) | Failed and "cannot tell" outcomes from Alfa's [ACT rules](../glossary.md#act-rule), on its own capture of the page. | Per ACT rule, at the level chosen for axe. | `src/audit/analyzer/alfa.py` and the Node runner in `src/audit/alfa_runner/`. | `alfa`, with `engine_outcome` set to `failed` or `cant_tell`. | `failed`: Mostly sure (`likely_barrier`). `cantTell`: Not sure (`expert_review`). | Needs `make alfa-install` and Node 22 or later. Separate headless capture at 1440 x 900, 75 seconds per page. At most 200 findings per page, failures first. `passed` and `inapplicable` outcomes are counted, not stored. |
+| Keyboard | A [keyboard trap](../glossary.md#keyboard-trap): focus that stays on one element through repeated Tab and Shift+Tab presses. | 2.1.2 (A), rule `keyboard-trap-stuck`. | `src/audit/analyzer/keyboard/` | `keyboard` | Not sure (`expert_review`). Rows from older probe versions: For information (`informational`). | Up to `max_focusable * 2 + 4` Tab presses (104 at the default of 50). Flags an element only when 4 Tabs and then 4 Shift+Tabs all stay on it. Stops at the first trap, so at most one finding per page. Does not test focus order, focus visibility, or reachability. |
+| Focus | A focused control hidden behind a sticky or fixed header or overlay ([focus not obscured](../glossary.md#focus-not-obscured)), and elements with a positive `tabindex`. | 2.4.11 (AA) `focus-not-obscured`; 2.4.3 (A) `focus-order-positive-tabindex`. | `src/audit/analyzer/focus/` | `focus` | Not sure (`expert_review`). | Tests the first 150 focusable elements and the first 150 `[tabindex]` elements. Samples only the centre point of each element, and only when that point is inside the 1440 x 900 viewport. No model. |
+| Responsive | Sideways scrolling at 320 CSS px ([reflow](../glossary.md#reflow)), text cut off at about 200% zoom ([resize text](../glossary.md#resize-text)), and text cut off with wider spacing ([text spacing](../glossary.md#text-spacing)). | 1.4.10 (AA) `responsive-reflow-overflow`; 1.4.4 (AA) `responsive-text-clipped`; 1.4.12 (AA) `responsive-text-spacing-clipped`. | `src/audit/analyzer/responsive/` | `responsive` | Not sure (`expert_review`). | Reflow at 320 x 900 with an 8 px tolerance; zoom uses a 640 x 450 viewport as a stand-in for 200%. Clipping means more than 4 px hidden by `overflow: hidden`, skipping `text-overflow: ellipsis`. Up to 5 offenders per check and 2,000 elements scanned. Runs last because it resizes the viewport. |
+| Visual | Audio that plays by itself with no control, autoplaying video or `<marquee>` with no pause, and a visual reading order that differs from the DOM order. | 1.4.2 (A) `visual-autoplay-audio-no-control`; 2.2.2 (A) `visual-motion-no-pause`; 1.3.2 (A) `visual-meaningful-sequence`. | `src/audit/analyzer/visual/` | `visual` | Not sure (`expert_review`). Older markup-only motion rows: For information. | Measures 350 ms of playback instead of trusting `autoplay` markup; audio must last over 3 seconds and video over 5, and every `<marquee>` is a lead. Reading order needs a reachable vision model: one screenshot and one call per page, up to 60 text blocks, at most one finding per page. No flashing (2.3.1) check exists, even though the New scan form hint mentions flashing. |
+| Interaction (click-through) | Problems that appear only after a control is used, such as an open menu, dialog, tab, or disclosure (a [DOM state](../glossary.md#page-state)). | Whatever the axe rule maps to. | `src/audit/analyzer/interaction/` | `axe`, with `revealed_by` set to the operated control's name. | Mostly sure (`likely_barrier`), because the rows are axe rows. | Needs axe. Up to 100 clicks, 20 per repeated control shape, 5 levels deep, and 120 seconds per page. Only axe re-runs in a revealed state, and problems already present at load are not reported again. Skips controls with destructive names and blocks navigation, non-GET/HEAD/OPTIONS requests, and cross-origin requests. |
+| Configured search journeys | Problems on search results pages that exist only after a query is entered. | Whatever the axe rule maps to. | `src/audit/crawler/search.py` | `axe`, with `revealed_by` set to `Configured search`. | Mostly sure (`likely_barrier`). | Runs only when the scan carries a confirmed search configuration (1 to 6 fields). Defaults to 3 result pages (at most 5) and 20 results (at most 50), within 120 seconds. Needs axe and browser rendering. |
+| [Image of text](../glossary.md#image-of-text): [OCR](../glossary.md#ocr), optional vision model, inline SVG text | Words inside images, how the alt text compares with them, and text drawn inside inline `<svg>`. | 1.4.5 (AA) for `essential` images; 1.1.1 (A) for `informational`, `logo`, and `decorative` images with missing alt; otherwise none (BP). Adequate and unclassified groups get no criterion. | `src/audit/extractor/` (including `svg_text.py`), `src/audit/analyzer/ocr/`, `src/audit/analyzer/vlm/`, `src/audit/synthesizer/` | None. Rows live in `images`, `page_images`, `analyses`, and `findings`; issue rows use `image`. | Adequate alt: For information (`informational`). Otherwise Not sure (`expert_review`), with low confidence when unclassified. | Reads `<img>` and `<picture><source>` only (not CSS backgrounds or `<canvas>`), up to 25 MB per image. An OCR text candidate needs mean word confidence of at least 60 and at least 3 words; SVG and icon files are not OCR'd, and inline SVG text is flagged with no OCR or model. The vision model sees OCR candidates only, and alt adequacy is a string comparison, not a model. Synthesis writes the findings after a completed crawl. |
+| Semantic analyzers | Wording that rule engines cannot judge: audio with no transcript, vague link text, vague headings, and missing or vague form labels. | 1.2.1 (A), 2.4.4 (A), 2.4.6 (AA), 3.3.2 (A); rule id `semantic:<sc>`. | `src/audit/analyzer/semantic/` | `semantic` | Not sure (`expert_review`). | Reads the page HTML, so rows have no screenshots; per page it sends at most 40 audio elements, 50 links, 60 headings, and 50 form fields, and drops the rest with only a log line. The whole pass is skipped unless the text default model (`gemma2:9b`) is installed. Only 4 of the 11 default criteria have an analyzer. 2.4.4 drops low-confidence flags; the others keep them as `minor`. |
+| Protected image leads | Text in images on protected-scan pages, found in memory by the protected-scan companion. | Stored as 1.4.5 (AA). | `src/audit/protected/companion.py` | `protected_image` | Not sure (`expert_review`). | Protected scans only (see [Protected scans](protected-scans.md)). Image bytes and OCR text are not retained. |
 
 A few rules apply across the table:
 
@@ -78,24 +78,24 @@ Things that surprise people:
 
 ## How a check is assigned to a report group
 
-![Diagram of the three report groups. Barrier holds rule-engine failures from axe-core and Siteimprove Alfa, including problems found after clicking or after a configured search; confirm them on the page, fix, and rescan. Needs review holds browser checks, the keyboard trap check, motion checks, text in images whose alt text is missing or does not match, AI checks, and Alfa "cannot tell" results; a person tests and records a decision. Informational holds images whose alt text already matches and older records kept for history; no action is needed.](../images/diagrams/report-groups.png)
+![Diagram of the three report groups in the How sure column. Mostly sure holds rule-engine failures from axe-core and Siteimprove Alfa, including problems found after clicking or after a configured search; confirm them on the page, fix, and rescan. Not sure holds browser checks, the keyboard trap check, motion checks, text in images whose alt text is missing or does not match, AI checks, and Alfa "cannot tell" results; a person tests and records a decision. For information holds images whose alt text already matches and older records kept for history; no action is needed.](../images/diagrams/report-groups.png)
 
 In short: rule-engine failures, including those found after clicking, go to
-Barrier. Browser checks, AI checks, and Alfa "cannot tell" results go to Needs
-review, and records such as matching alt text go to Informational.
+Mostly sure. Browser checks, AI checks, and Alfa "cannot tell" results go to Not
+sure, and records such as matching alt text go to For information.
 
 ### The rule in plain words
 
 Every issue row gets exactly one report group, stored as `review_lane`:
 
-- **[Barrier](../glossary.md#barrier) (`likely_barrier`)**: axe-core
+- **[Mostly sure](../glossary.md#mostly-sure) (`likely_barrier`)**: axe-core
   violations, including the axe rows written by the interaction probe and by
   search journeys, and Alfa `failed` outcomes. Nothing else.
-- **[Needs review](../glossary.md#needs-review) (`expert_review`)**: the
+- **[Not sure](../glossary.md#not-sure) (`expert_review`)**: the
   default. It covers keyboard, focus, responsive, visual, semantic, and
   protected image rows, Alfa `cantTell` outcomes, and image groups whose alt
   text is not adequate.
-- **[Informational](../glossary.md#informational) (`informational`)**: image
+- **[For information](../glossary.md#for-information) (`informational`)**: image
   groups whose alt text comparison is `adequate`, plus keyboard and autoplay
   rows from older probe versions.
 
@@ -103,7 +103,7 @@ The group depends only on the pipeline, the rule id, the Alfa outcome, and the
 image classification and alt adequacy. A finding's
 [status](../glossary.md#status) never changes its group. The Issues table,
 the issue page header, and the Issue guidance dialog all label the groups
-Barrier, Needs review, and Informational, the words of `REVIEW_TYPE_LABEL` in
+Mostly sure, Not sure, and For information, the words of `REVIEW_TYPE_LABEL` in
 `src/audit/web/frontend/src/lib/terms.ts`.
 
 ### Where the code decides
@@ -134,8 +134,8 @@ The image rule lives in `_image_issue_rows` (line 1009). An image group is
 `expert_review` otherwise. Unclassified groups get low confidence (line 1045),
 and adequate or unclassified groups lose their WCAG criterion (line 1029).
 
-Ordering uses `_LANE_RANK` (line 1224): Barrier first, then Needs review, then
-Informational. `_sort_rows` applies it to the default `priority_desc` sort and
+Ordering uses `_LANE_RANK` (line 1224): Mostly sure first, then Not sure, then
+For information. `_sort_rows` applies it to the default `priority_desc` sort and
 to `priority_asc`, so priority only orders rows within a group. The
 `conformance`, `occurrences_desc`, and `pages_desc` sorts ignore the group.
 
@@ -144,7 +144,7 @@ to `priority_asc`, so priority only orders rows within a group. The
 > `axe:<rule_id>`, the group `likely_barrier`, high confidence, and the
 > summary "Deterministic axe-core rule failure; verify after remediation." As
 > soon as a migration allows a new `pipeline` value, its rows appear as
-> Barriers unless `_axe_issue_rows` has an explicit branch for it. Also add
+> Mostly sure issues unless `_axe_issue_rows` has an explicit branch for it. Also add
 > the new value to the pipeline tuples
 > in `rule_meta_for` and `_pages_for_issue`, or
 > the issue page looks for its card and its pages in the image tables.
@@ -166,15 +166,15 @@ The group feeds these places, so a change to the rule changes all of them:
   appendices; the Excel workbook reaches it through `build_audit_cards`.
   - Findings already marked `remediated`, `accepted_risk`, or `false_positive`
     move to Appendix A.
-  - In a Needs review group, only `in_progress` findings (an expert confirmed
+  - In a Not sure group, only `in_progress` findings (an expert confirmed
     the barrier) become an issue card. `new` and `reviewing` findings go to
     Appendix B.
-  - A Barrier group becomes an issue card only when it has a WCAG criterion
+  - A Mostly sure group becomes an issue card only when it has a WCAG criterion
     and is not best practice. Otherwise it goes to Appendix B, along with
-    every Informational group.
+    every For information group.
 - **Final-export readiness.** `_unreviewed_actionable_evidence_blockers` in
   `src/audit/web/export_readiness.py` blocks a final export while any finding
-  behind a Barrier or Needs review group lacks an expert decision. See
+  behind a Mostly sure or Not sure group lacks an expert decision. See
   [False-positive safeguards](#false-positive-safeguards) for the full rule.
 
 Some consumers ignore the group. The CSV, JSON, Jira CSV, and Markdown
@@ -216,33 +216,33 @@ Known gaps:
 
 ## False-positive safeguards
 
-A [false positive](../glossary.md#false-positive) in the Barrier group costs
-the most trust, because Barrier is where people act first. The team's goal is
-[zero false positives in the Barrier group](../glossary.md#zero-false-positive-goal),
+A [false positive](../glossary.md#false-positive) in the Mostly sure group costs
+the most trust, because Mostly sure is where people act first. The team's goal is
+[zero false positives in the Mostly sure group](../glossary.md#zero-false-positive-goal),
 which is why only rule-engine failures go there. This section lists what
 supports that goal and then says plainly what the repo enforces today.
 
 ### Safeguards in the product
 
 - **Three report groups.** Probe, model, and heuristic output can only reach
-  Needs review or Informational, so it never inflates Barrier totals.
+  Not sure or For information, so it never inflates Mostly sure totals.
 - **Keyboard: both directions.** The probe reports an element only when 4 Tab
   presses and then 4 Shift+Tab presses all stay on it. The code calls the
   second direction "the precision gate" (`_confirm_reverse_exit_blocked` in
   `src/audit/analyzer/keyboard/probe.py`). Escape and iframe heuristics are no
-  longer run, and older rows built on them show as Informational.
+  longer run, and older rows built on them show as For information.
 - **Visual: measured playback.** The motion and audio checks measure
   `currentTime` instead of trusting `autoplay` markup. Older markup-only rows
-  show as Informational.
+  show as For information.
 - **axe `incomplete` results are dropped.** `AxeAnalyzer.run` keeps
   `violations` only, so axe's own "needs review" results never become
-  Barriers. They are not shown anywhere.
+  Mostly sure issues. They are not shown anywhere.
 - **Alfa outcomes stay apart.** `failed` and `cantTell` are separate groups
-  with separate issue keys, and `cantTell` never becomes a Barrier.
+  with separate issue keys, and `cantTell` is never marked Mostly sure.
 - **Final-export readiness.** A final (non-draft) export through the API needs
   a completed expert evaluation. It also needs every finding behind every
-  Barrier and Needs review group to be `in_progress`, `remediated`,
-  `accepted_risk`, or `false_positive`; Informational groups are exempt.
+  Mostly sure and Not sure group to be `in_progress`, `remediated`,
+  `accepted_risk`, or `false_positive`; For information groups are exempt.
   Otherwise the API returns 409 unless the caller asks for a
   [draft export](../glossary.md#draft-export), which is labeled DRAFT.
 - **Status history.** Setting `in_progress`, `remediated`, `accepted_risk`,
@@ -298,17 +298,17 @@ hand.
 ### What the repo enforces today
 
 - **Enforced in code:** only axe violations and Alfa `failed` outcomes can be
-  Barriers, as long as every pipeline has its own branch (see the warning
+  Mostly sure issues, as long as every pipeline has its own branch (see the warning
   above).
 - **Enforced in CI:** the report group unit tests and the corpus gate in
   `tests/quality` run on every pull request.
-- **Enforced for final API exports:** an expert decision on every Barrier and
-  Needs review finding. The CLI `audit export` command skips this gate and the
+- **Enforced for final API exports:** an expert decision on every Mostly sure and
+  Not sure finding. The CLI `audit export` command skips this gate and the
   draft labels.
 - **Not enforced: zero.** Nothing measures false positives on real sites. An
-  axe false positive lands in Barrier until someone marks it `false_positive`.
-  The dashboard's Barriers tile says "act without confirmation", which is
-  looser than the goal, so confirm each Barrier on the page anyway.
+  axe false positive lands in Mostly sure until someone marks it `false_positive`.
+  The dashboard's Mostly sure tile says to check each one on the page before
+  fixing it, in line with the goal.
 - **Not visible in the repo:** whether `main` requires CI to pass before a
   merge is a branch-protection setting. The desktop release job depends only
   on the two build jobs, not on CI or the detection evaluations.

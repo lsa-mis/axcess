@@ -382,11 +382,11 @@ function IssueToolbar({
         { value: "BP", label: "Best practice", count: conformanceCounts.BP ?? 0 },
       ],
     },
-    // "Type" is the column's name for the review lane, so the filter is
-    // named the same way and its options read as the cells do.
+    // The filter takes the column's own name ("How sure"), so the filter
+    // and the column read as one thing and its options read as the cells do.
     {
       key: "type",
-      label: "Type",
+      label: COLUMN_LABEL.Type,
       value: lane,
       multiple: true,
       options: [
@@ -462,7 +462,10 @@ type SortColumn = (typeof COLUMNS)[number];
  */
 const COLUMN_LABEL: Record<SortColumn, string> = {
   Issue: "Issue",
-  Type: "Type",
+  // "How sure", not "Type": the column says how sure Axcess is that the
+  // issue is a real problem, and "Type" named no question (see
+  // REVIEW_TYPE_LABEL in lib/terms.ts).
+  Type: "How sure",
   "Finding type": "Found by",
   WCAG: "WCAG",
   Priority: "Priority",
@@ -540,7 +543,7 @@ function parseSort(raw: string | null): SortState {
 /** What the order means in words, for the status line and the caption. */
 function describeSort(sort: SortState): string {
   if (!sort) {
-    return "Recommended order: Barriers, then Needs review, then Informational";
+    return `Recommended order: ${REVIEW_LANES.map((lane) => REVIEW_TYPE_LABEL[lane]).join(", then ")}`;
   }
   return `Sorted by ${COLUMN_LABEL[sort.column]}, ${sortWords(SORT_KINDS[sort.column], sort.direction)}`;
 }
@@ -642,8 +645,8 @@ function sortRows(rows: IssueRow[], sort: SortState): IssueRow[] {
 }
 
 /**
- * How many shown rows are of each type, for the live status line: "Barrier
- * 3, Needs review 7, Informational 2". Every type is named, zeros included,
+ * How many shown rows are of each type, for the live status line: "Mostly
+ * sure 3, Not sure 7, For information 2". Every type is named, zeros included,
  * so the sentence reads the same way each time the filters change.
  */
 function laneSummary(rows: IssueRow[]): string {
@@ -907,11 +910,11 @@ function IssueGlossary() {
   return (
     <ReportNote
       id="report-labels"
-      title={`What ${REVIEW_TYPE_LABEL.likely_barrier}, ${REVIEW_TYPE_LABEL.expert_review} and the other labels mean`}
+      title={`What "${REVIEW_TYPE_LABEL.likely_barrier}", "${REVIEW_TYPE_LABEL.expert_review}" and the other labels mean`}
     >
       <div className="grid max-w-5xl gap-x-10 gap-y-4 text-sm leading-relaxed text-fg-muted md:grid-cols-2 xl:grid-cols-3">
         <GlossaryList
-          heading="Type: how sure the evidence is"
+          heading={`${COLUMN_LABEL.Type}: how sure Axcess is that the issue is a real problem`}
           items={REVIEW_LANES.map((key) => ({ key, term: <LaneTag lane={key} hint={false} />, help: REVIEW_LANE_HELP[key] }))}
         />
         <GlossaryList

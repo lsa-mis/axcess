@@ -10300,8 +10300,8 @@ alfa_rules:
       <code>&lt;video&gt;</code> elements that have sound. It passes when a
       screen reader can read a full text version (transcript) of what is seen
       and heard, on the page or linked. When a person must say where the
-      transcript is, Alfa reports "cannot tell" and Axcess shows the issue as
-      Needs review. Axcess runs this rule only in scans set to Level AAA,
+      transcript is, Alfa reports "cannot tell" and Axcess marks the issue
+      Not sure. Axcess runs this rule only in scans set to Level AAA,
       because this criterion is Level AAA.
     why_matters: >-
       People who are deafblind cannot see the video well enough to read
@@ -10341,7 +10341,7 @@ alfa_rules:
     verify_manual: >-
       Read the text version without playing the video, then watch the video.
       Check that you missed nothing: speech, sounds, actions, and on-screen
-      text. For a Needs review occurrence, find the text version. Check that
+      text. For an occurrence marked Not sure, find the text version. Check that
       it matches the video and that a screen reader can reach it.
     verify_automated: >-
       Scan again at Level AAA, with Alfa or Both as the rule check tool, and
@@ -10359,8 +10359,8 @@ alfa_rules:
       video has captions (text shown in time with the video for all speech and
       important sounds). A video that only repeats text on the page also
       passes, if it is labeled as such. Alfa cannot watch or listen, so it
-      reports "cannot tell" when a person must answer, and Axcess shows the
-      issue as Needs review.
+      reports "cannot tell" when a person must answer, and Axcess marks the
+      issue Not sure.
     why_matters: >-
       People who are deaf or hard of hearing cannot hear the speech and sounds
       in a video. Captions give them the same words and sound cues as text.
@@ -10411,7 +10411,7 @@ alfa_rules:
     verify_manual: >-
       Turn the sound off and play the whole video with captions on. Check that
       every spoken word, who is speaking, and important sounds appear on time.
-      For a Needs review occurrence, first check that the video is prerecorded
+      For an occurrence marked Not sure, first check that the video is prerecorded
       and has sound. If so, look for captions or a visible label.
     verify_automated: >-
       Scan again with Alfa or Both as the rule check tool, and see if this
@@ -10496,8 +10496,8 @@ alfa_rules:
       people can see, and a screen reader can read, a transcript (a text
       version of everything said and heard). Audio that only repeats text on
       the page also passes, if it is labeled as such. Alfa cannot listen, so
-      it reports "cannot tell" when a person must answer, and Axcess shows the
-      issue as Needs review.
+      it reports "cannot tell" when a person must answer, and Axcess marks the
+      issue Not sure.
     why_matters: >-
       People who are deaf, hard of hearing, or who have trouble understanding
       speech cannot get the content of audio without a text version. People
@@ -10550,8 +10550,8 @@ alfa_rules:
     verify_manual: >-
       Play the audio with the transcript open and check that they match: every
       word, the speaker names, and important sounds. Then reach the transcript
-      using only the keyboard and a screen reader. For a Needs review
-      occurrence, first check that the audio is prerecorded and that people
+      using only the keyboard and a screen reader. For an occurrence marked
+      Not sure, first check that the audio is prerecorded and that people
       can play it. If so, look for an accurate transcript or a visible label.
     verify_automated: >-
       Scan again with Alfa or Both as the rule check tool, and see if this
@@ -10569,8 +10569,8 @@ alfa_rules:
       the page has a text description of the video, or an audio track
       describes it. A video that only shows what text on the page says also
       passes, if it is labeled as such. Alfa cannot watch video, so it reports
-      "cannot tell" when a person must answer, and Axcess shows the issue as
-      Needs review.
+      "cannot tell" when a person must answer, and Axcess marks the issue
+      Not sure.
     why_matters: >-
       People who are blind or have low vision miss everything in a silent
       video unless it is described. A text version also helps people who are
@@ -10624,7 +10624,7 @@ alfa_rules:
     verify_manual: >-
       Read the description without playing the video, then watch the video.
       Check that you missed nothing important, and that a screen reader can
-      reach the description. For a Needs review occurrence, first check that
+      reach the description. For an occurrence marked Not sure, first check that
       the video is prerecorded and really has no sound. If so, look for a text
       description, a describing audio track, or a visible label.
     verify_automated: >-
@@ -10643,8 +10643,8 @@ alfa_rules:
       soundtrack or an audio description (a narrator saying what is on screen)
       gives all important visual information. A label saying the video repeats
       page text also passes, but a transcript alone does not. When a person
-      must answer, Alfa reports "cannot tell" and Axcess shows the issue as
-      Needs review.
+      must answer, Alfa reports "cannot tell" and Axcess marks the issue
+      Not sure.
     why_matters: >-
       People who are blind, have low vision, or find it hard to understand
       what they see miss visual details the soundtrack leaves out. Audio
@@ -10694,7 +10694,7 @@ alfa_rules:
     verify_manual: >-
       Listen to the video, or its described version, without looking at the
       screen. Check that you can follow everything important that happens. For
-      a Needs review occurrence, a person must decide whether the main
+      an occurrence marked Not sure, a person must decide whether the main
       soundtrack already describes the visuals.
     verify_automated: >-
       Scan again with Alfa or Both as the rule check tool, and see if this
@@ -10713,7 +10713,7 @@ alfa_rules:
       gives all important visual information. A full text version (transcript)
       of everything seen and heard also passes, as does a label saying the
       video repeats page text. When a person must answer, Alfa reports "cannot
-      tell" and Axcess shows the issue as Needs review.
+      tell" and Axcess marks the issue Not sure.
     why_matters: >-
       People who are blind or have low vision miss actions, scene changes and
       on-screen text that the soundtrack does not mention. Audio description
@@ -10767,7 +10767,7 @@ alfa_rules:
     verify_manual: >-
       Listen to the video without watching, or read the text version without
       playing it. Check that you learn everything important the picture shows.
-      For a Needs review occurrence, a person must first decide whether the
+      For an occurrence marked Not sure, a person must first decide whether the
       soundtrack alone already explains the visuals. If it does, the video
       passes this rule.
     verify_automated: >-
@@ -10836,7 +10836,7 @@ alfa_rules:
           A required field can lead to filler text. Tell editors what good alt
           text looks like, and allow a clear "decoration" choice.
     verify_manual: >-
-      To decide a Needs review occurrence, look at the image on the live page.
+      To decide an occurrence marked Not sure, look at the image on the live page.
       Read its name with a screen reader, or in the accessibility panel of the
       browser's developer tools. If the name says what the image shows or what
       the button does, set the status to Not a problem (false positive). If it
@@ -10909,7 +10909,7 @@ alfa_rules:
         watch_out: >-
           Small differences, such as a #section or a tracking code, do not
           break WCAG if the content is the same. They do make the rule check
-          show the links as Needs review again.
+          mark the links Not sure again.
     verify_manual: >-
       Open the screen reader's list of links, such as the NVDA Elements List
       (Insert+F7) or the VoiceOver Rotor. Each name should say where the link
@@ -11339,7 +11339,7 @@ alfa_rules:
       when the sound lasts more than 3 seconds and there is no way to pause,
       stop or mute it. To decide, it must know how long the media lasts and
       whether it has sound. Axcess cannot give it those answers, so this issue
-      always shows as Needs review, and a person must check. Sound started by
+      is always marked Not sure, and a person must check. Sound started by
       a script, with no <code>autoplay</code> attribute, is not checked by
       this rule.
     why_matters: >-
@@ -11399,7 +11399,7 @@ alfa_rules:
       a problem (false positive). If sound plays longer, check that a visible
       pause, stop or mute control sits near the start of the page. Check that
       you can reach and use it with the keyboard alone, and that a screen
-      reader reads its name. A new scan still shows it as Needs review while
+      reader reads its name. A new scan still marks it Not sure while
       the element has autoplay and is not muted, so rely on this check.
     verify_automated: >-
       Scan again with Alfa or Both as the rule check tool, and see if this
@@ -11472,7 +11472,7 @@ alfa_rules:
       Look at the paragraph with a grayscale filter, for example the color
       filters in the operating system's display settings. Then point at the
       link with the mouse, and move to it with Tab. The link should stand out
-      from the text around it each time. For a Needs review occurrence, a
+      from the text around it each time. For an occurrence marked Not sure, a
       person must judge whether someone who cannot see color would still
       notice the link. Do the same when the link has an icon or other mark
       that shows it is a link.
@@ -11660,7 +11660,7 @@ alfa_rules:
           gets focus, and change it back when focus leaves.
         watch_out: >-
           The rule check (Alfa) cannot see changes made by a script, so this
-          element will keep showing as Needs review. Never use a script that
+          element will keep being marked Not sure. Never use a script that
           moves focus away from the element: that is a known WCAG failure.
     verify_manual: >-
       Put the mouse aside and press Tab and Shift+Tab until this element has
@@ -11685,7 +11685,7 @@ alfa_rules:
       or under 4.5:1 for large text. Sometimes Alfa cannot work out the
       colors, for example because of a <code>text-shadow</code>, a background
       image or an element placed over the text. Then it cannot decide, and the
-      issue shows as Needs review.
+      issue is marked Not sure.
     why_matters: >-
       People with low vision find it hard to read text that does not stand out
       from its background. W3C chose 7:1 to make up for the loss of contrast
@@ -11915,7 +11915,7 @@ alfa_rules:
       piece of visible text and its background (contrast ratio). The ratio
       runs from 1:1 to 21:1. It fails when even the best possible pair of text
       and background colors is under 4.5:1, or under 3:1 for large text. When
-      it cannot work out the colors, the issue shows as Needs review. That
+      it cannot work out the colors, the issue is marked Not sure. That
       happens with a background image, a <code>background-size</code> or a
       <code>text-shadow</code>. It also happens when an element moved with the
       CSS <code>position</code> property may sit between the text and its
@@ -11973,7 +11973,7 @@ alfa_rules:
           700 or more. Semibold (600) still needs 4.5:1. Bigger text can also
           break the layout on small screens.
     verify_manual: >-
-      For a Needs review occurrence, find the real colors behind the text. Use
+      For an occurrence marked Not sure, find the real colors behind the text. Use
       the color picker in your browser's developer tools, or pick colors from
       a screenshot. If an image, gradient or shape is behind the text, measure
       at the spot that is closest in color to the text. If a positioned

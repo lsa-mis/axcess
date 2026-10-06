@@ -6,7 +6,10 @@ again. If a word is missing or unclear, please open an issue.
 
 ## Report groups
 
-### Barrier
+The Issues table's **How sure** column puts every issue in one of these three
+groups: how sure Axcess is that the issue is a real problem.
+
+### Mostly sure
 
 A result where a [rule engine](#rule-engine) ([axe-core](#axe-core) or
 [Siteimprove Alfa](#siteimprove-alfa)) failed a fixed, machine-testable rule,
@@ -15,13 +18,17 @@ every time, so these are the most certain results. Start here: check that the
 rule applies to that part of the page, fix it, test the fix, then
 [rescan](#rescan-comparison) to see if it is still found.
 
-- Good to know: some Barriers are [best practices](#best-practice), not WCAG
-  failures. The Issues table's WCAG column shows Best practice for these.
+- Good to know: some Mostly sure issues are [best practices](#best-practice),
+  not WCAG failures. The Issues table's WCAG column shows Best practice for
+  these.
+- Why "mostly": a fixed rule can still be wrong about a page, so check each one
+  (see [Zero false positive goal](#zero-false-positive-goal)).
+- Called "Barrier" in earlier versions of Axcess.
 
-### Needs review
+### Not sure
 
-A possible problem, found by a less certain check, that a person must confirm
-before it counts as a [Barrier](#barrier). Open the page and check the item
+A possible problem, found by a check that cannot be sure, that a person must
+confirm before you report it. Open the page and check the item
 yourself. If it is a real problem, record that in its [status](#status) and fix
 it; if not, mark it as a [false positive](#false-positive) with a short note.
 
@@ -30,14 +37,16 @@ it; if not, mark it as a [false positive](#false-positive) with a short note.
   image text whose [alt text](#alt-text) is missing or does not match, a
   [local AI model](#local-ai-model) (such as for link text, headings, or form
   labels), or a [Siteimprove Alfa](#siteimprove-alfa) "cannot tell" result.
+- Called "Needs review" in earlier versions of Axcess.
 
-### Informational
+### For information
 
 A record kept so you can see what was checked, not a problem to fix. You do not
 need to act on it, and it should not be reported as an issue.
 
 - Examples: text in an image whose [alt text](#alt-text) already says the same
   words, and results from older checks that are no longer considered reliable.
+- Called "Informational" in earlier versions of Axcess.
 
 ## Issues and findings
 
@@ -159,8 +168,8 @@ can choose A or AAA when you start a scan.
 
 A result that is good practice but not tied to a WCAG success criterion,
 labeled Best practice. When a rule engine finds one, Axcess lists it with
-[Barriers](#barrier), so fix WCAG Barriers first and treat Best practice items
-as recommended.
+[Mostly sure](#mostly-sure) issues, so fix the WCAG ones first and treat Best
+practice items as recommended.
 
 ## Coverage
 
@@ -214,10 +223,10 @@ it out of the written report's worklist.
 
 ### Zero false positive goal
 
-Our goal is that nothing Axcess reports as a [Barrier](#barrier) is a false
+Our goal is that nothing Axcess marks [Mostly sure](#mostly-sure) is a false
 positive, which is why only rule-engine failures go there and every other
 check waits for a person. It is a goal, not a guarantee, so confirm each
-Barrier on the page before you report it.
+Mostly sure issue on the page before you report it.
 
 ## Testing methods
 
@@ -270,7 +279,7 @@ bundled copy on every [rendered page](#rendered-page).
 Siteimprove's open-source rule engine, built on [ACT rules](#act-rule), which
 Axcess can run on your computer alongside or instead of axe-core. When Alfa
 cannot decide a result by itself, it reports "cannot tell", and Axcess puts
-that result in [Needs review](#needs-review).
+that result [Not sure](#not-sure).
 
 ### ACT rule
 
@@ -281,14 +290,14 @@ tools can run it the same way.
 ### Browser check
 
 A check that measures how a page behaves in a real browser, such as resizing it
-to phone width or pressing Tab through it. Its results go to
-[Needs review](#needs-review).
+to phone width or pressing Tab through it. Its results are marked
+[Not sure](#not-sure).
 
 ### Motion check
 
 A check for audio that plays by itself with no control, and for autoplaying
 video or scrolling marquee text with no way to pause it (WCAG 1.4.2 and 2.2.2).
-Its results go to [Needs review](#needs-review), and in the app it runs only
+Its results are marked [Not sure](#not-sure), and in the app it runs only
 when you turn on **Check motion and animation**.
 
 ### Local AI model
@@ -296,7 +305,7 @@ when you turn on **Check motion and animation**.
 An optional AI model that reads text (a language model) or looks at images (a
 vision model), running on your own computer through a free program called
 Ollama. Axcess never installs one for you, and AI results
-are never reported as [Barriers](#barrier).
+are never marked [Mostly sure](#mostly-sure).
 
 ### OCR
 

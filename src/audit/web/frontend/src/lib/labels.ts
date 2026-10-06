@@ -60,9 +60,9 @@ export const REVIEW_LANE_LABELS: Record<ReviewLane, string> = REVIEW_TYPE_LABEL;
 
 export const REVIEW_LANE_HELP: Record<ReviewLane, string> = {
   likely_barrier:
-    "A rule check (axe or Alfa) failed a fixed rule, so this is likely to block someone. Fix it, test the fix, then scan again to see if it is still found.",
+    "A rule check (axe or Alfa) failed a fixed rule, which gives the same result every time. Check it on the page, fix it, test the fix, then scan again to see if it is still found.",
   expert_review:
-    "A possible problem from a less certain check, such as the AI review or a rule check that cannot tell. A person must confirm it before you report it as a barrier.",
+    "A possible problem from a check that cannot be sure, such as the AI review or a rule check that cannot tell. A person must decide if it is a real problem before you report it.",
   informational:
     "Recorded for context, not a problem to fix, such as an image whose alt text already says the same words.",
 };
@@ -74,7 +74,7 @@ export const REVIEW_LANE_HELP: Record<ReviewLane, string> = {
  * as the button's description.
  */
 export const ISSUE_COLUMN_HELP = {
-  Type: "How sure the evidence is: Barrier, Needs review, or Informational.",
+  "How sure": "How sure Axcess is that the issue is a real problem: Mostly sure, Not sure, or For information.",
   "Found by": "Which group of checks found the issue.",
   Priority:
     "High, Medium, or Low, from the issue's impact rating and how many pages it is on. Rule check (Alfa) issues have no rating, so they count as the lowest. A serious issue on one page can still be Low. Informational issues show Does not apply.",

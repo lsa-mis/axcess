@@ -307,7 +307,7 @@ function IssueGuidance({ detail }: { detail: IssueDetail }) {
                   ))}
               {isLead && (
                 <li className="font-semibold">
-                  Look at the issue on the page itself before you report it as a barrier.
+                  Look at the issue on the page itself before you report it as a problem.
                 </li>
               )}
             </ol>
@@ -378,7 +378,7 @@ const LANES: Record<
   expert_review: {
     label: REVIEW_TYPE_LABEL.expert_review,
     meaning:
-      "Do not call this a confirmed barrier until an expert checks it and records the decision.",
+      "Axcess is not sure this is a real problem. Do not report it until a person checks it and records the decision.",
     icon: AlertTriangle,
     className: "border-sev-major/40 border-l-sev-major bg-sev-major-bg",
     iconClass: "text-sev-major",
@@ -386,7 +386,7 @@ const LANES: Record<
   informational: {
     label: REVIEW_TYPE_LABEL.informational,
     meaning:
-      "This check found no barrier. Axcess keeps this record so you can see what it looked at. " +
+      "This check found no problem. Axcess keeps this record so you can see what it looked at. " +
       "It is for information only, and you cannot change it.",
     icon: Info,
     className: "border-border border-l-fg-subtle bg-surface-muted",

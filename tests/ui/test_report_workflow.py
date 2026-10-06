@@ -121,12 +121,12 @@ async def test_report_links_and_review_lanes(
     await playwright_async.expect(page.locator("p").filter(has_text="Filtered by")).to_contain_text(
         "Level: Level A, Level AA"
     )
-    # "Type" filters on the review lane the Type column shows. It is
+    # "How sure" filters on the review lane the How sure column shows. It is
     # a URL parameter like the others, so it narrows the table to the
     # one lane, reads the way the cells do, and clears with the rest.
     await page.get_by_role("button", name="Clear filters").click()
     await page.wait_for_url(re.compile(r"/issues$"))
-    await choose_filter(page, "Type", "expert_review")
+    await choose_filter(page, "How sure", "expert_review")
     await page.wait_for_url("**type=expert_review*")
     await playwright_async.expect(
         issues.get_by_role("rowheader").get_by_role(
@@ -138,7 +138,7 @@ async def test_report_links_and_review_lanes(
             issues.get_by_role("rowheader").get_by_role("link", name=hidden, exact=False)
         ).to_have_count(0)
     type_cells = issues.locator("tbody tr > td:nth-child(2)")
-    assert set(await type_cells.all_inner_texts()) == {"Needs review"}
+    assert set(await type_cells.all_inner_texts()) == {"Not sure"}
     assert "conformance" not in parse_qs(urlparse(page.url).query)
     assert await page.evaluate("document.body.scrollWidth <= innerWidth")
     violations = await _run_axe(page)
@@ -557,7 +557,7 @@ async def test_issue_table_recommended_order_is_lane_first_and_headers_sort_flat
     issues = page.get_by_role("table", name="Accessibility issues")
     group_headers = issues.locator("tbody th[scope='rowgroup']")
     back = page.get_by_role("button", name="Back to recommended order")
-    lane_order = ["Barrier", "Needs review", "Informational"]
+    lane_order = ["Mostly sure", "Not sure", "For information"]
 
     async def assert_recommended() -> None:
         await playwright_async.expect(
@@ -575,7 +575,7 @@ async def test_issue_table_recommended_order_is_lane_first_and_headers_sort_flat
         await playwright_async.expect(
             page.get_by_role("status").filter(has_text="issues shown")
         ).to_have_text(
-            re.compile(r"issues shown: Barrier \d+, Needs review \d+, Informational \d+$")
+            re.compile(r"issues shown: Mostly sure \d+, Not sure \d+, For information \d+$")
         )
         sorted_headers = issues.locator("thead th[aria-sort]:not([aria-sort='none'])")
         await playwright_async.expect(sorted_headers).to_have_count(0)
@@ -679,7 +679,7 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
     headers = await table.locator("thead th").all_inner_texts()
     names = [re.sub(r"\s+", " ", text).strip() for text in headers]
     # The Finding type column reads "Found by" ("finding" is not an interface word).
-    assert names[:4] == ["Issue", "Type", "Found by", "WCAG"], names
+    assert names[:4] == ["Issue", "How sure", "Found by", "WCAG"], names
 
     def row(title: str) -> Any:
         return table.locator("tbody tr").filter(
@@ -706,31 +706,34 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
     await playwright_async.expect(table.locator("th[scope='rowgroup']")).to_have_count(0)
     await playwright_async.expect(
         page.get_by_role("status").filter(has_text="issues shown")
-    ).to_contain_text("Barrier")
+    ).to_contain_text("Mostly sure")
 
     # The glossary defines both sets of words, closed until asked for, under
     # real headings, each term drawn as the chip the table uses.
     glossary = page.get_by_role(
-        "button", name="What Barrier, Needs review and the other labels mean", exact=True
+        "button", name='What "Mostly sure", "Not sure" and the other labels mean', exact=True
     )
     # The glossary's terms, not the summary line's, which are terms too.
     definitions = page.get_by_role("term").filter(
-        has_text=re.compile(r"^(Barrier|Needs review|Informational|WCAG|Click-Through|Alt Text)$")
+        has_text=re.compile(r"^(Mostly sure|Not sure|For information|WCAG|Click-Through|Alt Text)$")
     )
     await playwright_async.expect(definitions.first).to_be_hidden()
     await glossary.focus()
     await page.keyboard.press("Enter")
     await playwright_async.expect(definitions).to_have_text(
-        ["Barrier", "Needs review", "Informational", "WCAG", "Click-Through", "Alt Text"]
+        ["Mostly sure", "Not sure", "For information", "WCAG", "Click-Through", "Alt Text"]
     )
-    for heading in ("Type: how sure the evidence is", "Found by: which group of checks found it"):
+    for heading in (
+        "How sure: how sure Axcess is that the issue is a real problem",
+        "Found by: which group of checks found it",
+    ):
         await playwright_async.expect(
             page.get_by_role("heading", name=heading, level=3)
         ).to_be_visible()
     meanings = page.get_by_role("definition")
     for meaning in (
         "A rule check (axe or Alfa) failed a fixed rule",
-        "A person must confirm it",
+        "A person must decide if it is a real problem",
         "not a problem to fix",
     ):
         await playwright_async.expect(meanings.filter(has_text=meaning)).to_be_visible()

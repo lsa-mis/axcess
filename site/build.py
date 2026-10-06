@@ -61,11 +61,11 @@ DIAGRAM_SIZES = {
     "privacy-boundary": (3200, 1800),
 }
 REPORT_GROUPS_ALT = (
-    "Diagram of the three report groups. Barrier holds rule-engine failures from axe-core and Siteimprove Alfa, "
+    "Diagram of the three report groups in the How sure column. Mostly sure holds rule-engine failures from axe-core and Siteimprove Alfa, "
     "including problems found after clicking or after a configured search; confirm them on the page, fix, and rescan. "
-    "Needs review holds browser checks, the keyboard trap check, motion checks, text in images whose alt text is "
+    "Not sure holds browser checks, the keyboard trap check, motion checks, text in images whose alt text is "
     "missing or does not match, AI checks, and Alfa &quot;cannot tell&quot; results; a person tests and records a "
-    "decision. Informational holds images whose alt text already matches and older records kept for history; no "
+    "decision. For information holds images whose alt text already matches and older records kept for history; no "
     "action is needed."
 )
 
@@ -431,7 +431,7 @@ def home(summ) -> str:
         <div class="chips">
           <span class="chip chip-plain"><span class="sc">1.4.3</span>&nbsp;Contrast (Minimum)</span>
           <span class="chip chip-level">Level AA</span>
-          <span class="chip chip-automated">Barrier</span>
+          <span class="chip chip-automated">Mostly sure</span>
         </div>
         <p style="color:var(--navy);font-size:1.08rem;font-weight:800;margin:0 0 .4rem">Body text is too light to read against its background</p>
         <dl>
@@ -479,7 +479,7 @@ def home(summ) -> str:
       <article class="card">{icon("lock")}<h3>Scans behind a sign-in</h3><p>The signed-in session lives only in memory and ends with the scan. No password or reusable login is saved.</p></article>
       <article class="card">{icon("click")}<h3>Opens what visitors open</h3><p>Axcess clicks through menus, tabs, and dialogs, tests what appears, and tells you which button revealed each problem.</p></article>
       <article class="card">{icon("phone")}<h3>Checks rule-based tools rarely automate</h3><p>It measures reflow at phone width, text cut off at 200% zoom or with wider text spacing, and keyboard traps, and it finds text inside images.</p></article>
-      <article class="card">{icon("shield")}<h3>Honest about certainty</h3><p>Every result is a Barrier, Needs review, or Informational, so you know what to fix now and what a person should confirm first. <a href="faq/#glossary">What the groups mean.</a></p></article>
+      <article class="card">{icon("shield")}<h3>Honest about certainty</h3><p>Every result is marked Mostly sure, Not sure, or For information, so you know what to fix now and what a person should confirm first. <a href="faq/#glossary">What the groups mean.</a></p></article>
       <article class="card">{icon("server")}<h3>A documented data boundary</h3><p>The privacy page lists what stays on your computer and the few things Axcess connects to. <a href="privacy/">Read what stays local.</a></p></article>
       <article class="card">{icon("layers")}<h3>Works alongside your other tools</h3><p>We use and like Siteimprove and axe DevTools. Axcess covers what is hard for them to reach. <a href="coverage/#compare">See the side-by-side comparison.</a></p></article>
     </div>
@@ -614,7 +614,7 @@ def how_it_works(summ) -> str:
     <div class="section-head">
       <span class="eyebrow">Evidence before verdicts</span>
       <h2>How sure is each result?</h2>
-      <p class="sub">Not all findings are equally certain, and Axcess never pretends they are. Every result lands in one of three report groups, and only rule-engine failures become Barriers. <a href="../faq/#glossary">The glossary defines each group</a>, and <a href="../coverage/#groups">What Axcess checks shows which checks feed each one</a>.</p>
+      <p class="sub">Not all findings are equally certain, and Axcess never pretends they are. Every result lands in one of three report groups, and only rule-engine failures are marked Mostly sure. <a href="../faq/#glossary">The glossary defines each group</a>, and <a href="../coverage/#groups">What Axcess checks shows which checks feed each one</a>.</p>
     </div>
     <div>{callout("<strong>Decisions are recorded, not just made.</strong> You can mark each finding in progress, remediated, accepted risk, or false positive. Each of those decisions needs a short written reason.", "", "check")}</div>
   </div>
@@ -774,7 +774,7 @@ _INLINE_MD = re.compile(r"\[([^\]]+)\]\(([^)]+)\)|\*\*([^*]+)\*\*|`([^`]+)`")
 
 
 def _slug(text: str) -> str:
-    """GitHub's heading-anchor rule, so ``glossary.md#needs-review`` links work here too."""
+    """GitHub's heading-anchor rule, so ``glossary.md#not-sure`` links work here too."""
     return re.sub(r"[^\w\- ]", "", text.strip().lower()).replace(" ", "-")
 
 
@@ -849,7 +849,7 @@ CHECKS: tuple[tuple[str, str, str, str, str, str], ...] = (
         "Rule engine (axe-core)",
         "Machine-testable problems on every rendered page, such as missing text alternatives, unlabeled form fields, low text contrast, and ARIA errors. About 90 rules run at Level AA.",
         "Many A and AA criteria, such as 1.1.1, 1.4.3, and 4.1.2",
-        "Barrier",
+        "Mostly sure",
         "Yes. Siteimprove checks the same kinds of problems with its own rule engine.",
         "Yes. axe DevTools runs these same axe-core rules.",
     ),
@@ -857,7 +857,7 @@ CHECKS: tuple[tuple[str, str, str, str, str, str], ...] = (
         "Click through menus, tabs, and dialogs",
         "Problems that only appear after a control is used. Axcess operates each safe control, runs axe-core again on what appears, and records which control revealed each problem.",
         "The same criteria as axe-core",
-        "Barrier",
+        "Mostly sure",
         "Not automatically. Its crawler tests each page as it loads. A Dynamic Content Checker add-on lets you capture other states yourself.",
         "Not automatically. axe-core does not test closed menus or dialogs, so you open them and scan again. Paid guided tests help with dialogs.",
     ),
@@ -865,7 +865,7 @@ CHECKS: tuple[tuple[str, str, str, str, str, str], ...] = (
         "Reflow at phone width",
         "Pages that need sideways scrolling at 320 CSS pixels wide.",
         "1.4.10 (AA)",
-        "Needs review",
+        "Not sure",
         "No automated check found.",
         "No automated check found.",
     ),
@@ -873,7 +873,7 @@ CHECKS: tuple[tuple[str, str, str, str, str, str], ...] = (
         "Text cut off at 200% zoom",
         "Text that is clipped when the page is enlarged. Axcess approximates 200% zoom with a smaller browser window.",
         "1.4.4 (AA)",
-        "Needs review",
+        "Not sure",
         "Partly. It flags pages that block zooming. It has also documented a “Text is clipped when resized” rule, but its open-source engine deprecated that rule in 2026, so ask Siteimprove whether it still runs.",
         "Partly. axe-core flags pages that block zooming, not clipped text.",
     ),
@@ -881,7 +881,7 @@ CHECKS: tuple[tuple[str, str, str, str, str, str], ...] = (
         "Text spacing",
         "Text that is clipped after line, letter, word, and paragraph spacing are raised to the WCAG values.",
         "1.4.12 (AA)",
-        "Needs review",
+        "Not sure",
         "Partly. It flags inline styles that lock spacing with !important. No check found that applies the spacing and looks for clipping.",
         "Partly. The same inline-style check.",
     ),
@@ -889,7 +889,7 @@ CHECKS: tuple[tuple[str, str, str, str, str, str], ...] = (
         "Keyboard traps",
         "Places where Tab and Shift+Tab both fail to move focus away. Reported at most once per page.",
         "2.1.2 (A)",
-        "Needs review",
+        "Not sure",
         "No automated check found.",
         "Only in the paid Keyboard guided test. No axe-core rule.",
     ),
@@ -897,7 +897,7 @@ CHECKS: tuple[tuple[str, str, str, str, str, str], ...] = (
         "Focus checks",
         "A focused control hidden behind a sticky or fixed header, footer, or banner, and elements that force the tab order with a positive tabindex.",
         "2.4.11 (AA), 2.4.3 (A)",
-        "Needs review",
+        "Not sure",
         "No automated check found.",
         "Partly. axe-core flags positive tabindex as a best practice, and the paid Keyboard guided test reviews tab order. No rule found for focus hidden behind other content.",
     ),
@@ -905,7 +905,7 @@ CHECKS: tuple[tuple[str, str, str, str, str, str], ...] = (
         "Target size",
         "Buttons and links smaller than 24 by 24 CSS pixels without enough space around them.",
         "2.5.8 (AA)",
-        "Barrier",
+        "Mostly sure",
         "Yes, when WCAG 2.2 is selected. It also checks the stricter 44 pixel size (2.5.5, AAA), which Axcess checks only when Siteimprove Alfa runs at Level AAA.",
         "Only when WCAG 2.2 rules are turned on. The axe-core rule is off by default, and Axcess turns it on for Level AA scans.",
     ),
@@ -913,7 +913,7 @@ CHECKS: tuple[tuple[str, str, str, str, str, str], ...] = (
         "Text inside images",
         "Images that contain words, found with OCR and compared with their alt text. An optional local vision model judges what the text is for and maps it to a WCAG criterion.",
         "1.4.5 (AA), 1.1.1 (A)",
-        "Needs review (Informational when the alt text already matches)",
+        "Not sure (For information when the alt text already matches)",
         "No automated images-of-text check found. Its open-source engine has an experimental rule that asks whether an image contains text. An on-demand AI check judges whether alt text matches the image.",
         "No automated check found. A paid guided test reviews image alternatives.",
     ),
@@ -921,7 +921,7 @@ CHECKS: tuple[tuple[str, str, str, str, str, str], ...] = (
         "Motion and reading order (optional)",
         "Audio or video that plays on its own without controls, marquee text, and, with a local vision model, a visual reading order that differs from the code order.",
         "1.4.2, 2.2.2, 1.3.2 (A)",
-        "Needs review",
+        "Not sure",
         "Partly. Its open-source engine has an autoplaying audio rule that asks a person to confirm how long the audio plays, and a best-practice rule flags blink and marquee. No reading-order check found.",
         "Partly. axe-core covers autoplaying audio (for review), blink, and marquee. No reading-order check found.",
     ),
@@ -929,7 +929,7 @@ CHECKS: tuple[tuple[str, str, str, str, str, str], ...] = (
         "AI language checks (optional)",
         "Vague link text, headings that do not describe their section, form fields without clear labels or instructions, and audio without a transcript, judged by a local AI model.",
         "2.4.4 (A), 2.4.6 (AA), 3.3.2 (A), 1.2.1 (A)",
-        "Needs review",
+        "Not sure",
         "Partly. It checks that links and fields have names, offers an opt-in AI rule for descriptive headings, and guides a review for transcripts.",
         "Partly. axe-core checks that links and fields have names. Paid guided tests cover link purpose, headings, and labels.",
     ),
@@ -961,14 +961,14 @@ CHECK_CARDS = (
     (
         "axe",
         "Rule check (axe)",
-        "Tests each page against the axe-core rules a computer can check, at the WCAG version and level you choose. Failures are Barriers.",
+        "Tests each page against the axe-core rules a computer can check, at the WCAG version and level you choose. Failures are marked Mostly sure.",
         "A page with nothing found can still fail WCAG.",
     ),
     (
         "alfa",
         "Rule check (Alfa)",
         "Runs Siteimprove Alfa's standard test rules (Accessibility Conformance Testing, ACT). Each rule passes, fails, or cannot tell.",
-        "A failed rule is not proof the page fails WCAG. Each \u201ccannot tell\u201d goes to Needs review.",
+        "A failed rule is not proof the page fails WCAG. Each \u201ccannot tell\u201d is marked Not sure.",
     ),
     (
         "image",
@@ -980,7 +980,7 @@ CHECK_CARDS = (
         "semantic",
         "AI review",
         "A local AI model reads link text, headings, labels, and instructions in context.",
-        "Results go to Needs review. A person confirms each one.",
+        "Results are marked Not sure. A person confirms each one.",
     ),
     (
         "keyboard",
@@ -1044,17 +1044,17 @@ def checks_sections() -> str:
     </div>
     <div class="lanes" style="margin-top:1.5rem">
       <div class="lane lane-automated">
-        <span class="chip chip-automated">Barrier</span>
+        <span class="chip chip-automated">Mostly sure</span>
         <h3>Confirm it, then fix it</h3>
         <p>Comes from axe-core rule failures, including problems found after clicking, and from Siteimprove Alfa failures. Confirm it on the page, fix it, then rescan.</p>
       </div>
       <div class="lane lane-observed">
-        <span class="chip chip-partial">Needs review</span>
+        <span class="chip chip-partial">Not sure</span>
         <h3>A person decides</h3>
         <p>Comes from browser checks, the keyboard check, text in images whose alt text is missing or does not match, local AI checks, and Alfa “cannot tell” results. Test it on the page and record your decision.</p>
       </div>
       <div class="lane" style="border-top-color:#c2cad6">
-        <span class="chip chip-manual">Informational</span>
+        <span class="chip chip-manual">For information</span>
         <h3>Nothing to fix</h3>
         <p>Comes from image checks where the alt text already matches, and from older records kept for history. No action is needed.</p>
       </div>
@@ -1504,7 +1504,7 @@ def privacy() -> str:
       <h2>What Axcess claims about its own accuracy</h2>
     </div>
     <div class="grid grid-2">
-      <article class="card"><h3>A guardrail, not a marketing number</h3><p>We keep a fixed set of made-up examples, each labelled with the right answer, and score recorded results against it. For every kind of check, fewer than 5% of the results it reports may be wrong, and it must find at least 80% of the real problems in the set. Because the examples are made up, this protects the rules for what counts as a Barrier; it does not measure accuracy on real sites.</p></article>
+      <article class="card"><h3>A guardrail, not a marketing number</h3><p>We keep a fixed set of made-up examples, each labelled with the right answer, and score recorded results against it. For every kind of check, fewer than 5% of the results it reports may be wrong, and it must find at least 80% of the real problems in the set. Because the examples are made up, this protects the rules for what is marked Mostly sure; it does not measure accuracy on real sites.</p></article>
       <article class="card"><h3>What that does not mean</h3><p>It is not a claim that every real website will see the same rate. A real-world accuracy figure would need a fresh, representative sample of real pages, checked independently by at least two accessibility experts. The project says so in writing.</p></article>
     </div>
   </div>
@@ -1943,10 +1943,10 @@ make run               <span class="c"># open http://127.0.0.1:8765/app/</span><
     <div class="section-head">
       <span class="eyebrow">Step 4</span>
       <h2>Read your first report</h2>
-      <p class="sub">Every result lands in one of three groups: <strong>Barrier</strong>, <strong>Needs review</strong>, or <strong>Informational</strong>. <a href="../faq/#glossary">The glossary explains each one.</a></p>
+      <p class="sub">Every result lands in one of three groups: <strong>Mostly sure</strong>, <strong>Not sure</strong>, or <strong>For information</strong>. <a href="../faq/#glossary">The glossary explains each one.</a></p>
     </div>
     <div class="grid grid-2">
-      <article class="card">{icon("table")}<h3>Start at the Issues tab</h3><p>Issues are sorted with Barriers first, then by priority. Filter by <em>Type</em> or <em>Level</em>, and open an issue's title for its pages and its guidance.</p></article>
+      <article class="card">{icon("table")}<h3>Start at the Issues tab</h3><p>Issues are sorted with Mostly sure first, then by priority. Filter by <em>How sure</em> or <em>Level</em>, and open an issue's title for its pages and its guidance.</p></article>
       <article class="card">{icon("pin")}<h3>Open the evidence</h3><p>An issue's full evidence record shows the pages, the element, the code snippet, and screenshots. For problems found after a click, it names the control, for example "After clicking “Open menu”."</p></article>
       <article class="card">{icon("eye")}<h3>Check what actually ran</h3><p><em>What this scan checked</em>, above the Issues table, shows which methods ran and which did not, so you know what the scan covered before you draw conclusions.</p></article>
       <article class="card">{icon("sheet")}<h3>Export and rescan</h3><p>The <em>Export</em> menu offers an Excel workbook, an audit report, CSV, and JSON. After fixes land, scan again and use <em>Compare reports</em> to see what changed.</p></article>
@@ -1984,8 +1984,8 @@ def faq(summ) -> str:
                 "<p>No. Axcess gives you evidence to review. It can't certify WCAG conformance or prove legal compliance, and it doesn't replace testing with people who use assistive technology. An accessibility specialist can use its evidence when writing a conformance report.</p>",
             ),
             q(
-                "What do Barrier, Needs review, and Informational mean?",
-                '<p>They are the three report groups, and every result lands in one of them. The glossary below defines <a href="#barrier">Barrier</a>, <a href="#needs-review">Needs review</a>, and <a href="#informational">Informational</a>, and <a href="../coverage/#groups">What Axcess checks</a> shows which checks feed each group.</p>',
+                "What do Mostly sure, Not sure, and For information mean?",
+                '<p>They are the three report groups, and every result lands in one of them. The glossary below defines <a href="#mostly-sure">Mostly sure</a>, <a href="#not-sure">Not sure</a>, and <a href="#for-information">For information</a>, and <a href="../coverage/#groups">What Axcess checks</a> shows which checks feed each group.</p>',
             ),
             q(
                 "How is Axcess different from Siteimprove or axe DevTools?",
@@ -1993,7 +1993,7 @@ def faq(summ) -> str:
             ),
             q(
                 "Do I need AI to use it?",
-                "<p>No. The rule engines and the keyboard, zoom, focus, and click-through checks need only a browser, which the desktop app includes. AI-assisted checks are optional, run on a local model you install yourself, and are never reported as Barriers.</p>",
+                "<p>No. The rule engines and the keyboard, zoom, focus, and click-through checks need only a browser, which the desktop app includes. AI-assisted checks are optional, run on a local model you install yourself, and are never marked Mostly sure.</p>",
             ),
             q(
                 "Does any of my data go to the cloud?",
@@ -2009,7 +2009,7 @@ def faq(summ) -> str:
             ),
             q(
                 "How accurate is it?",
-                "<p>Every result carries its method and report group, so you can see how certain it is, and you can mark any result as a false positive with a reason. Only rule-engine failures are reported as Barriers; everything else waits for a person. The project also checks its results against a set of made-up examples, as a safety rail rather than a measure of accuracy on real sites. <a href=\"../privacy/#accuracy\">How we measure accuracy.</a></p>",
+                "<p>Every result carries its method and report group, so you can see how certain it is, and you can mark any result as a false positive with a reason. Only rule-engine failures are marked Mostly sure; everything else waits for a person. The project also checks its results against a set of made-up examples, as a safety rail rather than a measure of accuracy on real sites. <a href=\"../privacy/#accuracy\">How we measure accuracy.</a></p>",
             ),
             q(
                 "How long does a scan take?",

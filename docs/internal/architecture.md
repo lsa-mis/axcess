@@ -357,8 +357,8 @@ Nothing is grouped at write time. `issues.list_issues` in
 
 Each row gets a `review_lane` of `likely_barrier`, `expert_review`, or
 `informational`, which the Issues table shows as
-[Barrier](../glossary.md#barrier), [Needs review](../glossary.md#needs-review),
-and [Informational](../glossary.md#informational). By default, rows sort by
+[Mostly sure](../glossary.md#mostly-sure), [Not sure](../glossary.md#not-sure),
+and [For information](../glossary.md#for-information). By default, rows sort by
 group first, then by priority within a group. [Detection pipelines](detection-pipelines.md)
 explains which checks land in which group and where to change it.
 

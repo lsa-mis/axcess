@@ -43,7 +43,7 @@ import {
 import { ActiveFilters, FilterMenu, activeFilterItems, type FilterGroup } from "../components/table/FilterMenu";
 import { requestStatusRationale } from "../statusDecision";
 import { useScanQuery } from "../hooks/useScanQuery";
-import { CHECK_LABEL, STATUS_LABEL, STATUS_OPTION_LABEL } from "../lib/terms";
+import { CHECK_LABEL, REVIEW_TYPE_LABEL, STATUS_LABEL, STATUS_OPTION_LABEL } from "../lib/terms";
 
 const STATUS_OPTIONS: FindingStatus[] = [
   "new",
@@ -154,7 +154,7 @@ export default function A11yByRuleRoute() {
         <StatCard label="Issues" value={groups.length} />
         <StatCard label="Occurrences (axe)" value={coverage.axe_violations_total} />
         <StatCard label="Failed (Alfa)" value={coverage.alfa_failed_total} />
-        <StatCard label="Needs review (Alfa)" value={coverage.alfa_cant_tell_total} />
+        <StatCard label={`${REVIEW_TYPE_LABEL.expert_review} (Alfa)`} value={coverage.alfa_cant_tell_total} />
         <StatCard
           label="Pages checked (axe)"
           value={coverage.axe_pages_scanned}
@@ -247,7 +247,7 @@ function RuleGroupCard({
           </span>
           {group.pipeline === "alfa" && group.outcome_group && (
             <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${group.outcome_group === "failed" ? "bg-sev-critical-bg text-sev-critical" : "bg-sev-minor-bg text-sev-minor"}`}>
-              {group.outcome_group === "failed" ? "Failed a standard test (ACT)" : "Needs review (Alfa cannot tell)"}
+              {group.outcome_group === "failed" ? "Failed a standard test (ACT)" : `${REVIEW_TYPE_LABEL.expert_review} (Alfa cannot tell)`}
             </span>
           )}
           <code className="font-mono text-base font-semibold text-fg">
@@ -307,7 +307,7 @@ function RuleGroupCard({
           </div>
           {group.pipeline === "alfa" && group.engine_outcomes.cant_tell > 0 && (
             <p className="mb-2 text-xs text-fg-muted">
-              <strong className="text-fg">Needs review:</strong> For{" "}
+              <strong className="text-fg">{REVIEW_TYPE_LABEL.expert_review}:</strong> For{" "}
               {group.engine_outcomes.cant_tell} occurrence
               {group.engine_outcomes.cant_tell === 1 ? "" : "s"}, Alfa could not
               tell (<code>cantTell</code>) if the rule passed. A person needs to

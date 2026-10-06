@@ -75,20 +75,21 @@ ReviewLane = Literal["likely_barrier", "expert_review", "informational"]
 REVIEW_LANES: tuple[ReviewLane, ...] = ("likely_barrier", "expert_review", "informational")
 
 REVIEW_LANE_LABELS: dict[ReviewLane, str] = {
-    "likely_barrier": "Barrier",
-    "expert_review": "Needs review",
-    "informational": "Informational",
+    "likely_barrier": "Mostly sure",
+    "expert_review": "Not sure",
+    "informational": "For information",
 }
 
 REVIEW_LANE_HELP: dict[ReviewLane, str] = {
     "likely_barrier": (
-        "A rule check (axe or Alfa) failed a fixed rule, so this is likely to block someone. "
-        "Fix it, test the fix, then scan again to see if it is still found."
+        "A rule check (axe or Alfa) failed a fixed rule, which gives the same result every "
+        "time. Check it on the page, fix it, test the fix, then scan again to see if it is "
+        "still found."
     ),
     "expert_review": (
-        "A possible problem from a less certain check, such as the AI review or a "
-        "rule check that cannot tell. A person must confirm it before you report it "
-        "as a barrier."
+        "A possible problem from a check that cannot be sure, such as the AI review or a "
+        "rule check that cannot tell. A person must decide if it is a real problem before "
+        "you report it."
     ),
     "informational": (
         "Recorded for context, not a problem to fix, such as an image whose alt text "

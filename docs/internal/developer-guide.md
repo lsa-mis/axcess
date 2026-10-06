@@ -262,7 +262,7 @@ holds its logic.
   list of blockers until the reviewer, purpose, included scope, methods used,
   and limitations are filled in. Every WCAG A and AA manual check also needs
   an outcome with a rationale, and none may still need follow-up.
-- A final export also needs every finding behind a Barrier or Needs review
+- A final export also needs every finding behind a Mostly sure or Not sure
   issue to have a review status of in progress, remediated, accepted risk, or
   false positive (`assess_public_export_readiness` in
   `src/audit/web/export_readiness.py`). If anything is missing, the export

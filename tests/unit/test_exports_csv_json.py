@@ -363,6 +363,6 @@ def test_behavioral_and_ai_sources_are_not_mislabeled_as_axe(
 
     assert "**Source:** Semantic analyzer" in markdown
     assert "**Source:** Semantic analyzer" in jira
-    assert "Needs expert review (observed lead" in markdown
-    assert "Needs expert review (observed lead" in jira
+    assert "Not sure: a person must decide (a check that cannot be sure)" in markdown
+    assert "Not sure: a person must decide (a check that cannot be sure" in jira
     assert "**Source:** axe-core" not in jira

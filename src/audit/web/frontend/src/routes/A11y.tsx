@@ -35,7 +35,7 @@ import {
 import { ActiveFilters, FilterMenu, activeFilterItems, type FilterGroup } from "../components/table/FilterMenu";
 import { requestStatusRationale } from "../statusDecision";
 import { useScanQuery } from "../hooks/useScanQuery";
-import { CHECK_LABEL, STATUS_LABEL, STATUS_OPTION_LABEL } from "../lib/terms";
+import { CHECK_LABEL, REVIEW_TYPE_LABEL, STATUS_LABEL, STATUS_OPTION_LABEL } from "../lib/terms";
 
 const STATUS_OPTIONS: FindingStatus[] = [
   "new",
@@ -150,7 +150,7 @@ export default function A11yRoute() {
         />
         <StatCard label="Occurrences (axe)" value={coverage.axe_violations_total} />
         <StatCard label="Failed (Alfa)" value={coverage.alfa_failed_total} />
-        <StatCard label="Needs review (Alfa)" value={coverage.alfa_cant_tell_total} />
+        <StatCard label={`${REVIEW_TYPE_LABEL.expert_review} (Alfa)`} value={coverage.alfa_cant_tell_total} />
         <StatCard label="Level A" value={rollup.by_level.A} tone="critical" />
         <StatCard label="Level AA" value={rollup.by_level.AA} tone="major" />
         <StatCard label="Level AAA" value={rollup.by_level.AAA} tone="minor" />
@@ -185,7 +185,7 @@ export default function A11yRoute() {
       ) : rollup.groups.length === 0 ? (
         <EmptyState
           title="The rule checks found no issues"
-          message="The rule checks you chose found nothing that failed or needs review. A person still needs to test the site by hand. Automated checks alone cannot show that a site meets WCAG."
+          message="The rule checks you chose found nothing that failed or that it was not sure about. A person still needs to test the site by hand. Automated checks alone cannot show that a site meets WCAG."
         />
       ) : (
         <RollupView scanId={id} groups={rollup.groups} />
@@ -439,7 +439,7 @@ function DrillDownView({
                     <Cell className="text-xs text-fg-muted">
                       {CHECK_LABEL[f.pipeline] ?? f.pipeline}
                       {f.pipeline === "alfa" && f.engine_outcome === "cant_tell" && (
-                        <span className="mt-1 block">Needs review</span>
+                        <span className="mt-1 block">{REVIEW_TYPE_LABEL.expert_review}</span>
                       )}
                     </Cell>
                     <Cell>

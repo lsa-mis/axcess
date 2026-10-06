@@ -598,7 +598,7 @@ function TermsDialog({
   const earlier = baselineId !== null ? `report #${baselineId}` : "the earlier report";
   const later = `report #${currentId}`;
   const terms: Array<[ComparisonChange | "group" | "occurrence", string, string]> = [
-    ["new", "New", `Found in ${later} but not in ${earlier}. Check whether it is a new barrier.`],
+    ["new", "New", `Found in ${later} but not in ${earlier}. Check whether it is a new problem.`],
     [
       "resolved",
       "No longer found",

@@ -107,15 +107,20 @@ export default function DashboardRoute() {
                   thing the reader actually has to clear. */}
               <h2 className="mt-1.5 text-xl font-semibold tracking-tight text-fg sm:text-2xl">
                 {reviewLeads > 0
-                  ? `${reviewLeads} issue${reviewLeads === 1 ? "" : "s"} need${reviewLeads === 1 ? "s" : ""} review`
+                  ? `${reviewLeads} issue${reviewLeads === 1 ? "" : "s"} need${reviewLeads === 1 ? "s" : ""} a person to decide`
                   : latestIssues.total_unfiltered > 0
-                    ? "No issues need review"
+                    ? "No issues need a person to decide"
                     : "The checks found no issues"}
               </h2>
               <p className="mt-1.5 max-w-2xl text-sm leading-6 text-fg-muted">
+                {/* "Check it on the page, then fix it", not "sure enough to fix
+                    without checking first" (as this said before): a fixed rule
+                    can still be wrong about a page, and the glossary says to
+                    confirm each one (docs/glossary.md, "Zero false positive
+                    goal"). */}
                 {likelyBarriers > 0
-                  ? `${likelyBarriers} issue${likelyBarriers === 1 ? " is a Barrier" : "s are Barriers"}: sure enough to fix without checking first. `
-                  : "No issue in this report is a Barrier (sure enough to fix without checking first). "}
+                  ? `${likelyBarriers} issue${likelyBarriers === 1 ? " is" : "s are"} marked ${REVIEW_TYPE_LABEL.likely_barrier}: a fixed rule failed. Check ${likelyBarriers === 1 ? "it" : "each one"} on the page, then fix ${likelyBarriers === 1 ? "it" : "them"}. `
+                  : `No issues are marked ${REVIEW_TYPE_LABEL.likely_barrier}. `}
                 {latestIssues.occurrence_counts.all_evidence.toLocaleString()} occurrences across{" "}
                 {latest.page_count.toLocaleString()} page
                 {latest.page_count === 1 ? "" : "s"}.
@@ -134,14 +139,14 @@ export default function DashboardRoute() {
         // evidence · raw image records" measured the crawler, not the audit.
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatCard
-            label="Barriers"
+            label={REVIEW_TYPE_LABEL.likely_barrier}
             value={latestIssues ? likelyBarriers : "Not available"}
-            hint="Newest report · fix without checking first"
+            hint="Newest report · check on the page, then fix"
           />
           <StatCard
             label={REVIEW_TYPE_LABEL.expert_review}
             value={latestIssues ? reviewLeads : "Not available"}
-            hint="Newest report · an expert must decide"
+            hint="Newest report · a person must decide"
           />
           <StatCard
             label="Occurrences"

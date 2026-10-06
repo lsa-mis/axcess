@@ -58,7 +58,7 @@ import {
   protectedQueryKey,
   useProtectedIdentityContext,
 } from "../hooks/useProtectedIdentityContext";
-import { CHECK_LABEL } from "../lib/terms";
+import { CHECK_LABEL, REVIEW_TYPE_LABEL } from "../lib/terms";
 import type {
   ProtectedAgentEnrollmentResponse,
   ProtectedScanStatus,
@@ -554,7 +554,7 @@ export default function ProtectedCompanionRoute() {
           <ProgressMetric label="Issue occurrences" value={scan.progress.issue_occurrences} />
           <ProgressMetric label={CHECK_LABEL.axe} value={scan.progress.axe_occurrences} />
           <ProgressMetric
-            label={`${CHECK_LABEL.alfa}: failed / needs review`}
+            label={`${CHECK_LABEL.alfa}: failed or ${REVIEW_TYPE_LABEL.expert_review}`}
             value={`${scan.progress.alfa_failed_occurrences} / ${scan.progress.alfa_review_occurrences}`}
           />
         </dl>

@@ -20,15 +20,17 @@ pytestmark = [pytest.mark.ui, pytest.mark.asyncio(loop_scope="module")]
 playwright_async = pytest.importorskip("playwright.async_api")
 
 LANE_HELP = {
-    "Barrier": (
-        "A rule check (axe or Alfa) failed a fixed rule, so this is likely to block someone. "
-        "Fix it, test the fix, then scan again to see if it is still found."
+    "Mostly sure": (
+        "A rule check (axe or Alfa) failed a fixed rule, which gives the same result every "
+        "time. Check it on the page, fix it, test the fix, then scan again to see if it is "
+        "still found."
     ),
-    "Needs review": (
-        "A possible problem from a less certain check, such as the AI review or a rule check "
-        "that cannot tell. A person must confirm it before you report it as a barrier."
+    "Not sure": (
+        "A possible problem from a check that cannot be sure, such as the AI review or a rule "
+        "check that cannot tell. A person must decide if it is a real problem before you "
+        "report it."
     ),
-    "Informational": (
+    "For information": (
         "Recorded for context, not a problem to fix, such as an image whose alt text already "
         "says the same words."
     ),
@@ -79,7 +81,10 @@ async def test_issue_tags_headers_and_bands_explain_themselves(
         assert all(title == FOUND_BY_HELP[word] for word, title in found_by), found_by
 
         headers = {
-            "Type": "How sure the evidence is: Barrier, Needs review, or Informational.",
+            "How sure": (
+                "How sure Axcess is that the issue is a real problem: "
+                "Mostly sure, Not sure, or For information."
+            ),
             "Found by": "Which group of checks found the issue.",
         }
         # On the sort button, the header's focusable part, so a screen reader
@@ -110,10 +115,10 @@ async def test_issue_tags_headers_and_bands_explain_themselves(
         # The glossary prints each meaning beside its tag, so its tags add none,
         # and it spells out the priority bands for those who cannot hover.
         await page.get_by_role(
-            "button", name="What Barrier, Needs review and the other labels mean", exact=True
+            "button", name='What "Mostly sure", "Not sure" and the other labels mean', exact=True
         ).click()
         terms = page.get_by_role("term")
-        await playwright_async.expect(terms.filter(has_text="Needs review")).to_be_visible()
+        await playwright_async.expect(terms.filter(has_text="Not sure")).to_be_visible()
         assert await terms.locator("[title]").count() == 0
         await playwright_async.expect(
             page.get_by_role("heading", name="Priority: which issues to look at first", level=3)
@@ -156,8 +161,13 @@ async def test_keyboard_focus_keeps_the_hint_as_the_description(
     try:
         await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
         table = page.get_by_role("table", name="Accessibility issues")
-        button = table.get_by_role("columnheader", name="Type", exact=False).get_by_role("button")
-        hint = "How sure the evidence is: Barrier, Needs review, or Informational."
+        button = table.get_by_role("columnheader", name="How sure", exact=False).get_by_role(
+            "button"
+        )
+        hint = (
+            "How sure Axcess is that the issue is a real problem: "
+            "Mostly sure, Not sure, or For information."
+        )
         await button.focus()
         await playwright_async.expect(page.get_by_text(hint, exact=True)).to_be_visible()
         await playwright_async.expect(button).to_have_attribute("title", hint)
@@ -182,8 +192,13 @@ async def test_hovering_keeps_the_hint_as_the_description(
     try:
         await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
         table = page.get_by_role("table", name="Accessibility issues")
-        button = table.get_by_role("columnheader", name="Type", exact=False).get_by_role("button")
-        hint = "How sure the evidence is: Barrier, Needs review, or Informational."
+        button = table.get_by_role("columnheader", name="How sure", exact=False).get_by_role(
+            "button"
+        )
+        hint = (
+            "How sure Axcess is that the issue is a real problem: "
+            "Mostly sure, Not sure, or For information."
+        )
         await button.hover()
         await playwright_async.expect(page.get_by_text(hint, exact=True)).to_be_visible()
         await playwright_async.expect(button).not_to_have_attribute("title", hint)
