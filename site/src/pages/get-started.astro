@@ -289,316 +289,348 @@ const SMARTSCREEN_TEXT =
     drawings are simplified, so your screen may look a little different.
   </p>
 
-  <h3 id="mac">On a Mac with Apple silicon</h3>
-  <ol class="install-steps">
-    <li>
-      Select <strong>Download for Mac (Apple silicon)</strong> and wait for <code data-release-name="Mac-Apple-Silicon.dmg">Axcess-(version)-Mac-Apple-Silicon.dmg</code> to finish
-      downloading.
-    </li>
-    <li>
-      <div class="step-row">
-        <div class="step-text">
-        Open the downloaded file, then drag <strong>Axcess</strong> into your <strong>Applications</strong> folder.
-        </div>
-        <div class="step-pic">
-        <div
-          class="mock not-content"
-          role="img"
-          aria-label="Drawing of the window that opens with the downloaded file. It shows the Applications folder on the left and the Axcess app on the right, with an arrow from Axcess to Applications. Axcess is marked 2."
-        >
-          <div class="mock-win">
-            <div class="mock-bar"><span class="mock-dots"><i></i><i></i><i></i></span><span class="mock-bar-title">Axcess</span></div>
-            <div class="mock-drag">
-              <span class="mock-icon"><span class="mock-folder"></span><span>Applications</span></span>
-              <svg class="mock-arrow" viewBox="0 0 48 16" aria-hidden="true" focusable="false"><path d="M46 8H6m8-6-8 6 8 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
-              <span class="mock-mark mock-icon" data-step="2"><span class="mock-app" set:html={MARK} /><span>Axcess</span></span>
-            </div>
+  {
+    /* Mac, Windows and Linux as tabs, by the developer's direction
+       (2026-10-06), drawn like the app's own New scan tabs (a segmented
+       control: a grey track, the selected tab filled navy). It reverses an
+       earlier decision against tabs, whose two objections are met as far
+       as browsers allow:
+       - Without scripts there are no tabs: all three systems show, with
+         the jump links above (the ax-js class switches between the two).
+       - Hidden systems use hidden="until-found", so find-in-page still
+         finds their words and opens that tab (Chrome and Edge; Firefox and
+         Safari search only the open tab, the cost the developer accepted),
+         and printing shows all three.
+       The page opens on the visitor's own system, read from the browser,
+       or on the one a link names (#mac, #windows, #linux), and says the
+       choice was automatic, since it can guess wrong. WAI-ARIA APG Tabs
+       pattern with automatic activation
+       (https://www.w3.org/WAI/ARIA/apg/patterns/tabs/): arrow keys move and
+       select, Home and End jump, only the selected tab is in the Tab order,
+       and each panel is labelled by its tab. */
+  }
+  <div class="os-tabs" data-os-tabs>
+    <div class="not-content os-tablist" role="tablist" aria-label="Your computer">
+      <button type="button" role="tab" id="tab-mac" aria-controls="mac" aria-selected="true">Mac</button>
+      <button type="button" role="tab" id="tab-windows" aria-controls="windows" aria-selected="false" tabindex="-1">Windows</button>
+      <button type="button" role="tab" id="tab-linux" aria-controls="linux" aria-selected="false" tabindex="-1">Linux</button>
+    </div>
+    <p class="os-note">Showing the steps for your computer, picked from your browser. If that is wrong, choose another tab.</p>
+    <div class="os-panel" id="mac">
+    <h3>On a Mac with Apple silicon</h3>
+    <ol class="install-steps">
+      <li>
+        Select <strong>Download for Mac (Apple silicon)</strong> and wait for <code data-release-name="Mac-Apple-Silicon.dmg">Axcess-(version)-Mac-Apple-Silicon.dmg</code> to finish
+        downloading.
+      </li>
+      <li>
+        <div class="step-row">
+          <div class="step-text">
+          Open the downloaded file, then drag <strong>Axcess</strong> into your <strong>Applications</strong> folder.
           </div>
-        </div>
-        </div>
-      </div>
-    </li>
-    <li>
-      <div class="step-row">
-        <div class="step-text">
-        Open <strong>Applications</strong> and double-click <strong>Axcess</strong>. macOS says it could not verify the
-        app. Choose <strong>Done</strong>, not <em>Move to Trash</em>.
-        </div>
-        <div class="step-pic">
-        <div
-          class="mock not-content"
-          role="img"
-          aria-label="Drawing of the macOS message “Axcess” Not Opened, which says Apple could not verify Axcess. It has two buttons, one above the other: the blue Move to Trash button on top, and below it the pale Done button, marked 3."
-        >
-          <div class="mock-win mock-alert">
-            <span class="mock-app" set:html={MARK} />
-            <p class="mock-title">“Axcess” Not Opened</p>
-            <p>Apple could not verify “Axcess” is free of malware that may harm your Mac or compromise your privacy.</p>
-            <div class="mock-stack"><span class="mock-btn mock-btn-mac">Move to Trash</span><span class="mock-mark mock-btn mock-btn-pale" data-step="3">Done</span></div>
-          </div>
-        </div>
-        </div>
-      </div>
-    </li>
-    <li>
-      <div class="step-row">
-        <div class="step-text">
-        Open <strong>System Settings</strong>, choose <strong>Privacy &amp; Security</strong>, and scroll down to the <strong>Security</strong> section.
-        {
-          /* Only the names people need to find Privacy & Security are written
-             out; the other settings are grey bars. More names were more to
-             read for no gain, and they change between macOS versions (COGA
-             "Making Content Usable": keep only what helps the task,
-             https://www.w3.org/TR/coga-usable/, paraphrased). */
-        }
-        </div>
-        <div class="step-pic">
-        <div
-          class="mock not-content"
-          role="img"
-          aria-label="Drawing of System Settings. The list on the left has Privacy & Security selected, marked 4, below General, Appearance and Accessibility. On the right, below other settings, is the Security heading. Under it, the message “Axcess” was blocked to protect your Mac has an Open Anyway button on its right, marked 5."
-        >
-          <div class="mock-win mock-settings">
-            <div class="mock-side">
-              <span class="mock-dots"><i></i><i></i><i></i></span>
-              <ul>
-                <li>General</li>
-                <li>Appearance</li>
-                <li>Accessibility</li>
-                <li><i class="mock-hidden"></i></li>
-                <li><span class="mock-mark mock-selected" data-step="4">Privacy &amp; Security</span></li>
-                <li><i class="mock-hidden"></i></li>
-                <li><i class="mock-hidden"></i></li>
-              </ul>
-            </div>
-            <div class="mock-main">
-              <p class="mock-title">Privacy &amp; Security</p>
-              <div class="mock-group mock-faint"><i></i><i></i><i></i></div>
-              <p class="mock-scroll">Scroll down <span>↓</span></p>
-              <p class="mock-heading">Security</p>
-              <div class="mock-group mock-row"><span class="mock-grow">“Axcess” was blocked to protect your Mac.</span><span class="mock-mark mock-btn" data-step="5">Open Anyway</span></div>
-            </div>
-          </div>
-        </div>
-        </div>
-      </div>
-    </li>
-    <li>
-      Next to the message that Axcess was blocked, choose <strong>Open Anyway</strong>. Then confirm with your Mac
-      password or Touch ID.
-    </li>
-    <li>
-      Choose <strong>Open</strong> in the last message. Axcess starts, and from now on it opens like any other app.
-    </li>
-  </ol>
-  <p>
-    On macOS 14 (Sonoma) or earlier there is a shortcut: in Applications, right-click <strong>Axcess</strong>,
-    choose <strong>Open</strong>, then choose <strong>Open</strong> again in the message.
-  </p>
-
-  <h3 id="windows">On Windows 10 or 11</h3>
-  <ol class="install-steps">
-    <li>
-      Select <strong>Download the Windows installer</strong> and wait for <code data-release-name="Windows-Installer.exe">Axcess-(version)-Windows-Installer.exe</code> to finish
-      downloading.
-    </li>
-    <li>
-      <div class="step-row">
-        <div class="step-text">
-        If your browser says the file is not commonly downloaded, open the download's menu (the three dots) and
-        choose <strong>Keep</strong>, then <strong>Keep anyway</strong>.
-        </div>
-        <div class="step-pic">
-        <div
-          class="mock not-content"
-          role="img"
-          aria-label="Drawing of the browser’s list of downloads. The Axcess installer has a warning that it is not commonly downloaded. The three dots button to its right is marked 2, and so is Keep in the menu that opens below it."
-        >
-          <div class="mock-win mock-flat">
-            <div class="mock-bar"><span class="mock-bar-title">Downloads</span></div>
-            <div class="mock-row mock-pad">
-              <span class="mock-warn">!</span>
-              <span class="mock-grow"><code data-release-name="Windows-Installer.exe">Axcess-(version)-Windows-Installer.exe</code> is not commonly downloaded. Make sure you trust it before you open it.</span>
-              <span class="mock-mark mock-btn mock-btn-icon" data-step="2">⋯</span>
-            </div>
-            <ul class="mock-menu"><li>Delete</li><li><span class="mock-mark" data-step="2">Keep</span></li></ul>
-          </div>
-        </div>
-        </div>
-      </div>
-    </li>
-    <li>Open the downloaded file. Windows shows a blue <em>Windows protected your PC</em> window.</li>
-    <li>
-      <div class="step-row">
-        <div class="step-text">
-        Choose <strong>More info</strong>. A <strong>Run anyway</strong> button appears. Choose it.
-        </div>
-        <div class="step-pic">
-        <div
-          class="mock not-content"
-          role="img"
-          aria-label="Two drawings of the blue Windows protected your PC window. In the first, the More info link under the message is marked 4. In the second, after you choose More info, it shows the app and Unknown publisher, and the Run anyway button at the bottom is marked 4."
-        >
-          <div class="mock-pair">
-            <div>
-              <p class="mock-label">First</p>
-              <div class="mock-win mock-flat mock-blue">
-                <p class="mock-title">Windows protected your PC</p>
-                <p>{SMARTSCREEN_TEXT}</p>
-                <p><span class="mock-mark mock-link" data-step="4">More info</span></p>
-                <div class="mock-btns"><span class="mock-btn">Don’t run</span></div>
-              </div>
-            </div>
-            <div>
-              <p class="mock-label">After you choose More info</p>
-              <div class="mock-win mock-flat mock-blue">
-                <p class="mock-title">Windows protected your PC</p>
-                <p>{SMARTSCREEN_TEXT}</p>
-                <p>
-                  App: <code data-release-name="Windows-Installer.exe">Axcess-(version)-Windows-Installer.exe</code><br />Publisher:
-                  Unknown publisher
-                </p>
-                <div class="mock-btns"><span class="mock-mark mock-btn" data-step="4">Run anyway</span><span class="mock-btn">Don’t run</span></div>
+          <div class="step-pic">
+          <div
+            class="mock not-content"
+            role="img"
+            aria-label="Drawing of the window that opens with the downloaded file. It shows the Applications folder on the left and the Axcess app on the right, with an arrow from Axcess to Applications. Axcess is marked 2."
+          >
+            <div class="mock-win">
+              <div class="mock-bar"><span class="mock-dots"><i></i><i></i><i></i></span><span class="mock-bar-title">Axcess</span></div>
+              <div class="mock-drag">
+                <span class="mock-icon"><span class="mock-folder"></span><span>Applications</span></span>
+                <svg class="mock-arrow" viewBox="0 0 48 16" aria-hidden="true" focusable="false"><path d="M46 8H6m8-6-8 6 8 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                <span class="mock-mark mock-icon" data-step="2"><span class="mock-app" set:html={MARK} /><span>Axcess</span></span>
               </div>
             </div>
           </div>
-        </div>
-        </div>
-      </div>
-    </li>
-    <li>
-      <div class="step-row">
-        <div class="step-text">
-        Setup asks who can use Axcess. Choose <strong>Only for me</strong>, then <strong>Next</strong>. This works
-        without administrator permission. For <strong>Everyone who uses this computer</strong>, Windows asks for it.
-        {
-          /* The Setup drawings follow the real wizard on Windows 11: a blue
-             title bar, a white header with the logo on its right, the grey
-             page, and Windows' button shapes. Setup's version label and
-             "Space needed" are left out: both change with every build, and
-             the steps should stay true after the next one. */
-        }
-        </div>
-        <div class="step-pic">
-        <div
-          class="mock not-content"
-          role="img"
-          aria-label="Drawing of the Axcess Setup screen Choose who can use Axcess. It has two choices: Everyone who uses this computer, and below it Only for me, followed by your account name. Only for me is selected and marked 5. The Next button at the bottom right is marked 5."
-        >
-          <div class="mock-win mock-flat mock-setup">
-            <div class="mock-titlebar"><span class="mock-title-icon" set:html={MARK} /><span class="mock-bar-title">Axcess Setup</span><span class="mock-controls"><i>-</i><i>▢</i><i>✕</i></span></div>
-            <div class="mock-head">
-              <div class="mock-grow"><p class="mock-title">Choose who can use Axcess</p><p>Install it for you, or for everyone who uses this computer.</p></div>
-              <span class="mock-head-logo" set:html={MARK} />
-            </div>
-            <div class="mock-pad">
-              <p>Only for me works without administrator permission. For everyone, Windows asks for it.</p>
-              <p class="mock-radio">Everyone who uses this computer</p>
-              <p class="mock-radio mock-on"><span class="mock-mark" data-step="5">Only for me (your name)</span></p>
-              <p class="mock-note">Installs Axcess for your account only. You do not need administrator permission.</p>
-            </div>
-            <div class="mock-btns mock-foot"><span class="mock-mark mock-btn mock-btn-win mock-btn-default" data-step="5">Next &gt;</span><span class="mock-btn mock-btn-win">Cancel</span></div>
           </div>
         </div>
-        </div>
-      </div>
-    </li>
-    <li>
-      <div class="step-row">
-        <div class="step-text">
-        The next screen shows the folder Axcess will be installed in. Leave it, or choose <strong>Browse</strong> to
-        pick another. Then choose <strong>Install</strong>.
-        </div>
-        <div class="step-pic">
-        <div
-          class="mock not-content"
-          role="img"
-          aria-label="Drawing of the Axcess Setup screen Choose a folder. It shows the install folder in a box, with a Browse button to its right. The Install button at the bottom right is marked 6."
-        >
-          <div class="mock-win mock-flat mock-setup">
-            <div class="mock-titlebar"><span class="mock-title-icon" set:html={MARK} /><span class="mock-bar-title">Axcess Setup</span><span class="mock-controls"><i>-</i><i>▢</i><i>✕</i></span></div>
-            <div class="mock-head">
-              <div class="mock-grow"><p class="mock-title">Choose a folder</p><p>Choose where to install Axcess.</p></div>
-              <span class="mock-head-logo" set:html={MARK} />
+      </li>
+      <li>
+        <div class="step-row">
+          <div class="step-text">
+          Open <strong>Applications</strong> and double-click <strong>Axcess</strong>. macOS says it could not verify the
+          app. Choose <strong>Done</strong>, not <em>Move to Trash</em>.
+          </div>
+          <div class="step-pic">
+          <div
+            class="mock not-content"
+            role="img"
+            aria-label="Drawing of the macOS message “Axcess” Not Opened, which says Apple could not verify Axcess. It has two buttons, one above the other: the blue Move to Trash button on top, and below it the pale Done button, marked 3."
+          >
+            <div class="mock-win mock-alert">
+              <span class="mock-app" set:html={MARK} />
+              <p class="mock-title">“Axcess” Not Opened</p>
+              <p>Apple could not verify “Axcess” is free of malware that may harm your Mac or compromise your privacy.</p>
+              <div class="mock-stack"><span class="mock-btn mock-btn-mac">Move to Trash</span><span class="mock-mark mock-btn mock-btn-pale" data-step="3">Done</span></div>
             </div>
-            <div class="mock-pad">
-              <p>Setup installs Axcess in the folder below. To use a different folder, choose Browse. When you are ready, choose Install.</p>
-              <p class="mock-field-label">Install folder:</p>
-              <div class="mock-row"><span class="mock-field mock-grow">{WIN_FOLDER}</span><span class="mock-btn mock-btn-win">Browse…</span></div>
-            </div>
-            <div class="mock-btns mock-foot"><span class="mock-btn mock-btn-win">&lt; Back</span><span class="mock-mark mock-btn mock-btn-win mock-btn-default" data-step="6">Install</span><span class="mock-btn mock-btn-win">Cancel</span></div>
+          </div>
           </div>
         </div>
+      </li>
+      <li>
+        <div class="step-row">
+          <div class="step-text">
+          Open <strong>System Settings</strong>, choose <strong>Privacy &amp; Security</strong>, and scroll down to the <strong>Security</strong> section.
+          {
+            /* Only the names people need to find Privacy & Security are written
+               out; the other settings are grey bars. More names were more to
+               read for no gain, and they change between macOS versions (COGA
+               "Making Content Usable": keep only what helps the task,
+               https://www.w3.org/TR/coga-usable/, paraphrased). */
+          }
+          </div>
+          <div class="step-pic">
+          <div
+            class="mock not-content"
+            role="img"
+            aria-label="Drawing of System Settings. The list on the left has Privacy & Security selected, marked 4, below General, Appearance and Accessibility. On the right, below other settings, is the Security heading. Under it, the message “Axcess” was blocked to protect your Mac has an Open Anyway button on its right, marked 5."
+          >
+            <div class="mock-win mock-settings">
+              <div class="mock-side">
+                <span class="mock-dots"><i></i><i></i><i></i></span>
+                <ul>
+                  <li>General</li>
+                  <li>Appearance</li>
+                  <li>Accessibility</li>
+                  <li><i class="mock-hidden"></i></li>
+                  <li><span class="mock-mark mock-selected" data-step="4">Privacy &amp; Security</span></li>
+                  <li><i class="mock-hidden"></i></li>
+                  <li><i class="mock-hidden"></i></li>
+                </ul>
+              </div>
+              <div class="mock-main">
+                <p class="mock-title">Privacy &amp; Security</p>
+                <div class="mock-group mock-faint"><i></i><i></i><i></i></div>
+                <p class="mock-scroll">Scroll down <span>↓</span></p>
+                <p class="mock-heading">Security</p>
+                <div class="mock-group mock-row"><span class="mock-grow">“Axcess” was blocked to protect your Mac.</span><span class="mock-mark mock-btn" data-step="5">Open Anyway</span></div>
+              </div>
+            </div>
+          </div>
+          </div>
         </div>
-      </div>
-    </li>
-    <li>
-      <div class="step-row">
-        <div class="step-text">
-        The last screen shows where Axcess is installed. Leave <strong>Open Axcess now</strong> checked and choose <strong>Finish</strong>.
+      </li>
+      <li>
+        Next to the message that Axcess was blocked, choose <strong>Open Anyway</strong>. Then confirm with your Mac
+        password or Touch ID.
+      </li>
+      <li>
+        Choose <strong>Open</strong> in the last message. Axcess starts, and from now on it opens like any other app.
+      </li>
+    </ol>
+    <p>
+      On macOS 14 (Sonoma) or earlier there is a shortcut: in Applications, right-click <strong>Axcess</strong>,
+      choose <strong>Open</strong>, then choose <strong>Open</strong> again in the message.
+    </p>
+    </div>
+    <div class="os-panel" id="windows">
+    <h3>On Windows 10 or 11</h3>
+    <ol class="install-steps">
+      <li>
+        Select <strong>Download the Windows installer</strong> and wait for <code data-release-name="Windows-Installer.exe">Axcess-(version)-Windows-Installer.exe</code> to finish
+        downloading.
+      </li>
+      <li>
+        <div class="step-row">
+          <div class="step-text">
+          If your browser says the file is not commonly downloaded, open the download's menu (the three dots) and
+          choose <strong>Keep</strong>, then <strong>Keep anyway</strong>.
+          </div>
+          <div class="step-pic">
+          <div
+            class="mock not-content"
+            role="img"
+            aria-label="Drawing of the browser’s list of downloads. The Axcess installer has a warning that it is not commonly downloaded. The three dots button to its right is marked 2, and so is Keep in the menu that opens below it."
+          >
+            <div class="mock-win mock-flat">
+              <div class="mock-bar"><span class="mock-bar-title">Downloads</span></div>
+              <div class="mock-row mock-pad">
+                <span class="mock-warn">!</span>
+                <span class="mock-grow"><code data-release-name="Windows-Installer.exe">Axcess-(version)-Windows-Installer.exe</code> is not commonly downloaded. Make sure you trust it before you open it.</span>
+                <span class="mock-mark mock-btn mock-btn-icon" data-step="2">⋯</span>
+              </div>
+              <ul class="mock-menu"><li>Delete</li><li><span class="mock-mark" data-step="2">Keep</span></li></ul>
+            </div>
+          </div>
+          </div>
         </div>
-        <div class="step-pic">
-        <div
-          class="mock not-content"
-          role="img"
-          aria-label="Drawing of the last Axcess Setup screen, Axcess is installed. A blue picture of a laptop is on the left. On the right, it shows the install folder, and below it Open Axcess now is checked. Of the buttons at the bottom, only Finish can be chosen, and it is marked 7."
-        >
-          <div class="mock-win mock-flat mock-setup">
-            <div class="mock-titlebar"><span class="mock-title-icon" set:html={MARK} /><span class="mock-bar-title">Axcess Setup</span><span class="mock-controls"><i>-</i><i>▢</i><i>✕</i></span></div>
-            <div class="mock-finish">
-              <div class="mock-panel">
-                <svg viewBox="0 0 60 60" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="10" y="22" width="40" height="24" rx="2"></rect><path d="M4 52h52M30 6v26m-9-9 9 9 9-9"></path></svg>
+      </li>
+      <li>Open the downloaded file. Windows shows a blue <em>Windows protected your PC</em> window.</li>
+      <li>
+        <div class="step-row">
+          <div class="step-text">
+          Choose <strong>More info</strong>. A <strong>Run anyway</strong> button appears. Choose it.
+          </div>
+          <div class="step-pic">
+          <div
+            class="mock not-content"
+            role="img"
+            aria-label="Two drawings of the blue Windows protected your PC window. In the first, the More info link under the message is marked 4. In the second, after you choose More info, it shows the app and Unknown publisher, and the Run anyway button at the bottom is marked 4."
+          >
+            <div class="mock-pair">
+              <div>
+                <p class="mock-label">First</p>
+                <div class="mock-win mock-flat mock-blue">
+                  <p class="mock-title">Windows protected your PC</p>
+                  <p>{SMARTSCREEN_TEXT}</p>
+                  <p><span class="mock-mark mock-link" data-step="4">More info</span></p>
+                  <div class="mock-btns"><span class="mock-btn">Don’t run</span></div>
+                </div>
+              </div>
+              <div>
+                <p class="mock-label">After you choose More info</p>
+                <div class="mock-win mock-flat mock-blue">
+                  <p class="mock-title">Windows protected your PC</p>
+                  <p>{SMARTSCREEN_TEXT}</p>
+                  <p>
+                    App: <code data-release-name="Windows-Installer.exe">Axcess-(version)-Windows-Installer.exe</code><br />Publisher:
+                    Unknown publisher
+                  </p>
+                  <div class="mock-btns"><span class="mock-mark mock-btn" data-step="4">Run anyway</span><span class="mock-btn">Don’t run</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          </div>
+        </div>
+      </li>
+      <li>
+        <div class="step-row">
+          <div class="step-text">
+          Setup asks who can use Axcess. Choose <strong>Only for me</strong>, then <strong>Next</strong>. This works
+          without administrator permission. For <strong>Everyone who uses this computer</strong>, Windows asks for it.
+          {
+            /* The Setup drawings follow the real wizard on Windows 11: a blue
+               title bar, a white header with the logo on its right, the grey
+               page, and Windows' button shapes. Setup's version label and
+               "Space needed" are left out: both change with every build, and
+               the steps should stay true after the next one. */
+          }
+          </div>
+          <div class="step-pic">
+          <div
+            class="mock not-content"
+            role="img"
+            aria-label="Drawing of the Axcess Setup screen Choose who can use Axcess. It has two choices: Everyone who uses this computer, and below it Only for me, followed by your account name. Only for me is selected and marked 5. The Next button at the bottom right is marked 5."
+          >
+            <div class="mock-win mock-flat mock-setup">
+              <div class="mock-titlebar"><span class="mock-title-icon" set:html={MARK} /><span class="mock-bar-title">Axcess Setup</span><span class="mock-controls"><i>-</i><i>▢</i><i>✕</i></span></div>
+              <div class="mock-head">
+                <div class="mock-grow"><p class="mock-title">Choose who can use Axcess</p><p>Install it for you, or for everyone who uses this computer.</p></div>
+                <span class="mock-head-logo" set:html={MARK} />
               </div>
               <div class="mock-pad">
-                <p class="mock-title mock-title-big">Axcess is installed</p>
-                <p>Axcess is installed in this folder:<br /><span class="mock-path">{WIN_FOLDER}</span></p>
-                <p>Open it from the Start menu or from the shortcut on your desktop.</p>
-                <p class="mock-check">Open Axcess now</p>
+                <p>Only for me works without administrator permission. For everyone, Windows asks for it.</p>
+                <p class="mock-radio">Everyone who uses this computer</p>
+                <p class="mock-radio mock-on"><span class="mock-mark" data-step="5">Only for me (your name)</span></p>
+                <p class="mock-note">Installs Axcess for your account only. You do not need administrator permission.</p>
               </div>
+              <div class="mock-btns mock-foot"><span class="mock-mark mock-btn mock-btn-win mock-btn-default" data-step="5">Next &gt;</span><span class="mock-btn mock-btn-win">Cancel</span></div>
             </div>
-            <div class="mock-btns mock-foot"><span class="mock-btn mock-btn-win mock-off">&lt; Back</span><span class="mock-mark mock-btn mock-btn-win mock-btn-default" data-step="7">Finish</span><span class="mock-btn mock-btn-win mock-off">Cancel</span></div>
+          </div>
           </div>
         </div>
+      </li>
+      <li>
+        <div class="step-row">
+          <div class="step-text">
+          The next screen shows the folder Axcess will be installed in. Leave it, or choose <strong>Browse</strong> to
+          pick another. Then choose <strong>Install</strong>.
+          </div>
+          <div class="step-pic">
+          <div
+            class="mock not-content"
+            role="img"
+            aria-label="Drawing of the Axcess Setup screen Choose a folder. It shows the install folder in a box, with a Browse button to its right. The Install button at the bottom right is marked 6."
+          >
+            <div class="mock-win mock-flat mock-setup">
+              <div class="mock-titlebar"><span class="mock-title-icon" set:html={MARK} /><span class="mock-bar-title">Axcess Setup</span><span class="mock-controls"><i>-</i><i>▢</i><i>✕</i></span></div>
+              <div class="mock-head">
+                <div class="mock-grow"><p class="mock-title">Choose a folder</p><p>Choose where to install Axcess.</p></div>
+                <span class="mock-head-logo" set:html={MARK} />
+              </div>
+              <div class="mock-pad">
+                <p>Setup installs Axcess in the folder below. To use a different folder, choose Browse. When you are ready, choose Install.</p>
+                <p class="mock-field-label">Install folder:</p>
+                <div class="mock-row"><span class="mock-field mock-grow">{WIN_FOLDER}</span><span class="mock-btn mock-btn-win">Browse…</span></div>
+              </div>
+              <div class="mock-btns mock-foot"><span class="mock-btn mock-btn-win">&lt; Back</span><span class="mock-mark mock-btn mock-btn-win mock-btn-default" data-step="6">Install</span><span class="mock-btn mock-btn-win">Cancel</span></div>
+            </div>
+          </div>
+          </div>
         </div>
-      </div>
-    </li>
-    <li>Next time, open <strong>Axcess</strong> from the Start menu.</li>
-  </ol>
-  <p>
-    If <strong>Run anyway</strong> does not appear, your organization manages your computer and blocks apps that
-    are not signed. Ask your IT support to allow it.
-  </p>
+      </li>
+      <li>
+        <div class="step-row">
+          <div class="step-text">
+          The last screen shows where Axcess is installed. Leave <strong>Open Axcess now</strong> checked and choose <strong>Finish</strong>.
+          </div>
+          <div class="step-pic">
+          <div
+            class="mock not-content"
+            role="img"
+            aria-label="Drawing of the last Axcess Setup screen, Axcess is installed. A blue picture of a laptop is on the left. On the right, it shows the install folder, and below it Open Axcess now is checked. Of the buttons at the bottom, only Finish can be chosen, and it is marked 7."
+          >
+            <div class="mock-win mock-flat mock-setup">
+              <div class="mock-titlebar"><span class="mock-title-icon" set:html={MARK} /><span class="mock-bar-title">Axcess Setup</span><span class="mock-controls"><i>-</i><i>▢</i><i>✕</i></span></div>
+              <div class="mock-finish">
+                <div class="mock-panel">
+                  <svg viewBox="0 0 60 60" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="10" y="22" width="40" height="24" rx="2"></rect><path d="M4 52h52M30 6v26m-9-9 9 9 9-9"></path></svg>
+                </div>
+                <div class="mock-pad">
+                  <p class="mock-title mock-title-big">Axcess is installed</p>
+                  <p>Axcess is installed in this folder:<br /><span class="mock-path">{WIN_FOLDER}</span></p>
+                  <p>Open it from the Start menu or from the shortcut on your desktop.</p>
+                  <p class="mock-check">Open Axcess now</p>
+                </div>
+              </div>
+              <div class="mock-btns mock-foot"><span class="mock-btn mock-btn-win mock-off">&lt; Back</span><span class="mock-mark mock-btn mock-btn-win mock-btn-default" data-step="7">Finish</span><span class="mock-btn mock-btn-win mock-off">Cancel</span></div>
+            </div>
+          </div>
+          </div>
+        </div>
+      </li>
+      <li>Next time, open <strong>Axcess</strong> from the Start menu.</li>
+    </ol>
+    <p>
+      If <strong>Run anyway</strong> does not appear, your organization manages your computer and blocks apps that
+      are not signed. Ask your IT support to allow it.
+    </p>
 
-  <h4 id="windows-portable">Windows, without installing</h4>
-  <p>Use <strong>Download the portable Windows zip</strong>.</p>
-  <ol>
-    <li>Unzip it into a folder you can change, such as Documents. Do not use a network drive.</li>
-    <li>Open <strong>Axcess.exe</strong> in that folder, and approve it as in the steps above.</li>
-    <li>
-      Axcess keeps your reports and settings in the <strong>Axcess data</strong> folder next to it. To move Axcess,
-      move the whole folder. On a USB drive, close Axcess before you unplug the drive, or the reports can be
-      damaged.
-    </li>
-  </ol>
-
-  <h3 id="linux">On Linux</h3>
-  <ol>
-    <li>
-      Select <strong>Download for Linux (AppImage)</strong> and wait for <code data-release-name="Linux.AppImage">Axcess-(version)-Linux.AppImage</code> to finish downloading. It is the
-      whole app in one file.
-    </li>
-    <li>Move it where you keep programs, such as a folder named Applications in your home folder.</li>
-    <li>
-      Allow it to run: open its <strong>Properties</strong> in your file manager and turn on <strong>Allow executing file as program</strong>. Or run <code>chmod +x Axcess-*-Linux.AppImage</code> in a
-      terminal.
-    </li>
-    <li>Double-click it to open Axcess.</li>
-  </ol>
-  <p>
-    On Ubuntu 23.10 and later, an AppImage can't use the browser sandbox, which keeps web pages apart from the rest
-    of your computer. There, Axcess opens with that sandbox off, so open saved copies only of sites you trust in the
-    Page inspector. On other Linux systems the sandbox stays on.
-  </p>
+    <h4 id="windows-portable">Windows, without installing</h4>
+    <p>Use <strong>Download the portable Windows zip</strong>.</p>
+    <ol>
+      <li>Unzip it into a folder you can change, such as Documents. Do not use a network drive.</li>
+      <li>Open <strong>Axcess.exe</strong> in that folder, and approve it as in the steps above.</li>
+      <li>
+        Axcess keeps your reports and settings in the <strong>Axcess data</strong> folder next to it. To move Axcess,
+        move the whole folder. On a USB drive, close Axcess before you unplug the drive, or the reports can be
+        damaged.
+      </li>
+    </ol>
+    </div>
+    <div class="os-panel" id="linux">
+    <h3>On Linux</h3>
+    <ol>
+      <li>
+        Select <strong>Download for Linux (AppImage)</strong> and wait for <code data-release-name="Linux.AppImage">Axcess-(version)-Linux.AppImage</code> to finish downloading. It is the
+        whole app in one file.
+      </li>
+      <li>Move it where you keep programs, such as a folder named Applications in your home folder.</li>
+      <li>
+        Allow it to run: open its <strong>Properties</strong> in your file manager and turn on <strong>Allow executing file as program</strong>. Or run <code>chmod +x Axcess-*-Linux.AppImage</code> in a
+        terminal.
+      </li>
+      <li>Double-click it to open Axcess.</li>
+    </ol>
+    <p>
+      On Ubuntu 23.10 and later, an AppImage can't use the browser sandbox, which keeps web pages apart from the rest
+      of your computer. There, Axcess opens with that sandbox off, so open saved copies only of sites you trust in the
+      Page inspector. On other Linux systems the sandbox stays on.
+    </p>
+    </div>
+  </div>
 
   <h3 id="after-install">After you install</h3>
   <p>
@@ -779,6 +811,71 @@ const SMARTSCREEN_TEXT =
 </div>
 </StarlightPage>
 
+<script>
+  // Mac, Windows and Linux tabs (see the comment above the tab list).
+  const root = document.querySelector<HTMLElement>("[data-os-tabs]");
+  if (root) {
+    const tabs = [...root.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+    const panels = tabs.map((tab) => document.getElementById(tab.getAttribute("aria-controls") ?? ""));
+    const ids = panels.map((panel) => panel?.id ?? "");
+
+    const select = (id: string, focus = false) => {
+      tabs.forEach((tab, i) => {
+        const on = ids[i] === id;
+        tab.setAttribute("aria-selected", String(on));
+        tab.tabIndex = on ? 0 : -1;
+        if (on) panels[i]?.removeAttribute("hidden");
+        else panels[i]?.setAttribute("hidden", "until-found");
+        if (on && focus) tab.focus();
+      });
+    };
+
+    panels.forEach((panel, i) => {
+      if (!panel) return;
+      panel.setAttribute("role", "tabpanel");
+      panel.setAttribute("aria-labelledby", tabs[i].id);
+      panel.tabIndex = 0;
+      // Find-in-page opened a hidden system: make its tab the selected one.
+      panel.addEventListener("beforematch", () => select(panel.id));
+    });
+
+    tabs.forEach((tab, i) => {
+      tab.addEventListener("click", () => select(ids[i]));
+      tab.addEventListener("keydown", (event) => {
+        const last = tabs.length - 1;
+        const next =
+          event.key === "ArrowRight" ? (i === last ? 0 : i + 1)
+          : event.key === "ArrowLeft" ? (i === 0 ? last : i - 1)
+          : event.key === "Home" ? 0
+          : event.key === "End" ? last
+          : null;
+        if (next === null) return;
+        event.preventDefault();
+        select(ids[next], true);
+      });
+    });
+
+    const fromHash = () => {
+      const id = location.hash.slice(1);
+      return ids.includes(id) ? id : null;
+    };
+    const detected = () => {
+      const nav = navigator as Navigator & { userAgentData?: { platform?: string } };
+      const name = (nav.userAgentData?.platform || navigator.platform || navigator.userAgent).toLowerCase();
+      if (name.includes("win")) return "windows";
+      if (name.includes("linux") && !/android/i.test(navigator.userAgent)) return "linux";
+      return "mac";
+    };
+    select(fromHash() ?? detected());
+    window.addEventListener("hashchange", () => {
+      const id = fromHash();
+      if (!id) return;
+      select(id);
+      document.getElementById(id)?.scrollIntoView();
+    });
+  }
+</script>
+
 <style>
   /* One readable column, centred, on the full-width layout: the page title
      and the body share it, so their left edges line up. */
@@ -927,6 +1024,76 @@ const SMARTSCREEN_TEXT =
     line-height: 1.6;
   }
 
+  /* The system tabs, drawn like the app's New scan tabs. Hidden until
+     scripts run; without them the jump links show instead. */
+  .os-tablist,
+  .os-note {
+    display: none;
+  }
+  :global(.ax-js) .os-tablist {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin: 1.5rem 0 0.5rem;
+    padding: 0.25rem;
+    border: 1px solid var(--ax-border);
+    border-radius: 0.625rem;
+    background: var(--ax-surface-muted);
+  }
+  :global(.ax-js) .os-note {
+    display: block;
+    margin: 0 0 0.5rem;
+    color: var(--ax-fg-muted);
+    font-size: 0.9375rem;
+  }
+  :global(.ax-js) .systems {
+    display: none;
+  }
+  .os-tablist [role="tab"] {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--ax-target);
+    padding: 0 1.25rem;
+    border: 0;
+    border-radius: 0.375rem;
+    background: transparent;
+    color: var(--ax-fg);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .os-tablist [role="tab"]:hover {
+    background: var(--ax-surface);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+  .os-tablist [role="tab"][aria-selected="true"] {
+    background: var(--ax-inverse-bg);
+    color: var(--ax-inverse-fg);
+    text-decoration: none;
+  }
+  /* The fill is dropped in forced colours, so the selected tab also gets an
+     outline there, as in the app. */
+  @media (forced-colors: active) {
+    .os-tablist [role="tab"][aria-selected="true"] {
+      outline: 2px solid;
+      outline-offset: -2px;
+    }
+  }
+  /* Printing shows every system. */
+  @media print {
+    .os-panel[hidden] {
+      display: block !important;
+      content-visibility: visible !important;
+    }
+    :global(.ax-js) .os-tablist,
+    :global(.ax-js) .os-note {
+      display: none;
+    }
+  }
+  .os-panel > h3 {
+    padding-top: 1rem;
+  }
   /* Each part, and each system's steps, starts at a thin rule, the same
      separation as the home page's numbered groups: on a long page it shows
      where one part ends without adding boxes or colour. */

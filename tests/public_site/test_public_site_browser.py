@@ -310,7 +310,9 @@ def test_download_links_point_at_the_newest_release_files(
     for kind in BUILDS:
         for link in page.locator(f'a[data-release-file="{kind}"]').all():
             assert link.get_attribute("href") == f"{DOWNLOAD}/Axcess-0.64-{kind}", kind
-    shown = page.locator("code[data-release-name]").all_inner_texts()
+    # Text, not innerText: names inside a closed system tab are filled in
+    # too, but innerText is empty for hidden content.
+    shown = page.locator("code[data-release-name]").all_text_contents()
     assert shown and all(s.startswith("Axcess-0.64-") for s in shown)
     page.context.close()
 
@@ -329,8 +331,10 @@ def test_without_the_api_download_links_open_the_release_page(
 
 def test_each_install_drawing_is_one_named_picture(site_browser: Browser, dist: Path) -> None:
     page = _get_started(site_browser, dist, None)
-    assert page.get_by_role("img", name="Drawing of", exact=False).count() == 7
-    assert page.get_by_role("img", name="Two drawings of", exact=False).count() == 1
+    # Counted in the page, not by role: with scripts on, the systems not
+    # chosen sit in closed tabs, out of the accessibility tree on purpose.
+    assert page.locator('[role=img][aria-label^="Drawing of"]').count() == 7
+    assert page.locator('[role=img][aria-label^="Two drawings of"]').count() == 1
     # The drawn buttons are part of the picture, not controls.
     for name in ("Open Anyway", "Run anyway", "Done", "Next >", "Install", "Finish"):
         assert page.get_by_role("button", name=name, exact=True).count() == 0, name
