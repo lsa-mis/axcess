@@ -1,12 +1,18 @@
 ---
 /**
- * Site header: name, search, the three main destinations, GitHub, the day and
+ * Site header: name, search, the four main destinations, GitHub, the day and
  * night switch, and Download.
  *
- * Why these three links: they are the questions a first-time visitor asks
- * (how do I use it, what does it check, where does my data go). Everything
- * else is one level down in the sidebar, which lists every page. Download is
- * the one filled button, so there is a single primary action per screen.
+ * Why these four links: they are the questions a first-time visitor asks
+ * (how do I start, how do I use it, what does it check, where does my data
+ * go). Everything else is one level down in the sidebar, which lists every
+ * page. Download is the one filled button, so there is a single primary
+ * action per screen. "Get started" and Download both lead to the Get
+ * started page, by the developer's choice (2026-10-06): the link opens the
+ * whole path (download, install, first scan), the button jumps straight to
+ * the files. Two ways to one page is a cost (COGA: one way to do one
+ * thing), accepted because the two answer different needs: "show me how"
+ * and "I know, give me the file".
  *
  * Below 72rem the three links are left to the sidebar, which lists them
  * too. Below 50rem the GitHub and theme controls also move into
@@ -97,7 +103,13 @@ const path = Astro.url.pathname;
     }
     .search {
       flex: 0 1 18rem;
+      min-width: 9rem;
       margin-inline-end: auto;
+    }
+    /* With four links the row is full at 72rem: the search box gives up
+       width first, never the name (it was cut to "Axces"). */
+    .title-wrapper {
+      flex-shrink: 0;
     }
     .main-nav {
       display: block;

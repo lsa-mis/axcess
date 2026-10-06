@@ -17,6 +17,7 @@ export function url(path: string): string {
 
 /** Header links. Every page is also in the sidebar (astro.config.mjs). */
 export const MAIN_NAV = [
+  { label: "Get started", href: "/get-started/" },
   { label: "Documentation", href: "/docs/" },
   { label: "What it checks", href: "/coverage/" },
   { label: "Privacy", href: "/privacy/" },
