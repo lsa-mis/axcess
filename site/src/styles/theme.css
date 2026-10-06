@@ -176,6 +176,28 @@ mobile-starlight-toc a {
   display: flex;
   align-items: center;
 }
+/* Navigation at reading size. Starlight sets sidebar links at 14 px and the
+ * "On this page" links at 13 px, below the 16 px body text they lead to;
+ * at that size the words people use to find their way are the hardest to
+ * read on the page. Sidebar links now match the body (16 px) and the page
+ * contents list is one step smaller (15 px), so the order of importance
+ * still shows. Group names stay bold, so they still read as headings.
+ * There is no WCAG minimum size; this follows the repo's plain-language
+ * rules and W3C COGA "Making Content Usable" (make text easy to read,
+ * https://www.w3.org/TR/coga-usable/, paraphrased). */
+.sidebar-content a {
+  font-size: var(--sl-text-base);
+  line-height: 1.4;
+}
+starlight-toc a,
+mobile-starlight-toc a {
+  font-size: 0.9375rem;
+  line-height: 1.4;
+}
+starlight-toc h2,
+mobile-starlight-toc summary {
+  font-size: var(--sl-text-base);
+}
 /* The code copy button and the "Edit this page on GitHub" link. */
 .expressive-code .copy button {
   width: var(--ax-target) !important;
