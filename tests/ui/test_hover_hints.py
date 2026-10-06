@@ -21,33 +21,33 @@ playwright_async = pytest.importorskip("playwright.async_api")
 
 LANE_HELP = {
     "Mostly sure": (
-        "A rule check (axe or Alfa) failed a fixed rule, which gives the same result every "
-        "time. Check it on the page, fix it, test the fix, then scan again to see if it is "
-        "still found."
+        "A rule check (axe or Alfa) failed. These checks follow fixed rules, so they give the "
+        "same result every time. Look at the issue on the page, fix it, test the fix, then "
+        "scan again to see if it is still found."
     ),
     "Not sure": (
-        "A possible problem from a check that cannot be sure, such as the AI review or a rule "
-        "check that cannot tell. A person must decide if it is a real problem before you "
-        "report it."
+        "Axcess found a possible problem, but it cannot be certain. This happens with checks "
+        "such as the AI review, the browser checks, or a rule check that cannot decide. A "
+        "person must decide whether it is a real problem before you report it."
     ),
     "For information": (
-        "Recorded for context, not a problem to fix, such as an image whose alt text already "
-        "says the same words."
+        "Recorded for context. This is not a problem to fix. For example, an image whose text "
+        "description (alt text) already matches the words in the image."
     ),
 }
 FOUND_BY_HELP = {
     "At page load": (
-        "Found on the page as it first loads, by a rule check (axe or Alfa), a browser check "
-        "such as the keyboard check, or the AI review."
+        "Found when the page first loads. It can come from a rule check, a browser check "
+        "(such as the keyboard check), or the AI review."
     ),
     "After clicking": (
         "Found only after Axcess clicked something that opens more of the page, such as a "
-        "menu, tab, or pop-up window (dialog). Click the same thing to see it. Axcess never "
-        "clicks links."
+        "menu, a tab, or a pop-up window (dialog). To see the problem yourself, click the "
+        "same thing. Axcess never clicks links."
     ),
     "In an image": (
-        "Found by the image text check: words inside an image, and whether the image's text "
-        "description (alt text), which a screen reader reads, says the same words."
+        "Found by the image text check. It looks at words inside an image and compares them "
+        "to the image's text description (alt text), which a screen reader reads aloud."
     ),
 }
 

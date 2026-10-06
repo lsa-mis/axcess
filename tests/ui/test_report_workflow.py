@@ -741,9 +741,9 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
         ).to_be_visible()
     meanings = page.get_by_role("definition")
     for meaning in (
-        "A rule check (axe or Alfa) failed a fixed rule",
-        "A person must decide if it is a real problem",
-        "not a problem to fix",
+        "A rule check (axe or Alfa) failed.",
+        "A person must decide whether it is a real problem",
+        "This is not a problem to fix.",
     ):
         await playwright_async.expect(meanings.filter(has_text=meaning)).to_be_visible()
 
