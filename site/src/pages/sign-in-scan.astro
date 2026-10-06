@@ -98,12 +98,20 @@ const shot = (name: Shot) => ({
         sign-in opens a new tab, finish in that tab. You are done when the browser shows the site itself, not a
         sign-in page.
       </p>
+      <p>
+        To stop without scanning, select <em>Cancel sign-in</em> in Axcess. Nothing is recorded until you start the
+        scan. If you close the sign-in window before you start, Axcess keeps your sign-in for 30 minutes, in memory
+        only: you can still start the scan, or select <em>Reopen sign-in window</em>.
+        <a href={url("/docs/troubleshooting/#i-closed-the-sign-in-window-before-starting")}>If you closed the
+        sign-in window</a>.
+      </p>
     </li>
     <li>
       <h3>Start the scan</h3>
       <p>
         Come back to Axcess. Under <em>Finished signing in?</em>, select <em>I’m signed in, start scan</em>. The
-        scan starts from the page in the newest tab that is still open in the browser. If that page is outside the
+        scan starts from the page in the newest tab that is still open in the browser, or, if you closed the
+        window, from the last page you were on. If that page is outside the
         address you entered, the scan starts from that address instead. Either way, it stays inside the address you
         entered.
       </p>

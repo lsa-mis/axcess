@@ -25,6 +25,21 @@ export default defineConfig({
       // Axcess, and a second credit is noise (COGA, one idea per chunk).
       credits: false,
       social: [{ icon: "github", label: "Axcess on GitHub", href: REPO }],
+      // A preview picture when a page is shared, as the old site had: the
+      // report groups diagram, with its own description for people who
+      // cannot see it.
+      head: [
+        { tag: "meta", attrs: { property: "og:image", content: "https://lsa-mis.github.io/axcess/diagrams/report-groups.png" } },
+        {
+          tag: "meta",
+          attrs: {
+            property: "og:image:alt",
+            content:
+              "Diagram of the three report groups in the How sure column: Mostly sure, Not sure and For information, and the checks that feed each one.",
+          },
+        },
+        { tag: "meta", attrs: { name: "twitter:card", content: "summary_large_image" } },
+      ],
       editLink: { baseUrl: `${REPO}/edit/main/` },
       customCss: ["./src/styles/fonts.css", "./src/styles/theme.css"],
       // Code in the guides: GitHub's high-contrast themes, because the
