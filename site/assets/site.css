@@ -103,7 +103,13 @@ kbd { font-family: var(--mono); font-size: .85em; border: 1px solid var(--line-s
 .site-nav .cta a { background: var(--navy); color: #fff; margin-left: .4rem; }
 .site-nav .cta a:hover { background: var(--navy-2); }
 
-@media (max-width: 880px) {
+/* The nav collapses into the Menu button before it can wrap under the logo.
+   The logo plus a one-line nav need about 945px; at 880px the nav wrapped
+   onto a ragged second row between 880 and 945px and at 150-200% zoom.
+   The breakpoint is in em so a larger default text size collapses it too.
+   Keep site.js's matchMedia query in step. Rests on SC 1.4.10 Reflow and
+   SC 1.4.4 Resize Text (Level AA). */
+@media (max-width: 62.5em) {
   .js .nav-toggle { display: inline-block; }
   .js .site-nav { width: 100%; margin-left: 0; }
   .js .site-nav[hidden] { display: none; }
