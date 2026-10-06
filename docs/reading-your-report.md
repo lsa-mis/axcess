@@ -247,8 +247,8 @@ or `.../export/markdown`) or the command line (`audit export -f jira` or
 Sheets in the issue list with fixes (Excel):
 
 - Summary
-- Issues Overview: ID, Issue, Severity, Conformance Level, Remediation
-  Ownership, Status, Instances, Pages, and Details
+- Issues Overview: ID, Issue, How sure, Severity, Conformance Level,
+  Remediation Ownership, Status, Instances, Pages, and Details
 - A tab per issue for the first 40 issues: #, Where, User action, Element,
   What to fix, and How to reproduce
 - More Issues, which holds the rest when there are more than 40
@@ -282,10 +282,11 @@ Notes on the exports:
 - Written report issue cards cover open Mostly sure issues tied to a WCAG
   criterion and Not sure issues marked In progress; other open results,
   including other Not sure results, go to Appendix B. The workbook
-  Summary's "Likely-barrier" counts follow these cards, so they can differ
+  Summary's "Issues to fix" counts follow these cards, so they can differ
   from the Issues table.
-- The workbook's Issues Overview, the CSV, the JSON, and the Jira CSV have no
-  report group column. The Jira CSV also includes Not sure and
+- The workbook's Issues Overview has a How sure column, like the Issues
+  table. The CSV, the JSON, and the Jira CSV have no report group column.
+  The Jira CSV also includes Not sure and
   For information results, so check it before you import. Edits to a downloaded
   file never flow back to Axcess.
 
