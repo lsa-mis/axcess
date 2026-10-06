@@ -599,7 +599,7 @@ async def test_issue_table_recommended_order_is_lane_first_and_headers_sort_flat
     # Flat, and "Does not apply" is not a low priority: it trails in both
     # directions.
     for direction in ("desc", "asc"):
-        # Row header, Type, Found by, WCAG, then Priority.
+        # Row header, How sure, Where it shows, WCAG, then Priority.
         cells = await issues.locator("tbody tr > td:nth-child(5)").all_inner_texts()
         flags = [cell.strip() == "Does not apply" for cell in cells]
         assert flags == sorted(flags), (direction, cells)
@@ -678,8 +678,8 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
     table = page.get_by_role("table", name="Accessibility issues")
     headers = await table.locator("thead th").all_inner_texts()
     names = [re.sub(r"\s+", " ", text).strip() for text in headers]
-    # The Finding type column reads "Found by" ("finding" is not an interface word).
-    assert names[:4] == ["Issue", "How sure", "Found by", "WCAG"], names
+    # The Finding type column reads "Where it shows" ("finding" is not an interface word).
+    assert names[:4] == ["Issue", "How sure", "Where it shows", "WCAG"], names
 
     def row(title: str) -> Any:
         return table.locator("tbody tr").filter(
@@ -689,17 +689,17 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
     finding_type = "td:nth-child(3)"
     assert (
         await row("Load-state rule failure").locator(finding_type).inner_text()
-    ).strip() == "WCAG"
-    # Both tags, and nothing else: no count beside the Click-Through tag.
+    ).strip() == "At page load"
+    # Both tags, and nothing else: no count beside the After clicking tag.
     mixed = row("Contrast inside an opened menu")
     assert re.sub(r"\s+", " ", await mixed.locator(finding_type).inner_text()).strip() == (
-        "WCAG Click-Through"
+        "At page load After clicking"
     )
     assert (await row("Only behind a dialog").locator(finding_type).inner_text()).strip() == (
-        "Click-Through"
+        "After clicking"
     )
     assert (await row("Adequate alternative").locator(finding_type).inner_text()).strip() == (
-        "Alt Text"
+        "In an image"
     )
 
     # No row-group header rows split the types; the live status counts each.
@@ -715,17 +715,26 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
     )
     # The glossary's terms, not the summary line's, which are terms too.
     definitions = page.get_by_role("term").filter(
-        has_text=re.compile(r"^(Mostly sure|Not sure|For information|WCAG|Click-Through|Alt Text)$")
+        has_text=re.compile(
+            r"^(Mostly sure|Not sure|For information|At page load|After clicking|In an image)$"
+        )
     )
     await playwright_async.expect(definitions.first).to_be_hidden()
     await glossary.focus()
     await page.keyboard.press("Enter")
     await playwright_async.expect(definitions).to_have_text(
-        ["Mostly sure", "Not sure", "For information", "WCAG", "Click-Through", "Alt Text"]
+        [
+            "Mostly sure",
+            "Not sure",
+            "For information",
+            "At page load",
+            "After clicking",
+            "In an image",
+        ]
     )
     for heading in (
         "How sure: how sure Axcess is that the issue is a real problem",
-        "Found by: which group of checks found it",
+        "Where it shows: where the problem shows up",
     ):
         await playwright_async.expect(
             page.get_by_role("heading", name=heading, level=3)
@@ -753,7 +762,7 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
 
     # The filter narrows to the type, counts a mixed row under both, and
     # offers the detailed view the old bottom-of-report button led to.
-    await choose_filter(page, "Found by", "click_through")
+    await choose_filter(page, "Where it shows", "click_through")
     await page.wait_for_url("**finding_type=click_through*")
     # The URL changes before the filtered response lands, so wait for the rows.
     issue_rows = table.locator("tbody th[scope='row']")
@@ -765,7 +774,7 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
     ], shown
     wcag_view = page.get_by_role("link", name="Rule check issues by WCAG criterion")
     await playwright_async.expect(wcag_view).to_have_attribute("href", f"/app/scans/{scan_id}/a11y")
-    await choose_filter(page, "Found by", "alt_text")
+    await choose_filter(page, "Where it shows", "alt_text")
     await page.wait_for_url("**finding_type=alt_text*")
     await playwright_async.expect(
         page.get_by_role("link", name=re.compile(r"^Images \(\d+\)$"))
@@ -1105,7 +1114,7 @@ async def test_report_opens_keyboard_only_in_reading_order(
         first(lambda s: s["group"] == "Report views" and s["name"] == "Issues"),
         first(lambda s: s["group"] == "Report views" and s["name"] == "Compare reports"),
         first(lambda s: s["name"] == "Search issues"),
-        # One Filter menu holds Level, Type and Found by.
+        # One Filter menu holds Level, How sure and Where it shows.
         first(lambda s: s["tag"] == "BUTTON" and s["name"] == "Filter issues"),
         first(lambda s: s["group"] == "table"),
     ]

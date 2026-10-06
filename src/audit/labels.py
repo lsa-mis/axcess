@@ -47,23 +47,24 @@ FindingType = Literal["wcag", "click_through", "alt_text"]
 FINDING_TYPES: tuple[FindingType, ...] = ("wcag", "click_through", "alt_text")
 
 FINDING_TYPE_LABELS: dict[FindingType, str] = {
-    "wcag": "WCAG",
-    "click_through": CLICK_THROUGH,
-    "alt_text": "Alt Text",
+    "wcag": "At page load",
+    "click_through": "After clicking",
+    "alt_text": "In an image",
 }
 
 FINDING_TYPE_HELP: dict[FindingType, str] = {
     "wcag": (
-        "Found at page load, by a rule check (axe or Alfa), a browser check such "
-        "as the keyboard check, or the AI review."
+        "Found on the page as it first loads, by a rule check (axe or Alfa), a browser "
+        "check such as the keyboard check, or the AI review."
     ),
     "click_through": (
-        "Found only in a page state opened by clicking a control, such as a menu, "
-        "tab, or dialog. Use that control first to see it."
+        "Found only after Axcess clicked something that opens more of the page, such as "
+        "a menu, tab, or pop-up window (dialog). Click the same thing to see it. Axcess "
+        "never clicks links."
     ),
     "alt_text": (
-        "Found by the image text check: text in an image, and whether its alt text "
-        "(what a screen reader reads) says the same."
+        "Found by the image text check: words inside an image, and whether the image's "
+        "text description (alt text), which a screen reader reads, says the same words."
     ),
 }
 

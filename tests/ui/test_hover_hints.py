@@ -1,6 +1,6 @@
 """Words that need explaining say what they mean on hover.
 
-The Issues table's Type and Found by tags carry the glossary's own sentences,
+The Issues table's How sure and Where it shows tags carry the glossary's own sentences,
 the column headers say what their column counts, the priority band says what
 it ranks, a level badge names its level, and a status chip says whose
 decision it is. The glossary, where each meaning is printed beside its tag,
@@ -36,17 +36,18 @@ LANE_HELP = {
     ),
 }
 FOUND_BY_HELP = {
-    "WCAG": (
-        "Found at page load, by a rule check (axe or Alfa), a browser check such as the "
-        "keyboard check, or the AI review."
+    "At page load": (
+        "Found on the page as it first loads, by a rule check (axe or Alfa), a browser check "
+        "such as the keyboard check, or the AI review."
     ),
-    "Click-Through": (
-        "Found only in a page state opened by clicking a control, such as a menu, tab, or "
-        "dialog. Use that control first to see it."
+    "After clicking": (
+        "Found only after Axcess clicked something that opens more of the page, such as a "
+        "menu, tab, or pop-up window (dialog). Click the same thing to see it. Axcess never "
+        "clicks links."
     ),
-    "Alt Text": (
-        "Found by the image text check: text in an image, and whether its alt text (what a "
-        "screen reader reads) says the same."
+    "In an image": (
+        "Found by the image text check: words inside an image, and whether the image's text "
+        "description (alt text), which a screen reader reads, says the same words."
     ),
 }
 
@@ -85,7 +86,9 @@ async def test_issue_tags_headers_and_bands_explain_themselves(
                 "How sure Axcess is that the issue is a real problem: "
                 "Mostly sure, Not sure, or For information."
             ),
-            "Found by": "Which group of checks found the issue.",
+            "Where it shows": (
+                "Where the issue shows up: at page load, after clicking, or in an image."
+            ),
         }
         # On the sort button, the header's focusable part, so a screen reader
         # reads it as the button's description.

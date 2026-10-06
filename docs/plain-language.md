@@ -66,6 +66,7 @@ Use the word in the first column, and never the words in the last.
 | occurrence | One place an issue appears: one element on one page. | instance, violation, result, finding, hit |
 | image | One image the image text check looked at: "Image #12". | finding (for an image) |
 | Mostly sure / Not sure / For information | The three types of issue, in the "How sure" column: how sure Axcess is that the issue is a real problem. An Alfa "cannot tell" result is Not sure. | Barrier, Needs review, Informational, likely barrier, likely problem, possible problem, needs confirmation, review lead, lead, expert decision, cantTell, "Type" (for this column) |
+| At page load / After clicking / In an image | The values of the Issues table's "Where it shows" column: where the issue shows up. "At page load" and "After clicking" match the page state names. | Found by, Found (as the header), WCAG (as a value), Click-Through (as a value; it stays the feature's name), Alt Text (as a value), finding type |
 | status | Where an occurrence stands in review. Values: New, Reviewing, In progress, Fixed, Accepted risk, Not a problem (false positive). | triage status, review status, remediated, raw values like `in_progress` |
 | check | One way Axcess tests pages. See the check names below. | engine, pipeline, probe, method, detector, source |
 | page state | How a page looked at one moment: "At page load" or "After clicking Menu". | DOM state, interaction state, captured state |

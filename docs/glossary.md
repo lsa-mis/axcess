@@ -68,21 +68,25 @@ One row in the Issues table: every occurrence found by the same check (for
 images, the same kind of image with the same [alt text](#alt-text) problem). The
 Issues page shows the number of issues and occurrences side by side.
 
-### Found by
+### Where it shows
 
-Which kind of check found an issue, shown in the Issues table's Found by
-column and filter.
+Where an issue shows up, shown in the Issues table's Where it shows column and
+filter.
 
-- WCAG: found at page load by a [rule engine](#rule-engine)
-  ([axe-core](#axe-core) or [Siteimprove Alfa](#siteimprove-alfa)), a
-  [browser check](#browser-check), or a [local AI model](#local-ai-model).
-- [Click-Through](#click-through): found only in a [page state](#page-state)
-  opened by clicking a control, such as a menu. It shows only when at least
-  one of the issue's occurrences needed the click. One issue can be both WCAG
-  and Click-Through when the same problem appears at page load and behind a
-  control.
-- Alt Text: text found in an image, and whether its [alt text](#alt-text) says
-  the same thing.
+- At page load: found on the page as it first loads, by a
+  [rule engine](#rule-engine) ([axe-core](#axe-core) or
+  [Siteimprove Alfa](#siteimprove-alfa)), a [browser check](#browser-check),
+  or a [local AI model](#local-ai-model).
+- After clicking: found only after [Click-Through](#click-through) clicked
+  something that opens more of the page, such as a menu, tab, or pop-up
+  window, so it is in a [page state](#page-state) of its own. It shows only
+  when at least one of the issue's occurrences needed the click. One issue
+  can show both At page load and After clicking when the same problem
+  appears in both places.
+- In an image: words inside an image, and whether its [alt text](#alt-text)
+  says the same words.
+- Called "Found by", with the values WCAG, Click-Through, and Alt Text, in
+  earlier versions of Axcess.
 
 ### Root cause
 

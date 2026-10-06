@@ -34,19 +34,38 @@ export function clickThroughStates(count: number): string {
 /** Which family of checks produced an issue's evidence. Table order. */
 export const FINDING_TYPES = ["wcag", "click_through", "alt_text"] as const satisfies readonly FindingType[];
 
+/**
+ * Where an issue shows up, as the Issues table's "Where it shows" column
+ * names it: "At page load", "After clicking", "In an image". The header is a
+ * plain question every value answers, like "How sure" beside it. Rejected
+ * headers: "Found" (a lone verb, read as "found: yes or no" or a count),
+ * "Where found" and "When found" (a time and a place do not both fit).
+ *
+ * Rejected: "WCAG", "Click-Through" and "Alt Text" under "Found by". WCAG
+ * finds nothing, so "Found by WCAG" was wrong; "WCAG" is an abbreviation and
+ * also the name of the next column (one word, two meanings); "Click-Through"
+ * and "Alt Text" are feature and technical names. Also rejected as too
+ * long: "When the page loads", "After opening something". "At page load"
+ * and "After clicking" are the words page states already use ("At page
+ * load", "After clicking Menu"), so one thing keeps one name. The
+ * Click-Through feature keeps its name elsewhere; only this badge changed.
+ * SC 3.1.4 Abbreviations and SC 3.1.5 Reading Level (both Level AAA); W3C
+ * COGA "Making Content Usable", https://www.w3.org/TR/coga-usable/ (the
+ * same word for the same thing); docs/plain-language.md.
+ */
 export const FINDING_TYPE_LABELS: Record<FindingType, string> = {
-  wcag: "WCAG",
-  click_through: CLICK_THROUGH,
-  alt_text: "Alt Text",
+  wcag: "At page load",
+  click_through: "After clicking",
+  alt_text: "In an image",
 };
 
 export const FINDING_TYPE_HELP: Record<FindingType, string> = {
   wcag:
-    "Found at page load, by a rule check (axe or Alfa), a browser check such as the keyboard check, or the AI review.",
+    "Found on the page as it first loads, by a rule check (axe or Alfa), a browser check such as the keyboard check, or the AI review.",
   click_through:
-    "Found only in a page state opened by clicking a control, such as a menu, tab, or dialog. Use that control first to see it.",
+    "Found only after Axcess clicked something that opens more of the page, such as a menu, tab, or pop-up window (dialog). Click the same thing to see it. Axcess never clicks links.",
   alt_text:
-    "Found by the image text check: text in an image, and whether its alt text (what a screen reader reads) says the same.",
+    "Found by the image text check: words inside an image, and whether the image's text description (alt text), which a screen reader reads, says the same words.",
 };
 
 export const isFindingType = (value: string): value is FindingType =>
@@ -75,7 +94,7 @@ export const REVIEW_LANE_HELP: Record<ReviewLane, string> = {
  */
 export const ISSUE_COLUMN_HELP = {
   "How sure": "How sure Axcess is that the issue is a real problem: Mostly sure, Not sure, or For information.",
-  "Found by": "Which group of checks found the issue.",
+  "Where it shows": "Where the issue shows up: at page load, after clicking, or in an image.",
   Priority:
     "High, Medium, or Low, from the issue's impact rating and how many pages it is on. Rule check (Alfa) issues have no rating, so they count as the lowest. A serious issue on one page can still be Low. Informational issues show Does not apply.",
   Pages:

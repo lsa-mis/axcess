@@ -694,8 +694,8 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     await coverage.focus()
     await page.keyboard.press("Enter")
     await playwright_async.expect(ledger).to_be_visible()
-    # Scoped to the ledger panel: "Click-Through" is also a "Found by" label
-    # elsewhere on the report, and exact text must match one element.
+    # Scoped to the ledger panel: "Click-Through" may appear elsewhere on the
+    # report, and exact text must match one element.
     await playwright_async.expect(ledger.get_by_text("Click-Through", exact=True)).to_be_visible()
 
     # The subtitle names the report without repeating a stat card's count.

@@ -119,8 +119,8 @@ ran. **Result** says what the check ran on and what it found. **About this
 check** says in one line each what the check does and its limit, and **More
 about this check** opens its card on the Axcess website. The focus and visual
 checks have no row here. The second row, **What "Mostly sure", "Not sure"
-and the other labels mean**, explains the words in the **How sure** and **Found
-by** columns.
+and the other labels mean**, explains the words in the **How sure** and **Where it shows**
+columns.
 
 The error count says how many pages failed, not which ones. See
 [pages not reached](glossary.md#pages-not-reached) for what the report does and
@@ -135,7 +135,7 @@ order:
 | --- | --- |
 | Issue | The issue's name. Select it to open the issue page. |
 | How sure | The report group: Mostly sure, Not sure, or For information. |
-| Found by | Which kind of check found it: WCAG, Click-Through, or Alt Text (see [Found by](glossary.md#found-by)). One issue can show both WCAG and Click-Through. |
+| Where it shows | Where the issue shows up: At page load, After clicking, or In an image (see [Where it shows](glossary.md#where-it-shows)). One issue can show both At page load and After clicking. |
 | WCAG | The [success criterion](glossary.md#success-criterion) number with its [level](glossary.md#conformance-level) badge, or "Best practice" (see [best practice](glossary.md#best-practice)). |
 | Priority | High, Medium, or Low (see [priority](glossary.md#priority)); "Does not apply" for rows marked For information. |
 | Pages | How many pages have it, linked to the list of those pages. |
@@ -143,9 +143,9 @@ order:
 
 Search with the **Search issues** box (an issue name or a WCAG number, such as
 1.4.3). The **Filter** menu narrows the table by **Level** (Level A, AA, AAA,
-or Best practice), **How sure** (a report group), and **Found by**. When you choose
-one **Found by** value, a link to its detailed view appears above the table:
-**Rule check issues by WCAG criterion**, or **Images** for Alt Text.
+or Best practice), **How sure** (a report group), and **Where it shows**. When you choose
+one **Where it shows** value, a link to its detailed view appears above the table:
+**Rule check issues by WCAG criterion**, or **Images** for In an image.
 
 The table opens in the recommended order: Mostly sure, then Not sure, then
 For information, each by priority. Select a column header to sort by that
@@ -219,7 +219,7 @@ but does not show again.
 You cannot change status in the Issues table or on the issue page. Instead:
 
 1. On the report's **Issues** tab, open the **Filter** menu and choose one
-   **Found by** value.
+   **Where it shows** value.
 2. For page results, select **Rule check issues by WCAG criterion** (use
    **Group by rule** to change a whole rule). For image results, select
    **Images** (use **Group by issue** to change a whole issue).

@@ -397,9 +397,9 @@ function IssueToolbar({
         })),
       ],
     },
-    // A mixed WCAG and Click-Through issue is listed under both, so these
-    // counts can add up to more than the whole table. Named as its column
-    // is ("Found by"): "finding" is not an interface word.
+    // An issue found both at page load and after clicking is listed under
+    // both, so these counts can add up to more than the whole table. Named
+    // as its column is ("Where it shows"): "finding" is not an interface word.
     {
       key: "finding_type",
       label: COLUMN_LABEL["Finding type"],
@@ -457,8 +457,9 @@ type SortColumn = (typeof COLUMNS)[number];
 /**
  * What each column header says. The column keys above stay as they are:
  * they are the ``?sort=`` vocabulary and ``HIDDEN_ISSUE_FIELDS``' names.
- * "Finding type" reads "Found by", because "finding" is not an interface
- * word (docs/plain-language.md).
+ * "Finding type" reads "Where it shows", because "finding" is not an
+ * interface word (docs/plain-language.md) and every value answers that
+ * question (see FINDING_TYPE_LABELS in lib/labels.ts).
  */
 const COLUMN_LABEL: Record<SortColumn, string> = {
   Issue: "Issue",
@@ -466,7 +467,7 @@ const COLUMN_LABEL: Record<SortColumn, string> = {
   // issue is a real problem, and "Type" named no question (see
   // REVIEW_TYPE_LABEL in lib/terms.ts).
   Type: "How sure",
-  "Finding type": "Found by",
+  "Finding type": "Where it shows",
   WCAG: "WCAG",
   Priority: "Priority",
   Pages: "Pages",
@@ -918,7 +919,7 @@ function IssueGlossary() {
           items={REVIEW_LANES.map((key) => ({ key, term: <LaneTag lane={key} hint={false} />, help: REVIEW_LANE_HELP[key] }))}
         />
         <GlossaryList
-          heading={`${COLUMN_LABEL["Finding type"]}: which group of checks found it`}
+          heading={`${COLUMN_LABEL["Finding type"]}: where the problem shows up`}
           items={FINDING_TYPES.map((key) => ({
             key,
             term: <FindingTypePill type={key} hint={false} />,
