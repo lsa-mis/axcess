@@ -89,15 +89,18 @@ const rows = [
               <div class="card">
                 <h4>Opens what your users open</h4>
                 <p>Menus, tabs, accordions and dialogs only appear after a click. Axcess opens them, within set limits, and runs the rule check on each page state it reaches. It skips buttons like Sign out, Delete and Buy.</p>
-                <div class="proof stats">
-                  <div><span class="n">194</span><span class="l">pages</span></div>
-                  <div><span class="n">1,171</span><span class="l">page states opened by clicking</span></div>
+                <div class="proof">
+                  <img class="proof-shot" src={url("/screens/home-page-states.png")} width="250" height="112" loading="lazy" decoding="async"
+                    alt="A real Axcess report counting 232 page states opened by clicking: the menus, tabs and other controls Axcess opened to check what they reveal." />
                 </div>
               </div>
               <div class="card">
                 <h4>Checks pages behind a sign-in</h4>
                 <p>Student portals, staff tools and course pages usually go untested. Sign in yourself, including U-M sign-in and Duo, and Axcess checks the pages behind it. It deletes the sign-in when the scan ends.</p>
-                <p class="proof kv"><span>Pages behind a sign-in</span><strong>Included in scan</strong></p>
+                <div class="proof">
+                  <img class="proof-shot" src={url("/screens/sign-in-tab.png")} width="630" height="170" loading="lazy" decoding="async"
+                    alt="New scan with the tab Site with a sign-in or two-step sign-in (2FA) chosen, beside Public website. This tab starts a scan of the pages behind a sign-in." />
+                </div>
               </div>
             </div>
           </div>
@@ -113,16 +116,20 @@ const rows = [
                 <p class="card-label">For designers</p>
                 <h4>Highlights the exact element</h4>
                 <p>Each problem is outlined on a saved copy of the page, with its size and label.</p>
-                <div class="proof outline-sample">
-                  <span class="target" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></span>
-                  <span><strong>Size</strong><br /><span class="muted">30 pixels wide, 30 pixels tall</span></span>
+                <div class="proof">
+                  <img class="proof-shot" src={url("/screens/home-highlight.png")} width="355" height="100" loading="lazy" decoding="async"
+                    alt="On the saved copy of a page, Axcess outlines the flagged element, a small square button, in yellow and dark blue and tags it 1 of 19, just left of the page heading that begins Creating a Title." />
                 </div>
               </div>
               <div class="card">
                 <p class="card-label">For developers</p>
                 <h4>Points to the code</h4>
                 <p>Copy the element locator (CSS selector) and paste it into your browser's developer tools.</p>
-                <code class="proof locator">.copy-link-btn.before.auto-heading-links</code>
+                <div class="proof">
+                  <code class="locator">.copy-link-btn.before.auto-heading-links</code>
+                  <img class="proof-shot" src={url("/screens/home-copy-locator.png")} width="374" height="64" loading="lazy" decoding="async"
+                    alt="The Copy element locator button in the Page inspector, which copies a locator like the one above for your browser's developer tools." />
+                </div>
               </div>
             </div>
           </div>
@@ -351,9 +358,6 @@ const rows = [
     line-height: 1.55;
     text-wrap: pretty;
   }
-  .muted {
-    color: var(--h-muted);
-  }
 
   /* What it catches */
   /* minmax(0, 1fr): a grid column otherwise refuses to shrink below its
@@ -440,29 +444,28 @@ const rows = [
     font-size: 13px;
     font-weight: 700;
   }
+  /* Real crops of the app in the card footers, by the developer's
+     direction (2026-10-06): they show the actual screen where a drawing
+     only resembled it. Each is shown at most at its own size, so it is
+     never blown up and blurred, and each has alt text that says what the
+     crop shows. A drawing, which follows the theme, was the earlier choice;
+     the crops stay light in dark mode, as the app's screens are. */
+  .proof-shot {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    border: 1px solid var(--h-card-line);
+    border-radius: 8px;
+  }
+  .locator + .proof-shot {
+    margin-top: 10px;
+  }
   .proof {
     margin: auto 0 0;
     padding-top: 14px;
     border-top: 1px solid var(--h-divider);
     color: var(--h-text);
     font-size: 14px;
-  }
-  .stats {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 24px;
-  }
-  .stats > div {
-    display: flex;
-    flex-direction: column;
-  }
-  .n {
-    font-size: 24px;
-    font-weight: 700;
-  }
-  .l {
-    color: var(--h-muted);
-    font-size: 13px;
   }
   .kv {
     display: flex;
@@ -485,36 +488,6 @@ const rows = [
     font-size: 13px;
     font-weight: 600;
     white-space: nowrap;
-  }
-  .outline-sample {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-  /* The flagged element, drawn as the app's Page inspector shows it: a maize
-     ring and a navy inner line around the element itself, here the page's
-     "Copy link to this heading" button, a 30 by 30 pixel square showing a
-     bookmark icon (the page's own icon, so drawn in a page blue, not the
-     app's navy). An empty box, and then a wide box with a link icon, were
-     tried; both differed from the real screen (developer's review with
-     screenshots, 2026-10-06). Decoration inside a picture that already has
-     a text description. */
-  .target {
-    flex-shrink: 0;
-    display: grid;
-    place-items: center;
-    width: 32px;
-    height: 32px;
-    color: #1d5fbf;
-    border: 3px solid #f5c400;
-    border-radius: 2px;
-    outline: 2px solid #0a2647;
-    outline-offset: -5px;
-    background: #ffffff;
-  }
-  .target svg {
-    width: 14px;
-    height: 14px;
   }
   .locator {
     display: block;
