@@ -114,7 +114,7 @@ const rows = [
                 <h4>Highlights the exact element</h4>
                 <p>Each problem is outlined on a saved copy of the page, with its size and label.</p>
                 <div class="proof outline-sample">
-                  <span class="target" aria-hidden="true"></span>
+                  <span class="target" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg></span>
                   <span><strong>Size</strong><br /><span class="muted">35 pixels wide, 20 pixels tall</span></span>
                 </div>
               </div>
@@ -491,15 +491,28 @@ const rows = [
     align-items: center;
     gap: 12px;
   }
+  /* The flagged element, drawn as the app outlines it (maize ring, navy
+     inner line). It is the "Copy link to this heading" link the panel
+     describes, so it holds a link icon and has that link's shape, wider
+     than tall (35 by 20 pixels); an empty, taller-than-wide box matched
+     neither (developer's review, 2026-10-06). Decoration inside a picture
+     that already has a text description. */
   .target {
     flex-shrink: 0;
-    width: 26px;
-    height: 34px;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 26px;
+    color: #0a2647;
     border: 3px solid #f5c400;
     border-radius: 2px;
     outline: 2px solid #0a2647;
     outline-offset: -5px;
     background: #ffffff;
+  }
+  .target svg {
+    width: 12px;
+    height: 12px;
   }
   .locator {
     display: block;
