@@ -120,14 +120,14 @@ const CHECK_CARDS: [string, string, string, string][] = [
   [
     "axe",
     "Rule check (axe)",
-    "Tests each page against the axe-core rules a computer can check, at the WCAG version and level you choose (WCAG 2.1 AA unless you change it). Failures are Barriers.",
+    "Tests each page against the axe-core rules a computer can check, at the WCAG version and level you choose (WCAG 2.1 AA unless you change it). Failures are marked Mostly sure.",
     "A page with nothing found can still fail WCAG.",
   ],
   [
     "alfa",
     "Rule check (Alfa)",
     "Runs Siteimprove Alfa's standard test rules (Accessibility Conformance Testing, ACT). Each rule passes, fails, or cannot tell. It runs only when you choose it.",
-    "A failed rule is not proof the page fails WCAG. Each “cannot tell” goes to Needs review.",
+    "A failed rule is not proof the page fails WCAG. Each “cannot tell” is marked Not sure.",
   ],
   [
     "image",
@@ -139,7 +139,7 @@ const CHECK_CARDS: [string, string, string, string][] = [
     "semantic",
     "AI review",
     "A local AI model reads link text, headings, labels, and instructions in context. It runs only when you turn it on.",
-    "Results go to Needs review. A person confirms each one.",
+    "Results are marked Not sure. A person confirms each one.",
   ],
   [
     "keyboard",
@@ -170,7 +170,7 @@ const CHECKS: [string, string, string, string, string, string][] = [
     "Rule check (axe)",
     "Problems a computer can test on every opened page, such as missing text alternatives, unlabeled form fields, low text contrast, and errors in ARIA (Accessible Rich Internet Applications) code. It runs axe's rules for the WCAG version and level you choose, plus axe's best-practice rules.",
     "Many A and AA criteria, such as 1.1.1, 1.4.3, and 4.1.2",
-    "Barrier",
+    "Mostly sure",
     "Yes. Siteimprove checks the same kinds of problems with its own rules.",
     "Yes. axe DevTools runs these same axe-core rules.",
   ],
@@ -178,7 +178,7 @@ const CHECKS: [string, string, string, string, string, string][] = [
     "Click-Through",
     "Problems that only appear after a control is used. Axcess operates each safe control, runs the rule check (axe) again on what appears, and records which control revealed each problem.",
     "The same criteria as the rule check (axe)",
-    "Barrier",
+    "Mostly sure",
     "Not automatically. Its crawler tests each page as it loads. A Dynamic Content Checker add-on lets you capture other states yourself.",
     "Not automatically. axe-core does not test closed menus or dialogs, so you open them and scan again. Paid guided tests help with dialogs.",
   ],
@@ -186,7 +186,7 @@ const CHECKS: [string, string, string, string, string, string][] = [
     "Zoom and layout check: reflow at phone width",
     "Pages that need sideways scrolling at 320 CSS pixels wide.",
     "1.4.10 (AA)",
-    "Needs review",
+    "Not sure",
     "No automated check found.",
     "No automated check found.",
   ],
@@ -194,7 +194,7 @@ const CHECKS: [string, string, string, string, string, string][] = [
     "Zoom and layout check: text cut off at 200% zoom",
     "Text that is clipped when the page is enlarged. Axcess approximates 200% zoom with a smaller browser window.",
     "1.4.4 (AA)",
-    "Needs review",
+    "Not sure",
     "Partly. It flags pages that block zooming. It has also documented a “Text is clipped when resized” rule, but its open-source engine deprecated that rule in 2026, so ask Siteimprove whether it still runs.",
     "Partly. axe-core flags pages that block zooming, not clipped text.",
   ],
@@ -202,7 +202,7 @@ const CHECKS: [string, string, string, string, string, string][] = [
     "Zoom and layout check: text spacing",
     "Text that is clipped after line, letter, word, and paragraph spacing are raised to the WCAG values.",
     "1.4.12 (AA)",
-    "Needs review",
+    "Not sure",
     "Partly. It flags inline styles that lock spacing with !important. No check found that applies the spacing and looks for clipping.",
     "Partly. The same inline-style check.",
   ],
@@ -210,7 +210,7 @@ const CHECKS: [string, string, string, string, string, string][] = [
     "Keyboard check",
     "Places where Tab and Shift+Tab both fail to move focus away (keyboard traps). Reported at most once per page.",
     "2.1.2 (A)",
-    "Needs review",
+    "Not sure",
     "No automated check found.",
     "Only in the paid Keyboard guided test. No axe-core rule.",
   ],
@@ -218,7 +218,7 @@ const CHECKS: [string, string, string, string, string, string][] = [
     "Focus check",
     "A focused control hidden behind a sticky or fixed header, footer, or banner, and elements that force the tab order with a positive tabindex.",
     "2.4.11 (AA, new in WCAG 2.2; a WCAG 2.1 scan reports it as Best practice), 2.4.3 (A)",
-    "Needs review",
+    "Not sure",
     "No automated check found.",
     "Partly. axe-core flags positive tabindex as a best practice, and the paid Keyboard guided test reviews tab order. No rule found for focus hidden behind other content.",
   ],
@@ -226,7 +226,7 @@ const CHECKS: [string, string, string, string, string, string][] = [
     "Rule check (axe): target size",
     "Buttons and links smaller than 24 by 24 CSS pixels without enough space around them.",
     "2.5.8 (AA, new in WCAG 2.2)",
-    "Barrier",
+    "Mostly sure",
     "Yes, when WCAG 2.2 is selected. It also checks the stricter 44 pixel size (2.5.5, AAA), which Axcess checks only when the rule check (Alfa) runs at Level AAA.",
     "Only when WCAG 2.2 rules are turned on. The axe-core rule is off by default, and Axcess turns it on only for WCAG 2.2 scans.",
   ],
@@ -234,7 +234,7 @@ const CHECKS: [string, string, string, string, string, string][] = [
     "Image text check",
     "Images that contain words, found with text recognition (OCR) and compared with their alt text. An optional local vision model judges what the text is for and maps it to a WCAG criterion.",
     "1.4.5 (AA), 1.1.1 (A)",
-    "Needs review (Informational when the alt text already matches)",
+    "Not sure (For information when the alt text already matches)",
     "No automated images-of-text check found. Its open-source engine has an experimental rule that asks whether an image contains text. An on-demand AI check judges whether alt text matches the image.",
     "No automated check found. A paid guided test reviews image alternatives.",
   ],
@@ -242,7 +242,7 @@ const CHECKS: [string, string, string, string, string, string][] = [
     "Motion and reading-order check (optional)",
     "Audio or video that plays on its own without controls, marquee text, and, with a local vision model, a visual reading order that differs from the code order.",
     "1.4.2, 2.2.2, 1.3.2 (A)",
-    "Needs review",
+    "Not sure",
     "Partly. Its open-source engine has an autoplaying audio rule that asks a person to confirm how long the audio plays, and a best-practice rule flags blink and marquee. No reading-order check found.",
     "Partly. axe-core covers autoplaying audio (for review), blink, and marquee. No reading-order check found.",
   ],
@@ -250,7 +250,7 @@ const CHECKS: [string, string, string, string, string, string][] = [
     "AI review (optional)",
     "Vague link text, headings that do not describe their section, form fields without clear labels or instructions, and audio without a transcript, judged by a local AI model.",
     "2.4.4 (A), 2.4.6 (AA), 3.3.2 (A), 1.2.1 (A)",
-    "Needs review",
+    "Not sure",
     "Partly. It checks that links and fields have names, offers an opt-in AI rule for descriptive headings, and guides a review for transcripts.",
     "Partly. axe-core checks that links and fields have names. Paid guided tests cover link purpose, headings, and labels.",
   ],
@@ -259,11 +259,11 @@ const CHECKS: [string, string, string, string, string, string][] = [
 // The old site's description of the diagram (build.py REPORT_GROUPS_ALT). Its
 // pixel size, 3200 by 1800, is in build.py DIAGRAM_SIZES.
 const REPORT_GROUPS_ALT =
-  "Diagram of the three report groups. Barrier holds rule-engine failures from axe-core and Siteimprove Alfa, " +
+  "Diagram of the three report groups in the How sure column. Mostly sure holds rule-engine failures from axe-core and Siteimprove Alfa, " +
   "including problems found after clicking or after a configured search; confirm them on the page, fix, and rescan. " +
-  "Needs review holds browser checks, the keyboard trap check, motion checks, text in images whose alt text is " +
+  "Not sure holds browser checks, the keyboard trap check, motion checks, text in images whose alt text is " +
   'missing or does not match, AI checks, and Alfa "cannot tell" results; a person tests and records a ' +
-  "decision. Informational holds images whose alt text already matches and older records kept for history; no " +
+  "decision. For information holds images whose alt text already matches and older records kept for history; no " +
   "action is needed.";
 
 const LSA_WEB_RESOURCES = "https://accessibility.lsa.umich.edu/browse-resources/web-accessibility.html";
@@ -344,10 +344,11 @@ const headings = [
     below says what they look for.
   </p>
 
-  <h2 id="groups">Every issue gets one of three types</h2>
+  <h2 id="groups">How sure Axcess is about each issue</h2>
   <p>
-    The type tells you how certain an issue is and what to do next. It is shown in the Type column of the Issues
-    table. <a href={url("/docs/glossary/#barrier")}>The glossary explains each type.</a>
+    Every issue is marked Mostly sure, Not sure, or For information, in the How sure column of the Issues table. It
+    tells you how sure Axcess is that the issue is a real problem, and what to do next.
+    <a href={url("/docs/glossary/#mostly-sure")}>The glossary explains each one.</a>
   </p>
   <!-- The diagram is an image of text, so the same facts follow as real text
        in the three cards (SC 1.4.5 Images of Text, Level AA), and the full
@@ -365,20 +366,20 @@ const headings = [
     <figcaption><a href={url("/diagrams/report-groups.png")}>Open the diagram at full size</a></figcaption>
   </figure>
   <div class="not-content cards">
-    <Card heading="Barrier: confirm it, then fix it" level={3}>
+    <Card heading="Mostly sure: confirm it, then fix it" level={3}>
       <p>
         Comes from failures in the Rule check (axe), including problems found by Click-Through or after a search you
         set up, and failures in the Rule check (Alfa). Confirm it on the page, fix it, then scan again.
       </p>
     </Card>
-    <Card heading="Needs review: a person decides" level={3}>
+    <Card heading="Not sure: a person decides" level={3}>
       <p>
         Comes from the Zoom and layout, Focus, Keyboard, and Motion and reading-order checks, from the Image text
         check when alt text is missing or does not match, from the AI review, and from Rule check (Alfa) "cannot
         tell" results. Test it on the page and record your decision.
       </p>
     </Card>
-    <Card heading="Informational: nothing to fix" level={3}>
+    <Card heading="For information: nothing to fix" level={3}>
       <p>
         Comes from the Image text check when the alt text already matches, and from older records kept for history.
         No action is needed.

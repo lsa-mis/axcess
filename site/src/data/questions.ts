@@ -57,16 +57,16 @@ export const QUESTIONS: Question[] = [
     a: "No. Axcess does the slow work of finding and recording problems, so your experts can spend their time reviewing results and planning fixes.",
   },
   // Issue types: docs/glossary.md "Report groups"; only rule checks make a
-  // Barrier (glossary "Zero false positive goal"; Alfa "cannot tell" is
-  // Needs review, docs/plain-language.md terms table).
+  // Mostly sure (glossary "Zero false positive goal"; Alfa "cannot tell" is
+  // Not sure, docs/plain-language.md terms table).
   {
     id: "issue-types",
-    q: "What do Barrier, Needs review and Informational mean?",
-    a: "They are the three types of issue, and every issue is one of them. A Barrier is a fixed rule that a rule check (axe or Alfa) found broken. Confirm it on the page, then fix it. Needs review comes from a less certain check, and a person must confirm it before it counts. Informational is a record of what was checked, with nothing to fix.",
+    q: "What do Mostly sure, Not sure and For information mean?",
+    a: "They say how sure Axcess is that an issue is a real problem, in the How sure column of the Issues table. Mostly sure means a rule check (axe or Alfa) found a fixed rule broken. Check it on the page, then fix it. Not sure comes from a check that cannot be certain, and a person must decide whether it is a real problem before it counts. For information is a record of what was checked, with nothing to fix.",
     links: [
-      { href: "/docs/glossary/#barrier", text: "Barrier, in the glossary" },
-      { href: "/docs/glossary/#needs-review", text: "Needs review, in the glossary" },
-      { href: "/docs/glossary/#informational", text: "Informational, in the glossary" },
+      { href: "/docs/glossary/#mostly-sure", text: "Mostly sure, in the glossary" },
+      { href: "/docs/glossary/#not-sure", text: "Not sure, in the glossary" },
+      { href: "/docs/glossary/#for-information", text: "For information, in the glossary" },
     ],
   },
   // Default standard: src/audit/wcag_version.py:3-4. Manual list with steps:
@@ -86,12 +86,12 @@ export const QUESTIONS: Question[] = [
   },
   // AI is optional: semantic_enabled and vlm_enabled default to false
   // (src/audit/web/scan_settings.py). The desktop app bundles Chromium and
-  // Tesseract (docs/desktop-app.md). AI results are never Barriers
+  // Tesseract (docs/desktop-app.md). AI results are never Mostly sure
   // (docs/glossary.md "Local AI model").
   {
     id: "ai",
     q: "Do I need AI to use it?",
-    a: "No. Most checks need only a browser and software that reads text in images (OCR), and the desktop app includes both. AI review is optional, and so is the AI step of the Image text check. They use a local AI model that you install yourself, through a free program called Ollama. Their results are never Barriers.",
+    a: "No. Most checks need only a browser and software that reads text in images (OCR), and the desktop app includes both. AI review is optional, and so is the AI step of the Image text check. They use a local AI model that you install yourself, through a free program called Ollama. Their results are never marked Mostly sure.",
     links: [{ href: "/docs/glossary/#local-ai-model", text: "Local AI model, in the glossary" }],
   },
   // Update check: desktop/src/updates.cjs, desktop/src/main.cjs:508
@@ -127,7 +127,7 @@ export const QUESTIONS: Question[] = [
   {
     id: "accuracy",
     q: "How accurate is it?",
-    a: "Every occurrence records which check found it, and every issue shows its type, so you can see how certain it is. Only rule check failures are Barriers. Everything else waits for a person to confirm it. You can mark any occurrence Not a problem (a false positive), with a short reason. The project also tests its checks against a fixed set of made-up examples. That is a safety rail, not a measure of accuracy on real sites.",
+    a: "Every occurrence records which check found it, and every issue shows how sure Axcess is. Only rule check failures are marked Mostly sure. Everything else waits for a person to confirm it. You can mark any occurrence Not a problem (a false positive), with a short reason. The project also tests its checks against a fixed set of made-up examples. That is a safety rail, not a measure of accuracy on real sites.",
     links: [
       { href: "/docs/glossary/#zero-false-positive-goal", text: "Zero false positive goal, in the glossary" },
       { href: "/docs/glossary/#false-positive", text: "False positive, in the glossary" },
