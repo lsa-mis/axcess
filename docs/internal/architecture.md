@@ -357,8 +357,8 @@ Nothing is grouped at write time. `issues.list_issues` in
 
 Each row gets a `review_lane` of `likely_barrier`, `expert_review`, or
 `informational`, which the Issues table shows as
-[Barrier](../glossary.md#barrier), [Needs review](../glossary.md#needs-review),
-and [Informational](../glossary.md#informational). By default, rows sort by
+[Mostly sure](../glossary.md#mostly-sure), [Not sure](../glossary.md#not-sure),
+and [For information](../glossary.md#for-information). By default, rows sort by
 group first, then by priority within a group. [Detection pipelines](detection-pipelines.md)
 explains which checks land in which group and where to change it.
 
@@ -452,17 +452,40 @@ How it works:
 
 1. `POST /api/local-login-scans` opens a visible Chromium with a fresh,
    temporary profile under the system temp folder
-   (`axcess-protected-browser`, mode 0700), at the page you typed.
+   (`axcess-protected-browser`, mode 0700), at the page you typed. This is a
+   sign-in in progress, not a scan: it has its own ID, lives only in memory
+   (`audit.web.local_sign_in.SignInRegistry`), and creates no `scans` row,
+   so Reports shows nothing for it. Only one waits at a time; asking again
+   returns the one that waits. It does not take the one-crawl lock, so a
+   public scan can run meanwhile.
 2. You complete the full sign-in, including any two-factor step. During
    sign-in the browser may reach any public HTTPS host, so identity providers
-   and two-factor services work.
-3. "I'm signed in, start scan" calls `POST /api/local-login-scans/{id}/confirm`.
-4. By default, the session's cookies and storage are copied in memory into a
-   new headless Chromium, and the sign-in window closes. With "Show the
-   scanning browser window", the scan reuses the signed-in tabs instead.
-5. The crawl starts where sign-in landed, and the scope still comes from the
+   and two-factor services work. While the window is open, the session keeps
+   a copy of the signed-in state in memory (cookies, local storage,
+   IndexedDB and the tab's sessionStorage), refreshed on every page change
+   and every 5 seconds. It is never written to disk.
+3. If you close the sign-in window before starting, nothing ends: the
+   browser and its temporary profile go, and the kept copy stays in memory.
+   "Reopen sign-in window" (`POST /api/local-sign-ins/{id}/reopen`) opens a
+   new window restored from it, on the last page you were on. Some sites
+   tie a sign-in to the exact browser window, so they may ask you to sign in
+   again. After 30 minutes with the window closed, Axcess forgets the
+   sign-in: it erases the kept copy and records nothing. Reopening restarts
+   that clock; while the window is open there is no limit.
+4. "I'm signed in, start scan" calls `POST /api/local-sign-ins/{id}/start`.
+   That creates the `scans` row, takes the crawl lock and starts the crawl.
+   If another scan is running, it is refused and the sign-in is kept.
+   "Cancel sign-in" (`POST /api/local-sign-ins/{id}/cancel`) closes the
+   window, erases the kept copy and records nothing. Quitting Axcess ends a
+   waiting sign-in at once.
+5. By default, the session's cookies and storage are copied in memory into a
+   new headless Chromium, and the sign-in window closes; if it was already
+   closed, the kept copy is used. With "Show the scanning browser window",
+   the scan reuses the signed-in tabs instead, or a visible window reopened
+   from the kept copy.
+6. The crawl starts where sign-in landed, and the scope still comes from the
    URL you typed.
-6. When the scan ends, `session.close()` shuts the browsers and deletes the
+7. When the scan ends, `session.close()` shuts the browsers and deletes the
    temporary profile.
 
 Rules that are fixed for login scans:
@@ -475,7 +498,8 @@ Rules that are fixed for login scans:
   checks are off, the focus check is on, and the scan cannot be resumed.
 - The vision model, if used, must be Ollama on a literal loopback address.
 
-A login scan is an ordinary `scans` row with no `protected_scans` row. By
+A login scan is an ordinary `scans` row with no `protected_scans` row,
+created when the scan starts, not when the sign-in window opens. By
 default it stores rendered HTML and element screenshots of signed-in pages in
 the normal, unencrypted database and blob folder; "Don't store rendered pages"
 turns both off. The server log records each page's URL and title.
@@ -518,7 +542,7 @@ for updates when the app window opens. This is what
 | Destination | When | Code |
 | --- | --- | --- |
 | The website you scan | Every scan: the plain HTTP fetch, the Chromium render, and Alfa's separate capture. A render also loads the page's own subresources from whatever hosts it names, such as CDNs. Only the click-through check's guard blocks cross-origin requests, and only while it operates controls. | `crawler/fetcher.py`, `crawler/js_fetcher.py`, `analyzer/alfa.py`, `analyzer/interaction/safety.py` |
-| The website you scan, from the page inspector | Opening a stored page: the capture gets the page's URL as `<base href>`, so the reviewer's browser loads that site's stylesheets, fonts, and images live. Its scripts never run. With no stored capture, the server renders the page again in a throwaway browser. | `frontend/src/routes/Inspector.tsx`, `web/page_inspector.py` |
+| The website you scan, from the page inspector | Opening a stored page: the capture gets the page's URL as `<base href>`, so the reviewer's browser loads that site's fonts and images live. Its stylesheets load live too, unless the scan saved the copy's CSS (`saved_copy_styles`, served by `/api/scans/{id}/pages/{page}/saved-styles.css`), which newer scans do. Its scripts never run. With no stored capture, the server renders the page again in a throwaway browser. | `frontend/src/routes/Inspector.tsx`, `web/page_inspector.py` |
 | Sign-in and two-factor services | Login scans only, while you sign in | `protected/session.py`, `protected/egress.py` |
 | Ollama, if you use it | The vision model, the visual reading-order check, the AI language checks, and one model-list request when the New scan form opens. The default address is `http://localhost:11434` (`AUDIT_OLLAMA_BASE_URL`). Axcess never pulls a model. | `config.py`, `web/server.py` |
 | `api.github.com`, desktop app only | The update check, each time the app window opens (on macOS, also when the Dock icon reopens a closed window), until a newer release has been offered. It is skipped when the app runs unpackaged in development and when `AXCESS_DISABLE_UPDATE_CHECK=1`, and nothing downloads without a click. | `desktop/src/updates.cjs`, `desktop/src/main.cjs` |

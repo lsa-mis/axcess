@@ -382,11 +382,11 @@ function IssueToolbar({
         { value: "BP", label: "Best practice", count: conformanceCounts.BP ?? 0 },
       ],
     },
-    // "Type" is the column's name for the review lane, so the filter is
-    // named the same way and its options read as the cells do.
+    // The filter takes the column's own name ("How sure"), so the filter
+    // and the column read as one thing and its options read as the cells do.
     {
       key: "type",
-      label: "Type",
+      label: COLUMN_LABEL.Type,
       value: lane,
       multiple: true,
       options: [
@@ -397,9 +397,9 @@ function IssueToolbar({
         })),
       ],
     },
-    // A mixed WCAG and Click-Through issue is listed under both, so these
-    // counts can add up to more than the whole table. Named as its column
-    // is ("Found by"): "finding" is not an interface word.
+    // An issue found both at page load and after clicking is listed under
+    // both, so these counts can add up to more than the whole table. Named
+    // as its column is ("Where it shows"): "finding" is not an interface word.
     {
       key: "finding_type",
       label: COLUMN_LABEL["Finding type"],
@@ -424,7 +424,8 @@ function IssueToolbar({
         value={q}
         onChange={(value) => onParam("q", value)}
       />
-      <FilterMenu groups={groups} onChange={onParam} onReset={onResetFilters} />
+      <FilterMenu
+          label="Filter issues" groups={groups} onChange={onParam} onReset={onResetFilters} />
     </TableBar>
   );
 }
@@ -456,13 +457,17 @@ type SortColumn = (typeof COLUMNS)[number];
 /**
  * What each column header says. The column keys above stay as they are:
  * they are the ``?sort=`` vocabulary and ``HIDDEN_ISSUE_FIELDS``' names.
- * "Finding type" reads "Found by", because "finding" is not an interface
- * word (docs/plain-language.md).
+ * "Finding type" reads "Where it shows", because "finding" is not an
+ * interface word (docs/plain-language.md) and every value answers that
+ * question (see FINDING_TYPE_LABELS in lib/labels.ts).
  */
 const COLUMN_LABEL: Record<SortColumn, string> = {
   Issue: "Issue",
-  Type: "Type",
-  "Finding type": "Found by",
+  // "How sure", not "Type": the column says how sure Axcess is that the
+  // issue is a real problem, and "Type" named no question (see
+  // REVIEW_TYPE_LABEL in lib/terms.ts).
+  Type: "How sure",
+  "Finding type": "Where it shows",
   WCAG: "WCAG",
   Priority: "Priority",
   Pages: "Pages",
@@ -539,7 +544,7 @@ function parseSort(raw: string | null): SortState {
 /** What the order means in words, for the status line and the caption. */
 function describeSort(sort: SortState): string {
   if (!sort) {
-    return "Recommended order: Barriers, then Needs review, then Informational";
+    return `Recommended order: ${REVIEW_LANES.map((lane) => REVIEW_TYPE_LABEL[lane]).join(", then ")}`;
   }
   return `Sorted by ${COLUMN_LABEL[sort.column]}, ${sortWords(SORT_KINDS[sort.column], sort.direction)}`;
 }
@@ -641,8 +646,8 @@ function sortRows(rows: IssueRow[], sort: SortState): IssueRow[] {
 }
 
 /**
- * How many shown rows are of each type, for the live status line: "Barrier
- * 3, Needs review 7, Informational 2". Every type is named, zeros included,
+ * How many shown rows are of each type, for the live status line: "Mostly
+ * sure 3, Not sure 7, For information 2". Every type is named, zeros included,
  * so the sentence reads the same way each time the filters change.
  */
 function laneSummary(rows: IssueRow[]): string {
@@ -781,7 +786,6 @@ const IssueTableRow = memo(function IssueTableRow({
       <Cell className={cn(cell, "whitespace-nowrap")}>
         <LaneTag lane={row.review_lane} />
       </Cell>
-      {/* May wrap: a mixed group's two pills stack when the table is tight. */}
       <Cell className={cell}>
         <FindingTypeCell row={row} />
       </Cell>
@@ -868,14 +872,23 @@ function LaneTag({ lane, hint = true }: { lane: ReviewLane; hint?: boolean }) {
 /**
  * The row's finding types as outlined pills, a different shape from the
  * filled review-lane tag beside them so the two columns do not read as one.
- * "Click-Through" appears only when at least one of the group's errors was
- * found after operating a control; a group seen both at load and behind a
- * control shows "WCAG" and "Click-Through" together.
+ * "After clicking" appears only when at least one of the group's errors was
+ * found after clicking; a group seen both at page load and after clicking
+ * shows "At page load" and "After clicking" together.
+ *
+ * Two pills always stack, one per line, at one width, so their edges line up
+ * and the pair stays centred under the heading. They used to wrap only when
+ * the table was tight, and two pills of different widths then centred one by
+ * one, edges out of line (seen once the labels grew from "WCAG" and
+ * "Click-Through"). Side by side on one line was rejected: it widens the
+ * column and pushes the table past nine columns in view at 1280 px (see
+ * `cell` in IssueTableRow). Stacking also keeps one row looking the same at every
+ * width.
  */
 function FindingTypeCell({ row }: { row: IssueRow }) {
   const types = row.finding_types ?? ["wcag"];
   return (
-    <span className="inline-flex flex-wrap items-center gap-1">
+    <span className="inline-flex flex-col items-stretch gap-1">
       {types.map((type) => (
         <FindingTypePill key={type} type={type} />
       ))}
@@ -888,7 +901,7 @@ function FindingTypePill({ type, hint = true }: { type: FindingType; hint?: bool
   return (
     <span
       title={hint ? FINDING_TYPE_HELP[type] : undefined}
-      className="inline-flex items-center whitespace-nowrap rounded-full border border-border-strong px-1.5 py-px text-2xs font-semibold text-fg"
+      className="inline-flex items-center justify-center whitespace-nowrap rounded-full border border-border-strong px-1.5 py-px text-2xs font-semibold text-fg"
     >
       {FINDING_TYPE_LABELS[type]}
     </span>
@@ -906,15 +919,15 @@ function IssueGlossary() {
   return (
     <ReportNote
       id="report-labels"
-      title={`What ${REVIEW_TYPE_LABEL.likely_barrier}, ${REVIEW_TYPE_LABEL.expert_review} and the other labels mean`}
+      title={`What "${REVIEW_TYPE_LABEL.likely_barrier}", "${REVIEW_TYPE_LABEL.expert_review}" and the other labels mean`}
     >
       <div className="grid max-w-5xl gap-x-10 gap-y-4 text-sm leading-relaxed text-fg-muted md:grid-cols-2 xl:grid-cols-3">
         <GlossaryList
-          heading="Type: how sure the evidence is"
+          heading={`${COLUMN_LABEL.Type}: how sure Axcess is that the issue is a real problem`}
           items={REVIEW_LANES.map((key) => ({ key, term: <LaneTag lane={key} hint={false} />, help: REVIEW_LANE_HELP[key] }))}
         />
         <GlossaryList
-          heading={`${COLUMN_LABEL["Finding type"]}: which group of checks found it`}
+          heading={`${COLUMN_LABEL["Finding type"]}: where the problem shows up`}
           items={FINDING_TYPES.map((key) => ({
             key,
             term: <FindingTypePill type={key} hint={false} />,

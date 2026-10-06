@@ -56,9 +56,9 @@ _NAMES = {
 # phrases, so "Delete Page" still fails while "the Page inspector" passes.
 # Each is one name from docs/plain-language.md's terms table or lib/.
 _PHRASES = (
-    "Needs review",  # issue type, lib/terms.ts
-    "Barrier",  # issue type, lib/terms.ts
-    "Informational",  # issue type, lib/terms.ts
+    "Mostly sure",  # issue type, lib/terms.ts
+    "Not sure",  # issue type, lib/terms.ts
+    "For information",  # issue type, lib/terms.ts
     "Best practice",  # level, docs/plain-language.md
     "Rule check",  # check name: Rule check (axe), Rule check (Alfa)
     "Page inspector",  # the tool's name

@@ -288,7 +288,7 @@ def test_audit_report_unifies_all_four_pipelines(
     assert "keyboard-trap" not in issue_cards
     assert "The AI review (a language model on this computer)" in appendix_b
     assert "keyboard-trap" in appendix_b
-    assert "expert review / medium confidence" in appendix_b
+    assert "Not sure / medium confidence" in appendix_b
 
     # And the methods line in the header names them.
     methods_line = md.split("**Detection methods used:**", 1)[1].split("\n", 1)[0]
@@ -415,7 +415,7 @@ def test_audit_report_image_lead_uses_yaml_title_without_claiming_failure(
     appendix_b = md.split("## Appendix B", 1)[1]
     assert title not in issue_cards
     assert title in appendix_b
-    assert "expert review / medium confidence" in appendix_b
+    assert "Not sure / medium confidence" in appendix_b
 
 
 def test_open_card_excludes_terminal_occurrences_and_keeps_appendix_receipt(

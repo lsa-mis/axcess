@@ -425,9 +425,45 @@ export interface LocalLoginScanPayload {
   image_analysis_acknowledged: boolean;
 }
 
-export type LocalLoginScanStatus =
+/**
+ * A sign-in in progress: the person is signing in, and no scan exists yet.
+ * `cancelled`, `expired` and `failed` say why one ended; the server keeps
+ * only that word for a few recent IDs, never the site or the sign-in.
+ */
+export type LocalSignInStatus =
   | "opening_browser"
   | "awaiting_authentication"
+  | "cancelled"
+  | "expired"
+  | "failed";
+
+/** `GET /api/local-sign-ins/{id}` and the create, cancel and reopen responses. */
+export interface LocalSignInState {
+  /** The sign-in's own ID. It is not a scan ID. */
+  sign_in_id: string;
+  status: LocalSignInStatus;
+  /** The host the person is signing in to, for example "accessibility.umich.edu". */
+  site: string | null;
+  /** Whether a sign-in window is open on this computer. */
+  window_open: boolean;
+  error: string | null;
+  /** How long Axcess keeps the sign-in after its window closes. */
+  keep_minutes: number;
+  /** Seconds until Axcess forgets it; null while the window is open. */
+  forget_in_seconds: number | null;
+  /** True when a create request found this sign-in already waiting. */
+  already_waiting: boolean;
+  /** The settings this sign-in will scan with, to refill New scan. */
+  settings: NewScanPayload | null;
+}
+
+/** `GET /api/local-sign-ins/current`. */
+export interface CurrentLocalSignIn {
+  sign_in: LocalSignInState | null;
+}
+
+/** A sign-in scan that has started, from "I'm signed in, start scan" on. */
+export type LocalLoginScanStatus =
   | "verifying_authentication"
   | "scanning"
   | "completed"
@@ -1166,6 +1202,11 @@ export interface PageInspection {
    * reports made before state capture.
    */
   states: PageDomState[];
+  /**
+   * The CSS the scan saved with the copy of the page as it loaded, or null
+   * (older reports, scans that kept no copies, and every live render).
+   */
+  saved_styles: SavedStyles | null;
   render: {
     ok: boolean;
     /**
@@ -1195,6 +1236,39 @@ export interface PageDomState {
   /** Controls operated to arrive here, ending with this state's own. The
    *  reproduction recipe for a reviewer working by hand. */
   path_labels: string[];
+  /** The CSS the scan saved with this state's copy, or null. */
+  saved_styles: SavedStyles | null;
+}
+
+/**
+ * A saved copy's CSS, read from the live page during the scan and served by
+ * /api/scans/{id}/pages/{page}/saved-styles.css from the review UI's origin.
+ */
+export interface SavedStyles {
+  /** Root-relative URL of the stylesheet, versioned by its content. */
+  url: string;
+  /** False when the scan hit a size limit or could not read a sheet. */
+  complete: boolean;
+  /** Computed styles of a few elements, taken with the CSS. */
+  fingerprint: StyleFingerprint;
+}
+
+/** One sampled element's computed styles at scan time. */
+export interface StyleSample {
+  /** Position in the filtered element order (see lib/styleFingerprint.ts). */
+  index: number;
+  fontFamily: string;
+  fontWeight: string;
+  color: string;
+  backgroundColor: string;
+  textDecorationLine: string;
+}
+
+export interface StyleFingerprint {
+  /** The colour scheme the scan's browser preferred. */
+  scheme?: "light" | "dark";
+  forced_colors?: boolean;
+  samples?: StyleSample[];
 }
 
 

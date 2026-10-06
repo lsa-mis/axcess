@@ -46,10 +46,13 @@ if TYPE_CHECKING:
 
     from playwright.async_api import Locator, Page
 
+    from audit.crawler.style_snapshot import StyleSnapshot
+
     #: Takes an element screenshot for a CSS selector, or returns None. Supplied
     #: per call rather than held on the probe: the probe is shared by every
     #: crawl worker, and it must not learn how the crawler makes a PNG.
     ShotFn = Callable[[Page, str], Awaitable[bytes | None]]
+    StylesFn = Callable[[Page], Awaitable[StyleSnapshot | None]]
 
 log = get_logger(__name__)
 
@@ -328,6 +331,9 @@ DEFAULT_MAX_STATE_CAPTURES = 25
 _MAX_CAPTURE_BYTES = 2_000_000
 _MAX_CAPTURE_TOTAL_BYTES = 8_000_000
 _CAPTURE_TIMEOUT_S = 3.0
+# Reading a state's CSS. Usually quick: a site's cross-origin sheets were
+# already fetched for the page as it loaded and are cached for the scan.
+_STYLES_TIMEOUT_S = 5.0
 
 # Length of the serialized document, asked for before the bytes themselves so
 # an enormous DOM is refused without ever crossing the CDP boundary.
@@ -411,6 +417,10 @@ class _Budget:
     #: ``target_hash`` -> element PNG, taken while the state is still open.
     screenshots: dict[str, bytes] = field(default_factory=dict)
     shot_bytes: int = 0
+    #: Reads a state's CSS while it is open, or None when the scan does not
+    #: save styles. Held here rather than on the probe: the probe is shared
+    #: by every worker, and this belongs to one page's fetch.
+    capture_styles: StylesFn | None = None
     #: Consecutive clicks per shape that changed nothing. A date grid answers
     #: every cell the same way, so once a few have done nothing the rest will
     #: too, and the page's remaining budget is better spent elsewhere. Reset
@@ -480,6 +490,7 @@ class InteractionProbe:
         *,
         baseline: Sequence[AxeViolation] = (),
         capture_screenshot: ShotFn | None = None,
+        capture_styles: StylesFn | None = None,
     ) -> InteractionResult:
         """Return violations reachable only by operating the page.
 
@@ -492,6 +503,7 @@ class InteractionProbe:
         budget = _Budget(
             remaining=self.max_clicks,
             seen_hashes={v.target_hash for v in baseline},
+            capture_styles=capture_styles,
         )
         found: list[RevealedViolation] = []
         evaluated = False
@@ -1097,12 +1109,23 @@ class InteractionProbe:
         if budget.capture_bytes + len(blob) > _MAX_CAPTURE_TOTAL_BYTES:
             budget.limits.add("state_captures")
             return
+        # The state's CSS, read while it is still open. Its own timeout, and
+        # never fatal: losing it only means the inspector loads this state's
+        # CSS from the live site, as it does for older reports.
+        styles = None
+        if budget.capture_styles is not None:
+            try:
+                async with asyncio.timeout(_STYLES_TIMEOUT_S):
+                    styles = await budget.capture_styles(page)
+            except Exception as exc:
+                log.debug("interaction.styles_failed", error_type=type(exc).__name__)
         budget.capture_bytes += len(blob)
         budget.captures[state_key] = StateCapture(
             state_key=state_key,
             revealed_by=label,
             path_labels=path_labels,
             html=blob,
+            styles=styles,
         )
 
     async def _restore(self, page: Page, pinned: str) -> None:

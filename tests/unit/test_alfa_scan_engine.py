@@ -460,14 +460,14 @@ def test_alfa_only_exports_keep_review_outcomes_distinct(tmp_db: sqlite3.Connect
     markdown = render_markdown(scan)
     assert "## WCAG DOM-engine findings" in markdown
     assert "**Source:** Siteimprove Alfa" in markdown
-    assert "Needs expert review (Alfa cantTell)" in markdown
+    assert "Not sure: a person must decide (Alfa could not tell)" in markdown
 
     structured_report = render_audit_report(scan, conn=tmp_db)
     assert "Alfa ACT evidence is a review lead" in structured_report
 
     jira = render_jira_csv(scan)
     assert "alfa-sia-r55" in jira
-    assert "not a conformance failure" in jira
+    assert "not a WCAG failure" in jira
 
 
 def test_alfa_counters_keep_full_runner_outcome_counts_when_evidence_is_capped(

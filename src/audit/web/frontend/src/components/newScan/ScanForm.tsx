@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode, type Ref } from "react";
+import { withScheme } from "../../lib/webAddress";
 import { Disclosure } from "../ui";
 import ChecksGroup from "./ChecksGroup";
 import { GROUPS } from "./copy";
@@ -45,7 +46,7 @@ const GROUP_FIELDS: Record<GroupKey, readonly FieldKey[]> = {
  * in words what will run, so nothing has to be scrolled past to start. A
  * failed submit opens the group that holds a named field (the limits, or
  * Fast scan under Speed), so the alert's link lands on a visible control.
- * Start and Cancel (`actions`) are pinned at the foot of the rail, and
+ * Start (`actions`) is pinned at the foot of the rail, and
  * Reset at its top right. Why the foot of the rail: see `SubmitBar`.
  *
  * It is the tab panel, and it is keyed on the mode by the route, so a tab
@@ -84,7 +85,7 @@ export default function ScanForm({
   urlInputRef?: Ref<HTMLInputElement>;
   beforeGroups?: ReactNode;
   afterGroups?: ReactNode;
-  /** Start and Cancel (`SubmitBar`), pinned at the foot of the rail. */
+  /** Start (`SubmitBar`), pinned at the foot of the rail. */
   actions?: ReactNode;
 }) {
   const urlError = errors.find((error) => error.field === "url")?.message;
@@ -138,6 +139,15 @@ export default function ScanForm({
             placeholder={policy.urlPlaceholder}
             value={settings.url}
             onChange={(url) => update({ url })}
+            // On leaving the box, show the address as it will be scanned:
+            // "example.edu" becomes "https://example.edu", "localhost:8000"
+            // becomes "http://localhost:8000" (lib/webAddress.ts). Done on
+            // blur, not while typing, so the text never changes under the
+            // reader's cursor (SC 3.2.2 On Input, Level A).
+            onBlur={() => {
+              const completed = withScheme(settings.url);
+              if (completed !== settings.url) update({ url: completed });
+            }}
             preview={preview}
             error={urlError}
             afterSignIn={policy.mode === "login"}

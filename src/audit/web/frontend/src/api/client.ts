@@ -25,8 +25,10 @@ import type {
   FindingStatus,
   GroupedFindingsResponse,
   IssuesResponse,
+  CurrentLocalSignIn,
   LocalLoginScanPayload,
   LocalLoginScanState,
+  LocalSignInState,
   LocalAnalysisCapability,
   NewScanPayload,
   ProtectedAgentEnrollmentResponse,
@@ -206,18 +208,34 @@ export const api = {
     request<LocalAnalysisCapability>("/api/capabilities/local-analysis"),
   getProtectedScanCapability: () =>
     request<ProtectedScanCapability>("/api/capabilities/protected-scans"),
-  createLocalLoginScan: (payload: LocalLoginScanPayload) =>
-    request<LocalLoginScanState>("/api/local-login-scans", {
+  /** Open the sign-in window. Gives back the sign-in already waiting, if one is. */
+  createLocalSignIn: (payload: LocalLoginScanPayload) =>
+    request<LocalSignInState>("/api/local-login-scans", {
       method: "POST",
       body: JSON.stringify(payload),
+    }),
+  getCurrentLocalSignIn: () =>
+    request<CurrentLocalSignIn>("/api/local-sign-ins/current", { cache: "no-store" }),
+  getLocalSignIn: (signInId: string) =>
+    request<LocalSignInState>(`/api/local-sign-ins/${encodeURIComponent(signInId)}`, {
+      cache: "no-store",
+    }),
+  /** "I'm signed in, start scan": creates the scan and starts it. */
+  startLocalSignInScan: (signInId: string) =>
+    request<LocalLoginScanState>(`/api/local-sign-ins/${encodeURIComponent(signInId)}/start`, {
+      method: "POST",
+    }),
+  reopenLocalSignIn: (signInId: string) =>
+    request<LocalSignInState>(`/api/local-sign-ins/${encodeURIComponent(signInId)}/reopen`, {
+      method: "POST",
+    }),
+  cancelLocalSignIn: (signInId: string) =>
+    request<LocalSignInState>(`/api/local-sign-ins/${encodeURIComponent(signInId)}/cancel`, {
+      method: "POST",
     }),
   getLocalLoginScan: (scanId: number) =>
     request<LocalLoginScanState>(`/api/local-login-scans/${scanId}`, {
       cache: "no-store",
-    }),
-  confirmLocalLogin: (scanId: number) =>
-    request<LocalLoginScanState>(`/api/local-login-scans/${scanId}/confirm`, {
-      method: "POST",
     }),
   getEvaluation: (scanId: number) =>
     request<EvaluationRecord>(`/api/scans/${scanId}/evaluation`),
@@ -255,6 +273,12 @@ export const api = {
    * Refuses running/failed/interrupted scans, protected reports, and targets
    * outside the scan's scope. Nothing is stored by this call.
    */
+  /**
+   * Absolute address of a saved copy's CSS (`SavedStyles.url`). Absolute,
+   * because the copy carries the scanned site's `<base href>`, against which
+   * a root-relative URL would point at the site instead of this app.
+   */
+  savedStylesUrl: (path: string) => new URL(path, window.location.origin).href,
   getPageInspection: (scanId: number, pageId: number, stateKey?: string | null) =>
     request<PageInspection>(
       `/api/scans/${scanId}/pages/${pageId}/inspect${

@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
 import sqlite3
+import time
+from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock
 
@@ -127,8 +132,12 @@ async def test_headless_handoff_restores_storage_without_replaying_old_tokens(
             await browser.close()
 
 
-_APP = """<!doctype html><html lang="en"><title>Fixture sign in</title><body>
+_APP = """<!doctype html><html lang="en"><title>Fixture sign in</title>
+<style>main { color: rgb(1, 2, 3); }</style><body>
 <main></main><script>
+const added = document.createElement('style');
+document.head.appendChild(added);
+added.sheet.insertRule('main { outline-color: rgb(4, 5, 6); }');
 const prefix = 'ROUTER_PREFIX';
 const tabSession = TAB_SESSION;
 const signedIn = () => tabSession ? sessionStorage.getItem('fixture') === 'yes'
@@ -165,9 +174,15 @@ setTimeout(render, 75);
 @pytest.mark.parametrize("prefix", ["#", "#!", ""])
 @pytest.mark.parametrize("tab_session", [False, True])
 async def test_login_traverses_nested_spa_routes_with_session_intact(
-    tmp_db: sqlite3.Connection, prefix: str, tab_session: bool, monkeypatch: pytest.MonkeyPatch
+    tmp_db: sqlite3.Connection,
+    prefix: str,
+    tab_session: bool,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     origin = "https://app.example.test"
+    blob_dir = tmp_path / "blobs"
+    monkeypatch.setenv("AUDIT_BLOB_DIR", str(blob_dir))
     html = _APP.replace("ROUTER_PREFIX", prefix).replace("TAB_SESSION", str(tab_session).lower())
 
     async def serve(route: Route) -> None:
@@ -261,6 +276,21 @@ async def test_login_traverses_nested_spa_routes_with_session_intact(
                 (summary.scan_id,),
             ).fetchone()[0]
             assert revealed == 3
+            # A sign-in scan saves each saved copy's CSS exactly as any other
+            # scan does: every page and every revealed state, with the
+            # stylesheet rule and the rule a script added through the CSSOM.
+            styles = tmp_db.execute(
+                "SELECT state_key, sheets_json FROM saved_copy_styles WHERE scan_id = ?",
+                (summary.scan_id,),
+            ).fetchall()
+            assert sum(1 for row in styles if row["state_key"] == "") == 3
+            assert sum(1 for row in styles if row["state_key"]) == summary.interaction_states_total
+            for row in styles:
+                css = "".join(
+                    (blob_dir / s["sha256"][:2] / f"{s['sha256']}.css").read_text(encoding="utf-8")
+                    for s in json.loads(row["sheets_json"])
+                )
+                assert "rgb(1, 2, 3)" in css and "rgb(4, 5, 6)" in css, row["state_key"]
             assert len(pages) == (1 if tab_session else 2)
         finally:
             await session.close()
@@ -388,3 +418,187 @@ async def test_login_tab_closure_does_not_close_the_authenticated_scan_tab(
             assert row["title"] == "/dashboard"
         finally:
             await session.close()
+
+
+@pytest.mark.parametrize("tab_session", [False, True])
+@pytest.mark.parametrize("show_browser", [False, True])
+def test_login_scan_starts_from_the_kept_sign_in_after_the_window_closed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    migrate_db: Callable[[sqlite3.Connection], None],
+    show_browser: bool,
+    tab_session: bool,
+) -> None:
+    """Sign in, close the sign-in window, press start: the crawl is signed in.
+
+    Through the real server routes and a real Chromium. The sign-in window
+    closes before "I'm signed in, start scan", so the only signed-in state
+    left is the copy the session kept in memory. With "Show the scanning
+    browser window" off the headless handoff starts from that copy; with it
+    on, a visible window is reopened from it. Either way the crawl must
+    reach the signed-in pages, which a signed-out browser cannot see: the
+    fixture shows only a "Sign in" button until its cookie, or its tab's
+    sessionStorage, says otherwise.
+
+    Only transport is synthetic, as in the tests above: every target
+    response is fulfilled locally, browsers launch headless, and no proxy
+    listener or identity provider runs.
+    """
+    from fastapi.testclient import TestClient
+
+    from audit.db.schema import connect
+    from audit.web import server
+
+    origin = "https://app.example.test"
+    html = _APP.replace("ROUTER_PREFIX", "").replace("TAB_SESSION", str(tab_session).lower())
+    db_path = tmp_path / "audit.db"
+    blob_dir = tmp_path / "blobs"
+    conn = connect(db_path)
+    migrate_db(conn)
+    conn.close()
+
+    async def serve(route: Route) -> None:
+        await route.fulfill(status=200, content_type="text/html", body=html)
+
+    new_context = Browser.new_context
+
+    async def fixture_context(browser: Browser, **kwargs: Any) -> BrowserContext:
+        kwargs.pop("proxy", None)
+        return await new_context(browser, **kwargs)
+
+    async def started_playwright() -> Playwright:
+        pw = await async_playwright().start()
+        launch_persistent = pw.chromium.launch_persistent_context
+        launch = pw.chromium.launch
+
+        async def persistent(user_data_dir: str, **kwargs: Any) -> BrowserContext:
+            kwargs["headless"] = True
+            kwargs.pop("proxy", None)
+            return await launch_persistent(user_data_dir, **kwargs)
+
+        async def headless(**kwargs: Any) -> Browser:
+            kwargs["headless"] = True
+            return await launch(**kwargs)
+
+        pw.chromium.launch_persistent_context = persistent  # type: ignore[method-assign]
+        pw.chromium.launch = headless  # type: ignore[method-assign]
+        return pw
+
+    sessions: list[ManualAuthenticationSession] = []
+    real_session = ManualAuthenticationSession
+
+    def make_session(**kwargs: Any) -> ManualAuthenticationSession:
+        session = real_session(
+            **kwargs,
+            resolver=lambda _host: ("8.8.8.8",),
+            playwright_start=started_playwright,
+        )
+        session._route_guard.handle_route = serve  # type: ignore[method-assign]
+        sessions.append(session)
+        return session
+
+    monkeypatch.setattr(Browser, "new_context", fixture_context)
+    monkeypatch.setattr(LoopbackEgressProxy, "start", AsyncMock())
+    monkeypatch.setattr(
+        LoopbackEgressProxy, "server_url", property(lambda _self: "http://127.0.0.1:1")
+    )
+    monkeypatch.setattr(server, "ManualAuthenticationSession", make_session)
+
+    def kept_is_signed_in(session: ManualAuthenticationSession) -> bool:
+        kept = session._kept
+        if kept is None:
+            return False
+        if tab_session:
+            return any("fixture" in entries for entries in kept.tab_storage.values())
+        return any(cookie["name"] == "fixture" for cookie in kept.storage.get("cookies", []))
+
+    async def sign_in_then_close_the_window() -> None:
+        session = sessions[0]
+        page = session.page
+        await page.get_by_role("button", name="Sign in").click()
+        await page.get_by_role("heading", name="/dashboard", exact=True).wait_for()
+        # A person takes a moment before closing the window; the session
+        # refreshes its kept copy on the page change in that time.
+        for _ in range(200):
+            if kept_is_signed_in(session):
+                break
+            await asyncio.sleep(0.05)
+        await page.close()
+
+    origin_header = {"origin": "http://127.0.0.1:8765"}
+    app = server.create_app(db_path=db_path, blob_dir=blob_dir)
+    with TestClient(app, base_url="http://127.0.0.1:8765", client=("127.0.0.1", 45678)) as client:
+        created = client.post(
+            "/api/local-login-scans",
+            headers=origin_header,
+            json={
+                "seed_url": f"{origin}/",
+                "authorization_acknowledged": True,
+                "show_browser": show_browser,
+                "whole_host": True,
+                "max_pages": 10,
+                "max_depth": 5,
+                "rps": 5,
+                "workers": 2,
+                "skip_interaction": True,
+                "skip_keyboard": True,
+                "skip_responsive": True,
+            },
+        )
+        assert created.status_code == 201, created.text
+        sign_in_id = created.json()["sign_in_id"]
+        state = _poll(
+            lambda: client.get(f"/api/local-sign-ins/{sign_in_id}").json(),
+            lambda body: body["status"] != "opening_browser",
+        )
+        assert state["status"] == "awaiting_authentication", state
+
+        assert client.portal is not None
+        client.portal.call(sign_in_then_close_the_window)
+        assert kept_is_signed_in(sessions[0]), "the session never kept the signed-in state"
+        state = _poll(
+            lambda: client.get(f"/api/local-sign-ins/{sign_in_id}").json(),
+            lambda body: body["window_open"] is False,
+        )
+        assert state["status"] == "awaiting_authentication"
+        assert state["window_open"] is False
+
+        started = client.post(f"/api/local-sign-ins/{sign_in_id}/start", headers=origin_header)
+        assert started.status_code == 201, started.text
+        scan_id = started.json()["scan_id"]
+        finished = _poll(
+            lambda: client.get(f"/api/local-login-scans/{scan_id}").json(),
+            lambda body: body["status"] in {"completed", "failed", "interrupted"},
+            timeout=180,
+        )
+
+    assert finished["status"] == "completed", finished
+    assert finished["browser_backgrounded"] is (not show_browser)
+    conn = connect(db_path)
+    try:
+        rows = conn.execute(
+            "SELECT url_normalized, title, status_code FROM pages WHERE scan_id = ?", (scan_id,)
+        ).fetchall()
+    finally:
+        conn.close()
+    assert {row["url_normalized"] for row in rows} == {
+        origin + path for path in ("/dashboard", "/projects", "/projects/detail")
+    }
+    assert {row["title"] for row in rows} == {"/dashboard", "/projects", "/projects/detail"}
+    assert all(row["status_code"] == 200 for row in rows)
+    # The session is gone with the scan, kept copy and all.
+    assert sessions[0]._kept is None
+
+
+def _poll(
+    read: Callable[[], dict[str, Any]],
+    done: Callable[[dict[str, Any]], bool],
+    *,
+    timeout: float = 30,
+) -> dict[str, Any]:
+    deadline = time.monotonic() + timeout
+    while True:
+        body = read()
+        if done(body) or time.monotonic() > deadline:
+            return body
+        time.sleep(0.1)

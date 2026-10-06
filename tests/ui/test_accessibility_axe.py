@@ -14,6 +14,7 @@ and target-size regressions fail here, not just AA.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 import sqlite3
@@ -417,14 +418,14 @@ async def test_issue_card_answers_what_why_fix_and_where(
     base, scan_id = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
-    await choose_filter(page, "Type", "expert_review")
+    await choose_filter(page, "How sure", "expert_review")
     await page.wait_for_url("**type=expert_review*")
     issues = page.get_by_role("table", name="Accessibility issues")
     # Contains, not equals: the sorted header also carries its direction chip.
     await playwright_async.expect(issues.get_by_role("columnheader")).to_contain_text(
         [
             "Issue",
-            "Type",
+            "How sure",
             "WCAG",
             "Priority",
             "Pages",
@@ -444,9 +445,9 @@ async def test_issue_card_answers_what_why_fix_and_where(
     await playwright_async.expect(page.get_by_role("heading", name=title, level=1)).to_be_visible()
     # The header names the type in the Issues table's word, the same one the
     # guidance dialog uses.
-    await playwright_async.expect(page.locator("main h1 + p")).to_contain_text("Needs review")
+    await playwright_async.expect(page.locator("main h1 + p")).to_contain_text("Not sure")
     # The guidance opens from the top right, every section expanded at once;
-    # the Needs review caution (an expert checks it first) sits under What it is.
+    # the Not sure caution (a person checks it first) sits under What it is.
     guidance = page.get_by_role("button", name="Issue guidance", exact=True)
     await guidance.click()
     dialog = page.get_by_role("dialog", name="Issue guidance")
@@ -457,7 +458,7 @@ async def test_issue_card_answers_what_why_fix_and_where(
     await playwright_async.expect(
         dialog.get_by_role("heading", name=re.compile("^Why it matters"), level=3)
     ).to_be_visible()
-    caution = dialog.get_by_text("an expert checks it", exact=False)
+    caution = dialog.get_by_text("a person checks it", exact=False)
     await playwright_async.expect(caution).to_be_visible()
     violations = await _run_axe(page)
     assert not violations, _render_violations(violations)
@@ -504,7 +505,7 @@ async def test_issue_list_reaches_exact_locations_without_sideways_scrolling(
     base, scan_id = live_server
     page = await new_page(viewport={"width": 320, "height": 800})
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
-    await choose_filter(page, "Type", "expert_review")
+    await choose_filter(page, "How sure", "expert_review")
     await page.wait_for_url("**type=expert_review*")
     issues = page.get_by_role("table", name="Accessibility issues")
     await playwright_async.expect(issues).to_be_visible()
@@ -569,7 +570,7 @@ async def test_informational_evidence_is_read_only_and_not_barrier_language(
     row_link = issues.get_by_role("rowheader").get_by_role("link", name=logo_title, exact=False)
     informational_row = row_link.locator("xpath=ancestor::tr[1]")
     await playwright_async.expect(
-        informational_row.get_by_text("Informational", exact=True)
+        informational_row.get_by_text("For information", exact=True)
     ).to_be_visible()
     # Informational evidence never inherits triage or remediation
     # controls: the row has no buttons at all, only its links.
@@ -587,10 +588,10 @@ async def test_informational_evidence_is_read_only_and_not_barrier_language(
         )
     ).to_be_visible()
     await playwright_async.expect(
-        page.get_by_role("heading", name="Informational", exact=True)
+        page.get_by_role("heading", name="For information", exact=True)
     ).to_be_visible()
     await playwright_async.expect(
-        page.get_by_text("This check found no barrier.", exact=False)
+        page.get_by_text("This check found no problem.", exact=False)
     ).to_be_visible()
     assert await page.get_by_role("link", name="Audit report").count() == 0
     assert await page.get_by_role("heading", name="Fix (do this)").count() == 0
@@ -693,8 +694,8 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     await coverage.focus()
     await page.keyboard.press("Enter")
     await playwright_async.expect(ledger).to_be_visible()
-    # Scoped to the ledger panel: "Click-Through" is also a "Found by" label
-    # elsewhere on the report, and exact text must match one element.
+    # Scoped to the ledger panel: "Click-Through" may appear elsewhere on the
+    # report, and exact text must match one element.
     await playwright_async.expect(ledger.get_by_text("Click-Through", exact=True)).to_be_visible()
 
     # The subtitle names the report without repeating a stat card's count.
@@ -703,8 +704,12 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     assert "issue groups" not in text and "issues" not in text, text
     assert "occurrences" not in text, text
     issues = await (await page.request.get(f"{base}/api/scans/{scan_id}/issues")).json()
+    # The date after "started"/"generated" has its own numbers ("Oct 3, 2026"),
+    # which matched a count of 3 on the 3rd of any month. Only the rest of the
+    # subtitle must not repeat a count.
+    words = re.sub(r"\b(started|generated)\b.*$", "", text)
     for count in (issues["total_unfiltered"], issues["occurrence_counts"]["all_evidence"]):
-        assert not re.search(rf"\b{count}\b", text), (count, text)
+        assert not re.search(rf"\b{count}\b", words), (count, text)
 
 
 async def test_running_scan_shows_factual_pipeline_progress(
@@ -1111,6 +1116,66 @@ async def test_search_finds_every_sidebar_place(
         await page.keyboard.press("Enter")
         await playwright_async.expect(dialog).to_have_count(0)
         await playwright_async.expect(page).to_have_url(re.compile(re.escape(path) + r"$"))
+
+
+@pytest.mark.parametrize(
+    ("chunk", "query", "heading"),
+    [
+        # The shell moves focus to <main> when the page changes.
+        ("About", "about", "About Axcess"),
+        # New scan also puts focus in its web address box; Enter there
+        # submitted the scan form instead of choosing the Search result.
+        ("NewScan", "new scan", "New scan"),
+    ],
+)
+async def test_a_late_page_change_leaves_focus_in_search(
+    live_server: tuple[str, int],
+    new_page: Any,
+    chunk: str,
+    query: str,
+    heading: str,
+) -> None:
+    """A page that finishes loading while Search is open does not take its focus.
+
+    Each page's code loads on first visit, so on a slow machine the page
+    change finishes after Search has closed and been opened again. The page
+    then took focus out of the open Search, and Enter did nothing (the CI
+    failure of the test above). Holding back the page's code makes that order
+    certain.
+    """
+    base, _scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    release = asyncio.Event()
+
+    async def hold(route: Any) -> None:
+        await release.wait()
+        await route.continue_()
+
+    await page.route(re.compile(rf"/assets/{chunk}-[^/]*\.js$"), hold)
+    await page.goto(f"{base}/app/scans", wait_until="networkidle")
+    search = page.get_by_role("complementary", name="Primary").get_by_role(
+        "button", name="Search everything (Cmd+K)", exact=True
+    )
+    dialog = page.get_by_role("dialog", name="Search everything")
+    box = dialog.get_by_role("textbox", name="Search")
+
+    await search.click()
+    await box.fill(query)
+    await page.keyboard.press("Enter")
+    await playwright_async.expect(dialog).to_have_count(0)
+
+    await search.click()
+    await box.fill("settings")
+    release.set()
+    # Behind the open Search the page is inert, out of the accessibility tree,
+    # so find its heading by tag, not by role.
+    await playwright_async.expect(page.locator("main h1")).to_have_text(heading)
+    # The shell moves focus a frame after the page changes: let two pass.
+    await page.evaluate("new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))")
+    await playwright_async.expect(box).to_be_focused()
+    await page.keyboard.press("Enter")
+    await playwright_async.expect(dialog).to_have_count(0)
+    await playwright_async.expect(page).to_have_url(re.compile(r"/app/settings$"))
 
 
 async def test_search_changes_a_setting_from_its_results(

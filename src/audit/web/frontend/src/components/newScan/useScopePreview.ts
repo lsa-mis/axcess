@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { withScheme } from "../../lib/webAddress";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api } from "../../api/client";
 import type { ScopePreview } from "../../api/types";
@@ -28,7 +29,8 @@ export function useScopePreview(
   const trimmed = debounced.trim();
   const query = useQuery({
     queryKey: ["scope-preview", trimmed, wholeHost, scope],
-    queryFn: () => api.scopePreview(trimmed, wholeHost),
+    // The completed address (lib/webAddress.ts), as the scan will use it.
+    queryFn: () => api.scopePreview(withScheme(trimmed), wholeHost),
     enabled: Boolean(trimmed),
     placeholderData: keepPreviousData,
     retry: false,

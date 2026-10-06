@@ -12,9 +12,17 @@ import { cn } from "../../lib/cn";
  * fieldset names each group. A `multiple` group is a set of checkboxes, so
  * several values can be on at once (Level A and Level AA); a group whose
  * data can only take one value is a set of radios, and arrow keys move
- * within it as radios always do. A choice applies at once. Escape, Done, a
- * press outside, or focus moving out closes the panel. Escape and Done
- * return focus to the button.
+ * within it as radios always do. A choice applies at once. Escape, Close
+ * filters, a press outside, or focus moving out closes the panel. Escape and
+ * Close filters return focus to the button.
+ *
+ * Every button says what it acts on in its own words: "Filter issues" (each
+ * table passes its own `label`), "Clear all filters", "Close filters". A bare
+ * "Filter", "Clear all" or "Done" left the reader to guess filter what, clear
+ * what, done with what (SC 2.4.6 Headings and Labels, Level AA;
+ * docs/plain-language.md rule 8: a verb and an object). The words are real
+ * text, not an aria-label, so everyone reads the same thing
+ * (tests/ui/test_control_text_purpose.py).
  * What is filtered is also written out under the bar (`ActiveFilters`), so
  * the state never lives only in the button.
  */
@@ -62,7 +70,7 @@ export function FilterMenu({
   groups,
   onChange,
   onReset,
-  label = "Filter",
+  label,
 }: {
   groups: readonly FilterGroup[];
   onChange: (key: string, value: string) => void;
@@ -72,7 +80,7 @@ export function FilterMenu({
    * same query string, so a second call puts back what the first removed.
    */
   onReset: () => void;
-  label?: string;
+  label: string;
 }) {
   const [open, setOpen] = useState(false);
   const panelId = useId();
@@ -226,14 +234,14 @@ export function FilterMenu({
             aria-disabled={active === 0 || undefined}
             className="min-h-target rounded-xs px-2 text-sm font-semibold text-umich-blue underline underline-offset-2 hover:text-umich-blue-600 focus-visible:outline-none focus-visible:shadow-focus aria-disabled:cursor-not-allowed aria-disabled:text-fg-muted aria-disabled:no-underline"
           >
-            Clear all
+            Clear all filters
           </button>
           <button
             type="button"
             onClick={close}
             className="min-h-target rounded-xs border border-border-strong bg-surface px-4 text-sm font-semibold text-fg hover:bg-surface-muted focus-visible:outline-none focus-visible:shadow-focus"
           >
-            Done
+            Close filters
           </button>
         </div>
       </div>

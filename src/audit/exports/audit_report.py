@@ -50,7 +50,7 @@ from audit.analyzer.alfa_evidence import (
 from audit.exports import interaction_coverage
 from audit.exports.collector import ExportA11yFinding, ExportFinding, ExportScan
 from audit.exports.interaction_coverage import InteractionCoverage
-from audit.labels import CLICK_THROUGH, CLICK_THROUGH_STATES_LABEL
+from audit.labels import CLICK_THROUGH, CLICK_THROUGH_STATES_LABEL, REVIEW_LANE_LABELS
 from audit.web import issues as issues_mod
 
 # The framework caps the executive summary at 8 sentences. The renderer
@@ -205,7 +205,7 @@ _PIPELINE_COVERAGE = [
         "name": CLICK_THROUGH,
         "method": "Operates the page's own menus, tabs, dialogs, and disclosure "
         "controls, then re-runs the rule engine on each state a click reveals.",
-        "checks": "Barriers that a page load never shows because the content only "
+        "checks": "Problems that a page load never shows because the content only "
         "exists after a control is operated. Links are never clicked, and controls "
         "labelled sign out, delete, remove, or unsubscribe are refused.",
         "confidence": "Same deterministic rule evidence as a load-state pass, on states "
@@ -1344,7 +1344,7 @@ def _appendix_b(best_practice: list[Any]) -> list[str]:
         lines.append(
             f"- **{row.title}** (`{rule_id}`), {row.occurrence_count} "
             f"finding(s) on {row.page_count} page{plural}; "
-            f"**{row.review_lane.replace('_', ' ')} / {row.evidence_confidence} confidence**. "
+            f"**{REVIEW_LANE_LABELS[row.review_lane]} / {row.evidence_confidence} confidence**. "
             f"{row.evidence_summary}"
         )
     if len(best_practice) > TOP_GROUPS_PER_SECTION:

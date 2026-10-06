@@ -17,6 +17,7 @@ from datetime import UTC, datetime
 
 from audit.analyzer.alfa_evidence import evidence_notice
 from audit.exports.collector import ExportA11yFinding, ExportFinding, ExportScan
+from audit.labels import REVIEW_LANE_LABELS
 
 TOP_N = 20
 TOP_A11Y_N = 30
@@ -64,7 +65,7 @@ def render_markdown(scan: ExportScan, *, generated_at: datetime | None = None) -
     )
     lines.append(
         f"- **Siteimprove Alfa outcomes:** {scan.alfa_failed_total} failed; "
-        f"{scan.alfa_cant_tell_total} need expert review "
+        f"{scan.alfa_cant_tell_total} marked {REVIEW_LANE_LABELS['expert_review']} "
         f"(evaluated {scan.alfa_pages_scanned} of {scan.page_count} pages)"
     )
     alfa_total = scan.alfa_failed_total + scan.alfa_cant_tell_total
@@ -227,17 +228,20 @@ def _source_label(af: ExportA11yFinding) -> str:
 
 def _outcome_label(af: ExportA11yFinding) -> str:
     reviewed = {
-        "in_progress": "Barrier confirmed by expert, remediation planned",
-        "remediated": "Barrier confirmed by expert, remediated",
-        "accepted_risk": "Barrier confirmed by expert, risk accepted",
-        "false_positive": "Reviewed, not a barrier",
+        "in_progress": "Confirmed as a problem, fix planned",
+        "remediated": "Confirmed as a problem, marked fixed",
+        "accepted_risk": "Confirmed as a problem, risk accepted",
+        "false_positive": "Checked, not a problem",
     }
     if af.status in reviewed:
         return reviewed[af.status]
     if af.pipeline == "alfa" and af.engine_outcome == "cant_tell":
-        return "Needs expert review (Alfa cantTell)"
+        return f"{REVIEW_LANE_LABELS['expert_review']}: a person must decide (Alfa could not tell)"
     if af.pipeline not in {"axe", "alfa"}:
-        return "Needs expert review (observed lead)"
+        return (
+            f"{REVIEW_LANE_LABELS['expert_review']}: a person must decide "
+            "(a check that cannot be sure)"
+        )
     return "Failed automated rule outcome"
 
 

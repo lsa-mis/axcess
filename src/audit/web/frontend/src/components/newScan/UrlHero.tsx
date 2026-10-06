@@ -26,6 +26,7 @@ export default function UrlHero({
   placeholder,
   value,
   onChange,
+  onBlur,
   preview,
   error,
   afterSignIn = false,
@@ -38,6 +39,7 @@ export default function UrlHero({
   placeholder: string;
   value: string;
   onChange: (value: string) => void;
+  onBlur?: () => void;
   preview: { state: ScopePreviewState; data: ScopePreview | null };
   error?: string;
   afterSignIn?: boolean;
@@ -65,6 +67,7 @@ export default function UrlHero({
         aria-invalid={error ? true : undefined}
         aria-describedby={[helpId, error ? errorId : scopeId].join(" ")}
         onChange={(event) => onChange(event.target.value)}
+        onBlur={onBlur}
         className={cn(
           "min-h-[52px] rounded-xs border-2 bg-surface px-4 py-3 text-base text-fg focus:border-umich-blue focus:outline-none",
           error ? "border-sev-critical" : "border-border",

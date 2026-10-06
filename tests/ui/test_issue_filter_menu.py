@@ -132,7 +132,7 @@ async def test_menu_is_three_checkbox_groups_with_big_rows(enriched, live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
     await _open(page, base, scan_id)
     await _open_menu(page)
-    for group in ("Level", "Type", "Found by"):
+    for group in ("Level", "How sure", "Where it shows"):
         fieldset = page.get_by_role("group", name=group, exact=True)
         await pw.expect(fieldset).to_be_visible()
         assert await fieldset.get_by_role("radio").count() == 0, group
@@ -208,22 +208,24 @@ async def test_several_in_a_group_and_across_groups_match_the_api(
 
     # Across groups the filters combine (AND); within a group they widen (OR).
     await _box(page, "Level", "A").uncheck()
-    await _box(page, "Found by", "click_through").check()
+    await _box(page, "Where it shows", "click_through").check()
     await page.wait_for_url(re.compile(r"finding_type=click_through"))
     ct = await _assert_matches_api(page, base, scan_id)
     assert ct == {"axe%3Abutton-name"}, ct
-    await _box(page, "Found by", "alt_text").check()
+    await _box(page, "Where it shows", "alt_text").check()
     ct_or_alt = await _assert_matches_api(page, base, scan_id)
     assert ct < ct_or_alt, ct_or_alt
-    await _box(page, "Type", "informational").check()
+    await _box(page, "How sure", "informational").check()
     narrowed = await _assert_matches_api(page, base, scan_id)
     assert narrowed and narrowed < ct_or_alt, narrowed
 
     # The badge counts groups in use; the line under the bar names them.
     await pw.expect(_filter_button(page)).to_contain_text("2")
     filtered = page.get_by_text("Filtered by", exact=False)
-    await pw.expect(filtered.locator("xpath=..")).to_contain_text("Type: Informational")
-    await pw.expect(filtered.locator("xpath=..")).to_contain_text("Click-Through, Alt Text")
+    await pw.expect(filtered.locator("xpath=..")).to_contain_text("How sure: For information")
+    await pw.expect(filtered.locator("xpath=..")).to_contain_text(
+        "Where it shows: After clicking, In an image"
+    )
     # Checking the lower options scrolls the page (the open panel reaches
     # past the fold), which takes the report tabs off screen. axe then
     # cannot see the active tab's sliding fill (a pointer-events-none layer
@@ -247,8 +249,8 @@ async def test_a_reload_and_an_old_single_value_link_keep_the_checks(
         ("Level", "A", True),
         ("Level", "AA", True),
         ("Level", "BP", False),
-        ("Found by", "wcag", True),
-        ("Found by", "alt_text", False),
+        ("Where it shows", "wcag", True),
+        ("Where it shows", "alt_text", False),
     ):
         check = pw.expect(_box(page, group, value))
         await (check.to_be_checked() if on else check.not_to_be_checked())
@@ -260,8 +262,8 @@ async def test_a_reload_and_an_old_single_value_link_keep_the_checks(
     # A saved link from before checkboxes: one value.
     await _open(page, base, scan_id, "?type=expert_review")
     await _open_menu(page)
-    await pw.expect(_box(page, "Type", "expert_review")).to_be_checked()
-    await pw.expect(_box(page, "Type", "likely_barrier")).not_to_be_checked()
+    await pw.expect(_box(page, "How sure", "expert_review")).to_be_checked()
+    await pw.expect(_box(page, "How sure", "likely_barrier")).not_to_be_checked()
     shown = await _assert_matches_api(page, base, scan_id)
     assert shown == {"image%3Aessential_missing"}, shown
 
@@ -298,7 +300,7 @@ async def test_keyboard_only(enriched, live_server, new_page) -> None:
     await pw.expect(button).to_be_focused()
     # Done does the same.
     await page.keyboard.press("Enter")
-    await page.get_by_role("button", name="Done", exact=True).click()
+    await page.get_by_role("button", name="Close filters", exact=True).click()
     await pw.expect(button).to_be_focused()
 
 
@@ -309,10 +311,10 @@ async def test_clear_all_and_clear_filters_reset_every_group(
     page = await new_page(viewport={"width": 1280, "height": 900})
     await _open(page, base, scan_id, "?conformance=A,AA&type=likely_barrier&finding_type=wcag")
     await _open_menu(page)
-    await page.get_by_role("button", name="Clear all", exact=True).click()
+    await page.get_by_role("button", name="Clear all filters", exact=True).click()
     await page.wait_for_url(lambda url: not re.search(r"conformance|type=", url))
     assert len(await _assert_matches_api(page, base, scan_id)) == 5
-    for group in ("Level", "Type", "Found by"):
+    for group in ("Level", "How sure", "Where it shows"):
         boxes = page.get_by_role("group", name=group, exact=True).get_by_role("checkbox")
         for i in range(await boxes.count()):
             await pw.expect(boxes.nth(i)).not_to_be_checked()
@@ -332,13 +334,13 @@ async def test_closing_by_clicking_outside_keeps_the_choice(
     page = await new_page(viewport={"width": 1280, "height": 900})
     await _open(page, base, scan_id)
     await _open_menu(page)
-    await _box(page, "Type", "likely_barrier").check()
+    await _box(page, "How sure", "likely_barrier").check()
     await page.wait_for_url(re.compile(r"type=likely_barrier"))
     await page.mouse.click(5, 5)
     await pw.expect(_filter_button(page)).to_have_attribute("aria-expanded", "false")
     await _assert_matches_api(page, base, scan_id)
     await _open_menu(page)
-    await pw.expect(_box(page, "Type", "likely_barrier")).to_be_checked()
+    await pw.expect(_box(page, "How sure", "likely_barrier")).to_be_checked()
 
 
 async def test_rapid_toggles_settle_on_the_last_state(enriched, live_server, new_page) -> None:
@@ -367,6 +369,6 @@ async def test_mobile_width_rows_still_one_target_tall(enriched, live_server, ne
             i,
             box,
         )
-    await _box(page, "Found by", "alt_text").locator("xpath=ancestor::label[1]").click()
+    await _box(page, "Where it shows", "alt_text").locator("xpath=ancestor::label[1]").click()
     await page.wait_for_url(re.compile(r"finding_type=alt_text"))
     await _assert_matches_api(page, base, scan_id)

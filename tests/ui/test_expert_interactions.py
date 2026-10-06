@@ -107,7 +107,7 @@ async def test_issue_table_filters_are_keyboard_operable(
     # The next stop is the one Filter menu (Level, Type, Finding type). Its
     # visible text is its accessible name; there is no second, different
     # one via aria-label.
-    filters = page.get_by_role("button", name="Filter", exact=True)
+    filters = page.get_by_role("button", name="Filter issues", exact=True)
     await playwright_async.expect(filters).to_be_focused()
     await playwright_async.expect(filters).to_have_attribute("aria-expanded", "false")
 

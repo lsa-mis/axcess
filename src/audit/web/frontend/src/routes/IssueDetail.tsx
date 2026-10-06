@@ -72,7 +72,7 @@ export default function IssueDetailRoute() {
             <span>{row?.title ?? key}</span>
           </span>
         }
-        // The type rides with the criterion, so a "Needs review" issue reads
+        // The type rides with the criterion, so a "Not sure" issue reads
         // as one even with the guidance closed. The word is the Issues
         // table's (REVIEW_TYPE_LABEL), the same one the guidance dialog uses.
         meta={
