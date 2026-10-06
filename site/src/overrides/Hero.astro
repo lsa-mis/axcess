@@ -85,19 +85,19 @@ const { hero, title } = Astro.locals.starlightRoute.entry.data;
       <div class="panel inspector" aria-hidden="true">
         <div class="bar">
           <span>Flagged element 1 of 19</span>
-          <span class="chips"><span class="chip muted">Previous</span><span class="chip">Next</span></span>
+          <span class="chips"><span class="chip muted"><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m18 15-6-6-6 6"/></svg>Previous</span><span class="chip">Next<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg></span></span>
         </div>
         <dl class="facts-list">
           <dt>What it is</dt><dd>Link</dd>
           <dt>Text or label</dt><dd>“Copy link to this heading”</dd>
-          <dt>Size</dt><dd>35 pixels wide, 20 pixels tall</dd>
-          <dt>Element locator</dt><dd class="mono">…post &gt; .copy-link-btn.before</dd>
+          <dt>Size</dt><dd>30 pixels wide, 30 pixels tall</dd>
+          <dt>Element locator (CSS selector)</dt><dd class="mono">…our-post &gt; .copy-link-btn.before.auto-heading-links--iconcolor</dd>
         </dl>
         <div class="saved-copy">
           <p class="page-heading">Using editors to build accessible pages</p>
           <span class="tag">1 of 19</span>
           <div class="row">
-            <span class="target"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg></span>
+            <span class="target"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></span>
             <span class="page-sub">Give your post a clear title</span>
           </div>
         </div>
@@ -354,19 +354,21 @@ const { hero, title } = Astro.locals.starlightRoute.entry.data;
     align-items: center;
     gap: 12px;
   }
-  /* The flagged element, drawn as the app outlines it (maize ring, navy
-     inner line). It is the "Copy link to this heading" link the panel
-     describes, so it holds a link icon and has that link's shape, wider
-     than tall (35 by 20 pixels); an empty, taller-than-wide box matched
-     neither (developer's review, 2026-10-06). Decoration inside a picture
-     that already has a text description. */
+  /* The flagged element, drawn as the app's Page inspector shows it: a maize
+     ring and a navy inner line around the element itself, here the page's
+     "Copy link to this heading" button, a 30 by 30 pixel square showing a
+     bookmark icon (the page's own icon, so drawn in a page blue, not the
+     app's navy). An empty box, and then a wide box with a link icon, were
+     tried; both differed from the real screen (developer's review with
+     screenshots, 2026-10-06). Decoration inside a picture that already has
+     a text description. */
   .target {
     flex-shrink: 0;
     display: grid;
     place-items: center;
-    width: 54px;
-    height: 34px;
-    color: #0a2647;
+    width: 40px;
+    height: 40px;
+    color: #1d5fbf;
     border: 4px solid #f5c400;
     border-radius: 2px;
     outline: 3px solid #0a2647;
@@ -374,8 +376,19 @@ const { hero, title } = Astro.locals.starlightRoute.entry.data;
     background: #ffffff;
   }
   .target svg {
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
+  }
+  /* The inspector's Previous and Next carry chevrons, as in the app:
+     Previous points up, and Next opens a list of the flagged elements. */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .chev {
+    width: 14px;
+    height: 14px;
   }
   .page-sub {
     color: var(--h-saved-link);
