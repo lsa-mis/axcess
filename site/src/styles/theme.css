@@ -327,6 +327,40 @@ button.sl-menu-button {
   display: none;
 }
 
+/* Running text no wider than about 75 characters a line. SC 1.4.8 Visual
+ * Presentation (Level AAA) asks for 80 characters or fewer; Starlight's
+ * column and the wider product layouts gave 81 to 107. In em, not ch: this
+ * font's zero (what ch measures) is wide, so 70ch came to about 90
+ * characters of real text. Applied to the text itself, not its column, so
+ * tables, code, cards and pictures keep their width. */
+.sl-markdown-content :is(p, li, dd, blockquote),
+.site-footer p {
+  max-width: 35em;
+}
+
+/* The report groups diagram is an image of text. In the guide it comes from
+ * (docs/reading-your-report.md, also read on GitHub) it is followed by a
+ * table that says the same in real text, so the site does not show the
+ * picture (SC 1.4.9 Images of Text (No Exception), Level AAA). */
+.sl-markdown-content img[src$="report-groups.png"] {
+  display: none;
+}
+
+/* "Reduce motion" turns off every transition and animation the site has
+ * (the theme switch's knob, the tabs, hover fades), not only the ones that
+ * remembered to ask, and scrolling jumps instead of gliding. SC 2.3.3
+ * Animation from Interactions, Level AAA. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* ---------------------------------------------------------------------
  * Without JavaScript. overrides/ThemeProvider.astro adds the ax-js class to
  * <html> when scripts run, so its absence means they did not. The code copy
