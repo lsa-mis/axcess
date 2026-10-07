@@ -219,6 +219,21 @@
     outline: 3px solid rgb(var(--c-umich-blue));
     outline-offset: 2px;
   }
+  /* Room for the sticky top bar (72 px), and on narrow screens the report
+     bar that sticks under it (53 px), when the page scrolls to a focused
+     element or a #link, plus 16 px to spare. Without it, tabbing could
+     leave a control half under the bar, as on Images ("Back to Report",
+     "Group by issue"). SC 2.4.11 Focus Not Obscured (Minimum), Level AA,
+     and SC 2.4.12 Focus Not Obscured (Enhanced), Level AAA; October 2026
+     AAA audit. The breakpoint is the report bar's own (md, 768 px). */
+  html {
+    scroll-padding-top: 88px;
+  }
+  @media (max-width: 767px) {
+    html {
+      scroll-padding-top: 141px;
+    }
+  }
   a {
     @apply text-umich-blue underline-offset-2;
   }
