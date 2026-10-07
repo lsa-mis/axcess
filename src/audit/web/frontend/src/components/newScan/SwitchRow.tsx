@@ -77,7 +77,7 @@ export default function SwitchRow({
         <span className="flex min-w-0 flex-col gap-0.5 text-fg">
           <span className="font-semibold leading-snug">{label}</span>
           {hint && (
-            <span id={hintId} className="text-xs leading-snug text-fg-muted">
+            <span id={hintId} className="text-xs text-fg-muted">
               {hint}
             </span>
           )}

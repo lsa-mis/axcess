@@ -274,7 +274,7 @@ function ScanStep({
           <span className="sr-only">: </span>
           <span className="ml-2 text-xs font-semibold text-fg-muted">{STEP_WORD[status]}</span>
         </p>
-        <p className="mt-0.5 text-xs leading-5 text-fg-muted">{detail}</p>
+        <p className="mt-0.5 text-xs text-fg-muted">{detail}</p>
       </div>
     </li>
   );

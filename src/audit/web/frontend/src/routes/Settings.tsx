@@ -137,7 +137,7 @@ function SettingRow({
         <p id={`${id}-label`} className="text-sm font-semibold text-fg">
           {row.label}
         </p>
-        <p id={`${id}-desc`} className="mt-0.5 text-xs leading-5 text-fg-muted">
+        <p id={`${id}-desc`} className="mt-0.5 text-xs text-fg-muted">
           {row.description}
         </p>
       </div>

@@ -152,9 +152,16 @@ const config: Config = {
       // (`text-fg-muted`, `font-semibold`), not by being smaller. Do not add
       // a smaller size back, and do not use an arbitrary one (text-[12px])
       // to get round the floor.
+      //
+      // Line height 1.5 (21px on 14px), not Tailwind's 1.25rem (1.43): SC
+      // 1.4.8 Visual Presentation (Level AAA) asks for at least 1.5 within
+      // paragraphs, and Siteimprove Alfa found 122 paragraphs of small text
+      // below it (October 2026 AAA audit). Set on the tokens, so every hint,
+      // caption and note gets it at once; the cost is one pixel per line.
       fontSize: {
-        "2xs": ["0.875rem", { lineHeight: "1.25rem" }], // 14px, was 12px
-        xs: ["0.875rem", { lineHeight: "1.25rem" }], // 14px, was 13px
+        "2xs": ["0.875rem", { lineHeight: "1.3125rem" }], // 14px, was 12px
+        xs: ["0.875rem", { lineHeight: "1.3125rem" }], // 14px, was 13px
+        sm: ["0.875rem", { lineHeight: "1.3125rem" }], // 14px
       },
     },
   },

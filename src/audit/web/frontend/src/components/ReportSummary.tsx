@@ -37,7 +37,7 @@ function SummaryStat({
       >
         {value.toLocaleString()}
       </dd>
-      <dd className={cn("order-3 text-xs leading-5", flag ? "text-sev-major" : "text-fg-muted")}>{detail}</dd>
+      <dd className={cn("order-3 text-xs", flag ? "text-sev-major" : "text-fg-muted")}>{detail}</dd>
     </div>
   );
 }

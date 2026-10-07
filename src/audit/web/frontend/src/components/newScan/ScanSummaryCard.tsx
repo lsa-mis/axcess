@@ -276,7 +276,7 @@ export default function ScanSummaryCard({
               WCAG {settings.wcag_version} Level {settings.axe_level}, checked with {engine}
             </dd>
             {alfaUnavailable && (
-              <dd className="mt-1.5 text-xs leading-5 text-sev-major">
+              <dd className="mt-1.5 text-xs text-sev-major">
                 {CHECK_LABEL.alfa} is not available, so this scan uses {CHECK_LABEL.axe}. Reason:{" "}
                 {capabilities.alfa?.reason ?? "not installed"}.
               </dd>
@@ -287,7 +287,7 @@ export default function ScanSummaryCard({
             <dd className="mt-1">
               {running.length ? <ItemList items={running} on /> : <span className="text-fg-muted">None</span>}
             </dd>
-            {usesLocalModels && <dd className="mt-2 text-xs leading-5 text-fg-muted">{SUMMARY.localModels}</dd>}
+            {usesLocalModels && <dd className="mt-2 text-xs text-fg-muted">{SUMMARY.localModels}</dd>}
           </Section>
 
           <Section term={SUMMARY.notIncluded}>
@@ -298,12 +298,12 @@ export default function ScanSummaryCard({
                 <span className="text-fg-muted">{SUMMARY.nothingLeftOut}</span>
               )}
             </dd>
-            {login && <dd className="mt-2 text-xs leading-5 text-fg-muted">{SUMMARY.loginPrivacy}</dd>}
+            {login && <dd className="mt-2 text-xs text-fg-muted">{SUMMARY.loginPrivacy}</dd>}
           </Section>
         </dl>
       </aside>
 
-      <p className="border-t border-border px-5 py-3 text-xs leading-5 text-fg-muted">{SUMMARY.footnote}</p>
+      <p className="border-t border-border px-5 py-3 text-xs text-fg-muted">{SUMMARY.footnote}</p>
 
       {/* When the rail is capped and scrolls, the actions stay pinned to its
           foot and only the summary moves under them, so Start is always in

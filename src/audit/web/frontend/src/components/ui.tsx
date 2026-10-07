@@ -694,7 +694,7 @@ export function Checkbox({
       <span className="flex flex-col gap-0.5 text-fg">
         <span className="leading-snug">{label}</span>
         {hint && (
-          <span id={hintId} className="text-xs leading-snug text-fg-muted">
+          <span id={hintId} className="text-xs text-fg-muted">
             {hint}
           </span>
         )}
