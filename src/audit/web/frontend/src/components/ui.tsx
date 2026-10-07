@@ -1164,7 +1164,7 @@ export function PageLink({
       {inspectTo ? (
         <Link
           to={inspectTo}
-          className="inline-flex items-baseline gap-1 break-words text-umich-blue underline underline-offset-2"
+          className="inline-flex min-h-target items-center gap-1 break-words text-umich-blue underline underline-offset-2"
         >
           {/* self-start, not self-center: the flex line is as tall as the wrapped
               title, so centring drops the icon into the gap between lines on
@@ -1180,7 +1180,7 @@ export function PageLink({
           href={pageUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-baseline gap-1 break-words text-umich-blue underline underline-offset-2"
+          className="inline-flex min-h-target items-center gap-1 break-words text-umich-blue underline underline-offset-2"
         >
           <span className="break-words">{display}</span>
           <span aria-hidden className="text-2xs">
@@ -1199,7 +1199,7 @@ export function PageLink({
           href={pageUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="underline underline-offset-2 hover:text-fg"
+          className="inline-flex min-h-target items-center underline underline-offset-2 hover:text-fg"
         >
           Open live page ↗
           <span className="sr-only"> (opens in a new tab)</span>
@@ -1211,7 +1211,7 @@ export function PageLink({
             </span>
             <Link
               to={pageEvidencePath({ scanId, pageId, origin, backTo })}
-              className="underline underline-offset-2 hover:text-fg"
+              className="inline-flex min-h-target items-center underline underline-offset-2 hover:text-fg"
             >
               Page details
             </Link>

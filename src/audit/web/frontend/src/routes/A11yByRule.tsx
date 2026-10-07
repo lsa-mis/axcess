@@ -388,7 +388,7 @@ function FindingRow({
         </code>
         {finding.html_snippet && (
           <details className="mt-1">
-            <summary className="cursor-pointer text-2xs text-fg-muted">
+            <summary className="flex min-h-target cursor-pointer items-center text-2xs text-fg-muted">
               Show element code (HTML)
             </summary>
             <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-xs bg-surface-muted p-2 text-2xs">

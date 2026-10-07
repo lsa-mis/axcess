@@ -394,7 +394,7 @@ export function SortHeader<K extends string>({
         title={hint}
         onClick={() => onSort(nextSort(sort, column, kind))}
         className={cn(
-          "group inline-flex min-h-target rounded-xs px-1 text-sm font-semibold normal-case tracking-normal hover:bg-border/50 focus-visible:outline-none focus-visible:shadow-focus",
+          "group inline-flex min-h-target min-w-target justify-center rounded-xs px-1 text-sm font-semibold normal-case tracking-normal hover:bg-border/50 focus-visible:outline-none focus-visible:shadow-focus",
           // Words at the foot of the target, not its middle: with the cell
           // bottom-aligned, the last line of every label then sits on one
           // line, right over the column's data, however many lines each

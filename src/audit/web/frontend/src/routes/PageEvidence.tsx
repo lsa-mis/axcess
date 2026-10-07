@@ -176,7 +176,7 @@ export default function PageEvidenceRoute() {
                     href={image.src_url_canonical}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-umich-blue underline underline-offset-2"
+                    className="inline-flex min-h-target items-center gap-1.5 text-sm font-semibold text-umich-blue underline underline-offset-2"
                   >
                     Open the image
                     <ExternalLink className="h-3.5 w-3.5" aria-hidden />

@@ -291,7 +291,7 @@ const IssuePageRow = memo(function IssuePageRow({
       </Cell>
       <Cell className="whitespace-nowrap text-center">
         {shots > 0 ? (
-          <Link to={screenshotsPath} className="text-umich-blue underline underline-offset-2">
+          <Link to={screenshotsPath} className="inline-flex min-h-target items-center text-umich-blue underline underline-offset-2">
             {shots} screenshot{shots === 1 ? "" : "s"}
             <span className="sr-only"> of this issue on {label}</span>
           </Link>

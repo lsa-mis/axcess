@@ -248,7 +248,7 @@ function SCGroupCard({ scanId, group }: { scanId: number; group: A11ySCGroup }) 
           {group.wcag_sc ? (
             <Link
               to={`/scans/${scanId}/a11y?${linkParams}`}
-              className="text-umich-blue underline underline-offset-2"
+              className="inline-flex min-h-target items-center text-umich-blue underline underline-offset-2"
             >
               WCAG {group.wcag_sc}
             </Link>
@@ -292,7 +292,7 @@ function SCGroupCard({ scanId, group }: { scanId: number; group: A11ySCGroup }) 
                 href={r.help_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-1 inline-flex items-center gap-1 text-xs text-umich-blue underline underline-offset-2"
+                className="inline-flex min-h-target items-center gap-1 text-xs text-umich-blue underline underline-offset-2"
               >
                 {r.pipeline === "alfa" ? "About this rule (Alfa)" : "About this rule"}{" "}
                 <ExternalLink className="h-3 w-3" aria-hidden />
