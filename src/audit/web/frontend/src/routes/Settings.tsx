@@ -153,7 +153,7 @@ function SettingRow({
             <label
               key={option.value}
               className={cn(
-                "relative inline-flex min-h-target cursor-pointer items-center justify-center whitespace-nowrap rounded-2xs border px-3 text-xs font-semibold transition-colors motion-reduce:transition-none",
+                "relative inline-flex min-h-target min-w-target cursor-pointer items-center justify-center whitespace-nowrap rounded-2xs border px-3 text-xs font-semibold transition-colors motion-reduce:transition-none",
                 // Chosen is a raised white card with a border: a change of
                 // shape and weight, not only of colour.
                 selected
@@ -169,7 +169,9 @@ function SettingRow({
                 checked={selected}
                 onChange={() => onChange(option.value)}
                 // Covers the whole option, invisible, like PillGroup: the
-                // label is the radio's own 44 px hit area.
+                // label is the radio's own 44 px hit area, in both directions
+                // (min-w-target too: a two-character option such as "On" was
+                // 41 px wide; SC 2.5.5 Target Size (Enhanced), Level AAA).
                 className="absolute inset-0 m-0 h-full w-full cursor-[inherit] appearance-none rounded-2xs opacity-0"
               />
               {option.box !== undefined && (
