@@ -256,15 +256,6 @@ const CHECKS: [string, string, string, string, string, string][] = [
   ],
 ];
 
-// The old site's description of the diagram (build.py REPORT_GROUPS_ALT). Its
-// pixel size, 3200 by 1800, is in build.py DIAGRAM_SIZES.
-const REPORT_GROUPS_ALT =
-  "Diagram of the three report groups in the How sure column. Mostly sure holds rule-engine failures from axe-core and Siteimprove Alfa, " +
-  "including problems found after clicking or after a configured search; confirm them on the page, fix, and rescan. " +
-  "Not sure holds browser checks, the keyboard trap check, motion checks, text in images whose alt text is " +
-  'missing or does not match, AI checks, and Alfa "cannot tell" results; a person tests and records a ' +
-  "decision. For information holds images whose alt text already matches and older records kept for history; no " +
-  "action is needed.";
 
 const LSA_WEB_RESOURCES = "https://accessibility.lsa.umich.edu/browse-resources/web-accessibility.html";
 const LSA_TRAINING = "https://accessibility.lsa.umich.edu/learn/training.html";
@@ -350,21 +341,13 @@ const headings = [
     tells you how sure Axcess is that the issue is a real problem, and what to do next.
     <a href={url("/docs/glossary/#mostly-sure")}>The glossary explains each one.</a>
   </p>
-  <!-- The diagram is an image of text, so the same facts follow as real text
-       in the three cards (SC 1.4.5 Images of Text, Level AA), and the full
-       size file is linked for anyone who wants to zoom into it (SC 1.4.4
-       Resize Text, Level AA). The alt text is the old site's description. -->
-  <figure class="not-content diagram">
-    <img
-      src={url("/diagrams/report-groups.png")}
-      width="3200"
-      height="1800"
-      alt={REPORT_GROUPS_ALT}
-      loading="lazy"
-      decoding="async"
-    />
-    <figcaption><a href={url("/diagrams/report-groups.png")}>Open the diagram at full size</a></figcaption>
-  </figure>
+  <!-- No picture of the report groups here, only the three cards: the
+       diagram (diagrams/report-groups.png) is an image of text, and the
+       cards already say everything in it as real text. SC 1.4.9 Images of
+       Text (No Exception), Level AAA, allows images of text only for
+       decoration or where the look is essential; neither applies. The
+       picture stays in the README and in docs/reading-your-report.md for
+       GitHub readers, and the site hides it there (theme.css). -->
   <div class="not-content cards">
     <Card heading="Mostly sure: confirm it, then fix it" level={3}>
       <p>
@@ -833,21 +816,6 @@ const headings = [
     scroll-margin-top: calc(var(--sl-nav-height, 4rem) + 1rem);
   }
 
-  .diagram {
-    margin: 1.25rem 0 0;
-  }
-  .diagram img {
-    display: block;
-    width: 100%;
-    height: auto;
-    border: 1px solid var(--ax-border);
-    border-radius: 0.75rem;
-  }
-  .diagram figcaption {
-    margin-top: 0.5rem;
-    font-size: 1rem;
-  }
-  .diagram a,
   .principle a {
     color: var(--ax-link);
     text-underline-offset: 0.2em;
