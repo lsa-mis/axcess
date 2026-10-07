@@ -94,8 +94,8 @@ the tool that found it:
 | 3 | The saved copy's frame gets the focus ring while focus is inside it (`data-focused`, set from the frame's own focus and blur, since a focused iframe matches no focus selector). |
 | 4 | Page-wide `scroll-padding-top` for the top bar, and the narrow-screen report bar only where it shows; the table region's and occurrence cards' own scroll margins were removed so they no longer add up. |
 | 5 | Small text's line height is 1.5 on the size tokens; eleven hints with their own tighter `leading-*` lost it. Alfa sia-r73 is gone. |
-| 6 | Running text in the main content is capped at 35em in a specificity-free rule. |
-| 7 | `min-h-target` on the small links, `min-w-target` on sort headers. The regression tests then found two more the live report did not show: Settings' two-character options ("On", "10") were 41 px wide, now `min-w-target` there and in New scan's matching choices; and an issue's page title link, shown only for pages with a saved copy, was 24 px tall. |
+| 6 | Each paragraph of running text that ran long carries `max-w-measure` (35em, in the Tailwind theme). The first fix capped every `p`, `li` and `dd` in the main area at once; in use it cut the Inspector's bands and boxed notes short and squeezed the element locator beside its buttons, so it was replaced. SC 1.4.8 does not need a cap on every element: its sufficient techniques for width are G204 (text reflows as the window narrows) and C20 (relative widths). |
+| 7 | `min-h-target` on the small links (a page title link's eye icon starts beside the title's first line, with 10 px above and below for the 44 px height; centring the text left the icon above it), `min-w-target` on sort headers. The regression tests then found two more the live report did not show: Settings' two-character options ("On", "10") were 41 px wide, now `min-w-target` there and in New scan's matching choices; and an issue's page title link, shown only for pages with a saved copy, was 24 px tall. |
 | 8 | Screen-reader-only context on repeated links, including the shared `PageLink` (`shortLocator`). |
 | 9 | `IMPACT_LABEL` in `lib/terms.ts`. |
 | 10 | The report and scan headers' separators are drawn shapes, not light text; the other unresolved results are on the page's faint background gradient, where axe passes 91 elements at 7:1 and the darkest point (`#f4f5f7`) still clears 7:1 for the app's text colours. |
@@ -118,4 +118,4 @@ Left as they are, with reasons:
 720, on 13 screens: 44 px targets, one destination per link name, line
 length and line height, focus clear of the top bar, the saved copy's focus
 ring, named dropdowns, the impact chips' contrast and words (light and
-dark), Not found's level 1 heading, and drawn header separators.
+dark), Not found's level 1 heading, drawn header separators, no reading-width cap on a band or box, and page title icons beside the first line. The last two were checked against the replaced design and fail on it.
