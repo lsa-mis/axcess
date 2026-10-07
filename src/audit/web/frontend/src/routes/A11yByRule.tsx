@@ -1,4 +1,5 @@
 import AlfaEvidenceNote from "../components/AlfaEvidenceNote";
+import ImpactChip from "../components/ImpactChip";
 import { Link, useParams, useSearchParams } from "react-router";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -25,9 +26,7 @@ import { withoutUserinfo } from "../components/ReportCrumb";
 import type {
   A11yRuleGroup,
   A11yRuleGroupFinding,
-  AxeImpact,
   FindingStatus,
-  Severity,
 } from "../api/types";
 import { TablePagination, usePagedRows } from "../components/TablePagination";
 import {
@@ -475,21 +474,3 @@ function RuleBulkBar({
   );
 }
 
-/** Mirror of the chip used in the by-SC view, keep both in sync. */
-function ImpactChip({ value }: { value: AxeImpact }) {
-  const tone: Severity = (
-    {
-      critical: "critical",
-      serious: "major",
-      moderate: "minor",
-      minor: "info",
-    } as const
-  )[value];
-  return (
-    <span
-      className={`inline-flex items-center rounded-xs px-1.5 py-0.5 text-2xs font-semibold text-white bg-sev-${tone}-bg`}
-    >
-      {value}
-    </span>
-  );
-}

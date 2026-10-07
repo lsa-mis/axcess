@@ -1,7 +1,8 @@
 import AlfaEvidenceNote from "../components/AlfaEvidenceNote";
+import ImpactChip from "../components/ImpactChip";
 import { Link, useParams, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ChevronRight, ExternalLink, Info } from "lucide-react";
+import { ChevronRight, ExternalLink, Info } from "lucide-react";
 import { api } from "../api/client";
 import {
   Card,
@@ -16,9 +17,7 @@ import {
 import { withoutUserinfo } from "../components/ReportCrumb";
 import type {
   A11ySCGroup,
-  AxeImpact,
   FindingStatus,
-  Severity,
 } from "../api/types";
 import { TablePagination, usePagedRows } from "../components/TablePagination";
 import {
@@ -565,29 +564,3 @@ function StatusCell({
   );
 }
 
-/**
- * Pill rendering an axe impact value. We map axe's four-level scale to
- * the existing severity tokens so this view inherits the color system
- * the rest of the SPA uses, no new colors to audit. critical → critical,
- * serious → major, moderate → minor, minor → info.
- */
-function ImpactChip({ value }: { value: AxeImpact }) {
-  const tone: Severity = (
-    {
-      critical: "critical",
-      serious: "major",
-      moderate: "minor",
-      minor: "info",
-    } as const
-  )[value];
-  return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-xs px-1.5 py-0.5 text-2xs font-semibold text-white bg-sev-${tone}-bg`}
-    >
-      {value === "critical" && (
-        <AlertTriangle className="h-3 w-3" aria-hidden />
-      )}
-      {value}
-    </span>
-  );
-}
