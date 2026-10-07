@@ -275,10 +275,13 @@ const IssuePageRow = memo(function IssuePageRow({
     <Row index={index}>
       <RowHeader className="text-center font-normal tabular-nums text-fg-muted">{index + 1}</RowHeader>
       <Cell className="min-w-[12rem] font-semibold text-fg">
-        {/* The title opens the inspector with this issue outlined on the page. */}
+        {/* The title opens the inspector with this issue outlined on the page.
+            At least 44 px tall, as the shared PageLink is: a link alone in its
+            cell is not in a sentence, so the SC 2.5.5 Target Size (Enhanced),
+            Level AAA, inline exception does not cover it. */}
         <Link
           to={issueInspectorPath({ scanId, pageId: page.page_id, issueKey, origin, backTo })}
-          className="inline-flex items-baseline gap-1 text-umich-blue underline underline-offset-2"
+          className="inline-flex min-h-target items-center gap-1 text-umich-blue underline underline-offset-2"
         >
           <ScanEye className="h-5 w-5 shrink-0 self-start pt-0.5 text-fg-subtle" aria-hidden />
           <span>{page.page_title?.trim() || <span className="font-normal">Untitled</span>}</span>
