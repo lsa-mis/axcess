@@ -626,6 +626,24 @@ export default function InspectorRoute() {
     try {
       const frame = frameRef.current;
       const doc = frame?.contentDocument;
+      // Show the app's focus ring while focus is inside the saved copy. A
+      // focused iframe matches none of :focus, :focus-within or
+      // :focus-visible in the app's page, so CSS alone never drew a ring
+      // and keyboard users could not see that focus had moved into the copy
+      // (SC 2.4.7 Focus Visible, Level AA; October 2026 AAA audit). The copy
+      // is same-origin, so its window's own focus and blur mark the frame,
+      // and styles.css draws the ring on iframe[data-focused]. A new load
+      // brings a new window, so the listeners never pile up.
+      const view = frame?.contentWindow;
+      if (frame && view) {
+        delete frame.dataset.focused;
+        view.addEventListener("focus", () => {
+          frame.dataset.focused = "true";
+        });
+        view.addEventListener("blur", () => {
+          delete frame.dataset.focused;
+        });
+      }
       if (frame && doc) {
         setCanvasCheck({ doc: frame.srcdoc, drawn: drawnOnCanvas(doc) });
         if (fingerprint?.samples?.length) {

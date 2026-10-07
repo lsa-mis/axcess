@@ -208,6 +208,17 @@
     outline-offset: 2px;
     border-radius: 2px;
   }
+  /* An iframe that holds focus (the Inspector's saved copy, where keys
+     scroll the page) gets the same ring. A focused iframe matches no focus
+     selector in this page, so the Inspector marks it with data-focused from
+     the frame's own focus and blur (routes/Inspector.tsx), and keyboard
+     users can see that focus moved into the copy (SC 2.4.7 Focus Visible,
+     Level AA; October 2026 AAA audit). Focus only lands there by tabbing or
+     clicking in, so the ring is right for both. */
+  iframe[data-focused] {
+    outline: 3px solid rgb(var(--c-umich-blue));
+    outline-offset: 2px;
+  }
   a {
     @apply text-umich-blue underline-offset-2;
   }
