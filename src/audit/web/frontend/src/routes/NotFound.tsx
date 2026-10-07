@@ -5,6 +5,7 @@ export default function NotFoundRoute() {
   const loc = useLocation();
   return (
     <EmptyState
+      level={1}
       title="Page not found"
       message={
         <>

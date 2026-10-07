@@ -187,19 +187,30 @@ export function PageHeader({
   );
 }
 
-/** Empty-state block, used when lists come back empty. */
+/**
+ * Empty-state block, used when lists come back empty.
+ *
+ * `level` is the title's heading level: 2 inside a page that has its own
+ * title, 1 when the empty state is the whole page (Not found), so every
+ * page still has one level 1 heading (SC 1.3.1 Info and Relationships,
+ * Level A, and SC 2.4.6 Headings and Labels, Level AA; axe
+ * page-has-heading-one; October 2026 AAA audit).
+ */
 export function EmptyState({
   title,
   message,
   action,
+  level = 2,
 }: {
   title: string;
   message?: ReactNode;
   action?: ReactNode;
+  level?: 1 | 2;
 }) {
+  const Heading = level === 1 ? "h1" : "h2";
   return (
     <Card className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center">
-      <h2 className="text-base font-semibold text-fg">{title}</h2>
+      <Heading className="text-base font-semibold text-fg">{title}</Heading>
       {message && <p className="max-w-md text-sm text-fg-muted">{message}</p>}
       {action && <div className="mt-2">{action}</div>}
     </Card>
