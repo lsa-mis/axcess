@@ -1185,12 +1185,18 @@ export function PageLink({
       {inspectTo ? (
         <Link
           to={inspectTo}
-          className="inline-flex min-h-target items-center gap-1 break-words text-umich-blue underline underline-offset-2"
+          className="inline-flex min-h-target items-start gap-1 break-words py-2.5 text-umich-blue underline underline-offset-2"
         >
-          {/* self-start, not self-center: the flex line is as tall as the wrapped
-              title, so centring drops the icon into the gap between lines on
-              any title that wraps. Top-aligned it stays beside the first line. */}
-          <ScanEye className="h-5 w-5 shrink-0 self-start pt-0.5 text-fg-subtle" aria-hidden />
+          {/* Icon and text both start at the top, so the icon sits beside the
+              first line whether the title fits on one line or wraps.
+              Rejected: centring them (items-center), which drops the icon
+              into the gap between lines on a title that wraps; and centring
+              the text with the icon at the top, which left the icon above a
+              one-line title. The 10 px above and below (py-2.5) make a
+              one-line title the full 44 px target (SC 2.5.5 Target Size
+              (Enhanced), Level AAA) while keeping the text beside the icon;
+              min-h-target holds it at 44 px where the line is shorter. */}
+          <ScanEye className="mt-0.5 h-5 w-5 shrink-0 text-fg-subtle" aria-hidden />
           <span className="break-words">{display}</span>
           <span className="sr-only">
             , opens in the page inspector{element ? ` at ${element}` : ""}
