@@ -1,6 +1,6 @@
 import { ExternalLink, Info } from "lucide-react";
 import BrandMark from "../components/BrandMark";
-import { isDesktopApp } from "../hooks/useSwipeNavigation";
+import { desktopAppVersion, isDesktopApp } from "../hooks/useSwipeNavigation";
 import { CLICK_THROUGH } from "../lib/labels";
 
 /**
@@ -79,7 +79,11 @@ const RESOURCES: Resource[] = [
  * static public pages, opened only when someone clicks one.
  */
 export default function AboutRoute() {
-  const build = `${isDesktopApp() ? "Desktop preview" : "Preview"} ${__APP_VERSION__}`;
+  // The desktop app shows its own build number, which goes up with every
+  // release; the browser shows the version the web bundle was built from.
+  const build = isDesktopApp()
+    ? `Desktop preview ${desktopAppVersion() ?? __APP_VERSION__}`
+    : `Preview ${__APP_VERSION__}`;
   return (
     <div className="space-y-8">
       <header className="flex items-start gap-4">

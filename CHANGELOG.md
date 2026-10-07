@@ -171,6 +171,9 @@ merge.
 
 ### Fixed
 
+- About: the desktop app now shows the version you are running, such as
+  "Desktop preview 0.2.3". It always said 0.2.0, because the page took the
+  number from the web part of the app, which each release does not change.
 - Stopping a scan: the page now says "Partial report", with "Review what
   the scan found", as soon as you press Stop. It said "No report was
   produced" for about 15 seconds, even when the scan had saved pages,
