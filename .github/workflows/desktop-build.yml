@@ -158,8 +158,19 @@ jobs:
           uv run playwright install chromium
       - name: Bundle Tesseract OCR
         shell: pwsh
+        # Retried: the Chocolatey community feed sometimes answers 504
+        # Gateway Timeout, and one bad minute there skipped a whole release.
+        # Success is judged by tesseract.exe being on disk, not by choco's
+        # exit code, since the bundle script needs exactly that file.
         run: |
-          choco install tesseract --yes --no-progress
+          $tesseract = Join-Path $env:ProgramFiles "Tesseract-OCR\tesseract.exe"
+          for ($attempt = 1; $attempt -le 4; $attempt++) {
+            choco install tesseract --yes --no-progress
+            if (Test-Path $tesseract) { break }
+            if ($attempt -eq 4) { throw "Tesseract did not install after 4 attempts." }
+            Write-Host "Tesseract install failed; retrying (attempt $($attempt + 1) of 4)."
+            Start-Sleep -Seconds (30 * $attempt)
+          }
           desktop/scripts/bundle-tesseract-windows.ps1
       - name: Bundle Python backend
         run: uv run pyinstaller --clean --noconfirm --distpath desktop/backend-dist --workpath build/desktop-pyinstaller desktop/backend.spec
