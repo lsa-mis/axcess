@@ -225,12 +225,15 @@
      leave a control half under the bar, as on Images ("Back to Report",
      "Group by issue"). SC 2.4.11 Focus Not Obscured (Minimum), Level AA,
      and SC 2.4.12 Focus Not Obscured (Enhanced), Level AAA; October 2026
-     AAA audit. The breakpoint is the report bar's own (md, 768 px). */
+     AAA audit. The report bar has content only on a report's screens, so
+     its height is reserved only while it holds a link: reserving it
+     everywhere scrolled a focused table on Reports too far down. The
+     breakpoint is the report bar's own (md, 768 px). */
   html {
     scroll-padding-top: 88px;
   }
   @media (max-width: 767px) {
-    html {
+    html:has([data-sticky-crumb] a) {
       scroll-padding-top: 141px;
     }
   }

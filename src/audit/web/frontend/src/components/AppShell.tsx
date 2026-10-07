@@ -219,7 +219,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
               under the sticky top bar, and a crumb that is half-covered is a
               target a thumb cannot reliably hit (SC 2.5.8) — it either sits
               fully above the content or it does not show at all. */}
-          <div className="sticky top-[72px] z-10 border-b border-border bg-surface px-2 py-1 md:hidden">
+          <div data-sticky-crumb className="sticky top-[72px] z-10 border-b border-border bg-surface px-2 py-1 md:hidden">
             <ReportCrumb />
           </div>
           <div className="sr-only" aria-live="polite">

@@ -252,7 +252,7 @@ function FindingCard({
     <Card
       id={`finding-${finding.id}`}
       tabIndex={-1}
-      className="scroll-mt-24 p-4"
+      className="p-4"
       aria-label={`Occurrence ${finding.id}: ${finding.help}`}
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
