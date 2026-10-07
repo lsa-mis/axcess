@@ -31,6 +31,20 @@ export function isDesktopApp(userAgent = navigator.userAgent): boolean {
   return /\bElectron\//.test(userAgent);
 }
 
+/**
+ * The version of the running desktop app, or null outside it.
+ *
+ * Electron's user agent names the app and its version ("Axcess/0.2.3"),
+ * taken from desktop/package.json, which each release build stamps. The
+ * web bundle is built before that stamp, so its own version stays at the
+ * release line's first number; reading the user agent shows the build the
+ * person is actually running, with no extra bridge into the page.
+ */
+export function desktopAppVersion(userAgent = navigator.userAgent): string | null {
+  if (!isDesktopApp(userAgent)) return null;
+  return /\bAxcess\/(\d+\.\d+\.\d+)\b/i.exec(userAgent)?.[1] ?? null;
+}
+
 export function useSwipeNavigation(enabled = isDesktopApp()): void {
   useEffect(() => {
     if (!enabled) return;
