@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import sqlite3
 
+from audit.ai.state import ai_enabled
 from audit.config import Settings
 from audit.suggest import context, repo
 from audit.suggest.models import (
@@ -30,9 +31,12 @@ class SuggestionRefusedError(Exception):
 
 
 def _require_feature(conn: sqlite3.Connection, settings: Settings) -> None:
-    if not settings.suggestions_enabled:
+    if not settings.suggestions_enabled or not ai_enabled(settings):
         raise SuggestionRefusedError(
-            403, "AI suggestions are turned off. An administrator can turn them on."
+            403,
+            "AI features are off. Turn them on in Settings > AI features."
+            if settings.desktop
+            else "AI suggestions are turned off. An administrator can turn them on.",
         )
     if not repo.table_exists(conn):
         raise SuggestionRefusedError(
@@ -207,7 +211,7 @@ async def availability(
             scan_running=scan_running,
         )
 
-    if not settings.suggestions_enabled:
+    if not settings.suggestions_enabled or not ai_enabled(settings):
         return result("turned_off")
     if not repo.table_exists(conn):
         return result("database_update_needed")

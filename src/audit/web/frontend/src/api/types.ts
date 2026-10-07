@@ -257,6 +257,8 @@ export interface ScopePreview {
 }
 
 export interface LocalAnalysisCapability {
+  /** Desktop's saved AI choice; absent on shared-server installs. */
+  ai_enabled?: boolean;
   ocr: {
     available: boolean;
     engine: string;
@@ -1406,6 +1408,7 @@ export interface AiSetup {
 }
 
 export interface AiPlan {
+  preferences: AiPreferences;
   hardware: {
     memory_bytes: number;
     free_disk_bytes: number;
@@ -1423,4 +1426,9 @@ export interface AiPlan {
   recommended: AiTierId | null;
   current: AiSetup | null;
   install: AiInstallStatus;
+}
+
+export interface AiPreferences {
+  enabled: boolean;
+  choice_recorded: boolean;
 }

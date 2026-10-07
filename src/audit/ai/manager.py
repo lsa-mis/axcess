@@ -6,6 +6,7 @@ drive it with fakes.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from typing import Literal
 
@@ -15,7 +16,18 @@ from audit.ai import hardware as hw
 from audit.ai.catalog import Catalog, Tier, load_catalog
 from audit.ai.installer import Installer, InstallStatus
 from audit.ai.runtime import OllamaRuntime, RuntimeSetupError, system_ollama
-from audit.ai.state import AIConfig, ai_dir, clear_config, load_config, save_config
+from audit.ai.state import (
+    AIConfig,
+    AIPreferences,
+    AIStateError,
+    ai_dir,
+    ai_enabled,
+    clear_config,
+    load_config,
+    load_preferences,
+    save_config,
+    save_preferences,
+)
 from audit.config import Settings
 
 
@@ -52,6 +64,7 @@ class ProgramInfo(BaseModel):
 
 
 class AIPlan(BaseModel):
+    preferences: AIPreferences
     hardware: HardwareInfo
     program: ProgramInfo
     tiers: list[TierPlan]
@@ -64,6 +77,10 @@ class NotEnoughSpaceError(Exception):
     """The data folder's disk cannot hold what this size still has to download."""
 
 
+class AIBusyError(Exception):
+    """An AI setting cannot change until active work finishes."""
+
+
 class AIManager:
     def __init__(
         self,
@@ -73,8 +90,9 @@ class AIManager:
         catalog: Catalog | None = None,
         runtime: OllamaRuntime | None = None,
         probe: Callable[[], hw.Hardware] | None = None,
-        find_system: Callable[[], str | None] = system_ollama,
+        find_system: Callable[[], str | None] | None = None,
         installer: Installer | None = None,
+        busy_reason: Callable[[], str | None] = lambda: None,
     ) -> None:
         self.settings = settings
         self.on_change = on_change
@@ -82,20 +100,80 @@ class AIManager:
         self.dir = ai_dir(settings)
         self.runtime = runtime or OllamaRuntime(self.dir, self.catalog)
         self.probe = probe or (lambda: hw.probe(self.dir))
-        self.find_system = find_system
+        self.find_system = find_system or system_ollama
+        self.busy_reason = busy_reason
         self.installer = installer or Installer(
-            self.catalog, self.runtime, self._installed, find_system=find_system
+            self.catalog,
+            self.runtime,
+            self._installed,
+            find_system=self.find_system,
+            on_stopped=self._download_stopped,
         )
 
+    def _download_stopped(self) -> None:
+        if not ai_enabled(self.settings):
+            self.runtime.stop()
+
     def _installed(self, config: AIConfig) -> None:
-        save_config(self.settings, config)
-        self.on_change(config)
+        previous_config = self.config()
+        previous_preferences = self.preferences()
+        try:
+            save_config(self.settings, config)
+            save_preferences(self.settings, AIPreferences(enabled=True, choice_recorded=True))
+            self.on_change(config)
+        except Exception:
+            # Keep the last usable setup if applying the new one fails.
+            if previous_config is None:
+                clear_config(self.settings)
+            else:
+                save_config(self.settings, previous_config)
+            save_preferences(self.settings, previous_preferences)
+            raise
+
+    def preferences(self) -> AIPreferences:
+        return load_preferences(self.settings)
+
+    def _require_idle(self) -> None:
+        reason = (
+            "Pause the AI download before changing AI settings."
+            if self.installer.running
+            else self.busy_reason()
+        )
+        if reason:
+            raise AIBusyError(reason)
+
+    def set_enabled(self, enabled: bool) -> AIPreferences:
+        previous = self.preferences()
+        self._require_idle()
+        config = self.config()
+        if enabled and config is not None and config.source == "private":
+            url = self.runtime.start(preferred_url=config.base_url)
+            config = config.model_copy(update={"base_url": url})
+            save_config(self.settings, config)
+        elif enabled and config is None and self.find_system() is None:
+            raise RuntimeSetupError(
+                "AI is not set up yet. Choose a size and select Download and set up."
+            )
+        next_preferences = AIPreferences(enabled=enabled, choice_recorded=True)
+        try:
+            save_preferences(self.settings, next_preferences)
+            self.on_change(config)
+        except Exception:
+            # Roll back the saved choice if the effective worker change failed.
+            save_preferences(self.settings, previous)
+            if not previous.enabled:
+                self.runtime.stop()
+            raise
+        if not enabled:
+            self.runtime.stop()
+        return next_preferences
 
     def config(self) -> AIConfig | None:
         return load_config(self.settings)
 
     def plan(self) -> AIPlan:
         machine = self.probe()
+        # Setup discovery reads only the program version, never a model.
         system = self.find_system()
         program_bytes = 0 if system else self.runtime.download_remaining()
         accelerator: Literal["apple", "nvidia", "amd", "none"] = (
@@ -110,6 +188,7 @@ class AIManager:
         recommended = hw.recommend(machine, self.catalog, program_bytes)
         release = self.catalog.ollama
         return AIPlan(
+            preferences=self.preferences(),
             hardware=HardwareInfo(
                 memory_bytes=machine.memory_bytes,
                 free_disk_bytes=machine.free_disk_bytes,
@@ -144,10 +223,12 @@ class AIManager:
         )
 
     def install(self, tier_id: str) -> InstallStatus:
+        preferences = self.preferences()
         tier = self.catalog.tier(tier_id)
         status = self.installer.status
         if not (self.installer.running and status.tier == tier_id):
             self._check_space(tier, status)
+        save_preferences(self.settings, preferences.model_copy(update={"choice_recorded": True}))
         return self.installer.start(tier)
 
     def _check_space(self, tier: Tier, status: InstallStatus) -> None:
@@ -166,7 +247,10 @@ class AIManager:
             )
 
     def pause(self) -> InstallStatus:
-        return self.installer.pause()
+        status = self.installer.pause()
+        if not self.preferences().enabled:
+            self.runtime.stop()
+        return status
 
     def remove(self) -> None:
         """Forget the setup; delete the private program and models if Axcess owns them.
@@ -174,19 +258,27 @@ class AIManager:
         Models pulled into an Ollama the person already ran stay there: they
         may use them outside Axcess.
         """
+        self._require_idle()
         self.installer.reset()
         self.runtime.remove()
         clear_config(self.settings)
+        save_preferences(self.settings, AIPreferences(enabled=False, choice_recorded=True))
         self.on_change(None)
 
     def startup(self) -> None:
         """Start the private Ollama if the saved setup uses it."""
         config = self.config()
-        if config is None or config.source != "private":
+        try:
+            enabled = self.preferences().enabled
+        except AIStateError:
+            logging.getLogger(__name__).exception("ai.preferences_unreadable")
+            return
+        if not enabled or config is None or config.source != "private":
             return
         try:
             url = self.runtime.start(preferred_url=config.base_url)
         except RuntimeSetupError:
+            logging.getLogger(__name__).exception("ai.runtime_start_failed")
             return
         if url != config.base_url:
             config = config.model_copy(update={"base_url": url})

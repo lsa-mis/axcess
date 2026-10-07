@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, Pause, Play, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router";
 import { ApiError, api } from "../api/client";
 import type {
   AiInstallStatus,
@@ -14,6 +15,7 @@ import {
   AI_INSTALL_STATE_LABEL,
   AI_INSTALL_STEP_LABEL,
   AI_TIER_LABEL,
+  AI_FEATURE_STATE_LABEL,
 } from "../lib/terms";
 
 /**
@@ -50,6 +52,13 @@ import {
  *   second button that takes focus, not a modal: there is nothing else to
  *   decide. W3C COGA, "Making Content Usable" (https://www.w3.org/TR/coga-usable/):
  *   help people avoid mistakes, and say what will happen.
+ * - Off and Remove are different actions: off keeps files, Remove deletes
+ *   them. A native button says the next action and a heading says the current
+ *   state, rather than an ambiguous toggle icon. Focus stays on the button
+ *   after a change; a status region announces the result (WCAG 2.2 SC 2.4.3
+ *   Focus Order, Level A, and SC 4.1.3 Status Messages, Level AA).
+ *   While saving, aria-disabled plus an activation guard keeps that focused
+ *   button in place; native disabled would blur it before the result arrives.
  */
 export default function AiSetupRoute() {
   const queryClient = useQueryClient();
@@ -79,6 +88,8 @@ export default function AiSetupRoute() {
     ) {
       void queryClient.invalidateQueries({ queryKey: ["ai-plan"] });
       void queryClient.invalidateQueries({ queryKey: ["suggestion-status"] });
+      void queryClient.invalidateQueries({ queryKey: ["ai-preferences"] });
+      void queryClient.invalidateQueries({ queryKey: ["capabilities", "local-analysis"] });
     }
     lastState.current = status?.state;
   }, [queryClient, status]);
@@ -110,6 +121,7 @@ function AiSetupPage({
   status: AiInstallStatus;
 }) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const headingId = useId();
   const [chosen, setChosen] = useState<AiTierId | null>(
     status.tier ??
@@ -126,7 +138,35 @@ function AiSetupPage({
     void queryClient.invalidateQueries({ queryKey: ["ai-plan"] });
     void queryClient.invalidateQueries({ queryKey: ["ai-install"] });
     void queryClient.invalidateQueries({ queryKey: ["suggestion-status"] });
+    void queryClient.invalidateQueries({ queryKey: ["ai-preferences"] });
+    void queryClient.invalidateQueries({ queryKey: ["capabilities", "local-analysis"] });
   };
+  const enabled = plan.preferences.enabled;
+  const changeEnabled = useMutation({
+    mutationFn: api.setAiEnabled,
+    onMutate: () => setMessage("Saving AI settings…"),
+    onSuccess: (preferences) => {
+      queryClient.setQueryData(["ai-preferences"], preferences);
+      setMessage(preferences.enabled
+        ? "AI features are on. Scan checks still need your choice for each scan."
+        : "AI features are off. Downloaded models and saved results are kept.");
+      refresh();
+    },
+    onError: (error) => setMessage(
+      error instanceof Error ? error.message : "AI settings could not be changed.",
+    ),
+  });
+  const continueWithout = useMutation({
+    mutationFn: () => api.setAiEnabled(false),
+    onSuccess: (preferences) => {
+      queryClient.setQueryData(["ai-preferences"], preferences);
+      refresh();
+      navigate("/scans");
+    },
+    onError: (error) => setMessage(
+      error instanceof Error ? error.message : "Your choice could not be saved.",
+    ),
+  });
   const start = useMutation({
     mutationFn: (tier: AiTierId) => api.installAi(tier),
     onSuccess: (next) => {
@@ -232,9 +272,14 @@ function AiSetupPage({
           </ul>
         </Card>
 
-        {current && (
           <Card className="px-4 py-4 text-sm leading-6 text-fg">
-            <h2 className="font-semibold">AI features are on</h2>
+            <h2 className="font-semibold">{AI_FEATURE_STATE_LABEL[enabled ? "on" : "off"]}</h2>
+            <p className="mt-2">
+              {enabled
+                ? "AI fix suggestions are on when the local models are ready. AI checks during a scan stay off until you choose them for that scan."
+                : "No new AI suggestions or model checks run. Regular checks, reading text inside images (OCR), and saved results still work. Downloaded models are kept."}
+            </p>
+            {current && <>
             <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
               <dt className="text-fg-muted">Size</dt>
               <dd>{AI_TIER_LABEL[current.tier]}</dd>
@@ -253,12 +298,26 @@ function AiSetupPage({
                   : "A private copy of Ollama that Axcess starts and stops"}
               </dd>
             </dl>
-            <p className="mt-2 text-fg-muted">
-              AI fix suggestions are on. AI checks during a scan are offered on
-              the new scan form, off until you choose them.
-            </p>
+            </>}
+            {(enabled || current) && <Button
+              className="mt-3"
+              type="button"
+              onClick={() => {
+                if (!changeEnabled.isPending) changeEnabled.mutate(!enabled);
+              }}
+              disabled={running}
+              aria-disabled={changeEnabled.isPending || undefined}
+            >
+              {enabled ? "Turn AI off" : "Turn AI on"}
+            </Button>}
+            {!enabled && current && <p className="mt-2 text-fg-muted">
+              Turning AI on reuses these models. It does not download them again.
+            </p>}
+            {enabled && <p className="mt-2 text-fg-muted">
+              Turning AI off stops Axcess’s private Ollama, not an Ollama you started yourself.
+              Finish or stop current work before changing this setting.
+            </p>}
           </Card>
-        )}
 
         <Card className="px-4 py-4">
           <fieldset aria-describedby={`${headingId}-hw`} disabled={running}>
@@ -359,6 +418,17 @@ function AiSetupPage({
               </Button>
             )}
           </div>
+          {!enabled && !current && <div className="mt-3">
+            <p className="mb-2 text-sm text-fg">
+              Download and set up turns AI on when setup finishes.
+            </p>
+            <Button type="button" onClick={() => {
+              if (!continueWithout.isPending) continueWithout.mutate();
+            }}
+              disabled={running} aria-disabled={continueWithout.isPending || undefined}>
+              Continue without AI
+            </Button>
+          </div>}
           {!plan.program.available_for_this_computer &&
             !plan.program.system_version && (
               <p className="mt-3 text-sm text-fg">

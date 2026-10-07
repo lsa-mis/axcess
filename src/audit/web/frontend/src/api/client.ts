@@ -46,6 +46,7 @@ import type {
   ScopePreview,
   AiInstallStatus,
   AiPlan,
+  AiPreferences,
   AiTierId,
   SuggestionAvailability,
   SuggestionFeedback,
@@ -257,6 +258,12 @@ export const api = {
     request<PageEvidence>(`/api/scans/${scanId}/pages/${pageId}`),
   /** Desktop only: this computer, the AI sizes it can run, and the current setup. 404 elsewhere. */
   getAiPlan: () => request<AiPlan>("/api/ai/plan", { cache: "no-store" }),
+  getAiPreferences: () => request<AiPreferences>("/api/ai/preferences", { cache: "no-store" }),
+  setAiEnabled: (enabled: boolean) =>
+    request<AiPreferences>("/api/ai/preferences", {
+      method: "PUT",
+      body: JSON.stringify({ enabled }),
+    }),
   getAiInstall: () => request<AiInstallStatus>("/api/ai/install", { cache: "no-store" }),
   /** Start or resume downloading the AI program and models for one size. */
   installAi: (tier: AiTierId) =>

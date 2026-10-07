@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronRight, ListChecks, PlusCircle, Trash2 } from "lucide-react";
 import { memo, useCallback, useMemo, useState } from "react";
 import { api } from "../api/client";
-import AiSetupPrompt from "../components/AiSetupPrompt";
 import {
   protectedQueryKey,
   useProtectedIdentityContext,
@@ -335,7 +334,6 @@ export default function ScansRoute() {
           description a screen reader read all of it on every entry. The band,
           the caption and each cell's `headers` say which scan the numbers
           come from. */}
-      <AiSetupPrompt />
       {!isLoading && !isError && <LastScannedSite sites={sites} />}
 
       {isError ? (

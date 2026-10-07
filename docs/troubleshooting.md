@@ -88,6 +88,15 @@ continues without those checks.
 
 ## AI features setup in the desktop app stopped or failed
 
+- **AI features are off**: open **Settings > AI features** and select
+  **Turn AI on** to reuse kept models, or choose a size and download if you
+  have not set AI up yet. The setting stays off after a restart.
+- **Cannot change the setting**: finish or stop the scan, finish or cancel
+  waiting AI answers, or pause the download. A canceled answer may still
+  have a model request finishing; wait for it before trying again.
+- **Saved AI settings could not be read**: AI stays off and report browsing
+  still works. Check the application log and the saved `ai/preferences.json`
+  file. Do not delete your models or scan evidence to fix a settings file.
 - **"Not enough free disk space"**: free up space or choose a smaller size.
   The page shows how much each size downloads.
 - **The download stopped or was paused**: select **Resume download**. It

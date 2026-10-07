@@ -89,12 +89,14 @@ class Installer:
         *,
         find_system: Callable[[], str | None] = system_ollama,
         pull: Callable[..., None] = pull_model,
+        on_stopped: Callable[[], None] = lambda: None,
     ) -> None:
         self.catalog = catalog
         self.runtime = runtime
         self.on_ready = on_ready
         self.find_system = find_system
         self.pull = pull
+        self.on_stopped = on_stopped
         self.status = InstallStatus()
         self._cancel = threading.Event()
         self._thread: threading.Thread | None = None
@@ -190,3 +192,6 @@ class Installer:
         except Exception as exc:
             self.status.state = "failed"
             self.status.error = f"AI setup stopped unexpectedly: {exc}"
+        finally:
+            if self.status.state in {"paused", "failed"}:
+                self.on_stopped()

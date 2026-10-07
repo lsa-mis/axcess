@@ -149,6 +149,11 @@ export default function FixSuggestion({
     : null;
 
   if (loadError) {
+    // With AI off, an unmigrated suggestion table has no saved answer to
+    // show. Other read failures remain visible, rather than hiding errors.
+    if (!availability.enabled && loadError instanceof ApiError && loadError.status === 404) {
+      return null;
+    }
     return (
       <p className="mt-3 text-sm text-fg-muted">
         Axcess could not load the AI suggestion for this occurrence. Reload the page to try again.
@@ -157,6 +162,7 @@ export default function FixSuggestion({
   }
 
   if (!record || record.status === "cancelled") {
+    if (!availability.enabled) return null;
     return (
       <div className="mt-3 flex flex-col items-start gap-1.5">
         <Button type="button" onClick={() => ask.mutate()} disabled={ask.isPending}>
@@ -212,7 +218,7 @@ export default function FixSuggestion({
         </div>
       )}
 
-      {record.status === "failed" && (
+      {record.status === "failed" && availability.enabled && (
         <div className="mt-2">
           <Button type="button" onClick={() => ask.mutate()} disabled={ask.isPending}>
             Try again
@@ -228,6 +234,7 @@ export default function FixSuggestion({
           onSettle={settle}
           onAskAgain={() => ask.mutate()}
           asking={ask.isPending}
+          canAsk={availability.enabled}
         />
       )}
 
@@ -267,6 +274,7 @@ function ReadySuggestion({
   onSettle,
   onAskAgain,
   asking,
+  canAsk,
 }: {
   scanId: number;
   record: SuggestionRecord;
@@ -274,6 +282,7 @@ function ReadySuggestion({
   onSettle: (next: SuggestionRecord) => void;
   onAskAgain: () => void;
   asking: boolean;
+  canAsk: boolean;
 }) {
   const [audience, setAudience] = useState<SuggestionAudience>(record.audience_default);
   const feedback = useMutation({
@@ -332,9 +341,9 @@ function ReadySuggestion({
             Not helpful
           </Button>
         </div>
-        <Button type="button" variant="ghost" onClick={onAskAgain} disabled={asking}>
+        {canAsk && <Button type="button" variant="ghost" onClick={onAskAgain} disabled={asking}>
           Suggest again
-        </Button>
+        </Button>}
       </div>
       {feedback.isError && (
         <p role="alert" className="text-sm text-sev-critical">
@@ -519,10 +528,21 @@ export function SuggestionsBlockedNote({
   const setupLink = aiSetup ? (
     <p className="mt-3">
       <LinkButton to="/settings/ai" variant="primary">
-        Set up AI features
+        Change AI features
       </LinkButton>
     </p>
   ) : null;
+  // Turning AI off never hides saved answers; only request actions disappear.
+  // The note links to the one settings page (WCAG 2.2 SC 3.2.4 Consistent
+  // Identification, Level AA), not a second local toggle.
+  if (status.reason === "turned_off") {
+    return <Card className={`${className} p-4 text-sm text-fg-muted`}>
+      <p>{aiSetup
+        ? "AI features are off. Saved suggestions are still available. Turn AI on in Settings → AI features to ask for a new suggestion."
+        : "AI suggestions are off. Saved suggestions are still available. An administrator can turn new suggestions on."}</p>
+      {setupLink}
+    </Card>;
+  }
   if (status.reason === "model_missing") {
     return (
       <Card className={`${className} p-4 text-sm text-fg-muted`}>

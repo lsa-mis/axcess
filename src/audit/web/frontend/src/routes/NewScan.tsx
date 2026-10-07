@@ -148,6 +148,16 @@ export default function NewScanRoute() {
     queryFn: api.getLocalAnalysisCapability,
     retry: false,
   });
+  // A retry may restore AI choices from an older scan. Honor today's saved
+  // off setting, and say why beside the switches instead of leaving a checked
+  // but unavailable model option (WCAG 2.2 SC 3.3.2 Labels or Instructions,
+  // Level A). Keep deterministic motion/OCR choices unchanged.
+  const aiOff = localAnalysisCapability.data?.ai_enabled === false;
+  useEffect(() => {
+    if (aiOff && (!settings.skip_vlm || !settings.skip_semantic)) {
+      setSettings((previous) => ({ ...previous, skip_vlm: true, skip_semantic: true }));
+    }
+  }, [aiOff, settings.skip_vlm, settings.skip_semantic]);
   const protectedCapability = useQuery({
     queryKey: ["capabilities", "protected-scans"],
     queryFn: api.getProtectedScanCapability,

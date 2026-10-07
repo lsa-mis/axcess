@@ -8,6 +8,10 @@ React workbench in a sandboxed Electron window.
 ## User experience
 
 - Opening Axcess prepares the local database and opens the workbench.
+- On a fresh installation, Axcess first offers **Set up AI features** or
+  **Continue without AI**. The choice is inside the app, not in the Mac disk
+  image installer. Neither choice starts a download. Skipping leaves all
+  model-based features off and keeps regular checks available.
 - Scan evidence is stored in the operating system's application-data folder,
   never inside the installed application.
 - Closing Axcess stops its private backend process.
@@ -30,11 +34,15 @@ React workbench in a sandboxed Electron window.
   [Set up AI features](ai-suggestions.md#set-up-ai-features-in-the-desktop-app).
   Model-assisted scan checks stay off for each new scan and clearly report
   when Ollama is unavailable.
-- AI fix suggestions are on by default (`AUDIT_SUGGESTIONS_ENABLED=true`
-  in `desktopEnvironment`), because each one is asked for with a click and
-  answered by the Ollama on the same computer. Without Ollama or the model,
-  the inspector says what is missing and gives the `ollama pull` command.
-  Set `AUDIT_SUGGESTIONS_ENABLED=false` before launch to turn them off. See
+- **Settings > AI features** has **Turn AI off** and **Turn AI on**.
+  Off stops Axcess's private Ollama, blocks new model calls, and keeps the
+  downloaded files and saved results. It never stops an Ollama you started
+  yourself. Turning AI on reuses kept models; new scan AI checks still need
+  a separate choice for each scan. Finish or stop a scan, finish or cancel
+  waiting answers, and pause a download before changing the setting.
+  Existing installations keep their setup without repeating the welcome.
+  The saved desktop choice takes precedence over `AUDIT_SUGGESTIONS_ENABLED`.
+  See
   [AI fix suggestions](ai-suggestions.md).
 
 Typical data locations are:

@@ -56,6 +56,7 @@ class SuggestionWorker:
         self._connect = connect_fn
         self._wake = asyncio.Event()
         self._task: asyncio.Task[None] | None = None
+        self.busy = False
 
     def wake(self) -> None:
         self._wake.set()
@@ -103,6 +104,13 @@ class SuggestionWorker:
 
     async def process_one(self) -> bool:
         """Handle the oldest queued suggestion. False when none was waiting."""
+        # A canceled database row may still have a model request in flight.
+        try:
+            return await self._process_one()
+        finally:
+            self.busy = False
+
+    async def _process_one(self) -> bool:
 
         def claim(conn: sqlite3.Connection) -> sqlite3.Row | None:
             if not repo.table_exists(conn):
@@ -112,6 +120,7 @@ class SuggestionWorker:
         row = await self._db(claim)
         if not isinstance(row, sqlite3.Row):
             return False
+        self.busy = True
         sid = int(row["id"])
         try:
             result, outcome, used_vision = await self._suggest(row)

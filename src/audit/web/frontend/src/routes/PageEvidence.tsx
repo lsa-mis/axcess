@@ -89,12 +89,15 @@ export default function PageEvidenceRoute() {
   // evidence is encrypted and must not reach a model, and a running scan's
   // evidence is not final. The server refuses both too; hiding the button
   // here means nobody is offered something that will be refused.
+  // Saved answers remain readable with AI off. FixSuggestion hides only
+  // new-request controls, not the saved answer (COGA: avoid loss of context,
+  // https://www.w3.org/TR/coga-usable/, paraphrased).
   const suggestionsApply =
     scanData.status === "completed" && !scanData.protection && suggestionStatus !== undefined;
   const suggestions: SuggestionAvailability | null =
-    suggestionsApply && suggestionStatus.enabled ? suggestionStatus : null;
+    suggestionsApply ? suggestionStatus : null;
   const suggestionsBlocked =
-    suggestionsApply && !suggestionStatus.enabled && suggestionStatus.reason !== "turned_off"
+    suggestionsApply && !suggestionStatus.enabled
       ? suggestionStatus
       : null;
 

@@ -671,6 +671,9 @@ function routeTitle(pathname: string): string {
     [/^\/about\/?$/, "About"],
     [/^\/settings\/?$/, "Settings"],
     [/^\/settings\/ai\/?$/, "AI features"],
+    // Match the welcome heading so route announcements use the same words
+    // (WCAG 2.2 SC 3.2.4 Consistent Identification, Level AA).
+    [/^\/welcome\/ai\/?$/, "Choose whether to use AI features"],
   ];
   for (const [pattern, title] of routes) {
     if (pattern.test(pathname)) return title;

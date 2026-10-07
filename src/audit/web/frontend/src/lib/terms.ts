@@ -124,6 +124,12 @@ export const AI_INSTALL_STATE_LABEL: Record<AiInstallState, string> = {
   done: "Ready",
 };
 
+/** Saved desktop AI choice, separate from whether models are ready. */
+export const AI_FEATURE_STATE_LABEL = {
+  on: "AI features are on",
+  off: "AI features are off",
+};
+
 /** Desktop AI setup: the size of the AI models. */
 export const AI_TIER_LABEL: Record<AiTierId, string> = {
   small: "Small",

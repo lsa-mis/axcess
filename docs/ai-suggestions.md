@@ -66,7 +66,10 @@ flowchart LR
 ## Set up AI features in the desktop app
 
 **Settings > AI features** installs everything the AI features need, after
-you ask it to. Nothing is downloaded before that.
+you ask it to. Nothing is downloaded before that. On a fresh installation,
+Axcess offers **Set up AI features** or **Continue without AI** when it first
+opens. Choosing setup opens the size page; it does not start a download.
+Choosing to continue keeps AI off. You can change your choice in Settings.
 
 1. Axcess checks this computer: memory (RAM), free disk space, and whether
    there is a graphics chip that speeds AI up (an Apple chip, or an NVIDIA or
@@ -96,23 +99,49 @@ want them.
 
 Files are kept in the Axcess data folder, under `ai/`: the Ollama program in
 `ai/runtime`, models in `ai/models`, and the setup in `ai/config.json`.
-**Remove AI features** deletes them. If Axcess used an Ollama you already had,
+The on/off and first-launch choices are saved in `ai/preferences.json`.
+**Remove AI features** deletes Axcess's program and models and forgets the
+setup. It keeps the saved off choice so the welcome does not repeat.
+If Axcess used an Ollama you already had,
 removing only forgets the setup; the models stay in your Ollama.
+
+### Turn AI off without removing it
+
+Select **Turn AI off** in **Settings > AI features**. This stops Axcess's
+private Ollama and blocks new AI suggestions and model-based scan checks.
+It does not stop an Ollama you started yourself. Models are kept, and the
+choice stays saved when you close and reopen Axcess.
+
+Regular checks, reading text inside images (OCR), reports, exports and saved
+AI suggestions still work. The motion check keeps its regular browser checks
+but does not ask an AI model.
+
+Finish or stop a scan, finish or cancel waiting AI answers, and pause a
+download before changing the setting. Canceling an answer can leave its model
+request finishing in the background; wait for that request to finish too.
+Axcess explains why it cannot change the setting and leaves the choice as it
+was. It does not switch off later without another click.
+
+Select **Turn AI on** to reuse the kept models. If there is no setup yet,
+choose a size and select **Download and set up** instead. AI becomes available
+only when the required local models are ready. Scan-time AI checks are still
+off for each new scan until you choose them. Existing installations keep
+their setup and do not repeat the first-launch choice.
 
 Sizes, checksums, and model names are pinned in `src/audit/ai/catalog.json`.
 To move to a newer Ollama or model, update that file in a release.
 
 ## Turn it on
 
-**In the desktop app** AI fix suggestions are already on. You only need
-Ollama and the models. The easy way is **Settings > AI features** (see
+**In the desktop app**, choose AI during first launch or open
+**Settings > AI features** (see
 [Set up AI features in the desktop app](#set-up-ai-features-in-the-desktop-app)).
-You can also do steps 1 and 2 yourself. Until the models are there, the
+You can also do steps 1 and 2 yourself, then enable AI in Settings. Until the models are there, the
 button's place shows what is missing and links to the setup page. Axcess
 never downloads anything until you choose a size and select **Download and
 set up**.
-To turn suggestions off, set `AUDIT_SUGGESTIONS_ENABLED=false` before you
-start the app.
+To turn AI off, use **Turn AI off** in Settings. The saved desktop choice
+takes precedence over `AUDIT_SUGGESTIONS_ENABLED`.
 
 **In the web version** follow all four steps.
 

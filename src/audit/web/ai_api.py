@@ -14,7 +14,9 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict
 
 from audit.ai.installer import InstallStatus
-from audit.ai.manager import AIManager, AIPlan, NotEnoughSpaceError
+from audit.ai.manager import AIBusyError, AIManager, AIPlan, NotEnoughSpaceError
+from audit.ai.runtime import RuntimeSetupError
+from audit.ai.state import AIPreferences, AIStateError
 
 
 class InstallRequest(BaseModel):
@@ -23,13 +25,37 @@ class InstallRequest(BaseModel):
     tier: Literal["small", "standard", "large"]
 
 
+class PreferenceRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    enabled: bool
+
+
 def build_ai_router(manager: AIManager) -> APIRouter:
     router = APIRouter()
 
     @router.get("/ai/plan")
     async def ai_plan() -> AIPlan:
         """This computer, the model sizes it can run, and the current setup."""
-        return await asyncio.to_thread(manager.plan)
+        try:
+            return await asyncio.to_thread(manager.plan)
+        except AIStateError as exc:
+            raise HTTPException(503, str(exc)) from exc
+
+    @router.get("/ai/preferences")
+    def ai_preferences() -> AIPreferences:
+        try:
+            return manager.preferences()
+        except AIStateError as exc:
+            raise HTTPException(503, str(exc)) from exc
+
+    @router.put("/ai/preferences")
+    async def ai_set_preferences(body: PreferenceRequest) -> AIPreferences:
+        try:
+            return await asyncio.to_thread(manager.set_enabled, body.enabled)
+        except AIBusyError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        except (RuntimeSetupError, AIStateError) as exc:
+            raise HTTPException(503, str(exc)) from exc
 
     @router.get("/ai/install")
     def ai_install_status() -> InstallStatus:
@@ -54,6 +80,9 @@ def build_ai_router(manager: AIManager) -> APIRouter:
     @router.delete("/ai", status_code=204)
     async def ai_remove() -> None:
         """Turn AI features off and delete what Axcess downloaded."""
-        await asyncio.to_thread(manager.remove)
+        try:
+            await asyncio.to_thread(manager.remove)
+        except AIBusyError as exc:
+            raise HTTPException(409, str(exc)) from exc
 
     return router

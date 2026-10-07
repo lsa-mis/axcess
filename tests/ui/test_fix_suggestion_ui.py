@@ -8,6 +8,7 @@ views switch by keyboard, and the panel has no axe violations.
 
 from __future__ import annotations
 
+import asyncio
 import threading
 import time
 from collections.abc import Iterator
@@ -17,6 +18,8 @@ from typing import Any
 import pytest
 import uvicorn
 
+from audit.ai.state import AIPreferences, save_preferences
+from audit.config import Settings
 from audit.db.schema import connect
 from audit.web import server as web_server
 from audit.web.server import create_app
@@ -31,13 +34,23 @@ pytest.importorskip("playwright.async_api")
 
 @pytest.fixture
 def suggest_server(
-    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch
+    seeded_db: tuple[Path, Path, int],
+    monkeypatch: pytest.MonkeyPatch,
+    request: pytest.FixtureRequest,
 ) -> Iterator[tuple[str, int, int, int]]:
     """Live server with suggestions on: ``(base, scan_id, page_id, finding_id)``."""
     if not (web_server._FRONTEND_DIST / "index.html").exists():
         pytest.skip("SPA bundle not built (run `npm run build`)")
     monkeypatch.setenv("AUDIT_SUGGESTIONS_ENABLED", "true")
     db_path, blob_dir, scan_id = seeded_db
+    if getattr(request, "param", False):
+        monkeypatch.setenv("AUDIT_DESKTOP", "1")
+        monkeypatch.setenv("AUDIT_DATA_DIR", str(db_path.parent))
+        monkeypatch.setattr("audit.ai.manager.system_ollama", lambda: None)
+        save_preferences(
+            Settings(data_dir=db_path.parent, desktop=True),
+            AIPreferences(enabled=True, choice_recorded=True),
+        )
     finding_id = _add_finding(db_path, scan_id)
     conn = connect(db_path)
     try:
@@ -66,6 +79,44 @@ def suggest_server(
     finally:
         server.should_exit = True
         thread.join(timeout=5)
+
+
+@pytest.mark.parametrize("suggest_server", [True], indirect=True)
+async def test_saved_suggestion_stays_readable_with_ai_off(
+    suggest_server: tuple[str, int, int, int], new_page: Any
+) -> None:
+    base, scan_id, page_id, finding_id = suggest_server
+    page = await new_page()
+    try:
+        response = await page.request.post(
+            f"{base}/api/scans/{scan_id}/suggestions",
+            data={"occurrence_kind": "a11y", "occurrence_id": finding_id},
+        )
+        assert response.status == 202
+        sid = (await response.json())["id"]
+        for _ in range(100):
+            answer = await (
+                await page.request.get(f"{base}/api/scans/{scan_id}/suggestions/{sid}")
+            ).json()
+            if answer["status"] == "ready":
+                break
+            await asyncio.sleep(0.02)
+        assert answer["status"] == "ready"
+        for _ in range(100):
+            off = await page.request.put(f"{base}/api/ai/preferences", data={"enabled": False})
+            if off.status == 200:
+                break
+            await asyncio.sleep(0.02)
+        assert off.status == 200
+        await page.goto(f"{base}/app/scans/{scan_id}/pages/{page_id}", wait_until="networkidle")
+        card = page.locator(f"#finding-{finding_id}")
+        await card.get_by_text('<input id="q" aria-label="Search">').wait_for()
+        assert await card.get_by_role("button", name="Suggest again").count() == 0
+        await page.get_by_text("AI features are off.", exact=False).first.wait_for()
+        violations = await _run_axe(page)
+        assert not violations, _render_violations(violations)
+    finally:
+        await page.context.close()
 
 
 async def test_suggestion_works_by_keyboard_and_passes_axe(

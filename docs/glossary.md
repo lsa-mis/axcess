@@ -299,6 +299,14 @@ Ollama. Axcess installs one only in the desktop app, from **Settings > AI
 features**, after you choose a size (Small, Standard or Large). AI results
 are never reported as [Barriers](#barrier).
 
+### AI features
+
+Optional model-based suggestions and checks that run on this computer.
+You can choose them when the desktop app first opens or in **Settings > AI
+features**. Turning AI off keeps downloaded models and saved results, but
+stops new model calls and Axcess's private Ollama. It does not stop an Ollama
+you started yourself. Regular checks and [OCR](#ocr) still work.
+
 ### OCR
 
 Optical character recognition: software that reads text inside images. The

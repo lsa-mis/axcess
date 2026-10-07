@@ -16,6 +16,10 @@ function formatBytes(value: number | null): string {
  * Each switch says why it is unavailable instead of going quietly grey:
  * "not installed" and "turn on OCR first" are the two reasons, and both
  * are things the reviewer can act on.
+ * AI off blocks only model reviews, not the browser motion check. Its hint
+ * explains that distinction rather than disabling useful regular coverage
+ * (repo plain-language rules; WCAG 2.2 SC 3.3.2 Labels or Instructions,
+ * Level A).
  */
 export default function LocalAiGroup({ settings, update, policy, capabilities }: GroupProps) {
   const local = capabilities.local;
@@ -70,7 +74,9 @@ export default function LocalAiGroup({ settings, update, policy, capabilities }:
             onChange={(on) => update(switchPatch(settings, "motion", on))}
             label={SWITCHES.motion.label}
             hint={
-              local?.vision.available
+              local?.ai_enabled === false
+                ? `${SWITCHES.motion.hint} AI is off; only the regular browser checks run.`
+                : local?.vision.available
                 ? `${SWITCHES.motion.hint} Adds one vision model review per page.`
                 : `${SWITCHES.motion.hint} The vision model review starts once the model is installed on this computer.`
             }

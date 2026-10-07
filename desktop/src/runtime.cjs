@@ -122,7 +122,8 @@ function desktopEnvironment({
     // by the Ollama on this computer. Without Ollama or its model the
     // button explains what is missing and links to Settings > AI features;
     // nothing is downloaded until the person chooses to. Setting
-    // AUDIT_SUGGESTIONS_ENABLED=false before starting Axcess turns them off.
+    // This is the legacy/default value; the saved desktop on/off choice
+    // takes precedence. A fresh installation starts with AI off.
     AUDIT_SUGGESTIONS_ENABLED: inherited.AUDIT_SUGGESTIONS_ENABLED || "true",
     // Turns on the Settings > AI features page. It downloads Ollama and
     // models only after the person chooses a size and selects Download.

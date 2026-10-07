@@ -263,6 +263,11 @@ def main(argv: list[str] | None = None) -> None:
     if args.verify_runtime:
         settings = get_settings()
         settings.ensure_dirs()
+        # Record a fresh-install choice before migrations create the database.
+        # An existing database marks an upgrade, including installs with no scans.
+        from audit.ai.state import initialize_preferences
+
+        initialize_preferences(settings, existing_install=settings.db_path.exists())
         apply_desktop_migrations(settings.db_path)
         print(json.dumps(asyncio.run(verify_runtime()), sort_keys=True))
         return

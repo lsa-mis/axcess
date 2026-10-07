@@ -693,9 +693,12 @@ export default function InspectorRoute() {
   const suggestionsApply =
     scanData?.status === "completed" && !scanData.protection && suggestionStatus !== undefined;
   const suggestions: SuggestionAvailability | null =
-    suggestionsApply && suggestionStatus.enabled ? suggestionStatus : null;
+    // Keep saved answers visible when AI is off; request controls are hidden
+    // inside FixSuggestion. W3C COGA (paraphrased: preserve context),
+    // https://www.w3.org/TR/coga-usable/.
+    suggestionsApply ? suggestionStatus : null;
   const suggestionsBlocked =
-    suggestionsApply && !suggestionStatus.enabled && suggestionStatus.reason !== "turned_off"
+    suggestionsApply && !suggestionStatus.enabled
       ? suggestionStatus
       : null;
   // readableLocator returns a selector unchanged and turns a Rule check
@@ -1957,4 +1960,3 @@ function scheduleIdle(task: () => void): void {
     window.setTimeout(task, 0);
   }
 }
-
