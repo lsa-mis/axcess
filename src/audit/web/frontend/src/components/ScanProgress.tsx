@@ -76,9 +76,12 @@ export default function ScanProgressView({
         meta={
           <>
             <span className="font-semibold text-fg">{site}</span>
-            <span aria-hidden className="px-1.5 text-border-strong">·</span>
+            {/* Drawn dots, not "·" characters, for the same reason as the line in
+                ReportHeader's meta: light text separators fail contrast checks
+                though they are decoration. */}
+            <span aria-hidden className="mx-2 inline-block h-1 w-1 rounded-full bg-border-strong align-middle" />
             Report #{scan.id}
-            <span aria-hidden className="px-1.5 text-border-strong">·</span>
+            <span aria-hidden className="mx-2 inline-block h-1 w-1 rounded-full bg-border-strong align-middle" />
             <span title={scan.started_at ?? undefined}>Started {relativeTime(scan.started_at)}</span>
           </>
         }

@@ -76,7 +76,11 @@ export function ReportMeta({
     <>
       <span className="font-semibold tabular-nums text-fg">{counts}</span>
       {note && (<>
-        <span aria-hidden className="px-1.5 text-border-strong">|</span>
+        {/* A drawn line, not a "|" character: as text in the light border
+            colour it was 1.68:1, which contrast checkers report even though
+            it is decoration (Alfa sia-r66; October 2026 AAA audit). A shape
+            is plainly decoration, so no contrast rule applies to it. */}
+        <span aria-hidden className="mx-2 inline-block h-[1em] w-px bg-border-strong align-[-0.15em]" />
         <span className="text-fg-subtle">{note}</span>
       </>)}
     </>
