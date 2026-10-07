@@ -237,18 +237,6 @@
       scroll-padding-top: 141px;
     }
   }
-  /* Running text no wider than about 75 characters a line (35em): SC 1.4.8
-     Visual Presentation (Level AAA) asks for 80 or fewer, and help text on
-     the roadmap, Rule check issues, About and a page's evidence ran 92 to
-     133 (October 2026 AAA audit). The whole selector is in :where(), so it
-     has no specificity and any element with its own max-w-* keeps it (with
-     #main outside :where(), the id outranked those classes and squeezed
-     the report header's one-line summary onto two lines); on the text itself, not
-     its container, so tables, cards and pictures keep their width. In em,
-     not ch: Atkinson's zero is wide, so ch overshoots. */
-  :where(#main p, #main li, #main dd) {
-    max-width: 35em;
-  }
   a {
     @apply text-umich-blue underline-offset-2;
   }

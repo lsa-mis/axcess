@@ -191,7 +191,7 @@ export default function PageEvidenceRoute() {
                   <AltChip alt={image.alt_text} />
                 </div>
                 {image.alt_text ? (
-                  <p className="mt-2 text-sm text-fg">
+                  <p className="mt-2 max-w-measure text-sm text-fg">
                     <span className="font-semibold">Alt text:</span> “{image.alt_text}”
                   </p>
                 ) : (
@@ -275,7 +275,7 @@ function FindingCard({
       </div>
 
       {finding.failure_summary && (
-        <p className="mt-2.5 text-sm leading-relaxed text-fg">{finding.failure_summary}</p>
+        <p className="mt-2.5 max-w-measure text-sm leading-relaxed text-fg">{finding.failure_summary}</p>
       )}
       <AlfaEvidenceNote evidence={finding} />
 

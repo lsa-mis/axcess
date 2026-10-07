@@ -195,7 +195,7 @@ export default function TrackingRoute() {
         <h2 id="roadmap-h" className="mb-1 text-base font-semibold text-fg">
           What Axcess checks, and what is planned
         </h2>
-        <p className="mb-3 text-sm text-fg-muted">
+        <p className="mb-3 max-w-measure text-sm text-fg-muted">
           This table lists every Web Content Accessibility Guidelines (WCAG) 2.2
           criterion at Level A and AA. For each one, it shows what Axcess checks
           today, what you still need to test by hand, and the AI reviews planned

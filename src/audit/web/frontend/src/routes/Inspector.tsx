@@ -1249,15 +1249,20 @@ export default function InspectorRoute() {
                 the capture, not a status that changes, so it should not be
                 re-announced every time the highlight count updates. It says
                 where the styles come from, because that differs: a copy with
-                saved styles uses them, an older copy loads the site's. */}
-            <p className="border-t border-border px-3 py-2 text-2xs text-fg-muted">
-              {savedStyles
-                ? "The page code shown here is a copy. Its styles are the ones the scan saved. Its fonts and images load from the live site now, so they can look different from how they looked during the scan."
-                : "The page code shown here is a copy. Its styles, fonts, and images load from the live site now, so the page can look different from how it looked during the scan."}{" "}
-              The page&rsquo;s own scripts never run here. So if the site would
-              only show a flagged element with JavaScript, Axcess makes it
-              visible to highlight it.
-            </p>
+                saved styles uses them, an older copy loads the site's. The
+                band spans the panel and the text inside it stops at a
+                readable width (max-w-measure, SC 1.4.8 Visual Presentation,
+                Level AAA): capping the band itself cut its top border short. */}
+            <div className="border-t border-border px-3 py-2 text-2xs text-fg-muted">
+              <p className="max-w-measure">
+                {savedStyles
+                  ? "The page code shown here is a copy. Its styles are the ones the scan saved. Its fonts and images load from the live site now, so they can look different from how they looked during the scan."
+                  : "The page code shown here is a copy. Its styles, fonts, and images load from the live site now, so the page can look different from how it looked during the scan."}{" "}
+                The page&rsquo;s own scripts never run here. So if the site would
+                only show a flagged element with JavaScript, Axcess makes it
+                visible to highlight it.
+              </p>
+            </div>
             {/* Below the page and closed: above it, the list pushed the page
                 the reviewer came to see out of view. */}
             {evidenceCount > 0 && (

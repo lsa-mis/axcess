@@ -136,6 +136,16 @@ const config: Config = {
       minWidth: {
         target: "var(--target, 44px)",
       },
+      maxWidth: {
+        // Running text no wider than about 75 characters a line: SC 1.4.8
+        // Visual Presentation, Level AAA, asks for 80 or fewer. Put it on a
+        // paragraph of help or explanation that would otherwise run the
+        // width of a wide panel. Not on a whole area: a blanket cap on every
+        // p, li and dd (the first fix) cut panels' coloured bands short and
+        // squeezed values such as the Inspector's element locator. In em,
+        // not ch: Atkinson Hyperlegible's zero is wide, so ch overshoots.
+        measure: "35em",
+      },
       borderRadius: {
         "2xs": "5px",
         xs: "8px",

@@ -205,7 +205,7 @@ function ScopeBanner() {
           className="mt-0.5 h-5 w-5 shrink-0 text-umich-blue"
           aria-hidden
         />
-        <p className="text-sm text-fg">
+        <p className="max-w-measure text-sm text-fg">
           <strong>What this page shows.</strong> Each occurrence names the check
           that found it: <strong>Rule check (axe)</strong> or{" "}
           <strong>Rule check (Alfa)</strong>. Both test pages against fixed

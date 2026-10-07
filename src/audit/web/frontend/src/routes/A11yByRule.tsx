@@ -132,7 +132,7 @@ export default function A11yByRuleRoute() {
       >
         <div className="flex items-start gap-3">
           <Info className="mt-0.5 h-5 w-5 shrink-0 text-umich-blue" aria-hidden />
-          <p className="text-sm text-fg">
+          <p className="max-w-measure text-sm text-fg">
             <strong>How this page groups issues.</strong> Each issue is one
             rule from one check. This view helps you <em>plan fixes</em>. For
             example, the <code>color-contrast</code> rule may fail 800 times.
