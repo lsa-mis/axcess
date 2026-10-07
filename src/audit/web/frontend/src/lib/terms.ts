@@ -1,4 +1,4 @@
-import type { DetectionPipeline, FindingStatus, ReviewLane, ScanStatus } from "../api/types";
+import type { AxeImpact, DetectionPipeline, FindingStatus, ReviewLane, ScanStatus } from "../api/types";
 
 /**
  * The words the interface uses for shared values, in one place.
@@ -62,6 +62,17 @@ export const REVIEW_TYPE_LABEL: Record<ReviewLane, string> = {
   likely_barrier: "Mostly sure",
   expert_review: "Not sure",
   informational: "For information",
+};
+
+/**
+ * An issue's impact rating, in the glossary's words ("Impact"), not axe's
+ * raw lower-case values.
+ */
+export const IMPACT_LABEL: Record<AxeImpact, string> = {
+  critical: "Critical",
+  serious: "Serious",
+  moderate: "Moderate",
+  minor: "Minor",
 };
 
 /** Each check by its interface name, with the tool in parentheses where it helps. */

@@ -1,5 +1,6 @@
 import { AlertTriangle } from "lucide-react";
 import type { AxeImpact, Severity } from "../api/types";
+import { IMPACT_LABEL } from "../lib/terms";
 
 /**
  * An axe impact rating as a small chip, on the Rule check issues views.
@@ -13,7 +14,8 @@ import type { AxeImpact, Severity } from "../api/types";
  * now, so the two views cannot drift apart again. The dark-on-pale pairs
  * clear 7:1 in both themes (SC 1.4.6 Contrast (Enhanced), Level AAA). The
  * critical chip also carries an icon, so its weight is not shown by colour
- * alone (SC 1.4.1 Use of Color, Level A).
+ * alone (SC 1.4.1 Use of Color, Level A). The words are the shared labels
+ * (IMPACT_LABEL in lib/terms.ts), never axe's raw values.
  */
 const TONE: Record<AxeImpact, Severity> = {
   critical: "critical",
@@ -35,7 +37,7 @@ export default function ImpactChip({ value }: { value: AxeImpact }) {
       className={`inline-flex items-center gap-1 rounded-xs px-1.5 py-0.5 text-2xs font-semibold ${CLASSES[TONE[value]]}`}
     >
       {value === "critical" && <AlertTriangle className="h-3 w-3" aria-hidden />}
-      {value}
+      {IMPACT_LABEL[value]}
     </span>
   );
 }
