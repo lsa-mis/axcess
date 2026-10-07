@@ -2,8 +2,8 @@
 
 What this is: an audit of the Axcess review app (`/app/`) against WCAG 2.2
 Level AAA, done on 2026-10-07 from the code on `main` (desktop 0.2.5).
-Findings are leads for fixing, ordered by level and impact. Nothing here is
-fixed yet.
+Findings are ordered by level and impact. Every finding has since been fixed
+or checked on the `WCAGAAA` branch; see "Status" at the end.
 
 ## How it was checked
 
@@ -81,3 +81,41 @@ minute kept sign-in says so on screen), 3.1.5 Reading Level (the interface
 follows docs/plain-language.md, but help text was not measured), 3.3.5 Help
 and 3.3.6 Error Prevention (All) on New scan and status changes, and 2.4.8
 Location (breadcrumbs exist on report screens; check the others).
+
+## Status
+
+Fixed on the `WCAGAAA` branch, one commit per finding, each rechecked with
+the tool that found it:
+
+| # | Fix |
+| --- | --- |
+| 1 | One shared `ImpactChip` with each severity's dark-on-pale pair; axe passes both Rule check views. |
+| 2 | `Select` triggers are named with `aria-labelledby`; Alfa sia-r8 is gone. |
+| 3 | The saved copy's frame gets the focus ring while focus is inside it (`data-focused`, set from the frame's own focus and blur, since a focused iframe matches no focus selector). |
+| 4 | Page-wide `scroll-padding-top` for the top bar, and the narrow-screen report bar only where it shows; the table region's and occurrence cards' own scroll margins were removed so they no longer add up. |
+| 5 | Small text's line height is 1.5 on the size tokens; eleven hints with their own tighter `leading-*` lost it. Alfa sia-r73 is gone. |
+| 6 | Running text in the main content is capped at 35em in a specificity-free rule. |
+| 7 | `min-h-target` on the small links, `min-w-target` on sort headers. The regression tests then found two more the live report did not show: Settings' two-character options ("On", "10") were 41 px wide, now `min-w-target` there and in New scan's matching choices; and an issue's page title link, shown only for pages with a saved copy, was 24 px tall. |
+| 8 | Screen-reader-only context on repeated links, including the shared `PageLink` (`shortLocator`). |
+| 9 | `IMPACT_LABEL` in `lib/terms.ts`. |
+| 10 | The report and scan headers' separators are drawn shapes, not light text; the other unresolved results are on the page's faint background gradient, where axe passes 91 elements at 7:1 and the darkest point (`#f4f5f7`) still clears 7:1 for the app's text colours. |
+| 11 | `EmptyState` takes a heading `level`; Not found uses 1. |
+
+Left as they are, with reasons:
+
+- About's resource links: each stretches over its card, which is the real
+  target and is 44 px or more.
+- Alfa reports the Images sample-page links at 43.5 px tall; the same links
+  measure 44 px in a full Chromium, and their minimum height is a fixed
+  44 px, so this is rounding in Alfa's headless browser build.
+- The selected tab's 1.1:1 result in New scan and Compare (a sliding fill
+  Alfa cannot see).
+- Results inside the saved copy, which belong to the scanned site.
+
+## Regression tests
+
+`tests/ui/test_wcag_aaa.py` checks each fix on a seeded report at 1280 by
+720, on 13 screens: 44 px targets, one destination per link name, line
+length and line height, focus clear of the top bar, the saved copy's focus
+ring, named dropdowns, the impact chips' contrast and words (light and
+dark), Not found's level 1 heading, and drawn header separators.
