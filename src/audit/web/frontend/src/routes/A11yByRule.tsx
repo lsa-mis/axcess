@@ -19,6 +19,7 @@ import {
   PageHeader,
   PageLink,
   pageEvidencePath,
+  shortLocator,
   Select,
   StatCard,
 } from "../components/ui";
@@ -288,7 +289,10 @@ function RuleGroupCard({
                         className="inline-flex items-center gap-1 text-umich-blue underline underline-offset-2"
                       >
                         About this rule <ExternalLink className="h-3 w-3" aria-hidden />
-                        <span className="sr-only">(opens in a new tab)</span>
+                        {/* Which rule, so the link names its destination by
+                            itself (SC 2.4.9 Link Purpose (Link Only), Level
+                            AAA; WCAG technique C7). */}
+                        <span className="sr-only">, {group.rule_id} (opens in a new tab)</span>
                       </a>
                     </>
                   )}
@@ -374,6 +378,7 @@ function FindingRow({
           pageUrl={finding.page_url}
           pageTitle={finding.page_title}
           selector={finding.target_selector}
+          elementName={finding.target_display}
           snippet={finding.html_snippet}
           origin="Rule check issues by rule"
           context={ruleId}
@@ -397,7 +402,16 @@ function FindingRow({
           </details>
         )}
         <AlfaEvidenceNote evidence={finding} />
-        <Link className="report-link inline-flex min-h-target items-center text-xs" to={pageEvidencePath({ scanId, pageId: finding.page_id, origin: "Rule check issues by rule", backTo: `/scans/${scanId}/a11y/by-rule`, hash: `#finding-${finding.id}` })}>Open the evidence for this occurrence</Link>
+        <Link className="report-link inline-flex min-h-target items-center text-xs" to={pageEvidencePath({ scanId, pageId: finding.page_id, origin: "Rule check issues by rule", backTo: `/scans/${scanId}/a11y/by-rule`, hash: `#finding-${finding.id}` })}>
+          Open the evidence for this occurrence
+          {/* Which occurrence, by page and element, for the same reason as
+              PageLink's context (SC 2.4.9 Link Purpose (Link Only), Level
+              AAA; WCAG technique C7). */}
+          <span className="sr-only">
+            {" "}on {finding.page_title?.trim() || finding.page_url}, at{" "}
+            {shortLocator(finding.target_display || finding.target_selector)}
+          </span>
+        </Link>
         {finding.failure_summary && (
           <div className="mt-1 text-2xs text-fg-muted">
             {finding.failure_summary}

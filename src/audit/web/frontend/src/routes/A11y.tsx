@@ -296,7 +296,12 @@ function SCGroupCard({ scanId, group }: { scanId: number; group: A11ySCGroup }) 
               >
                 {r.pipeline === "alfa" ? "About this rule (Alfa)" : "About this rule"}{" "}
                 <ExternalLink className="h-3 w-3" aria-hidden />
-                <span className="sr-only">(opens in a new tab)</span>
+                {/* Which rule, in screen-reader-only text: every card's link
+                    reads "About this rule", so out of context they could not
+                    be told apart (SC 2.4.9 Link Purpose (Link Only), Level
+                    AAA; WCAG technique C7). The rule ID is the one shown on
+                    the card. */}
+                <span className="sr-only">, {r.rule_id} (opens in a new tab)</span>
               </a>
             )}
           </li>

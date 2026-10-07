@@ -180,7 +180,13 @@ export default function PageEvidenceRoute() {
                   >
                     Open the image
                     <ExternalLink className="h-3.5 w-3.5" aria-hidden />
-                    <span className="sr-only">, opens in a new tab</span>
+                    {/* Which image, in screen-reader-only text: the visible
+                        words are the same on every card, so a link list read
+                        out of context gave several "Open the image" with no
+                        way to tell them apart (SC 2.4.9 Link Purpose (Link
+                        Only), Level AAA; WCAG technique C7). The file name,
+                        not the alt text, which can be missing or repeated. */}
+                    <span className="sr-only">, {imageFileName(image.src_url_canonical)}, opens in a new tab</span>
                   </a>
                   <AltChip alt={image.alt_text} />
                 </div>
@@ -381,4 +387,15 @@ function groupByRevealingControl(findings: PageEvidenceFinding[]) {
     });
   }
   return groups;
+}
+
+/** The last part of an image's address, decoded and kept short, to name it. */
+function imageFileName(src: string): string {
+  let name = src;
+  try {
+    name = decodeURIComponent(new URL(src).pathname.split("/").filter(Boolean).pop() ?? src);
+  } catch {
+    // Not a full address: use it as it is.
+  }
+  return name.length > 60 ? `${name.slice(0, 57)}…` : name;
 }

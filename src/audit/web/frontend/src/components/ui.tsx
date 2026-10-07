@@ -1110,6 +1110,7 @@ export function PageLink({
   pageTitle,
   showUrlBelow = true,
   selector = null,
+  elementName = null,
   snippet = null,
   issue = null,
   origin,
@@ -1126,6 +1127,8 @@ export function PageLink({
   showUrlBelow?: boolean;
   /** Target selector to outline on the inspected page (when known directly). */
   selector?: string | null;
+  /** A short readable name for the element (target_display), when known. */
+  elementName?: string | null;
   /** Exact element markup (html_snippet), the most reliable locator. */
   snippet?: string | null;
   /** Issue key to resolve the selector for (used when ``selector`` is absent). */
@@ -1140,6 +1143,13 @@ export function PageLink({
   backTo?: string;
 }) {
   const display = pageTitle?.trim() || pageUrl;
+  // Screen-reader-only context, so each link names where it goes by itself:
+  // one view lists many occurrences, and the same words ("Open live page",
+  // a page title) led to different pages or elements (SC 2.4.9 Link Purpose
+  // (Link Only), Level AAA; WCAG technique C7; October 2026 AAA audit). The
+  // element is its short display name where the view has one, else the last
+  // two steps of its locator, kept short (see shortLocator).
+  const element = elementName || selector ? shortLocator(elementName || selector || "") : null;
 
   // Build the inspector URL with whatever orientation/selector context the
   // caller can offer. The params are kept sparse so the route stays legible.
@@ -1171,7 +1181,9 @@ export function PageLink({
               any title that wraps. Top-aligned it stays beside the first line. */}
           <ScanEye className="h-5 w-5 shrink-0 self-start pt-0.5 text-fg-subtle" aria-hidden />
           <span className="break-words">{display}</span>
-          <span className="sr-only">, opens in the page inspector</span>
+          <span className="sr-only">
+            , opens in the page inspector{element ? ` at ${element}` : ""}
+          </span>
         </Link>
       ) : (
         // Without a scan scope there is no in-app inspector to link to; keep
@@ -1202,7 +1214,7 @@ export function PageLink({
           className="inline-flex min-h-target items-center underline underline-offset-2 hover:text-fg"
         >
           Open live page ↗
-          <span className="sr-only"> (opens in a new tab)</span>
+          <span className="sr-only"> of {display} (opens in a new tab)</span>
         </a>
         {scanId != null && (
           <>
@@ -1214,6 +1226,7 @@ export function PageLink({
               className="inline-flex min-h-target items-center underline underline-offset-2 hover:text-fg"
             >
               Page details
+              <span className="sr-only"> for {display}</span>
             </Link>
           </>
         )}
@@ -1251,4 +1264,20 @@ export function relativeTime(iso: string | null): string {
   if (months < 12) return ago(months, "month");
   const years = Math.floor(days / 365);
   return ago(years, "year");
+}
+
+/**
+ * The last two steps of an element locator, each kept short, to name an
+ * element. Two, not one: the same button repeated under different headings
+ * (a "copy link" icon on every heading) shares its last step, and the step
+ * above it is what tells them apart.
+ */
+export function shortLocator(selector: string): string {
+  const steps = selector
+    .split(">")
+    .map((step) => step.trim())
+    .filter(Boolean)
+    .slice(-2)
+    .map((step) => (step.length > 32 ? `${step.slice(0, 31)}…` : step));
+  return steps.join(" > ") || selector;
 }
