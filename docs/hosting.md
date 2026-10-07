@@ -155,7 +155,7 @@ Protected deployments must also set the administrator-owned
 `AUDIT_PROTECTED_KMS_VAULT_FACTORY` and schedule `audit protected-maintenance`
 with catch-up and failure alerting; this performs the required seven-day
 KMS-backed evidence crypto-erasure even when the web process has been offline.
-See the retention runbook in [Protected scans](./internal/protected-scans.md#required-retention-maintenance).
+See [the retention runbook for protected scans](./internal/protected-scans.md#required-retention-maintenance).
 
 Set `AUDIT_PROTECTED_PUBLIC_ORIGIN` to the exact external HTTPS origin served
 by that proxy. It is the authoritative browser Origin and companion-command
