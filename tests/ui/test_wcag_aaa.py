@@ -50,8 +50,8 @@ def report(seeded_db: tuple[Path, Path, int]) -> tuple[int, int]:
         CAPTURE,
         RULE,
         [
-            ("#intro > .copy-link-btn", "<a class='copy-link-btn'>#</a>"),
-            ("#usage > .copy-link-btn", "<a class='copy-link-btn'>#</a>"),
+            ("#intro > .copy-link-btn", '<a class="copy-link-btn" href="#intro">#</a>'),
+            ("#usage > .copy-link-btn", '<a class="copy-link-btn" href="#usage">#</a>'),
         ],
     )
     conn = connect(db_path)
@@ -222,6 +222,69 @@ async def test_running_text_is_short_and_spaced(
         problems += [f"{path}: tight {t}" for t in found["tight"]]
         await page.context.close()
     assert not problems, "\n".join(problems)
+
+
+# Elements held to a reading width that also draw a band or a box: the cap
+# cuts the band short, as a blanket cap on every p, li and dd once did.
+_CAPPED_BANDS = """() => [...document.querySelectorAll('main *')].filter((el) => {
+  const cs = getComputedStyle(el);
+  if (cs.maxWidth === 'none' || !el.getBoundingClientRect().width) return false;
+  const filled = cs.backgroundColor !== 'rgba(0, 0, 0, 0)';
+  const edged = ['Top', 'Bottom'].some((s) => parseFloat(cs[`border${s}Width`]) > 0);
+  const parent = el.parentElement.getBoundingClientRect().width;
+  return (filled || edged) && el.getBoundingClientRect().width < parent - 40
+    && /^(P|LI|DD)$/.test(el.tagName);
+}).map((el) => el.textContent.trim().slice(0, 40))"""
+
+
+async def test_reading_width_never_cuts_a_band_short(
+    live_server: tuple[str, int], new_page: Any, report: tuple[int, int]
+) -> None:
+    """The reading width (SC 1.4.8) sits on the text, not on a band or box
+    around it, and the values in the Inspector's facts about the flagged
+    element (such as its element locator) get the row's width."""
+    base, _ = live_server
+    scan_id, page_id = report
+    cut = []
+    for path in _screens(scan_id, page_id):
+        page = await _open(new_page, base, path)
+        cut += [f"{path}: {t}" for t in await page.evaluate(_CAPPED_BANDS)]
+        await page.context.close()
+    assert not cut, "\n".join(cut)
+    page = await _open(new_page, base, f"/scans/{scan_id}/pages/{page_id}/inspect?issue=axe:{RULE}")
+    await page.locator("main dl dd").first.wait_for()
+    shares = await page.evaluate(
+        """() => [...document.querySelectorAll('main dl dd')].map(
+          (dd) => dd.getBoundingClientRect().width / dd.closest('dl').getBoundingClientRect().width
+        )"""
+    )
+    assert shares and min(shares) > 0.6, shares
+    await page.context.close()
+
+
+async def test_page_link_icon_sits_beside_its_first_line(
+    live_server: tuple[str, int], new_page: Any, report: tuple[int, int]
+) -> None:
+    """The eye icon on a page title link lines up with the title's first
+    line, on one line or wrapped, while the link stays 44 px tall."""
+    base, _ = live_server
+    scan_id, _page = report
+    page = await _open(new_page, base, f"/scans/{scan_id}/issues/axe:{RULE}/pages")
+    offsets = await page.evaluate(
+        """() => [...document.querySelectorAll('main a:has(> svg.lucide-scan-eye)')].map((a) => {
+          const icon = a.querySelector('svg').getBoundingClientRect();
+          const range = document.createRange();
+          range.selectNodeContents(a.querySelector('svg + span'));
+          const line = range.getClientRects()[0];
+          const middle = (r) => r.top + r.height / 2;
+          return [Math.abs(middle(icon) - middle(line)), a.getBoundingClientRect().height];
+        })"""
+    )
+    assert offsets
+    for offset, height in offsets:
+        assert offset <= 4, offsets
+        assert height >= 43.5, offsets
+    await page.context.close()
 
 
 async def test_focus_is_never_under_the_top_bar(
