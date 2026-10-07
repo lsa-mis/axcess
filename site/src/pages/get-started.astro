@@ -883,13 +883,18 @@ const SMARTSCREEN_TEXT =
     max-width: 66rem;
     margin-inline: auto;
   }
-  /* Running text keeps a readable line (about 75 characters); lists of
-     choices, steps with pictures and cards use the full width. */
+  /* Running text keeps a readable line, the site's 35em (about 75
+     characters; SC 1.4.8 Visual Presentation, Level AAA, asks for 80 or
+     fewer); lists of choices, steps with pictures and cards use the full
+     width. */
   .gs > p,
   .gs > ul:not(.downloads),
   .gs > ol:not(.steps):not(.install-steps),
-  .gs > .callout {
-    max-width: 46rem;
+  .gs > .callout,
+  .os-panel > p,
+  .os-panel > ul,
+  .os-panel > ol:not(.install-steps) {
+    max-width: 35em;
   }
   .gs {
     padding-block: 0.5rem 2rem;
