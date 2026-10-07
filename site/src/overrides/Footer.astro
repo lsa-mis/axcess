@@ -84,6 +84,24 @@ const groups = [
   </p>
 </div>
 
+<script>
+  // Keyboard focus never lands under the sticky header (SC 2.4.12 Focus Not
+  // Obscured (Enhanced), Level AAA). The browser skips scrolling when part
+  // of a focused element is already on screen, so a tall table or a link
+  // just under the header could be left half covered. When focus arrives
+  // and the element's top is under the header, it is scrolled to just below
+  // the header (the page's scroll padding). Fixed parts, such as the skip
+  // link, and the header itself are left alone.
+  document.addEventListener("focusin", (event) => {
+    const el = event.target;
+    const header = document.querySelector("header.header");
+    if (!(el instanceof HTMLElement) || !header || header.contains(el)) return;
+    if (getComputedStyle(el).position === "fixed" || el.closest("mobile-starlight-toc")) return;
+    const top = el.getBoundingClientRect().top;
+    if (top < header.getBoundingClientRect().bottom) el.scrollIntoView({ block: "start" });
+  });
+</script>
+
 <style>
   .site-footer {
     margin-top: 3rem;
