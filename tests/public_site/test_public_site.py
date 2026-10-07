@@ -135,8 +135,10 @@ def test_page_skeleton(pages: dict[str, str]) -> None:
 
 
 def test_honesty_statement_is_on_every_page(pages: dict[str, str]) -> None:
+    # In the page's text, not its markup: the first "WCAG" on a page is
+    # wrapped in <abbr> with its full form (src/middleware.ts).
     for route, html in pages.items():
-        assert "does not certify WCAG conformance" in html, route
+        assert "does not certify WCAG conformance" in _parse(html).text, route
 
 
 def test_coverage_numbers_come_from_the_matrix(pages: dict[str, str]) -> None:
