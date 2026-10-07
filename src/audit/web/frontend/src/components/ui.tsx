@@ -771,7 +771,12 @@ const TYPEAHEAD_RESET_MS = 500;
  *
  * `label` is always rendered and always associated. Pass `hideLabel` for a
  * control whose meaning is already obvious from its surroundings; the name
- * stays available to a screen reader rather than being dropped.
+ * stays available to a screen reader rather than being dropped. The trigger
+ * is named by `aria-labelledby` pointing at the label, as the APG example
+ * does, as well as by the label's `for`: a `<label>` naming a button that
+ * carries `role="combobox"` is not read the same way by every browser and
+ * checker, and Siteimprove Alfa found the Inspector's page-state picker
+ * unnamed (SC 4.1.2 Name, Role, Value, Level A; October 2026 AAA audit).
  *
  * `stacked` puts the label above rather than beside it, for a filter bar of
  * several controls where inline captions would eat the width the values need.
@@ -964,6 +969,7 @@ export function Select({
           aria-expanded={open}
           aria-controls={listId}
           aria-activedescendant={open && active >= 0 ? optionId(active) : undefined}
+          aria-labelledby={labelId}
           aria-describedby={describedBy || undefined}
           data-value={value}
           disabled={disabled}
