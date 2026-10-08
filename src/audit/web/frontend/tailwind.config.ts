@@ -86,6 +86,9 @@ const config: Config = {
         // The stack itself is `--font-sans` in styles.css, so the Font
         // setting can swap it without touching a class.
         sans: ["var(--font-sans)"],
+        // The "axcess" logo beside the brand mark, and nothing else (see
+        // `src/fonts.css`). Not swapped by the Font setting: it is the logo.
+        brand: ['"Comfortaa"', "var(--font-sans)"],
         mono: [
           '"Atkinson Hyperlegible Mono"',
           "ui-monospace",
