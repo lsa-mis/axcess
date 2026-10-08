@@ -45,7 +45,9 @@ readers; this page tells contributors which words to use.
     Buttons and controls too: "Start a scan", not "Start A Scan". Names
     keep their capitals ("Axcess", "Excel"), and so do the named terms in
     the table below ("Mostly sure", "Not sure", "Best practice",
-    "Click-Through").
+    "Click-Through"). One exception: the logo beside the brand mark,
+    top left, spells it "axcess", in lowercase, as a logo; text everywhere
+    else writes "Axcess".
     Two tests enforce this: `tests/ui/test_control_label_case.py` reads
     every control on the main screens of the review app, and
     `desktop/test/installer-wording.test.cjs` reads every string of the
