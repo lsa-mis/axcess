@@ -86,7 +86,8 @@ async def test_previous_and_next_step_through_the_rendered_page(
         status = group.get_by_role("status")
         previous = group.get_by_role("button", name="Previous flagged element")
         following = group.get_by_role("button", name="Next flagged element")
-        await playwright_async.expect(status).to_have_text("Flagged element 1 of 3")
+        # After the count, a screen reader also hears what the element is.
+        await playwright_async.expect(status).to_have_text("Flagged element 1 of 3: Text field")
         await playwright_async.expect(previous).to_be_disabled()
         # The buttons say what they do, and each name starts with the word a
         # voice control user sees and says (SC 2.5.3).
@@ -96,7 +97,9 @@ async def test_previous_and_next_step_through_the_rendered_page(
         frame = page.frame_locator("iframe[title^='Saved copy']")
 
         async def assert_on(n: int) -> None:
-            await playwright_async.expect(status).to_have_text(f"Flagged element {n} of 3")
+            await playwright_async.expect(status).to_have_text(
+                f"Flagged element {n} of 3: Text field"
+            )
             # The current element is blue on a maize halo; the rest stay red,
             # so the one you are on is told apart by more than thickness.
             for other in (1, 2, 3):
@@ -185,7 +188,7 @@ async def test_the_stepper_fits_a_phone(
         )
         group = page.get_by_role("group", name="Flagged elements", exact=True)
         await playwright_async.expect(group.get_by_role("status")).to_have_text(
-            "Flagged element 1 of 3"
+            "Flagged element 1 of 3: Text field"
         )
         box = await group.bounding_box()
         assert box and box["x"] >= 0 and box["x"] + box["width"] <= 320, box

@@ -142,7 +142,7 @@ async def test_the_current_element_gets_a_numbered_box_and_a_description(
     try:
         group = page.get_by_role("group", name="Flagged elements", exact=True)
         await playwright_async.expect(group.get_by_role("status")).to_have_text(
-            "Flagged element 1 of 3"
+            "Flagged element 1 of 3: Link, “Read the big story”"
         )
         frame = page.frame_locator("iframe[title^='Saved copy']")
         box = frame.locator("#axcess-spotlight")

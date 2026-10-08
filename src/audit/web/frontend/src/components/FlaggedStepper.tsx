@@ -29,6 +29,13 @@ import { cn } from "../lib/cn";
  * controls; easier for low vision and for anyone with an unsteady hand),
  * and the count stands outside them as plain text, the status it is.
  *
+ * The count is a status, so a screen reader hears where the reader is after
+ * each step without moving. With ``detail`` it also hears what the element
+ * is ("Flagged element 2 of 5: Heading level 5, “Status messages”"), as
+ * screen-reader-only text: on screen the facts table under the toolbar
+ * already shows it, but a screen reader would have to go and find that table
+ * after every step (SC 4.1.3 Status Messages, Level AA).
+ *
  * "Previous" and "Next", not "issue": the steps are flagged elements (each
  * an occurrence's place on this page), and "issue" is the grouped rule
  * (docs/plain-language.md).
@@ -37,6 +44,7 @@ export default function FlaggedStepper({
   count,
   index,
   onGo,
+  detail,
   className,
 }: {
   /** How many flagged elements the page has. */
@@ -45,6 +53,8 @@ export default function FlaggedStepper({
   index: number;
   /** Go to element ``next`` (0-based). */
   onGo: (next: number) => void;
+  /** What the current element is, heard after the count; not shown. */
+  detail?: string;
   className?: string;
 }) {
   const many = count > 1;
@@ -56,6 +66,7 @@ export default function FlaggedStepper({
     >
       <span role="status" aria-atomic="true" className="text-2xs font-semibold text-fg-muted">
         {many ? `Flagged element ${index + 1} of ${count}` : "1 flagged element"}
+        {detail && <span className="sr-only">: {detail}</span>}
       </span>
       <span className="inline-flex items-center gap-2">
         {many && (

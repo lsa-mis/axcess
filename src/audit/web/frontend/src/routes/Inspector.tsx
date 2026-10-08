@@ -30,8 +30,10 @@ import {
   drawnOnCanvas,
   drawsNoBox,
   findTargetElement,
+  focusInCopy,
   HIGHLIGHT_CLASS,
   markCurrent,
+  noteCurrent,
   normalizeWhitespace,
   readableLocator,
   scrollPanels,
@@ -644,6 +646,15 @@ export default function InspectorRoute() {
           delete frame.dataset.focused;
         });
       }
+      // Escape inside the saved copy goes back to "Go to this element",
+      // the way in (see there). The copy runs no scripts of its own, so no
+      // key of the page's is taken.
+      doc?.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && goToRef.current) {
+          event.preventDefault();
+          goToRef.current.focus();
+        }
+      });
       if (frame && doc) {
         setCanvasCheck({ doc: frame.srcdoc, drawn: drawnOnCanvas(doc) });
         if (fingerprint?.samples?.length) {
@@ -678,6 +689,7 @@ export default function InspectorRoute() {
     const marks = Array.from(doc.querySelectorAll<HTMLElement>(`.${HIGHLIGHT_CLASS}`));
     if (marks.length === 0) {
       spotlight(null, "", doc);
+      noteCurrent(doc, null, "");
       return false;
     }
     marks.forEach((mark, i) => markCurrent(mark, i === index));
@@ -685,6 +697,7 @@ export default function InspectorRoute() {
     spotlight(target, marks.length > 1 ? `${index + 1} of ${marks.length}` : "Flagged element", doc, (el) =>
       setCurrentElement(describeElement(el)),
     );
+    noteCurrent(doc, target, marks.length > 1 ? `Flagged element ${index + 1} of ${marks.length}` : "Flagged element");
     if (target) keepCentered(target);
     return true;
   }
@@ -719,6 +732,32 @@ export default function InspectorRoute() {
   // Whether the locator is shown in full. It stays as the reader set it while
   // they step, so every element's row keeps the same shape.
   const [locatorOpen, setLocatorOpen] = useState(false);
+  // "Go to this element in the saved copy": the button, to come back to with
+  // Escape, and what it says when the element cannot take focus.
+  const goToRef = useRef<HTMLButtonElement>(null);
+  const [goToNote, setGoToNote] = useState<{ attempt: number; text: string } | null>(null);
+  const goToAttempts = useRef(0);
+  useEffect(() => setGoToNote(null), [srcDoc, pageMark]);
+  const goToElement = () => {
+    goToAttempts.current += 1;
+    const attempt = goToAttempts.current;
+    let landed = false;
+    try {
+      const target = frameRef.current?.contentDocument?.querySelector<HTMLElement>("[data-axcess-current]");
+      landed = Boolean(target && focusInCopy(target));
+      if (target && landed) keepCentered(target);
+    } catch {
+      // Opaque document: focus cannot be moved into it.
+    }
+    setGoToNote(
+      landed
+        ? null
+        : {
+            attempt,
+            text: "This element cannot take focus in the saved copy, because it is hidden there or it is the whole page. The table above describes it.",
+          },
+    );
+  };
   const goToPageMark = (index: number) => {
     const bounded = Math.max(0, Math.min(highlightedCount - 1, index));
     setPageMark(bounded);
@@ -997,6 +1036,11 @@ export default function InspectorRoute() {
                   count={highlightedCount}
                   index={pageMark}
                   onGo={goToPageMark}
+                  detail={
+                    currentElement
+                      ? `${currentElement.kind}${currentElement.text ? `, “${currentElement.text}”` : ""}`
+                      : undefined
+                  }
                   className="ml-auto"
                 />
               )}
@@ -1094,6 +1138,40 @@ export default function InspectorRoute() {
                     )
                   )}
                 </dl>
+                {/* The way to the element itself for a screen reader or a
+                    keyboard. The box in the copy is drawn for the eye, so
+                    without this a screen reader user had to search the
+                    whole copy for an element nothing marked. It moves focus
+                    onto the element, where a screen reader reads it in its
+                    place on the page, with "Flagged element 2 of 5" as its
+                    description (noteCurrent), and Escape comes back here.
+                    A separate button, not part of Next: moving focus into
+                    the copy at every step would take the reader away from
+                    Next each time. After the facts, so it is reached once
+                    the reader knows what the element is. SC 2.1.1 Keyboard,
+                    Level A; SC 2.4.3 Focus Order, Level A; SC 1.3.1 Info
+                    and Relationships, Level A (the flag was only visual).
+                    The hint is its description; the note, a status, says in
+                    words when focus could not move. */}
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <Button
+                    ref={goToRef}
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="min-h-target"
+                    aria-describedby="inspect-go-to-hint"
+                    onClick={goToElement}
+                  >
+                    Go to this element in the {copyName.toLowerCase()}
+                  </Button>
+                  <span id="inspect-go-to-hint" className="text-xs text-fg-muted">
+                    Moves keyboard focus onto it. Press Escape to come back here.
+                  </span>
+                  <span role="status" className="basis-full text-xs text-fg empty:sr-only">
+                    {goToNote && <span key={goToNote.attempt}>{goToNote.text}</span>}
+                  </span>
+                </div>
               </div>
             )}
             {/* Says when the saved copy may not look like the page Axcess

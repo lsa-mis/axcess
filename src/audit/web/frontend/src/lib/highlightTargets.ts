@@ -315,6 +315,65 @@ export function markCurrent(el: HTMLElement | SVGElement, current: boolean): voi
   el.style.setProperty("outline-offset", current ? "-3px" : "-2px", "important");
 }
 
+/** The hidden note a screen reader hears on the flagged element the reader is on. */
+const NOTE_ID = "axcess-flagged-note";
+
+/**
+ * Tell a screen reader which element is flagged, inside the saved copy.
+ *
+ * The box and its label are drawn for the eye and hidden from screen
+ * readers (``aria-hidden``): they are boxes over the page, not part of it.
+ * So the element the reader is on also gets a description (aria-describedby)
+ * pointing at one hidden note, "Flagged element 2 of 5", which a screen
+ * reader says when focus lands on it (``focusInCopy``). Its own description,
+ * if it has one, is kept and comes after. Only the current element carries
+ * it: the note is moved, not copied, at every step. Rejected: text written
+ * into the page beside the element, which a screen reader would also read
+ * as part of the page wherever it went, and which changes the page's
+ * layout. The note is ``hidden``: a description may point at hidden text,
+ * so it is heard on the element and never on its own.
+ */
+export function noteCurrent(doc: Document, el: Element | null, text: string): void {
+  for (const other of Array.from(doc.querySelectorAll(`[aria-describedby~="${NOTE_ID}"]`))) {
+    const rest = (other.getAttribute("aria-describedby") ?? "")
+      .split(/\s+/)
+      .filter((id) => id && id !== NOTE_ID);
+    if (rest.length) other.setAttribute("aria-describedby", rest.join(" "));
+    else other.removeAttribute("aria-describedby");
+  }
+  let note = doc.getElementById(NOTE_ID);
+  if (!el || isWholePage(el)) {
+    note?.remove();
+    return;
+  }
+  if (!note) {
+    note = doc.createElement("span");
+    note.id = NOTE_ID;
+    note.hidden = true;
+    doc.body?.appendChild(note);
+  }
+  note.textContent = text;
+  const own = (el.getAttribute("aria-describedby") ?? "").split(/\s+/).filter(Boolean);
+  el.setAttribute("aria-describedby", [NOTE_ID, ...own].join(" "));
+}
+
+/**
+ * Move keyboard (and screen reader) focus onto ``el`` in the saved copy.
+ * Most flagged elements, such as a heading or an image, cannot take focus,
+ * so they get ``tabindex="-1"``: focusable from here, still skipped by Tab.
+ * True when focus landed on it; false for the whole page, and for an
+ * element the copy hides, which cannot take focus at all.
+ */
+export function focusInCopy(el: Element): boolean {
+  // Checked by its focus method, not instanceof: the element belongs to
+  // the frame's window, whose HTMLElement is not this one.
+  const target = el as HTMLElement;
+  if (isWholePage(el) || typeof target.focus !== "function") return false;
+  if (target.tabIndex < 0 && !el.hasAttribute("tabindex")) el.setAttribute("tabindex", "-1");
+  target.focus({ preventScroll: true });
+  return el.ownerDocument.activeElement === el;
+}
+
 function isWholePage(el: Element): boolean {
   return el === el.ownerDocument.documentElement || el === el.ownerDocument.body;
 }
