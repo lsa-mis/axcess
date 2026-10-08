@@ -494,10 +494,14 @@ export function spotlight(
     // The label sits above the first line's box, or inside its top when that
     // is at the top of the frame's view. After the lines, so it is drawn
     // over their rings.
+    // The label stays inside the frame's view, where it can be read. For an
+    // element at the very top or the side of the page the box starts
+    // outside the view, and a label at the box's corner was cut off by the
+    // frame's edge.
     const first = pieces[0];
     const above = first.top - view.scrollY - pad > 30;
     const labelLeft = single ? -3 : first.left - pad - (left - pad);
-    const labelTop = single ? 0 : first.top - pad - (top - pad);
+    const labelTop = Math.max(single ? 0 : first.top - pad - (top - pad), view.scrollY + 2 - (top - pad));
     setStyles(tag, {
       position: "absolute",
       left: `${labelLeft}px`,
@@ -513,6 +517,13 @@ export function spotlight(
       "white-space": "nowrap",
       "box-shadow": `0 0 0 2px ${CURRENT_RING}`,
     });
+    // Left and right edges, measured once the label has its width. The
+    // ring (2px) is kept inside the view too.
+    const shown = tag.getBoundingClientRect();
+    const viewWidth = owner.documentElement.clientWidth;
+    const shift =
+      shown.left < 2 ? 2 - shown.left : shown.right > viewWidth - 2 ? Math.max(2 - shown.left, viewWidth - 2 - shown.right) : 0;
+    if (shift) tag.style.setProperty("left", `${labelLeft + shift}px`, "important");
   };
   // Every frame, not on events: a panel's scroll, a reflow when the live
   // site's stylesheets and fonts arrive, and an animation all move the
