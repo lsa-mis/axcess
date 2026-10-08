@@ -435,7 +435,7 @@ function Sidebar({
       <div
         className={cn(
           "flex h-[72px] items-center border-b border-border",
-          collapsed ? "justify-center px-2" : "gap-2 px-5",
+          collapsed ? "justify-center px-2" : "gap-1.5 px-5",
         )}
       >
         {/* Collapsed, the rail is 64px: a 44px target and the wordmark cannot
@@ -444,7 +444,7 @@ function Sidebar({
         {!collapsed && (
           <>
             <BrandMark className="h-8 w-8 text-umich-blue" />
-            {/* The logo: "axcess" in lowercase Comfortaa Medium (font-brand),
+            {/* The logo: "axcess" in lowercase Comfortaa SemiBold (font-brand),
                 the developer's choice. Comfortaa's round, one-storey "a"
                 matches the mark's inner "a", so mark and word read as one
                 logo. It is the only lowercase "axcess" and the only
@@ -456,7 +456,7 @@ function Sidebar({
                 and it keeps the theme's colour. No negative letter spacing:
                 that was tuned for Atkinson, and Comfortaa's own spacing is
                 drawn for it. */}
-            <span className="min-w-0 flex-1 truncate font-brand text-xl font-medium leading-tight">
+            <span className="min-w-0 flex-1 truncate font-brand text-xl font-semibold leading-tight">
               axcess
             </span>
           </>
@@ -558,7 +558,7 @@ function TopBar({
     >
       {/* Mobile brand, the sidebar (which carries the brand on desktop)
           is hidden below md, so the topbar shows it instead. */}
-      <div className="flex min-w-0 items-center gap-2 text-sm text-fg-muted md:hidden">
+      <div className="flex min-w-0 items-center gap-1.5 text-xl text-fg-muted md:hidden">
         {/* eslint-disable-next-line react/forbid-elements -- Keep: the top bar's menu control, styled with the shell */}
         <button
           type="button"
@@ -580,7 +580,7 @@ function TopBar({
         </button>
         <BrandMark className="h-8 w-8 text-xs" />
         {/* The same logo as the sidebar's (see there). */}
-        <span className="hidden font-brand font-medium leading-tight text-fg sm:inline">
+        <span className="hidden font-brand font-semibold leading-tight text-fg sm:inline">
           axcess
         </span>
       </div>
