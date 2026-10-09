@@ -20,6 +20,8 @@ from typing import Any
 
 import pytest
 
+from audit.blob_store import BlobStore
+from audit.db import repo
 from audit.db.schema import connect
 
 from ._inspector_case import seed
@@ -30,11 +32,15 @@ pytestmark = [pytest.mark.ui, pytest.mark.asyncio(loop_scope="module")]
 playwright_async = pytest.importorskip("playwright.async_api")
 
 # The first page's saved copy: two "copy link" buttons under two headings,
-# so two occurrences share their locator's last step.
+# so two occurrences share their locator's last step, and two buttons whose
+# locators share their last two steps (".actions > button"), which is all a
+# short locator keeps.
 CAPTURE = (
     "<!doctype html><html><head><title>AAA fixture</title></head><body>"
     "<main><h2 id='intro'>Intro <a class='copy-link-btn' href='#intro'>#</a></h2>"
     "<h2 id='usage'>Usage <a class='copy-link-btn' href='#usage'>#</a></h2>"
+    "<div id='first'><div class='actions'><button>Copy</button></div></div>"
+    "<div id='second'><div class='actions'><button>Copy</button></div></div>"
     "<p>Some text.</p></main></body></html>"
 )
 RULE = "aria-valid-attr"
@@ -43,7 +49,7 @@ RULE = "aria-valid-attr"
 @pytest.fixture
 def report(seeded_db: tuple[Path, Path, int]) -> tuple[int, int]:
     """The seeded report with rule check results; returns (scan id, first page id)."""
-    db_path, _, scan_id = seeded_db
+    db_path, blob_dir, scan_id = seeded_db
     page_id = seed(
         db_path,
         scan_id,
@@ -52,6 +58,8 @@ def report(seeded_db: tuple[Path, Path, int]) -> tuple[int, int]:
         [
             ("#intro > .copy-link-btn", '<a class="copy-link-btn" href="#intro">#</a>'),
             ("#usage > .copy-link-btn", '<a class="copy-link-btn" href="#usage">#</a>'),
+            ("#first > .actions > button", "<button>Copy</button>"),
+            ("#second > .actions > button", "<button>Copy</button>"),
         ],
     )
     conn = connect(db_path)
@@ -80,6 +88,33 @@ def report(seeded_db: tuple[Path, Path, int]) -> tuple[int, int]:
             )
         # The Rule check views show their rows only for a scan that ran axe.
         conn.execute("UPDATE scans SET axe_pages_scanned = ? WHERE id = ?", (len(pages), scan_id))
+        # Two images with one file name in two folders, on the first page.
+        store = BlobStore(blob_dir)
+        for n, folder in enumerate(("news", "events")):
+            data = b"\x89PNG\r\n\x1a\n" + bytes([n]) * 16
+            content_hash, blob_path = store.store(data, "image/png")
+            image_id = repo.upsert_image(
+                conn,
+                content_hash=content_hash,
+                src_url=f"http://example.com/{folder}/banner.png",
+                mime="image/png",
+                bytes_len=len(data),
+                width=40,
+                height=40,
+                blob_path=blob_path,
+                has_svg_text=False,
+                scan_id=scan_id,
+            )
+            repo.upsert_page_image(
+                conn,
+                page_id=page_id,
+                image_id=image_id,
+                alt_text="Banner",
+                role=None,
+                context_snippet="Banner",
+                position=10 + n,
+                above_fold=False,
+            )
         conn.commit()
     finally:
         conn.close()
@@ -92,6 +127,7 @@ def _screens(scan_id: int, page_id: int) -> list[str]:
         "/scans/new",
         f"/scans/{scan_id}",
         f"/scans/{scan_id}/issues",
+        f"/scans/{scan_id}/issues/axe:{RULE}",
         f"/scans/{scan_id}/issues/axe:{RULE}/pages",
         f"/scans/{scan_id}/pages/{page_id}",
         f"/scans/{scan_id}/pages/{page_id}/inspect?issue=axe:{RULE}",
@@ -147,33 +183,57 @@ _SMALL_TARGETS = """() => {
 }"""
 
 # Link names, as screen readers hear them, that lead to more than one place.
+# The whole address counts, # part included: links to two occurrences on one
+# page differ only there.
 _SHARED_NAMES = """() => {
   const names = {};
   for (const a of document.querySelectorAll('a[href]')) {
     const r = a.getBoundingClientRect();
     if (!r.width || a.closest('[hidden]')) continue;
     const name = (a.getAttribute('aria-label') || a.textContent).replace(/\\s+/g, ' ').trim();
-    const url = new URL(a.href, location.href);
-    (names[name] ||= new Set()).add(url.pathname + url.search);
+    (names[name] ||= new Set()).add(a.href);
   }
   return Object.entries(names)
     .filter(([, to]) => to.size > 1)
     .map(([n, to]) => `${n} (${to.size})`);
 }"""
 
-# Running text: lines over 80 characters, and line height under 1.5.
+# Running text: lines over 80 characters, and line height under 1.5. Each
+# rendered line is measured, character by character, so one long line
+# counts even when the others are short. SC 1.4.8 is about blocks of text:
+# text of two or more lines, or of two or more sentences. A one-line,
+# one-sentence label is not one. Screen-reader-only text takes no room.
 _TEXT_LAYOUT = """() => {
   const long = [], tight = [];
+  const range = document.createRange();
+  const lineLengths = (el) => {
+    const lines = [];
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (node.parentElement.closest('.sr-only')) continue;
+      for (let i = 0; i < node.length; i++) {
+        range.setStart(node, i);
+        range.setEnd(node, i + 1);
+        const r = range.getBoundingClientRect();
+        if (!r.width) continue;
+        const line = lines.find((l) => r.top < l.bottom - 1 && r.bottom > l.top + 1);
+        if (line) line.count += 1;
+        else lines.push({top: r.top, bottom: r.bottom, count: 1});
+      }
+    }
+    return lines.map((l) => l.count);
+  };
   for (const p of document.querySelectorAll('main p, main li, main dd')) {
     const r = p.getBoundingClientRect();
     if (!r.width || p.closest('table, nav, [role=img]')) continue;
     const cs = getComputedStyle(p); const size = parseFloat(cs.fontSize);
     const lh = cs.lineHeight === 'normal' ? size * 1.2 : parseFloat(cs.lineHeight);
     const text = p.innerText.replace(/\\s+/g, ' ').trim();
-    const lines = Math.round(r.height / lh);
     const start = text.slice(0, 40);
-    const perLine = text.length / lines;
-    if (lines >= 2 && perLine > 80) long.push(`${Math.round(perLine)}: ${start}`);
+    const lengths = lineLengths(p);
+    const sentences = (text.match(/[.!?](\\s|$)/g) || []).length;
+    const longest = Math.max(0, ...lengths);
+    if ((lengths.length >= 2 || sentences >= 2) && longest > 80) long.push(`${longest}: ${start}`);
     if (text.length > 40 && lh / size < 1.5) tight.push(`${(lh / size).toFixed(2)}: ${start}`);
   }
   return {long, tight};
@@ -222,6 +282,28 @@ async def test_running_text_is_short_and_spaced(
         problems += [f"{path}: tight {t}" for t in found["tight"]]
         await page.context.close()
     assert not problems, "\n".join(problems)
+
+
+async def test_the_checks_catch_what_they_claim(new_page: Any) -> None:
+    """The link and line-length checks, on cases built to slip past them: two
+    links that differ only after #, one long line followed by a short one,
+    and two sentences on one long line. A one-sentence label is left alone."""
+    page = await new_page(viewport={"width": 1280, "height": 720})
+    long_line = "A" + "a" * 98 + "."
+    await page.set_content(
+        "<main style='font:16px/1.5 monospace'>"
+        "<a href='http://example.com/page#finding-1'>Open</a> "
+        "<a href='http://example.com/page#finding-2'>Open</a>"
+        f"<p id='uneven'>{long_line}<br>Then a short line.</p>"
+        "<p id='two' style='white-space:nowrap'>" + "Short one. " * 9 + "</p>"
+        f"<p id='label' style='white-space:nowrap'>{long_line}</p>"
+        "<p id='fine'>" + "Word " * 12 + "<br>" + "Word " * 12 + "</p>"
+        "</main>"
+    )
+    assert await page.evaluate(_SHARED_NAMES) == ["Open (2)"]
+    found = await page.evaluate(_TEXT_LAYOUT)
+    assert [entry.split(": ")[1][:10] for entry in found["long"]] == ["Aaaaaaaaaa", "Short one."]
+    await page.context.close()
 
 
 # Elements held to a reading width that also draw a band or a box: the cap
