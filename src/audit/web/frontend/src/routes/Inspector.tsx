@@ -1069,6 +1069,114 @@ export default function InspectorRoute() {
                 </button>
               )}
             </div>
+            {/* Why a highlight is missing or partial ("Axcess could not find
+                the flagged element in this copy", "found 3 of 5"), and
+                other limits of what the copy shows, directly under the
+                toolbar, before the element's facts and the copy.
+                It sat under the copy, below a frame three quarters of the
+                screen tall, so a reader who saw no box had to scroll past
+                the whole page to learn why, and a screen reader reached it
+                only after the page. Here it is read first, as the saved
+                styles note above the copy is (SC 1.3.2 Meaningful
+                Sequence, Level A; W3C COGA, "Making Content Usable",
+                https://www.w3.org/TR/coga-usable/: put what people need
+                where they look for it). The key to the marks ("Dashed red
+                outlines mark…") stays under the copy, beside the marks it
+                explains: on top it pushed the copy down until stepping put
+                the box below the screen, and the stepper's status already
+                says which element the reader is on. Still a
+                polite live region, always in the page and empty until there
+                is something to say (empty:sr-only). Each message stops at a
+                readable width (max-w-measure, SC 1.4.8 Visual Presentation,
+                Level AAA); the band still spans the panel. */}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-border px-3 py-2 text-xs text-fg-muted empty:sr-only [&>span]:max-w-measure" aria-live="polite">
+              {highlightPending && (
+                <span>Highlighting the flagged element…</span>
+              )}
+              {!highlightPending &&
+                showHighlights &&
+                highlight !== null &&
+                highlightedCount > 0 &&
+                highlight.located + highlight.ambiguous + unreachableCount < highlight.total && (
+                  <span className="text-sev-major">
+                    Axcess found {highlight.located} of {highlight.total} flagged
+                    occurrences.{" "}
+                    {missingReason?.whenSomeFound ??
+                      "The others may have changed since the scan."}
+                  </span>
+                )}
+              {!highlightPending && showHighlights && highlight !== null && highlight.ambiguous > 0 && (
+                // Never a guess: the same markup in several places, with no
+                // locator to tell them apart, is said, not outlined.
+                <span className="text-sev-major">
+                  {highlight.ambiguous === 1
+                    ? "1 occurrence is not outlined: its markup appears in more than one place in this saved copy, and Axcess does not guess which."
+                    : `${highlight.ambiguous} occurrences are not outlined: their markup appears in more than one place in this saved copy, and Axcess does not guess which.`}
+                </span>
+              )}
+              {!highlightPending && showHighlights && highlight !== null && unreachableCount > 0 && (
+                // Never a guess: an element inside shadow DOM or a frame is
+                // in no saved copy, and one that looks the same elsewhere is
+                // not it (see ``unreachableLocator``). Said, with the reason.
+                <span className="text-sev-major">
+                  {unreachableSentence(highlight.unreachable.shadow, "shadow")}
+                  {highlight.unreachable.shadow > 0 && highlight.unreachable.frame > 0 && " "}
+                  {unreachableSentence(highlight.unreachable.frame, "frame")}
+                </span>
+              )}
+              {!highlightPending &&
+                showHighlights &&
+                hasScopedTarget &&
+                highlightedCount === 0 &&
+                unreachableCount < (highlight?.total ?? 0) && (
+                // Only drops the error styling when interaction accounts for
+                // every miss. Then "not found" is the expected result and
+                // flagging it warns about a fact of how the scan works; with a
+                // mix, something genuinely should have been matched.
+                <span className={missingReason?.certain ? undefined : "text-sev-major"}>
+                  {missingReason?.whenNoneFound ??
+                    "Axcess could not find the flagged element in this copy. The page may have changed since the scan."}
+                </span>
+              )}
+              {canvasPage && (
+                <span>
+                  This page draws on a drawing area (canvas). The saved copy runs no scripts, so it does not show the
+                  drawing, only any backup content the page gave. Nothing drawn on it can be outlined.
+                </span>
+              )}
+              {activeStateKey === null && hiddenImageCount > 0 && (
+                <span>
+                  {hiddenImageCount === 1
+                    ? "1 more occurrence is in page code that browsers do not show when scripts run (a <noscript> or <template> element), usually a backup copy of an image. It is not outlined."
+                    : `${hiddenImageCount} more occurrences are in page code that browsers do not show when scripts run (a <noscript> or <template> element), usually backup copies of images. They are not outlined.`}
+                </span>
+              )}
+              {offStateCount > 0 && (
+                // Without this the issue looks smaller in a state view than it
+                // is: the picker is the only way to the rest of it.
+                <span>
+                  {offStateCount} more {offStateCount === 1 ? "occurrence" : "occurrences"} of
+                  this issue {offStateCount === 1 ? "is" : "are"} in another page
+                  state. Choose it in the Page state list.
+                </span>
+              )}
+              {!showHighlights && hasScopedTarget && (
+                <span>Highlights are hidden for this page.</span>
+              )}
+              {!hasTarget && (
+                <span>
+                  {render.source === "stored"
+                    ? "This is the copy the scan saved. This issue has no element to mark."
+                    : "Axcess loaded this page just now. This issue has no element to mark."}
+                </span>
+              )}
+              {!data.store_rendered_html && (
+                <span>
+                  This scan did not save copies of pages, so Axcess loads the
+                  live page each time you open it.
+                </span>
+              )}
+            </div>
             {/* Sandboxed with scripts disabled: the page's own JS never runs,
                 but `allow-same-origin` lets us reach in to outline the flagged
                 element. This is the "point at the issue" affordance, no
@@ -1228,12 +1336,11 @@ export default function InspectorRoute() {
                 style={layout?.width ? { width: layout.width, height: layout.height ?? undefined } : undefined}
               />
             </div>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border px-3 py-2 text-xs text-fg-muted" aria-live="polite">
-              {highlightPending && (
-                <span>Highlighting the flagged element…</span>
-              )}
-              {!highlightPending && showHighlights && highlightedCount > 0 && (
-                <span>
+            {/* The key to the marks, under the copy it explains (see the
+                status band above the facts for why it is here). */}
+            {!highlightPending && showHighlights && highlightedCount > 0 && (
+              <p className="border-t border-border px-3 py-2 text-xs text-fg-muted">
+                <span className="block max-w-measure">
                   {highlightedCount > 1
                     ? `Dashed red outlines mark the ${highlightedCount} flagged elements on this page. The one you are on has a numbered blue box with a yellow ring, and the rest of the page is dimmed.`
                     : // Never describe a box that is not drawn (see ``drawsNoBox``).
@@ -1241,92 +1348,9 @@ export default function InspectorRoute() {
                       ? "No box marks the flagged element. The table above the saved copy says why."
                       : "A blue box with a yellow ring marks the flagged element."}
                 </span>
-              )}
-              {!highlightPending &&
-                showHighlights &&
-                highlight !== null &&
-                highlightedCount > 0 &&
-                highlight.located + highlight.ambiguous + unreachableCount < highlight.total && (
-                  <span className="text-sev-major">
-                    Axcess found {highlight.located} of {highlight.total} flagged
-                    occurrences.{" "}
-                    {missingReason?.whenSomeFound ??
-                      "The others may have changed since the scan."}
-                  </span>
-                )}
-              {!highlightPending && showHighlights && highlight !== null && highlight.ambiguous > 0 && (
-                // Never a guess: the same markup in several places, with no
-                // locator to tell them apart, is said, not outlined.
-                <span className="text-sev-major">
-                  {highlight.ambiguous === 1
-                    ? "1 occurrence is not outlined: its markup appears in more than one place in this saved copy, and Axcess does not guess which."
-                    : `${highlight.ambiguous} occurrences are not outlined: their markup appears in more than one place in this saved copy, and Axcess does not guess which.`}
-                </span>
-              )}
-              {!highlightPending && showHighlights && highlight !== null && unreachableCount > 0 && (
-                // Never a guess: an element inside shadow DOM or a frame is
-                // in no saved copy, and one that looks the same elsewhere is
-                // not it (see ``unreachableLocator``). Said, with the reason.
-                <span className="text-sev-major">
-                  {unreachableSentence(highlight.unreachable.shadow, "shadow")}
-                  {highlight.unreachable.shadow > 0 && highlight.unreachable.frame > 0 && " "}
-                  {unreachableSentence(highlight.unreachable.frame, "frame")}
-                </span>
-              )}
-              {!highlightPending &&
-                showHighlights &&
-                hasScopedTarget &&
-                highlightedCount === 0 &&
-                unreachableCount < (highlight?.total ?? 0) && (
-                // Only drops the error styling when interaction accounts for
-                // every miss. Then "not found" is the expected result and
-                // flagging it warns about a fact of how the scan works; with a
-                // mix, something genuinely should have been matched.
-                <span className={missingReason?.certain ? undefined : "text-sev-major"}>
-                  {missingReason?.whenNoneFound ??
-                    "Axcess could not find the flagged element in this copy. The page may have changed since the scan."}
-                </span>
-              )}
-              {canvasPage && (
-                <span>
-                  This page draws on a drawing area (canvas). The saved copy runs no scripts, so it does not show the
-                  drawing, only any backup content the page gave. Nothing drawn on it can be outlined.
-                </span>
-              )}
-              {activeStateKey === null && hiddenImageCount > 0 && (
-                <span>
-                  {hiddenImageCount === 1
-                    ? "1 more occurrence is in page code that browsers do not show when scripts run (a <noscript> or <template> element), usually a backup copy of an image. It is not outlined."
-                    : `${hiddenImageCount} more occurrences are in page code that browsers do not show when scripts run (a <noscript> or <template> element), usually backup copies of images. They are not outlined.`}
-                </span>
-              )}
-              {offStateCount > 0 && (
-                // Without this the issue looks smaller in a state view than it
-                // is: the picker is the only way to the rest of it.
-                <span>
-                  {offStateCount} more {offStateCount === 1 ? "occurrence" : "occurrences"} of
-                  this issue {offStateCount === 1 ? "is" : "are"} in another page
-                  state. Choose it in the Page state list.
-                </span>
-              )}
-              {!showHighlights && hasScopedTarget && (
-                <span>Highlights are hidden for this page.</span>
-              )}
-              {!hasTarget && (
-                <span>
-                  {render.source === "stored"
-                    ? "This is the copy the scan saved. This issue has no element to mark."
-                    : "Axcess loaded this page just now. This issue has no element to mark."}
-                </span>
-              )}
-              {!data.store_rendered_html && (
-                <span>
-                  This scan did not save copies of pages, so Axcess loads the
-                  live page each time you open it.
-                </span>
-              )}
-            </div>
-            {/* Outside the live region above: this is standing context about
+              </p>
+            )}
+            {/* Outside the status band under the toolbar: this is standing context about
                 the capture, not a status that changes, so it should not be
                 re-announced every time the highlight count updates. It says
                 where the styles come from, because that differs: a copy with
