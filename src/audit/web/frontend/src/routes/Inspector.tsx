@@ -745,7 +745,10 @@ export default function InspectorRoute() {
     try {
       const target = frameRef.current?.contentDocument?.querySelector<HTMLElement>("[data-axcess-current]");
       landed = Boolean(target && focusInCopy(target));
-      if (target && landed) keepCentered(target);
+      if (target && landed && frameRef.current) {
+        keepCentered(target);
+        revealInPage(frameRef.current, target);
+      }
     } catch {
       // Opaque document: focus cannot be moved into it.
     }
@@ -1611,6 +1614,30 @@ function withBaseHref(html: string | null, url: string | null): string | null {
 
 function escapeAttribute(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+}
+
+/**
+ * Scroll the inspector page so ``target``, inside the saved copy's frame, is
+ * in view below the sticky top bar, after "Go to this element" put focus on
+ * it. Focus moves without scrolling (``focusInCopy``) and ``keepCentered``
+ * scrolls only the frame, which is right while stepping, where the page must
+ * not jump. But this button is above the frame, so on a short window (or
+ * with a tall facts table) focus landed on an element below the bottom of
+ * the screen, and a keyboard user could not see where it went (SC 2.4.11
+ * Focus Not Obscured (Minimum), Level AA; found by review). The page moves
+ * only when the element is not fully shown already, and then centres it in
+ * the room under the bar (the page's scroll-padding-top, styles.css).
+ */
+function revealInPage(frame: HTMLIFrameElement, target: HTMLElement): void {
+  const outer = frame.getBoundingClientRect();
+  const inner = boxPlace(target).rect;
+  // The part of the element the frame shows, in the page's view.
+  const top = outer.top + frame.clientTop + Math.max(0, inner.top);
+  const bottom = outer.top + frame.clientTop + Math.min(frame.clientHeight, Math.max(inner.bottom, inner.top + 1));
+  const reserved = parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
+  if (top >= reserved && bottom <= window.innerHeight) return;
+  const middle = (top + bottom) / 2;
+  window.scrollBy({ top: middle - (reserved + (window.innerHeight - reserved) / 2), behavior: "instant" });
 }
 
 /**

@@ -102,6 +102,42 @@ async def test_go_to_moves_focus_onto_the_element_and_escape_comes_back(
     await page.context.close()
 
 
+@pytest.mark.parametrize("size", [(1280, 500), (320, 640)], ids=["short window", "phone"])
+async def test_go_to_brings_the_element_into_view(
+    live_server: tuple[str, int],
+    new_page: Any,
+    seeded_db: tuple[Path, Path, int],
+    page_id: int,
+    size: tuple[int, int],
+) -> None:
+    """On a short window the saved copy starts below the screen; after "Go
+    to", the focused element is fully on screen, below the sticky top bar."""
+    base, _ = live_server
+    width, height = size
+    page = await new_page(viewport={"width": width, "height": height})
+    await page.goto(
+        f"{base}/app/scans/{seeded_db[2]}/pages/{page_id}/inspect?issue=axe:{RULE}",
+        wait_until="networkidle",
+    )
+    go = page.get_by_role("button", name="Go to this element in the saved copy")
+    await go.focus()
+    await page.keyboard.press("Enter")
+    await playwright_async.expect(
+        page.frame_locator('iframe[title^="Saved copy"]').locator("#status")
+    ).to_be_focused()
+    top, bottom, bar, screen = await page.evaluate(
+        f"""() => {{
+          const frame = document.querySelector('iframe[title^="Saved copy"]')
+            .getBoundingClientRect();
+          const r = {DOC}.activeElement.getBoundingClientRect();
+          const bar = parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop);
+          return [frame.top + r.top, frame.top + r.bottom, bar, innerHeight];
+        }}"""
+    )
+    assert bar <= top and bottom <= screen, (top, bottom, bar, screen)
+    await page.context.close()
+
+
 async def test_only_the_current_element_is_described(
     live_server: tuple[str, int], new_page: Any, seeded_db: tuple[Path, Path, int], page_id: int
 ) -> None:
