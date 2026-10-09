@@ -2,8 +2,11 @@
 
 What this is: an audit of the Axcess review app (`/app/`) against WCAG 2.2
 Level AAA, done on 2026-10-07 from the code on `main` (desktop 0.2.5).
-Findings are ordered by level and impact. Every finding has since been fixed
-or checked on the `WCAGAAA` branch; see "Status" at the end.
+Findings are ordered by level and impact. Each finding has a change or a
+recorded decision on the `WCAGAAA` branch; see "Status" at the end. A fix
+here means the tools and tests below no longer find the problem, not that
+the app meets WCAG: these checks cannot show that, and no one has yet used
+the app with a screen reader.
 
 ## How it was checked
 
@@ -84,8 +87,8 @@ Location (breadcrumbs exist on report screens; check the others).
 
 ## Status
 
-Fixed on the `WCAGAAA` branch, one commit per finding, each rechecked with
-the tool that found it:
+Changed on the `WCAGAAA` branch, one commit per finding, each rechecked
+with the tool that found it:
 
 | # | Fix |
 | --- | --- |
@@ -119,3 +122,26 @@ Left as they are, with reasons:
 length and line height, focus clear of the top bar, the saved copy's focus
 ring, named dropdowns, the impact chips' contrast and words (light and
 dark), Not found's level 1 heading, drawn header separators, no reading-width cap on a band or box, and page title icons beside the first line. The last two were checked against the replaced design and fail on it.
+
+What these tests are: scripted checks in Chromium on seeded data. They
+measure the page; they are not a screen reader, and they cover only the
+screens and states listed.
+
+## Code review, 2026-10-09
+
+A review of the branch (`artifacts/wcagaaa-review.md`) found four gaps,
+all since changed:
+
+| # | Gap | Change |
+| --- | --- | --- |
+| 1 | "Go to this element in the saved copy" moved focus without scrolling the inspector page, so on a short window focus landed below the screen (SC 2.4.11, AA). | The page scrolls the element into view under the top bar. `tests/ui/test_inspector_screen_reader.py` checks its place on screen at 1280 by 500 and 320 by 640. |
+| 2 | Short locators and image file names could still repeat, so two links to different occurrences or images could share a name (SC 2.4.9, AAA). | Occurrence links add the occurrence's ID; image links add the image's place in the list. |
+| 3 | The link test compared only path and query, so links differing after `#` passed. | It compares the whole address; the seed adds colliding locators and same-named images. Without the change in 2 it fails on all three. |
+| 4 | The line-length test averaged across lines and skipped one-line text. | It measures each line; a block is two or more lines or sentences. It then found five more long paragraphs (subtitles, the delete note, issue detail text, Settings, roadmap), now capped. |
+
+A test runs the link and line checks on cases built to slip past them.
+The Page inspector's screen reader path (a status that says what each
+flagged element is, "Go to this element", Escape back) is tested for focus
+and accessible description, which still is not a test with a real screen
+reader. A short pass with NVDA or VoiceOver is the next check.
+
