@@ -169,7 +169,7 @@ export default function PageEvidenceRoute() {
             Alt text is the text a screen reader reads for an image.
           </p>
           <div className="grid gap-3 lg:grid-cols-2">
-            {data.image_occurrences.map((image) => (
+            {data.image_occurrences.map((image, imageIndex) => (
               <Card key={image.occurrence_id} className="p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <a
@@ -184,9 +184,15 @@ export default function PageEvidenceRoute() {
                         words are the same on every card, so a link list read
                         out of context gave several "Open the image" with no
                         way to tell them apart (SC 2.4.9 Link Purpose (Link
-                        Only), Level AAA; WCAG technique C7). The file name,
-                        not the alt text, which can be missing or repeated. */}
-                    <span className="sr-only">, {imageFileName(image.src_url_canonical)}, opens in a new tab</span>
+                        Only), Level AAA; WCAG technique C7). Its place in
+                        the list and its file name, not the alt text, which
+                        can be missing or repeated. The place is what makes
+                        it unique: two images in different folders can share
+                        a file name (found by review). */}
+                    <span className="sr-only">
+                      , image {imageIndex + 1} of {data.image_occurrences.length},{" "}
+                      {imageFileName(image.src_url_canonical)}, opens in a new tab
+                    </span>
                   </a>
                   <AltChip alt={image.alt_text} />
                 </div>

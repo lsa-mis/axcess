@@ -379,6 +379,7 @@ function FindingRow({
           pageTitle={finding.page_title}
           selector={finding.target_selector}
           elementName={finding.target_display}
+          occurrenceId={finding.id}
           snippet={finding.html_snippet}
           origin="Rule check issues by rule"
           context={ruleId}
@@ -404,12 +405,13 @@ function FindingRow({
         <AlfaEvidenceNote evidence={finding} />
         <Link className="report-link inline-flex min-h-target items-center text-xs" to={pageEvidencePath({ scanId, pageId: finding.page_id, origin: "Rule check issues by rule", backTo: `/scans/${scanId}/a11y/by-rule`, hash: `#finding-${finding.id}` })}>
           Open the evidence for this occurrence
-          {/* Which occurrence, by page and element, for the same reason as
-              PageLink's context (SC 2.4.9 Link Purpose (Link Only), Level
-              AAA; WCAG technique C7). */}
+          {/* Which occurrence, by page, element and ID, for the same reason
+              as PageLink's context (SC 2.4.9 Link Purpose (Link Only), Level
+              AAA; WCAG technique C7). The ID is what makes it unique: two
+              elements' short locators can match. */}
           <span className="sr-only">
             {" "}on {finding.page_title?.trim() || finding.page_url}, at{" "}
-            {shortLocator(finding.target_display || finding.target_selector)}
+            {shortLocator(finding.target_display || finding.target_selector)}, occurrence {finding.id}
           </span>
         </Link>
         {finding.failure_summary && (
@@ -487,4 +489,3 @@ function RuleBulkBar({
     </div>
   );
 }
-

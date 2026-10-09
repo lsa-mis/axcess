@@ -1122,6 +1122,7 @@ export function PageLink({
   showUrlBelow = true,
   selector = null,
   elementName = null,
+  occurrenceId = null,
   snippet = null,
   issue = null,
   origin,
@@ -1140,6 +1141,8 @@ export function PageLink({
   selector?: string | null;
   /** A short readable name for the element (target_display), when known. */
   elementName?: string | null;
+  /** The occurrence's ID, where a view lists occurrences (see below). */
+  occurrenceId?: number | null;
   /** Exact element markup (html_snippet), the most reliable locator. */
   snippet?: string | null;
   /** Issue key to resolve the selector for (used when ``selector`` is absent). */
@@ -1159,7 +1162,12 @@ export function PageLink({
   // a page title) led to different pages or elements (SC 2.4.9 Link Purpose
   // (Link Only), Level AAA; WCAG technique C7; October 2026 AAA audit). The
   // element is its short display name where the view has one, else the last
-  // two steps of its locator, kept short (see shortLocator).
+  // two steps of its locator, kept short (see shortLocator). Short names can
+  // still match: two elements whose locators end in the same two steps, or
+  // repeated elements with the same tag and attributes. So a view of
+  // occurrences also gives the occurrence's ID, which is unique and is the
+  // name the page's evidence uses for it ("Occurrence 1234"; found by
+  // review).
   const element = elementName || selector ? shortLocator(elementName || selector || "") : null;
 
   // Build the inspector URL with whatever orientation/selector context the
@@ -1200,6 +1208,7 @@ export function PageLink({
           <span className="break-words">{display}</span>
           <span className="sr-only">
             , opens in the page inspector{element ? ` at ${element}` : ""}
+            {occurrenceId != null ? `, occurrence ${occurrenceId}` : ""}
           </span>
         </Link>
       ) : (
