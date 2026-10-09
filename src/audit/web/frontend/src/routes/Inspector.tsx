@@ -1723,8 +1723,9 @@ function keepCentered(target: HTMLElement): void {
         });
       }
       const rect = boxPlace(target).rect;
+      const band = shownBand(win);
       win.scrollTo({
-        top: win.scrollY + toCentre(rect.top, rect.height, win.innerHeight, "top"),
+        top: win.scrollY + toCentre(rect.top - band.start, rect.height, band.size, "top"),
         left: win.scrollX + toCentre(rect.left, rect.width, win.innerWidth, "left"),
         behavior: "instant",
       });
@@ -1735,6 +1736,40 @@ function keepCentered(target: HTMLElement): void {
     }
   };
   step();
+}
+
+/**
+ * The part of the saved copy's view that is on the reader's screen, top to
+ * bottom, in the copy's own pixels: below the sticky top bar (the page's
+ * scroll-padding-top) and above the bottom of the window.
+ *
+ * Stepping centred the element in the frame, and the frame is tall (three
+ * quarters of the window) and starts under the toolbar, the status messages
+ * and the facts table. On a window of ordinary height its middle was below
+ * the screen, so after "Next element" the box was out of sight and the
+ * reader had to scroll the page to find it. Centring in the part of the
+ * frame that shows puts the box where the reader is already looking, and
+ * the page still does not move while stepping (keepCentered says why).
+ * When less than 160 pixels of the frame show, there is no room to centre
+ * anything, and the whole frame is used, as before. Found by the stepping
+ * test once the content above the copy grew. The nearest criterion is SC
+ * 2.4.11 Focus Not Obscured (Minimum), Level AA (paraphrased: what the
+ * reader is on is not hidden from them).
+ */
+function shownBand(win: Window): { start: number; size: number } {
+  const whole = { start: 0, size: win.innerHeight };
+  try {
+    const frame = win.frameElement as HTMLElement | null;
+    const outer = frame?.ownerDocument?.defaultView;
+    if (!frame || !outer) return whole;
+    const r = frame.getBoundingClientRect();
+    const reserved = parseFloat(outer.getComputedStyle(outer.document.documentElement).scrollPaddingTop) || 0;
+    const top = Math.max(0, reserved - r.top - frame.clientTop);
+    const bottom = Math.min(win.innerHeight, outer.innerHeight - r.top - frame.clientTop);
+    return bottom - top < Math.min(160, win.innerHeight) ? whole : { start: top, size: bottom - top };
+  } catch {
+    return whole;
+  }
 }
 
 /**
