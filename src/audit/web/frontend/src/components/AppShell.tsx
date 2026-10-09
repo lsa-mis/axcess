@@ -444,7 +444,7 @@ function Sidebar({
         {!collapsed && (
           <>
             <BrandMark className="h-8 w-8 text-umich-blue" />
-            {/* The logo: "axcess" in lowercase Comfortaa SemiBold (font-brand),
+            {/* The logo: "axcess" in lowercase Comfortaa Bold (font-brand),
                 the developer's choice. Comfortaa's round, one-storey "a"
                 matches the mark's inner "a", so mark and word read as one
                 logo. It is the only lowercase "axcess" and the only
@@ -456,7 +456,7 @@ function Sidebar({
                 and it keeps the theme's colour. No negative letter spacing:
                 that was tuned for Atkinson, and Comfortaa's own spacing is
                 drawn for it. */}
-            <span className="min-w-0 flex-1 truncate font-brand text-xl font-semibold leading-tight">
+            <span className="min-w-0 flex-1 truncate font-brand text-xl font-bold leading-tight">
               axcess
             </span>
           </>
@@ -580,7 +580,7 @@ function TopBar({
         </button>
         <BrandMark className="h-8 w-8 text-xs" />
         {/* The same logo as the sidebar's (see there). */}
-        <span className="hidden font-brand font-semibold leading-tight text-fg sm:inline">
+        <span className="hidden font-brand font-bold leading-tight text-fg sm:inline">
           axcess
         </span>
       </div>
