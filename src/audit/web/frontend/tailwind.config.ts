@@ -146,7 +146,8 @@ const config: Config = {
         // width of a wide panel. Not on a whole area: a blanket cap on every
         // p, li and dd (the first fix) cut panels' coloured bands short and
         // squeezed values such as the Inspector's element locator. In em,
-        // not ch: Atkinson Hyperlegible's zero is wide, so ch overshoots.
+        // not ch: ch is the width of a zero, which is wide in Atkinson
+        // Hyperlegible, so a 70ch cap still let lines reach 97 characters.
         measure: "35em",
       },
       borderRadius: {

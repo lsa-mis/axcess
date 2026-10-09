@@ -284,7 +284,7 @@ export default function TrackingRoute() {
         {/* Counted from the data, not written down: the previous sentence
         said "three deterministic, two AI" and had been wrong since two
         pipelines shipped. */}
-        <p className="mb-3 text-sm text-fg-muted">
+        <p className="mb-3 max-w-measure text-sm text-fg-muted">
           {deterministicCount} checks use fixed rules. They need only the
           Chromium browser, not Ollama. {aiCount} checks use AI. They need
           Ollama, an app that runs AI models on this computer.

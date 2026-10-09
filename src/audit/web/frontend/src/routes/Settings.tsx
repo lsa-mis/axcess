@@ -53,7 +53,7 @@ export default function SettingsRoute() {
           <div className="flex flex-col gap-3 px-4 py-4">
             <div className="min-w-0">
               <h2 className="text-sm font-semibold text-fg">Quick presets</h2>
-              <p className="mt-0.5 text-xs text-fg-muted">
+              <p className="mt-0.5 max-w-measure text-xs text-fg-muted">
                 Turn on a starting set of options, then fine-tune below. Select an active preset again to turn it off.
               </p>
             </div>

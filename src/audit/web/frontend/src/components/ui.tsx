@@ -174,7 +174,7 @@ export function PageHeader({
             {title}
           </h1>
           {subtitle && (
-            <p className="mt-1 max-w-4xl text-sm leading-6 text-fg-muted">
+            <p className="mt-1 max-w-measure text-sm leading-6 text-fg-muted">
               {subtitle}
             </p>
           )}

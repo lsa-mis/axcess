@@ -163,7 +163,7 @@ function GuidanceSection({ title, children }: { title: string; children: ReactNo
  */
 function DoneWhen({ text }: { text: string }) {
   return (
-    <div role="note" aria-label="Done when" className="mt-4 max-w-[70ch] rounded-xs border border-ok/30 bg-ok-bg px-4 py-3">
+    <div role="note" aria-label="Done when" className="mt-4 max-w-measure rounded-xs border border-ok/30 bg-ok-bg px-4 py-3">
       <p className="text-base leading-7 text-fg">
         <span className="font-semibold text-ok">Done when: </span>
         {text}
@@ -282,7 +282,7 @@ function IssueGuidance({ detail }: { detail: IssueDetail }) {
               line above already says why it was flagged, and repeating it
               here read as two findings. */}
           {(description || !row.evidence_summary) && (
-            <p className="mt-4 max-w-[70ch] text-base leading-7 text-fg">
+            <p className="mt-4 max-w-measure text-base leading-7 text-fg">
               {description ? (
                 <RuleText text={description} />
               ) : (
@@ -294,7 +294,7 @@ function IssueGuidance({ detail }: { detail: IssueDetail }) {
 
         {nextSteps.length > 0 && (
           <GuidanceSection title={nextTitle}>
-            <ol className="max-w-[70ch] list-decimal space-y-1.5 pl-6 text-base leading-7 text-fg">
+            <ol className="max-w-measure list-decimal space-y-1.5 pl-6 text-base leading-7 text-fg">
               {isLead
                 ? nextSteps.map((step, i) => <li key={i}>{step}</li>)
                 : nextSteps.map((step, i) => (
@@ -321,11 +321,11 @@ function IssueGuidance({ detail }: { detail: IssueDetail }) {
           <GuidanceSection
             title={isLead ? "Why it matters, and how to fix it if it is confirmed" : "Why it matters, and how to test the fix"}
           >
-            {why_matters && <p className="max-w-[70ch] text-base leading-7 text-fg">{why_matters}</p>}
+            {why_matters && <p className="max-w-measure text-base leading-7 text-fg">{why_matters}</p>}
             {isLead && fix_steps.length > 0 && (
               <>
                 <h4 className="mt-5 text-base font-semibold text-fg">How it should work</h4>
-                <ol className="mt-2 max-w-[70ch] list-decimal space-y-3 pl-6 text-base leading-7 text-fg">
+                <ol className="mt-2 max-w-measure list-decimal space-y-3 pl-6 text-base leading-7 text-fg">
                   {fix_steps.map((step, i) => (
                     <li key={i} dangerouslySetInnerHTML={{ __html: step }} />
                   ))}
@@ -338,7 +338,7 @@ function IssueGuidance({ detail }: { detail: IssueDetail }) {
             {!isLead && verifySteps.length > 0 && (
               <>
                 <h4 className="mt-5 text-base font-semibold text-fg">How to test the fix</h4>
-                <ul className="mt-2 max-w-[70ch] list-disc space-y-3 pl-6 text-base leading-7 text-fg">
+                <ul className="mt-2 max-w-measure list-disc space-y-3 pl-6 text-base leading-7 text-fg">
                   {verifySteps.map((step, i) => <li key={i}>{step}</li>)}
                 </ul>
               </>
