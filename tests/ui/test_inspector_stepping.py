@@ -84,15 +84,15 @@ async def test_previous_and_next_step_through_the_rendered_page(
         )
         group = page.get_by_role("group", name="Flagged elements", exact=True)
         status = group.get_by_role("status")
-        previous = group.get_by_role("button", name="Previous flagged element")
-        following = group.get_by_role("button", name="Next flagged element")
+        previous = group.get_by_role("button", name="Previous element")
+        following = group.get_by_role("button", name="Next element")
         # After the count, a screen reader also hears what the element is.
         await playwright_async.expect(status).to_have_text("Flagged element 1 of 3: Text field")
         await playwright_async.expect(previous).to_be_disabled()
         # The buttons say what they do, and each name starts with the word a
         # voice control user sees and says (SC 2.5.3).
-        await playwright_async.expect(previous).to_have_text("Previous")
-        await playwright_async.expect(following).to_have_text("Next")
+        await playwright_async.expect(previous).to_have_text("Previous element")
+        await playwright_async.expect(following).to_have_text("Next element")
 
         frame = page.frame_locator("iframe[title^='Saved copy']")
 
@@ -153,7 +153,7 @@ async def test_the_page_code_view_sets_the_current_element_apart(
         current = code.locator("[data-current]")
         await playwright_async.expect(current.first).to_contain_text('id="field-1"')
 
-        await group.get_by_role("button", name="Next flagged element").click()
+        await group.get_by_role("button", name="Next element").click()
         await playwright_async.expect(status).to_have_text("Flagged element 2 of 3")
         await playwright_async.expect(current.first).to_contain_text('id="field-2"')
         earlier = code.locator("div[data-index]").filter(has_text='id="field-1"')
@@ -192,7 +192,7 @@ async def test_the_stepper_fits_a_phone(
         )
         box = await group.bounding_box()
         assert box and box["x"] >= 0 and box["x"] + box["width"] <= 320, box
-        for name in ("Previous flagged element", "Next flagged element"):
+        for name in ("Previous element", "Next element"):
             button = await group.get_by_role("button", name=name).bounding_box()
             assert button and button["x"] + button["width"] <= 320, (name, button)
             assert button["height"] >= 44, (name, button)

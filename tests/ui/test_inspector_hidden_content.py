@@ -73,7 +73,7 @@ async def test_hidden_content_is_opened_or_said(
 
         # Not displayed: no box, and the view is not moved to the top.
         before = await page.evaluate(f"{DOC}.defaultView.scrollY")
-        await group.get_by_role("button", name="Next flagged element").click()
+        await group.get_by_role("button", name="Next element").click()
         await playwright_async.expect(box).to_have_text("2 of 2")
         await playwright_async.expect(fact(page, "Where the box is")).to_have_text(
             "No box. It was hidden in this saved copy (display: none)."

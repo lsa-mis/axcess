@@ -131,7 +131,7 @@ async def test_a_page_drawn_on_a_canvas_is_said(
         # The backup content shows in the saved copy, so the button inside the
         # drawing area is boxed as itself.
         group = page.get_by_role("group", name="Flagged elements", exact=True)
-        await group.get_by_role("button", name="Next flagged element").click()
+        await group.get_by_role("button", name="Next element").click()
         await playwright_async.expect(box).to_have_text("2 of 2")
         await settled(page)
         button = await page.evaluate(

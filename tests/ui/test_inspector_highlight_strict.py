@@ -164,7 +164,7 @@ async def test_the_current_element_gets_a_numbered_box_and_a_description(
         ).to_be_visible()
 
         # A tiny link: the box is still big enough to see, and labelled.
-        await group.get_by_role("button", name="Next flagged element").click()
+        await group.get_by_role("button", name="Next element").click()
         await playwright_async.expect(box).to_have_text("2 of 3")
         size = await box.evaluate("el => [el.offsetWidth, el.offsetHeight]")
         assert size[0] >= 26 and size[1] >= 26, size
@@ -173,7 +173,7 @@ async def test_the_current_element_gets_a_numbered_box_and_a_description(
         await playwright_async.expect(facts.locator("dt")).to_have_text(labels)
 
         # An empty element: said to have no visible size.
-        await group.get_by_role("button", name="Next flagged element").click()
+        await group.get_by_role("button", name="Next element").click()
         await playwright_async.expect(box).to_have_text("3 of 3")
         await playwright_async.expect(_fact(page, "What it is")).to_have_text("<span> element")
         await playwright_async.expect(_fact(page, "Text or label")).to_have_text("None found")
@@ -216,7 +216,7 @@ async def test_alfa_records_are_matched_by_tag_attributes_and_text(
     )
     page = await _open(new_page, base, scan_id, page_id, "alfa:sia-r111")
     try:
-        await playwright_async.expect(page.get_by_text("2 places highlighted")).to_be_visible()
+        await playwright_async.expect(page.get_by_text("Flagged element 1 of 2")).to_be_visible()
         frame = page.frame_locator("iframe[title^='Saved copy']")
         await playwright_async.expect(
             frame.locator("nav button.axcess-inspect-highlight")
@@ -301,11 +301,14 @@ async def test_a_long_locator_shows_its_end_and_copies_whole(
 async def test_the_locator_toggle_holds_still_at_every_width(
     seeded_db: tuple[Path, Path, int], live_server: tuple[str, int], new_page: Any, width: int
 ) -> None:
-    """The Show all button stays put, whatever the width.
+    """The Show all button holds still, whatever the width, and is there
+    exactly when the locator is cut.
 
-    It used to appear only when the locator was cut, which narrowed the
-    locator's box, which changed whether it was cut: at widths where one state
-    wrapped and the other did not, the button came and went every frame.
+    It once shared the locator's line, so appearing narrowed the locator's
+    box, which changed whether it was cut: at widths where one state wrapped
+    and the other did not, the button came and went every frame. It now sits
+    on the line under the locator, so it is left out when the locator fits,
+    and its coming or going cannot change the locator's width.
     """
     db_path, _, _ = seeded_db
     base, scan_id = live_server
@@ -327,19 +330,25 @@ async def test_the_locator_toggle_holds_still_at_every_width(
         wait_until="networkidle",
     )
     try:
-        toggle = page.locator("button[aria-controls='inspect-locator']")
-        await playwright_async.expect(toggle).to_have_count(1)
-        seen = await toggle.evaluate(
-            """async (el) => {
+        await page.locator("#inspect-locator").wait_for()
+        seen = await page.evaluate(
+            """async () => {
                 const states = new Set();
                 for (let i = 0; i < 30; i++) {
                     await new Promise((resolve) => requestAnimationFrame(resolve));
-                    states.add(getComputedStyle(el).visibility + ":" + el.isConnected);
+                    const code = document.getElementById('inspect-locator');
+                    const toggle = document.querySelector(
+                        "button[aria-controls='inspect-locator']"
+                    );
+                    const cut = code.scrollWidth > code.clientWidth + 0.5;
+                    states.add(`${cut}:${toggle !== null}:${code.clientWidth}`);
                 }
                 return [...states];
             }"""
         )
         assert len(seen) == 1, seen
+        cut, shown, _ = seen[0].split(":")
+        assert cut == shown, seen
         assert await page.evaluate("document.documentElement.scrollWidth") <= width
     finally:
         await page.context.close()

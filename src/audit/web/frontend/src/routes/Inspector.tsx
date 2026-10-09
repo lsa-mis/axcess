@@ -563,6 +563,8 @@ export default function InspectorRoute() {
   // Only what this view can hold: a view whose targets are all in other
   // states has nothing to highlight, and must not wait for it forever.
   const highlightPending = showHighlights && scopedTargets.length > 0 && highlight === null;
+  // Whether the toolbar steps through outlined elements (FlaggedStepper).
+  const stepping = !highlightPending && showHighlights && highlightedCount > 0;
 
   /** Missing elements for one picker option; the state on screen uses its highlight. */
   const missingFor = (key: string): MissingCount | undefined => {
@@ -646,8 +648,8 @@ export default function InspectorRoute() {
           delete frame.dataset.focused;
         });
       }
-      // Escape inside the saved copy goes back to "Go to this element",
-      // the way in (see there). The copy runs no scripts of its own, so no
+      // Escape inside the saved copy goes back to "Go to element", the way
+      // in (FlaggedStepper). The copy runs no scripts of its own, so no
       // key of the page's is taken.
       doc?.addEventListener("keydown", (event) => {
         if (event.key === "Escape" && goToRef.current) {
@@ -732,7 +734,7 @@ export default function InspectorRoute() {
   // Whether the locator is shown in full. It stays as the reader set it while
   // they step, so every element's row keeps the same shape.
   const [locatorOpen, setLocatorOpen] = useState(false);
-  // "Go to this element in the saved copy": the button, to come back to with
+  // "Go to element" (in FlaggedStepper): the button, to come back to with
   // Escape, and what it says when the element cannot take focus.
   const goToRef = useRef<HTMLButtonElement>(null);
   const [goToNote, setGoToNote] = useState<{ attempt: number; text: string } | null>(null);
@@ -1024,17 +1026,23 @@ export default function InspectorRoute() {
           <div>
             {/* Top corners as the panel's inner ones (8px less its 1px border),
                 so the bar's fill does not paint square corners over them. */}
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-t-[7px] border-b border-border bg-surface-muted/40 px-3 py-2">
-              <span className="text-xs font-semibold text-fg-subtle">
-                {highlightPending
-                  ? "Highlighting…"
-                  : showHighlights && highlightedCount > 0
-                    ? `${highlightedCount} place${highlightedCount === 1 ? "" : "s"} highlighted`
-                    : copyName}
-              </span>
-              {!highlightPending && showHighlights && highlightedCount > 0 && (
-                // Previous / Next through the outlined elements, the same
-                // control as the Page code (DOM) tab's (FlaggedStepper).
+            {/* Two sides and a line under them. Left, finding the element:
+                the stepper (count, Previous element, Next element, Go to
+                element; FlaggedStepper), the reader's main task, where
+                reading starts. Right, how the copy is shown: Show at full
+                width and Hide highlights, settings rather than steps. Under
+                both, on a line of its own at a reading width, what Go to
+                element does (also its description) and, when focus could
+                not move, why (a status, in words; SC 4.1.3 Status Messages,
+                Level AA). "5 places highlighted" is not shown beside the
+                stepper: "Flagged element 1 of 5" already gives the number,
+                and saying it twice crowded the bar into a third line (W3C
+                COGA, "Making Content Usable",
+                https://www.w3.org/TR/coga-usable/: keep it simple, no
+                repeats). Without the stepper the label stays: it says the
+                copy's name, or that highlighting is under way. */}
+            <div className="flex flex-wrap items-center gap-2 rounded-t-[7px] border-b border-border bg-surface-muted/40 px-3 py-2">
+              {stepping ? (
                 <FlaggedStepper
                   count={highlightedCount}
                   index={pageMark}
@@ -1044,30 +1052,50 @@ export default function InspectorRoute() {
                       ? `${currentElement.kind}${currentElement.text ? `, “${currentElement.text}”` : ""}`
                       : undefined
                   }
-                  className="ml-auto"
+                  goTo={currentElement ? { onClick: goToElement, ref: goToRef, hintId: "inspect-go-to-hint" } : undefined}
                 />
+              ) : (
+                <span className="text-xs font-semibold text-fg-subtle">
+                  {highlightPending ? "Highlighting…" : copyName}
+                </span>
               )}
-              {checkLayout && (
-                // eslint-disable-next-line react/forbid-elements -- Convert: styled by hand like a secondary Button; use Button variant="secondary" size="sm"
-                <button
-                  type="button"
-                  aria-pressed={!asChecked}
-                  onClick={() => setAsChecked((value) => !value)}
-                  className="inline-flex min-h-target items-center gap-1 rounded-xs border border-border-strong bg-surface px-3 text-xs font-semibold text-fg hover:bg-surface-muted"
-                >
-                  Show at full width
-                </button>
+              <span className="ml-auto flex flex-wrap items-center gap-2">
+                {checkLayout && (
+                  // eslint-disable-next-line react/forbid-elements -- Convert: styled by hand like a secondary Button; use Button variant="secondary" size="sm"
+                  <button
+                    type="button"
+                    aria-pressed={!asChecked}
+                    onClick={() => setAsChecked((value) => !value)}
+                    className="inline-flex min-h-target items-center gap-1 rounded-xs border border-border-strong bg-surface px-3 text-xs font-semibold text-fg hover:bg-surface-muted"
+                  >
+                    Show at full width
+                  </button>
+                )}
+                {hasTarget && (
+                  // eslint-disable-next-line react/forbid-elements -- Convert: styled by hand like a secondary Button; use Button variant="secondary" size="sm"
+                  <button
+                    type="button"
+                    onClick={toggleHighlights}
+                    className="inline-flex min-h-target items-center gap-1 rounded-xs border border-border-strong bg-surface px-3 text-xs font-semibold text-fg hover:bg-surface-muted"
+                  >
+                    {showHighlights ? "Hide highlights" : "Show highlights"}
+                  </button>
+                )}
+              </span>
+              {stepping && currentElement && (
+                <p id="inspect-go-to-hint" className="basis-full text-xs text-fg-muted">
+                  <span className="block max-w-measure">
+                    Go to element moves keyboard focus to it. Press Escape to come back.
+                  </span>
+                </p>
               )}
-              {hasTarget && (
-                // eslint-disable-next-line react/forbid-elements -- Convert: styled by hand like a secondary Button; use Button variant="secondary" size="sm"
-                <button
-                  type="button"
-                  onClick={toggleHighlights}
-                  className="inline-flex min-h-target items-center gap-1 rounded-xs border border-border-strong bg-surface px-3 text-xs font-semibold text-fg hover:bg-surface-muted"
-                >
-                  {showHighlights ? "Hide highlights" : "Show highlights"}
-                </button>
-              )}
+              <p role="status" className="basis-full text-xs text-fg empty:sr-only">
+                {goToNote && (
+                  <span key={goToNote.attempt} className="block max-w-measure">
+                    {goToNote.text}
+                  </span>
+                )}
+              </p>
             </div>
             {/* Why a highlight is missing or partial ("Axcess could not find
                 the flagged element in this copy", "found 3 of 5"), and
@@ -1249,40 +1277,6 @@ export default function InspectorRoute() {
                     )
                   )}
                 </dl>
-                {/* The way to the element itself for a screen reader or a
-                    keyboard. The box in the copy is drawn for the eye, so
-                    without this a screen reader user had to search the
-                    whole copy for an element nothing marked. It moves focus
-                    onto the element, where a screen reader reads it in its
-                    place on the page, with "Flagged element 2 of 5" as its
-                    description (noteCurrent), and Escape comes back here.
-                    A separate button, not part of Next: moving focus into
-                    the copy at every step would take the reader away from
-                    Next each time. After the facts, so it is reached once
-                    the reader knows what the element is. SC 2.1.1 Keyboard,
-                    Level A; SC 2.4.3 Focus Order, Level A; SC 1.3.1 Info
-                    and Relationships, Level A (the flag was only visual).
-                    The hint is its description; the note, a status, says in
-                    words when focus could not move. */}
-                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <Button
-                    ref={goToRef}
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    className="min-h-target"
-                    aria-describedby="inspect-go-to-hint"
-                    onClick={goToElement}
-                  >
-                    Go to this element in the {copyName.toLowerCase()}
-                  </Button>
-                  <span id="inspect-go-to-hint" className="text-xs text-fg-muted">
-                    Moves keyboard focus onto it. Press Escape to come back here.
-                  </span>
-                  <span role="status" className="basis-full text-xs text-fg empty:sr-only">
-                    {goToNote && <span key={goToNote.attempt}>{goToNote.text}</span>}
-                  </span>
-                </div>
               </div>
             )}
             {/* Says when the saved copy may not look like the page Axcess
@@ -1642,7 +1636,7 @@ function escapeAttribute(value: string): string {
 
 /**
  * Scroll the inspector page so ``target``, inside the saved copy's frame, is
- * in view below the sticky top bar, after "Go to this element" put focus on
+ * in view below the sticky top bar, after "Go to element" put focus on
  * it. Focus moves without scrolling (``focusInCopy``) and ``keepCentered``
  * scrolls only the frame, which is right while stepping, where the page must
  * not jump. But this button is above the frame, so on a short window (or
@@ -1924,12 +1918,36 @@ function ElementFact({ term, stack = false, children }: { term: string; stack?: 
 }
 
 /**
- * An element locator on one line, cut at its start, so its end, the part
- * that names the element, stays in view. "Show all" puts each step on its
- * own line. "Copy element locator" copies all of it either way. The cut is
- * visual only: the text in the page is the whole locator, character for
- * character, and a screen reader reads all of it. The copy button's words
- * never change; the result is given in words in a status beside it.
+ * An element locator, and under it the two controls for it: "Copy element
+ * locator" and, when the locator is cut, "Show all".
+ *
+ * The locator is on one line, cut at its start, so its end, the part that
+ * names the element, stays in view; "Show all" puts each step on its own
+ * line. The cut is visual only: the text in the page is the whole locator,
+ * character for character, and a screen reader reads all of it.
+ *
+ * The controls are on their own line under the locator, in the value
+ * column. Rejected, in turn: (1) the controls at the end of the locator's
+ * line, which made that row a 44 px button tall, taller than the rows above
+ * it, so the facts table lost its even rhythm where the eye reads values;
+ * and a "Show all" that came and went there changed the locator's width,
+ * which changed whether it was cut, every frame, so it had to stay in place
+ * invisibly, keeping the gap. (2) "Copy element locator" in a row of its
+ * own under the whole table, behind a divider, far from the value it copies.
+ * Under the locator, Copy sits next to what it acts on (W3C COGA, "Making
+ * Content Usable", https://www.w3.org/TR/coga-usable/: keep related things
+ * together), the locator's line is plain text like the others, and "Show
+ * all" can be left out entirely when the locator fits, since it no longer
+ * shares the locator's line. Copy comes first, so it stays in one place
+ * whether or not Show all is there. Both are full 44 px targets (SC 2.5.5
+ * Target Size (Enhanced), Level AAA).
+ *
+ * The copy button's words never change; the result is said in words in a
+ * status under the controls, at a reading width (SC 4.1.3 Status Messages,
+ * Level AA; SC 1.4.8 Visual Presentation, Level AAA). Each copy gets a new
+ * key, so a second "Copied" is announced like the first. When the browser
+ * blocks copying (plain http on a network address), the whole locator is
+ * shown and selected, so Ctrl+C or Command+C copies it.
  */
 function LocatorValue({
   id,
@@ -1947,20 +1965,17 @@ function LocatorValue({
   const toggleRef = useRef<HTMLButtonElement>(null);
   const copyRef = useRef<HTMLButtonElement>(null);
   const [cut, setCut] = useState(false);
-  // Whether the locator is wider than its box, measured on a hidden copy of
+  // Whether the locator is wider than its line, measured on a hidden copy of
   // it on one line (the probe), so the answer holds while it is shown in
-  // full too. The box's width never depends on the answer: the toggle keeps
-  // its place when it is not needed, only hidden. (It used to appear only
-  // when needed, which could narrow the box, change the answer and remove
-  // it again, every frame.) A font that arrives late resizes the probe,
-  // which measures again.
+  // full too. A font that arrives late resizes the probe, which measures
+  // again.
   useLayoutEffect(() => {
     const code = codeRef.current;
     const probe = probeRef.current;
     if (!code || !probe) return;
     const measure = () => {
       const isCut = probe.getBoundingClientRect().width > code.clientWidth + 0.5;
-      // The toggle is about to hide: move its focus on rather than lose it.
+      // The toggle is about to go: move its focus on rather than lose it.
       if (!isCut && !open && document.activeElement === toggleRef.current) copyRef.current?.focus();
       setCut(isCut);
     };
@@ -1971,27 +1986,8 @@ function LocatorValue({
     return () => observer.disconnect();
   }, [open]);
 
-  // Each copy gets a new key, so the status is new content every time and a
-  // second "Copied" is announced like the first.
   const attempts = useRef(0);
   const [copied, setCopied] = useState<{ attempt: number; ok: boolean } | null>(null);
-  const copy = async () => {
-    attempts.current += 1;
-    const attempt = attempts.current;
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied({ attempt, ok: true });
-    } catch {
-      // No clipboard, for example plain http on a network address. Show the
-      // whole locator and select it, so Ctrl+C or Command+C copies it.
-      setCopied({ attempt, ok: false });
-      if (open) selectLocator();
-      else {
-        selectWhenOpen.current = true;
-        onOpenChange(true);
-      }
-    }
-  };
   const selectLocator = () => {
     const code = codeRef.current;
     if (code) window.getSelection()?.selectAllChildren(code);
@@ -2003,6 +1999,21 @@ function LocatorValue({
     selectWhenOpen.current = false;
     selectLocator();
   });
+  const copy = async () => {
+    attempts.current += 1;
+    const attempt = attempts.current;
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied({ attempt, ok: true });
+    } catch {
+      setCopied({ attempt, ok: false });
+      if (open) selectLocator();
+      else {
+        selectWhenOpen.current = true;
+        onOpenChange(true);
+      }
+    }
+  };
 
   // Split before each " > ", so the steps join back into the exact locator.
   // The split is for display only: textContent, copy and tests stay exact.
@@ -2017,9 +2028,8 @@ function LocatorValue({
         {step}
       </span>
     ));
-  const needed = cut || open;
   return (
-    <div className="relative flex flex-wrap items-baseline gap-x-2 gap-y-1">
+    <div className="relative">
       {/* Out of the flow and clipped to nothing, so it never widens the page. */}
       <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-0 overflow-hidden">
         <span ref={probeRef} className="invisible inline-block whitespace-nowrap font-mono text-xs">
@@ -2031,7 +2041,7 @@ function LocatorValue({
         ref={codeRef}
         translate="no"
         className={cn(
-          "min-w-0 flex-[1_1_12rem] font-mono text-xs text-fg",
+          "block min-w-0 font-mono text-xs text-fg",
           !open && "overflow-hidden text-ellipsis whitespace-nowrap text-left [direction:rtl]",
         )}
       >
@@ -2039,30 +2049,32 @@ function LocatorValue({
           {stepSpans(open)}
         </span>
       </code>
-      <span className="ml-auto flex flex-wrap items-center justify-end gap-1">
-        <Button
-          ref={toggleRef}
-          type="button"
-          variant="ghost"
-          size="sm"
-          className={cn("min-h-target", !needed && "invisible")}
-          aria-expanded={open}
-          aria-controls={id}
-          onClick={() => {
-            // Closing a locator that fits hides this button: focus Copy first.
-            if (open && !cut) copyRef.current?.focus();
-            onOpenChange(!open);
-          }}
-        >
-          {open ? <ChevronUp className="h-3.5 w-3.5" aria-hidden /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden />}
-          {open ? "Show less" : "Show all"}
-        </Button>
-        <Button ref={copyRef} type="button" size="sm" className="min-h-target" onClick={copy}>
+      <div className="mt-1 flex flex-wrap items-center gap-2">
+        <Button ref={copyRef} type="button" variant="secondary" size="sm" className="min-h-target" onClick={copy}>
           <Copy className="h-3.5 w-3.5" aria-hidden />
           Copy element locator
         </Button>
-      </span>
-      <span role="status" className="basis-full text-xs text-fg empty:sr-only">
+        {(cut || open) && (
+          <Button
+            ref={toggleRef}
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="min-h-target"
+            aria-expanded={open}
+            aria-controls={id}
+            onClick={() => {
+              // Closing a locator that fits removes this button: focus Copy first.
+              if (open && !cut) copyRef.current?.focus();
+              onOpenChange(!open);
+            }}
+          >
+            {open ? <ChevronUp className="h-3.5 w-3.5" aria-hidden /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden />}
+            {open ? "Show less" : "Show all"}
+          </Button>
+        )}
+      </div>
+      <p role="status" className="mt-1 max-w-measure text-xs text-fg empty:sr-only">
         {copied &&
           (copied.ok ? (
             <span key={copied.attempt} className="inline-flex items-center gap-1">
@@ -2075,7 +2087,7 @@ function LocatorValue({
               Press Ctrl+C, or Command+C on a Mac, to copy it.
             </span>
           ))}
-      </span>
+      </p>
     </div>
   );
 }

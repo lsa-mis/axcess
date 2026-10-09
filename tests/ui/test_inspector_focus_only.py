@@ -79,7 +79,7 @@ async def test_a_skip_link_is_shown_where_it_appears_with_focus(
 
         # Asked for from the keyboard, the element is shown again and the
         # reader's focus stays on the button they used.
-        jump = page.get_by_role("button", name="Jump to flagged element")
+        jump = page.get_by_role("button", name="Show element")
         await jump.focus()
         # From here on, nothing may move focus: count every focus change.
         await page.evaluate(

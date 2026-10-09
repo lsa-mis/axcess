@@ -3,7 +3,7 @@
 The box and label over the saved copy are drawn for the eye and hidden from
 screen readers, so the inspector gives the same thing in words and a way
 in. After each step, the stepper's status says what the element is.
-"Go to this element in the saved copy" moves focus onto the element itself,
+"Go to element" moves focus onto the element itself,
 which then has "Flagged element N of M" as its description, and Escape comes
 back. The label also stays inside the frame for an element at the very top
 or side of the page, where it used to be cut off.
@@ -55,7 +55,7 @@ def page_id(seeded_db: tuple[Path, Path, int]) -> int:
 
 async def _inspector(new_page: Any, base: str, scan_id: int, page_id: int) -> Any:
     page = await open_inspector(new_page, base, scan_id, page_id, RULE)
-    await page.get_by_role("button", name="Go to this element in the saved copy").wait_for()
+    await page.get_by_role("button", name="Go to element").wait_for()
     await settled(page)
     return page
 
@@ -73,7 +73,7 @@ async def test_each_step_says_what_the_element_is(
     await playwright_async.expect(status).to_have_text(
         "Flagged element 1 of 2: Heading level 5, “Status messages”"
     )
-    await page.get_by_role("button", name="Next flagged element").click()
+    await page.get_by_role("button", name="Next element").click()
     await playwright_async.expect(status).to_have_text(
         "Flagged element 2 of 2: Link, “Skip to main content”"
     )
@@ -85,9 +85,9 @@ async def test_go_to_moves_focus_onto_the_element_and_escape_comes_back(
 ) -> None:
     base, _ = live_server
     page = await _inspector(new_page, base, seeded_db[2], page_id)
-    go = page.get_by_role("button", name="Go to this element in the saved copy")
+    go = page.get_by_role("button", name="Go to element")
     await playwright_async.expect(go).to_have_accessible_description(
-        "Moves keyboard focus onto it. Press Escape to come back here."
+        "Go to element moves keyboard focus to it. Press Escape to come back."
     )
     await go.focus()
     await page.keyboard.press("Enter")
@@ -119,7 +119,7 @@ async def test_go_to_brings_the_element_into_view(
         f"{base}/app/scans/{seeded_db[2]}/pages/{page_id}/inspect?issue=axe:{RULE}",
         wait_until="networkidle",
     )
-    go = page.get_by_role("button", name="Go to this element in the saved copy")
+    go = page.get_by_role("button", name="Go to element")
     await go.focus()
     await page.keyboard.press("Enter")
     await playwright_async.expect(
@@ -143,7 +143,7 @@ async def test_only_the_current_element_is_described(
 ) -> None:
     base, _ = live_server
     page = await _inspector(new_page, base, seeded_db[2], page_id)
-    await page.get_by_role("button", name="Next flagged element").click()
+    await page.get_by_role("button", name="Next element").click()
     copy = page.frame_locator('iframe[title^="Saved copy"]')
     await playwright_async.expect(copy.locator("#skip")).to_have_accessible_description(
         "Flagged element 2 of 2"
@@ -153,7 +153,7 @@ async def test_only_the_current_element_is_described(
         f"() => {DOC}.querySelectorAll('[aria-describedby~=\"axcess-flagged-note\"]').length"
     )
     assert described == 1
-    await page.get_by_role("button", name="Go to this element in the saved copy").click()
+    await page.get_by_role("button", name="Go to element").click()
     await playwright_async.expect(copy.locator("#skip")).to_be_focused()
     await page.context.close()
 
@@ -169,7 +169,7 @@ async def test_the_label_stays_inside_the_frame(
     base, _ = live_server
     page = await _inspector(new_page, base, seeded_db[2], page_id)
     for _ in range(step):
-        await page.get_by_role("button", name="Next flagged element").click()
+        await page.get_by_role("button", name="Next element").click()
     await settled(page)
     label = await page.evaluate(
         f"""() => {{
