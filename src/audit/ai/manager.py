@@ -7,6 +7,7 @@ drive it with fakes.
 from __future__ import annotations
 
 import logging
+import threading
 from collections.abc import Callable
 from typing import Literal
 
@@ -16,6 +17,7 @@ from audit.ai import hardware as hw
 from audit.ai.catalog import Catalog, Tier, load_catalog
 from audit.ai.installer import Installer, InstallStatus
 from audit.ai.runtime import OllamaRuntime, RuntimeSetupError, system_ollama
+from audit.ai.sandbox import IsolationError
 from audit.ai.state import (
     AIConfig,
     AIPreferences,
@@ -27,6 +29,7 @@ from audit.ai.state import (
     load_preferences,
     save_config,
     save_preferences,
+    trust_private_runtime,
 )
 from audit.config import Settings
 
@@ -73,6 +76,29 @@ class AIPlan(BaseModel):
     install: InstallStatus
 
 
+class AiRuntimeStatus(BaseModel):
+    running: bool = False
+    isolated: bool = False
+    reason: str | None = None
+
+
+class AiRuntimeStartResponse(BaseModel):
+    state: Literal[
+        "started",
+        "already_running",
+        "model_missing",
+        "not_isolated",
+        "system_ollama_not_managed",
+        "ai_off",
+        "not_desktop",
+        "busy",
+    ]
+    isolated: bool = False
+    reason: str | None = None
+    download_bytes: int | None = None
+    tier: Literal["small", "standard", "large"] | None = None
+
+
 class NotEnoughSpaceError(Exception):
     """The data folder's disk cannot hold what this size still has to download."""
 
@@ -94,6 +120,7 @@ class AIManager:
         installer: Installer | None = None,
         busy_reason: Callable[[], str | None] = lambda: None,
     ) -> None:
+        self._start_lock = threading.Lock()
         self.settings = settings
         self.on_change = on_change
         self.catalog = catalog or load_catalog()
@@ -115,6 +142,8 @@ class AIManager:
             self.runtime.stop()
 
     def _installed(self, config: AIConfig) -> None:
+        if config.source == "private":
+            trust_private_runtime(self.settings, config.base_url, self.runtime.running)
         previous_config = self.config()
         previous_preferences = self.preferences()
         try:
@@ -148,9 +177,10 @@ class AIManager:
         config = self.config()
         if enabled and config is not None and config.source == "private":
             url = self.runtime.start(preferred_url=config.base_url)
+            trust_private_runtime(self.settings, url, self.runtime.running)
             config = config.model_copy(update={"base_url": url})
             save_config(self.settings, config)
-        elif enabled and config is None and self.find_system() is None:
+        elif enabled and config is None:
             raise RuntimeSetupError(
                 "AI is not set up yet. Choose a size and select Download and set up."
             )
@@ -175,7 +205,7 @@ class AIManager:
         machine = self.probe()
         # Setup discovery reads only the program version, never a model.
         system = self.find_system()
-        program_bytes = 0 if system else self.runtime.download_remaining()
+        program_bytes = self.runtime.download_remaining()
         accelerator: Literal["apple", "nvidia", "amd", "none"] = (
             "apple"
             if machine.apple_silicon
@@ -227,15 +257,15 @@ class AIManager:
         tier = self.catalog.tier(tier_id)
         status = self.installer.status
         if not (self.installer.running and status.tier == tier_id):
+            self._require_idle()
             self._check_space(tier, status)
         save_preferences(self.settings, preferences.model_copy(update={"choice_recorded": True}))
         return self.installer.start(tier)
 
     def _check_space(self, tier: Tier, status: InstallStatus) -> None:
         # What a paused run of the same size already wrote is on disk, so
-        # only the rest needs room. A system Ollama keeps models in its own
-        # folder, which is usually on the same disk; this is a best guess.
-        program = 0 if self.find_system() else self.runtime.download_remaining()
+        # only the rest needs room. Private models stay in the data folder.
+        program = self.runtime.download_remaining()
         done = status.done_bytes if status.tier == tier.id else 0
         needed = max(0, tier.size + program - done) + hw.DISK_MARGIN
         free = self.probe().free_disk_bytes
@@ -265,6 +295,78 @@ class AIManager:
         save_preferences(self.settings, AIPreferences(enabled=False, choice_recorded=True))
         self.on_change(None)
 
+    def runtime_status(self) -> AiRuntimeStatus:
+        config = self.config()
+        if config is not None and config.source == "system":
+            return AiRuntimeStatus(reason="system_ollama_not_managed")
+        reason = self.runtime.isolation_reason
+        if not self.runtime.running() and reason is None:
+            try:
+                self.runtime.require_isolation()
+            except IsolationError as exc:
+                reason = exc.reason
+        return AiRuntimeStatus(
+            running=self.runtime.running(),
+            isolated=self.runtime.running(),
+            reason=reason,
+        )
+
+    def start_runtime(self) -> AiRuntimeStartResponse:
+        if not self.settings.desktop:
+            return AiRuntimeStartResponse(state="not_desktop")
+        if not self._start_lock.acquire(blocking=False):
+            return AiRuntimeStartResponse(state="busy")
+        try:
+            if not self.preferences().enabled:
+                return AiRuntimeStartResponse(state="ai_off")
+            try:
+                self._require_idle()
+            except AIBusyError:
+                return AiRuntimeStartResponse(state="busy")
+            config = self.config()
+            if config is not None and config.source == "system":
+                return AiRuntimeStartResponse(state="system_ollama_not_managed")
+            if self.runtime.running():
+                return AiRuntimeStartResponse(state="already_running", isolated=True)
+            try:
+                self.runtime.require_isolation()
+            except IsolationError as exc:
+                return AiRuntimeStartResponse(state="not_isolated", reason=exc.reason)
+            tier = self.catalog.tier(config.tier) if config else None
+            if (
+                not self.runtime.installed()
+                or config is None
+                or not all(
+                    self.runtime.has_model(tag) for tag in (config.text_model, config.vision_model)
+                )
+            ):
+                return AiRuntimeStartResponse(
+                    state="model_missing",
+                    tier=tier.id if tier else None,
+                    download_bytes=(tier.size + self.runtime.download_remaining())
+                    if tier
+                    else None,
+                )
+            try:
+                url = self.runtime.start(preferred_url=config.base_url)
+            except IsolationError as exc:
+                return AiRuntimeStartResponse(state="not_isolated", reason=exc.reason)
+            except RuntimeSetupError:
+                return AiRuntimeStartResponse(state="not_isolated", reason="runtime_failed")
+            trust_private_runtime(self.settings, url, self.runtime.running)
+            previous = config
+            config = config.model_copy(update={"base_url": url})
+            try:
+                save_config(self.settings, config)
+                self.on_change(config)
+            except Exception:
+                save_config(self.settings, previous)
+                self.runtime.stop()
+                return AiRuntimeStartResponse(state="not_isolated", reason="runtime_failed")
+            return AiRuntimeStartResponse(state="started", isolated=True)
+        finally:
+            self._start_lock.release()
+
     def startup(self) -> None:
         """Start the private Ollama if the saved setup uses it."""
         config = self.config()
@@ -277,9 +379,10 @@ class AIManager:
             return
         try:
             url = self.runtime.start(preferred_url=config.base_url)
-        except RuntimeSetupError:
+        except (RuntimeSetupError, IsolationError):
             logging.getLogger(__name__).exception("ai.runtime_start_failed")
             return
+        trust_private_runtime(self.settings, url, self.runtime.running)
         if url != config.base_url:
             config = config.model_copy(update={"base_url": url})
             save_config(self.settings, config)

@@ -28,9 +28,16 @@ React workbench in a sandboxed Electron window.
   installed or downloaded. **Settings > AI features** (on because
   `desktopEnvironment` sets `AUDIT_DESKTOP=1`) checks memory, disk and
   graphics chip, suggests a size, and downloads a pinned, checksum-verified
-  Ollama and the models only after the person selects **Download and set up**. It reuses
-  an Ollama already on port 11434; otherwise it runs a private copy on a
-  random loopback port, started and stopped with the backend. See
+  Ollama and the models only after the person selects **Download and set up**.
+  It always installs a private copy, not an Ollama already on port 11434.
+  **Start AI service** starts that private copy without downloading anything.
+  On macOS it uses a deny-by-default OS sandbox and a checked loopback-only
+  connection. The service cannot reach the internet; downloads run separately.
+  The sandbox allows only the Mac graphics driver and shader compiler, so
+  models still run on the graphics chip (Metal).
+  Windows and systems without supported isolation refuse to start AI. Linux
+  network namespaces are supported by the command builder, but starting stays
+  blocked until Axcess has a private connection bridge to that namespace. See
   [Set up AI features](ai-suggestions.md#set-up-ai-features-in-the-desktop-app).
   Model-assisted scan checks stay off for each new scan and clearly report
   when Ollama is unavailable.

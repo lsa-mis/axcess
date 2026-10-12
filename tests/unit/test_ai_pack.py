@@ -13,10 +13,17 @@ import pytest
 
 from audit.ai import hardware as hw
 from audit.ai.catalog import load_catalog, platform_key
-from audit.ai.installer import Installer, pull_model
+from audit.ai.installer import Installer
 from audit.ai.manager import AIManager, NotEnoughSpaceError
 from audit.ai.runtime import OllamaRuntime, RuntimeSetupError
-from audit.ai.state import AIConfig, effective_settings, load_config, save_config, semantic_model
+from audit.ai.state import (
+    AIConfig,
+    effective_settings,
+    load_config,
+    save_config,
+    semantic_model,
+    trust_private_runtime,
+)
 from audit.analyzer.semantic.registry import build_analyzers, supported_criteria
 from audit.config import Settings
 
@@ -90,6 +97,8 @@ def test_effective_settings_only_applies_on_desktop(tmp_path: Path) -> None:
     assert effective_settings(server) is server
     assert semantic_model(server) is None
 
+    assert effective_settings(desktop).ollama_base_url == "http://127.0.0.1:0"
+    trust_private_runtime(desktop, "http://127.0.0.1:50123", lambda: True)
     applied = effective_settings(desktop)
     assert applied.ollama_base_url == "http://127.0.0.1:50123"
     assert applied.suggestion_text_model == "text:1"
@@ -167,38 +176,13 @@ def test_download_with_wrong_checksum_is_deleted(tmp_path: Path) -> None:
     assert not (tmp_path / "ai" / "downloads" / "ollama-darwin.tgz.part").exists()
 
 
-def test_pull_model_sums_layer_progress_and_reports_errors() -> None:
-    body = (
-        b'{"status":"pulling manifest"}\n'
-        b'{"status":"pulling a","digest":"a","total":100,"completed":40}\n'
-        b'{"status":"pulling b","digest":"b","total":50,"completed":50}\n'
-        b'{"status":"success"}\n'
-    )
-    client = httpx.Client(
-        transport=httpx.MockTransport(lambda r: httpx.Response(200, content=body))
-    )
-    progress: list[tuple[int, int]] = []
-    pull_model(
-        "http://x", "m", lambda d, t: progress.append((d, t)), threading.Event(), client=client
-    )
-    assert progress[-1] == (90, 150)
-
-    bad = httpx.Client(
-        transport=httpx.MockTransport(
-            lambda r: httpx.Response(200, content=b'{"error":"no space"}\n')
-        )
-    )
-    with pytest.raises(RuntimeSetupError, match="no space"):
-        pull_model("http://x", "m", lambda d, t: None, threading.Event(), client=bad)
-
-
-def test_install_reuses_system_ollama_and_saves_setup(tmp_path: Path) -> None:
+def test_install_keeps_system_ollama_separate_and_saves_private_setup(tmp_path: Path) -> None:
     settings = Settings(data_dir=tmp_path, desktop=True)
     changes: list[AIConfig | None] = []
     pulled: list[str] = []
 
-    def fake_pull(base_url, tag, progress, cancel):  # type: ignore[no-untyped-def]
-        assert base_url == "http://127.0.0.1:11434"
+    def fake_pull(models_dir, tag, progress, cancel):  # type: ignore[no-untyped-def]
+        assert models_dir == tmp_path / "ai" / "models"
         pulled.append(tag)
         progress(1, 1)
 
@@ -208,11 +192,13 @@ def test_install_reuses_system_ollama_and_saves_setup(tmp_path: Path) -> None:
         probe=lambda: machine(24),
         find_system=lambda: "0.33.0",
     )
+    manager.runtime.download = lambda *a: None
+    manager.runtime.start = lambda *a, **kw: "http://127.0.0.1:50123"
     manager.installer.pull = fake_pull
     manager.installer.find_system = lambda: "0.33.0"
     plan = manager.plan()
     assert plan.recommended == "standard"
-    assert plan.program.download_bytes == 0
+    assert plan.program.download_bytes == manager.runtime.download_remaining()
 
     manager.install("small")
     manager.installer._thread.join(5)  # type: ignore[union-attr]
@@ -220,7 +206,7 @@ def test_install_reuses_system_ollama_and_saves_setup(tmp_path: Path) -> None:
     tier = load_catalog().tier("small")
     assert pulled == [tier.text.tag, tier.vision.tag]
     saved = load_config(settings)
-    assert saved is not None and saved.source == "system" and saved.tier == "small"
+    assert saved is not None and saved.source == "private" and saved.tier == "small"
     assert changes[-1] == saved
 
     manager.remove()
@@ -242,6 +228,7 @@ def test_install_failure_is_reported_in_plain_words(tmp_path: Path) -> None:
         find_system=lambda: "0.33.0",
         pull=failing_pull,
     )
+    installer.runtime.download = lambda *a: None
     installer.start(load_catalog().tier("small"))
     installer._thread.join(5)  # type: ignore[union-attr]
     assert installer.status.state == "failed"

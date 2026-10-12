@@ -73,12 +73,13 @@ you. Otherwise you install it separately.
   settings, **Local AI**, are off by default. **Read text inside images
   (OCR)** is on and needs no AI model. When a switch can't be used, the form
   says why, for example "Ollama is not running on this computer."
-- **Is Ollama running?** `curl -s http://localhost:11434/api/tags` should
-  return JSON.
-- **Is the model installed?** The form names any missing model, and for the
-  default vision model it shows the command: `ollama pull qwen3-vl:2b-instruct`.
-  Install a model with `ollama pull <model>`. On a source install,
-  `AUDIT_VLM_MODEL` picks a different vision model.
+- **Is Ollama running?** In the desktop app, select **Start AI service** in
+  Settings. For a separate source install, `curl -s http://localhost:11434/api/tags`
+  should return JSON.
+- **Is the model installed?** In the desktop app, choose a size in **AI features**
+  and confirm the size-labelled download. Do not use `ollama pull` with its
+  private service. On a separate source install, install a model with
+  `ollama pull <model>`. `AUDIT_VLM_MODEL` picks a different image model.
 - **Want the AI checks off?** Leave the switches off. On the command line they
   are on by default, so pass `--skip-vlm --skip-semantic --skip-visual`. Image
   findings are still created from OCR text and the alt text comparison.
@@ -87,6 +88,21 @@ If Ollama can't be reached when a scan starts, Axcess logs a warning and
 continues without those checks.
 
 ## AI features setup in the desktop app stopped or failed
+
+- **AI service is not running**: select **Start AI service** in Settings. This
+  starts only Axcess's private copy. It never starts or stops your own Ollama.
+- **Private models are missing**: choose a size in **AI features**. Check the
+  download size, then select **Download and set up**. Starting the service
+  never downloads files without that separate choice.
+- **AI could not be isolated**: the service stays stopped. Windows and systems
+  without the required sandbox are not supported. Linux startup also stays
+  blocked until a private connection bridge is available. Do not disable the
+  isolation check or expose a service to the internet to get past this error.
+- **Isolation check failed**: check the application log. Axcess requires proof
+  that the OS blocks outside connections; a timeout does not count. Reports
+  and saved suggestions remain readable.
+- **Your own Ollama is not managed**: Axcess leaves it alone. Select a private
+  download for isolated AI. Never run `ollama pull` against Axcess's service.
 
 - **AI features are off**: open **Settings > AI features** and select
   **Turn AI on** to reuse kept models, or choose a size and download if you

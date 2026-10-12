@@ -14,8 +14,9 @@ import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
+from urllib.parse import urlsplit
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 from audit.extractor.html_images import image_element_html
 from audit.protected.redaction import redact_text, redact_url
@@ -28,6 +29,7 @@ from audit.suggest.models import (
 from audit.web import image_findings_queries, issues
 
 MAX_NEARBY_CHARS = 1500
+MAX_SAVED_HTML_BYTES = 2 * 1024 * 1024
 MAX_FIX_STEPS = 6
 MAX_IMAGE_BYTES = 4 * 1024 * 1024
 _HASH_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -84,6 +86,9 @@ class EvidenceBundle:
     # Rule that can be re-run on suggested markup; None when no offline
     # check exists for this kind of problem.
     check_rule_id: str | None = None
+    nearby_html: str | None = None
+    page_css: str | None = None
+    help_url: str | None = None
 
 
 def _clip(value: Any, limit: int) -> str | None:
@@ -101,10 +106,17 @@ def safe_text(value: Any, limit: int) -> str | None:
 
 
 def safe_markup(value: Any, limit: int = MAX_SNIPPET_CHARS) -> str | None:
-    clipped = _clip(value, limit)
-    if clipped is None:
+    if value is None:
         return None
-    return redact_text(_FORM_VALUE_RE.sub(r'\1""', clipped))
+    text = re.sub(
+        r"(<textarea\b[^>]*>).*?(</textarea\s*>|$)",
+        r"\1\2",
+        str(value),
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    text = _FORM_VALUE_RE.sub(r'\1""', text)
+    clipped = _clip(text, limit)
+    return redact_text(clipped) if clipped is not None else None
 
 
 def _page_row(conn: sqlite3.Connection, scan_id: int, page_id: int) -> sqlite3.Row:
@@ -118,16 +130,90 @@ def _page_row(conn: sqlite3.Connection, scan_id: int, page_id: int) -> sqlite3.R
     return cast("sqlite3.Row", row)
 
 
-def _nearby_text(rendered: bytes | None, selector: str | None) -> str | None:
-    """Visible text around the element, so the model knows what it is for."""
-    if not rendered or not selector:
+def guidance_url(value: Any) -> str | None:
+    """Only a bounded HTTP(S) URL from the saved rule, never from a model."""
+    if not isinstance(value, str) or len(value) > 2000 or any(ord(c) < 32 for c in value):
         return None
     try:
-        html = gzip.decompress(rendered)
+        parsed = urlsplit(value)
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.hostname
+            or parsed.username
+            or parsed.password
+        ):
+            return None
+    except ValueError:
+        return None
+    return redact_url(value)
+
+
+def stored_help_url(conn: sqlite3.Connection, *, scan_id: int, occurrence_id: int) -> str | None:
+    row = conn.execute(
+        "SELECT help_url FROM page_a11y_findings WHERE id = ? AND scan_id = ?",
+        (occurrence_id, scan_id),
+    ).fetchone()
+    return guidance_url(row["help_url"]) if row else None
+
+
+def _saved_html(rendered: bytes | None) -> bytes | None:
+    if not rendered:
+        return None
+    try:
+        import io
+
+        with gzip.GzipFile(fileobj=io.BytesIO(rendered)) as stream:
+            html = stream.read(MAX_SAVED_HTML_BYTES + 1)
     except (OSError, EOFError):
         return None
-    soup = BeautifulSoup(html, "html.parser")
+    if len(html) > MAX_SAVED_HTML_BYTES:
+        return None
+    return html
+
+
+def _saved_soup(rendered: bytes | None) -> BeautifulSoup | None:
+    html = _saved_html(rendered)
+    return BeautifulSoup(html, "html.parser") if html is not None else None
+
+
+def _nearby_code(
+    rendered: bytes | None, selector: str | None, *, element_html: str | None = None
+) -> tuple[str | None, str | None]:
+    soup = _saved_soup(rendered)
+    if soup is None or not (selector or element_html):
+        return None, None
+    styles = safe_text(
+        "\n".join(tag.get_text() for tag in soup.find_all("style")), MAX_NEARBY_CHARS
+    )
     for tag in soup(["script", "style", "noscript", "template"]):
+        tag.decompose()
+    try:
+        if selector:
+            node = soup.select_one(selector)
+        else:
+            element = BeautifulSoup(element_html or "", "html.parser").find()
+            candidates = (
+                [tag for tag in soup.find_all(element.name) if tag.attrs == element.attrs]
+                if isinstance(element, Tag)
+                else []
+            )
+            # Repeated identical images have no unique saved locator. Do not
+            # silently use a neighbour from the wrong occurrence.
+            node = candidates[0] if len(candidates) == 1 else None
+    except Exception:
+        return None, None
+    if node is None:
+        return None, None
+    parent = node.parent or node
+    return safe_markup(str(parent)), styles
+
+
+def _nearby_text(rendered: bytes | None, selector: str | None) -> str | None:
+    """Visible text around the element, so the model knows what it is for."""
+    soup = _saved_soup(rendered)
+    if soup is None or not selector:
+        return None
+    for tag in soup(["script", "style", "noscript", "template", "textarea"]):
         tag.decompose()
     try:
         node = soup.select_one(selector)
@@ -300,7 +386,7 @@ def _build_a11y(
 ) -> EvidenceBundle:
     f = conn.execute(
         """
-        SELECT id, page_id, pipeline, rule_id, wcag_sc, help, target_selector,
+        SELECT id, page_id, pipeline, rule_id, wcag_sc, help, help_url, target_selector,
                failure_summary, html_snippet, screenshot_hash
           FROM page_a11y_findings WHERE id = ? AND scan_id = ?
         """,
@@ -315,6 +401,7 @@ def _build_a11y(
     pipeline = str(f["pipeline"] or "axe")
     rule_id = str(f["rule_id"])
     selector = _first_selector(f["target_selector"])
+    nearby_html, page_css = _nearby_code(page["rendered_html"], selector)
     wants_picture = pipeline in _VISUAL_PIPELINES or rule_id in _VISUAL_RULES
     problem_parts = [p for p in (f["help"], f["failure_summary"]) if p]
     return EvidenceBundle(
@@ -338,6 +425,9 @@ def _build_a11y(
         audience_default=_audience(row),
         confidence="likely" if pipeline in _FIRM_PIPELINES else "guess",
         check_rule_id=rule_id if pipeline == "axe" else None,
+        nearby_html=nearby_html,
+        page_css=page_css,
+        help_url=guidance_url(f["help_url"]),
     )
 
 
@@ -389,6 +479,8 @@ def _build_image(
     }
     if occ["role"]:
         facts["Role"] = str(occ["role"])
+    snippet = _image_markup(page, int(occ["position"]), alt)
+    nearby_html, page_css = _nearby_code(page["rendered_html"], None, element_html=snippet)
     return EvidenceBundle(
         scan_id=scan_id,
         page_id=page_id,
@@ -400,7 +492,9 @@ def _build_image(
         wcag_sc=(row.wcag_sc if row else "1.4.5"),
         page_url=redact_url(str(page["final_url"] or page["url_normalized"])),
         problem=(row.description if row and row.description else "An image may contain text."),
-        snippet=_image_markup(page, int(occ["position"]), alt),
+        snippet=snippet,
+        nearby_html=nearby_html,
+        page_css=page_css,
         selector=None,
         nearby_text=safe_text(occ["context_snippet"], MAX_NEARBY_CHARS),
         fix_steps=tuple(

@@ -16,10 +16,12 @@ page meets WCAG, and the interface says so.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any, Literal, Protocol
 
 from audit.analyzer.axe import DEFAULT_AXE_BUNDLE
+from audit.suggest.models import CodeOption
 
 log = logging.getLogger(__name__)
 
@@ -66,6 +68,25 @@ def can_check(rule_id: str | None) -> bool:
 
 class Verifier(Protocol):
     async def check(self, rule_id: str | None, html: str | None, css: str | None) -> Outcome: ...
+
+
+async def check_options(
+    verifier: Verifier, rule_id: str | None, options: list[CodeOption]
+) -> list[Outcome]:
+    """Run the same rule independently; a pass for one says nothing about the other."""
+    if not can_check(rule_id):
+        return ["not_checked" for _ in options]
+    outcomes: list[Outcome] = []
+    for option in options:
+        try:
+            outcome = await asyncio.wait_for(
+                verifier.check(rule_id, option.after_html, option.css), timeout=15
+            )
+        except Exception:
+            log.warning("suggest.option_check_failed")
+            outcome = "not_checked"
+        outcomes.append(outcome)
+    return outcomes
 
 
 def _document(html: str, css: str | None) -> str:

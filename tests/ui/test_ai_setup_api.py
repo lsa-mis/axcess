@@ -252,3 +252,103 @@ def test_cancelled_answer_must_finish_before_off_and_saved_answers_stay_readable
         assert client.get(f"{path}/{sid}").json()["result"] == answer["result"]
         assert client.post(path, json=body).status_code == 403
         assert len(provider.prompts) == 2
+
+
+def test_runtime_start_requires_explicit_boolean_confirmation(
+    db: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("AUDIT_DESKTOP", "1")
+    with TestClient(create_app(db_path=db, blob_dir=tmp_path / "blobs")) as client:
+        for body in (
+            {},
+            {"confirm": False},
+            {"confirm": "true"},
+            {"confirm": 1},
+            {"confirm": True, "extra": 1},
+        ):
+            assert client.post("/api/ai/runtime/start", json=body).status_code == 422
+        assert client.post("/api/ai/runtime/start", json={"confirm": True}).json() == {
+            "state": "ai_off",
+            "isolated": False,
+            "reason": None,
+            "download_bytes": None,
+            "tier": None,
+        }
+        assert set(client.get("/api/ai/runtime").json()) == {"running", "isolated", "reason"}
+
+
+def test_runtime_routes_stay_desktop_only(db: Path, tmp_path: Path) -> None:
+    with TestClient(create_app(db_path=db, blob_dir=tmp_path / "blobs")) as client:
+        assert client.get("/api/ai/runtime").status_code == 404
+        assert client.post("/api/ai/runtime/start", json={"confirm": True}).status_code in {
+            404,
+            405,
+        }
+
+
+@pytest.mark.parametrize(
+    "state",
+    [
+        "started",
+        "already_running",
+        "model_missing",
+        "not_isolated",
+        "system_ollama_not_managed",
+        "busy",
+    ],
+)
+def test_runtime_start_states(
+    db: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, state: str
+) -> None:
+    from unittest.mock import Mock
+
+    from audit.ai.catalog import load_catalog
+    from audit.ai.runtime import OllamaRuntime
+    from audit.ai.sandbox import IsolationError
+
+    monkeypatch.setenv("AUDIT_DESKTOP", "1")
+    settings = Settings(data_dir=tmp_path, desktop=True)
+    save_preferences(settings, AIPreferences(enabled=True, choice_recorded=True))
+    save_config(
+        settings,
+        AIConfig(
+            source="system" if state == "system_ollama_not_managed" else "private",
+            base_url="http://127.0.0.1:12345",
+            tier="small",
+            text_model="text:test",
+            vision_model="vision:test",
+        ),
+    )
+    runtime = Mock(spec=OllamaRuntime(tmp_path / "ai", load_catalog()))
+    runtime.running.return_value = state == "already_running"
+    runtime.installed.return_value = True
+    runtime.has_model.return_value = state != "model_missing"
+    runtime.download_remaining.return_value = 0
+    runtime.isolation_reason = None
+    runtime.start.return_value = "http://127.0.0.1:12345"
+    if state == "not_isolated":
+        runtime.start.side_effect = IsolationError("network_test_failed", "AI isolation failed")
+    original = AIManager.__init__
+
+    def init(manager, *args, **kwargs):
+        kwargs["runtime"] = runtime
+        original(manager, *args, **kwargs)
+
+    monkeypatch.setattr(AIManager, "__init__", init)
+    monkeypatch.setattr(AIManager, "startup", lambda self: None)
+    with TestClient(create_app(db_path=db, blob_dir=tmp_path / "blobs")) as client:
+        if state == "busy":
+            with connect(db) as conn:
+                conn.execute("UPDATE scans SET status = 'running'")
+        response = client.post("/api/ai/runtime/start", json={"confirm": True})
+        assert response.status_code == 200
+        result = response.json()
+        assert result["state"] == state
+        assert result["isolated"] is (state in {"started", "already_running"})
+        assert result["reason"] == ("network_test_failed" if state == "not_isolated" else None)
+        if state == "model_missing":
+            assert result["tier"] == "small"
+            assert result["download_bytes"] == load_catalog().tier("small").size
+        if state not in {"started", "not_isolated"}:
+            runtime.start.assert_not_called()
+        runtime.download.assert_not_called()

@@ -4,6 +4,7 @@ import { Check, ChevronRight, CircleCheck, CircleHelp, CircleX, Copy, Sparkles }
 import { ApiError, api } from "../api/client";
 import type {
   SuggestionAudience,
+  SuggestionCheckOutcome,
   SuggestionAvailability,
   SuggestionOccurrenceKind,
   SuggestionRecord,
@@ -13,11 +14,14 @@ import {
   SUGGESTION_AUDIENCE_LABEL,
   SUGGESTION_CHECK_LABEL,
   SUGGESTION_ERROR_LABEL,
+  SUGGESTION_OPTION_LABEL,
   SUGGESTION_STATUS_LABEL,
+  AI_ISOLATION_REASON_LABEL,
+  AI_RUNTIME_START_LABEL,
 } from "../lib/terms";
 import { useAiSetup } from "../hooks/useAiSetup";
 import Tabs from "./Tabs";
-import { Button, Card, LinkButton, relativeTime } from "./ui";
+import { Button, Card, ExternalLinkButton, LinkButton, relativeTime } from "./ui";
 
 /**
  * "Suggest a fix (AI)" for one occurrence, and the suggestion it produces.
@@ -59,19 +63,13 @@ import { Button, Card, LinkButton, relativeTime } from "./ui";
  * Level AA). Code is shown as text; nothing the model wrote is rendered as
  * HTML.
  *
- * **Brief by default.** A reader came for the fix, so the panel shows the
- * fix and little else: the code before and after for developers, the steps
- * for content editors. The model's summary and explanation repeat what the
- * issue already says, so they are not shown (the developer view falls back
- * to the explanation only when there is no code to show). "Ready" is
- * still announced to screen readers but not shown, since the answer itself
- * shows that it is ready. Facts that must not be lost but are not needed
- * to act (what to check by hand, which model wrote it and when, that it is
- * not exported, and when no rule check could run) sit in a closed "About
- * this suggestion" section, one press away (the repo rule "never drop a
- * limitation, privacy, or safety fact to make text shorter"). The warning
- * "It can be wrong" stays in view, and so does a rule-check result that
- * passed or failed, because those change what the reader should do.
+ * **Brief by default.** New answers show one precise change sentence, then
+ * the saved Before code and two After options. Saved v1 answers keep their
+ * original code view. Each new option keeps its own rule-check result visible,
+ * including when it could not run; one pass must not imply the other passed.
+ * The editor view is unchanged. Model details and manual-check notes remain
+ * in "About this suggestion", and the AI warning stays visible (the repo
+ * rule to never drop a limitation, privacy or safety fact).
  *
  * **Its own area.** The panel sits in a tinted box with a thick left
  * border, so AI-written content is never mistaken for what the scan found.
@@ -131,6 +129,23 @@ export default function FixSuggestion({
   const stop = useMutation({
     mutationFn: (id: number) => api.cancelSuggestion(scanId, id),
     onSuccess: settle,
+  });
+  const aiSetup = useAiSetup();
+  const [startMessage, setStartMessage] = useState("");
+  const startService = useMutation({
+    mutationFn: api.startAiRuntime,
+    onMutate: () => setStartMessage("Starting the AI service. You can keep browsing other issues."),
+    onSuccess: (result) => {
+      void queryClient.invalidateQueries({ queryKey: ["ai-runtime"] });
+      if (result.state === "started" || result.state === "already_running") {
+        setStartMessage("");
+        ask.mutate();
+        return;
+      }
+      const reason = result.reason ? AI_ISOLATION_REASON_LABEL[result.reason] : null;
+      setStartMessage(reason ?? AI_RUNTIME_START_LABEL[result.state]);
+    },
+    onError: () => setStartMessage("The AI service could not start. Try again or check AI settings."),
   });
 
   // Runs after the heading exists, so the move is to real content.
@@ -218,12 +233,47 @@ export default function FixSuggestion({
         </div>
       )}
 
+      {/* When the service is simply not running, the fix sits next to the
+          error: one "Start AI service" button that starts Axcess's own
+          isolated service and then writes this suggestion, so people do not
+          have to leave the issue (W3C COGA Making Content Usable,
+          https://www.w3.org/TR/coga-usable/, paraphrased: make it easy to
+          recover from errors). Rejected: only a link to Settings, which loses
+          the person's place. Desktop only: a shared server's AI belongs to
+          its administrator, so there the button is not shown. It never
+          downloads anything; a missing model points to AI settings, where
+          the size is shown before you confirm. aria-disabled plus a click
+          guard keep focus on the button while it works (SC 2.4.3 Focus
+          Order, Level A), and the polite status region announces progress
+          (SC 4.1.3 Status Messages, Level AA). */}
       {record.status === "failed" && availability.enabled && (
-        <div className="mt-2">
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {record.error_code === "model_unavailable" && aiSetup && (
+            <Button
+              type="button"
+              variant="primary"
+              aria-disabled={startService.isPending || ask.isPending || undefined}
+              onClick={() => {
+                if (!startService.isPending && !ask.isPending) startService.mutate();
+              }}
+            >
+              Start AI service
+            </Button>
+          )}
           <Button type="button" onClick={() => ask.mutate()} disabled={ask.isPending}>
             Try again
           </Button>
         </div>
+      )}
+      {record.status === "failed" && aiSetup && (
+        <p role="status" aria-live="polite" className={startMessage ? "mt-2 text-sm text-fg" : "sr-only"}>
+          {startMessage}
+        </p>
+      )}
+      {record.status === "failed" && startService.data?.state === "model_missing" && (
+        <p className="mt-2">
+          <LinkButton to="/settings/ai">Choose an AI download</LinkButton>
+        </p>
       )}
 
       {record.status === "ready" && record.result && (
@@ -255,7 +305,7 @@ function statusSentence(record: SuggestionRecord, availability: SuggestionAvaila
         ? `${SUGGESTION_STATUS_LABEL.queued}. ${record.queue_position - 1} ahead of it.${slow}`
         : `${SUGGESTION_STATUS_LABEL.queued}. It is next.${slow}`;
     case "running":
-      return `${SUGGESTION_STATUS_LABEL.running}. This can take a minute.${slow}`;
+      return `${SUGGESTION_STATUS_LABEL.running}. You can keep browsing other issues.${slow}`;
     case "failed":
       return `${SUGGESTION_STATUS_LABEL.failed}. ${
         record.error_code ? SUGGESTION_ERROR_LABEL[record.error_code] : SUGGESTION_ERROR_LABEL.internal
@@ -359,6 +409,47 @@ const CODE_BOX =
 
 function DeveloperPanel({ record }: { record: SuggestionRecord }) {
   const { developer, before_html } = record.result!;
+  if ("options" in developer) {
+    // Two sequential choices share one saved Before, rather than a third
+    // switcher: readers compare the smallest change with the nearby pattern
+    // without hiding either check. The Before is scan evidence, never AI text.
+    // Rejected: showing only After, which hides what changed. W3C COGA
+    // "Making Content Usable", objective 3 (paraphrase: help people understand
+    // content), https://www.w3.org/TR/coga-usable/; WCAG 2.2 SC 1.3.1 Info and
+    // Relationships (Level A), SC 1.4.10 Reflow (Level AA).
+    return (
+      <div className="min-w-0 space-y-3">
+        <p className="text-sm leading-relaxed text-fg">{developer.change_sentence}</p>
+        <div className="min-w-0">
+          <p className="text-2xs font-semibold text-fg-subtle">Before</p>
+          {before_html ? <pre className={CODE_BOX}>{before_html}</pre> : (
+            <p className="mt-1 text-xs text-fg-muted">
+              The scan kept no element code for this occurrence.
+            </p>
+          )}
+        </div>
+        <ol className="list-none space-y-4">
+          {developer.options.map((option) => (
+            <li key={option.kind} className="min-w-0 space-y-2">
+              <p className="text-sm font-semibold text-fg">{SUGGESTION_OPTION_LABEL[option.kind]}</p>
+              <div className="min-w-0">
+                <p className="text-2xs font-semibold text-fg-subtle">After</p>
+                <pre className={CODE_BOX}>{option.after_html}</pre>
+                <CopyButton value={option.after_html} name={`${SUGGESTION_OPTION_LABEL[option.kind]} code`} />
+              </div>
+              {option.css && <div className="min-w-0">
+                <p className="text-2xs font-semibold text-fg-subtle">Suggested styles (CSS)</p>
+                <pre className={CODE_BOX}>{option.css}</pre>
+                <CopyButton value={option.css} name={`${SUGGESTION_OPTION_LABEL[option.kind]} styles`} />
+              </div>}
+              <CheckOutcome record={record} outcome={option.check_outcome} showUnchecked />
+            </li>
+          ))}
+        </ol>
+        <GuidanceLink record={record} />
+      </div>
+    );
+  }
   return (
     <div className="space-y-3">
       {/* The explanation only when there is no code: then it is the fix. */}
@@ -404,6 +495,7 @@ function DeveloperPanel({ record }: { record: SuggestionRecord }) {
         </div>
       )}
       <CheckOutcome record={record} />
+      <GuidanceLink record={record} />
     </div>
   );
 }
@@ -442,11 +534,15 @@ function EditorPanel({ record }: { record: SuggestionRecord }) {
   );
 }
 
-function CheckOutcome({ record }: { record: SuggestionRecord }) {
-  const outcome = record.check_outcome ?? "not_checked";
-  // "Not checked" changes nothing the reader does; it is said under
-  // "About this suggestion" instead.
-  if (outcome === "not_checked") return null;
+function CheckOutcome({ record, outcome = record.check_outcome ?? "not_checked", showUnchecked = false }: {
+  record: SuggestionRecord;
+  outcome?: SuggestionCheckOutcome;
+  showUnchecked?: boolean;
+}) {
+  // New answers keep even "not checked" beside each option: hiding it would
+  // let a neighbouring pass suggest both passed (SC 1.3.1, Level A).
+  // Saved single-option answers retain their compact disclosure.
+  if (outcome === "not_checked" && !showUnchecked) return null;
   const Icon = outcome === "passed" ? CircleCheck : outcome === "still_fails" ? CircleX : CircleHelp;
   const tone =
     outcome === "passed" ? "text-ok" : outcome === "still_fails" ? "text-sev-critical" : "text-fg-muted";
@@ -455,11 +551,25 @@ function CheckOutcome({ record }: { record: SuggestionRecord }) {
       <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${tone}`} aria-hidden />
       <span>
         {SUGGESTION_CHECK_LABEL[outcome]}
+        {outcome === "not_checked" && ". Check this option on the real page."}
         {outcome === "passed" &&
           ". This checks one rule on the suggested code only. It does not show that the page meets WCAG."}
       </span>
     </p>
   );
+}
+
+function GuidanceLink({ record }: { record: SuggestionRecord }) {
+  // The scan's saved rule URL is the only link source, not AI-written text:
+  // fabricated links send readers to the wrong fix. Rejected model-generated
+  // links. The shared external link keeps the new-tab warning explicit
+  // (WCAG 2.2 SC 3.2.5 Change on Request, Level AAA) and the same link pattern
+  // (SC 3.2.4 Consistent Identification, Level AA).
+  const url = record.result?.help_url;
+  if (!url || !/^https?:\/\//i.test(url)) return null;
+  return <ExternalLinkButton href={url} size="sm" className="max-w-full whitespace-normal text-left">
+    Read guidance for this rule (opens in a new tab)
+  </ExternalLinkButton>;
 }
 
 /**
@@ -614,7 +724,7 @@ function AboutSuggestion({ record }: { record: SuggestionRecord }) {
             {checkByHand}
           </li>
         )}
-        {(record.check_outcome ?? "not_checked") === "not_checked" && (
+        {result.version !== 2 && (record.check_outcome ?? "not_checked") === "not_checked" && (
           <li>
             {SUGGESTION_CHECK_LABEL.not_checked}. Only some rule check (axe) issues can be checked
             this way.

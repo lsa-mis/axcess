@@ -6,6 +6,7 @@ import json
 import sqlite3
 from typing import Any, cast
 
+from audit.suggest.context import stored_help_url
 from audit.suggest.models import (
     Audience,
     ErrorCode,
@@ -262,7 +263,15 @@ def require(conn: sqlite3.Connection, *, scan_id: int, suggestion_id: int) -> sq
 def to_record(conn: sqlite3.Connection, row: sqlite3.Row) -> SuggestionRecord:
     result: SuggestionResult | None = None
     if row["result_json"]:
-        result = SuggestionResult.model_validate(json.loads(row["result_json"]))
+        answer_data = json.loads(row["result_json"])
+        answer_data["help_url"] = (
+            stored_help_url(
+                conn, scan_id=int(row["scan_id"]), occurrence_id=int(row["occurrence_id"])
+            )
+            if row["occurrence_kind"] == "a11y"
+            else None
+        )
+        result = SuggestionResult.model_validate(answer_data)
     position = queue_position(conn, int(row["id"])) if row["status"] == "queued" else None
     data: dict[str, Any] = {
         "id": int(row["id"]),

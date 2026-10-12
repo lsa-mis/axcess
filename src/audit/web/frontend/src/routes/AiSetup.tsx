@@ -10,6 +10,7 @@ import type {
   AiTierPlan,
 } from "../api/types";
 import { Button, Card, LinkButton, PageHeader } from "../components/ui";
+import { AiRuntimeControls } from "../components/AiRuntimeControls";
 import { cn } from "../lib/cn";
 import {
   AI_INSTALL_STATE_LABEL,
@@ -260,11 +261,10 @@ function AiSetupPage({
           </h2>
           <ul className="list-disc space-y-1 pl-5">
             <li>
-              {plan.program.system_version
-                ? `Axcess uses the Ollama program already running on this computer (version ${plan.program.system_version}).`
-                : `The Ollama program, version ${plan.program.version} (${plan.program.licence} licence), from GitHub. Axcess checks the file against its published checksum before using it.`}
+              {`Axcess downloads its own Ollama program, version ${plan.program.version} (${plan.program.licence} licence), from GitHub. It checks the published checksum before using it.`}
             </li>
-            <li>Two AI models from the Ollama model library (ollama.com).</li>
+            <li>Two AI models from the Ollama model library. Axcess checks each file before the isolated service reads it offline.</li>
+            <li>The AI service cannot connect to the internet. Downloads run separately, only after you choose them.</li>
             <li>
               Your reports, pages and screenshots are never sent anywhere. The
               AI reads them on this computer.
@@ -299,6 +299,7 @@ function AiSetupPage({
               </dd>
             </dl>
             </>}
+            <AiRuntimeControls setupPage />
             {(enabled || current) && <Button
               className="mt-3"
               type="button"
@@ -387,8 +388,12 @@ function AiSetupPage({
                 Pause download
               </Button>
             ) : (
-              chosenTier &&
-              chosen !== current?.tier && (
+              // Keep the same-size download available to replace missing files
+              // or move from a system Ollama to a private copy. Hiding it based
+              // on the saved size would leave no repair action. The size-labelled
+              // button keeps download consent separate from start (W3C COGA,
+              // https://www.w3.org/TR/coga-usable/, paraphrased: prevent mistakes).
+              chosenTier && (
                 <Button
                   type="button"
                   variant="primary"
@@ -432,8 +437,8 @@ function AiSetupPage({
           {!plan.program.available_for_this_computer &&
             !plan.program.system_version && (
               <p className="mt-3 text-sm text-fg">
-                Axcess has no Ollama download for this kind of computer. Install
-                Ollama from ollama.com, start it, then reload this page.
+                Axcess has no private AI program for this kind of computer.
+                AI stays off. Saved results still work.
               </p>
             )}
 

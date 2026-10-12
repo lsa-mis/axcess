@@ -84,7 +84,7 @@ export const AI_SUGGESTION = "AI suggestion";
 /** Where an AI suggestion is in its queue, for its status line. */
 export const SUGGESTION_STATUS_LABEL: Record<SuggestionStatus, string> = {
   queued: "Waiting to start",
-  running: "Writing a suggestion",
+  running: "Writing the fix",
   ready: "Ready",
   failed: "Could not write a suggestion",
   cancelled: "Stopped",
@@ -104,6 +104,12 @@ export const SUGGESTION_CHECK_LABEL: Record<SuggestionCheckOutcome, string> = {
   passed: "The rule check passed on the suggested code",
   still_fails: "The rule check still fails on the suggested code",
   not_checked: "Axcess could not check this suggestion",
+};
+
+/** Two code choices: the smaller change is always first. */
+export const SUGGESTION_OPTION_LABEL = {
+  minimal: "Option 1: Smallest change",
+  matches_pattern: "Option 2: Matches nearby code",
 };
 
 /** Desktop AI setup: what the download is doing now. */
@@ -146,4 +152,22 @@ export const SUGGESTION_ERROR_LABEL: Record<SuggestionErrorCode, string> = {
   restarted: "Axcess restarted before the suggestion was finished. Try again.",
   occurrence_gone: "This occurrence is no longer in the report.",
   internal: "Something went wrong in Axcess. Try again.",
+};
+
+export const AI_RUNTIME_START_LABEL: Record<import("../api/types").AiRuntimeStartState, string> = {
+  started: "AI service started. It is isolated and stays on this computer.",
+  already_running: "AI service: isolated, local only.",
+  model_missing: "The private AI program or models are missing. Choose a size and confirm its download below.",
+  not_isolated: "AI was not started because Axcess could not keep it isolated.",
+  system_ollama_not_managed: "This is your own Ollama. Axcess does not start, stop or isolate it. Choose a private download for isolated AI.",
+  ai_off: "AI features are off. Turn them on before starting the service.",
+  not_desktop: "Starting AI is available only in the Axcess desktop app.",
+  busy: "Finish or stop current work before starting the AI service.",
+};
+export const AI_ISOLATION_REASON_LABEL: Record<string, string> = {
+  sandbox_unavailable: "This computer cannot isolate the AI service. AI was not started. Saved results still work.",
+  network_test_failed: "The isolation check could not prove that outside connections are blocked. AI was not started.",
+  namespace_unreachable: "Axcess cannot reach the AI service inside its private network on this computer. AI was not started.",
+  runtime_failed: "The isolated AI service could not start. Check the application log.",
+  system_ollama_not_managed: "Your own Ollama is not isolated by Axcess. Axcess never starts or stops it.",
 };

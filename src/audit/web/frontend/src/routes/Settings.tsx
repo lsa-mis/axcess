@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 import { Check, RotateCcw } from "lucide-react";
 import { Button, Card, LinkButton, PageHeader } from "../components/ui";
+import { AiRuntimeControls } from "../components/AiRuntimeControls";
 import { useAiSetup } from "../hooks/useAiSetup";
 import { AI_FEATURE_STATE_LABEL, AI_TIER_LABEL } from "../lib/terms";
 import { cn } from "../lib/cn";
@@ -100,9 +101,9 @@ export default function SettingsRoute() {
         {/* Desktop only. A link to its own page, not a row here: rows on
             this page apply at once and stay on this computer, while AI
             setup downloads gigabytes and needs a deliberate step. On/off
-            stays on that same page, next to setup and removal, so there is
-            one place for this choice (WCAG 2.2 SC 3.2.4 Consistent
-            Identification, Level AA). */}
+            stays on that same page, next to setup and removal. The shared
+            service control starts only existing private models; it never
+            downloads files (WCAG 2.2 SC 3.2.4 Consistent Identification, Level AA). */}
         {aiSetup && (
           <Card className="px-4 py-4">
             <h2 className="text-sm font-semibold text-fg">AI features</h2>
@@ -112,6 +113,7 @@ export default function SettingsRoute() {
                 ? ` Size: ${AI_TIER_LABEL[aiSetup.current.tier]}. Models are kept on this computer.`
                 : " Optional AI that suggests fixes and checks images and wording. It runs on this computer."}
             </p>
+            <AiRuntimeControls setupPage />
             <LinkButton to="/settings/ai" className="mt-3">
               Change AI features
             </LinkButton>

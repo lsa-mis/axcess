@@ -1,17 +1,13 @@
 """Find, download, start and stop the Ollama program used for AI features.
 
-An Ollama the person already runs on port 11434 is reused as is. Otherwise
-Axcess downloads the pinned release from GitHub, checks its SHA-256, unpacks
-it into ``data_dir/ai/runtime/<version>`` and runs it on a random port on
-127.0.0.1 only, with its models kept in ``data_dir/ai/models``. Axcess stops
-the copy it started when it quits.
+Only Axcess's checksum-verified private copy is managed here. The model
+service runs offline inside an OS sandbox; confirmed downloads are separate.
 """
 
 from __future__ import annotations
 
 import contextlib
 import hashlib
-import os
 import shutil
 import socket
 import stat
@@ -27,6 +23,7 @@ from pathlib import Path
 import httpx
 
 from audit.ai.catalog import Catalog, RuntimeAsset, platform_key
+from audit.ai.sandbox import IsolationError, build_sandbox, test_network_boundary
 from audit.ai.state import SYSTEM_OLLAMA_URL
 
 Progress = Callable[[int, int], None]
@@ -122,6 +119,8 @@ class OllamaRuntime:
         self._process: subprocess.Popen[bytes] | None = None
         self._lock = threading.Lock()
         self.base_url: str | None = None
+        self.isolated = False
+        self.isolation_reason: str | None = None
 
     @property
     def asset(self) -> RuntimeAsset | None:
@@ -215,19 +214,28 @@ class OllamaRuntime:
             binary.chmod(binary.stat().st_mode | stat.S_IXUSR)
         part.unlink(missing_ok=True)
 
+    def require_isolation(self) -> None:
+        build_sandbox(self.install_dir, self.models_dir, self.ai_dir / "scratch")
+        if sys.platform.startswith("linux"):
+            raise IsolationError(
+                "namespace_unreachable",
+                "Axcess cannot reach the AI service inside its private network on this computer. "
+                "AI was not started.",
+            )
+
     def start(self, preferred_url: str | None = None, wait_s: float = 30.0) -> str:
         """Run the private Ollama on 127.0.0.1 and return its address."""
         with self._lock:
             if self._process is not None and self._process.poll() is None and self.base_url:
                 return self.base_url
+            try:
+                self.require_isolation()
+            except IsolationError as exc:
+                self.isolation_reason = exc.reason
+                raise
             binary = self.binary
             if binary is None or not binary.is_file():
                 raise RuntimeSetupError("The Ollama program is not installed yet.")
-            # A copy left running by an earlier Axcess that crashed still
-            # answers on its old port; reuse it rather than start a second.
-            if preferred_url and ollama_version(preferred_url, timeout=1.0):
-                self.base_url = preferred_url
-                return preferred_url
             port = _free_port()
             if preferred_url:
                 with contextlib.suppress(ValueError):
@@ -235,39 +243,64 @@ class OllamaRuntime:
                     if _port_free(old):
                         port = old
             self.models_dir.mkdir(parents=True, exist_ok=True)
+            scratch = self.ai_dir / "scratch"
+            scratch.mkdir(parents=True, exist_ok=True)
+            try:
+                sandbox = build_sandbox(self.install_dir, self.models_dir, scratch)
+                test_network_boundary(sandbox)
+            except IsolationError as exc:
+                self.isolated = False
+                self.isolation_reason = exc.reason
+                raise
             env = {
-                **os.environ,
+                "PATH": str(self.install_dir.resolve()),
+                "HOME": str(scratch.resolve()),
+                "TMPDIR": str(scratch.resolve()),
                 "OLLAMA_HOST": f"127.0.0.1:{port}",
                 "OLLAMA_MODELS": str(self.models_dir.resolve()),
                 "OLLAMA_NOPRUNE": "1",
+                "OLLAMA_NO_CLOUD": "1",
             }
             log_path = self.ai_dir / "ollama.log"
             with log_path.open("ab") as log:
-                creationflags = 0
-                if sys.platform.startswith("win"):
-                    creationflags = subprocess.CREATE_NO_WINDOW  # type: ignore[attr-defined]
-                self._process = subprocess.Popen(  # noqa: S603 - our checksum-verified binary
-                    [str(binary), "serve"],
-                    cwd=str(self.install_dir),
-                    env=env,
-                    stdout=log,
-                    stderr=subprocess.STDOUT,
-                    stdin=subprocess.DEVNULL,
-                    creationflags=creationflags,
-                )
+                try:
+                    self._process = subprocess.Popen(  # noqa: S603 - checksum-verified binary in OS sandbox
+                        sandbox.command([str(binary.resolve()), "serve"]),
+                        cwd=str(self.install_dir),
+                        env=env,
+                        stdout=log,
+                        stderr=subprocess.STDOUT,
+                        stdin=subprocess.DEVNULL,
+                    )
+                except OSError as exc:
+                    self.isolation_reason = "runtime_failed"
+                    raise RuntimeSetupError("The isolated AI service could not start.") from exc
             url = f"http://127.0.0.1:{port}"
             deadline = time.monotonic() + wait_s
             while time.monotonic() < deadline:
                 if self._process.poll() is not None:
+                    self._stop_locked()
+                    self.isolation_reason = "runtime_failed"
                     raise RuntimeSetupError(
-                        f"Ollama stopped as it started. See {log_path} for details."
+                        "The isolated AI service could not start. Check the application log."
                     )
                 if ollama_version(url, timeout=1.0):
                     self.base_url = url
+                    self.isolated = True
+                    self.isolation_reason = None
                     return url
                 time.sleep(0.25)
             self._stop_locked()
-            raise RuntimeSetupError("Ollama did not start in time.")
+            self.isolation_reason = "runtime_failed"
+            raise RuntimeSetupError("The isolated AI service did not start in time.")
+
+    def running(self) -> bool:
+        return self._process is not None and self._process.poll() is None and self.isolated
+
+    def has_model(self, tag: str) -> bool:
+        from audit.ai.downloader import model_present
+
+        return model_present(self.models_dir, tag)
 
     def stop(self) -> None:
         with self._lock:
@@ -276,6 +309,7 @@ class OllamaRuntime:
     def _stop_locked(self) -> None:
         process, self._process = self._process, None
         self.base_url = None
+        self.isolated = False
         if process is None or process.poll() is not None:
             return
         process.terminate()

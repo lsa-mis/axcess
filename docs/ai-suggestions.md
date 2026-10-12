@@ -24,16 +24,41 @@ is never mistaken for what the scan found. It is brief on purpose:
 
 | Part | What it is |
 | --- | --- |
-| For developers | **Before**: the element code (HTML) the scan found. For an image, Axcess reads it from the saved copy of the page. If the scan kept no element code (for example, a check of the whole page), "Before" says so. **After**: the suggested element code, and any CSS. When there is no code, a short explanation instead. |
+| For developers | **Before**: the element code (HTML) the scan found. For an image, Axcess reads it from the saved copy of the page. If the scan kept no element code (for example, a check of the whole page), "Before" says so. **One change sentence**, then **Option 1: Smallest change** and **Option 2: Matches nearby code**, each with **After** code and any needed styles (CSS). Both use only page code saved by the scan, not a source repository. Older saved suggestions keep their single After view. |
+| Guidance | A link to the rule guidance, only when the scan saved one. The AI never writes this link. |
 | For content editors | Short steps to follow in your content system, and text to paste, such as alt text. Text already in a step is not repeated. |
-| Rule check result | Shown only when it ran. For some rule check (axe) issues, Axcess runs that one rule on the suggested code. A pass means only that one rule passed. It does not show that the page meets WCAG. |
+| Rule check result | Each new code option has a separate result, including when Axcess could not check it. For some rule check (axe) issues, Axcess runs that one rule on the suggested code. A pass means only that one rule passed. It does not show that the page meets WCAG. |
 | About this suggestion | Closed by default. What to check by hand, whether a rule check could run, which model wrote it and when, and that it is not included in exports. |
 | Helpful / Not helpful | Your answer is saved with the suggestion, to help judge the model. |
 
-The warning "It can be wrong. Check it before you use it." is always shown.
+The warning "Written by AI on this computer. It can be wrong. Check it before you use it." is always shown. What to check by hand stays in **About this suggestion**.
+
+While an answer is being written, a short status says you can keep browsing other issues.
 
 The view that opens first follows the issue's "Who fixes it": content editors
 for text and images, developers for code.
+
+### Answer format (developer notes)
+
+New model answers use `version: 2`. `developer.change_sentence` is one sentence,
+up to 25 words and 240 characters. `developer.options` contains exactly two
+objects, in this order:
+
+```json
+[
+  {"kind": "minimal", "label": "Smallest change", "after_html": "...", "css": null},
+  {"kind": "matches_pattern", "label": "Matches nearby code", "after_html": "...", "css": null}
+]
+```
+
+Each code field is limited to 4,000 characters. Each label has at most 60.
+The editor fields, AI warning, and manual-check note stay available.
+Axcess adds `check_outcome` to each option after its own offline check.
+It adds `before_html` from saved evidence and `help_url` from the same report's
+saved rule, allowing only HTTP or HTTPS links. Neither comes from the model.
+The existing answer JSON column stores these fields; no new table is needed.
+Saved version 1 answers, including those without a version field, still open
+in their original view. New model answers must use version 2.
 
 ## How it works
 
@@ -84,11 +109,11 @@ Choosing to continue keeps AI off. You can change your choice in Settings.
 
    Without a graphics chip Axcess suggests Small, because larger models are
    very slow on the processor alone. All models use the Apache 2.0 licence.
-3. Select **Download and set up**. If Ollama is already running on this computer
-   (port 11434), Axcess uses it and adds the models there. If not, Axcess
-   downloads Ollama 0.33.0 (MIT licence) from its GitHub release, checks the
-   file against a fixed SHA-256 checksum, and runs its own copy on a private
-   port that only this computer can reach.
+3. Select **Download and set up** after checking the size shown on the button.
+   Axcess downloads its own Ollama 0.33.0 (MIT licence), checks its fixed SHA-256
+   checksum, and separately downloads the models over HTTPS. It checks the
+   registry manifest checksum and every model file before installing them.
+   It never asks Ollama to download anything. Your own Ollama is left alone.
 4. You can select **Pause download** and **Resume download** later. A
    download that stops part way picks up where it stopped. Axcess does not
    start the download if the disk does not have room for what is left, plus 3 GB.
@@ -128,15 +153,47 @@ only when the required local models are ready. Scan-time AI checks are still
 off for each new scan until you choose them. Existing installations keep
 their setup and do not repeat the first-launch choice.
 
-Sizes, checksums, and model names are pinned in `src/audit/ai/catalog.json`.
-To move to a newer Ollama or model, update that file in a release.
+### Start the isolated AI service
+
+Select **Start AI service** in Settings or AI features. This starts only the
+private copy Axcess owns. It does not start, stop or download into your own
+Ollama. An existing setup that explicitly uses your own Ollama is not isolated
+by Axcess; choose a private download to use isolated AI.
+
+On macOS, a deny-by-default `sandbox-exec` profile allows the bundled program,
+private models and scratch folder, the system libraries and the local Python
+interpreter needed for the isolation check. Networking is restricted to
+loopback. Before startup, a socket probe in the same sandbox must receive an
+OS denial for a non-loopback connection. A timeout is not enough. Failure
+keeps AI stopped; report browsing and saved suggestions still work. Ollama
+uses `OLLAMA_HOST=127.0.0.1:<private port>` and `OLLAMA_NO_CLOUD=1`. The OS
+boundary, not an environment variable, prevents internet access.
+
+Windows and computers without an OS sandbox cannot start private AI. Linux
+Bubblewrap command construction restricts networking and files, but startup
+is blocked: the host cannot reach a loopback-only network namespace until a
+private connection bridge is implemented. `unshare` alone is not sufficient
+because it does not restrict file access. No fallback shares the host network.
+The real bundled Ollama and GPU operation still need desktop release testing.
+A saved private port is not trusted after a restart. Axcess sends no model
+requests to it until the running private process has passed isolation checks.
+
+The catalogue pins the program checksum and model **tags**, not independent
+model manifest checksums. First acquisition verifies the checksum supplied
+by the HTTPS registry. That verified manifest is then pinned locally for
+retries, and blobs are checked by SHA-256. This detects transfer corruption;
+it does not provide an independently pinned model release. Release tooling
+must add independently reviewed manifest digests before claiming that guarantee.
+Downloads happen on the host only after the size-labelled confirmation button,
+not inside the model service. No report evidence is sent to the registry.
 
 ## Turn it on
 
 **In the desktop app**, choose AI during first launch or open
 **Settings > AI features** (see
 [Set up AI features in the desktop app](#set-up-ai-features-in-the-desktop-app)).
-You can also do steps 1 and 2 yourself, then enable AI in Settings. Until the models are there, the
+The desktop download uses a private isolated service, not a newly detected
+system Ollama. Until the private models are there, the
 button's place shows what is missing and links to the setup page. Axcess
 never downloads anything until you choose a size and select **Download and
 set up**.

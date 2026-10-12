@@ -47,6 +47,28 @@ GOOD_ANSWER: dict[str, Any] = {
     "manual_check_reason": None,
 }
 
+GOOD_ANSWER_V2: dict[str, Any] = {
+    **GOOD_ANSWER,
+    "version": 2,
+    "developer": {
+        "change_sentence": "Add a label linked to the search field by its existing id.",
+        "options": [
+            {
+                "kind": "minimal",
+                "label": "Smallest change",
+                "after_html": '<input id="q" aria-label="Search">',
+                "css": None,
+            },
+            {
+                "kind": "matches_pattern",
+                "label": "Visible label",
+                "after_html": '<label for="q">Search</label><input id="q">',
+                "css": None,
+            },
+        ],
+    },
+}
+
 PAGE_HTML = (
     "<html><body><form><p>Find a product</p>"
     '<input id="q" value="jane@example.com"></form></body></html>'
@@ -55,7 +77,7 @@ PAGE_HTML = (
 
 class FakeProvider:
     def __init__(self, answer: str | None = None, error: SuggestionError | None = None) -> None:
-        self.answer = answer if answer is not None else json.dumps(GOOD_ANSWER)
+        self.answer = answer if answer is not None else json.dumps(GOOD_ANSWER_V2)
         self.error = error
         self.prompts: list[str] = []
         self.models: list[str] = []
@@ -223,14 +245,22 @@ async def test_queue_then_ready(seeded_db: tuple[Path, Path, int], enabled: None
 
     done = client.get(f"/api/scans/{scan_id}/suggestions/{queued['id']}").json()
     assert done["status"] == "ready"
-    assert done["check_outcome"] == "passed"
+    assert done["check_outcome"] == "not_checked"
+    assert done["result"]["version"] == 2
+    assert [o["check_outcome"] for o in done["result"]["developer"]["options"]] == [
+        "passed",
+        "passed",
+    ]
     assert done["vision_model"] is None
     result = done["result"]
     assert result["confidence"] == "likely"
     assert result["check_rule_id"] == "aria-input-field-name"
     # The "before" is the stored evidence, redacted; never the model's text.
     assert "jane@example.com" not in result["before_html"]
-    assert verifier.calls == [("aria-input-field-name", '<input id="q" aria-label="Search">')]
+    assert verifier.calls == [
+        ("aria-input-field-name", option["after_html"])
+        for option in GOOD_ANSWER_V2["developer"]["options"]
+    ]
 
     latest = client.get(f"/api/scans/{scan_id}/occurrences/a11y/{finding}/suggestion").json()
     assert latest["id"] == queued["id"]
@@ -258,6 +288,8 @@ async def test_prompt_is_redacted_and_delimited(
     prompt = build_prompt(bundle)
     assert "jane@example.com" not in prompt
     assert bundle.nearby_text is not None and "Find a product" in bundle.nearby_text
+    assert bundle.nearby_html is not None and '<input id="q" value=""' in bundle.nearby_html
+    assert "Nearby and parent markup" in prompt.rsplit("<<<EVIDENCE", 1)[1]
     # Scanned text cannot close the evidence block early.
     evidence = prompt.rsplit("<<<EVIDENCE", 1)[1]
     assert evidence.count("EVIDENCE>>>") == 1
@@ -677,3 +709,70 @@ async def test_ollama_request_is_bounded_and_schema_shaped() -> None:
     assert sent["options"]["temperature"] == 0
     assert sent["options"]["num_predict"] > 0
     assert sent["options"]["num_ctx"] >= 4096
+
+
+async def test_v2_option_checks_round_trip_independently(
+    seeded_db: tuple[Path, Path, int], enabled: None
+) -> None:
+    db_path, _, scan_id = seeded_db
+    finding = _add_finding(db_path, scan_id)
+    client = _client(seeded_db)
+    created = client.post(
+        f"/api/scans/{scan_id}/suggestions",
+        json={"occurrence_kind": "a11y", "occurrence_id": finding},
+    ).json()
+
+    class MixedVerifier(FakeVerifier):
+        async def check(self, rule_id: str | None, html: str | None, css: str | None) -> Any:
+            self.calls.append((rule_id, html))
+            return "passed" if len(self.calls) == 1 else "still_fails"
+
+    await _worker(seeded_db, FakeProvider(), MixedVerifier()).process_one()
+    done = client.get(f"/api/scans/{scan_id}/suggestions/{created['id']}").json()
+    options = done["result"]["developer"]["options"]
+    assert [o["check_outcome"] for o in options] == ["passed", "still_fails"]
+    assert [o["after_html"] for o in options] == [
+        o["after_html"] for o in GOOD_ANSWER_V2["developer"]["options"]
+    ]
+
+
+async def test_guidance_always_comes_from_the_same_scan_not_answer_json(
+    seeded_db: tuple[Path, Path, int], enabled: None
+) -> None:
+    db_path, _, scan_id = seeded_db
+    finding = _add_finding(db_path, scan_id)
+    client = _client(seeded_db)
+    created = client.post(
+        f"/api/scans/{scan_id}/suggestions",
+        json={"occurrence_kind": "a11y", "occurrence_id": finding},
+    ).json()
+    await _worker(seeded_db, FakeProvider()).process_one()
+    conn = connect(db_path)
+    try:
+        conn.execute(
+            "UPDATE page_a11y_findings SET help_url = ? WHERE id = ?",
+            ("https://example.com/rules/label", finding),
+        )
+        row = repo.require(conn, scan_id=scan_id, suggestion_id=created["id"])
+        forged = json.loads(row["result_json"])
+        forged["help_url"] = "https://wrong.example/model-generated"
+        conn.execute(
+            "UPDATE fix_suggestions SET result_json = ? WHERE id = ?",
+            (json.dumps(forged), created["id"]),
+        )
+        record = repo.to_record(
+            conn, repo.require(conn, scan_id=scan_id, suggestion_id=created["id"])
+        )
+        assert record.result and record.result.help_url == "https://example.com/rules/label"
+        other = _second_scan(db_path)
+        assert context.stored_help_url(conn, scan_id=other, occurrence_id=finding) is None
+        conn.execute(
+            "UPDATE page_a11y_findings SET help_url = ? WHERE id = ?",
+            ("javascript:alert(1)", finding),
+        )
+        record = repo.to_record(conn, row)
+        assert record.result and record.result.help_url is None
+        conn.execute("UPDATE page_a11y_findings SET help_url = NULL WHERE id = ?", (finding,))
+        assert repo.to_record(conn, row).result.help_url is None
+    finally:
+        conn.close()

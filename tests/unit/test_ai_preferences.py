@@ -162,6 +162,7 @@ def test_failed_setup_stops_private_runtime_while_ai_is_off(tmp_path: Path) -> N
         probe=lambda: Hardware(16 * 1024**3, 100 * 10**9, True, None, "darwin", "arm64"),
         find_system=lambda: "0.33.0",
     )
+    runtime.download_remaining.return_value = 0
     manager.installer.pull = Mock(side_effect=RuntimeSetupError("download stopped"))
     manager.install("small")
     assert manager.installer._thread is not None

@@ -1318,9 +1318,20 @@ export type SuggestionAvailabilityReason =
   | "model_unavailable"
   | "model_missing";
 
+export interface SuggestionCodeOption {
+  kind: "minimal" | "matches_pattern";
+  label: string;
+  after_html: string;
+  css: string | null;
+  check_outcome: SuggestionCheckOutcome;
+}
+
 export interface SuggestionResult {
+  version?: 1 | 2;
   summary: string;
-  developer: { explanation: string; after_html: string | null; css: string | null };
+  developer:
+    | { explanation: string; after_html: string | null; css: string | null }
+    | { change_sentence: string; options: SuggestionCodeOption[] };
   editor: {
     steps: string[];
     paste_text: Array<{ label: string; value: string }>;
@@ -1332,6 +1343,8 @@ export interface SuggestionResult {
   needs_manual_check: boolean;
   manual_check_reason: string | null;
   check_rule_id: string | null;
+  /** Saved rule guidance, never a model-generated link. */
+  help_url?: string | null;
 }
 
 export interface SuggestionRecord {
@@ -1431,4 +1444,19 @@ export interface AiPlan {
 export interface AiPreferences {
   enabled: boolean;
   choice_recorded: boolean;
+}
+
+/** Private desktop AI service. No download happens when it is started. */
+export type AiRuntimeStartState = "started" | "already_running" | "model_missing" | "not_isolated" | "system_ollama_not_managed" | "ai_off" | "not_desktop" | "busy";
+export interface AiRuntimeStartResponse {
+  state: AiRuntimeStartState;
+  isolated: boolean;
+  reason: string | null;
+  download_bytes: number | null;
+  tier: AiTierId | null;
+}
+export interface AiRuntimeStatus {
+  running: boolean;
+  isolated: boolean;
+  reason: string | null;
 }

@@ -20,7 +20,12 @@ from pathlib import Path
 
 from audit.db.schema import connect
 from audit.suggest import context, repo
-from audit.suggest.models import SuggestionResult
+from audit.suggest.models import (
+    CheckedCodeOption,
+    CheckedDeveloperViewV2,
+    ModelAnswerV2,
+    SuggestionResult,
+)
 from audit.suggest.provider import (
     Provider,
     SuggestionError,
@@ -28,7 +33,7 @@ from audit.suggest.provider import (
     choose_model,
     parse_answer,
 )
-from audit.suggest.verify import Outcome, Verifier
+from audit.suggest.verify import Outcome, Verifier, check_options
 
 log = logging.getLogger(__name__)
 
@@ -174,14 +179,23 @@ class SuggestionWorker:
             uses_vision = False
             raw = await self._generate(bundle, self._text_model, with_image=False)
         answer = parse_answer(raw)
+        if not isinstance(answer, ModelAnswerV2):
+            raise SuggestionError("bad_answer", "The model did not return two code options.")
         outcome: Outcome = "not_checked"
-        if bundle.check_rule_id and answer.developer.after_html:
-            outcome = await self._verifier.check(
-                bundle.check_rule_id, answer.developer.after_html, answer.developer.css
-            )
+        outcomes = await check_options(
+            self._verifier, bundle.check_rule_id, answer.developer.options
+        )
+        developer = CheckedDeveloperViewV2(
+            change_sentence=answer.developer.change_sentence,
+            options=[
+                CheckedCodeOption(**option.model_dump(), check_outcome=checked)
+                for option, checked in zip(answer.developer.options, outcomes, strict=True)
+            ],
+        )
         result = SuggestionResult(
+            version=2,
             summary=answer.summary,
-            developer=answer.developer,
+            developer=developer,
             editor=answer.editor,
             before_html=bundle.snippet,
             confidence=bundle.confidence,
@@ -190,6 +204,7 @@ class SuggestionWorker:
             needs_manual_check=answer.needs_manual_check or bundle.confidence == "guess",
             manual_check_reason=answer.manual_check_reason,
             check_rule_id=bundle.check_rule_id,
+            help_url=bundle.help_url,
         )
         return result, outcome, uses_vision
 

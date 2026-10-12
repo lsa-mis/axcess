@@ -1855,6 +1855,40 @@
         "title": "AgentHeartbeatRequest",
         "description": "Opaque lease presentation for a companion liveness heartbeat."
       },
+      "CheckedCodeOption": {
+        "properties": {
+          "kind": {"type": "string", "enum": ["minimal", "matches_pattern"], "title": "Kind"},
+          "label": {"type": "string", "maxLength": 60, "minLength": 1, "title": "Label"},
+          "after_html": {"type": "string", "maxLength": 4000, "minLength": 1, "title": "After Html"},
+          "css": {"anyOf": [{"type": "string", "maxLength": 4000}, {"type": "null"}], "title": "Css"},
+          "check_outcome": {
+            "type": "string",
+            "enum": ["passed", "still_fails", "not_checked"],
+            "title": "Check Outcome"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["kind", "label", "after_html", "check_outcome"],
+        "title": "CheckedCodeOption",
+        "description": "The server adds this result; the model is not allowed to supply it."
+      },
+      "CheckedDeveloperViewV2": {
+        "properties": {
+          "change_sentence": {"type": "string", "maxLength": 240, "minLength": 1, "title": "Change Sentence"},
+          "options": {
+            "items": {"$ref": "#/components/schemas/CheckedCodeOption"},
+            "type": "array",
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Options"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["change_sentence", "options"],
+        "title": "CheckedDeveloperViewV2"
+      },
       "ComparisonResponse": {
         "properties": {
           "current": {"$ref": "#/components/schemas/ReportIdentity"},
@@ -2607,14 +2641,22 @@
       },
       "SuggestionResult": {
         "properties": {
+          "version": {"type": "integer", "enum": [1, 2], "title": "Version", "default": 1},
           "summary": {"type": "string", "title": "Summary"},
-          "developer": {"$ref": "#/components/schemas/DeveloperView"},
+          "developer": {
+            "anyOf": [
+              {"$ref": "#/components/schemas/DeveloperView"},
+              {"$ref": "#/components/schemas/CheckedDeveloperViewV2"}
+            ],
+            "title": "Developer"
+          },
           "editor": {"$ref": "#/components/schemas/EditorView"},
           "before_html": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Before Html"},
           "confidence": {"type": "string", "enum": ["likely", "guess"], "title": "Confidence"},
           "needs_manual_check": {"type": "boolean", "title": "Needs Manual Check"},
           "manual_check_reason": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Manual Check Reason"},
-          "check_rule_id": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Check Rule Id"}
+          "check_rule_id": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Check Rule Id"},
+          "help_url": {"anyOf": [{"type": "string", "maxLength": 2000}, {"type": "null"}], "title": "Help Url"}
         },
         "additionalProperties": false,
         "type": "object",

@@ -27,6 +27,7 @@ import yaml
 
 from audit.config import get_settings
 from audit.suggest.context import EvidenceBundle
+from audit.suggest.models import ModelAnswerV2
 from audit.suggest.provider import (
     OllamaSuggestionProvider,
     SuggestionError,
@@ -34,7 +35,7 @@ from audit.suggest.provider import (
     parse_answer,
     prompt_version,
 )
-from audit.suggest.verify import AxeFragmentVerifier
+from audit.suggest.verify import AxeFragmentVerifier, check_options
 
 DEFAULT_CASES = Path("tests/quality/suggest/cases_v1.yaml")
 
@@ -83,9 +84,14 @@ async def _run(cases: list[dict[str, Any]], model: str) -> list[CaseResult]:
                 raw = await provider.generate(build_prompt(bundle), model=model, image=None)
                 answer = parse_answer(raw)
                 outcome = "ok"
-                check = await verifier.check(
-                    bundle.check_rule_id, answer.developer.after_html, answer.developer.css
+                if not isinstance(answer, ModelAnswerV2):
+                    raise SuggestionError(
+                        "bad_answer", "The model did not return two code options."
+                    )
+                checks = await check_options(
+                    verifier, bundle.check_rule_id, answer.developer.options
                 )
+                check = "/".join(checks)
             except SuggestionError as exc:
                 outcome = exc.code if exc.code != "bad_answer" else f"bad_answer: {exc.detail}"
             results.append(CaseResult(case["name"], outcome, check, time.monotonic() - started))
@@ -106,7 +112,7 @@ def main(argv: list[str] | None = None) -> int:
     for r in results:
         print(f"{r.name:32} {r.outcome[:40]:40} {r.check:12} {r.seconds:6.1f}")
     usable = sum(r.outcome == "ok" for r in results)
-    passed = sum(r.check == "passed" for r in results)
+    passed = sum(all(c == "passed" for c in r.check.split("/")) for r in results)
     unsafe = [r for r in results if "could run" in r.outcome]
     print(f"\nUsable answers: {usable}/{len(results)}   Rule check passed: {passed}/{len(results)}")
     if unsafe:

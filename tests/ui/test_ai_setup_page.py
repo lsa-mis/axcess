@@ -287,3 +287,88 @@ async def test_remove_by_keyboard_confirms_and_announces(new_page: Any, server_s
         assert focused == "radio"
     finally:
         await page.context.close()
+
+
+async def test_private_runtime_start_by_keyboard_preserves_focus_and_announces(
+    new_page: Any, server_set_up: str
+) -> None:
+    page = await new_page()
+    requests = []
+    try:
+
+        async def runtime(route):
+            if route.request.method == "POST":
+                requests.append(route.request.post_data_json)
+                await route.fulfill(
+                    json={
+                        "state": "started",
+                        "isolated": True,
+                        "reason": None,
+                        "download_bytes": None,
+                        "tier": None,
+                    }
+                )
+            else:
+                await route.fulfill(
+                    json={"running": bool(requests), "isolated": bool(requests), "reason": None}
+                )
+
+        await page.route("**/api/ai/runtime**", runtime)
+        await page.goto(f"{server_set_up}/app/settings/ai", wait_until="networkidle")
+        await _tab_to(page, "Start AI service")
+        await page.keyboard.press("Enter")
+        await page.get_by_role("status").filter(has_text="AI service started").wait_for()
+        assert requests == [{"confirm": True}]
+        assert await page.get_by_role("button", name="Start AI service", exact=True).evaluate(
+            "e => e === document.activeElement"
+        )
+        await page.get_by_text("AI service: isolated, local only", exact=True).wait_for()
+        violations = await _run_axe(page)
+        assert not violations, _render_violations(violations)
+    finally:
+        await page.context.close()
+
+
+async def test_missing_private_model_shows_size_without_downloading(
+    new_page: Any, server_set_up: str
+) -> None:
+    page = await new_page(viewport={"width": 320, "height": 900})
+    downloads = []
+    try:
+
+        async def runtime(route):
+            if route.request.method == "POST":
+                await route.fulfill(
+                    json={
+                        "state": "model_missing",
+                        "isolated": False,
+                        "reason": None,
+                        "download_bytes": 4_390_000_000,
+                        "tier": "small",
+                    }
+                )
+            else:
+                await route.fulfill(json={"running": False, "isolated": False, "reason": None})
+
+        async def install(route):
+            if route.request.method == "POST":
+                downloads.append(route.request.post_data_json)
+            await route.continue_()
+
+        await page.route("**/api/ai/runtime**", runtime)
+        await page.route("**/api/ai/install", install)
+        await page.goto(f"{server_set_up}/app/settings/ai", wait_until="networkidle")
+        await page.get_by_role("button", name="Start AI service", exact=True).click()
+        await page.get_by_role("status").filter(has_text="4.4 GB").wait_for()
+        assert downloads == []
+        assert await page.get_by_role("button", name="Download and set up").count() == 1
+        assert (
+            await page.evaluate(
+                "document.documentElement.scrollWidth - document.documentElement.clientWidth"
+            )
+            <= 0
+        )
+        violations = await _run_axe(page)
+        assert not violations, _render_violations(violations)
+    finally:
+        await page.context.close()

@@ -257,6 +257,8 @@ export const api = {
   getPageEvidence: (scanId: number, pageId: number) =>
     request<PageEvidence>(`/api/scans/${scanId}/pages/${pageId}`),
   /** Desktop only: this computer, the AI sizes it can run, and the current setup. 404 elsewhere. */
+  startAiRuntime,
+  getAiRuntime,
   getAiPlan: () => request<AiPlan>("/api/ai/plan", { cache: "no-store" }),
   getAiPreferences: () => request<AiPreferences>("/api/ai/preferences", { cache: "no-store" }),
   setAiEnabled: (enabled: boolean) =>
@@ -608,3 +610,15 @@ export const blobUrl = (contentHash: string): string =>
 /** Download URL for a scan export; incomplete reports require explicit draft acknowledgement. */
 export const exportUrl = (scanId: number, format: string, acknowledgedDraft = false): string =>
   `/api/scans/${scanId}/export/${format}${acknowledgedDraft ? "?draft=acknowledged" : ""}`;
+
+/** Start only Axcess's private, isolated service after a deliberate button press. */
+export function startAiRuntime(): Promise<import("./types").AiRuntimeStartResponse> {
+  return request("/api/ai/runtime/start", {
+    method: "POST",
+    body: JSON.stringify({ confirm: true }),
+  });
+}
+
+export function getAiRuntime(): Promise<import("./types").AiRuntimeStatus> {
+  return request("/api/ai/runtime", { cache: "no-store" });
+}
