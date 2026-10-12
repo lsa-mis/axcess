@@ -15,7 +15,11 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 DIST = Path(os.environ.get("AXCESS_SITE_DIST", ROOT / "site" / "dist"))
-BASE = "/axcess/"
+# The live site is built under /axcess/; the testers' staging copy under
+# /axcess/staging/ (site/README.md). AXCESS_SITE_BASE matches the build.
+BASE = os.environ.get("AXCESS_SITE_BASE", "/axcess").rstrip("/") + "/"
+# A staging build (AXCESS_SITE_STAGING=1) carries a draft notice and noindex.
+STAGING = os.environ.get("AXCESS_SITE_STAGING") == "1"
 
 # Every page the site must publish, by route under the base.
 PRODUCT_ROUTES = (

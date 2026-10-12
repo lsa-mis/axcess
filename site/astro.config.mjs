@@ -10,10 +10,18 @@ import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
 
 const REPO = "https://github.com/lsa-mis/axcess";
+const SITE = "https://lsa-mis.github.io";
+// The live site is served under /axcess. The staging copy for testers is the
+// same site built under /axcess/staging (see site/README.md), so the base
+// comes from AXCESS_SITE_BASE when it is set.
+const BASE = process.env.AXCESS_SITE_BASE ?? "/axcess";
+// A staging build is marked as a draft: every page asks search engines not
+// to list it, and a banner says it is not the live site.
+const STAGING = process.env.AXCESS_SITE_STAGING === "1";
 
 export default defineConfig({
-  site: "https://lsa-mis.github.io",
-  base: "/axcess",
+  site: SITE,
+  base: BASE,
   trailingSlash: "always",
   integrations: [
     starlight({
@@ -29,7 +37,7 @@ export default defineConfig({
       // report groups diagram, with its own description for people who
       // cannot see it.
       head: [
-        { tag: "meta", attrs: { property: "og:image", content: "https://lsa-mis.github.io/axcess/diagrams/report-groups.png" } },
+        { tag: "meta", attrs: { property: "og:image", content: `${SITE}${BASE}/diagrams/report-groups.png` } },
         {
           tag: "meta",
           attrs: {
@@ -39,6 +47,7 @@ export default defineConfig({
           },
         },
         { tag: "meta", attrs: { name: "twitter:card", content: "summary_large_image" } },
+        ...(STAGING ? [{ tag: /** @type {const} */ ("meta"), attrs: { name: "robots", content: "noindex" } }] : []),
       ],
       editLink: { baseUrl: `${REPO}/edit/main/` },
       customCss: ["./src/styles/fonts.css", "./src/styles/theme.css"],
@@ -65,6 +74,8 @@ export default defineConfig({
         // A day and night switch in place of the three-way theme menu, in
         // the header and the phone menu alike (see the file for why).
         ThemeSelect: "./src/overrides/ThemeToggle.astro",
+        // The draft notice, in staging builds only (see the file for why).
+        ...(STAGING ? { Banner: "./src/overrides/StagingBanner.astro" } : {}),
       },
       // One list for every page, product and documentation alike, grouped by
       // what the reader is trying to do (COGA "Making Content Usable":

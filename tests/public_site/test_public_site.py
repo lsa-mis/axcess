@@ -13,7 +13,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
-from .conftest import BASE, PRODUCT_ROUTES, ROOT, ROUTES
+from .conftest import BASE, PRODUCT_ROUTES, ROOT, ROUTES, STAGING
 
 # Words docs/plain-language.md's terms table says never to use, and the old
 # site's check names. Only unambiguous ones: "finding" and "coverage" also
@@ -159,6 +159,22 @@ def test_volume_is_unlisted(pages: dict[str, str]) -> None:
     for route, html in pages.items():
         if route != "volume/":
             assert f'href="{BASE}volume/"' not in html, route
+
+
+def test_staging_marking_only_on_staging_builds(pages: dict[str, str]) -> None:
+    """A staging build says it is a draft and stays out of search engines;
+    the live build carries neither the notice nor an extra noindex."""
+    notice = "This is a draft of the new Axcess site"
+    for route, html in pages.items():
+        if STAGING:
+            assert '<meta name="robots" content="noindex"' in html, route
+            assert notice in html, route
+            live_link = r'<a href="https://lsa-mis\.github\.io/axcess/"[^>]*>Go to the live Axcess site</a>'
+            assert re.search(live_link, html), route
+        else:
+            assert notice not in html, route
+            if route != "volume/":
+                assert 'content="noindex"' not in html, route
 
 
 def test_internal_links_images_and_anchors_resolve(dist: Path, pages: dict[str, str]) -> None:

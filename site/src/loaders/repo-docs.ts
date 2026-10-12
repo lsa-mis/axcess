@@ -30,7 +30,10 @@ import { fileURLToPath } from "node:url";
 import type { Loader } from "astro/loaders";
 
 const REPO = "https://github.com/lsa-mis/axcess";
-const BASE = "/axcess";
+// The site's base: /axcess live, /axcess/staging for the testers' copy
+// (astro.config.mjs reads the same variable).
+const BASE = process.env.AXCESS_SITE_BASE ?? "/axcess";
+const LIVE = "https://lsa-mis.github.io/axcess/";
 
 /** File name (no extension) -> route id under the site's base. */
 export const GUIDES: Record<string, string> = {
@@ -50,7 +53,7 @@ const LINK = /(\]\()([^)\s]+)(\))/g;
 export function rewriteTarget(target: string): string {
   // Links to the published site from a guide become site paths, so they
   // stay on whichever copy (local preview or live) the reader is using.
-  if (target.startsWith(`https://lsa-mis.github.io${BASE}/`)) return target.slice("https://lsa-mis.github.io".length);
+  if (target.startsWith(LIVE)) return `${BASE}/${target.slice(LIVE.length)}`;
   if (/^(https?:|mailto:|#)/.test(target)) return target;
   const [file, hash = ""] = target.split("#");
   // Diagrams: the site serves its own copies (site/public/diagrams/, see
