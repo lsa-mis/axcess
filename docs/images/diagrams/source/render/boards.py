@@ -470,11 +470,11 @@ def board_release() -> str:
 
     chips = lambda xs: div("".join(chip(x) for x in xs), display="flex",  # noqa: E731
                            flex_wrap="wrap", gap=6, margin="6px 0")
-    s1 = step("1", "git_merge", "Merge to main",
-              "With a change under:" + chips(["src/", "desktop/", "pyproject.toml", "uv.lock"])
-              + "or the workflow file. A manual run also works.")
+    s1 = step("1", "user", "Run the release by hand",
+              "In the Actions tab, run" + chips(["desktop-release.yml"])
+              + "on main. A merge only makes a test build, which publishes nothing.")
     s2 = step("2", "wrench", "Build the apps",
-              chips(["desktop-build.yml"])
+              "It calls" + chips(["desktop-build.yml"])
               + "macOS (Apple Silicon), Windows and Linux build in parallel, stamped with "
               "the next version: " + span(mono("0.2.1", 18), white_space="nowrap")
               + " after " + span(mono("0.2.0", 18), white_space="nowrap") + ".")
@@ -543,7 +543,7 @@ def board_release() -> str:
     )
     content = header(
         "How a desktop release ships",
-        "Merging app code to main publishes a preview release. Installed apps offer it "
+        "A person runs the release workflow on main. Installed apps offer the release "
         "on their next launch.",
     ) + lane + caveat + site
     return page("Release flow", w, h, content)
