@@ -856,3 +856,81 @@ async def test_a_screenshot_failure_costs_nothing_but_the_screenshot(page, axe) 
     assert result.findings, "detection must be unaffected"
     assert result.dialogs_opened == 2, "dialog cleanup still ran"
     assert result.dialogs_stuck == 0
+
+
+# Google Sites puts a site's own "Custom embed" three frames deep, and every
+# embed frame has the same address. These pages copy that shape with nested
+# srcdoc frames, which all have the address about:srcdoc.
+_EMBED_JS = """
+    const embed = (name, body) => {
+      const inner = '<iframe name="' + name + '" srcdoc="' +
+        body.replaceAll('&', '&amp;').replaceAll('"', '&quot;') + '"></iframe>';
+      const outer = document.createElement('iframe');
+      outer.srcdoc = inner;
+      document.body.append(outer);
+    };
+"""
+
+
+async def _embeds_ready(page, *names: str) -> None:  # type: ignore[no-untyped-def]
+    for name in names:
+        for _ in range(50):
+            frame = page.frame(name=name)
+            if frame is not None:
+                break
+            await page.wait_for_timeout(50)
+        assert frame is not None, f"frame {name} never loaded"
+        await frame.wait_for_selector("button")
+
+
+async def test_controls_inside_embedded_frames_are_clicked(page) -> None:  # type: ignore[no-untyped-def]
+    """A frame on the page is part of the page: its controls are clicked, and
+    what a click reveals there is explored too. Two frames with the same
+    address and markup are still two frames, and "Like" and "Follow" inside a
+    frame are refused, while "Follow" in ordinary page text is not."""
+    body = (
+        '<button id=policies onclick="this.hidden=true;list.hidden=false;'
+        "top.clicked.push(window.name+':policies')\">Policies and Procedures</button>"
+        "<div id=list hidden><button onclick=\"top.clicked.push(window.name+':indirect');"
+        "this.insertAdjacentHTML('afterend','<p>Indirect cost</p>')\">"
+        "Indirect Cost Policy</button></div>"
+        "<button onclick=\"top.clicked.push(window.name+':like')\">Like</button>"
+        "<button onclick=\"top.clicked.push(window.name+':follow')\">Follow</button>"
+    )
+    await page.set_content(f"""
+        <body><script>window.clicked = [];</script>
+        <button onclick="clicked.push('page');this.insertAdjacentHTML('afterend','<p>1</p>')">
+          Follow these steps</button>
+        <script>{_EMBED_JS} embed('A', `{body}`); embed('B', `{body}`);</script>
+    """)
+    await _embeds_ready(page, "A", "B")
+
+    result = await InteractionProbe(axe=_NoopAxe(), settle_ms=0).run(page)  # type: ignore[arg-type]
+
+    clicked = await page.evaluate("window.clicked")
+    assert sorted(clicked) == sorted(
+        ["page", "A:policies", "A:indirect", "B:policies", "B:indirect"]
+    ), clicked
+    assert result.blocked_controls == 4  # Like and Follow, in each frame
+
+
+async def test_a_frame_reports_only_what_a_click_revealed(page, axe) -> None:  # type: ignore[no-untyped-def]
+    """The load-state check reads only the page, so the probe reads each frame
+    before clicking: an image without alt text that was in the frame from the
+    start was not revealed by a click and is not reported as if it were."""
+    body = (
+        "<img src=data:image/gif;base64,R0lGODlhAQABAAAAACw= width=20 height=20>"
+        "<button onclick=\"this.insertAdjacentHTML('afterend','<input type=text>')\">"
+        "Show form</button>"
+    )
+    await page.set_content(f"<body><script>{_EMBED_JS} embed('A', `{body}`);</script>")
+    await _embeds_ready(page, "A")
+    baseline = await axe.run(page, "AA")
+    assert not any(v.rule_id in {"label", "image-alt"} for v in baseline), "fixture regressed"
+
+    revealed = (await InteractionProbe(axe=axe).run(page, baseline=baseline)).findings
+
+    rules = {r.violation.rule_id: r for r in revealed}
+    assert "label" in rules, "the input revealed inside the frame was not checked"
+    assert rules["label"].revealed_by == "Show form"
+    assert "image-alt" not in rules

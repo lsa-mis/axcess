@@ -6,7 +6,8 @@ load-time axe pass cannot see any of it, so the defects in those states are
 invisible to every other pipeline here.
 
 This probe operates the page's controls one at a time and re-runs axe
-whenever a click actually changed the DOM. It is deliberately conservative:
+whenever a click actually changed the DOM, in the page and in every frame
+embedded in it. It is deliberately conservative:
 it never clicks anything whose accessible name matches a destructive word,
 it queues navigation for the crawler, and it is bounded on four
 independent axes (total clicks, repeats of one structural shape, recursion
@@ -44,7 +45,7 @@ from audit.wcag_version import LEGACY_WCAG_VERSION, WcagVersion
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
-    from playwright.async_api import Locator, Page
+    from playwright.async_api import Frame, Locator, Page
 
     from audit.crawler.style_snapshot import StyleSnapshot
 
@@ -300,6 +301,13 @@ _CLOSE_CONTROL_JS = (
 """
 )
 
+# Refused in an embedded frame only, as whole words. A frame can be another
+# company's widget (a video player, a social feed) that knows the person the
+# browser is signed in as, so "Like" or "Follow" there would act as them.
+# Whole words, because on the page itself "Looks like" or "Follow these
+# steps" are ordinary text. "Subscribe" is already refused everywhere.
+_FRAME_BLOCKED_WORDS = re.compile(r"\b(like|unlike|follow|unfollow)\b")
+
 DEFAULT_MAX_CLICKS = 100
 DEFAULT_MAX_REPEATED = 20
 DEFAULT_MAX_DEPTH = 5
@@ -357,7 +365,10 @@ _DIGITS = re.compile(r"\d+")
 def _shape_of(control: dict[str, Any], pinned: str) -> str:
     """Group key for repeat sampling: one calendar is one shape."""
     signature = _signature(control.get("shape", control["selector"]))
-    return f"{'GLOBAL' if control['isGlobal'] else pinned}|{signature}"
+    scope = "GLOBAL" if control["isGlobal"] else pinned
+    if control.get("frame"):
+        scope += "#" + control["frame"]
+    return f"{scope}|{signature}"
 
 
 def _signature(selector: str) -> str:
@@ -427,6 +438,12 @@ class _Budget:
     #: when a member of the shape does change something, because then the shape
     #: is not inert and the run of duds was incidental.
     inert_counts: dict[str, int] = field(default_factory=dict)
+    #: The frame being swept ("frame3"), or "" for the page itself. Frames are
+    #: swept one after another, never at once, so one field is enough. It is
+    #: put on every control found, so a button in one frame is never taken
+    #: for the same button in another: Google Sites' embeds all have the
+    #: address about:blank and the same markup.
+    frame: str = ""
 
 
 @dataclass
@@ -513,7 +530,7 @@ class InteractionProbe:
                     await page.evaluate(_RESET_MARKS_JS, _CANDIDATE_SELECTOR)
                     evaluated = True
                     await self._explore(
-                        page,
+                        page.main_frame,
                         budget,
                         found,
                         pinned=page.url,
@@ -521,6 +538,7 @@ class InteractionProbe:
                         fresh_only=False,
                         shot=capture_screenshot,
                     )
+                    await self._explore_frames(page, budget, found)
         except TimeoutError:
             budget.limits.add("time")
             log.info("interaction.limited", reason="time_limit")
@@ -566,9 +584,50 @@ class InteractionProbe:
             detail=budget.detail,
         )
 
+    async def _explore_frames(
+        self, page: Page, budget: _Budget, found: list[RevealedViolation]
+    ) -> None:
+        """Sweep each frame on the page the same way, after the page itself.
+
+        A frame on a page in the scan's scope is part of that page, so its
+        controls are clicked like the page's own, under the same budget,
+        guard and blocked words (plus ``_FRAME_BLOCKED_WORDS``). Google Sites
+        puts a site's own "Custom embed" content three frames deep, so
+        without this a site built there showed no controls at all. Frames
+        nested in frames are in ``page.frames`` too.
+
+        The load-state rule check reads only the page, not its frames, so
+        each frame is read once here before anything is clicked. That result
+        is the frame's baseline, as the page's load-state result is the
+        page's: what was in the frame before any click was not revealed by
+        one, and is not reported as if it were.
+        """
+        for index, frame in enumerate(page.frames):
+            if frame is page.main_frame:
+                continue
+            if budget.remaining <= 0 or budget.halted:
+                return
+            try:
+                if frame.is_detached():
+                    continue
+                element = await frame.frame_element()
+                # A hidden frame's controls cannot be clicked; each would only
+                # spend its timeout.
+                if not await element.is_visible():
+                    continue
+                budget.seen_hashes.update(
+                    v.target_hash for v in await self.axe.run(frame, self.level, self.version)
+                )
+            except Exception as exc:
+                log.debug("interaction.frame_skipped", error_type=type(exc).__name__)
+                continue
+            budget.frame = f"frame{index}"
+            await self._explore(frame, budget, found, pinned=frame.url, depth=0, fresh_only=False)
+        budget.frame = ""
+
     async def _explore(
         self,
-        page: Page,
+        page: Frame,
         budget: _Budget,
         found: list[RevealedViolation],
         *,
@@ -610,6 +669,8 @@ class InteractionProbe:
             return  # navigated or detached mid-sweep
         if fresh_only:
             controls = [c for c in controls if c["fresh"]]
+        for control in controls:
+            control["frame"] = budget.frame
         # Count what this level exposed before any bound is applied. A
         # control that the depth cap, the repeat cap or the label filter
         # stops us reaching is still a control the page has and this scan
@@ -630,7 +691,9 @@ class InteractionProbe:
         for control in controls:
             if budget.remaining <= 0 or budget.halted:
                 break
-            if self._is_blocked(control.get("safetyLabel", control["label"])):
+            if self._is_blocked(
+                control.get("safetyLabel", control["label"]), in_frame=bool(budget.frame)
+            ):
                 budget.blocked_keys.add(self._interaction_key(control, pinned))
                 log.info(
                     "interaction.refused",
@@ -677,13 +740,14 @@ class InteractionProbe:
                 shot=shot,
             )
 
-    async def _resolve_control(self, page: Page, control: dict[str, Any]) -> Locator | None:
+    async def _resolve_control(self, page: Frame, control: dict[str, Any]) -> Locator | None:
         """Resolve the same action again after a framework replaces its menu.
 
         Prefer the exact DOM location. A recreated portal can get a new ID;
         then require one unambiguous match by tag, label and structural shape.
         Never fall back to the first button or an arbitrary duplicate name.
         """
+        in_frame = page.parent_frame is not None
         locator = page.locator(control["selector"])
         count = await locator.count()
         if count:
@@ -691,7 +755,8 @@ class InteractionProbe:
                 return None
             current = await locator.evaluate(_DESCRIBE_JS)
             if current and current["label"] == control["label"]:
-                return None if self._is_blocked(current["safetyLabel"]) else locator
+                blocked = self._is_blocked(current["safetyLabel"], in_frame=in_frame)
+                return None if blocked else locator
             return None
         controls = await page.evaluate(_COLLECT_JS, _CANDIDATE_SELECTOR)
         matches = [
@@ -700,7 +765,7 @@ class InteractionProbe:
             if item["tag"] == control["tag"]
             and item["label"] == control["label"]
             and _signature(item["shape"]) == _signature(control["shape"])
-            and not self._is_blocked(item["safetyLabel"])
+            and not self._is_blocked(item["safetyLabel"], in_frame=in_frame)
         ]
         if len(matches) != 1:
             return None
@@ -708,7 +773,7 @@ class InteractionProbe:
 
     async def _reopen_path(
         self,
-        page: Page,
+        page: Frame,
         budget: _Budget,
         control: dict[str, Any],
         path: tuple[dict[str, Any], ...],
@@ -737,8 +802,10 @@ class InteractionProbe:
             log.info("interaction.reopened", control=ancestor["label"][:60], depth=index)
         return await self._resolve_control(page, control)
 
-    def _is_blocked(self, label: str) -> bool:
+    def _is_blocked(self, label: str, *, in_frame: bool = False) -> bool:
         lowered = re.sub(r"[-_]+", " ", label).casefold()
+        if in_frame and _FRAME_BLOCKED_WORDS.search(lowered):
+            return True
         return any(
             re.sub(r"[-_]+", " ", word).casefold() in lowered for word in self.blocked_labels
         )
@@ -750,11 +817,13 @@ class InteractionProbe:
         deduplicated across pages: the same menu can expose different content.
         """
         scope = "GLOBAL" if control["isGlobal"] else pinned
+        if control.get("frame"):
+            scope += "#" + control["frame"]
         return f"{scope}|{control['selector']}|{control['label']}"
 
     async def _operate(
         self,
-        page: Page,
+        page: Frame,
         budget: _Budget,
         found: list[RevealedViolation],
         control: dict[str, Any],
@@ -906,7 +975,7 @@ class InteractionProbe:
             # hide all its remaining siblings. Unwind at the root only, and
             # not when a dialog was already dismissed above.
             if depth == 0 and not opened:
-                await page.keyboard.press("Escape")
+                await page.page.keyboard.press("Escape")
                 await page.wait_for_timeout(150)
             return True
 
@@ -917,7 +986,7 @@ class InteractionProbe:
                 await self._restore(page, pinned)
             return True
 
-    async def _open_dialogs(self, page: Page) -> list[dict[str, Any]]:
+    async def _open_dialogs(self, page: Frame) -> list[dict[str, Any]]:
         try:
             dialogs: list[dict[str, Any]] = await page.evaluate(_OPEN_DIALOGS_JS)
         except Exception:
@@ -926,7 +995,7 @@ class InteractionProbe:
 
     async def _dismiss_dialog(
         self,
-        page: Page,
+        page: Frame,
         budget: _Budget,
         dialog: dict[str, Any],
         *,
@@ -948,7 +1017,7 @@ class InteractionProbe:
             return any(item["id"] == dialog["id"] for item in await self._open_dialogs(page))
 
         with contextlib.suppress(Exception):
-            await page.keyboard.press("Escape")
+            await page.page.keyboard.press("Escape")
             attempts.append("Escape")
             if not await still_open():
                 return True
@@ -991,7 +1060,7 @@ class InteractionProbe:
 
     async def _collect(
         self,
-        page: Page,
+        page: Frame,
         budget: _Budget,
         found: list[RevealedViolation],
         label: str,
@@ -1014,7 +1083,7 @@ class InteractionProbe:
 
     async def _capture_shots(
         self,
-        page: Page,
+        page: Frame,
         budget: _Budget,
         revealed: Sequence[RevealedViolation],
         shot: ShotFn | None,
@@ -1032,7 +1101,9 @@ class InteractionProbe:
         land on its overlay while the ledger counted them as coverage.
         """
 
-        if shot is None:
+        # Not in a frame: the screenshot helper finds the element in the page,
+        # where a frame's locator would miss it or match the wrong element.
+        if shot is None or page.parent_frame is not None:
             return
         for revealed_violation in revealed:
             if len(budget.screenshots) >= self.max_state_shots:
@@ -1047,7 +1118,7 @@ class InteractionProbe:
                 continue
             try:
                 async with asyncio.timeout(_SHOT_TIMEOUT_S):
-                    png = await shot(page, selector)
+                    png = await shot(page.page, selector)
             except Exception as exc:
                 log.debug(
                     "interaction.shot_failed",
@@ -1061,7 +1132,7 @@ class InteractionProbe:
 
     async def _capture_state(
         self,
-        page: Page,
+        page: Frame,
         budget: _Budget,
         *,
         state_key: str,
@@ -1085,7 +1156,9 @@ class InteractionProbe:
         only the former is safe to let past ``except Exception``. It is caught
         here regardless.
         """
-        if not self.capture_states or state_key in budget.captures:
+        # Not in a frame: a saved state is shown as the whole page in the
+        # inspector, and a frame's document is not the page.
+        if not self.capture_states or state_key in budget.captures or page.parent_frame:
             return
         if len(budget.captures) >= self.max_state_captures:
             budget.limits.add("state_captures")
@@ -1097,7 +1170,7 @@ class InteractionProbe:
                 length = int(await page.evaluate(_DOM_LENGTH_JS))
                 if length <= 0 or length > _MAX_CAPTURE_BYTES:
                     return
-                html = await page.content()
+                html = await page.page.content()
             blob = gzip.compress(html.encode("utf-8", "replace"), compresslevel=1, mtime=0)
         except Exception as exc:
             log.debug(
@@ -1116,7 +1189,7 @@ class InteractionProbe:
         if budget.capture_styles is not None:
             try:
                 async with asyncio.timeout(_STYLES_TIMEOUT_S):
-                    styles = await budget.capture_styles(page)
+                    styles = await budget.capture_styles(page.page)
             except Exception as exc:
                 log.debug("interaction.styles_failed", error_type=type(exc).__name__)
         budget.capture_bytes += len(blob)
@@ -1128,16 +1201,20 @@ class InteractionProbe:
             styles=styles,
         )
 
-    async def _restore(self, page: Page, pinned: str) -> None:
+    async def _restore(self, page: Frame, pinned: str) -> None:
         """Return the browser to the page we are probing.
 
         Best-effort by design: if we cannot get back, the next sweep's
         control collection simply finds nothing familiar and the probe
         winds down. Failing to restore must never fail the page fetch,
-        which has already produced its load-state evidence.
+        which has already produced its load-state evidence. A frame that
+        went elsewhere is left there, by the same rule: going back in the
+        page's history could undo more than the frame's step.
         """
+        if page.parent_frame is not None:
+            return
         with contextlib.suppress(Exception):
-            await page.go_back(timeout=5000, wait_until="domcontentloaded")
+            await page.page.go_back(timeout=5000, wait_until="domcontentloaded")
         if page.url != pinned:
             with contextlib.suppress(Exception):
                 await page.goto(pinned, timeout=10000, wait_until="domcontentloaded")
