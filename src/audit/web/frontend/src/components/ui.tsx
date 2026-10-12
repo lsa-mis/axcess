@@ -5,7 +5,7 @@ import { Check, ChevronDown, ChevronRight, ScanEye } from "lucide-react";
 import { Link } from "react-router";
 import { cn } from "../lib/cn";
 import type { Severity, FindingStatus, ScanStatus } from "../api/types";
-import { SCAN_STATUS_LABEL, STATUS_HELP, STATUS_LABEL } from "../lib/terms";
+import { OPENS_NEW_WINDOW, SCAN_STATUS_LABEL, STATUS_HELP, STATUS_LABEL } from "../lib/terms";
 
 /** Severity chip, pairs color + text, so the signal isn't color-only. */
 export function SeverityChip({ value }: { value: Severity }) {
@@ -380,7 +380,8 @@ export function DownloadLink({
  * browser, which is why the href must be http(s).
  *
  * Pass ``aria-label`` whenever the visible text is hidden at small
- * widths, and say "opens in a new tab" in it, the new window is a
+ * widths, and include ``OPENS_NEW_WINDOW`` from lib/terms in it ("opens in
+ * a new tab", or "opens in your web browser" in the desktop app), the new window is a
  * change of context the user should hear about before they activate it
  * (WCAG 3.2.5).
  */
@@ -1170,7 +1171,7 @@ export function PageLink({
           <span aria-hidden className="text-2xs">
             ↗
           </span>
-          <span className="sr-only">opens in a new tab</span>
+          <span className="sr-only">{OPENS_NEW_WINDOW}</span>
         </a>
       )}
       {showUrlBelow && pageTitle && (
@@ -1186,7 +1187,7 @@ export function PageLink({
           className="underline underline-offset-2 hover:text-fg"
         >
           Open live page ↗
-          <span className="sr-only"> (opens in a new tab)</span>
+          <span className="sr-only"> ({OPENS_NEW_WINDOW})</span>
         </a>
         {scanId != null && (
           <>

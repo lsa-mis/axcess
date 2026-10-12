@@ -10,7 +10,7 @@ import { Card, StatusChip } from "../components/ui";
 import { httpStatusLabel, renderModeLabel } from "../lib/pageLabels";
 import { findingLocation } from "../lib/findingLocation";
 import type { DetectionPipeline, PageEvidence, SuggestionAvailability } from "../api/types";
-import { CHECK_LABEL, REVIEW_TYPE_LABEL } from "../lib/terms";
+import { OPENS_NEW_WINDOW, CHECK_LABEL, REVIEW_TYPE_LABEL } from "../lib/terms";
 import { useScanQuery } from "../hooks/useScanQuery";
 
 /** One row of a page's accessibility evidence. */
@@ -216,7 +216,7 @@ export default function PageEvidenceRoute() {
                   >
                     Open the image
                     <ExternalLink className="h-3.5 w-3.5" aria-hidden />
-                    <span className="sr-only">, opens in a new tab</span>
+                    <span className="sr-only">, {OPENS_NEW_WINDOW}</span>
                   </a>
                   <AltChip alt={image.alt_text} />
                 </div>
@@ -341,7 +341,7 @@ function FindingCard({
           >
             <Crosshair className="h-4 w-4" aria-hidden />
             Show me on the live page
-            <span className="sr-only">, opens in a new tab and scrolls to this text</span>
+            <span className="sr-only">, {OPENS_NEW_WINDOW} and scrolls to this text</span>
           </a>
         )}
         <details className="text-xs">

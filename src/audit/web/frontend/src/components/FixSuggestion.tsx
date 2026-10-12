@@ -9,7 +9,7 @@ import type {
   SuggestionOccurrenceKind,
   SuggestionRecord,
 } from "../api/types";
-import {
+import { OPENS_NEW_WINDOW,
   AI_SUGGESTION,
   SUGGESTION_AUDIENCE_LABEL,
   SUGGESTION_CHECK_LABEL,
@@ -582,7 +582,7 @@ function GuidanceLink({ record }: { record: SuggestionRecord }) {
   const url = record.result?.help_url;
   if (!url || !/^https?:\/\//i.test(url)) return null;
   return <ExternalLinkButton href={url} size="sm" className="max-w-full whitespace-normal text-left">
-    Read guidance for this rule (opens in a new tab)
+    Read guidance for this rule ({OPENS_NEW_WINDOW})
   </ExternalLinkButton>;
 }
 

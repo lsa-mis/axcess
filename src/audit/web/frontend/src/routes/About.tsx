@@ -2,6 +2,7 @@ import { ExternalLink, Info } from "lucide-react";
 import BrandMark from "../components/BrandMark";
 import { isDesktopApp } from "../hooks/useSwipeNavigation";
 import { CLICK_THROUGH } from "../lib/labels";
+import { OPENS_NEW_WINDOW } from "../lib/terms";
 
 /**
  * One outbound resource. ``display`` is the short address printed on the
@@ -158,7 +159,7 @@ function ResourceCard({ resource }: { resource: Resource }) {
           className="no-underline outline-none after:absolute after:inset-0 after:content-[''] hover:underline hover:underline-offset-2"
         >
           {resource.title}
-          <span className="sr-only"> (opens in a new tab)</span>
+          <span className="sr-only"> ({OPENS_NEW_WINDOW})</span>
         </a>
         <ExternalLink className="h-4 w-4 shrink-0 text-fg-muted" aria-hidden />
       </h3>

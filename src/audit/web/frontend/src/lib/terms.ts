@@ -11,6 +11,7 @@ import type {
   SuggestionErrorCode,
   SuggestionStatus,
 } from "../api/types";
+import { isDesktopApp } from "../hooks/useSwipeNavigation";
 
 /**
  * The words the interface uses for shared values, in one place.
@@ -172,3 +173,21 @@ export const AI_ISOLATION_REASON_LABEL: Record<string, string> = {
   runtime_failed: "The isolated AI service could not start. Check the application log.",
   system_ollama_not_managed: "Your own Ollama is not isolated by Axcess. Axcess never starts or stops it.",
 };
+
+/**
+ * What happens when someone opens a link to another website, for the
+ * screen-reader note and visible text on every external link.
+ *
+ * In a browser the link opens a new tab. In the desktop app, the app
+ * (desktop/src/main.cjs) blocks the new window and opens the address in
+ * the person's default web browser, so "new tab" would be wrong there.
+ * Rejected: keeping one wording everywhere, because it would describe
+ * something that does not happen in the app. People need to hear where
+ * a link takes them before they use it (WCAG 2.2 SC 3.2.5 Change on
+ * Request, Level AAA). Text must also match what the code does (repo
+ * plain-language rules), and one shared phrase keeps every link the same
+ * (SC 3.2.4 Consistent Identification, Level AA).
+ */
+export const OPENS_NEW_WINDOW = isDesktopApp()
+  ? "opens in your web browser"
+  : "opens in a new tab";

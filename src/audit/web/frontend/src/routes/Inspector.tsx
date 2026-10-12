@@ -43,6 +43,7 @@ import {
   type Target,
   type Unreachable,
 } from "../lib/highlightTargets";
+import { OPENS_NEW_WINDOW } from "../lib/terms";
 
 type TabId = "page" | "dom";
 
@@ -827,7 +828,7 @@ export default function InspectorRoute() {
           <ExternalLinkButton
             href={liveUrl}
             variant="secondary"
-            aria-label={`Open live page: ${displayTitle} (opens in a new tab)`}
+            aria-label={`Open live page: ${displayTitle} (${OPENS_NEW_WINDOW})`}
           >
             <ExternalLink className="h-4 w-4" aria-hidden />
             Open live page

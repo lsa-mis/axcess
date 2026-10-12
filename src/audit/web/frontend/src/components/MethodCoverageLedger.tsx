@@ -8,6 +8,7 @@ import type {
   ScanMethodCoverage,
   ScanMethodState,
 } from "../api/types";
+import { OPENS_NEW_WINDOW } from "../lib/terms";
 
 /**
  * What was checked, as a table: one row per check, with what it ran on,
@@ -209,7 +210,7 @@ function MethodRow({
             More about this check
             <span className="sr-only">
               {" "}
-              ({method.label}, on the Axcess website, opens in a new tab)
+              ({method.label}, on the Axcess website, {OPENS_NEW_WINDOW})
             </span>
             <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden />
           </a>

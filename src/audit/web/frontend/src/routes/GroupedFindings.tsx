@@ -34,7 +34,7 @@ import {
 import { ActiveFilters, FilterMenu, activeFilterItems, type FilterGroup } from "../components/table/FilterMenu";
 import { requestStatusRationale } from "../statusDecision";
 import { useScanQuery } from "../hooks/useScanQuery";
-import { STATUS_LABEL, STATUS_OPTION_LABEL } from "../lib/terms";
+import { OPENS_NEW_WINDOW, STATUS_LABEL, STATUS_OPTION_LABEL } from "../lib/terms";
 
 const STATUS_OPTIONS: FindingStatus[] = [
   "new",
@@ -501,7 +501,7 @@ function FindingRow({ finding, index }: { finding: GroupedFinding; index: number
                     ? `…${occ.page_url.slice(-60)}`
                     : occ.page_url}
                   <span aria-hidden> ↗</span>
-                  <span className="sr-only">opens in a new tab</span>
+                  <span className="sr-only">{OPENS_NEW_WINDOW}</span>
                 </a>
                 <Link
                   to={`/pages/${occ.page_id}`}

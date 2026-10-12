@@ -43,7 +43,7 @@ import {
 import { ActiveFilters, FilterMenu, activeFilterItems, type FilterGroup } from "../components/table/FilterMenu";
 import { requestStatusRationale } from "../statusDecision";
 import { useScanQuery } from "../hooks/useScanQuery";
-import { CHECK_LABEL, STATUS_LABEL, STATUS_OPTION_LABEL } from "../lib/terms";
+import { OPENS_NEW_WINDOW, CHECK_LABEL, STATUS_LABEL, STATUS_OPTION_LABEL } from "../lib/terms";
 
 const STATUS_OPTIONS: FindingStatus[] = [
   "new",
@@ -288,7 +288,7 @@ function RuleGroupCard({
                         className="inline-flex items-center gap-1 text-umich-blue underline underline-offset-2"
                       >
                         About this rule <ExternalLink className="h-3 w-3" aria-hidden />
-                        <span className="sr-only">(opens in a new tab)</span>
+                        <span className="sr-only">({OPENS_NEW_WINDOW})</span>
                       </a>
                     </>
                   )}

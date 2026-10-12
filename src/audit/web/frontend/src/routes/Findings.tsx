@@ -23,7 +23,7 @@ import type {
   FindingStatus,
   Severity,
 } from "../api/types";
-import { STATUS_OPTION_LABEL } from "../lib/terms";
+import { OPENS_NEW_WINDOW, STATUS_OPTION_LABEL } from "../lib/terms";
 
 const SEVERITIES: Severity[] = ["critical", "major", "minor", "info"];
 const STATUSES: FindingStatus[] = [
@@ -326,7 +326,7 @@ function FindingsTable({
                     >
                       {f.sample_page}{" "}
                       <span aria-hidden>↗</span>
-                      <span className="sr-only">opens in a new tab</span>
+                      <span className="sr-only">{OPENS_NEW_WINDOW}</span>
                     </a>
                   ) : (
                     <span className="text-xs text-fg-subtle">Does not apply</span>

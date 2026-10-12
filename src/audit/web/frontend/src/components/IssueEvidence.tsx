@@ -8,7 +8,7 @@ import IssuePagesTable from "./IssuePagesTable";
 import type { AbilityLabel, IssueDetail, IssueRow } from "../api/types";
 import { HIDDEN_ISSUE_FIELDS } from "../lib/hiddenIssueFields";
 import { REVIEW_LANE_HELP } from "../lib/labels";
-import { REVIEW_TYPE_LABEL } from "../lib/terms";
+import { OPENS_NEW_WINDOW, REVIEW_TYPE_LABEL } from "../lib/terms";
 
 /**
  * Every page one issue affects, with its occurrences and their
@@ -221,7 +221,7 @@ function IssueGuidance({ detail }: { detail: IssueDetail }) {
                   >
                     About this rule
                     <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                    <span className="sr-only">, opens in a new tab</span>
+                    <span className="sr-only">, {OPENS_NEW_WINDOW}</span>
                   </a>
                 )}
               </div>

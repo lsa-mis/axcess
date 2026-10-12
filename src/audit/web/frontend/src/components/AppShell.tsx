@@ -24,6 +24,7 @@ import { useSwipeNavigation } from "../hooks/useSwipeNavigation";
 import { setPreference, usePreferences } from "../hooks/usePreferences";
 import PreferenceEffects from "./PreferenceEffects";
 import ShortcutsDialog from "./ShortcutsDialog";
+import { OPENS_NEW_WINDOW } from "../lib/terms";
 
 /**
  * One sidebar entry. ``isActive`` decides whether the item should render
@@ -332,8 +333,8 @@ function FeedbackAction({ collapsed }: { collapsed: boolean }) {
       href={FEEDBACK_FORM_URL}
       target="_blank"
       rel="noopener noreferrer"
-      aria-label="Give feedback (opens in a new tab)"
-      title="Give feedback (opens in a new tab)"
+      aria-label={`Give feedback (${OPENS_NEW_WINDOW})`}
+      title={`Give feedback (${OPENS_NEW_WINDOW})`}
       className={cn(SIDEBAR_ROW, SIDEBAR_ROW_IDLE, collapsed ? "justify-center px-2" : "px-3")}
     >
       <MessageSquarePlus className="h-5 w-5 shrink-0" aria-hidden />
@@ -628,7 +629,7 @@ function MobileNav({ pathname, onSearch }: { pathname: string; onSearch: () => v
           href={FEEDBACK_FORM_URL}
           target="_blank"
           rel="noopener noreferrer"
-          aria-label="Give feedback (opens in a new tab)"
+          aria-label={`Give feedback (${OPENS_NEW_WINDOW})`}
           className={action}
         >
           <MessageSquarePlus className="h-4 w-4" aria-hidden />
