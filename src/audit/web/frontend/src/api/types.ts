@@ -1308,6 +1308,7 @@ export type SuggestionErrorCode =
   | "model_missing"
   | "timeout"
   | "bad_answer"
+  | "no_change"
   | "restarted"
   | "occurrence_gone"
   | "internal";

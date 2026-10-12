@@ -181,6 +181,7 @@ class SuggestionWorker:
         answer = parse_answer(raw)
         if not isinstance(answer, ModelAnswerV2):
             raise SuggestionError("bad_answer", "The model did not return two code options.")
+        _reject_unchanged(answer, bundle.snippet)
         outcome: Outcome = "not_checked"
         outcomes = await check_options(
             self._verifier, bundle.check_rule_id, answer.developer.options
@@ -221,3 +222,22 @@ class SuggestionWorker:
             )
         except TimeoutError as exc:
             raise SuggestionError("timeout") from exc
+
+
+def _same_code(a: str | None, b: str | None) -> bool:
+    return " ".join((a or "").split()) == " ".join((b or "").split())
+
+
+def _reject_unchanged(answer: ModelAnswerV2, before_html: str | None) -> None:
+    """A copy of the saved element with no styles is not a fix; do not show it.
+
+    Small models sometimes echo the input. Showing that as an option would
+    claim a fix that changes nothing.
+    """
+    if before_html is None:
+        return
+    if all(
+        _same_code(option.after_html, before_html) and not (option.css or "").strip()
+        for option in answer.developer.options
+    ):
+        raise SuggestionError("no_change", "Both options repeated the saved code.")

@@ -410,6 +410,13 @@ const CODE_BOX =
 function DeveloperPanel({ record }: { record: SuggestionRecord }) {
   const { developer, before_html } = record.result!;
   if ("options" in developer) {
+    const [first, second] = developer.options;
+    const norm = (v: string | null | undefined) => (v ?? "").replace(/\s+/g, " ").trim();
+    const sameCode =
+      !!first && !!second &&
+      norm(first.after_html) === norm(second.after_html) &&
+      norm(first.css) === norm(second.css);
+    const shownOptions = sameCode ? [first] : developer.options;
     // Two sequential choices share one saved Before, rather than a third
     // switcher: readers compare the smallest change with the nearby pattern
     // without hiding either check. The Before is scan evidence, never AI text.
@@ -428,8 +435,15 @@ function DeveloperPanel({ record }: { record: SuggestionRecord }) {
             </p>
           )}
         </div>
+        {/* When the model returns the same code twice, show it once and
+            say so, rather than two identical options that look like a
+            real choice (W3C COGA "Making Content Usable", paraphrase: no
+            duplicate content, https://www.w3.org/TR/coga-usable/). */}
+        {sameCode && (
+          <p className="text-sm text-fg-muted">The AI gave the same code for both options, so it is shown once.</p>
+        )}
         <ol className="list-none space-y-4">
-          {developer.options.map((option) => (
+          {shownOptions.map((option) => (
             <li key={option.kind} className="min-w-0 space-y-2">
               <p className="text-sm font-semibold text-fg">{SUGGESTION_OPTION_LABEL[option.kind]}</p>
               <div className="min-w-0">

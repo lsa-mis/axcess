@@ -776,3 +776,37 @@ async def test_guidance_always_comes_from_the_same_scan_not_answer_json(
         assert repo.to_record(conn, row).result.help_url is None
     finally:
         conn.close()
+
+
+async def test_answer_that_repeats_the_saved_code_is_not_shown(
+    seeded_db: tuple[Path, Path, int], enabled: None
+) -> None:
+    """Echoing the Before back as both options is a failed answer, not a fix."""
+    db_path, _, scan_id = seeded_db
+    finding = _add_finding(db_path, scan_id)
+    client = _client(seeded_db)
+    created = client.post(
+        f"/api/scans/{scan_id}/suggestions",
+        json={"occurrence_kind": "a11y", "occurrence_id": finding},
+    ).json()
+    conn = connect(db_path)
+    try:
+        bundle = context.build(
+            conn,
+            db_path.parent / "blobs",
+            scan_id=scan_id,
+            occurrence_kind="a11y",
+            occurrence_id=finding,
+        )
+    finally:
+        conn.close()
+    assert bundle.snippet
+    echo = json.loads(json.dumps(GOOD_ANSWER_V2))
+    for option in echo["developer"]["options"]:
+        option["after_html"] = "  " + bundle.snippet + "\n"
+        option["css"] = None
+    await _worker(seeded_db, FakeProvider(json.dumps(echo))).process_one()
+    done = client.get(f"/api/scans/{scan_id}/suggestions/{created['id']}").json()
+    assert done["status"] == "failed"
+    assert done["error_code"] == "no_change"
+    assert done["result"] is None

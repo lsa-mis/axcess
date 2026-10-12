@@ -148,6 +148,7 @@ export const SUGGESTION_ERROR_LABEL: Record<SuggestionErrorCode, string> = {
   model_unavailable: "The local AI service (Ollama) is not running. Start it, then try again.",
   model_missing: "The AI model is not installed in Ollama. Install it with ollama pull, then try again.",
   timeout: "The AI model took too long to answer. Try again when the computer is less busy.",
+  no_change: "The AI did not suggest a real change to the code, so nothing is shown. Try again, or choose a bigger AI model in Settings.",
   bad_answer: "The AI model gave an answer Axcess could not use safely, so it is not shown. Try again.",
   restarted: "Axcess restarted before the suggestion was finished. Try again.",
   occurrence_gone: "This occurrence is no longer in the report.",
