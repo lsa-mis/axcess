@@ -36,13 +36,23 @@ export function AiRuntimeControls({ setupPage = false }: { setupPage?: boolean }
     onError: () => setMessage("The AI service could not start. Try again or check AI settings."),
   });
   const reason = runtime.data?.reason;
+  // Your own Ollama: one plain sentence and no Start button, because the
+  // button could only reply that Axcess does not manage it. Rejected: the
+  // old three sentences plus a button that did nothing, which said the same
+  // fact three times (W3C COGA Making Content Usable,
+  // https://www.w3.org/TR/coga-usable/, paraphrased: keep text short and do
+  // not offer controls that cannot work).
+  if (reason === "system_ollama_not_managed") {
+    return <p className="mt-3 text-sm leading-6 text-fg">
+      Uses your own Ollama. Axcess does not start, stop or isolate it.
+    </p>;
+  }
   return <div className="mt-3 space-y-2 text-sm leading-6 text-fg">
     <p>{runtime.data?.running && runtime.data.isolated
       ? "AI service: isolated, local only"
       : reason ? AI_ISOLATION_REASON_LABEL[reason] ?? "AI service is not running."
         : runtime.isError ? "AI service status could not be loaded."
           : "AI service is not running."}</p>
-    <p>Axcess starts only its own private AI service. It does not start or stop your own Ollama.</p>
     <Button type="button" aria-disabled={start.isPending || undefined}
       onClick={() => { if (!start.isPending) start.mutate(); }}>
       Start AI service

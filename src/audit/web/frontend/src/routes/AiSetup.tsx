@@ -236,7 +236,7 @@ function AiSetupPage({
     <div className="mx-auto max-w-3xl">
       <PageHeader
         title="AI features"
-        subtitle="Optional. The AI runs on this computer."
+        subtitle="Optional. The AI suggests fixes and checks images and wording, on this computer."
       />
       <p
         role="status"
@@ -249,26 +249,24 @@ function AiSetupPage({
       </p>
 
       <div className="space-y-5">
+        {/* Facts first, short: one sentence on limits, three on privacy.
+            Rejected: the earlier two headings and four long bullets, which
+            repeated "on this computer" and buried the main point. Every
+            limitation and privacy fact is kept, said more simply (repo
+            plain-language rule; W3C COGA Making Content Usable,
+            https://www.w3.org/TR/coga-usable/, paraphrased: one idea per
+            chunk, short text). */}
         <Card className="space-y-2 border-l-4 border-l-umich-blue px-4 py-4 text-sm leading-6 text-fg">
-          <h2 className="font-semibold">What AI features do</h2>
           <p>
-            They suggest fixes for issues and can check images and wording
-            during a scan. A person still checks every result: the AI can be
-            wrong, and a scan never proves a site meets WCAG.
+            The AI can be wrong, so a person checks every result. A scan never
+            proves a site meets WCAG.
           </p>
-          <h2 className="pt-2 font-semibold">
-            What is downloaded, and what stays here
-          </h2>
           <ul className="list-disc space-y-1 pl-5">
             <li>
-              {`Axcess downloads its own Ollama program, version ${plan.program.version} (${plan.program.licence} licence), from GitHub. It checks the published checksum before using it.`}
+              {`Downloads: the Ollama program ${plan.program.version} (${plan.program.licence} licence) from GitHub and two models from the Ollama library. Axcess checks every file first.`}
             </li>
-            <li>Two AI models from the Ollama model library. Axcess checks each file before the isolated service reads it offline.</li>
-            <li>The AI service cannot connect to the internet. Downloads run separately, only after you choose them.</li>
-            <li>
-              Your reports, pages and screenshots are never sent anywhere. The
-              AI reads them on this computer.
-            </li>
+            <li>The private AI service cannot reach the internet.</li>
+            <li>Your reports, pages and screenshots are never sent anywhere.</li>
           </ul>
         </Card>
 
@@ -276,29 +274,12 @@ function AiSetupPage({
             <h2 className="font-semibold">{AI_FEATURE_STATE_LABEL[enabled ? "on" : "off"]}</h2>
             <p className="mt-2">
               {enabled
-                ? "AI fix suggestions are on when the local models are ready. AI checks during a scan stay off until you choose them for that scan."
+                ? "You can ask for fix suggestions. AI checks during a scan stay off until you turn them on for that scan."
                 : "No new AI suggestions or model checks run. Regular checks, reading text inside images (OCR), and saved results still work. Downloaded models are kept."}
             </p>
-            {current && <>
-            <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
-              <dt className="text-fg-muted">Size</dt>
-              <dd>{AI_TIER_LABEL[current.tier]}</dd>
-              <dt className="text-fg-muted">Text model</dt>
-              <dd className="break-all font-mono text-xs leading-6">
-                {current.text_model}
-              </dd>
-              <dt className="text-fg-muted">Image model</dt>
-              <dd className="break-all font-mono text-xs leading-6">
-                {current.vision_model}
-              </dd>
-              <dt className="text-fg-muted">Runs in</dt>
-              <dd>
-                {current.source === "system"
-                  ? "Your own Ollama on this computer"
-                  : "A private copy of Ollama that Axcess starts and stops"}
-              </dd>
-            </dl>
-            </>}
+            {current && <p className="mt-2">
+              {`Size: ${AI_TIER_LABEL[current.tier]}.`}
+            </p>}
             <AiRuntimeControls setupPage />
             {(enabled || current) && <Button
               className="mt-3"
@@ -315,8 +296,7 @@ function AiSetupPage({
               Turning AI on reuses these models. It does not download them again.
             </p>}
             {enabled && <p className="mt-2 text-fg-muted">
-              Turning AI off stops Axcess’s private Ollama, not an Ollama you started yourself.
-              Finish or stop current work before changing this setting.
+              Turning AI off keeps the models and stops only Axcess’s private AI service. Finish current work first.
             </p>}
           </Card>
 
@@ -332,7 +312,7 @@ function AiSetupPage({
               className="mt-1 text-xs leading-5 text-fg-muted"
             >
               {hardwareSentence(plan)} Bigger models give better answers but
-              need more memory and are slower to download.
+              need more memory.
             </p>
             <div className="mt-3 space-y-2">
               {plan.tiers.map((tier) => (
@@ -356,6 +336,30 @@ function AiSetupPage({
               </p>
             )}
           </fieldset>
+
+          {/* Model names and licences are for people who need them (an IT
+              check, say), so they sit one press away instead of in every
+              size option. Rejected: repeating two model lines inside each
+              option, which made the choice hard to scan. Native details and
+              summary give keyboard and screen-reader support for free (W3C
+              "Using ARIA", rule 1, https://www.w3.org/TR/using-aria/#rule1,
+              paraphrased); COGA, paraphrased: show the main choice first. */}
+          <details className="mt-3 text-xs leading-5 text-fg">
+            <summary className="min-h-target cursor-pointer content-center text-sm font-semibold">
+              Model names and licences
+            </summary>
+            <ul className="space-y-1">
+              {plan.tiers.map((tier) => (
+                <li key={tier.id} className="break-all">
+                  <span className="font-semibold">{AI_TIER_LABEL[tier.id]}:</span>{" "}
+                  text <span className="font-mono">{tier.text.tag}</span> (
+                  {licenceName(tier.text.licence)}), image{" "}
+                  <span className="font-mono">{tier.vision.tag}</span> (
+                  {licenceName(tier.vision.licence)})
+                </li>
+              ))}
+            </ul>
+          </details>
 
           {running && (
             <div className="mt-4">
@@ -529,21 +533,12 @@ function TierOption({
         {note}
       </span>
       <span id={`${id}-desc`} className="text-xs leading-5 text-fg-muted">
-        Needs {tier.min_memory_gb} GB of memory. Download:{" "}
-        {formatBytes(tier.download_bytes)}.
+        {tier.min_memory_gb} GB memory · {formatBytes(tier.download_bytes)} download.
         {tooSmall &&
           " This computer has less memory than this size needs, so it may be slow or fail."}
         {!tooSmall &&
           !tier.fits &&
           " There may not be enough free disk space for this size."}
-        <span className="mt-0.5 block break-all">
-          Text model: <span className="font-mono">{tier.text.tag}</span> (
-          {licenceName(tier.text.licence)})
-        </span>
-        <span className="block break-all">
-          Image model: <span className="font-mono">{tier.vision.tag}</span> (
-          {licenceName(tier.vision.licence)})
-        </span>
       </span>
     </label>
   );
