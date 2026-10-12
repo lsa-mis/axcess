@@ -1,5 +1,19 @@
 name: Deploy GitHub Pages
 
+# Publishes two copies of the public site in one deploy:
+#
+#   main            -> https://lsa-mis.github.io/axcess/          (live)
+#   STAGING_BRANCH  -> https://lsa-mis.github.io/axcess/staging/  (draft for testers)
+#
+# Why one run builds both: every Pages deploy replaces the whole site, and
+# the github-pages environment lets only main deploy. So the live copy is
+# rebuilt from main each time, exactly as before (site/ copied as-is), and
+# the draft is added under staging/. The live copy never depends on the
+# draft: a failed staging build is left out of the deploy, and the assemble
+# job stops the deploy if the draft would change any live file. Pushes to
+# the staging branch start this workflow through its staging-trigger.yml.
+# The staging branch's site/README.md explains the flow with a diagram.
+
 on:
   push:
     branches:
@@ -18,23 +32,134 @@ concurrency:
   group: pages
   cancel-in-progress: true
 
+env:
+  # The branch testers review at /axcess/staging/. Change it here and in
+  # staging-trigger.yml on that branch.
+  STAGING_BRANCH: website-refresh
+
 jobs:
-  build:
-    name: Prepare static site
+  build-live:
+    name: Prepare the live site
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
       - name: Stage public files
         run: |
           rsync -a --exclude build.py site/ _site/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site-live
+          path: _site
+          retention-days: 1
+
+  build-staging:
+    name: Build and test the staging site
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    # A broken draft must never block the live site.
+    continue-on-error: true
+    env:
+      AXCESS_SITE_BASE: /axcess/staging
+      AXCESS_SITE_STAGING: "1"
+    steps:
+      - name: Check that the staging branch exists
+        id: ref
+        run: |
+          if git ls-remote --exit-code --heads "https://github.com/${{ github.repository }}" "$STAGING_BRANCH" >/dev/null; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Branch $STAGING_BRANCH does not exist, so there is no staging copy this time."
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v4
+        if: steps.ref.outputs.found == 'true'
+        with:
+          ref: ${{ env.STAGING_BRANCH }}
+      - uses: astral-sh/setup-uv@v6
+        if: steps.ref.outputs.found == 'true'
+        with:
+          enable-cache: true
+          python-version: "3.13"
+      - uses: actions/setup-node@v4
+        if: steps.ref.outputs.found == 'true'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+      - name: Install locked dependencies
+        if: steps.ref.outputs.found == 'true'
+        run: |
+          uv sync --frozen --no-install-project
+          npm ci --prefix site
+      - name: Export coverage data, type-check and build
+        if: steps.ref.outputs.found == 'true'
+        env:
+          PYTHONPATH: src
+        run: |
+          uv run --no-sync python site/export_data.py
+          npm run check --prefix site
+          npm run build --prefix site
+      - name: Install Chromium
+        if: steps.ref.outputs.found == 'true'
+        run: uv run --no-sync playwright install --with-deps chromium
+      - name: Test the built site
+        if: steps.ref.outputs.found == 'true'
+        env:
+          PYTHONPATH: src
+          AXCESS_SITE_REQUIRED: "1"
+        run: uv run --no-sync pytest -p no:cacheprovider tests/public_site
+      - uses: actions/upload-artifact@v4
+        if: steps.ref.outputs.found == 'true'
+        with:
+          name: site-staging
+          path: site/dist
+          retention-days: 1
+
+  assemble:
+    name: Put the live and staging copies together
+    needs: [build-live, build-staging]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: site-live
+          path: live
+      - name: Get the staging copy, if it built
+        id: staging
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: site-staging
+          path: staging
+      - name: Assemble and check that the live files are untouched
+        run: |
+          if [ -e live/staging ]; then
+            echo "::error::The live site already has a staging/ path; the draft would overwrite it."
+            exit 1
+          fi
+          mkdir _site
+          cp -R live/. _site/
+          if [ "${{ steps.staging.outcome }}" = success ] && [ -n "$(ls -A staging 2>/dev/null)" ]; then
+            mkdir _site/staging
+            cp -R staging/. _site/staging/
+          else
+            echo "::warning::No staging copy in this deploy (it failed or was skipped). The live site is deployed as usual."
+          fi
+          # Byte-for-byte: the only difference allowed is the added staging/.
+          out=$(diff -r live _site || true)
+          if [ -n "$out" ] && [ "$out" != "Only in _site: staging" ]; then
+            echo "$out"
+            echo "::error::Assembling changed live files. Nothing was deployed."
+            exit 1
+          fi
+      - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
 
   deploy:
     name: Deploy
-    needs: build
+    needs: assemble
     runs-on: ubuntu-latest
     environment:
       name: github-pages
