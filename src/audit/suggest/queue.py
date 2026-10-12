@@ -178,10 +178,19 @@ class SuggestionWorker:
             # the image's stored facts rather than not at all.
             uses_vision = False
             raw = await self._generate(bundle, self._text_model, with_image=False)
-        answer = parse_answer(raw)
-        if not isinstance(answer, ModelAnswerV2):
-            raise SuggestionError("bad_answer", "The model did not return two code options.")
-        _reject_unchanged(answer, bundle.snippet)
+        model = choice.model if uses_vision else self._text_model
+        try:
+            answer = _accept(raw, bundle)
+        except SuggestionError as exc:
+            if exc.code not in _RETRYABLE:
+                raise
+            # One second try that says what was wrong. The same prompt at
+            # temperature 0 gives the same answer, so a plain repeat (or the
+            # person pressing "Try again") cannot fix it; a changed prompt can.
+            raw = await self._generate(
+                bundle, model, with_image=uses_vision, correction=_correction(exc)
+            )
+            answer = _accept(raw, bundle)
         outcome: Outcome = "not_checked"
         outcomes = await check_options(
             self._verifier, bundle.check_rule_id, answer.developer.options
@@ -210,9 +219,14 @@ class SuggestionWorker:
         return result, outcome, uses_vision
 
     async def _generate(
-        self, bundle: context.EvidenceBundle, model: str, *, with_image: bool
+        self,
+        bundle: context.EvidenceBundle,
+        model: str,
+        *,
+        with_image: bool,
+        correction: str | None = None,
     ) -> str:
-        prompt = build_prompt(bundle, with_image=with_image)
+        prompt = build_prompt(bundle, with_image=with_image, correction=correction)
         try:
             return await asyncio.wait_for(
                 self._provider.generate(
@@ -222,6 +236,34 @@ class SuggestionWorker:
             )
         except TimeoutError as exc:
             raise SuggestionError("timeout") from exc
+
+
+_RETRYABLE = frozenset({"bad_answer", "no_change"})
+
+
+def _accept(raw: str, bundle: context.EvidenceBundle) -> ModelAnswerV2:
+    answer = parse_answer(raw)
+    if not isinstance(answer, ModelAnswerV2):
+        raise SuggestionError("bad_answer", "The model did not return two code options.")
+    _reject_unchanged(answer, bundle.snippet)
+    return answer
+
+
+def _correction(exc: SuggestionError) -> str:
+    if exc.code == "no_change":
+        reason = "both options repeated the saved code without fixing the problem"
+    elif exc.detail and "could run" in exc.detail:
+        reason = (
+            "it contained code that could run, such as a javascript: link, an inline "
+            "event handler (on...=) or a script. Leave those parts out, even if the "
+            "saved page code has them"
+        )
+    else:
+        reason = "it was not in the expected JSON shape"
+    return (
+        f"Your previous answer was rejected because {reason}. "
+        "Write a new answer that follows every rule above."
+    )
 
 
 def _same_code(a: str | None, b: str | None) -> bool:

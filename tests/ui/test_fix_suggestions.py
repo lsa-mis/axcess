@@ -810,3 +810,81 @@ async def test_answer_that_repeats_the_saved_code_is_not_shown(
     assert done["status"] == "failed"
     assert done["error_code"] == "no_change"
     assert done["result"] is None
+
+
+class _SequenceProvider(FakeProvider):
+    """Returns each answer in turn, recording every prompt."""
+
+    def __init__(self, answers: list[str]) -> None:
+        super().__init__()
+        self.answers = answers
+
+    async def generate(self, prompt: str, *, model: str, image: bytes | None) -> str:
+        self.prompts.append(prompt)
+        self.models.append(model)
+        return self.answers[min(len(self.prompts), len(self.answers)) - 1]
+
+
+def _unsafe_v2() -> str:
+    answer = json.loads(json.dumps(GOOD_ANSWER_V2))
+    answer["developer"]["options"][1]["after_html"] = (
+        '<form action="javascript:void(0);"><label for="q">Search</label><input id="q"></form>'
+    )
+    return json.dumps(answer)
+
+
+async def test_rejected_answer_is_asked_again_once_with_the_reason(
+    seeded_db: tuple[Path, Path, int], enabled: None
+) -> None:
+    db_path, _, scan_id = seeded_db
+    finding = _add_finding(db_path, scan_id)
+    client = _client(seeded_db)
+    created = client.post(
+        f"/api/scans/{scan_id}/suggestions",
+        json={"occurrence_kind": "a11y", "occurrence_id": finding},
+    ).json()
+    provider = _SequenceProvider([_unsafe_v2(), json.dumps(GOOD_ANSWER_V2)])
+    await _worker(seeded_db, provider).process_one()
+    done = client.get(f"/api/scans/{scan_id}/suggestions/{created['id']}").json()
+    assert done["status"] == "ready"
+    assert len(provider.prompts) == 2
+    first, second = provider.prompts
+    assert "previous answer was rejected" not in first
+    # The reason is Axcess's own words, after the evidence, never scanned text.
+    tail = second.split("EVIDENCE>>>")[-1]
+    assert "previous answer was rejected because it contained code that could run" in tail
+    assert "jane@example.com" not in tail
+
+
+async def test_second_rejected_answer_still_fails_without_a_third_try(
+    seeded_db: tuple[Path, Path, int], enabled: None
+) -> None:
+    db_path, _, scan_id = seeded_db
+    finding = _add_finding(db_path, scan_id)
+    client = _client(seeded_db)
+    created = client.post(
+        f"/api/scans/{scan_id}/suggestions",
+        json={"occurrence_kind": "a11y", "occurrence_id": finding},
+    ).json()
+    provider = _SequenceProvider([_unsafe_v2()])
+    await _worker(seeded_db, provider).process_one()
+    done = client.get(f"/api/scans/{scan_id}/suggestions/{created['id']}").json()
+    assert done["status"] == "failed"
+    assert done["error_code"] == "bad_answer"
+    assert done["result"] is None
+    assert len(provider.prompts) == 2
+
+
+def test_runnable_saved_markup_is_defused_before_the_model_reads_it() -> None:
+    from audit.suggest.provider import _UNSAFE_MARKUP, defuse_markup
+
+    saved = (
+        '<form action="javascript:void(0);" onsubmit="go()">'
+        '<a href="JavaScript:x">a</a><script>evil()</script><input></form>'
+    )
+    out = defuse_markup(saved)
+    assert not _UNSAFE_MARKUP.search(out)
+    assert 'action="#removed-by-axcess"' in out
+    assert "data-removed-handler-submit=" in out
+    assert "evil()" not in out
+    assert "<input>" in out

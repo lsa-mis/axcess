@@ -252,7 +252,7 @@ in exports.
 | --- | --- |
 | A note that suggestions cannot run | Start Ollama, install the model, or run `make migrate`, as the note says. |
 | "The AI model took too long to answer" | Try again when no scan is running, or raise `AUDIT_SUGGESTION_TIMEOUT_S`. |
-| "An answer Axcess could not use safely" | Press **Try again**. If it keeps happening, try another model. |
+| "An answer Axcess could not show safely" or "did not suggest a real change" | Axcess already asked the model a second time, explaining what was wrong. Pressing **Try again** usually gives the same answer, so choose a bigger model in Settings, or fix it by hand with the rule guidance. |
 | "Axcess restarted before the suggestion was finished" | Press **Try again**. |
 
 ## Measuring the model

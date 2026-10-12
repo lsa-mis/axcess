@@ -17,6 +17,14 @@ Rules:
   contrast, change the colour in css; do not only copy the element.
 - Each after_html is a complete replacement for the same saved element,
   including any new label or wrapper it needs. Include CSS only if needed.
+  Do not copy unrelated sibling elements.
+- If a label uses for="...", the field must have the same id. If the field
+  has no id, add one. Never point a label at an id that does not exist.
+- If the saved code has a javascript: link, an inline event handler
+  (on...=) or a script, leave that part out of your code. Do not copy it.
+- If the class names show the markup is made by a library or tool (for
+  example a search widget), say in manual_check_reason that the change may
+  belong in that tool's settings or template instead.
 - change_sentence is ONE precise sentence saying what to change and how,
   at most 25 words and 240 characters. Do not repeat the issue description.
 - Never supply guidance links or check results. Axcess adds these itself.

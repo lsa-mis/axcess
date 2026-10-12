@@ -40,6 +40,22 @@ _UNSAFE_MARKUP = re.compile(
 )
 
 
+# Small models copy parent markup verbatim, so a site's own
+# `action="javascript:void(0)"` would make every answer fail the safety
+# check above. Runnable parts of saved markup are swapped for visible
+# placeholders before the model reads them; the Before shown to people is
+# the untouched saved copy.
+_SCRIPT_BLOCK = re.compile(r"<\s*script\b.*?(<\s*/\s*script\s*>|$)", re.IGNORECASE | re.DOTALL)
+_JS_URL = re.compile(r"javascript\s*:[^\"'>\s]*", re.IGNORECASE)
+_HANDLER = re.compile(r"\bon([a-z]+)(\s*=)", re.IGNORECASE)
+
+
+def defuse_markup(html: str) -> str:
+    html = _SCRIPT_BLOCK.sub("<!-- script removed by Axcess -->", html)
+    html = _JS_URL.sub("#removed-by-axcess", html)
+    return _HANDLER.sub(r"data-removed-handler-\1\2", html)
+
+
 class SuggestionError(Exception):
     def __init__(self, code: ErrorCode, detail: str | None = None) -> None:
         super().__init__(detail or code)
@@ -61,7 +77,9 @@ def _neutralise(text: str) -> str:
     return text.replace(_EVIDENCE_CLOSE, "EVIDENCE>>]").replace(_EVIDENCE_OPEN, "<<[EVIDENCE")
 
 
-def build_prompt(bundle: EvidenceBundle, *, with_image: bool = True) -> str:
+def build_prompt(
+    bundle: EvidenceBundle, *, with_image: bool = True, correction: str | None = None
+) -> str:
     lines = [prompt_text().strip()]
     evidence = [
         f"Issue: {bundle.issue_title}",
@@ -77,9 +95,11 @@ def build_prompt(bundle: EvidenceBundle, *, with_image: bool = True) -> str:
     if bundle.selector:
         evidence.append(f"Element locator (CSS selector): {bundle.selector}")
     if bundle.snippet:
-        evidence.append(f"Element markup:\n{bundle.snippet}")
+        evidence.append(f"Element markup:\n{defuse_markup(bundle.snippet)}")
     if bundle.nearby_html:
-        evidence.append(f"Nearby and parent markup (saved copy):\n{bundle.nearby_html}")
+        evidence.append(
+            f"Nearby and parent markup (saved copy):\n{defuse_markup(bundle.nearby_html)}"
+        )
     if bundle.page_css:
         evidence.append(f"Saved page styles (partial):\n{bundle.page_css}")
     for label, value in bundle.image_facts.items():
@@ -87,6 +107,9 @@ def build_prompt(bundle: EvidenceBundle, *, with_image: bool = True) -> str:
     if bundle.nearby_text:
         evidence.append(f"Text near the element: {bundle.nearby_text}")
     lines += ["", _EVIDENCE_OPEN, _neutralise("\n".join(evidence)), _EVIDENCE_CLOSE, ""]
+    if correction:
+        # Axcess's own words about the rejected answer, never scanned text.
+        lines += [correction, ""]
     lines.append("Reply with the JSON object only.")
     return "\n".join(lines)
 
