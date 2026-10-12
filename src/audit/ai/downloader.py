@@ -29,7 +29,7 @@ class Manifest(BaseModel):
 
 
 def model_path(models: Path, tag: str) -> tuple[Path, str, str]:
-    match = re.fullmatch(r"([a-zA-Z0-9_-]+):([a-zA-Z0-9_.-]+)", tag)
+    match = re.fullmatch(r"([a-zA-Z0-9][a-zA-Z0-9_.-]*):([a-zA-Z0-9][a-zA-Z0-9_.-]*)", tag)
     if match is None:
         raise RuntimeSetupError("The AI model name is not supported by the private downloader.")
     name, version = match.groups()

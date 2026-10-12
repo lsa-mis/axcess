@@ -13,7 +13,7 @@ import httpx
 import pytest
 
 from audit.ai.catalog import load_catalog
-from audit.ai.downloader import download_model, model_present
+from audit.ai.downloader import download_model, model_path, model_present
 from audit.ai.manager import AIManager
 from audit.ai.runtime import OllamaRuntime
 from audit.ai.sandbox import IsolationError, Sandbox, build_sandbox, macos_profile
@@ -126,6 +126,21 @@ def test_downloader_imports_checksum_verified_offline_model_without_pull(tmp_pat
     assert seen == []
 
 
+@pytest.mark.parametrize(
+    "tag",
+    [model.tag for tier in load_catalog().tiers for model in (tier.text, tier.vision)],
+)
+def test_downloader_supports_every_catalog_model(tmp_path, tag) -> None:
+    client, seen = registry_client(b"a model!")
+    download_model(tmp_path, tag, lambda d, t: None, threading.Event(), client)
+    assert model_present(tmp_path, tag)
+    name, version = tag.split(":")
+    path, parsed_name, parsed_version = model_path(tmp_path, tag)
+    assert (parsed_name, parsed_version) == (name, version)
+    assert path == tmp_path / "manifests/registry.ollama.ai/library" / name / version
+    assert seen[0][1] == f"https://registry.ollama.ai/v2/library/{name}/manifests/{version}"
+
+
 @pytest.mark.parametrize("wrong_manifest,wrong_blob", [(True, False), (False, True)])
 def test_downloader_rejects_wrong_checksums(tmp_path, wrong_manifest, wrong_blob) -> None:
     client, _ = registry_client(b"a model!", wrong_blob=wrong_blob, wrong_manifest=wrong_manifest)
@@ -136,7 +151,16 @@ def test_downloader_rejects_wrong_checksums(tmp_path, wrong_manifest, wrong_blob
 
 
 @pytest.mark.parametrize(
-    "tag", ["../escape:test", "https://outside/model:test", "text:../../escape"]
+    "tag",
+    [
+        "../escape:test",
+        "https://outside/model:test",
+        "text:../../escape",
+        "..:test",
+        "text:..",
+        ".:test",
+        "text:.",
+    ],
 )
 def test_downloader_rejects_paths_and_external_registry_names(tmp_path, tag) -> None:
     with pytest.raises(Exception, match="model name"):
