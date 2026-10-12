@@ -447,3 +447,36 @@ async def test_start_ai_service_then_writes_the_suggestion(
         assert started == [{"confirm": True}]
     finally:
         await page.context.close()
+
+
+@pytest.mark.parametrize("suggest_server", ["slow"], indirect=True)
+@pytest.mark.parametrize("stay", [True, False], ids=["stays", "browses_on"])
+async def test_ready_answer_takes_focus_only_if_person_waited(
+    suggest_server: tuple[str, int, int, int], new_page: Any, stay: bool
+) -> None:
+    base, scan_id, page_id, finding_id = suggest_server
+    page = await new_page()
+    try:
+        await page.goto(f"{base}/app/scans/{scan_id}/pages/{page_id}", wait_until="networkidle")
+        card = page.locator(f"#finding-{finding_id}")
+        await card.get_by_role("button", name="Suggest a fix (AI)").focus()
+        await page.keyboard.press("Enter")
+        heading = card.get_by_role("heading", name="AI suggestion")
+        await heading.wait_for()
+        elsewhere = page.get_by_role("link").first
+        if not stay:
+            await elsewhere.focus()
+        lead = card.get_by_text("Add a label linked to the search field by its existing id.")
+        await lead.wait_for(timeout=15000)
+        # The fix sentence leads in larger, bold text than the code labels.
+        size = await lead.evaluate("el => parseFloat(getComputedStyle(el).fontSize)")
+        label = await card.get_by_text("Before", exact=True).evaluate(
+            "el => parseFloat(getComputedStyle(el).fontSize)"
+        )
+        assert size > label
+        assert int(await lead.evaluate("el => getComputedStyle(el).fontWeight")) >= 600
+        await page.wait_for_timeout(300)
+        target = lead if stay else elsewhere
+        assert await target.evaluate("el => el === document.activeElement")
+    finally:
+        await page.context.close()

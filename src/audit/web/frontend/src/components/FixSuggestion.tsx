@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { type RefObject, useEffect, useId, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronRight, CircleCheck, CircleHelp, CircleX, Copy, Sparkles } from "lucide-react";
 import { ApiError, api } from "../api/client";
@@ -50,8 +50,17 @@ import { Button, Card, ExternalLinkButton, LinkButton, relativeTime } from "./ui
  * clicked, so its focus would fall to the page body. Focus moves to the
  * "AI suggestion" heading instead, which is the start of the new content
  * (SC 2.4.3 Focus Order, Level A). Status changes are announced through one
- * polite live region (SC 4.1.3 Status Messages, Level AA), never by moving
- * focus a second time while someone is reading.
+ * polite live region (SC 4.1.3 Status Messages, Level AA). When the answer
+ * the person asked for becomes ready, focus moves once more, to the lead
+ * fix sentence (or the heading when there is none), so they land on the
+ * answer instead of hunting for it. That move happens only while focus is
+ * still inside this panel or has fallen to the page body: someone who went
+ * on browsing other issues keeps their place, as the waiting text promises.
+ * Rejected: always moving focus on ready, which would pull a person away
+ * from whatever they are reading (SC 3.2.1 On Focus and SC 3.2.2 On Input,
+ * Level A, paraphrased: no change of context the person did not start), and
+ * never moving it, which left keyboard and screen-reader users at a status
+ * line above a long answer.
  *
  * **Views.** Developer / editor use the shared `Tabs` in `filter` mode,
  * toggle buttons with `aria-pressed`, not an ARIA tablist; the `Tabs`
@@ -105,6 +114,9 @@ export default function FixSuggestion({
   const panelId = useId();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const focusHeading = useRef(false);
+  const sectionRef = useRef<HTMLElement>(null);
+  const leadRef = useRef<HTMLParagraphElement>(null);
+  const lastStatus = useRef<SuggestionRecord["status"] | null>(null);
   const queryKey = ["suggestion", scanId, kind, occurrenceId];
 
   const { data: record, error: loadError } = useQuery({
@@ -156,6 +168,19 @@ export default function FixSuggestion({
     }
   });
 
+  // Lands on the answer once it arrives, only if the person is still here.
+  useEffect(() => {
+    const status = record?.status ?? null;
+    const was = lastStatus.current;
+    lastStatus.current = status;
+    if (status !== "ready" || (was !== "queued" && was !== "running")) return;
+    const active = document.activeElement;
+    const stillHere =
+      !active || active === document.body || !!sectionRef.current?.contains(active);
+    if (!stillHere) return;
+    (leadRef.current ?? headingRef.current)?.focus();
+  }, [record?.status]);
+
   const actionError = ask.error ?? stop.error;
   const errorText = actionError
     ? actionError instanceof ApiError
@@ -197,6 +222,7 @@ export default function FixSuggestion({
 
   return (
     <section
+      ref={sectionRef}
       aria-labelledby={headingId}
       className="mt-4 rounded-xs border border-l-4 border-border border-l-umich-blue bg-umich-blue/5 p-3"
     >
@@ -281,6 +307,7 @@ export default function FixSuggestion({
           scanId={scanId}
           record={record}
           panelId={panelId}
+          leadRef={leadRef}
           onSettle={settle}
           onAskAgain={() => ask.mutate()}
           asking={ask.isPending}
@@ -321,6 +348,7 @@ function ReadySuggestion({
   scanId,
   record,
   panelId,
+  leadRef,
   onSettle,
   onAskAgain,
   asking,
@@ -329,6 +357,7 @@ function ReadySuggestion({
   scanId: number;
   record: SuggestionRecord;
   panelId: string;
+  leadRef: RefObject<HTMLParagraphElement | null>;
   onSettle: (next: SuggestionRecord) => void;
   onAskAgain: () => void;
   asking: boolean;
@@ -362,7 +391,7 @@ function ReadySuggestion({
 
       <div id={panelId}>
         {audience === "developer" ? (
-          <DeveloperPanel record={record} />
+          <DeveloperPanel record={record} leadRef={leadRef} />
         ) : (
           <EditorPanel record={record} />
         )}
@@ -407,7 +436,10 @@ function ReadySuggestion({
 const CODE_BOX =
   "mt-1 whitespace-pre-wrap break-words rounded-2xs border border-border bg-surface-muted px-2 py-1.5 font-mono text-xs text-fg";
 
-function DeveloperPanel({ record }: { record: SuggestionRecord }) {
+function DeveloperPanel({ record, leadRef }: {
+  record: SuggestionRecord;
+  leadRef?: RefObject<HTMLParagraphElement | null>;
+}) {
   const { developer, before_html } = record.result!;
   if ("options" in developer) {
     const [first, second] = developer.options;
@@ -426,7 +458,17 @@ function DeveloperPanel({ record }: { record: SuggestionRecord }) {
     // Relationships (Level A), SC 1.4.10 Reflow (Level AA).
     return (
       <div className="min-w-0 space-y-3">
-        <p className="text-sm leading-relaxed text-fg">{developer.change_sentence}</p>
+        {/* The one-sentence fix leads, larger and bold, so it is the first
+            thing seen and read; the code below is the detail. Rejected: the
+            same small size as the code labels, which made the answer easy
+            to skip. It is the focus target when an answer arrives (see
+            Focus above). W3C COGA "Making Content Usable", paraphrased:
+            put the most important information first and make it stand
+            out, https://www.w3.org/TR/coga-usable/; WCAG 2.2 SC 1.3.1 Info
+            and Relationships, Level A (weight and size, with the order). */}
+        <p ref={leadRef} tabIndex={-1} className="text-base font-semibold leading-snug text-fg sm:text-lg">
+          {developer.change_sentence}
+        </p>
         <div className="min-w-0">
           <p className="text-2xs font-semibold text-fg-subtle">Before</p>
           {before_html ? <pre className={CODE_BOX}>{before_html}</pre> : (
