@@ -219,23 +219,17 @@
     outline: 3px solid rgb(var(--c-umich-blue));
     outline-offset: 2px;
   }
-  /* Room for the sticky top bar (72 px), and on narrow screens the report
-     bar that sticks under it (53 px), when the page scrolls to a focused
-     element or a #link, plus 16 px to spare. Without it, tabbing could
+  /* Room for the sticky top bar (72 px), the only sticky bar at every
+     width, when the page scrolls to a focused element or a #link, plus
+     16 px to spare. Without it, tabbing could
      leave a control half under the bar, as on Images ("Back to Report",
      "Group by issue"). SC 2.4.11 Focus Not Obscured (Minimum), Level AA,
      and SC 2.4.12 Focus Not Obscured (Enhanced), Level AAA; October 2026
-     AAA audit. The report bar has content only on a report's screens, so
-     its height is reserved only while it holds a link: reserving it
-     everywhere scrolled a focused table on Reports too far down. The
-     breakpoint is the report bar's own (md, 768 px). */
+     AAA audit. (Narrow screens once had a second sticky bar for the
+     report trail, with room reserved for it; the trail is now in the top
+     bar, as on a desktop.) */
   html {
     scroll-padding-top: 88px;
-  }
-  @media (max-width: 767px) {
-    html:has([data-sticky-crumb] a) {
-      scroll-padding-top: 141px;
-    }
   }
   a {
     @apply text-umich-blue underline-offset-2;

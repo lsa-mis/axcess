@@ -60,7 +60,11 @@ async def test_report_links_and_review_lanes(
     await page.goto(f"{base}/app/scans/{scan_id}", wait_until="networkidle")
     await page.wait_for_url(f"**/app/scans/{scan_id}/issues")
     crumb = page.get_by_role("navigation", name="Breadcrumb").filter(visible=True)
-    reports = crumb.get_by_role("link", name="Reports", exact=True)
+    # On a phone the trail is only the step up, a back link named "Back to
+    # Reports" (ReportCrumb's compact form); on a wider screen, "Reports".
+    reports = crumb.get_by_role(
+        "link", name="Back to Reports" if width < 640 else "Reports", exact=True
+    )
     await reports.focus()
     assert await reports.evaluate("el => getComputedStyle(el).textDecorationLine") == "underline"
     assert await reports.evaluate("el => el.getBoundingClientRect().height") >= 44
@@ -1248,13 +1252,18 @@ async def test_actual_comparison_links_reach_the_issue(
         page.get_by_role("navigation", name="Breadcrumb").filter(visible=True)
     ).to_contain_text("Compare reports")
     items = await _breadcrumb(page)
-    assert [item["text"] for item in items][:3] == [
-        "Reports",
-        f"example.com Report #{new}",
-        "Compare reports",
-    ], items
-    assert items[2]["link"] and items[2]["link"].startswith(f"/app/scans/{new}/compare"), items
-    _assert_current_is_plain_text(items)
+    if width < 640:
+        # On a phone only the step up shows: back to the comparison.
+        assert [item["text"] for item in items] == ["Back to Compare reports"], items
+        assert items[0]["link"] and items[0]["link"].startswith(f"/app/scans/{new}/compare"), items
+    else:
+        assert [item["text"] for item in items][:3] == [
+            "Reports",
+            f"example.com Report #{new}",
+            "Compare reports",
+        ], items
+        assert items[2]["link"] and items[2]["link"].startswith(f"/app/scans/{new}/compare"), items
+        _assert_current_is_plain_text(items)
 
 
 async def test_crumbs_stay_on_one_line_and_cut_the_longest_first(

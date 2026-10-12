@@ -18,7 +18,7 @@ import { FEEDBACK_FORM_URL } from "../lib/scanCopy";
 import { Button, LinkButton } from "./ui";
 import BrandMark from "./BrandMark";
 import CommandPalette from "./CommandPalette";
-import ReportCrumb, { reportRouteMatch } from "./ReportCrumb";
+import ReportCrumb, { reportRouteMatch, useReportTrail } from "./ReportCrumb";
 import { useScrollRestoration } from "../hooks/useScrollRestoration";
 import { useSwipeNavigation } from "../hooks/useSwipeNavigation";
 import { setPreference, usePreferences } from "../hooks/usePreferences";
@@ -215,13 +215,6 @@ export default function AppShell({ children }: { children: ReactNode }) {
           {mobileNavOpen && (
             <MobileNav pathname={pathname} onSearch={() => setCommandOpen(true)} />
           )}
-          {/* Sticky with the bar above it. Left in the scroll flow it slid
-              under the sticky top bar, and a crumb that is half-covered is a
-              target a thumb cannot reliably hit (SC 2.5.8) — it either sits
-              fully above the content or it does not show at all. */}
-          <div data-sticky-crumb className="sticky top-[72px] z-10 border-b border-border bg-surface px-2 py-1 md:hidden">
-            <ReportCrumb />
-          </div>
           <div className="sr-only" aria-live="polite">
             {routeLabel} page loaded
           </div>
@@ -308,7 +301,16 @@ const SIDEBAR_ROW_ACTIVE =
  * and W3C COGA, "Making Content Usable" (https://www.w3.org/TR/coga-usable/):
  * the same control for the same job, everywhere.
  */
-function NewScanAction({ iconOnly, className }: { iconOnly: boolean; className?: string }) {
+function NewScanAction({
+  iconOnly,
+  className,
+  labelClassName,
+}: {
+  iconOnly: boolean;
+  className?: string;
+  /** Classes for the "New scan" word, e.g. to show it only from a width up. */
+  labelClassName?: string;
+}) {
   const { pathname } = useLocation();
   const onNewScanForm = pathname === "/scans/new";
   return (
@@ -325,23 +327,40 @@ function NewScanAction({ iconOnly, className }: { iconOnly: boolean; className?:
       <Plus className="h-5 w-5 shrink-0" aria-hidden />
       {/* "New scan" fits half the sidebar; the accessible name and tooltip
           keep the full phrase, which contains these words (SC 2.5.3). */}
-      {!iconOnly && <span>New scan</span>}
+      {!iconOnly && <span className={labelClassName}>New scan</span>}
     </LinkButton>
   );
 }
 
-function SearchAction({ collapsed, onSearch }: { collapsed: boolean; onSearch: () => void }) {
+function SearchAction({
+  collapsed,
+  onSearch,
+  className,
+}: {
+  collapsed: boolean;
+  onSearch: () => void;
+  className?: string;
+}) {
   return (
     <Button
       type="button"
       variant="secondary"
       onClick={onSearch}
-      aria-label="Search everything (Cmd+K)"
       title="Search everything (Cmd/Ctrl+K)"
-      className={SIDEBAR_TILE}
+      className={cn(SIDEBAR_TILE, className)}
     >
       <Search className="h-5 w-5 shrink-0" aria-hidden />
-      {!collapsed && <span>Search</span>}
+      {/* The name is real text, the visible word and the rest in
+          screen-reader-only text (WCAG technique C7), not an aria-label
+          (repo rule: Interface language rule 8). Collapsed, all of it is
+          screen-reader-only. */}
+      {collapsed ? (
+        <span className="sr-only">Search everything (Cmd+K)</span>
+      ) : (
+        <span>
+          Search<span className="sr-only"> everything (Cmd+K)</span>
+        </span>
+      )}
     </Button>
   );
 }
@@ -352,12 +371,18 @@ function FeedbackAction({ collapsed }: { collapsed: boolean }) {
       href={FEEDBACK_FORM_URL}
       target="_blank"
       rel="noopener noreferrer"
-      aria-label="Give feedback (opens in a new tab)"
       title="Give feedback (opens in a new tab)"
       className={cn(SIDEBAR_ROW, SIDEBAR_ROW_IDLE, collapsed ? "justify-center px-2" : "px-3")}
     >
       <MessageSquarePlus className="h-5 w-5 shrink-0" aria-hidden />
-      {!collapsed && <span>Give feedback</span>}
+      {/* Real text, as Search's (see there). */}
+      {collapsed ? (
+        <span className="sr-only">Give feedback (opens in a new tab)</span>
+      ) : (
+        <span>
+          Give feedback<span className="sr-only"> (opens in a new tab)</span>
+        </span>
+      )}
     </a>
   );
 }
@@ -407,6 +432,34 @@ function FootLink({
   );
 }
 
+/** One of the places in NAV, as a sidebar row; the narrow-screen menu uses the same row. */
+function NavRow({ item, collapsed, active }: { item: NavItem; collapsed: boolean; active: boolean }) {
+  const Icon = item.icon;
+  return (
+    <Link
+      to={item.to}
+      aria-current={active ? "page" : undefined}
+      title={collapsed ? item.label : undefined}
+      aria-label={collapsed ? item.label : undefined}
+      // min-h-target keeps every nav row at 44px for SC 2.5.5,
+      // and the slightly larger icon (h-5) plus base text reads
+      // as a primary surface, not a sub-list of links.
+      className={cn(
+        SIDEBAR_ROW,
+        collapsed ? "justify-center px-2" : "px-3",
+        active ? SIDEBAR_ROW_ACTIVE : SIDEBAR_ROW_IDLE,
+      )}
+    >
+      <Icon className="h-5 w-5 shrink-0" aria-hidden />
+      {!collapsed && <span>{item.label}</span>}
+    </Link>
+  );
+}
+
+/** The sidebar's fill, a light neutral ramp; the narrow-screen menu wears it too. */
+const SIDEBAR_FILL =
+  "bg-[linear-gradient(180deg,rgb(var(--c-sidebar-1))_0%,rgb(var(--c-sidebar-2))_52%,rgb(var(--c-sidebar-3))_100%)]";
+
 function Sidebar({
   collapsed,
   onToggle,
@@ -427,7 +480,8 @@ function Sidebar({
         // uses the standard foreground ramp rather than the inverse one: at the
         // darkest stop (#E6EBF2) `fg` is 14.8:1 and `fg-muted` 8.6:1, both AAA.
         // `fg-subtle` would fall to 6.6:1 here, so it is deliberately not used.
-        "sticky top-0 hidden h-screen shrink-0 flex-col overflow-y-auto border-r border-border bg-[linear-gradient(180deg,rgb(var(--c-sidebar-1))_0%,rgb(var(--c-sidebar-2))_52%,rgb(var(--c-sidebar-3))_100%)] text-fg shadow-[8px_0_30px_rgba(0,39,76,0.05)] transition-[width] duration-150 md:flex",
+        "sticky top-0 hidden h-screen shrink-0 flex-col overflow-y-auto border-r border-border text-fg shadow-[8px_0_30px_rgba(0,39,76,0.05)] transition-[width] duration-150 md:flex",
+        SIDEBAR_FILL,
         collapsed ? "w-16" : "w-64",
       )}
       aria-label="Primary"
@@ -497,31 +551,11 @@ function Sidebar({
       </div>
       <nav className={cn("flex-1 pb-5 pt-4", collapsed ? "px-2" : "px-3")}>
         <ul className="space-y-1">
-          {NAV.map((item) => {
-            const Icon = item.icon;
-            const active = item.isActive(pathname);
-            return (
-              <li key={item.to}>
-                <Link
-                  to={item.to}
-                  aria-current={active ? "page" : undefined}
-                  title={collapsed ? item.label : undefined}
-                  aria-label={collapsed ? item.label : undefined}
-                  // min-h-target keeps every nav row at 44px for SC 2.5.5,
-                  // and the slightly larger icon (h-5) plus base text reads
-                  // as a primary surface, not a sub-list of links.
-                  className={cn(
-                    SIDEBAR_ROW,
-                    collapsed ? "justify-center px-2" : "px-3",
-                    active ? SIDEBAR_ROW_ACTIVE : SIDEBAR_ROW_IDLE,
-                  )}
-                >
-                  <Icon className="h-5 w-5 shrink-0" aria-hidden />
-                  {!collapsed && <span>{item.label}</span>}
-                </Link>
-              </li>
-            );
-          })}
+          {NAV.map((item) => (
+            <li key={item.to}>
+              <NavRow item={item} collapsed={collapsed} active={item.isActive(pathname)} />
+            </li>
+          ))}
         </ul>
       </nav>
       <div className={cn("space-y-1 border-t border-border py-3", collapsed ? "px-2" : "px-3")}>
@@ -551,14 +585,29 @@ function TopBar({
   mobileNavOpen: boolean;
   onToggleMobileNav: () => void;
 }) {
+  const { match: inReport } = useReportTrail();
   return (
     <header
       className="sticky top-0 z-20 flex h-[72px] items-center gap-4 border-b border-border bg-surface/95 px-4 shadow-[0_1px_0_rgba(0,39,76,0.03)] backdrop-blur sm:px-6 lg:px-8"
       role="banner"
     >
-      {/* Mobile brand, the sidebar (which carries the brand on desktop)
-          is hidden below md, so the topbar shows it instead. */}
-      <div className="flex min-w-0 items-center gap-1.5 text-xl text-fg-muted md:hidden">
+      {/* Below md, one line: the menu button, then where you are, then New
+          scan. Inside a report "where you are" is the trail, as on a
+          desktop, where the trail is in this bar too; elsewhere it is the
+          logo, which the hidden sidebar carries on a desktop. The trail
+          used to be a second sticky bar under this one, 53 px more of a
+          phone's height held over the page on every report screen, and on
+          other screens an empty 9 px strip; one bar keeps the page's room
+          for the page (W3C COGA, "Making Content Usable",
+          https://www.w3.org/TR/coga-usable/: keep the layout simple and the
+          same; SC 1.4.10 Reflow, Level AA, asks that content not need two
+          scroll directions at 320 px, and a tall sticky header eats the
+          one direction left). Rejected: the logo and the trail together,
+          which left the trail too little width at 320 px to name the
+          report. The trail fits itself to the room it has (ReportCrumb
+          cuts the longest crumb first). The trail is the same component
+          as the desktop's, so it reads the same. */}
+      <div className="flex min-w-0 flex-1 items-center gap-1.5 text-xl text-fg-muted md:hidden">
         {/* eslint-disable-next-line react/forbid-elements -- Keep: the top bar's menu control, styled with the shell */}
         <button
           type="button"
@@ -578,11 +627,23 @@ function TopBar({
             <Menu className="h-5 w-5" aria-hidden />
           )}
         </button>
-        <BrandMark className="h-8 w-8 text-xs" />
-        {/* The same logo as the sidebar's (see there). */}
-        <span className="hidden font-brand font-bold leading-tight text-fg sm:inline">
-          axcess
-        </span>
+        {inReport ? (
+          <div className="min-w-0 flex-1">
+            {/* Below 640 px only the step up fits (ReportCrumb says why). */}
+            <div className="sm:hidden">
+              <ReportCrumb compact />
+            </div>
+            <div className="hidden sm:block">
+              <ReportCrumb />
+            </div>
+          </div>
+        ) : (
+          <>
+            <BrandMark className="h-8 w-8 text-xs" />
+            {/* The same logo as the sidebar's (see there). */}
+            <span className="font-brand font-bold leading-tight text-fg">axcess</span>
+          </>
+        )}
       </div>
       {/* flex-1: the trail's room is the bar's, not its own content's. The
           crumbs are cut to fit this width, so a width that followed them
@@ -590,83 +651,61 @@ function TopBar({
       <div className="hidden min-w-0 flex-1 md:block">
         <ReportCrumb />
       </div>
+      {/* The same New scan button as the sidebar's, word and all, at every
+          width: a plus sign alone said less than the button everywhere
+          else, and words are what people know (W3C COGA, "Making Content
+          Usable"; repo rule: Interface language rule 8). The trail and the
+          logo give up the width it takes. */}
       <div className="ml-auto flex shrink-0 items-center gap-2 md:hidden">
-        <NewScanAction iconOnly />
+        <NewScanAction iconOnly={false} />
       </div>
     </header>
   );
 }
 
-/** The sidebar's stand-in below md: the same places, then search, about, settings and feedback. */
+/**
+ * The sidebar's stand-in below md, built from the sidebar's own parts in the
+ * sidebar's order and look: Search, then the places (Reports), then, after a
+ * line, Give feedback, About and Settings. One column, each row the full
+ * width and 44 px tall, the label after its icon at the left edge, the
+ * current place the same white card with a bar as in the sidebar.
+ *
+ * It was a navy panel of its own: Reports alone in a three-column grid,
+ * then Search, About, Settings and Give feedback in a two-column grid with
+ * centred labels. The same navigation looked different on a phone and on a
+ * desktop, in a different order (SC 3.2.3 Consistent Navigation and SC
+ * 3.2.4 Consistent Identification, both Level AA; W3C COGA, "Making Content
+ * Usable", https://www.w3.org/TR/coga-usable/: the same control for the
+ * same job, everywhere), centred labels in a grid were harder to scan than
+ * a list down one edge, and Search and Give feedback took their names from
+ * an aria-label. Built from the same parts (SearchAction, NavRow,
+ * FeedbackAction, FootLink), the two cannot drift apart again. New scan is
+ * not repeated here: it is the + button in the top bar, always in view.
+ */
 function MobileNav({ pathname, onSearch }: { pathname: string; onSearch: () => void }) {
-  const action =
-    "flex min-h-target items-center justify-center gap-2 rounded-xs px-2 py-2 text-sm font-semibold text-fg-inverse no-underline hover:bg-white/10";
   return (
     <div
       id="mobile-primary-nav"
-      className="border-b border-border bg-umich-blue p-2 text-fg-inverse shadow-card md:hidden"
+      className={cn("border-b border-border px-3 py-3 text-fg shadow-card md:hidden", SIDEBAR_FILL)}
     >
-      <nav aria-label="Primary">
-        <ul className="grid grid-cols-3 gap-1">
-          {NAV.map((item) => {
-            const Icon = item.icon;
-            const active = item.isActive(pathname);
-            return (
-              <li key={item.to}>
-                <Link
-                  to={item.to}
-                  aria-current={active ? "page" : undefined}
-                  className={cn(
-                    "flex min-h-target items-center justify-center gap-2 rounded-xs px-2 py-2 text-sm font-semibold no-underline",
-                    active
-                      ? "bg-surface text-umich-blue"
-                      : "text-fg-inverse hover:bg-white/10",
-                  )}
-                >
-                  <Icon className="h-4 w-4" aria-hidden />
-                  <span>{item.label}</span>
-                </Link>
-              </li>
-            );
-          })}
+      {/* Full width here, so its icon and word start where the rows' do,
+          not centred: one edge to read down (the sidebar centres them in
+          its half-width tile). */}
+      <SearchAction collapsed={false} onSearch={onSearch} className="justify-start gap-3 px-3" />
+      <nav aria-label="Primary" className="pt-3">
+        <ul className="space-y-1">
+          {NAV.map((item) => (
+            <li key={item.to}>
+              <NavRow item={item} collapsed={false} active={item.isActive(pathname)} />
+            </li>
+          ))}
         </ul>
       </nav>
-      <div className="mt-1 grid grid-cols-2 gap-1 border-t border-white/20 pt-1">
-        {/* eslint-disable-next-line react/forbid-elements -- Keep: the sidebar's own control on its dark background */}
-        <button
-          type="button"
-          onClick={onSearch}
-          aria-label="Search everything (Cmd+K)"
-          className={action}
-        >
-          <Search className="h-4 w-4" aria-hidden />
-          <span>Search</span>
-        </button>
-        {FOOT_PLACES.map((place) => {
-          const Icon = place.icon;
-          const active = pathname === place.to;
-          return (
-            <Link
-              key={place.to}
-              to={place.to}
-              aria-current={active ? "page" : undefined}
-              className={cn(action, active && "bg-surface text-umich-blue hover:bg-surface")}
-            >
-              <Icon className="h-4 w-4" aria-hidden />
-              <span>{place.label}</span>
-            </Link>
-          );
-        })}
-        <a
-          href={FEEDBACK_FORM_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="Give feedback (opens in a new tab)"
-          className={action}
-        >
-          <MessageSquarePlus className="h-4 w-4" aria-hidden />
-          <span>Give feedback</span>
-        </a>
+      <div className="mt-3 space-y-1 border-t border-border pt-3">
+        <FeedbackAction collapsed={false} />
+        {FOOT_PLACES.map((place) => (
+          <FootLink key={place.to} place={place} collapsed={false} active={pathname === place.to} />
+        ))}
       </div>
     </div>
   );
