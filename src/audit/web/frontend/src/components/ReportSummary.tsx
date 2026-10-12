@@ -5,39 +5,40 @@ import type { IssueRow, ScanDetail } from "../api/types";
 import MethodCoverageLedger, { methodsRan } from "./MethodCoverageLedger";
 import { Card, Disclosure } from "./ui";
 import { cn } from "../lib/cn";
-import { CLICK_THROUGH_STATES_LABEL } from "../lib/labels";
+import { CLICK_THROUGH_STATES, clickThroughStates } from "../lib/labels";
 
 /**
  * One number in the summary strip: the value large, what it counts under it,
- * and one short sentence of explanation. The label is the ``dt`` and the value
- * and explanation its ``dd``s, so a screen reader reads "Pages checked, 46,
- * 0 errors while scanning"; CSS order puts the number first on screen.
- * ``flag`` colours the number and the explanation when it needs attention
- * (errors while scanning), which the explanation also says in words.
+ * and one or two short lines of explanation. The label is the ``dt`` and the
+ * value and each line its ``dd``s, so a screen reader reads "Pages visited,
+ * 46, Plus 120 page states opened by clicking"; CSS order puts the number
+ * first on screen. A line with ``flag`` set is coloured
+ * because it needs attention (pages that could not be loaded); its words say
+ * so too, so the colour is never the only signal (SC 1.4.1 Use of Color,
+ * Level A).
  */
 function SummaryStat({
   label,
   value,
-  detail,
-  flag = false,
+  details,
+  className,
 }: {
   label: string;
   value: number;
-  detail: string;
-  flag?: boolean;
+  details: { text: string; flag?: boolean }[];
+  className?: string;
 }) {
   return (
-    <div className="flex flex-col gap-1">
+    <div className={cn("flex flex-col gap-1", className)}>
       <dt className="order-2 text-sm font-semibold text-fg">{label}</dt>
-      <dd
-        className={cn(
-          "order-1 mb-1 text-3xl font-semibold leading-none tabular-nums",
-          flag ? "text-sev-major" : "text-umich-blue",
-        )}
-      >
+      <dd className="order-1 mb-1 text-3xl font-semibold leading-none tabular-nums text-umich-blue">
         {value.toLocaleString()}
       </dd>
-      <dd className={cn("order-3 text-xs", flag ? "text-sev-major" : "text-fg-muted")}>{detail}</dd>
+      {details.map(({ text, flag = false }) => (
+        <dd key={text} className={cn("order-3 text-xs", flag ? "text-sev-major" : "text-fg-muted")}>
+          {text}
+        </dd>
+      ))}
     </div>
   );
 }
@@ -77,46 +78,110 @@ export function ReportSummary({
   return (
     <>
       {scan.blocked && <BlockedScanNotice scanId={scan.id} blocked={scan.blocked} />}
-      {/* Read left to right as the scan itself ran: how much was tested,
-          what that turned up, how those occurrences group, and how much of
-          the site only existed after a control was used. Four even cells,
-          each a number, its name and one sentence, rather than one run-on
-          line of text: four across on a wide screen, two by two on a narrow
-          one.
+      {/* Three numbers, main point first: how many issues, how many places
+          they appear, then how much of the site was scanned to find them.
+          The first version read left to right as the scan ran (pages, then
+          occurrences, then issues), and a coworker testing it misread it in
+          three ways: "errors" as accessibility errors, "Occurrences found"
+          as the issue count, and "Issues found" as a part of that count.
+          Leading with what the reader came for is the first rule of the U.S.
+          Federal Plain Language Guidelines, and the issue count now sits
+          next to the table whose rows it counts.
 
-          No panel, border or dividers, the same rule as StatCard (ui.tsx):
-          a frame around a number competes with the number. The cells were
-          a white panel cut by 1px dividers, which made a second card above
-          the issues table and left the app with two looks for the same kind
-          of readout. The space between the cells does the grouping instead
-          (W3C COGA, "Making Content Usable": group related content, and keep
-          the page free of what does not help). Every colour here is at least
-          7:1 on the page background, in light and dark and every
-          colour-vision setting (WCAG 2.2 SC 1.4.6 Contrast (Enhanced), Level
-          AAA), so taking the white away costs no contrast.
+          The labels carry the difference between the two issue numbers, not
+          the lines under them, because a reader scanning the numbers reads
+          the label and skips the rest: "Kinds of issue found" for the rows,
+          "Places issues appear (occurrences)" for every place one shows up.
+          The developer chose both. "Issues found" over the first said
+          nothing about kinds, and "Places they appear" leaned on the label
+          before it. The coworker asked to call the second "Issues found",
+          and the developer suggested "Issues appear"; both were rejected:
+          the terms table in docs/plain-language.md makes an issue one kind of
+          problem (one row) and an occurrence one place it appears, so one
+          word for both numbers would put "166 issues" over a 12-row table
+          (W3C COGA, "Making Content Usable": the same word for the same thing).
+          The plain phrase comes first and the product term in parentheses
+          (Interface language rule 3), which also ties the number to the
+          table's Occurrences column. "Types of issues" was rejected too:
+          the terms table already calls Mostly sure, Not sure and For
+          information the three types of issue.
+
+          The page states opened by clicking are a line under the pages, not a
+          fourth number: they say how much was scanned, like the pages, not
+          what was found, and a big number of their own read as a result. The
+          line stays, because pages alone understate a site whose content
+          mostly appears only after a control is used, and a limitation is
+          never dropped to save space (Interface language rule 4).
+
+          A line shows only when it tells the reader something: "3 pages
+          could not be loaded" when pages failed, and nothing when none did.
+          The developer's rule: hide what the reader does not need. An
+          "Every page loaded" line was dropped for that reason. The page
+          states line stays even at zero ("No page states opened by
+          clicking"), because zero is a limitation the reader does need.
+
+          "Pages visited", not "Pages checked": the count is every page the
+          scan recorded, including pages that could not be loaded or answered
+          with an error (docs/reading-your-report.md), so "checked" claimed
+          more than the scan did. The failures are said in words, "3 pages
+          could not be loaded", not "3 errors while scanning", which the
+          coworker read as accessibility errors (glossary: "Pages not
+          reached").
+
+          No panel, border, fill or dividers, the same rule as StatCard
+          (ui.tsx): a frame around a number competes with the number, and a
+          tinted, rounded tile, suggested again with the reorder, looks like a
+          card that can be clicked when these cannot (W3C COGA: make controls
+          look like controls, and what is not a control not look like one).
+          The cells were once a white panel cut by 1px dividers, which made a
+          second card above the issues table. The space between the cells does
+          the grouping instead. Every colour here is at least 7:1 on the page
+          background, in light and dark and every colour-vision setting (WCAG
+          2.2 SC 1.4.6 Contrast (Enhanced), Level AAA); a fill would have to
+          be checked again for all of them.
 
           Without a panel, space alone has to say what belongs together
           (proximity), so the space outside the group is clearly larger than
           the space inside it: 32px above (with the header's margin) and
           below it, 48px between columns on a wide screen (32px on a narrow
-          one, where width is short) and 32px between rows, against 8px from
-          a number to its name and 4px from the name to its sentence, which
-          read as one unit. */}
-      <dl className="mt-10 mb-5 grid grid-cols-2 gap-x-8 gap-y-8 lg:grid-cols-4 lg:gap-x-12">
+          one) and 32px between rows, against 8px from a number to its name
+          and 4px between the lines under it, which read as one unit. Three
+          across from 640px; below that the two issue numbers share a row,
+          as the pair they are, and the pages take the row under them, so
+          nothing is squeezed at 320px (SC 1.4.10 Reflow, Level AA). */}
+      <dl className="mt-10 mb-5 grid grid-cols-2 gap-x-8 gap-y-8 sm:grid-cols-3 lg:gap-x-12">
         <SummaryStat
-          label="Pages checked"
-          value={scan.page_count}
-          detail={`${scan.error_count.toLocaleString()} error${scan.error_count === 1 ? "" : "s"} while scanning`}
-          flag={scan.error_count > 0}
+          label={issueGroups === 1 ? "Kind of issue found" : "Kinds of issue found"}
+          value={issueGroups}
+          details={[{ text: "One per row in the table below" }]}
         />
-        <SummaryStat label="Occurrences found" value={occurrences} detail="Each place an issue appears" />
-        <SummaryStat label="Issues found" value={issueGroups} detail="Kinds of problem, one per row below" />
-        {/* Pages alone understate an application whose content mostly does
-            not exist until a control is used. */}
         <SummaryStat
-          label={CLICK_THROUGH_STATES_LABEL}
-          value={scan.dom_state_count ?? 0}
-          detail="Reached by using menus, tabs and other controls"
+          label="Places issues appear (occurrences)"
+          value={occurrences}
+          details={[{ text: "Each one is an element on a page" }]}
+        />
+        <SummaryStat
+          label="Pages visited"
+          value={scan.page_count}
+          className="col-span-2 sm:col-span-1"
+          details={[
+            {
+              text:
+                (scan.dom_state_count ?? 0) > 0
+                  ? `Plus ${clickThroughStates(scan.dom_state_count)}`
+                  : `No ${CLICK_THROUGH_STATES}`,
+            },
+            ...(scan.error_count > 0
+              ? [
+                  {
+                    text: `${scan.error_count.toLocaleString()} ${
+                      scan.error_count === 1 ? "page" : "pages"
+                    } could not be loaded`,
+                    flag: true,
+                  },
+                ]
+              : []),
+          ]}
         />
       </dl>
 
