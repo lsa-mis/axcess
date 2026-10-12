@@ -117,6 +117,19 @@ To [crawl](./docs/glossary.md#crawl) a site from the command line, run
 `uv run audit --help` for every option. The [contributing guide](./CONTRIBUTING.md)
 covers quality checks and how to propose changes.
 
+### Desktop builds and releases (for developers)
+
+Two GitHub Actions workflows build the desktop app:
+
+- **Desktop test build** runs by itself on merges and on pull requests that
+  change the desktop app. It makes the download files for you to try, as
+  workflow artifacts, and **never publishes a release**.
+- **Desktop preview release** runs **only when someone starts it by hand** on
+  `main` (Actions tab, then **Run workflow**). It builds the same files and
+  publishes the release that installed apps are offered.
+
+The steps are in [Releases](./docs/internal/releases.md#ship-a-release).
+
 ## License
 
 [MIT](./LICENSE). Built for evidence-led accessibility work at the University

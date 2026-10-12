@@ -70,7 +70,7 @@ schedule, and manual dispatch.
 | `python-tests` | `pytest tests/unit tests/quality tests/ui -m "not browser"` |
 | `frontend` | `npm run lint` and `npm run build` (the build is also the TypeScript check) |
 | `desktop-node` | `npm test` in `desktop/` |
-| `desktop-release-dry-run` | The release's version pick, `package.json` stamp, and installer-name check, with the scripts `desktop-build.yml` uses |
+| `desktop-release-dry-run` | The release's version pick, `package.json` stamp, and installer-name check, with the scripts `desktop-release.yml` uses |
 | `accessibility` | `pytest tests/ui -m browser`: every Playwright UI test, with every axe-core check |
 | `browser-suites` | `pytest tests/integration` |
 
@@ -100,9 +100,21 @@ Other workflows:
 - CI runs Python 3.13, and ruff and mypy target 3.11 (the minimum version).
 - `pages.yml` publishes the public site, and [Releases](docs/internal/releases.md)
   covers the desktop build.
-- `desktop-build.yml` also builds both installers, without publishing, on
-  pull requests that change `desktop/**`, the workflow itself,
-  `pyproject.toml`, or `uv.lock`.
+- The desktop app has two workflows. See
+  [Desktop builds and releases](#desktop-builds-and-releases).
+
+### Desktop builds and releases
+
+| Workflow (Actions tab name) | When it runs | What it does |
+| --- | --- | --- |
+| Desktop test build (`desktop-build.yml`) | Automatically: pushes to `main` that change app code, and pull requests that change `desktop/**`, either desktop workflow, `pyproject.toml`, or `uv.lock`. Also by hand, on any branch. | Builds the macOS, Windows and Linux download files as workflow artifacts (kept 14 days). **It never publishes a release.** |
+| Desktop preview release (`desktop-release.yml`) | **Only by hand**, on `main`. A merge never starts it. | Builds the same files, then publishes GitHub release `desktop-v0.2.N` marked latest. Installed apps offer it on their next launch. |
+
+To publish a release, make sure CI is green on `main`, then open the Actions
+tab, choose **Desktop preview release**, and **Run workflow** on `main`. To try
+a branch's installers without releasing them, run **Desktop test build** on
+that branch and download its artifacts. The full checklist is in
+[Releases](docs/internal/releases.md#ship-a-release).
 
 ## Rules from AGENTS.md that apply to everyone
 

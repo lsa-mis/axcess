@@ -3,7 +3,7 @@
  * (0.61.0 reads as 0.61): make-macos-dmg.cjs names the DMG,
  * electron-builder.config.cjs the Windows installer and the AppImage, and
  * make-windows-installer.cjs the portable zip, all with these. The publish
- * job in desktop-build.yml then requires
+ * job in desktop-release.yml then requires
  * `Axcess-$VERSION-Mac-Apple-Silicon.dmg`, `Axcess-$VERSION-Windows-Installer.exe`,
  * `Axcess-$VERSION-Windows-Portable.zip` and `Axcess-$VERSION-Linux.AppImage`,
  * where $VERSION is the two-part version the version job picked. CI's
@@ -53,7 +53,7 @@ if (require.main === module) {
     console.log(names.join("\n"));
   } else {
     const version = args[at + 1];
-    // The publish job's own patterns, in desktop-build.yml.
+    // The publish job's own patterns, in desktop-release.yml.
     const wanted = [
       `Axcess-${version}-Mac-Apple-Silicon.dmg`,
       `Axcess-${version}-Windows-Installer.exe`,
