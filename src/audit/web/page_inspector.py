@@ -75,6 +75,12 @@ _IDLE_TIMEOUT_MS = 8_000
 
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
+# The saved frames sent with one page, in characters of HTML. Each frame is
+# already bounded at capture (``audit.crawler.frame_snapshot``); this bounds
+# the response, so a page with many large frames cannot send tens of
+# megabytes. Frames past it are left out and the inspector shows its note.
+MAX_INSPECT_FRAME_CHARS = 8_000_000
+
 
 class SavedStylesRef(BaseModel):
     """Where a saved copy's CSS is served, and what the inspector checks it by.
@@ -91,6 +97,24 @@ class SavedStylesRef(BaseModel):
     url: str
     complete: bool
     fingerprint: dict[str, Any]
+
+
+class SavedFrameOut(BaseModel):
+    """One frame's document, saved with the page, and where it sat.
+
+    ``parent_id`` is 0 for a frame in the page itself, otherwise the
+    ``frame_id`` of the frame it is inside; ``index`` is which ``<iframe>`` or
+    ``<frame>`` it is in that document, in document order, not counting any
+    inside ``<noscript>``. ``html`` is untrusted scanned content, like the page.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    frame_id: int
+    parent_id: int
+    index: int
+    url: str
+    html: str
 
 
 def _styles_etag(styles: StoredStyles) -> str:
@@ -200,6 +224,40 @@ def _table_exists(conn: sqlite3.Connection, table: str) -> bool:
         ).fetchone()
         is not None
     )
+
+
+def _saved_frames(conn: sqlite3.Connection, scan_id: int, page_id: int) -> list[dict[str, Any]]:
+    """The frames saved with the page as it loaded, decoded, within the bound.
+
+    Read for that exact scan and page (``repo.page_frames``), so one report can
+    never show another's frames. A frame that will not decode is left out, and
+    so is every frame inside it: it would have nowhere to go.
+    """
+    if not _table_exists(conn, "page_frames"):
+        return []
+    out: list[dict[str, Any]] = []
+    kept = {0}
+    total = 0
+    for frame in repo.page_frames(conn, scan_id=scan_id, page_id=page_id):
+        if frame.parent_id not in kept:
+            continue
+        html = _decode_stored_html(frame.html)
+        if html is None:
+            continue
+        if total + len(html) > MAX_INSPECT_FRAME_CHARS:
+            break
+        total += len(html)
+        kept.add(frame.frame_id)
+        out.append(
+            SavedFrameOut(
+                frame_id=frame.frame_id,
+                parent_id=frame.parent_id,
+                index=frame.index,
+                url=frame.url,
+                html=html,
+            ).model_dump()
+        )
+    return out
 
 
 def _dom_states(conn: sqlite3.Connection, page_id: int) -> list[dict[str, Any]]:
@@ -537,6 +595,8 @@ async def inspect_page(
             "store_rendered_html": validated["store_rendered_html"],
             "states": states,
             "saved_styles": page_styles,
+            # Only the copy stored at page load has frames: states keep none,
+            # and a live render is the site now.
             "render": _render_payload(
                 ok=True,
                 source="stored",
@@ -544,7 +604,8 @@ async def inspect_page(
                 status_code=page["status_code"],
                 dom_html=stored,
                 max_dom_chars=max_dom_chars,
-            ),
+            )
+            | {"frames": _saved_frames(conn, scan_id, page_id)},
         }
 
     # ``timezone.utc`` is used over the ``datetime.UTC`` alias because mypy's

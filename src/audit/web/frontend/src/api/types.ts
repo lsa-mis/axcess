@@ -1224,7 +1224,29 @@ export interface PageInspection {
     dom_html?: string;
     dom_chars?: number;
     dom_truncated?: boolean;
+    /**
+     * The documents of the page's frames, saved with the page as it loaded.
+     * Only on "stored"; empty for reports made before frames were saved.
+     */
+    frames?: SavedFrame[];
   };
+}
+
+/**
+ * One frame's document, saved with the page. Untrusted scanned content, like
+ * the page itself.
+ */
+export interface SavedFrame {
+  /** 1-based, unique within the page. */
+  frame_id: number;
+  /** 0 when the frame is in the page itself, else the `frame_id` it is inside. */
+  parent_id: number;
+  /** Which `<iframe>` or `<frame>` it is in its parent document, from 0, in
+   *  document order, not counting any inside `<noscript>`. */
+  index: number;
+  /** The frame's own address; about:blank for one the page's code filled. */
+  url: string;
+  html: string;
 }
 
 export interface PageDomState {

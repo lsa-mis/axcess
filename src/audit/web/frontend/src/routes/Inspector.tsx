@@ -6,7 +6,7 @@ import { Check, ChevronDown, ChevronUp, Copy, ExternalLink, FileCode2, Layers, L
 import DomSource from "../components/DomSource";
 import FlaggedStepper from "../components/FlaggedStepper";
 import { api } from "../api/client";
-import type { PageEvidence, PageInspection, SavedStyles } from "../api/types";
+import type { PageEvidence, PageInspection, SavedFrame, SavedStyles } from "../api/types";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import Tabs from "../components/Tabs";
 import {
@@ -45,6 +45,7 @@ import {
   type Unreachable,
 } from "../lib/highlightTargets";
 import { checkFingerprint, looksDifferent } from "../lib/styleFingerprint";
+import { withSavedFrames } from "../lib/savedFrames";
 
 type TabId = "page" | "dom";
 
@@ -525,8 +526,9 @@ export default function InspectorRoute() {
         data?.render.dom_html ?? null,
         data?.render.final_url || data?.page.url || null,
         savedStylesUrl,
+        data?.render.frames,
       ),
-    [data?.render.dom_html, data?.render.final_url, data?.page.url, savedStylesUrl],
+    [data?.render.dom_html, data?.render.final_url, data?.page.url, savedStylesUrl, data?.render.frames],
   );
 
   // Bake the highlight into the srcdoc rather than reaching into the frame's
@@ -1545,11 +1547,32 @@ function savedStylesFor(inspection: PageInspection): SavedStyles | null {
  *    disabled, so a single-page app announces "You need to enable JavaScript
  *    to run this app" over markup that was captured with JavaScript running.
  *    It is the alternative to a state this document is not in.
+ * 6. Each `<iframe>` gets the document the scan saved for it, readied by the
+ *    same steps, or a note saying the saved copy does not include it (see
+ *    `withSavedFrames`). This happens first, on the markup as saved, because
+ *    a frame's place is counted in it.
  *
  * The DOM-source view deliberately does not go through this: that tab shows
  * the evidence as stored, and these edits exist only to render it.
  */
-function prepareCapture(html: string | null, url: string | null, savedStylesUrl: string | null = null): string | null {
+function prepareCapture(
+  html: string | null,
+  url: string | null,
+  savedStylesUrl: string | null = null,
+  frames?: SavedFrame[],
+): string | null {
+  if (!html) return html;
+  // Frames first, while the markup is as saved: their places are counted in
+  // it. Each frame's document is readied like a page without saved CSS.
+  return prepareDocument(
+    withSavedFrames(html, frames, url, (doc, frameUrl) => prepareDocument(doc, frameUrl) ?? doc),
+    url,
+    savedStylesUrl,
+  );
+}
+
+/** Steps 1 to 5 above, for the page or for one of its frames. */
+function prepareDocument(html: string | null, url: string | null, savedStylesUrl: string | null = null): string | null {
   if (!html) return html;
   let rendered = html
     .replace(/<meta\b[^>]*http-equiv\s*=\s*["']?content-security-policy[^>]*>/gi, "")
