@@ -8,48 +8,59 @@ the test gates, see [CONTRIBUTING.md](../../CONTRIBUTING.md).
 
 ## How a desktop release ships today
 
-![Diagram of a desktop release. A merge to main that changes app code starts the desktop build workflow, which builds the macOS, Windows and Linux apps in parallel, stamped with the next version, such as 0.2.1 after 0.2.0, and publishes a GitHub release marked latest with one file per platform. Installed apps check for it on launch: Windows can update in place, and macOS and Linux open the new file to download. No tests gate publishing, and builds are not notarized or signed; the public site ships separately through pages.yml.](../images/diagrams/release-flow.png)
+![Diagram of a desktop release. A person runs the Desktop preview release workflow by hand on main. It calls the desktop test build, which builds the macOS, Windows and Linux apps in parallel, stamped with the next version, such as 0.2.1 after 0.2.0, and then publishes a GitHub release marked latest with one file per platform. Merges and pull requests run only the test build, which publishes nothing. Installed apps check for the release on launch: Windows can update in place, and macOS and Linux open the new file to download. No tests gate publishing, and builds are not notarized or signed; the public site ships separately through pages.yml.](../images/diagrams/release-flow.png)
 
-In short: a merge to `main` that changes app code builds both installers and
-publishes them as the latest GitHub release, and installed copies offer that
-release the next time they start.
+In short: merges build test installers and publish nothing. A release
+happens only when a person runs **Desktop preview release** by hand on
+`main`. It builds the installers, publishes them as the latest GitHub
+release, and installed copies offer that release the next time they start.
 
-One workflow does all of this: `.github/workflows/desktop-build.yml`, shown as
-"Desktop application build" in the Actions tab. Nobody tags a commit or
-uploads an installer by hand.
+### Two workflows: test build and preview release
 
-### What starts a build
+| Workflow (Actions tab name) | File | When it runs | What it makes |
+| --- | --- | --- | --- |
+| Desktop test build | `.github/workflows/desktop-build.yml` | Automatically, and by hand (see below) | Download files as workflow artifacts, kept 14 days. **Never publishes.** |
+| Desktop preview release | `.github/workflows/desktop-release.yml` | **Only by hand**, on `main` | The same files, published as GitHub release `desktop-v0.2.N`, marked latest |
 
-The workflow runs in three cases:
+The release workflow does not repeat the build steps. It calls the test
+build workflow (`workflow_call`) for its builds, so both always build the
+same way, and then runs its own publish job.
+
+**To publish a release:** open the Actions tab, choose **Desktop preview
+release**, choose **Run workflow**, keep the branch as `main`, and run it.
+A run on any other branch stops at its first job, "Check the release comes
+from main", before it builds anything.
+
+### What starts a test build
+
+"Desktop test build" runs in three cases:
 
 - a push to `main` that changes at least one of
   `.github/workflows/desktop-build.yml`, `desktop/**`, `src/**`,
   `pyproject.toml`, or `uv.lock`;
 - a pull request that changes `.github/workflows/desktop-build.yml`,
-  `desktop/**`, `pyproject.toml`, or `uv.lock`. It builds both installers as
-  workflow artifacts and never publishes, so a packaging break shows before
-  the merge. Changes under `src/` alone do not trigger it, since each run
-  costs macOS and Windows minutes;
-- a manual run (`workflow_dispatch`) from the Actions tab.
+  `.github/workflows/desktop-release.yml`, `desktop/**`, `pyproject.toml`,
+  or `uv.lock`, so a packaging break shows before the merge. Changes under
+  `src/` alone do not trigger it, since each run costs macOS and Windows
+  minutes;
+- a manual run (`workflow_dispatch`) from the Actions tab, on any branch.
+  This is the way to try a branch's installers before merging.
 
-There is no tag trigger. A merge that only changes docs, the site, or tests
-does not build a release. If you want a release anyway, run the workflow
-manually on `main`.
+None of these publish anything. Download the files from the run's summary
+page, under **Artifacts** (you need to be signed in to GitHub).
 
-Only runs on `main` publish a release. A manual run on any other branch still
-builds both installers as workflow artifacts but skips the publish job, which
-is a handy way to try a branch's installers before merging.
+A new test build on the same branch cancels one that is still in progress
+(`cancel-in-progress: true`). It never cancels a release's builds: they run
+in a separate group. Two release runs never cancel each other either; the
+second waits until the first finishes.
 
-A new run on the same branch cancels a run that is still in progress
-(`cancel-in-progress: true`). If two app-code merges land close together, the
-second one can cancel the first one's release.
-
-### The two build jobs
+### The build jobs
 
 | Job | Runner | Workflow artifact (kept 14 days) |
 | --- | --- | --- |
 | `build-macos` ("Apple Silicon macOS desktop artifact") | `macos-15` | `axcess-macos-apple-silicon` |
 | `build-windows` ("Windows x64 desktop artifact") | `windows-2022` | `axcess-windows-x64` |
+| `build-linux` ("Linux x64 AppImage") | `ubuntu-22.04` | `axcess-linux-x64` |
 
 Both jobs use Python 3.13 and Node 22 and run the same steps in this order:
 
@@ -89,7 +100,7 @@ for more.
 ### Checks inside the build
 
 Apart from each build step having to succeed, these are the only automatic
-checks between a merge and a published release:
+checks between a release run and a published release:
 
 - **Resource check.** `desktop/scripts/verify-resources.cjs` runs before
   packaging. It fails if an app icon, the frozen backend, the built review
@@ -130,10 +141,10 @@ On macOS, `npm run make` runs the resource and runtime checks through the
 
   | Line | Who it is for | How they get it |
   | --- | --- | --- |
-  | `0.1` | Developers | Branch builds: the workflow artifacts of a manual or pull request run, never published |
-  | `0.2` | The U-M ITS accessibility team | Releases published from `main` |
-  | `0.3` | A wider pilot, such as selected departments | Releases published from `main` |
-  | `1.0` | University-wide | Releases published from `main`, signed and notarized (see [Before an institutional rollout](#before-an-institutional-rollout)) |
+  | `0.1` | Developers | Test builds: the workflow artifacts of "Desktop test build", never published |
+  | `0.2` | The U-M ITS accessibility team | Releases published by "Desktop preview release" from `main` |
+  | `0.3` | A wider pilot, such as selected departments | Releases published by "Desktop preview release" from `main` |
+  | `1.0` | University-wide | Releases published by "Desktop preview release" from `main`, signed and notarized (see [Before an institutional rollout](#before-an-institutional-rollout)) |
 
   University-wide is `1.0` rather than `0.4`: most readers take a version
   below 1.0 as early or pilot software, and 1.0 as ready and supported.
@@ -165,9 +176,10 @@ On macOS, `npm run make` runs the resource and runtime checks through the
 
 ### The publish job
 
-The `publish` job ("Publish preview release") runs only on `main`, and only
-after both build jobs succeed. It uses the workflow's built-in token, so no
-repository secrets are involved.
+The `publish` job ("Publish preview release") is in
+`desktop-release.yml`, so it runs only when a person starts that workflow on
+`main`, and only after all three build jobs succeed. It uses the workflow's
+built-in token, so no repository secrets are involved.
 
 1. **Collect the installers.** It copies the files named by
    `releaseFileName` in `desktop/src/updates.cjs`, in plain words, from the
@@ -208,9 +220,8 @@ other changelog.
 
 ## What does not gate a release
 
-The `publish` job needs only the two build jobs
-(`needs: [build-macos, build-windows]`). Nothing in `desktop-build.yml` waits
-for:
+The `publish` job needs only the build jobs (`needs: build`, the call to
+`desktop-build.yml`). Nothing in `desktop-release.yml` waits for:
 
 - the CI workflow (`.github/workflows/ci.yml`), which also runs on every push
   to `main`, but on its own;
@@ -222,9 +233,9 @@ for:
   (The accessibility and Playwright UI suites run on every pull request and
   push to `main`, but the desktop build does not wait for them either.)
 
-So a commit on `main` that fails CI still ships, as long as it touches the
-build paths and both installers build. **Make sure CI is green before you
-merge.** See the [quality gates in CONTRIBUTING.md](../../CONTRIBUTING.md#quality-gates).
+So a release run on a `main` that fails CI still ships, as long as the
+installers build. **Make sure CI is green on `main` before you run a
+release.** See the [quality gates in CONTRIBUTING.md](../../CONTRIBUTING.md#quality-gates).
 
 ## Signing and notarization
 
@@ -372,7 +383,7 @@ has to make because the workflow does not.
    `desktop/scripts/`). The first 0.60 build (of the earlier scheme) failed at the stamp step, which
    no pull request job ran before.
 2. If the pull request changes the desktop app or its build, confirm the
-   "Desktop application build" run on it built both installers.
+   "Desktop test build" run on it built all three apps.
 3. Confirm the "Accessibility and Playwright UI suites" job passed. If the
    change touches the crawler or a
    [browser check](../glossary.md#browser-check), also add the
@@ -381,20 +392,24 @@ has to make because the workflow does not.
 5. Write the merge commit message as release notes. Its body becomes the
    "What changed" section.
 
-### Merge and watch
+### Merge, then run the release
 
-1. Merge to `main`. A merge that changes nothing in the
-   [build trigger list](#what-starts-a-build) does not release. If you still
-   want a release, run "Desktop application build" manually on `main`.
-2. Watch the run in the Actions tab: the two build jobs, then "Publish preview
-   release". Hold other app-code merges until it finishes, because a new run
-   cancels the one in progress.
-3. If a build job fails, nothing is published. Fix the cause and merge again,
-   or run the workflow manually once the fix is on `main`.
-4. If the publish job fails after creating the draft, the release stays a
+1. Merge to `main`. A merge never publishes a release. If it changes
+   anything in the [test build trigger list](#what-starts-a-test-build),
+   "Desktop test build" runs and makes download files you can try.
+2. Confirm CI is green on `main`.
+3. Open the Actions tab, choose **Desktop preview release**, then **Run
+   workflow** on `main`. It releases whatever `main` holds at that moment,
+   so you can batch several merges into one release.
+4. Watch the run: "Check the release comes from main", the three build jobs,
+   then "Publish preview release". A second release run waits for this one
+   rather than cancelling it.
+5. If a build job fails, nothing is published. Fix the cause, merge, and run
+   the release again.
+6. If the publish job fails after creating the draft, the release stays a
    draft. Installed apps ignore drafts, so nobody is offered it. You can
    delete the leftover draft on the Releases page.
-5. For a failure that looks flaky, such as a packaging step or an upload,
+7. For a failure that looks flaky, such as a packaging step or an upload,
    try **Re-run failed jobs** on the same run first. A re-run keeps the
    version job's result, so the version and tag stay the same (and a draft is
    not a tag, so even a full re-run picks the same version). The publish job creates a
@@ -583,10 +598,6 @@ newest release, and `site.js` finds its files (see
   Axcess** menu item on macOS, the installed app's properties on Windows);
   neither was checked, so confirm them in the smoke test before you rely on
   them.
-- **Some statements say more than the code does:**
-  - The header comment in `desktop/src/updates.cjs` and a comment at the top
-    of `.github/workflows/ci.yml` say every push to `main` publishes a
-    release. Only pushes that change the build paths do.
 - **Three platforms are released:** Apple Silicon macOS, Windows x64 (the
   installer and the portable zip), and Linux x64 as an AppImage. The Forge
   config's DEB and RPM makers have no build job.

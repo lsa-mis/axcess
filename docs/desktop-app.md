@@ -226,14 +226,24 @@ Do not distribute these preview builds as a production U-M application.
 
 ## Update channel
 
-`desktop-build.yml` runs on every push to `main` that changes `desktop/**`,
-`src/**`, `pyproject.toml`, `uv.lock`, or the workflow file itself, and it can
-also be started by hand. Each run takes the next version on the release line
-the team chose (`config.releaseLine` in `desktop/package.json`, `0.2`):
-`0.2.0`, then `0.2.1`, and so on (the git commit is recorded in the package's
-`config.buildCommit`). On `main`, it then publishes the four files people
+Releases are published only by hand. Two workflows build the app:
+
+- **Desktop test build** (`desktop-build.yml`) runs on every push to `main`
+  that changes `desktop/**`, `src/**`, `pyproject.toml`, `uv.lock`, or the
+  workflow file itself, on pull requests that change the desktop app or its
+  build, and by hand. It makes the download files as workflow artifacts and
+  never publishes them.
+- **Desktop preview release** (`desktop-release.yml`) runs only when a person
+  starts it on `main` from the Actions tab. It calls the test build for its
+  builds, then publishes.
+
+Each build takes the next version on the release line the team chose
+(`config.releaseLine` in `desktop/package.json`, `0.2`): `0.2.0`, then
+`0.2.1`, and so on (the git commit is recorded in the package's
+`config.buildCommit`). A release run then publishes the four files people
 download, the Windows installer's `.blockmap`, and the Windows update feed
-`latest.yml` as GitHub Release `desktop-v0.2.1`.
+`latest.yml` as GitHub Release `desktop-v0.2.1`. See
+[Releases](internal/releases.md) for the full steps.
 
 Each release holds one file per platform and the two files the Windows
 updater reads, nothing else. The public site's download links open

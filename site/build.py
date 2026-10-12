@@ -33,7 +33,7 @@ BASE_URL = "https://lsa-mis.github.io/axcess/"
 REPO = "https://github.com/lsa-mis/axcess"
 RELEASES = f"{REPO}/releases"
 LATEST_RELEASE = f"{RELEASES}/latest"
-# Version-less asset names are uploaded by .github/workflows/desktop-build.yml
+# Version-less asset names are uploaded by .github/workflows/desktop-release.yml
 # so these links always fetch the newest build without a GitHub sign-in.
 # Each release holds one file per platform, named with its version
 # (Axcess-0.64-Windows-Installer.exe, releaseFileName in
