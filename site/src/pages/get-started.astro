@@ -46,7 +46,7 @@ import DownloadLink from "../components/DownloadLink.astro";
 import { HONESTY, RELEASES, REPO, url } from "../lib/site";
 
 /*
- * Screenshots of Axcess itself, beside the first-scan steps.
+ * Screenshots of Axcess itself, under the first-scan steps.
  *
  * Why screenshots here when the install steps use drawings: Axcess is our
  * own app, so a screenshot is exactly what people will see, and it is cheap
@@ -58,21 +58,28 @@ import { HONESTY, RELEASES, REPO, url } from "../lib/site";
  * A). Width and height reserve its space so the steps do not jump. Left out
  * on purpose: a site's own sign-in page, which looks different for every
  * organization. Retake a screenshot when the words on its screen change.
+ * Take it at twice its size and crop it to the part the step is about, from
+ * a window about 860 pixels wide: a whole wide screen shrunk into the
+ * column left its words too small to read.
  */
 const shots = {
   "new-scan-button": {
-    w: 386,
-    h: 302,
+    // Taken at twice its size (580 by 428 pixels), so it stays sharp.
+    w: 435,
+    h: 321,
     alt: "The top of the Axcess sidebar. The dark blue New scan button, with a plus sign, is on the left, beside Search. Reports is below them.",
   },
   "new-scan-public": {
-    w: 1000,
-    h: 424,
+    // Twice its size (1176 by 736 pixels), cropped from a window 860 pixels
+    // wide, so its words stay readable at the column's width.
+    w: 588,
+    h: 368,
     alt: "The top of the New scan page. The Public website tab is chosen, beside the tab Site with a sign-in or two-step sign-in (2FA). Below the tabs is the Website address box, showing the example example.edu/section/ in grey. The hint under it says Axcess adds https:// for you, or http:// for localhost and IP addresses.",
   },
   "maximum-pages": {
-    w: 995,
-    h: 420,
+    // Twice its size (1112 by 802 pixels), cropped like new-scan-public.
+    w: 556,
+    h: 401,
     alt: "The Limits and rule check tool group. At the top, the Scan every page it finds switch is off. Below it, Maximum pages is set to 25, on the left, beside Maximum link depth.",
   },
   "start-scan": {
@@ -1276,28 +1283,19 @@ const SMARTSCREEN_TEXT =
     border: 1px solid var(--ax-border-strong);
     border-radius: 0.5rem;
   }
-  /* On a wide screen a step's words sit beside its screenshot, as the
-     install steps sit beside their drawings, so the two parts of the page
-     read the same way and the reader never scrolls between a step and its
-     picture. The screenshot spans the step's rows; the words stay at the
-     top. */
-  @media (min-width: 56rem) {
-    .steps > li:has(.step-shot) {
-      display: grid;
-      grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-      grid-template-rows: auto auto auto 1fr;
-      column-gap: 2rem;
-      align-items: start;
-    }
-    .steps > li > :not(.step-shot) {
-      grid-column: 1;
-    }
-    .steps > li > .step-shot {
-      grid-column: 2;
-      grid-row: 1 / -1;
-      margin-top: 0;
-    }
-  }
+  /* At every width a step's words come first, across the whole step, and
+     its screenshot sits under them, at up to its own size. The words and the
+     picture used to sit side by side on a wide screen, as the install steps
+     sit beside their drawings. In a 48rem column that left the words about
+     230px, so the example address broke mid-word, and shrank a 1000px
+     screenshot of the New scan page to about 350px, where its text could not
+     be read; the developer asked for both to be fixed. Rejected: side by side
+     only for the small crops. Steps would then change shape from one to the
+     next, and even the smallest crop (386px) left the words too narrow. The
+     install drawings stay beside their steps: they are drawn to fit a narrow
+     column, a screenshot is not (W3C COGA, "Making Content Usable",
+     https://www.w3.org/TR/coga-usable/: make content easy to read,
+     paraphrased; SC 1.4.10 Reflow, Level AA). */
   /* On a phone, the screenshot also uses the space under the step number:
      every pixel makes its words easier to read. The text keeps its indent. */
   @media (max-width: 37.5rem) {
