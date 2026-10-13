@@ -73,7 +73,7 @@ export default function UrlHero({
           error ? "border-sev-critical" : "border-border",
         )}
       />
-      <p id={helpId} className="text-xs text-fg-muted">
+      <p id={helpId} className="max-w-measure text-xs text-fg-muted">
         {help}
       </p>
       {error ? (

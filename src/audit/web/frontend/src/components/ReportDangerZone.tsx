@@ -38,7 +38,7 @@ export default function ReportDangerZone({ scan }: { scan: ScanDetail }) {
       <h2 id="delete-report-heading" className="text-base font-semibold text-sev-critical">
         Delete this report
       </h2>
-      <p className="mt-1 max-w-[70ch] text-sm text-fg-muted">
+      <p className="mt-1 max-w-measure text-sm text-fg-muted">
         Deleting removes this report and everything the scan saved for it. Image files that other
         reports also use may stay in storage.
       </p>

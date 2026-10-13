@@ -49,7 +49,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from audit.wcag_version import LEGACY_WCAG_VERSION, WcagVersion
 
 if TYPE_CHECKING:
-    from playwright.async_api import Page
+    from playwright.async_api import Frame, Page
 
 log = logging.getLogger(__name__)
 
@@ -257,11 +257,11 @@ class AxeAnalyzer:
 
     async def run(
         self,
-        page: Page,
+        page: Page | Frame,
         level: Level = "AA",
         version: WcagVersion = LEGACY_WCAG_VERSION,
     ) -> list[AxeViolation]:
-        """Inject axe into ``page`` and return the flattened violations.
+        """Inject axe into ``page`` (or one of its frames) and return the flattened violations.
 
         ``level`` controls the tag pack: ``"AA"`` (default) catches every
         rule axe knows for Level A or AA, plus axe's ``best-practice`` set.

@@ -190,9 +190,10 @@ follows links to find more pages, and tests each page in the [scope](#scope).
 
 ### Pages not reached
 
-Pages the scan tried but could not load, which the report summary counts as
-errors next to the number of pages checked; a page that answered with an
-error, such as "Sign-in required", is listed with that status instead. The
+Pages the scan tried but could not load, which the report summary counts
+under the number of pages visited ("3 pages could not be loaded"); a page
+that answered with an error, such as "Sign-in required", is listed with that
+status instead. The
 report does not list pages skipped because the site asked scanners to stay out
 (its robots.txt file) or because they were outside the [scope](#scope).
 

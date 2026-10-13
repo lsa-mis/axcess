@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Frame</title></head>
+<body>
+  <p>Inside the frame</p>
+  <!-- Filled by this page's own code, as Google Sites fills its embeds. -->
+  <iframe id="inner" title="Built by code"></iframe>
+  <script>
+    document.getElementById("inner").contentDocument.body.innerHTML = "<p>Built by script</p>";
+  </script>
+</body>
+</html>

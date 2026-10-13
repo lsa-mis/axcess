@@ -315,6 +315,65 @@ export function markCurrent(el: HTMLElement | SVGElement, current: boolean): voi
   el.style.setProperty("outline-offset", current ? "-3px" : "-2px", "important");
 }
 
+/** The hidden note a screen reader hears on the flagged element the reader is on. */
+const NOTE_ID = "axcess-flagged-note";
+
+/**
+ * Tell a screen reader which element is flagged, inside the saved copy.
+ *
+ * The box and its label are drawn for the eye and hidden from screen
+ * readers (``aria-hidden``): they are boxes over the page, not part of it.
+ * So the element the reader is on also gets a description (aria-describedby)
+ * pointing at one hidden note, "Flagged element 2 of 5", which a screen
+ * reader says when focus lands on it (``focusInCopy``). Its own description,
+ * if it has one, is kept and comes after. Only the current element carries
+ * it: the note is moved, not copied, at every step. Rejected: text written
+ * into the page beside the element, which a screen reader would also read
+ * as part of the page wherever it went, and which changes the page's
+ * layout. The note is ``hidden``: a description may point at hidden text,
+ * so it is heard on the element and never on its own.
+ */
+export function noteCurrent(doc: Document, el: Element | null, text: string): void {
+  for (const other of Array.from(doc.querySelectorAll(`[aria-describedby~="${NOTE_ID}"]`))) {
+    const rest = (other.getAttribute("aria-describedby") ?? "")
+      .split(/\s+/)
+      .filter((id) => id && id !== NOTE_ID);
+    if (rest.length) other.setAttribute("aria-describedby", rest.join(" "));
+    else other.removeAttribute("aria-describedby");
+  }
+  let note = doc.getElementById(NOTE_ID);
+  if (!el || isWholePage(el)) {
+    note?.remove();
+    return;
+  }
+  if (!note) {
+    note = doc.createElement("span");
+    note.id = NOTE_ID;
+    note.hidden = true;
+    doc.body?.appendChild(note);
+  }
+  note.textContent = text;
+  const own = (el.getAttribute("aria-describedby") ?? "").split(/\s+/).filter(Boolean);
+  el.setAttribute("aria-describedby", [NOTE_ID, ...own].join(" "));
+}
+
+/**
+ * Move keyboard (and screen reader) focus onto ``el`` in the saved copy.
+ * Most flagged elements, such as a heading or an image, cannot take focus,
+ * so they get ``tabindex="-1"``: focusable from here, still skipped by Tab.
+ * True when focus landed on it; false for the whole page, and for an
+ * element the copy hides, which cannot take focus at all.
+ */
+export function focusInCopy(el: Element): boolean {
+  // Checked by its focus method, not instanceof: the element belongs to
+  // the frame's window, whose HTMLElement is not this one.
+  const target = el as HTMLElement;
+  if (isWholePage(el) || typeof target.focus !== "function") return false;
+  if (target.tabIndex < 0 && !el.hasAttribute("tabindex")) el.setAttribute("tabindex", "-1");
+  target.focus({ preventScroll: true });
+  return el.ownerDocument.activeElement === el;
+}
+
 function isWholePage(el: Element): boolean {
   return el === el.ownerDocument.documentElement || el === el.ownerDocument.body;
 }
@@ -494,10 +553,14 @@ export function spotlight(
     // The label sits above the first line's box, or inside its top when that
     // is at the top of the frame's view. After the lines, so it is drawn
     // over their rings.
+    // The label stays inside the frame's view, where it can be read. For an
+    // element at the very top or the side of the page the box starts
+    // outside the view, and a label at the box's corner was cut off by the
+    // frame's edge.
     const first = pieces[0];
     const above = first.top - view.scrollY - pad > 30;
     const labelLeft = single ? -3 : first.left - pad - (left - pad);
-    const labelTop = single ? 0 : first.top - pad - (top - pad);
+    const labelTop = Math.max(single ? 0 : first.top - pad - (top - pad), view.scrollY + 2 - (top - pad));
     setStyles(tag, {
       position: "absolute",
       left: `${labelLeft}px`,
@@ -513,6 +576,13 @@ export function spotlight(
       "white-space": "nowrap",
       "box-shadow": `0 0 0 2px ${CURRENT_RING}`,
     });
+    // Left and right edges, measured once the label has its width. The
+    // ring (2px) is kept inside the view too.
+    const shown = tag.getBoundingClientRect();
+    const viewWidth = owner.documentElement.clientWidth;
+    const shift =
+      shown.left < 2 ? 2 - shown.left : shown.right > viewWidth - 2 ? Math.max(2 - shown.left, viewWidth - 2 - shown.right) : 0;
+    if (shift) tag.style.setProperty("left", `${labelLeft + shift}px`, "important");
   };
   // Every frame, not on events: a panel's scroll, a reflow when the live
   // site's stylesheets and fonts arrive, and an animation all move the

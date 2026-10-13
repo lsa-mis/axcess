@@ -6,7 +6,7 @@ import { Check, ChevronDown, ChevronUp, Copy, ExternalLink, FileCode2, Layers, L
 import DomSource from "../components/DomSource";
 import FlaggedStepper from "../components/FlaggedStepper";
 import { api } from "../api/client";
-import type { PageEvidence, PageInspection, SavedStyles } from "../api/types";
+import type { PageEvidence, PageInspection, SavedFrame, SavedStyles } from "../api/types";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import Tabs from "../components/Tabs";
 import {
@@ -30,8 +30,10 @@ import {
   drawnOnCanvas,
   drawsNoBox,
   findTargetElement,
+  focusInCopy,
   HIGHLIGHT_CLASS,
   markCurrent,
+  noteCurrent,
   normalizeWhitespace,
   readableLocator,
   scrollPanels,
@@ -43,6 +45,7 @@ import {
   type Unreachable,
 } from "../lib/highlightTargets";
 import { checkFingerprint, looksDifferent } from "../lib/styleFingerprint";
+import { withSavedFrames } from "../lib/savedFrames";
 
 type TabId = "page" | "dom";
 
@@ -523,8 +526,9 @@ export default function InspectorRoute() {
         data?.render.dom_html ?? null,
         data?.render.final_url || data?.page.url || null,
         savedStylesUrl,
+        data?.render.frames,
       ),
-    [data?.render.dom_html, data?.render.final_url, data?.page.url, savedStylesUrl],
+    [data?.render.dom_html, data?.render.final_url, data?.page.url, savedStylesUrl, data?.render.frames],
   );
 
   // Bake the highlight into the srcdoc rather than reaching into the frame's
@@ -561,6 +565,8 @@ export default function InspectorRoute() {
   // Only what this view can hold: a view whose targets are all in other
   // states has nothing to highlight, and must not wait for it forever.
   const highlightPending = showHighlights && scopedTargets.length > 0 && highlight === null;
+  // Whether the toolbar steps through outlined elements (FlaggedStepper).
+  const stepping = !highlightPending && showHighlights && highlightedCount > 0;
 
   /** Missing elements for one picker option; the state on screen uses its highlight. */
   const missingFor = (key: string): MissingCount | undefined => {
@@ -626,6 +632,33 @@ export default function InspectorRoute() {
     try {
       const frame = frameRef.current;
       const doc = frame?.contentDocument;
+      // Show the app's focus ring while focus is inside the saved copy. A
+      // focused iframe matches none of :focus, :focus-within or
+      // :focus-visible in the app's page, so CSS alone never drew a ring
+      // and keyboard users could not see that focus had moved into the copy
+      // (SC 2.4.7 Focus Visible, Level AA; October 2026 AAA audit). The copy
+      // is same-origin, so its window's own focus and blur mark the frame,
+      // and styles.css draws the ring on iframe[data-focused]. A new load
+      // brings a new window, so the listeners never pile up.
+      const view = frame?.contentWindow;
+      if (frame && view) {
+        delete frame.dataset.focused;
+        view.addEventListener("focus", () => {
+          frame.dataset.focused = "true";
+        });
+        view.addEventListener("blur", () => {
+          delete frame.dataset.focused;
+        });
+      }
+      // Escape inside the saved copy goes back to "Go to element", the way
+      // in (FlaggedStepper). The copy runs no scripts of its own, so no
+      // key of the page's is taken.
+      doc?.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && goToRef.current) {
+          event.preventDefault();
+          goToRef.current.focus();
+        }
+      });
       if (frame && doc) {
         setCanvasCheck({ doc: frame.srcdoc, drawn: drawnOnCanvas(doc) });
         if (fingerprint?.samples?.length) {
@@ -660,6 +693,7 @@ export default function InspectorRoute() {
     const marks = Array.from(doc.querySelectorAll<HTMLElement>(`.${HIGHLIGHT_CLASS}`));
     if (marks.length === 0) {
       spotlight(null, "", doc);
+      noteCurrent(doc, null, "");
       return false;
     }
     marks.forEach((mark, i) => markCurrent(mark, i === index));
@@ -667,6 +701,7 @@ export default function InspectorRoute() {
     spotlight(target, marks.length > 1 ? `${index + 1} of ${marks.length}` : "Flagged element", doc, (el) =>
       setCurrentElement(describeElement(el)),
     );
+    noteCurrent(doc, target, marks.length > 1 ? `Flagged element ${index + 1} of ${marks.length}` : "Flagged element");
     if (target) keepCentered(target);
     return true;
   }
@@ -701,6 +736,35 @@ export default function InspectorRoute() {
   // Whether the locator is shown in full. It stays as the reader set it while
   // they step, so every element's row keeps the same shape.
   const [locatorOpen, setLocatorOpen] = useState(false);
+  // "Go to element" (in FlaggedStepper): the button, to come back to with
+  // Escape, and what it says when the element cannot take focus.
+  const goToRef = useRef<HTMLButtonElement>(null);
+  const [goToNote, setGoToNote] = useState<{ attempt: number; text: string } | null>(null);
+  const goToAttempts = useRef(0);
+  useEffect(() => setGoToNote(null), [srcDoc, pageMark]);
+  const goToElement = () => {
+    goToAttempts.current += 1;
+    const attempt = goToAttempts.current;
+    let landed = false;
+    try {
+      const target = frameRef.current?.contentDocument?.querySelector<HTMLElement>("[data-axcess-current]");
+      landed = Boolean(target && focusInCopy(target));
+      if (target && landed && frameRef.current) {
+        keepCentered(target);
+        revealInPage(frameRef.current, target);
+      }
+    } catch {
+      // Opaque document: focus cannot be moved into it.
+    }
+    setGoToNote(
+      landed
+        ? null
+        : {
+            attempt,
+            text: "This element cannot take focus in the saved copy, because it is hidden there or it is the whole page. The table above describes it.",
+          },
+    );
+  };
   const goToPageMark = (index: number) => {
     const bounded = Math.max(0, Math.min(highlightedCount - 1, index));
     setPageMark(bounded);
@@ -964,44 +1028,183 @@ export default function InspectorRoute() {
           <div>
             {/* Top corners as the panel's inner ones (8px less its 1px border),
                 so the bar's fill does not paint square corners over them. */}
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-t-[7px] border-b border-border bg-surface-muted/40 px-3 py-2">
-              <span className="text-xs font-semibold text-fg-subtle">
-                {highlightPending
-                  ? "Highlighting…"
-                  : showHighlights && highlightedCount > 0
-                    ? `${highlightedCount} place${highlightedCount === 1 ? "" : "s"} highlighted`
-                    : copyName}
-              </span>
-              {!highlightPending && showHighlights && highlightedCount > 0 && (
-                // Previous / Next through the outlined elements, the same
-                // control as the Page code (DOM) tab's (FlaggedStepper).
+            {/* Two sides and a line under them. Left, finding the element:
+                the stepper (count, Previous element, Next element, Go to
+                element; FlaggedStepper), the reader's main task, where
+                reading starts. Right, how the copy is shown: Show at full
+                width and Hide highlights, settings rather than steps. Under
+                both, on a line of its own at a reading width, what Go to
+                element does (also its description) and, when focus could
+                not move, why (a status, in words; SC 4.1.3 Status Messages,
+                Level AA). "5 places highlighted" is not shown beside the
+                stepper: "Flagged element 1 of 5" already gives the number,
+                and saying it twice crowded the bar into a third line (W3C
+                COGA, "Making Content Usable",
+                https://www.w3.org/TR/coga-usable/: keep it simple, no
+                repeats). Without the stepper the label stays: it says the
+                copy's name, or that highlighting is under way. */}
+            <div className="flex flex-wrap items-center gap-2 rounded-t-[7px] border-b border-border bg-surface-muted/40 px-3 py-2">
+              {stepping ? (
                 <FlaggedStepper
                   count={highlightedCount}
                   index={pageMark}
                   onGo={goToPageMark}
-                  className="ml-auto"
+                  detail={
+                    currentElement
+                      ? `${currentElement.kind}${currentElement.text ? `, “${currentElement.text}”` : ""}`
+                      : undefined
+                  }
+                  goTo={currentElement ? { onClick: goToElement, ref: goToRef, hintId: "inspect-go-to-hint" } : undefined}
                 />
+              ) : (
+                <span className="text-xs font-semibold text-fg-subtle">
+                  {highlightPending ? "Highlighting…" : copyName}
+                </span>
               )}
-              {checkLayout && (
-                // eslint-disable-next-line react/forbid-elements -- Convert: styled by hand like a secondary Button; use Button variant="secondary" size="sm"
-                <button
-                  type="button"
-                  aria-pressed={!asChecked}
-                  onClick={() => setAsChecked((value) => !value)}
-                  className="inline-flex min-h-target items-center gap-1 rounded-xs border border-border-strong bg-surface px-3 text-xs font-semibold text-fg hover:bg-surface-muted"
-                >
-                  Show at full width
-                </button>
+              <span className="ml-auto flex flex-wrap items-center gap-2">
+                {checkLayout && (
+                  // eslint-disable-next-line react/forbid-elements -- Convert: styled by hand like a secondary Button; use Button variant="secondary" size="sm"
+                  <button
+                    type="button"
+                    aria-pressed={!asChecked}
+                    onClick={() => setAsChecked((value) => !value)}
+                    className="inline-flex min-h-target items-center gap-1 rounded-xs border border-border-strong bg-surface px-3 text-xs font-semibold text-fg hover:bg-surface-muted"
+                  >
+                    Show at full width
+                  </button>
+                )}
+                {hasTarget && (
+                  // eslint-disable-next-line react/forbid-elements -- Convert: styled by hand like a secondary Button; use Button variant="secondary" size="sm"
+                  <button
+                    type="button"
+                    onClick={toggleHighlights}
+                    className="inline-flex min-h-target items-center gap-1 rounded-xs border border-border-strong bg-surface px-3 text-xs font-semibold text-fg hover:bg-surface-muted"
+                  >
+                    {showHighlights ? "Hide highlights" : "Show highlights"}
+                  </button>
+                )}
+              </span>
+              {stepping && currentElement && (
+                <p id="inspect-go-to-hint" className="basis-full text-xs text-fg-muted">
+                  <span className="block max-w-measure">
+                    Go to element moves keyboard focus to it. Press Escape to come back.
+                  </span>
+                </p>
               )}
-              {hasTarget && (
-                // eslint-disable-next-line react/forbid-elements -- Convert: styled by hand like a secondary Button; use Button variant="secondary" size="sm"
-                <button
-                  type="button"
-                  onClick={toggleHighlights}
-                  className="inline-flex min-h-target items-center gap-1 rounded-xs border border-border-strong bg-surface px-3 text-xs font-semibold text-fg hover:bg-surface-muted"
-                >
-                  {showHighlights ? "Hide highlights" : "Show highlights"}
-                </button>
+              <p role="status" className="basis-full text-xs text-fg empty:sr-only">
+                {goToNote && (
+                  <span key={goToNote.attempt} className="block max-w-measure">
+                    {goToNote.text}
+                  </span>
+                )}
+              </p>
+            </div>
+            {/* Why a highlight is missing or partial ("Axcess could not find
+                the flagged element in this copy", "found 3 of 5"), and
+                other limits of what the copy shows, directly under the
+                toolbar, before the element's facts and the copy.
+                It sat under the copy, below a frame three quarters of the
+                screen tall, so a reader who saw no box had to scroll past
+                the whole page to learn why, and a screen reader reached it
+                only after the page. Here it is read first, as the saved
+                styles note above the copy is (SC 1.3.2 Meaningful
+                Sequence, Level A; W3C COGA, "Making Content Usable",
+                https://www.w3.org/TR/coga-usable/: put what people need
+                where they look for it). The key to the marks ("Dashed red
+                outlines mark…") stays under the copy, beside the marks it
+                explains: on top it pushed the copy down until stepping put
+                the box below the screen, and the stepper's status already
+                says which element the reader is on. Still a
+                polite live region, always in the page and empty until there
+                is something to say (empty:sr-only). Each message stops at a
+                readable width (max-w-measure, SC 1.4.8 Visual Presentation,
+                Level AAA); the band still spans the panel. */}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-border px-3 py-2 text-xs text-fg-muted empty:sr-only [&>span]:max-w-measure" aria-live="polite">
+              {highlightPending && (
+                <span>Highlighting the flagged element…</span>
+              )}
+              {!highlightPending &&
+                showHighlights &&
+                highlight !== null &&
+                highlightedCount > 0 &&
+                highlight.located + highlight.ambiguous + unreachableCount < highlight.total && (
+                  <span className="text-sev-major">
+                    Axcess found {highlight.located} of {highlight.total} flagged
+                    occurrences.{" "}
+                    {missingReason?.whenSomeFound ??
+                      "The others may have changed since the scan."}
+                  </span>
+                )}
+              {!highlightPending && showHighlights && highlight !== null && highlight.ambiguous > 0 && (
+                // Never a guess: the same markup in several places, with no
+                // locator to tell them apart, is said, not outlined.
+                <span className="text-sev-major">
+                  {highlight.ambiguous === 1
+                    ? "1 occurrence is not outlined: its markup appears in more than one place in this saved copy, and Axcess does not guess which."
+                    : `${highlight.ambiguous} occurrences are not outlined: their markup appears in more than one place in this saved copy, and Axcess does not guess which.`}
+                </span>
+              )}
+              {!highlightPending && showHighlights && highlight !== null && unreachableCount > 0 && (
+                // Never a guess: an element inside shadow DOM or a frame is
+                // in no saved copy, and one that looks the same elsewhere is
+                // not it (see ``unreachableLocator``). Said, with the reason.
+                <span className="text-sev-major">
+                  {unreachableSentence(highlight.unreachable.shadow, "shadow")}
+                  {highlight.unreachable.shadow > 0 && highlight.unreachable.frame > 0 && " "}
+                  {unreachableSentence(highlight.unreachable.frame, "frame")}
+                </span>
+              )}
+              {!highlightPending &&
+                showHighlights &&
+                hasScopedTarget &&
+                highlightedCount === 0 &&
+                unreachableCount < (highlight?.total ?? 0) && (
+                // Only drops the error styling when interaction accounts for
+                // every miss. Then "not found" is the expected result and
+                // flagging it warns about a fact of how the scan works; with a
+                // mix, something genuinely should have been matched.
+                <span className={missingReason?.certain ? undefined : "text-sev-major"}>
+                  {missingReason?.whenNoneFound ??
+                    "Axcess could not find the flagged element in this copy. The page may have changed since the scan."}
+                </span>
+              )}
+              {canvasPage && (
+                <span>
+                  This page draws on a drawing area (canvas). The saved copy runs no scripts, so it does not show the
+                  drawing, only any backup content the page gave. Nothing drawn on it can be outlined.
+                </span>
+              )}
+              {activeStateKey === null && hiddenImageCount > 0 && (
+                <span>
+                  {hiddenImageCount === 1
+                    ? "1 more occurrence is in page code that browsers do not show when scripts run (a <noscript> or <template> element), usually a backup copy of an image. It is not outlined."
+                    : `${hiddenImageCount} more occurrences are in page code that browsers do not show when scripts run (a <noscript> or <template> element), usually backup copies of images. They are not outlined.`}
+                </span>
+              )}
+              {offStateCount > 0 && (
+                // Without this the issue looks smaller in a state view than it
+                // is: the picker is the only way to the rest of it.
+                <span>
+                  {offStateCount} more {offStateCount === 1 ? "occurrence" : "occurrences"} of
+                  this issue {offStateCount === 1 ? "is" : "are"} in another page
+                  state. Choose it in the Page state list.
+                </span>
+              )}
+              {!showHighlights && hasScopedTarget && (
+                <span>Highlights are hidden for this page.</span>
+              )}
+              {!hasTarget && (
+                <span>
+                  {render.source === "stored"
+                    ? "This is the copy the scan saved. This issue has no element to mark."
+                    : "Axcess loaded this page just now. This issue has no element to mark."}
+                </span>
+              )}
+              {!data.store_rendered_html && (
+                <span>
+                  This scan did not save copies of pages, so Axcess loads the
+                  live page each time you open it.
+                </span>
               )}
             </div>
             {/* Sandboxed with scripts disabled: the page's own JS never runs,
@@ -1129,12 +1332,11 @@ export default function InspectorRoute() {
                 style={layout?.width ? { width: layout.width, height: layout.height ?? undefined } : undefined}
               />
             </div>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border px-3 py-2 text-xs text-fg-muted" aria-live="polite">
-              {highlightPending && (
-                <span>Highlighting the flagged element…</span>
-              )}
-              {!highlightPending && showHighlights && highlightedCount > 0 && (
-                <span>
+            {/* The key to the marks, under the copy it explains (see the
+                status band above the facts for why it is here). */}
+            {!highlightPending && showHighlights && highlightedCount > 0 && (
+              <p className="border-t border-border px-3 py-2 text-xs text-fg-muted">
+                <span className="block max-w-measure">
                   {highlightedCount > 1
                     ? `Dashed red outlines mark the ${highlightedCount} flagged elements on this page. The one you are on has a numbered blue box with a yellow ring, and the rest of the page is dimmed.`
                     : // Never describe a box that is not drawn (see ``drawsNoBox``).
@@ -1142,104 +1344,26 @@ export default function InspectorRoute() {
                       ? "No box marks the flagged element. The table above the saved copy says why."
                       : "A blue box with a yellow ring marks the flagged element."}
                 </span>
-              )}
-              {!highlightPending &&
-                showHighlights &&
-                highlight !== null &&
-                highlightedCount > 0 &&
-                highlight.located + highlight.ambiguous + unreachableCount < highlight.total && (
-                  <span className="text-sev-major">
-                    Axcess found {highlight.located} of {highlight.total} flagged
-                    occurrences.{" "}
-                    {missingReason?.whenSomeFound ??
-                      "The others may have changed since the scan."}
-                  </span>
-                )}
-              {!highlightPending && showHighlights && highlight !== null && highlight.ambiguous > 0 && (
-                // Never a guess: the same markup in several places, with no
-                // locator to tell them apart, is said, not outlined.
-                <span className="text-sev-major">
-                  {highlight.ambiguous === 1
-                    ? "1 occurrence is not outlined: its markup appears in more than one place in this saved copy, and Axcess does not guess which."
-                    : `${highlight.ambiguous} occurrences are not outlined: their markup appears in more than one place in this saved copy, and Axcess does not guess which.`}
-                </span>
-              )}
-              {!highlightPending && showHighlights && highlight !== null && unreachableCount > 0 && (
-                // Never a guess: an element inside shadow DOM or a frame is
-                // in no saved copy, and one that looks the same elsewhere is
-                // not it (see ``unreachableLocator``). Said, with the reason.
-                <span className="text-sev-major">
-                  {unreachableSentence(highlight.unreachable.shadow, "shadow")}
-                  {highlight.unreachable.shadow > 0 && highlight.unreachable.frame > 0 && " "}
-                  {unreachableSentence(highlight.unreachable.frame, "frame")}
-                </span>
-              )}
-              {!highlightPending &&
-                showHighlights &&
-                hasScopedTarget &&
-                highlightedCount === 0 &&
-                unreachableCount < (highlight?.total ?? 0) && (
-                // Only drops the error styling when interaction accounts for
-                // every miss. Then "not found" is the expected result and
-                // flagging it warns about a fact of how the scan works; with a
-                // mix, something genuinely should have been matched.
-                <span className={missingReason?.certain ? undefined : "text-sev-major"}>
-                  {missingReason?.whenNoneFound ??
-                    "Axcess could not find the flagged element in this copy. The page may have changed since the scan."}
-                </span>
-              )}
-              {canvasPage && (
-                <span>
-                  This page draws on a drawing area (canvas). The saved copy runs no scripts, so it does not show the
-                  drawing, only any backup content the page gave. Nothing drawn on it can be outlined.
-                </span>
-              )}
-              {activeStateKey === null && hiddenImageCount > 0 && (
-                <span>
-                  {hiddenImageCount === 1
-                    ? "1 more occurrence is in page code that browsers do not show when scripts run (a <noscript> or <template> element), usually a backup copy of an image. It is not outlined."
-                    : `${hiddenImageCount} more occurrences are in page code that browsers do not show when scripts run (a <noscript> or <template> element), usually backup copies of images. They are not outlined.`}
-                </span>
-              )}
-              {offStateCount > 0 && (
-                // Without this the issue looks smaller in a state view than it
-                // is: the picker is the only way to the rest of it.
-                <span>
-                  {offStateCount} more {offStateCount === 1 ? "occurrence" : "occurrences"} of
-                  this issue {offStateCount === 1 ? "is" : "are"} in another page
-                  state. Choose it in the Page state list.
-                </span>
-              )}
-              {!showHighlights && hasScopedTarget && (
-                <span>Highlights are hidden for this page.</span>
-              )}
-              {!hasTarget && (
-                <span>
-                  {render.source === "stored"
-                    ? "This is the copy the scan saved. This issue has no element to mark."
-                    : "Axcess loaded this page just now. This issue has no element to mark."}
-                </span>
-              )}
-              {!data.store_rendered_html && (
-                <span>
-                  This scan did not save copies of pages, so Axcess loads the
-                  live page each time you open it.
-                </span>
-              )}
-            </div>
-            {/* Outside the live region above: this is standing context about
+              </p>
+            )}
+            {/* Outside the status band under the toolbar: this is standing context about
                 the capture, not a status that changes, so it should not be
                 re-announced every time the highlight count updates. It says
                 where the styles come from, because that differs: a copy with
-                saved styles uses them, an older copy loads the site's. */}
-            <p className="border-t border-border px-3 py-2 text-2xs text-fg-muted">
-              {savedStyles
-                ? "The page code shown here is a copy. Its styles are the ones the scan saved. Its fonts and images load from the live site now, so they can look different from how they looked during the scan."
-                : "The page code shown here is a copy. Its styles, fonts, and images load from the live site now, so the page can look different from how it looked during the scan."}{" "}
-              The page&rsquo;s own scripts never run here. So if the site would
-              only show a flagged element with JavaScript, Axcess makes it
-              visible to highlight it.
-            </p>
+                saved styles uses them, an older copy loads the site's. The
+                band spans the panel and the text inside it stops at a
+                readable width (max-w-measure, SC 1.4.8 Visual Presentation,
+                Level AAA): capping the band itself cut its top border short. */}
+            <div className="border-t border-border px-3 py-2 text-2xs text-fg-muted">
+              <p className="max-w-measure">
+                {savedStyles
+                  ? "The page code shown here is a copy. Its styles are the ones the scan saved. Its fonts and images load from the live site now, so they can look different from how they looked during the scan."
+                  : "The page code shown here is a copy. Its styles, fonts, and images load from the live site now, so the page can look different from how it looked during the scan."}{" "}
+                The page&rsquo;s own scripts never run here. So if the site would
+                only show a flagged element with JavaScript, Axcess makes it
+                visible to highlight it.
+              </p>
+            </div>
             {/* Below the page and closed: above it, the list pushed the page
                 the reviewer came to see out of view. */}
             {evidenceCount > 0 && (
@@ -1423,11 +1547,32 @@ function savedStylesFor(inspection: PageInspection): SavedStyles | null {
  *    disabled, so a single-page app announces "You need to enable JavaScript
  *    to run this app" over markup that was captured with JavaScript running.
  *    It is the alternative to a state this document is not in.
+ * 6. Each `<iframe>` gets the document the scan saved for it, readied by the
+ *    same steps, or a note saying the saved copy does not include it (see
+ *    `withSavedFrames`). This happens first, on the markup as saved, because
+ *    a frame's place is counted in it.
  *
  * The DOM-source view deliberately does not go through this: that tab shows
  * the evidence as stored, and these edits exist only to render it.
  */
-function prepareCapture(html: string | null, url: string | null, savedStylesUrl: string | null = null): string | null {
+function prepareCapture(
+  html: string | null,
+  url: string | null,
+  savedStylesUrl: string | null = null,
+  frames?: SavedFrame[],
+): string | null {
+  if (!html) return html;
+  // Frames first, while the markup is as saved: their places are counted in
+  // it. Each frame's document is readied like a page without saved CSS.
+  return prepareDocument(
+    withSavedFrames(html, frames, url, (doc, frameUrl) => prepareDocument(doc, frameUrl) ?? doc),
+    url,
+    savedStylesUrl,
+  );
+}
+
+/** Steps 1 to 5 above, for the page or for one of its frames. */
+function prepareDocument(html: string | null, url: string | null, savedStylesUrl: string | null = null): string | null {
   if (!html) return html;
   let rendered = html
     .replace(/<meta\b[^>]*http-equiv\s*=\s*["']?content-security-policy[^>]*>/gi, "")
@@ -1513,6 +1658,30 @@ function escapeAttribute(value: string): string {
 }
 
 /**
+ * Scroll the inspector page so ``target``, inside the saved copy's frame, is
+ * in view below the sticky top bar, after "Go to element" put focus on
+ * it. Focus moves without scrolling (``focusInCopy``) and ``keepCentered``
+ * scrolls only the frame, which is right while stepping, where the page must
+ * not jump. But this button is above the frame, so on a short window (or
+ * with a tall facts table) focus landed on an element below the bottom of
+ * the screen, and a keyboard user could not see where it went (SC 2.4.11
+ * Focus Not Obscured (Minimum), Level AA; found by review). The page moves
+ * only when the element is not fully shown already, and then centres it in
+ * the room under the bar (the page's scroll-padding-top, styles.css).
+ */
+function revealInPage(frame: HTMLIFrameElement, target: HTMLElement): void {
+  const outer = frame.getBoundingClientRect();
+  const inner = boxPlace(target).rect;
+  // The part of the element the frame shows, in the page's view.
+  const top = outer.top + frame.clientTop + Math.max(0, inner.top);
+  const bottom = outer.top + frame.clientTop + Math.min(frame.clientHeight, Math.max(inner.bottom, inner.top + 1));
+  const reserved = parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
+  if (top >= reserved && bottom <= window.innerHeight) return;
+  const middle = (top + bottom) / 2;
+  window.scrollBy({ top: middle - (reserved + (window.innerHeight - reserved) / 2), behavior: "instant" });
+}
+
+/**
  * Center ``target`` in its frame and hold it there while the layout settles.
  *
  * A single `scrollIntoView` is not enough: the capture's fonts and images (and,
@@ -1571,8 +1740,9 @@ function keepCentered(target: HTMLElement): void {
         });
       }
       const rect = boxPlace(target).rect;
+      const band = shownBand(win);
       win.scrollTo({
-        top: win.scrollY + toCentre(rect.top, rect.height, win.innerHeight, "top"),
+        top: win.scrollY + toCentre(rect.top - band.start, rect.height, band.size, "top"),
         left: win.scrollX + toCentre(rect.left, rect.width, win.innerWidth, "left"),
         behavior: "instant",
       });
@@ -1583,6 +1753,40 @@ function keepCentered(target: HTMLElement): void {
     }
   };
   step();
+}
+
+/**
+ * The part of the saved copy's view that is on the reader's screen, top to
+ * bottom, in the copy's own pixels: below the sticky top bar (the page's
+ * scroll-padding-top) and above the bottom of the window.
+ *
+ * Stepping centred the element in the frame, and the frame is tall (three
+ * quarters of the window) and starts under the toolbar, the status messages
+ * and the facts table. On a window of ordinary height its middle was below
+ * the screen, so after "Next element" the box was out of sight and the
+ * reader had to scroll the page to find it. Centring in the part of the
+ * frame that shows puts the box where the reader is already looking, and
+ * the page still does not move while stepping (keepCentered says why).
+ * When less than 160 pixels of the frame show, there is no room to centre
+ * anything, and the whole frame is used, as before. Found by the stepping
+ * test once the content above the copy grew. The nearest criterion is SC
+ * 2.4.11 Focus Not Obscured (Minimum), Level AA (paraphrased: what the
+ * reader is on is not hidden from them).
+ */
+function shownBand(win: Window): { start: number; size: number } {
+  const whole = { start: 0, size: win.innerHeight };
+  try {
+    const frame = win.frameElement as HTMLElement | null;
+    const outer = frame?.ownerDocument?.defaultView;
+    if (!frame || !outer) return whole;
+    const r = frame.getBoundingClientRect();
+    const reserved = parseFloat(outer.getComputedStyle(outer.document.documentElement).scrollPaddingTop) || 0;
+    const top = Math.max(0, reserved - r.top - frame.clientTop);
+    const bottom = Math.min(win.innerHeight, outer.innerHeight - r.top - frame.clientTop);
+    return bottom - top < Math.min(160, win.innerHeight) ? whole : { start: top, size: bottom - top };
+  } catch {
+    return whole;
+  }
 }
 
 /**
@@ -1737,12 +1941,36 @@ function ElementFact({ term, stack = false, children }: { term: string; stack?: 
 }
 
 /**
- * An element locator on one line, cut at its start, so its end, the part
- * that names the element, stays in view. "Show all" puts each step on its
- * own line. "Copy element locator" copies all of it either way. The cut is
- * visual only: the text in the page is the whole locator, character for
- * character, and a screen reader reads all of it. The copy button's words
- * never change; the result is given in words in a status beside it.
+ * An element locator, and under it the two controls for it: "Copy element
+ * locator" and, when the locator is cut, "Show all".
+ *
+ * The locator is on one line, cut at its start, so its end, the part that
+ * names the element, stays in view; "Show all" puts each step on its own
+ * line. The cut is visual only: the text in the page is the whole locator,
+ * character for character, and a screen reader reads all of it.
+ *
+ * The controls are on their own line under the locator, in the value
+ * column. Rejected, in turn: (1) the controls at the end of the locator's
+ * line, which made that row a 44 px button tall, taller than the rows above
+ * it, so the facts table lost its even rhythm where the eye reads values;
+ * and a "Show all" that came and went there changed the locator's width,
+ * which changed whether it was cut, every frame, so it had to stay in place
+ * invisibly, keeping the gap. (2) "Copy element locator" in a row of its
+ * own under the whole table, behind a divider, far from the value it copies.
+ * Under the locator, Copy sits next to what it acts on (W3C COGA, "Making
+ * Content Usable", https://www.w3.org/TR/coga-usable/: keep related things
+ * together), the locator's line is plain text like the others, and "Show
+ * all" can be left out entirely when the locator fits, since it no longer
+ * shares the locator's line. Copy comes first, so it stays in one place
+ * whether or not Show all is there. Both are full 44 px targets (SC 2.5.5
+ * Target Size (Enhanced), Level AAA).
+ *
+ * The copy button's words never change; the result is said in words in a
+ * status under the controls, at a reading width (SC 4.1.3 Status Messages,
+ * Level AA; SC 1.4.8 Visual Presentation, Level AAA). Each copy gets a new
+ * key, so a second "Copied" is announced like the first. When the browser
+ * blocks copying (plain http on a network address), the whole locator is
+ * shown and selected, so Ctrl+C or Command+C copies it.
  */
 function LocatorValue({
   id,
@@ -1760,20 +1988,17 @@ function LocatorValue({
   const toggleRef = useRef<HTMLButtonElement>(null);
   const copyRef = useRef<HTMLButtonElement>(null);
   const [cut, setCut] = useState(false);
-  // Whether the locator is wider than its box, measured on a hidden copy of
+  // Whether the locator is wider than its line, measured on a hidden copy of
   // it on one line (the probe), so the answer holds while it is shown in
-  // full too. The box's width never depends on the answer: the toggle keeps
-  // its place when it is not needed, only hidden. (It used to appear only
-  // when needed, which could narrow the box, change the answer and remove
-  // it again, every frame.) A font that arrives late resizes the probe,
-  // which measures again.
+  // full too. A font that arrives late resizes the probe, which measures
+  // again.
   useLayoutEffect(() => {
     const code = codeRef.current;
     const probe = probeRef.current;
     if (!code || !probe) return;
     const measure = () => {
       const isCut = probe.getBoundingClientRect().width > code.clientWidth + 0.5;
-      // The toggle is about to hide: move its focus on rather than lose it.
+      // The toggle is about to go: move its focus on rather than lose it.
       if (!isCut && !open && document.activeElement === toggleRef.current) copyRef.current?.focus();
       setCut(isCut);
     };
@@ -1784,27 +2009,8 @@ function LocatorValue({
     return () => observer.disconnect();
   }, [open]);
 
-  // Each copy gets a new key, so the status is new content every time and a
-  // second "Copied" is announced like the first.
   const attempts = useRef(0);
   const [copied, setCopied] = useState<{ attempt: number; ok: boolean } | null>(null);
-  const copy = async () => {
-    attempts.current += 1;
-    const attempt = attempts.current;
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied({ attempt, ok: true });
-    } catch {
-      // No clipboard, for example plain http on a network address. Show the
-      // whole locator and select it, so Ctrl+C or Command+C copies it.
-      setCopied({ attempt, ok: false });
-      if (open) selectLocator();
-      else {
-        selectWhenOpen.current = true;
-        onOpenChange(true);
-      }
-    }
-  };
   const selectLocator = () => {
     const code = codeRef.current;
     if (code) window.getSelection()?.selectAllChildren(code);
@@ -1816,6 +2022,21 @@ function LocatorValue({
     selectWhenOpen.current = false;
     selectLocator();
   });
+  const copy = async () => {
+    attempts.current += 1;
+    const attempt = attempts.current;
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied({ attempt, ok: true });
+    } catch {
+      setCopied({ attempt, ok: false });
+      if (open) selectLocator();
+      else {
+        selectWhenOpen.current = true;
+        onOpenChange(true);
+      }
+    }
+  };
 
   // Split before each " > ", so the steps join back into the exact locator.
   // The split is for display only: textContent, copy and tests stay exact.
@@ -1830,9 +2051,8 @@ function LocatorValue({
         {step}
       </span>
     ));
-  const needed = cut || open;
   return (
-    <div className="relative flex flex-wrap items-baseline gap-x-2 gap-y-1">
+    <div className="relative">
       {/* Out of the flow and clipped to nothing, so it never widens the page. */}
       <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-0 overflow-hidden">
         <span ref={probeRef} className="invisible inline-block whitespace-nowrap font-mono text-xs">
@@ -1844,7 +2064,7 @@ function LocatorValue({
         ref={codeRef}
         translate="no"
         className={cn(
-          "min-w-0 flex-[1_1_12rem] font-mono text-xs text-fg",
+          "block min-w-0 font-mono text-xs text-fg",
           !open && "overflow-hidden text-ellipsis whitespace-nowrap text-left [direction:rtl]",
         )}
       >
@@ -1852,30 +2072,32 @@ function LocatorValue({
           {stepSpans(open)}
         </span>
       </code>
-      <span className="ml-auto flex flex-wrap items-center justify-end gap-1">
-        <Button
-          ref={toggleRef}
-          type="button"
-          variant="ghost"
-          size="sm"
-          className={cn("min-h-target", !needed && "invisible")}
-          aria-expanded={open}
-          aria-controls={id}
-          onClick={() => {
-            // Closing a locator that fits hides this button: focus Copy first.
-            if (open && !cut) copyRef.current?.focus();
-            onOpenChange(!open);
-          }}
-        >
-          {open ? <ChevronUp className="h-3.5 w-3.5" aria-hidden /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden />}
-          {open ? "Show less" : "Show all"}
-        </Button>
-        <Button ref={copyRef} type="button" size="sm" className="min-h-target" onClick={copy}>
+      <div className="mt-1 flex flex-wrap items-center gap-2">
+        <Button ref={copyRef} type="button" variant="secondary" size="sm" className="min-h-target" onClick={copy}>
           <Copy className="h-3.5 w-3.5" aria-hidden />
           Copy element locator
         </Button>
-      </span>
-      <span role="status" className="basis-full text-xs text-fg empty:sr-only">
+        {(cut || open) && (
+          <Button
+            ref={toggleRef}
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="min-h-target"
+            aria-expanded={open}
+            aria-controls={id}
+            onClick={() => {
+              // Closing a locator that fits removes this button: focus Copy first.
+              if (open && !cut) copyRef.current?.focus();
+              onOpenChange(!open);
+            }}
+          >
+            {open ? <ChevronUp className="h-3.5 w-3.5" aria-hidden /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden />}
+            {open ? "Show less" : "Show all"}
+          </Button>
+        )}
+      </div>
+      <p role="status" className="mt-1 max-w-measure text-xs text-fg empty:sr-only">
         {copied &&
           (copied.ok ? (
             <span key={copied.attempt} className="inline-flex items-center gap-1">
@@ -1888,7 +2110,7 @@ function LocatorValue({
               Press Ctrl+C, or Command+C on a Mac, to copy it.
             </span>
           ))}
-      </span>
+      </p>
     </div>
   );
 }

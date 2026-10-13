@@ -1,4 +1,5 @@
 import AlfaEvidenceNote from "../components/AlfaEvidenceNote";
+import ImpactChip from "../components/ImpactChip";
 import { Link, useParams, useSearchParams } from "react-router";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -18,6 +19,7 @@ import {
   PageHeader,
   PageLink,
   pageEvidencePath,
+  shortLocator,
   Select,
   StatCard,
 } from "../components/ui";
@@ -25,9 +27,7 @@ import { withoutUserinfo } from "../components/ReportCrumb";
 import type {
   A11yRuleGroup,
   A11yRuleGroupFinding,
-  AxeImpact,
   FindingStatus,
-  Severity,
 } from "../api/types";
 import { TablePagination, usePagedRows } from "../components/TablePagination";
 import {
@@ -132,7 +132,7 @@ export default function A11yByRuleRoute() {
       >
         <div className="flex items-start gap-3">
           <Info className="mt-0.5 h-5 w-5 shrink-0 text-umich-blue" aria-hidden />
-          <p className="text-sm text-fg">
+          <p className="max-w-measure text-sm text-fg">
             <strong>How this page groups issues.</strong> Each issue is one
             rule from one check. This view helps you <em>plan fixes</em>. For
             example, the <code>color-contrast</code> rule may fail 800 times.
@@ -289,7 +289,10 @@ function RuleGroupCard({
                         className="inline-flex items-center gap-1 text-umich-blue underline underline-offset-2"
                       >
                         About this rule <ExternalLink className="h-3 w-3" aria-hidden />
-                        <span className="sr-only">(opens in a new tab)</span>
+                        {/* Which rule, so the link names its destination by
+                            itself (SC 2.4.9 Link Purpose (Link Only), Level
+                            AAA; WCAG technique C7). */}
+                        <span className="sr-only">, {group.rule_id} (opens in a new tab)</span>
                       </a>
                     </>
                   )}
@@ -375,6 +378,8 @@ function FindingRow({
           pageUrl={finding.page_url}
           pageTitle={finding.page_title}
           selector={finding.target_selector}
+          elementName={finding.target_display}
+          occurrenceId={finding.id}
           snippet={finding.html_snippet}
           origin="Rule check issues by rule"
           context={ruleId}
@@ -389,7 +394,7 @@ function FindingRow({
         </code>
         {finding.html_snippet && (
           <details className="mt-1">
-            <summary className="cursor-pointer text-2xs text-fg-muted">
+            <summary className="flex min-h-target cursor-pointer items-center text-2xs text-fg-muted">
               Show element code (HTML)
             </summary>
             <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-xs bg-surface-muted p-2 text-2xs">
@@ -398,7 +403,17 @@ function FindingRow({
           </details>
         )}
         <AlfaEvidenceNote evidence={finding} />
-        <Link className="report-link inline-flex min-h-target items-center text-xs" to={pageEvidencePath({ scanId, pageId: finding.page_id, origin: "Rule check issues by rule", backTo: `/scans/${scanId}/a11y/by-rule`, hash: `#finding-${finding.id}` })}>Open the evidence for this occurrence</Link>
+        <Link className="report-link inline-flex min-h-target items-center text-xs" to={pageEvidencePath({ scanId, pageId: finding.page_id, origin: "Rule check issues by rule", backTo: `/scans/${scanId}/a11y/by-rule`, hash: `#finding-${finding.id}` })}>
+          Open the evidence for this occurrence
+          {/* Which occurrence, by page, element and ID, for the same reason
+              as PageLink's context (SC 2.4.9 Link Purpose (Link Only), Level
+              AAA; WCAG technique C7). The ID is what makes it unique: two
+              elements' short locators can match. */}
+          <span className="sr-only">
+            {" "}on {finding.page_title?.trim() || finding.page_url}, at{" "}
+            {shortLocator(finding.target_display || finding.target_selector)}, occurrence {finding.id}
+          </span>
+        </Link>
         {finding.failure_summary && (
           <div className="mt-1 text-2xs text-fg-muted">
             {finding.failure_summary}
@@ -472,24 +487,5 @@ function RuleBulkBar({
         </span>
       )}
     </div>
-  );
-}
-
-/** Mirror of the chip used in the by-SC view, keep both in sync. */
-function ImpactChip({ value }: { value: AxeImpact }) {
-  const tone: Severity = (
-    {
-      critical: "critical",
-      serious: "major",
-      moderate: "minor",
-      minor: "info",
-    } as const
-  )[value];
-  return (
-    <span
-      className={`inline-flex items-center rounded-xs px-1.5 py-0.5 text-2xs font-semibold text-white bg-sev-${tone}-bg`}
-    >
-      {value}
-    </span>
   );
 }

@@ -86,6 +86,9 @@ const config: Config = {
         // The stack itself is `--font-sans` in styles.css, so the Font
         // setting can swap it without touching a class.
         sans: ["var(--font-sans)"],
+        // The "axcess" logo beside the brand mark, and nothing else (see
+        // `src/fonts.css`). Not swapped by the Font setting: it is the logo.
+        brand: ['"Comfortaa"', "var(--font-sans)"],
         mono: [
           '"Atkinson Hyperlegible Mono"',
           "ui-monospace",
@@ -136,6 +139,17 @@ const config: Config = {
       minWidth: {
         target: "var(--target, 44px)",
       },
+      maxWidth: {
+        // Running text no wider than about 75 characters a line: SC 1.4.8
+        // Visual Presentation, Level AAA, asks for 80 or fewer. Put it on a
+        // paragraph of help or explanation that would otherwise run the
+        // width of a wide panel. Not on a whole area: a blanket cap on every
+        // p, li and dd (the first fix) cut panels' coloured bands short and
+        // squeezed values such as the Inspector's element locator. In em,
+        // not ch: ch is the width of a zero, which is wide in Atkinson
+        // Hyperlegible, so a 70ch cap still let lines reach 97 characters.
+        measure: "35em",
+      },
       borderRadius: {
         "2xs": "5px",
         xs: "8px",
@@ -152,9 +166,16 @@ const config: Config = {
       // (`text-fg-muted`, `font-semibold`), not by being smaller. Do not add
       // a smaller size back, and do not use an arbitrary one (text-[12px])
       // to get round the floor.
+      //
+      // Line height 1.5 (21px on 14px), not Tailwind's 1.25rem (1.43): SC
+      // 1.4.8 Visual Presentation (Level AAA) asks for at least 1.5 within
+      // paragraphs, and Siteimprove Alfa found 122 paragraphs of small text
+      // below it (October 2026 AAA audit). Set on the tokens, so every hint,
+      // caption and note gets it at once; the cost is one pixel per line.
       fontSize: {
-        "2xs": ["0.875rem", { lineHeight: "1.25rem" }], // 14px, was 12px
-        xs: ["0.875rem", { lineHeight: "1.25rem" }], // 14px, was 13px
+        "2xs": ["0.875rem", { lineHeight: "1.3125rem" }], // 14px, was 12px
+        xs: ["0.875rem", { lineHeight: "1.3125rem" }], // 14px, was 13px
+        sm: ["0.875rem", { lineHeight: "1.3125rem" }], // 14px
       },
     },
   },

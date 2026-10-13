@@ -254,15 +254,16 @@ export function TableRegion({
       // names the columns: a jump the reader did not ask for (SC 3.2.1 On
       // Focus, Level A, is about that kind of surprise, paraphrased). On
       // keyboard focus, when the table's top has gone above the top bar,
-      // its top is brought back into view, just under the bar (the 72px
-      // topbar and 16px of room: scroll-mt-[88px]); see the effect above.
+      // its top is brought back into view, just under the bar (the page's
+      // scroll-padding-top in styles.css leaves room for the 72px top bar
+      // and 16px more); see the effect above.
       // A mouse click inside it moves nothing.
       // `relative`: screen-reader-only text in a cell is positioned
       // absolutely (`sr-only`). Without a positioned region it was placed
       // against the page, outside this clip, and on a phone widened the whole
       // page (615px at 320), so it scrolled sideways (SC 1.4.10 Reflow).
       className={cn(
-        "relative scroll-mt-[88px] overflow-x-auto focus:outline-none focus-visible:shadow-focus",
+        "relative overflow-x-auto focus:outline-none focus-visible:shadow-focus",
         CARD_EDGE,
         className,
       )}
@@ -393,7 +394,7 @@ export function SortHeader<K extends string>({
         title={hint}
         onClick={() => onSort(nextSort(sort, column, kind))}
         className={cn(
-          "group inline-flex min-h-target rounded-xs px-1 text-sm font-semibold normal-case tracking-normal hover:bg-border/50 focus-visible:outline-none focus-visible:shadow-focus",
+          "group inline-flex min-h-target min-w-target justify-center rounded-xs px-1 text-sm font-semibold normal-case tracking-normal hover:bg-border/50 focus-visible:outline-none focus-visible:shadow-focus",
           // Words at the foot of the target, not its middle: with the cell
           // bottom-aligned, the last line of every label then sits on one
           // line, right over the column's data, however many lines each

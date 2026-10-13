@@ -88,7 +88,7 @@ async def test_the_box_covers_only_what_a_clipping_part_shows(
         assert await page.evaluate(f"({BOX_RECT})()") is None
 
         # The cut-off menu item: the box ends where the menu bar does.
-        await group.get_by_role("button", name="Next flagged element").click()
+        await group.get_by_role("button", name="Next element").click()
         await playwright_async.expect(box).to_have_text("2 of 3")
         await settled(page)
         assert await page.evaluate(_box_within(rect_of("#bar"), rect_of("#cut")))
@@ -98,7 +98,7 @@ async def test_the_box_covers_only_what_a_clipping_part_shows(
         )
 
         # The dropdown the browser does not cut off: its whole box.
-        await group.get_by_role("button", name="Next flagged element").click()
+        await group.get_by_role("button", name="Next element").click()
         await playwright_async.expect(box).to_have_text("3 of 3")
         await settled(page)
         assert await page.evaluate(_box_within(rect_of("#drop"), rect_of("#drop")))

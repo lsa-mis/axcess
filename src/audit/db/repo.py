@@ -13,6 +13,7 @@ from contextlib import contextmanager
 from typing import Literal
 
 from audit.analyzer.interaction.base import StateCapture
+from audit.crawler.frame_snapshot import SavedFrame
 from audit.crawler.search import SearchOutcome
 from audit.crawler.style_snapshot import SheetRef, StoredStyles
 from audit.protected.redaction import redact_text
@@ -219,6 +220,60 @@ def saved_copy_styles(
             fingerprint=fingerprint if isinstance(fingerprint, dict) else {},
         )
     return out
+
+
+def replace_page_frames(
+    conn: sqlite3.Connection,
+    *,
+    scan_id: int,
+    page_id: int,
+    frames: Sequence[SavedFrame],
+) -> int:
+    """Make ``frames`` the saved frames of the page as it loaded.
+
+    Replace, not merge: ``upsert_page`` has just replaced the saved copy, and
+    frames kept from an earlier fetch would sit in a document the report no
+    longer holds. An empty sequence deletes them. Returns rows written.
+    """
+    if (
+        conn.execute(
+            "SELECT 1 FROM pages WHERE id = ? AND scan_id = ?", (page_id, scan_id)
+        ).fetchone()
+        is None
+    ):
+        raise ValueError("Saved frames page does not belong to scan")
+    with _status_transaction(conn):
+        conn.execute("DELETE FROM page_frames WHERE page_id = ?", (page_id,))
+        conn.executemany(
+            "INSERT INTO page_frames (scan_id, page_id, frame_id, parent_id, frame_index, "
+            "url, html) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            [(scan_id, page_id, f.frame_id, f.parent_id, f.index, f.url, f.html) for f in frames],
+        )
+    return len(frames)
+
+
+def page_frames(conn: sqlite3.Connection, *, scan_id: int, page_id: int) -> list[SavedFrame]:
+    """The saved frames of one page of one scan, in the order they were read.
+
+    Both ids are required and must match the same row, so one report can never
+    read another's frames.
+    """
+    rows = conn.execute(
+        "SELECT f.frame_id, f.parent_id, f.frame_index, f.url, f.html "
+        "FROM page_frames f JOIN pages p ON p.id = f.page_id "
+        "WHERE f.page_id = ? AND f.scan_id = ? AND p.scan_id = ? ORDER BY f.frame_id",
+        (page_id, scan_id, scan_id),
+    ).fetchall()
+    return [
+        SavedFrame(
+            frame_id=int(row["frame_id"]),
+            parent_id=int(row["parent_id"]),
+            index=int(row["frame_index"]),
+            url=str(row["url"] or ""),
+            html=bytes(row["html"]),
+        )
+        for row in rows
+    ]
 
 
 def record_interaction_run(

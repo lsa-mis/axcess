@@ -162,7 +162,7 @@ async def test_an_image_issue_outlines_its_images_and_says_what_it_leaves_out(
     page_id = _seed(db_path, scan_id)
     page = await _open(new_page, base, scan_id, page_id, "image:informational_adequate")
     try:
-        await playwright_async.expect(page.get_by_text("2 places highlighted")).to_be_visible()
+        await playwright_async.expect(page.get_by_text("Flagged element 1 of 2")).to_be_visible()
         frame = page.frame_locator("iframe[title^='Saved copy']")
         marked = frame.locator(".axcess-inspect-highlight")
         await playwright_async.expect(marked).to_have_count(2)
@@ -175,7 +175,7 @@ async def test_an_image_issue_outlines_its_images_and_says_what_it_leaves_out(
         await playwright_async.expect(where).to_have_text("Number 1 of the 3 img elements")
         await playwright_async.expect(_fact(page, "Image address")).to_have_text("/sale.png")
         group = page.get_by_role("group", name="Flagged elements", exact=True)
-        await group.get_by_role("button", name="Next flagged element").click()
+        await group.get_by_role("button", name="Next element").click()
         await playwright_async.expect(where).to_have_text("Number 3 of the 3 img elements")
         await playwright_async.expect(
             page.get_by_text(

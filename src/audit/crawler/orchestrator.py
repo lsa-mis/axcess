@@ -1638,6 +1638,14 @@ def _record_page(
         except (sqlite3.Error, ValueError) as exc:
             # The inspector falls back to the live site's CSS without it.
             log.warning("styles.persist_failed", page_id=page_id, error_type=type(exc).__name__)
+        # The frames go with the saved copy too: none when the copy was not
+        # kept, and a re-fetch replaces them.
+        frames = result.frames if rendered_html is not None and result is not None else ()
+        try:
+            repo.replace_page_frames(ctx.conn, scan_id=ctx.scan_id, page_id=page_id, frames=frames)
+        except (sqlite3.Error, ValueError) as exc:
+            # The inspector shows a note in place of each frame without them.
+            log.warning("frames.persist_failed", page_id=page_id, error_type=type(exc).__name__)
     return page_id
 
 

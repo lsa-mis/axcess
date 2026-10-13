@@ -275,12 +275,17 @@ const IssuePageRow = memo(function IssuePageRow({
     <Row index={index}>
       <RowHeader className="text-center font-normal tabular-nums text-fg-muted">{index + 1}</RowHeader>
       <Cell className="min-w-[12rem] font-semibold text-fg">
-        {/* The title opens the inspector with this issue outlined on the page. */}
+        {/* The title opens the inspector with this issue outlined on the page.
+            At least 44 px tall, and laid out as the shared PageLink is (see
+            its comment): a link alone in its cell is not in a sentence, so
+            the SC 2.5.5 Target Size (Enhanced), Level AAA, inline exception
+            does not cover it. The negative margin lets the target's padding
+            use the cell's own, so rows are no taller than before. */}
         <Link
           to={issueInspectorPath({ scanId, pageId: page.page_id, issueKey, origin, backTo })}
-          className="inline-flex items-baseline gap-1 text-umich-blue underline underline-offset-2"
+          className="-my-2.5 inline-flex min-h-target items-start gap-1 py-2.5 text-umich-blue underline underline-offset-2"
         >
-          <ScanEye className="h-5 w-5 shrink-0 self-start pt-0.5 text-fg-subtle" aria-hidden />
+          <ScanEye className="mt-0.5 h-5 w-5 shrink-0 text-fg-subtle" aria-hidden />
           <span>{page.page_title?.trim() || <span className="font-normal">Untitled</span>}</span>
           <span className="sr-only">, opens the saved copy with this issue marked</span>
         </Link>
@@ -291,7 +296,7 @@ const IssuePageRow = memo(function IssuePageRow({
       </Cell>
       <Cell className="whitespace-nowrap text-center">
         {shots > 0 ? (
-          <Link to={screenshotsPath} className="text-umich-blue underline underline-offset-2">
+          <Link to={screenshotsPath} className="inline-flex min-h-target items-center text-umich-blue underline underline-offset-2">
             {shots} screenshot{shots === 1 ? "" : "s"}
             <span className="sr-only"> of this issue on {label}</span>
           </Link>

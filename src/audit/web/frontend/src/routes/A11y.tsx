@@ -1,7 +1,8 @@
 import AlfaEvidenceNote from "../components/AlfaEvidenceNote";
+import ImpactChip from "../components/ImpactChip";
 import { Link, useParams, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ChevronRight, ExternalLink, Info } from "lucide-react";
+import { ChevronRight, ExternalLink, Info } from "lucide-react";
 import { api } from "../api/client";
 import {
   Card,
@@ -16,9 +17,7 @@ import {
 import { withoutUserinfo } from "../components/ReportCrumb";
 import type {
   A11ySCGroup,
-  AxeImpact,
   FindingStatus,
-  Severity,
 } from "../api/types";
 import { TablePagination, usePagedRows } from "../components/TablePagination";
 import {
@@ -206,7 +205,7 @@ function ScopeBanner() {
           className="mt-0.5 h-5 w-5 shrink-0 text-umich-blue"
           aria-hidden
         />
-        <p className="text-sm text-fg">
+        <p className="max-w-measure text-sm text-fg">
           <strong>What this page shows.</strong> Each occurrence names the check
           that found it: <strong>Rule check (axe)</strong> or{" "}
           <strong>Rule check (Alfa)</strong>. Both test pages against fixed
@@ -249,7 +248,7 @@ function SCGroupCard({ scanId, group }: { scanId: number; group: A11ySCGroup }) 
           {group.wcag_sc ? (
             <Link
               to={`/scans/${scanId}/a11y?${linkParams}`}
-              className="text-umich-blue underline underline-offset-2"
+              className="inline-flex min-h-target items-center text-umich-blue underline underline-offset-2"
             >
               WCAG {group.wcag_sc}
             </Link>
@@ -293,11 +292,16 @@ function SCGroupCard({ scanId, group }: { scanId: number; group: A11ySCGroup }) 
                 href={r.help_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-1 inline-flex items-center gap-1 text-xs text-umich-blue underline underline-offset-2"
+                className="inline-flex min-h-target items-center gap-1 text-xs text-umich-blue underline underline-offset-2"
               >
                 {r.pipeline === "alfa" ? "About this rule (Alfa)" : "About this rule"}{" "}
                 <ExternalLink className="h-3 w-3" aria-hidden />
-                <span className="sr-only">(opens in a new tab)</span>
+                {/* Which rule, in screen-reader-only text: every card's link
+                    reads "About this rule", so out of context they could not
+                    be told apart (SC 2.4.9 Link Purpose (Link Only), Level
+                    AAA; WCAG technique C7). The rule ID is the one shown on
+                    the card. */}
+                <span className="sr-only">, {r.rule_id} (opens in a new tab)</span>
               </a>
             )}
           </li>
@@ -562,32 +566,5 @@ function StatusCell({
         </span>
       ) : null}
     </div>
-  );
-}
-
-/**
- * Pill rendering an axe impact value. We map axe's four-level scale to
- * the existing severity tokens so this view inherits the color system
- * the rest of the SPA uses, no new colors to audit. critical → critical,
- * serious → major, moderate → minor, minor → info.
- */
-function ImpactChip({ value }: { value: AxeImpact }) {
-  const tone: Severity = (
-    {
-      critical: "critical",
-      serious: "major",
-      moderate: "minor",
-      minor: "info",
-    } as const
-  )[value];
-  return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-xs px-1.5 py-0.5 text-2xs font-semibold text-white bg-sev-${tone}-bg`}
-    >
-      {value === "critical" && (
-        <AlertTriangle className="h-3 w-3" aria-hidden />
-      )}
-      {value}
-    </span>
   );
 }
