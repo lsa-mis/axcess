@@ -88,6 +88,7 @@ function isTyping(target: EventTarget | null): boolean {
 export default function AppShell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const closeMobileNav = useCallback(() => setMobileNavOpen(false), []);
   const prefs = usePreferences();
   const sidebarCollapsed = prefs.sidebar === "collapsed";
   const shortcutsOn = prefs.shortcuts === "on";
@@ -211,10 +212,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
           <TopBar
             mobileNavOpen={mobileNavOpen}
             onToggleMobileNav={() => setMobileNavOpen((open) => !open)}
-          />
-          {mobileNavOpen && (
-            <MobileNav pathname={pathname} onSearch={() => setCommandOpen(true)} />
-          )}
+            onCloseMobileNav={closeMobileNav}
+          >
+            {mobileNavOpen && <MobileNav pathname={pathname} onSearch={() => setCommandOpen(true)} />}
+          </TopBar>
           <div className="sr-only" aria-live="polite">
             {routeLabel} page loaded
           </div>
@@ -581,13 +582,58 @@ function Sidebar({
 function TopBar({
   mobileNavOpen,
   onToggleMobileNav,
+  onCloseMobileNav,
+  children,
 }: {
   mobileNavOpen: boolean;
   onToggleMobileNav: () => void;
+  onCloseMobileNav: () => void;
+  /** The narrow-screen menu, while it is open (see `MobileNav`). */
+  children?: ReactNode;
 }) {
   const { match: inReport } = useReportTrail();
+  const headerRef = useRef<HTMLElement | null>(null);
+  const menuButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  // The open menu lies over the page (see `MobileNav`), so it closes the way
+  // an overlay does: Escape, which puts focus back on the menu button; a
+  // click or tap outside the bar and the menu; and focus leaving them, so
+  // Tab past the last row cannot land on a link the menu is covering (SC
+  // 2.4.11 Focus Not Obscured (Minimum), Level AA). The WAI-ARIA APG
+  // Disclosure (Show/Hide) pattern, which the button follows
+  // (https://www.w3.org/WAI/ARIA/apg/patterns/disclosure/), asks only for
+  // Enter and Space; these are what an overlay adds. Rejected: making the
+  // page behind it inert, as for Search. The menu is not a dialog, it is the
+  // page's own navigation shown in another place, and a reader may still
+  // scroll the page to compare before choosing.
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+    const header = headerRef.current;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      onCloseMobileNav();
+      menuButtonRef.current?.focus();
+    };
+    const onPointerDown = (event: PointerEvent) => {
+      if (header && !header.contains(event.target as Node)) onCloseMobileNav();
+    };
+    const onFocusOut = (event: FocusEvent) => {
+      const next = event.relatedTarget as Node | null;
+      if (next && header && !header.contains(next)) onCloseMobileNav();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener("pointerdown", onPointerDown);
+    header?.addEventListener("focusout", onFocusOut);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("pointerdown", onPointerDown);
+      header?.removeEventListener("focusout", onFocusOut);
+    };
+  }, [mobileNavOpen, onCloseMobileNav]);
+
   return (
     <header
+      ref={headerRef}
       className="sticky top-0 z-20 flex h-[72px] items-center gap-4 border-b border-border bg-surface/95 px-4 shadow-[0_1px_0_rgba(0,39,76,0.03)] backdrop-blur sm:px-6 lg:px-8"
       role="banner"
     >
@@ -610,6 +656,7 @@ function TopBar({
       <div className="flex min-w-0 flex-1 items-center gap-1.5 text-xl text-fg-muted md:hidden">
         {/* eslint-disable-next-line react/forbid-elements -- Keep: the top bar's menu control, styled with the shell */}
         <button
+          ref={menuButtonRef}
           type="button"
           aria-label={
             mobileNavOpen
@@ -659,6 +706,7 @@ function TopBar({
       <div className="ml-auto flex shrink-0 items-center gap-2 md:hidden">
         <NewScanAction iconOnly={false} />
       </div>
+      {children}
     </header>
   );
 }
@@ -680,13 +728,27 @@ function TopBar({
  * a list down one edge, and Search and Give feedback took their names from
  * an aria-label. Built from the same parts (SearchAction, NavRow,
  * FeedbackAction, FootLink), the two cannot drift apart again. New scan is
- * not repeated here: it is the + button in the top bar, always in view.
+ * not repeated here: it is the New scan button in the top bar, always in
+ * view.
+ *
+ * It lies over the page, inside the sticky top bar and just under it, not
+ * in the page's flow. In the flow it opened at the very top of the page, so
+ * after scrolling down, the menu button in the sticky bar seemed to do
+ * nothing until the reader scrolled back up (found on hardware by the
+ * developer). Under the bar it opens where the reader is, and it scrolls
+ * inside itself when it is taller than the screen, so its last row is always
+ * reachable (SC 1.4.10 Reflow, Level AA). How it closes is with the bar
+ * (`TopBar`).
  */
 function MobileNav({ pathname, onSearch }: { pathname: string; onSearch: () => void }) {
   return (
     <div
       id="mobile-primary-nav"
-      className={cn("border-b border-border px-3 py-3 text-fg shadow-card md:hidden", SIDEBAR_FILL)}
+      className={cn(
+        "absolute inset-x-0 top-full max-h-[calc(100dvh-72px)] overflow-y-auto overscroll-contain",
+        "border-b border-border px-3 py-3 text-fg shadow-card md:hidden",
+        SIDEBAR_FILL,
+      )}
     >
       {/* Full width here, so its icon and word start where the rows' do,
           not centred: one edge to read down (the sidebar centres them in
