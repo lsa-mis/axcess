@@ -49,7 +49,6 @@ from audit.logging import get_logger
 from audit.protected.egress import (
     EgressViolation,
     HostResolver,
-    LoopbackEgressProxy,
     PlaywrightRoutePolicy,
     ProtectedEgressPolicy,
     PublicHttpsManualAuthPolicy,
@@ -92,8 +91,8 @@ _KEEP_REFRESH_S = 5.0
 _KEEP_CAPTURE_TIMEOUT_S = 15.0
 _EPHEMERAL_PROFILE_PREFIX = "axcess-protected-browser-"
 _WEBRTC_BLOCK_INIT_SCRIPT = """
-// Protected scans must not establish a direct UDP/STUN path around the
-// loopback egress proxy. This is defense in depth alongside Chromium's
+// Protected scans must not open a UDP/STUN path that the request check
+// never sees. This is defense in depth alongside Chromium's
 // disable_non_proxied_udp policy; page content is untrusted and never gets a
 // working WebRTC constructor.
 for (const name of ["RTCPeerConnection", "webkitRTCPeerConnection", "mozRTCPeerConnection"]) {
@@ -350,21 +349,25 @@ class _SessionRouteGuard:
     async def handle_route(self, route: Route) -> None:
         request = route.request
         method = request.method.upper()
+        # Read once: sign-in can be confirmed while the check below runs.
+        state = self._state
+        validate = (
+            self._validate_scan_request
+            if state is ManualAuthState.AUTHENTICATED
+            else self._validate_setup_request
+        )
         try:
-            if self._state is ManualAuthState.AUTHENTICATED:
-                self._validate_scan_request(
-                    method=method,
-                    url=request.url,
-                    resource_type=request.resource_type,
-                )
-            else:
-                self._validate_setup_request(
-                    method=method,
-                    url=request.url,
-                    resource_type=request.resource_type,
-                )
+            # Off the event loop: the check includes a blocking DNS lookup and
+            # runs for every request the page makes. On the loop, one slow
+            # lookup stalled every other request and the Axcess API with it.
+            await asyncio.to_thread(
+                validate,
+                method=method,
+                url=request.url,
+                resource_type=request.resource_type,
+            )
         except EgressViolation as exc:
-            if self._state is ManualAuthState.AUTHENTICATED:
+            if state is ManualAuthState.AUTHENTICATED:
                 self._last_scan_block_code = "egress_policy_blocked"
             # Log the shape of what was refused, never the URL: a protected
             # request path can carry session material. Method, resource type,
@@ -375,7 +378,7 @@ class _SessionRouteGuard:
             # indication why.
             log.info(
                 "protected.request_blocked",
-                phase=self._state.value,
+                phase=state.value,
                 method=method,
                 resource_type=request.resource_type,
                 reason=str(exc.args[0]) if exc.args else "unknown",
@@ -383,7 +386,7 @@ class _SessionRouteGuard:
             )
             await route.abort("blockedbyclient")
             return
-        if self._state is not ManualAuthState.AUTHENTICATED:
+        if state is not ManualAuthState.AUTHENTICATED:
             await route.continue_()
             return
 
@@ -392,10 +395,9 @@ class _SessionRouteGuard:
         # every script, image, or response would silently buffer authenticated
         # content in the companion process. Native continuation streams the
         # resource through Chromium instead. Each routed request (including
-        # redirect requests when surfaced by Playwright) is still validated;
-        # the loopback CONNECT proxy independently validates every actual
-        # destination origin and freshly resolved IP before it dials it. The
-        # crawler validates its final document URL before extracting evidence.
+        # redirect requests when surfaced by Playwright) is still validated,
+        # and the crawler validates its final document URL before extracting
+        # evidence.
         await route.continue_()
 
     def _validate_setup_request(self, *, method: str, url: str, resource_type: str) -> None:
@@ -489,7 +491,6 @@ class ManualAuthenticationSession:
         # tab, not the one we opened, is where verification must read the
         # landing URL from, and all of them have to be closed afterwards.
         self._auth_pages: list[Page] = []
-        self._egress_proxy = LoopbackEgressProxy(self._policies.setup)
         self._profile_dir: str | None = None
         # The kept sign-in and what keeps it fresh. See the module docstring.
         self._kept: _KeptSignIn | None = None
@@ -558,7 +559,6 @@ class ManualAuthenticationSession:
         try:
             self._playwright = await self._playwright_start()
             self._profile_dir = _create_ephemeral_profile_dir()
-            await self._egress_proxy.start()
             self._context = await self._playwright.chromium.launch_persistent_context(
                 self._profile_dir,
                 headless=False,
@@ -568,12 +568,11 @@ class ManualAuthenticationSession:
                 user_agent=self._user_agent,
                 accept_downloads=False,
                 service_workers="block",
-                proxy={"server": self._egress_proxy.server_url, "bypass": ""},
             )
-            # Keep WebRTC from opening a direct UDP/STUN connection outside
-            # the CONNECT-only companion proxy. The init script is applied
-            # before any document script runs; Chromium's launch policy above
-            # remains the transport-level enforcement.
+            # Keep WebRTC from opening a UDP/STUN connection that the route
+            # guard never sees. The init script is applied before any document
+            # script runs; Chromium's launch policy above remains the
+            # transport-level enforcement.
             await self._context.add_init_script(_WEBRTC_BLOCK_INIT_SCRIPT)
             self._route_guard.observe_auth_pages(self._adopt_auth_page)
             await self._route_guard.install_on_context(self._context)
@@ -673,7 +672,6 @@ class ManualAuthenticationSession:
             raise ManualAuthenticationError("The manual authentication browser is not running.")
         self._stop_keeping()
         self._route_guard.activate_scan_mode()
-        self._egress_proxy.set_policy(self._policies.scan)
         self._state = ManualAuthState.AUTHENTICATED
         return landed
 
@@ -720,7 +718,6 @@ class ManualAuthenticationSession:
                     viewport={"width": 1440, "height": 900},
                     accept_downloads=False,
                     service_workers="block",
-                    proxy={"server": self._egress_proxy.server_url, "bypass": ""},
                 )
                 await context.add_init_script(_WEBRTC_BLOCK_INIT_SCRIPT)
                 await self._route_guard.install_on_context(context)
@@ -982,7 +979,6 @@ class ManualAuthenticationSession:
                 # it did before; lifting Alfa's own gates is separate work.
                 allowed_origins=self._policies.target.allowed_origins,
                 target_origins=self._policies.target.allowed_origins,
-                egress_proxy=self._egress_proxy.server_url,
             )
         except EgressViolation as exc:
             raise ManualAuthenticationError("Alfa URL is outside the approved scan scope.") from exc
@@ -1022,7 +1018,6 @@ class ManualAuthenticationSession:
         if playwright is not None:
             with contextlib.suppress(Exception):
                 await playwright.stop()
-        await self._egress_proxy.close()
         profile_dir = self._profile_dir
         self._profile_dir = None
         if profile_dir is not None:
@@ -1092,7 +1087,6 @@ class ManualAuthenticationSession:
                 user_agent=self._user_agent,
                 accept_downloads=False,
                 service_workers="block",
-                proxy={"server": self._egress_proxy.server_url, "bypass": ""},
             )
             await context.add_init_script(_WEBRTC_BLOCK_INIT_SCRIPT)
             await self._route_guard.install_on_context(context)
