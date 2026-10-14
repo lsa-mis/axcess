@@ -1369,7 +1369,7 @@ export interface SiteHistory {
 }
 
 /** A file the report's Export panel offers (``export_options.PANEL_FORMATS``). */
-export type ExportFormat = "xlsx" | "audit" | "csv" | "json";
+export type ExportFormat = "xlsx" | "its" | "audit" | "csv" | "json";
 export interface ExportFormatOption {
   format: ExportFormat;
   /** The downloaded file's name, ``_DRAFT`` marker included. */

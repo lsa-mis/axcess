@@ -1690,7 +1690,7 @@
     "/api/scans/{scan_id}/export/{fmt}": {
       "get": {
         "summary": "Export Scan",
-        "description": "Download a scan export as CSV / JSON / Jira CSV / Markdown / Audit.",
+        "description": "Download a scan export as CSV / JSON / Jira CSV / Markdown / Audit / Excel.",
         "operationId": "export_scan_api_scans__scan_id__export__fmt__get",
         "parameters": [
           {
@@ -1986,7 +1986,7 @@
       },
       "ExportFormatOption": {
         "properties": {
-          "format": {"type": "string", "enum": ["xlsx", "audit", "csv", "json"], "title": "Format"},
+          "format": {"type": "string", "enum": ["xlsx", "its", "audit", "csv", "json"], "title": "Format"},
           "filename": {"type": "string", "title": "Filename"},
           "size_bytes": {"type": "integer", "title": "Size Bytes"}
         },

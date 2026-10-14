@@ -75,6 +75,8 @@ src/audit/
     jira_export.py
     markdown_report.py        evidence inventory
     xlsx_export.py            remediation workbook
+    its_review.py             U-M ITS Technical Review template, filled in
+    templates/                the ITS template, kept as the team supplied it
     audit_report.py           audit report (Markdown)
     interaction_coverage.py   click-through coverage text (workbook, audit report, Jira)
     webhook.py                env-gated webhook; nothing calls it yet
@@ -174,7 +176,7 @@ try a crawl without touching a real site, run `make fixture-site` and crawl
 | --- | --- |
 | `audit crawl URL` | Crawls and checks a site, stores a new report, or resumes an interrupted crawl of the same URL |
 | `audit status` | Shows the latest report's status, pages, and errors. Its findings count covers image-of-text findings only. |
-| `audit export [SCAN_ID] --format FORMAT` | Writes a report to a file. Formats are `csv` (the default), `json`, `jira`, `markdown`, and `xlsx`. |
+| `audit export [SCAN_ID] --format FORMAT` | Writes a report to a file. Formats are `csv` (the default), `json`, `jira`, `markdown`, `xlsx`, and `its`. |
 | `audit synthesize [SCAN_ID]` | Recomputes image-of-text findings without crawling again |
 | `audit serve` | Serves the review app, by default at `http://127.0.0.1:8765/` |
 | `audit protected-maintenance` | Runs the retention cleanup for protected reports |

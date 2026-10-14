@@ -63,11 +63,12 @@ def test_harness_matches_the_route_download(
     assert response.headers["Content-Disposition"] == f'attachment; filename="{filename}"'
 
     harness = render_export(tmp_db, scan_id, export_format, draft=True, blob_store=blobs)
-    if export_format == "xlsx":
+    if export_format in {"xlsx", "its"}:
         assert isinstance(harness, bytes)
         served = fingerprint_xlsx(response.content)
-        # The route's evidence embedding is in play, not just the harness's.
-        assert sum(len(sheet["images"]) for sheet in served["sheets"]) == 2
+        if export_format == "xlsx":
+            # The route's evidence embedding is in play, not just the harness's.
+            assert sum(len(sheet["images"]) for sheet in served["sheets"]) == 2
         diff = fingerprint_diff(fingerprint_xlsx(harness), served, labels=("harness", "route"))
         assert not diff, "\n".join(diff)
         return

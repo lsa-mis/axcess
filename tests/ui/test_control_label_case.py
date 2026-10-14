@@ -63,6 +63,10 @@ _PHRASES = (
     "Rule check",  # check name: Rule check (axe), Rule check (Alfa)
     "Page inspector",  # the tool's name
     "Click-Through",  # the feature's one name, lib/labels.ts CLICK_THROUGH
+    # The organization and team the ITS technical review export is for
+    # (ExportMenu.tsx); both are proper names.
+    "University of Michigan Information and Technology Services",
+    "Accessibility Team",
 )
 
 _WORD = re.compile("[A-Za-z][A-Za-z'\u2019-]*")

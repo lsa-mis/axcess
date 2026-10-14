@@ -37,6 +37,20 @@ import { Button } from "./ui";
  * a refused or failed export saved the error as the file, or nothing, with
  * no word on the page. The link's `href` stays the real export URL, so a
  * modified click (a new tab, copying the link) still does what it asks.
+ *
+ * The ITS technical review is its own file in the list, not a setting on
+ * the issue list workbook. It is a different document: the University of
+ * Michigan ITS Accessibility Team's own template, filled in, with one row
+ * per issue in their columns. A setting would add a second step to one
+ * of the two files and hide the other behind it; a row keeps one choice
+ * per file, the same as every other download here. It sits directly
+ * under the other Excel file so the two spreadsheets are grouped, and it
+ * shares that file's XLSX badge because the badge names the file type
+ * (W3C COGA "Making Content Usable", paraphrased: group related content
+ * and use the same sign for the same thing,
+ * https://www.w3.org/TR/coga-usable/; SC 3.2.4 Consistent
+ * Identification, Level AA). The hint spells out "ITS" (SC 3.1.4
+ * Abbreviations, Level AAA).
  */
 const FORMATS: {
   format: ExportFormat;
@@ -53,6 +67,13 @@ const FORMATS: {
     tone: "bg-umich-blue/10 text-umich-blue",
     label: "Issue list with fixes (Excel)",
     hint: "One row per issue, with how to fix it",
+  },
+  {
+    format: "its",
+    badge: "XLSX",
+    tone: "bg-umich-blue/10 text-umich-blue",
+    label: "ITS technical review (Excel)",
+    hint: "The University of Michigan Information and Technology Services (ITS) Accessibility Team's form, filled in",
   },
   {
     format: "audit",

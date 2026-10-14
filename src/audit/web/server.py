@@ -70,6 +70,7 @@ from audit.db.schema import connect
 from audit.exports.audit_report import render_audit_report
 from audit.exports.collector import ExportScan, collect_scan
 from audit.exports.csv_export import render_csv
+from audit.exports.its_review import render_its_review
 from audit.exports.jira_export import render_jira_csv
 from audit.exports.json_export import render_json
 from audit.exports.markdown_report import render_markdown
@@ -494,13 +495,15 @@ _EXPORT_RENDERERS: dict[str, Any] = {
     "json": render_json,
     "jira": render_jira_csv,
     "markdown": render_markdown,
-    # `audit` and `xlsx` are rendered via a special-case branch in the route
-    # handler because they need the live `conn` (not just the collector
+    # `audit`, `xlsx` and `its` are rendered via a special-case branch in the
+    # route handler because they need the live `conn` (not just the collector
     # result) to build their issue tables. The entries here exist only so
     # the format-validation check (`fmt in _EXPORT_RENDERERS`) accepts them;
     # the values are unused for those formats.
     "audit": render_audit_report,
     "xlsx": render_xlsx,
+    # The U-M ITS Accessibility Team's Technical Review template, filled in.
+    "its": render_its_review,
 }
 _EXPORT_MEDIA_TYPES = {
     "csv": "text/csv; charset=utf-8",
@@ -509,6 +512,7 @@ _EXPORT_MEDIA_TYPES = {
     "markdown": "text/markdown; charset=utf-8",
     "audit": "text/markdown; charset=utf-8",
     "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "its": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 }
 _EXPORT_EXTENSIONS = {
     "csv": "csv",
@@ -517,6 +521,7 @@ _EXPORT_EXTENSIONS = {
     "markdown": "md",
     "audit": "audit.md",
     "xlsx": "xlsx",
+    "its": "its.xlsx",
 }
 
 _BASE_DIR = Path(__file__).resolve().parent
@@ -2761,6 +2766,8 @@ def create_app(
             # Pass the blob store so the Issues Overview sheet can embed
             # each finding's marked location screenshot as evidence.
             rendered = render_xlsx(scan, conn=conn, blob_store=blob_store)
+        elif fmt == "its":
+            rendered = render_its_review(scan, conn=conn)
         else:
             rendered = _EXPORT_RENDERERS[fmt](scan)
         return label_draft_export(rendered, export_format=fmt, readiness=readiness)
@@ -2805,7 +2812,7 @@ def create_app(
             ),
         ] = None,
     ) -> Response:
-        """Download a scan export as CSV / JSON / Jira CSV / Markdown / Audit."""
+        """Download a scan export as CSV / JSON / Jira CSV / Markdown / Audit / Excel."""
         fmt_lower = fmt.lower()
         if fmt_lower not in _EXPORT_RENDERERS:
             raise HTTPException(status_code=400, detail="Unknown export format")

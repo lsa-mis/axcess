@@ -240,13 +240,14 @@ becomes an issue card. Status never changes a result's report group.
 ## Exports
 
 The **Export report** menu, at the top right of the Issues tab, offers the
-first four formats. The last two need the API (`/api/scans/{id}/export/jira`
+first five formats. The last two need the API (`/api/scans/{id}/export/jira`
 or `.../export/markdown`) or the command line (`audit export -f jira` or
 `-f markdown`).
 
 | Format | Best for | Main sheets or columns |
 | --- | --- | --- |
 | Issue list with fixes (Excel, `.xlsx`) | Assigning and tracking fixes | A summary, an issue index, a tab per issue, and supporting sheets (listed below the table) |
+| ITS technical review (Excel, `.its.xlsx`) | Handing the report to the University of Michigan Information and Technology Services (ITS) Accessibility Team | The team's own Technical Review form, filled in (described below the table) |
 | Written report (Markdown, `.audit.md`) | A narrative report for stakeholders | Sections from an executive summary to the appendices (listed below the table) |
 | Occurrence list (CSV, `.csv`) | Filtering in a spreadsheet | One row per occurrence (per page for an image), 24 columns such as `severity`, `status`, `wcag_criterion`, `page_url`, `target_selector`, and `revealed_by` |
 | All report data (JSON, `.json`) | Scripts and other tools | `scan`, `findings` (image results), and `a11y_findings` (everything else) |
@@ -268,6 +269,34 @@ Sheets in the issue list with fixes (Excel):
 - Coverage & Method
 - Test Tracking
 - Manual Review Evidence
+
+The ITS technical review is the ITS Accessibility Team's own form, kept
+exactly as the team wrote it: its sheets, formulas, lists, styles and
+reference tables are not changed. Axcess fills in only what the scan knows:
+
+| Sheet | What Axcess fills in |
+| --- | --- |
+| Coversheet | Scan date, site name and main web address, the checks used, and that no sign-in was used. If an expert review records them, the reviewer goes in Tester(s) and the purpose in Background. The other prompts are left for a person to answer. |
+| Test Plan | Every page the scan checked, one row each, with its name and web address. The Description column is left empty for you. These rows are the choices in the Test column. |
+| Summary | A short summary of the scan, in the Narrative Summary box. The form's own counts are left as they are. |
+| Findings Issues | One row for each occurrence: one place an issue appears, on one page. An issue's rows sit together. Test is the page. Category, Criterion, Impact and "Most affects" use the team's own wording. Issue notes say what is wrong, where it is (the page and the element), which check found it, how sure Axcess is, and how to fix it. |
+| Reference, Reference Impact | Nothing. They stay as the team wrote them. |
+
+Issues marked For information, and occurrences marked Not a problem, are
+left out, because the form lists problems only.
+
+The form has room for 48 rows. If a scan has more occurrences, Axcess still
+lists them all, but the rows after row 49 have no drop-down lists or formatting, and the
+Summary counts leave them out. The summary text says when this happens.
+In Excel, the Summary's percentages show `#NAME?`, because the form uses a
+Google Sheets function (`DIVIDE`). They work in Google Sheets.
+
+Severity is a first estimate. Axcess turns each issue's automated impact into
+the form's scale: Critical becomes 4 Critical, Serious becomes 3 Major, and
+Moderate or Minor becomes 2 Minor. An issue with no WCAG criterion becomes
+1 Best practice. Nothing is marked 5 Blocker, because that depends on which
+tasks matter most on the site, and only a person can judge that. Check each
+issue and its severity before you share the form.
 
 Written report sections:
 

@@ -39,7 +39,7 @@ has the file-by-file tree.
 | Storage | `audit.db`, `audit.blob_store` | `repo`, `queue`, `BlobStore` |
 | Issue grouping | `audit.web.issues` | `list_issues`, `get_issue_detail` |
 | Web server | `audit.web.server` | `create_app` |
-| Exports | `audit.exports` | `csv_export`, `json_export`, `jira_export`, `markdown_report`, `xlsx_export`, `audit_report` |
+| Exports | `audit.exports` | `csv_export`, `json_export`, `jira_export`, `markdown_report`, `xlsx_export`, `its_review`, `audit_report` |
 | Login and protected scans | `audit.protected` | `session.ManualAuthenticationSession` |
 
 `src/audit/mcp_server.py` holds read-only, report-scoped tool functions for a
@@ -396,6 +396,7 @@ Exports read the database when you ask for one, through
 | Format | Built from | In the app's Export menu | On the command line |
 | --- | --- | --- | --- |
 | `xlsx` (remediation workbook) | `issues.list_issues` on a live connection | Yes | Yes |
+| `its` (U-M ITS Technical Review template, filled in) | `issues.list_issues` on a live connection, into `exports/templates/its_technical_review.xlsx` | Yes | Yes |
 | `audit` (audit report, Markdown) | `issues.list_issues` on a live connection | Yes | No |
 | `csv` (one row per finding) | `collector.collect_scan` | Yes | Yes, the default |
 | `json` (full evidence payload) | `collector.collect_scan` | Yes | Yes |

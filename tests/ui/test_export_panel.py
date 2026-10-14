@@ -22,6 +22,7 @@ expect = playwright_async.expect
 
 _FORMATS = (
     "Issue list with fixes (Excel)",
+    "ITS technical review (Excel)",
     "Written report (Markdown)",
     "Occurrence list (CSV)",
     "All report data (JSON)",
@@ -80,6 +81,8 @@ async def test_arrow_keys_move_between_downloads(
 
     link = lambda name: page.get_by_role("link", name=name, exact=True)  # noqa: E731
     await expect(link("Issue list with fixes (Excel)")).to_be_focused()
+    await page.keyboard.press("ArrowDown")
+    await expect(link("ITS technical review (Excel)")).to_be_focused()
     await page.keyboard.press("ArrowDown")
     await expect(link("Written report (Markdown)")).to_be_focused()
     await page.keyboard.press("End")
