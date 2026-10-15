@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass, field
 
 import pytest
 
 from audit.protected.egress import (
     EgressViolation,
-    LoopbackEgressProxy,
     ProtectedEgressPolicy,
     redact_url,
 )
@@ -156,7 +156,9 @@ def test_dns_answer_must_contain_only_public_addresses(addresses: tuple[str, ...
         policy.validate_url("https://app.example.edu/dashboard")
 
 
-def test_dns_is_rechecked_for_every_request_to_prevent_rebinding() -> None:
+def test_dns_is_rechecked_for_every_request() -> None:
+    # This catches an answer that changes between requests. It cannot catch
+    # one that changes between the check and the browser's own lookup.
     answers = iter((("8.8.8.8",), ("127.0.0.1",)))
     calls: list[str] = []
 
@@ -356,32 +358,22 @@ def test_redact_url_returns_non_sensitive_marker_for_invalid_input() -> None:
     assert redact_url("not a URL") == "<invalid-url>"
 
 
-@dataclass(eq=False)
-class _FakeTunnelWriter:
-    closed: bool = False
+@pytest.mark.asyncio
+async def test_playwright_route_policy_looks_up_hosts_off_the_event_loop() -> None:
+    """A slow DNS lookup must not stall every other request and the Axcess API."""
 
-    def close(self) -> None:
-        self.closed = True
+    loop_thread = threading.get_ident()
+    lookup_threads: list[int] = []
 
+    def recording_resolver(host: str) -> tuple[str, ...]:
+        lookup_threads.append(threading.get_ident())
+        return _public_resolver(host)
 
-def test_proxy_policy_transition_closes_pre_auth_tunnels_and_never_broadens() -> None:
-    """Browser connection pooling cannot retain an IdP tunnel into scan mode."""
+    policy = ProtectedEgressPolicy(["https://app.example.edu"], resolver=recording_resolver)
+    route = _FakeRoute(_FakeRequest("GET", "https://app.example.edu/dashboard"))
 
-    setup = ProtectedEgressPolicy(
-        ["https://app.example.edu", "https://login.example.edu"],
-        resolver=lambda _host: ("8.8.8.8",),
-    )
-    scan = ProtectedEgressPolicy(["https://app.example.edu"], resolver=lambda _host: ("8.8.8.8",))
-    proxy = LoopbackEgressProxy(setup)
-    client_tunnel = _FakeTunnelWriter()
-    upstream_tunnel = _FakeTunnelWriter()
-    proxy._active_client_writers.add(client_tunnel)  # type: ignore[arg-type]
-    proxy._active_upstream_writers.add(upstream_tunnel)  # type: ignore[arg-type]
+    await policy.playwright_policy().handle_route(route)  # type: ignore[arg-type]
 
-    proxy.set_policy(scan)
-
-    assert client_tunnel.closed
-    assert upstream_tunnel.closed
-    assert proxy._policy_generation == 1
-    with pytest.raises(ValueError, match="only be tightened"):
-        proxy.set_policy(setup)
+    assert route.actions == [("continue", None)]
+    assert len(lookup_threads) == 1
+    assert lookup_threads[0] != loop_thread

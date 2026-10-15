@@ -380,7 +380,7 @@ phase, every seed, navigation, redirect, popup, worker, request, and resource
 must use an exact approved target, IdP, or CDN origin, and the policy freshly
 resolves the hostname. It rejects non-HTTPS schemes, URL userinfo, sensitive
 query parameters, wildcard or cross-origin expansion, IP literals,
-localhost/private/metadata/reserved addresses, and DNS-rebinding answers. Only
+localhost/private/metadata/reserved addresses. Only
 `GET`, `HEAD`, `OPTIONS`, and `POST` are allowed, and only explicitly approved
 target/IdP origins may use the narrow `POST`/OAuth or SAML redirect exception.
 
@@ -393,6 +393,15 @@ loopback, private, or other non-public address. The pages the crawl visits
 are limited separately: the companion follows only links that are on an
 approved target origin and inside the seed's crawl scope, and it checks each
 page's requested and final URL against the approved target origins.
+
+These checks run on each request before the browser sends it. The browser
+then connects on its own, with its own DNS lookup, so a DNS answer that
+changes between the check and the connection (DNS rebinding) is not caught.
+Axcess used to close that gap with a local proxy that connected only to the
+address it had checked. It was removed in October 2026: it tried one address
+at a time with a 15-second wait each, with no switch from IPv6 to IPv4, so
+sign-in pages behind a full-tunnel VPN loaded very slowly or not at all. The
+note at the top of `src/audit/protected/egress.py` records the tradeoff.
 
 Downloads, service workers, and WebSockets are blocked in both phases. Popups
 are kept during sign-in, because single sign-on often opens one, and closed
@@ -547,7 +556,7 @@ owner and validate all of these:
 - rejection of a mismatched `Origin`, missing `AUDIT_PROTECTED_PUBLIC_ORIGIN`,
   or attacker-supplied `Host`/`Forwarded` headers when a protected browser
   action or companion command is created;
-- origin/redirect/DNS-rebinding/private-address refusal during sign-in, and
+- origin/redirect/private-address refusal during sign-in, and
   after authentication both private-address refusal and the approved-target
   check on every crawled page (there is no `GET`/`HEAD`-only rule);
 - password-only and MFA handoff, expiry/re-authentication, IdP return, and

@@ -145,7 +145,6 @@ class AlfaAnalyzer:
         storage_state: Mapping[str, Any] | None = None,
         allowed_origins: Sequence[str] = (),
         target_origins: Sequence[str] = (),
-        egress_proxy: str | None = None,
     ) -> AlfaResult:
         """Evaluate one already in-scope page with Alfa.
 
@@ -211,7 +210,6 @@ class AlfaAnalyzer:
                     # A CDN may be needed for subresources but must never
                     # become an authenticated document/iframe destination.
                     "target_origins": list(target_origins),
-                    "egress_proxy": egress_proxy or "",
                 }
             )
         input_bytes = json.dumps(runner_input, separators=(",", ":")).encode("utf-8")

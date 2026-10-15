@@ -9,7 +9,6 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
-from unittest.mock import AsyncMock
 
 import pytest
 from playwright.async_api import Browser, BrowserContext, Playwright, Route, async_playwright
@@ -17,7 +16,6 @@ from playwright.async_api import Browser, BrowserContext, Playwright, Route, asy
 from audit.analyzer.axe import AxeAnalyzer
 from audit.analyzer.interaction import InteractionProbe
 from audit.crawler.orchestrator import CrawlConfig, run_crawl
-from audit.protected.egress import LoopbackEgressProxy
 from audit.protected.session import ManualAuthenticationSession, ManualAuthState
 
 pytestmark = pytest.mark.integration
@@ -29,11 +27,6 @@ async def test_headless_handoff_restores_storage_without_replaying_old_tokens(
     """Transfer real cookies, localStorage, IndexedDB and frame sessionStorage."""
     origin = "https://app.example.test"
     frame_origin = "https://frame.example.test"
-    new_context = Browser.new_context
-
-    async def fixture_context(browser: Browser, **kwargs: Any) -> BrowserContext:
-        kwargs.pop("proxy", None)
-        return await new_context(browser, **kwargs)
 
     async def serve(route: Route) -> None:
         body = "<h1>Protected application</h1>"
@@ -41,8 +34,6 @@ async def test_headless_handoff_restores_storage_without_replaying_old_tokens(
             body += f'<iframe src="{frame_origin}/"></iframe>'
         await route.fulfill(status=200, content_type="text/html", body=body)
 
-    monkeypatch.setattr(Browser, "new_context", fixture_context)
-    monkeypatch.setattr(LoopbackEgressProxy, "server_url", property(lambda _: "http://127.0.0.1:1"))
     async with async_playwright() as pw:
         browser = await pw.chromium.launch()
         context = await browser.new_context()
@@ -190,16 +181,6 @@ async def test_login_traverses_nested_spa_routes_with_session_intact(
 
     # Route all target responses locally, including the newly launched browser.
     # No network listener or real identity provider is needed for this test.
-    new_context = Browser.new_context
-
-    async def fixture_context(browser: Browser, **kwargs: Any) -> BrowserContext:
-        kwargs.pop("proxy", None)
-        return await new_context(browser, **kwargs)
-
-    monkeypatch.setattr(Browser, "new_context", fixture_context)
-    monkeypatch.setattr(
-        LoopbackEgressProxy, "server_url", property(lambda _self: "http://127.0.0.1:1")
-    )
     async with async_playwright() as pw:
         browser = await pw.chromium.launch()
         context = await browser.new_context()
@@ -318,13 +299,6 @@ async def test_login_tab_closure_does_not_close_the_authenticated_scan_tab(
     async def serve(route: Route) -> None:
         await route.fulfill(status=200, content_type="text/html", body=html)
 
-    new_context = Browser.new_context
-
-    async def fixture_context(browser: Browser, **kwargs: Any) -> BrowserContext:
-        kwargs.pop("proxy", None)
-        return await new_context(browser, **kwargs)
-
-    monkeypatch.setattr(Browser, "new_context", fixture_context)
     async with async_playwright() as pw:
         launch = pw.chromium.launch_persistent_context
 
@@ -332,17 +306,12 @@ async def test_login_tab_closure_does_not_close_the_authenticated_scan_tab(
             # Only browser transport is synthetic: no listener or external
             # requests. Page creation and close events remain real Chromium.
             kwargs["headless"] = True
-            kwargs.pop("proxy", None)
             return await launch(user_data_dir, **kwargs)
 
         async def started_playwright() -> Playwright:
             return pw
 
         monkeypatch.setattr(pw.chromium, "launch_persistent_context", launch_fixture_context)
-        monkeypatch.setattr(LoopbackEgressProxy, "start", AsyncMock())
-        monkeypatch.setattr(
-            LoopbackEgressProxy, "server_url", property(lambda _self: "http://127.0.0.1:1")
-        )
         session = ManualAuthenticationSession(
             seed_url=origin,
             approved_target_origins=(origin,),
@@ -441,8 +410,8 @@ def test_login_scan_starts_from_the_kept_sign_in_after_the_window_closed(
     sessionStorage, says otherwise.
 
     Only transport is synthetic, as in the tests above: every target
-    response is fulfilled locally, browsers launch headless, and no proxy
-    listener or identity provider runs.
+    response is fulfilled locally, browsers launch headless, and no
+    identity provider runs.
     """
     from fastapi.testclient import TestClient
 
@@ -460,12 +429,6 @@ def test_login_scan_starts_from_the_kept_sign_in_after_the_window_closed(
     async def serve(route: Route) -> None:
         await route.fulfill(status=200, content_type="text/html", body=html)
 
-    new_context = Browser.new_context
-
-    async def fixture_context(browser: Browser, **kwargs: Any) -> BrowserContext:
-        kwargs.pop("proxy", None)
-        return await new_context(browser, **kwargs)
-
     async def started_playwright() -> Playwright:
         pw = await async_playwright().start()
         launch_persistent = pw.chromium.launch_persistent_context
@@ -473,7 +436,6 @@ def test_login_scan_starts_from_the_kept_sign_in_after_the_window_closed(
 
         async def persistent(user_data_dir: str, **kwargs: Any) -> BrowserContext:
             kwargs["headless"] = True
-            kwargs.pop("proxy", None)
             return await launch_persistent(user_data_dir, **kwargs)
 
         async def headless(**kwargs: Any) -> Browser:
@@ -497,11 +459,6 @@ def test_login_scan_starts_from_the_kept_sign_in_after_the_window_closed(
         sessions.append(session)
         return session
 
-    monkeypatch.setattr(Browser, "new_context", fixture_context)
-    monkeypatch.setattr(LoopbackEgressProxy, "start", AsyncMock())
-    monkeypatch.setattr(
-        LoopbackEgressProxy, "server_url", property(lambda _self: "http://127.0.0.1:1")
-    )
     monkeypatch.setattr(server, "ManualAuthenticationSession", make_session)
 
     def kept_is_signed_in(session: ManualAuthenticationSession) -> bool:
