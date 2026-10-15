@@ -135,6 +135,9 @@ def test_rejects_requests_it_cannot_bound(
     assert client.put(url, json=unknown_field).status_code == 422
     nothing = {"decision": "report", "notes": ""}
     assert client.put(url, json=nothing).status_code == 400
+    # Notes may be left out: the decision alone is saved, notes kept.
+    decision_only = {"page_image_ids": [image_id], "decision": "repeat"}
+    assert client.put(url, json=decision_only).status_code == 200
 
 
 def test_refuses_protected_reports(

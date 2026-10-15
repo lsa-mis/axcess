@@ -125,9 +125,14 @@ def save_review(
     a11y_finding_ids: list[int],
     page_image_ids: list[int],
     decision: Decision | None,
-    notes: str,
+    notes: str | None,
 ) -> OccurrenceReview:
-    """Give every named occurrence this review, all or nothing."""
+    """Give every named occurrence this review, all or nothing.
+
+    ``notes=None`` sets the decision only: each occurrence keeps the notes
+    it has (a new review starts with none). The inspector's "Mark … as
+    repeats" uses it, so marking many elements never wipes their notes.
+    """
     a11y_ids = sorted(set(a11y_finding_ids))
     image_ids = sorted(set(page_image_ids))
     if not a11y_ids and not image_ids:
@@ -136,7 +141,7 @@ def save_review(
         raise ReviewError(f"One save can cover at most {MAX_OCCURRENCES_PER_SAVE} occurrences.")
     if decision is not None and decision not in DECISIONS:
         raise ReviewError("Unknown decision.")
-    safe_notes = normalize_notes(notes)
+    safe_notes = normalize_notes(notes) if notes is not None else None
 
     with _write(conn):
         _check_scope(
@@ -151,24 +156,26 @@ def save_review(
                 """
                 INSERT INTO occurrence_reviews
                     (scan_id, page_id, a11y_finding_id, decision, notes)
-                VALUES (?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, COALESCE(?, ''))
                 ON CONFLICT (a11y_finding_id) WHERE a11y_finding_id IS NOT NULL
-                DO UPDATE SET decision = excluded.decision, notes = excluded.notes,
+                DO UPDATE SET decision = excluded.decision,
+                              notes = COALESCE(?, occurrence_reviews.notes),
                               updated_at = CURRENT_TIMESTAMP
                 """,
-                (scan_id, page_id, finding_id, decision, safe_notes),
+                (scan_id, page_id, finding_id, decision, safe_notes, safe_notes),
             )
         for image_id in image_ids:
             conn.execute(
                 """
                 INSERT INTO occurrence_reviews
                     (scan_id, page_id, page_image_id, decision, notes)
-                VALUES (?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, COALESCE(?, ''))
                 ON CONFLICT (page_image_id) WHERE page_image_id IS NOT NULL
-                DO UPDATE SET decision = excluded.decision, notes = excluded.notes,
+                DO UPDATE SET decision = excluded.decision,
+                              notes = COALESCE(?, occurrence_reviews.notes),
                               updated_at = CURRENT_TIMESTAMP
                 """,
-                (scan_id, page_id, image_id, decision, safe_notes),
+                (scan_id, page_id, image_id, decision, safe_notes, safe_notes),
             )
         # Every named occurrence now holds the same review; read one back for
         # the time it was saved.
@@ -176,10 +183,12 @@ def save_review(
             ("a11y_finding_id", a11y_ids[0]) if a11y_ids else ("page_image_id", image_ids[0])
         )
         row = conn.execute(
-            f"SELECT updated_at FROM occurrence_reviews WHERE {column} = ?",  # noqa: S608
+            f"SELECT updated_at, notes FROM occurrence_reviews WHERE {column} = ?",  # noqa: S608
             (first,),
         ).fetchone()
-    return OccurrenceReview(decision=decision, notes=safe_notes, updated_at=str(row[0]))
+    # With notes left as they were, the first occurrence's stand for the save.
+    stored = safe_notes if safe_notes is not None else str(row[1])
+    return OccurrenceReview(decision=decision, notes=stored, updated_at=str(row[0]))
 
 
 def reviews_for_page(

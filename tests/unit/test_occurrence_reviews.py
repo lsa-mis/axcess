@@ -319,3 +319,66 @@ def test_pages_table_loads_when_reviews_cannot_be_read(tmp_db: sqlite3.Connectio
     tmp_db.execute("DROP TABLE occurrence_reviews")
     pages = _pages(tmp_db, scan_id, "axe:link-name")
     assert pages and all(checked == 0 for checked, _ in pages.values())
+
+
+def test_a_decision_alone_keeps_each_occurrences_notes(tmp_db: sqlite3.Connection) -> None:
+    """``notes=None`` sets the decision only, as "Mark … as repeats" saves it."""
+    scan_id = seed_rich_scan(tmp_db)
+    rows = tmp_db.execute(
+        "SELECT id, page_id FROM page_a11y_findings WHERE scan_id = ? AND rule_id = 'link-name' "
+        "ORDER BY id LIMIT 2",
+        (scan_id,),
+    ).fetchall()
+    page_id = int(rows[0][1])
+    with_notes, without = int(rows[0][0]), int(rows[1][0])
+    save_review(
+        tmp_db,
+        scan_id=scan_id,
+        page_id=page_id,
+        a11y_finding_ids=[with_notes],
+        page_image_ids=[],
+        decision=None,
+        notes="Seen, not decided yet.",
+    )
+
+    saved = save_review(
+        tmp_db,
+        scan_id=scan_id,
+        page_id=page_id,
+        a11y_finding_ids=[with_notes, without],
+        page_image_ids=[],
+        decision="repeat",
+        notes=None,
+    )
+
+    stored = dict(
+        tmp_db.execute(
+            "SELECT a11y_finding_id, notes FROM occurrence_reviews WHERE decision = 'repeat'"
+        ).fetchall()
+    )
+    assert stored == {with_notes: "Seen, not decided yet.", without: ""}
+    assert saved.decision == "repeat"
+
+
+def test_pages_table_counts_what_was_reported(tmp_db: sqlite3.Connection) -> None:
+    scan_id = seed_rich_scan(tmp_db)
+    rows = tmp_db.execute(
+        "SELECT id, page_id FROM page_a11y_findings WHERE scan_id = ? AND rule_id = 'link-name' "
+        "ORDER BY id LIMIT 2",
+        (scan_id,),
+    ).fetchall()
+    page_id = int(rows[0][1])
+    for (finding_id, _), decision in zip(rows, ("report", "repeat"), strict=True):
+        save_review(
+            tmp_db,
+            scan_id=scan_id,
+            page_id=page_id,
+            a11y_finding_ids=[int(finding_id)],
+            page_image_ids=[],
+            decision=decision,  # type: ignore[arg-type]
+            notes="",
+        )
+    detail = issues.get_issue_detail(tmp_db, scan_id, "axe:link-name")
+    assert detail is not None
+    (page,) = [p for p in detail.pages if p.page_id == page_id]
+    assert (page.checked_count, page.reported_count) == (2, 1)

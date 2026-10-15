@@ -6,7 +6,7 @@ import { Check, ChevronDown, ChevronUp, Copy, ExternalLink, FileCode2, Layers, L
 import DomSource from "../components/DomSource";
 import FlaggedStepper from "../components/FlaggedStepper";
 import ElementReview, { type ReviewDraft } from "../components/ElementReview";
-import { api } from "../api/client";
+import { ApiError, api } from "../api/client";
 import type {
   OccurrenceReview,
   PageEvidence,
@@ -753,25 +753,35 @@ export default function InspectorRoute() {
   // highlighting, which rebuilds this panel (losing the "Saved." message)
   // and moves the saved copy under the reader.
   const [savedReviews, setSavedReviews] = useState<Record<string, OccurrenceReview>>({});
-  const reviewTargets = (highlight?.steps[pageMark]?.targets ?? [])
-    .map((index) => scopedTargets[index])
-    .filter((target): target is Target => Boolean(target));
-  const reviewFindingIds = [...new Set(reviewTargets.flatMap((target) => target.findingIds ?? []))];
-  const reviewImageIds = [
-    ...new Set(
-      reviewTargets.flatMap((target) =>
-        target.imageOccurrenceId === undefined ? [] : [target.imageOccurrenceId],
+  // Each outlined element the stepper steps through, as the occurrences it
+  // stands for: the unit a review is saved for.
+  const reviewElements = (highlight?.steps ?? []).map((step) => {
+    const targets = step.targets
+      .map((index) => scopedTargets[index])
+      .filter((target): target is Target => Boolean(target));
+    const a11yIds = [...new Set(targets.flatMap((target) => target.findingIds ?? []))];
+    const imageIds = [
+      ...new Set(
+        targets.flatMap((target) =>
+          target.imageOccurrenceId === undefined ? [] : [target.imageOccurrenceId],
+        ),
       ),
-    ),
-  ];
-  const reviewKey = `${reviewFindingIds.join(",")}|${reviewImageIds.join(",")}`;
-  const savedReview: OccurrenceReview | null =
-    savedReviews[reviewKey] ??
-    pageEvidence?.a11y_findings.find((f) => reviewFindingIds.includes(f.id) && f.review)?.review ??
+    ];
+    return { key: `${a11yIds.join(",")}|${imageIds.join(",")}`, a11yIds, imageIds };
+  });
+  type ReviewElement = (typeof reviewElements)[number];
+  const storedReview = (element: ReviewElement): OccurrenceReview | null =>
+    savedReviews[element.key] ??
+    pageEvidence?.a11y_findings.find((f) => element.a11yIds.includes(f.id) && f.review)?.review ??
     pageEvidence?.image_occurrences.find(
-      (image) => reviewImageIds.includes(image.occurrence_id) && image.review,
+      (image) => element.imageIds.includes(image.occurrence_id) && image.review,
     )?.review ??
     null;
+  const currentReviewElement = reviewElements[pageMark] ?? { key: "|", a11yIds: [], imageIds: [] };
+  const reviewFindingIds = currentReviewElement.a11yIds;
+  const reviewImageIds = currentReviewElement.imageIds;
+  const reviewKey = currentReviewElement.key;
+  const savedReview = storedReview(currentReviewElement);
   const canReview = reviewing && reviewFindingIds.length + reviewImageIds.length > 0;
   // The issue's plain-language title, for the suggested notes. The same
   // query, and so the same cache, as the issue page the reader came from.
@@ -804,12 +814,112 @@ export default function InspectorRoute() {
   // The saved review is shown at once, from the server's answer. The page
   // evidence is marked stale without refetching it now, so the next visit
   // reads the stored review.
-  const reviewSaved = (review: OccurrenceReview) => {
-    setSavedReviews((reviews) => ({ ...reviews, [reviewKey]: review }));
+  const reviewsChanged = () => {
     void queryClient.invalidateQueries({
       queryKey: ["page-evidence", scan, page],
       refetchType: "none",
     });
+    // The issue's counts (checked, reported) feed "Mark … as repeats".
+    void queryClient.invalidateQueries({ queryKey: ["issue-detail", scan, issueKey] });
+  };
+  const reviewSaved = (review: OccurrenceReview) => {
+    setSavedReviews((reviews) => ({ ...reviews, [reviewKey]: review }));
+    reviewsChanged();
+  };
+
+  // "Mark … as repeats": every element the stepper steps through in this
+  // page state that has no decision yet and no unsaved edit. Offered only
+  // once a person has reported an element of this issue, anywhere in the
+  // report: a repeat is a repeat of one already reported, and marking
+  // everything before that would leave the issue out of the ITS export.
+  const notCheckedElements = reviewElements.filter(
+    (element) => !storedReview(element)?.decision && !reviewDrafts[element.key],
+  );
+  const reportedInIssue =
+    (issueDetail?.pages.reduce((total, p) => total + (p.reported_count ?? 0), 0) ?? 0) +
+    Object.values(savedReviews).filter((review) => review.decision === "report").length;
+  // The elements the last "Mark … as repeats" changed, with the review each
+  // had before, so it can be taken back exactly.
+  const [lastRepeats, setLastRepeats] = useState<
+    { element: ReviewElement; before: OccurrenceReview | null }[]
+  >([]);
+  // A bulk change's outcome, said in the review region's status line.
+  const [bulkMessage, setBulkMessage] = useState<{ text: string; error?: boolean } | null>(null);
+  useEffect(() => setBulkMessage(null), [reviewKey]);
+  // A new page or page state is a new set of elements; its undo goes too.
+  useEffect(() => setLastRepeats([]), [page, activeStateKey]);
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  /** Save one decision for many elements, notes kept, in requests the server accepts. */
+  const saveDecision = async (elements: ReviewElement[], decision: "repeat" | null) => {
+    const a11y = elements.flatMap((element) => element.a11yIds);
+    const images = elements.flatMap((element) => element.imageIds);
+    for (let start = 0; start < a11y.length; start += REVIEW_BATCH) {
+      await api.saveOccurrenceReview(scan, page, {
+        a11y_finding_ids: a11y.slice(start, start + REVIEW_BATCH),
+        page_image_ids: [],
+        decision,
+        notes: null,
+      });
+    }
+    for (let start = 0; start < images.length; start += REVIEW_BATCH) {
+      await api.saveOccurrenceReview(scan, page, {
+        a11y_finding_ids: [],
+        page_image_ids: images.slice(start, start + REVIEW_BATCH),
+        decision,
+        notes: null,
+      });
+    }
+  };
+  const markRepeats = async () => {
+    if (bulkBusy || notCheckedElements.length === 0) return;
+    const elements = notCheckedElements;
+    const before = elements.map((element) => ({ element, before: storedReview(element) }));
+    setBulkBusy(true);
+    try {
+      await saveDecision(elements, "repeat");
+      const now = new Date().toISOString();
+      setSavedReviews((reviews) => ({
+        ...reviews,
+        ...Object.fromEntries(
+          before.map(({ element, before: was }) => [
+            element.key,
+            { decision: "repeat" as const, notes: was?.notes ?? "", updated_at: now },
+          ]),
+        ),
+      }));
+      setLastRepeats(before);
+      setBulkMessage({ text: `${plural(elements.length, "element")} marked as repeats.` });
+      reviewsChanged();
+    } catch (error) {
+      setBulkMessage({ text: `Axcess could not mark them as repeats. ${errorText(error)} Try again.`, error: true });
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+  const undoRepeats = async () => {
+    if (bulkBusy || lastRepeats.length === 0) return;
+    setBulkBusy(true);
+    try {
+      await saveDecision(lastRepeats.map(({ element }) => element), null);
+      const now = new Date().toISOString();
+      setSavedReviews((reviews) => ({
+        ...reviews,
+        ...Object.fromEntries(
+          lastRepeats.map(({ element, before: was }) => [
+            element.key,
+            { decision: null, notes: was?.notes ?? "", updated_at: now },
+          ]),
+        ),
+      }));
+      setBulkMessage({ text: `${plural(lastRepeats.length, "element")} set back to not checked yet.` });
+      setLastRepeats([]);
+      reviewsChanged();
+    } catch (error) {
+      setBulkMessage({ text: `Axcess could not take them back. ${errorText(error)} Try again.`, error: true });
+    } finally {
+      setBulkBusy(false);
+    }
   };
   // readableLocator returns a selector unchanged and turns a Rule check
   // (Alfa) record into its XPath, so a changed string is an XPath. An AI
@@ -1390,6 +1500,14 @@ export default function InspectorRoute() {
                         a11yFindingIds={reviewFindingIds}
                         pageImageIds={reviewImageIds}
                         suggestedNotes={suggestedNotes}
+                        bulk={{
+                          markCount: reportedInIssue > 0 ? notCheckedElements.length : 0,
+                          undoCount: lastRepeats.length,
+                          busy: bulkBusy,
+                          message: bulkMessage,
+                          onMark: markRepeats,
+                          onUndo: undoRepeats,
+                        }}
                         saved={savedReview}
                         draft={reviewDrafts[reviewKey]}
                         onDraftChange={setReviewDraft}
@@ -2246,6 +2364,19 @@ function LocatorValue({
  * for a card can run on ("Fellowships · FundedTeach For Nepal…"), so each
  * name is cut at a word near 40 characters.
  */
+/** Occurrences one review request may name (the server's bound). */
+const REVIEW_BATCH = 50;
+
+function plural(count: number, noun: string): string {
+  return `${count.toLocaleString()} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+function errorText(error: unknown): string {
+  return error instanceof ApiError
+    ? error.message
+    : "The Axcess server did not respond. Check that it is still running.";
+}
+
 function clickChain(state: { path_labels: string[]; revealed_by: string }): string {
   const names = state.path_labels.length > 0 ? state.path_labels : [state.revealed_by];
   return names.map((name) => `“${shortName(name)}”`).join(" → ");

@@ -151,6 +151,10 @@ class IssuePage:
     # reported" (``audit.occurrence_reviews``). Counted over the same
     # occurrences as ``occurrence_count``, so "3 of 19 checked" adds up.
     checked_count: int = 0
+    # Of those, how many a person decided are "a problem to report". The
+    # inspector offers "Mark … as repeats" only once an issue has one: a
+    # repeat is a repeat of one already reported.
+    reported_count: int = 0
 
 
 @dataclass(frozen=True)
@@ -665,14 +669,18 @@ def _pages_for_issue(
                 occurrence_count=int(r["occurrence_count"]),
                 status_summary=counts,
                 screenshot_hashes=shots,
-                checked_count=checked.get(int(r["page_id"]), 0),
+                checked_count=checked.get(int(r["page_id"]), (0, 0))[0],
+                reported_count=checked.get(int(r["page_id"]), (0, 0))[1],
             )
         )
     return out
 
 
-def _checked_counts(conn: sqlite3.Connection, scan_id: int, row: IssueRow) -> dict[int, int]:
-    """Per page, how many of this issue's occurrences a person has checked.
+def _checked_counts(
+    conn: sqlite3.Connection, scan_id: int, row: IssueRow
+) -> dict[int, tuple[int, int]]:
+    """Per page, how many of this issue's occurrences a person has checked,
+    and how many of those they reported: ``page_id -> (checked, reported)``.
 
     The occurrences are the ones ``_pages_for_issue`` counts: the row's
     finding ids for a DOM pipeline, and each placement of the row's images
@@ -685,7 +693,7 @@ def _checked_counts(conn: sqlite3.Connection, scan_id: int, row: IssueRow) -> di
     ids = json.dumps(list(row.finding_ids))
     if row.pipeline == "image":
         sql = """
-            SELECT pi.page_id, COUNT(*)
+            SELECT pi.page_id, COUNT(*), SUM(r.decision = 'report')
               FROM occurrence_reviews r
               JOIN page_images pi ON pi.id = r.page_image_id
               JOIN findings f ON f.image_id = pi.image_id AND f.scan_id = r.scan_id
@@ -695,7 +703,7 @@ def _checked_counts(conn: sqlite3.Connection, scan_id: int, row: IssueRow) -> di
         """
     else:
         sql = """
-            SELECT a.page_id, COUNT(*)
+            SELECT a.page_id, COUNT(*), SUM(r.decision = 'report')
               FROM occurrence_reviews r
               JOIN page_a11y_findings a ON a.id = r.a11y_finding_id
              WHERE r.scan_id = ? AND r.decision IS NOT NULL
@@ -703,7 +711,10 @@ def _checked_counts(conn: sqlite3.Connection, scan_id: int, row: IssueRow) -> di
              GROUP BY a.page_id
         """
     try:
-        return {int(page_id): int(n) for page_id, n in conn.execute(sql, (scan_id, ids))}
+        return {
+            int(page_id): (int(checked), int(reported or 0))
+            for page_id, checked, reported in conn.execute(sql, (scan_id, ids))
+        }
     except sqlite3.OperationalError as exc:
         log.warning("issues.checked_counts_unreadable", error=str(exc))
         return {}

@@ -174,7 +174,9 @@ class OccurrenceReviewRequest(BaseModel):
     #: None: not checked yet. "report": checked, a problem to report.
     #: "repeat": checked, a repeat of one already reported.
     decision: occurrence_reviews.Decision | None
-    notes: str = Field(default="", max_length=occurrence_reviews.MAX_NOTES_LENGTH)
+    #: Leave out (or null) to set the decision only and keep each
+    #: occurrence's notes, as "Mark … as repeats" does.
+    notes: str | None = Field(default=None, max_length=occurrence_reviews.MAX_NOTES_LENGTH)
 
 
 class OccurrenceReviewResponse(BaseModel):

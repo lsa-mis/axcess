@@ -63,22 +63,37 @@ const MAX_NOTES = 2000;
  * dialog closes on save (SC 4.1.3 Status Messages, Level AA). A failed save
  * keeps the dialog open with the reason as an alert and the edit intact.
  *
- * "Mark as repeat", beside "Review this element", saves "Checked: a
- * repeat of one already reported" in one press, as the developer chose.
- * Shared headers, menus and footers repeat on every page, so a repeat is
- * often the most frequent decision, and it is the one decision that needs
- * no notes (a repeat stays out of the ITS technical review), so skipping
- * the dialog loses nothing; "a problem to report" keeps the dialog, where
- * its notes are written. It is a second way to make one of the three
- * choices, against COGA's "one way to do one thing" (W3C COGA "Making
- * Content Usable", paraphrased, https://www.w3.org/TR/coga-usable/),
- * accepted as a fast path for the commonest action, named in the same
- * word as the choice it makes ("repeat"). It shows only while the element
- * is not already a repeat; once pressed it is gone, so focus moves to
- * "Review this element" rather than falling to the top of the page. It
- * keeps any notes there, and its outcome ("Saved as a repeat.", or why it
- * failed) is said on the "Your review:" line, in the same status region as
- * a save from the dialog. Both buttons fit one row in the region's 21rem.
+ * "Mark N not checked as repeats", beside "Review this element", gives
+ * every flagged element in the page state on screen that has no review
+ * yet (and no unsaved edit) "Checked: a repeat of one already reported",
+ * in one press, as the developer chose. Evaluators step through a page's
+ * elements with Next, and once the first is reported the rest are often
+ * the same shared header, menu or footer. Its scope is what Previous and
+ * Next step through, so it only marks elements the reader could have just
+ * looked at; elements already checked, and every note, are left as they
+ * are (the save sends no notes). It is offered only once an element of
+ * this issue has been reported, anywhere in the report: a repeat is a
+ * repeat of one already reported, and marking everything first would
+ * leave the issue out of the ITS technical review. The count is in its
+ * name, so it says exactly how much it changes, and its description says
+ * which elements. It replaces a one-element "Mark as repeat", which made
+ * a second way to make one choice (the dialog's); a press on many
+ * elements is a different job, so there is one way to do each (W3C COGA
+ * "Making Content Usable", paraphrased: one way to do one thing,
+ * https://www.w3.org/TR/coga-usable/).
+ *
+ * It takes a row of its own under "Review this element": the full label
+ * (234 px for "Mark 2 not checked as repeats") does not fit beside it in
+ * the 21rem column, and "Mark 2 as repeats" would no longer say which
+ * elements (repo rule 8: a button names what it does). So while it is
+ * offered, the region is one button taller and the saved page sits that
+ * much lower; it is offered only once an element is reported.
+ *
+ * Undo instead of a confirmation: "Undo N repeats" takes its place and
+ * puts exactly those elements back as they were, so a slip costs one
+ * press and the common case costs none. The two buttons take turns in
+ * one place, and focus moves to whichever is there. The outcome is said
+ * on the "Your review:" line, in the region's one status region.
  *
  * Suggested notes. An element with no saved notes opens with notes built
  * from the scan (``suggestIssueNotes``: page state, element, problem, in
@@ -105,6 +120,7 @@ export default function ElementReview({
   a11yFindingIds,
   pageImageIds,
   suggestedNotes,
+  bulk,
   saved,
   draft,
   onDraftChange,
@@ -120,6 +136,20 @@ export default function ElementReview({
   pageImageIds: number[];
   /** Issue notes built from the scan (``suggestIssueNotes``); "" when none. */
   suggestedNotes: string;
+  /**
+   * "Mark … as repeats" for the page state on screen, run by the inspector,
+   * which knows every element in it. ``markCount`` is how many have no
+   * review yet (0 hides the button, as does no element of the issue being
+   * reported yet); ``undoCount`` how many the last press changed.
+   */
+  bulk?: {
+    markCount: number;
+    undoCount: number;
+    busy: boolean;
+    message: { text: string; error?: boolean } | null;
+    onMark: () => Promise<void>;
+    onUndo: () => Promise<void>;
+  };
   /** The review as stored, or null when no one has saved one. */
   saved: OccurrenceReview | null;
   /** This element's unsaved edit, kept by the inspector while the page is open. */
@@ -132,6 +162,7 @@ export default function ElementReview({
   const subjectId = `${idBase}-subject`;
   const summaryId = `${idBase}-summary`;
   const summaryLabelId = `${idBase}-summary-label`;
+  const bulkHintId = `${idBase}-bulk-hint`;
   const reviewButton = useRef<HTMLButtonElement>(null);
   const notesId = `${idBase}-notes`;
   const notesHintId = `${idBase}-notes-hint`;
@@ -204,35 +235,26 @@ export default function ElementReview({
     }
   }
 
-  // The shortcut for the most frequent decision: a repeat needs no notes,
-  // so it is saved in one press, without the dialog. Any notes already
-  // there (saved, or typed and not yet saved) are kept and saved with it.
-  async function markRepeat() {
-    if (saving) return;
-    setSaving(true);
-    setAnnouncement({ text: "" });
-    try {
-      const result = await api.saveOccurrenceReview(scanId, pageId, {
-        a11y_finding_ids: a11yFindingIds,
-        page_image_ids: pageImageIds,
-        decision: "repeat",
-        notes: value.notes,
-      });
-      onSaved(result);
-      onDraftChange(undefined);
-      setAnnouncement({ text: "Saved as a repeat." });
-      // The shortcut is gone now that the element is a repeat; focus goes
-      // to the next control in the region, not to the top of the page.
+  // The bulk action and its undo take turns in one place, so when one
+  // replaces the other, focus moves to the one now there rather than
+  // falling to the top of the page.
+  const markButton = useRef<HTMLButtonElement>(null);
+  const undoButton = useRef<HTMLButtonElement>(null);
+  const [focusAfterBulk, setFocusAfterBulk] = useState<"mark" | "undo" | null>(null);
+  useEffect(() => {
+    if (focusAfterBulk === "undo" && undoButton.current) {
+      undoButton.current.focus();
+      setFocusAfterBulk(null);
+    } else if (focusAfterBulk === "mark" && markButton.current) {
+      markButton.current.focus();
+      setFocusAfterBulk(null);
+    } else if (focusAfterBulk && !bulk?.busy) {
+      // Neither is there (nothing left to mark): the region's next control.
       reviewButton.current?.focus();
-    } catch (error) {
-      setAnnouncement({
-        text: `Axcess could not save it as a repeat. ${failureMessage(error)} Try again.`,
-        error: true,
-      });
-    } finally {
-      setSaving(false);
+      setFocusAfterBulk(null);
     }
-  }
+  }, [focusAfterBulk, bulk?.busy, bulk?.undoCount, bulk?.markCount]);
+  const status = announcement.text ? announcement : (bulk?.message ?? { text: "" });
 
   return (
     <div className="min-w-0 text-sm text-fg">
@@ -250,10 +272,10 @@ export default function ElementReview({
           role="status"
           className={cn(
             "text-sm empty:sr-only",
-            announcement.error ? "font-semibold text-sev-critical" : "text-fg",
+            status.error ? "font-semibold text-sev-critical" : "text-fg",
           )}
         >
-          {announcement.text}
+          {status.text}
         </p>
       </div>{" "}
       <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -283,17 +305,41 @@ export default function ElementReview({
         >
           Review this element
         </Button>
-        {value.decision !== "repeat" && (
+        {bulk && bulk.undoCount > 0 ? (
           <Button
+            ref={undoButton}
             type="button"
             variant="secondary"
-            onClick={markRepeat}
-            // aria-disabled, not disabled: a disabled button drops focus.
-            aria-disabled={saving || undefined}
+            aria-disabled={bulk.busy || undefined}
+            onClick={async () => {
+              setAnnouncement({ text: "" });
+              await bulk.onUndo();
+              setFocusAfterBulk("mark");
+            }}
           >
-            Mark as repeat
+            Undo {bulk.undoCount} {bulk.undoCount === 1 ? "repeat" : "repeats"}
           </Button>
-        )}
+        ) : bulk && bulk.markCount > 0 ? (
+          <Button
+            ref={markButton}
+            type="button"
+            variant="secondary"
+            aria-describedby={bulkHintId}
+            // aria-disabled, not disabled: a disabled button drops focus.
+            aria-disabled={bulk.busy || undefined}
+            onClick={async () => {
+              setAnnouncement({ text: "" });
+              await bulk.onMark();
+              setFocusAfterBulk("undo");
+            }}
+          >
+            Mark {bulk.markCount} not checked as {bulk.markCount === 1 ? "a repeat" : "repeats"}
+          </Button>
+        ) : null}
+        <span id={bulkHintId} hidden>
+          Every flagged element in this page state with no review yet becomes Checked: a
+          repeat of one already reported. Elements already checked are not changed.
+        </span>
       </div>
 
       <dialog

@@ -351,6 +351,7 @@
           "page_id": "integer",
           "page_title": "string",
           "page_url": "string",
+          "reported_count": "integer",
           "screenshot_hashes": ["string"],
           "status_summary": {"new": "integer"}
         }
@@ -426,6 +427,7 @@
           "page_id": "integer",
           "page_title": "string",
           "page_url": "string",
+          "reported_count": "integer",
           "screenshot_hashes": [],
           "status_summary": {"new": "integer"}
         }
@@ -494,6 +496,7 @@
           "page_id": "integer",
           "page_title": "string",
           "page_url": "string",
+          "reported_count": "integer",
           "screenshot_hashes": [],
           "status_summary": {"new": "integer"}
         }

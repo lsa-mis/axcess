@@ -858,6 +858,8 @@ export interface IssuePage {
   /** How many of `occurrence_count` a person has checked in the page
    *  inspector (a problem to report, or a repeat). */
   checked_count: number;
+  /** Of those, how many are "a problem to report". */
+  reported_count: number;
 }
 
 export interface IssueDetail {
@@ -1104,7 +1106,8 @@ export interface OccurrenceReviewRequest {
   a11y_finding_ids: number[];
   page_image_ids: number[];
   decision: ReviewDecision | null;
-  notes: string;
+  /** Null sets the decision only, keeping each occurrence's notes. */
+  notes: string | null;
 }
 
 export interface PageEvidence {

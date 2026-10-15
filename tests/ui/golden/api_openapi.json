@@ -2200,7 +2200,7 @@
             "anyOf": [{"type": "string", "enum": ["report", "repeat"]}, {"type": "null"}],
             "title": "Decision"
           },
-          "notes": {"type": "string", "maxLength": 2000, "title": "Notes", "default": ""}
+          "notes": {"anyOf": [{"type": "string", "maxLength": 2000}, {"type": "null"}], "title": "Notes"}
         },
         "additionalProperties": false,
         "type": "object",

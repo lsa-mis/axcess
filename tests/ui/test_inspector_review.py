@@ -362,48 +362,72 @@ async def test_suggested_notes_leave_out_axes_other_ways_to_fix(
     )
 
 
-async def test_mark_as_repeat_saves_in_one_press(
+async def test_mark_not_checked_as_repeats_in_one_press(
     live_server: tuple[str, int], seeded_db: tuple[Path, Path, int], new_page: Any
 ) -> None:
-    """The shortcut for the most frequent decision: no dialog, notes kept."""
+    """Report the first, step through the rest, mark them all as repeats; undo."""
     base, scan_id = live_server
     db_path = seeded_db[0]
-    page_id = seed(db_path, scan_id, CAPTURE, RULE, FINDINGS)
+    capture = (
+        "<!doctype html><html><body><main>"
+        '<button id="one"></button><p>A</p><button id="two"></button>'
+        '<p>B</p><button id="three"></button></main></body></html>'
+    )
+    findings = [*FINDINGS, ("#three", '<button id="three"></button>')]
+    page_id = seed(db_path, scan_id, capture, RULE, findings)
     page = await open_inspector(new_page, base, scan_id, page_id, RULE)
     panel = page.get_by_role("group", name="The flagged element you are on")
     opener = panel.get_by_role("button", name="Review this element")
-    shortcut = panel.get_by_role("button", name="Mark as repeat")
     dialog = page.get_by_role("dialog", name="Review this element")
+    bulk = panel.get_by_role("button", name=re.compile(r"^Mark \d+ not checked as"))
 
-    # Both buttons on one row, so the region does not grow.
-    opener_box, shortcut_box = await opener.bounding_box(), await shortcut.bounding_box()
-    assert opener_box and shortcut_box and abs(opener_box["y"] - shortcut_box["y"]) < 1
+    # Nothing reported in this issue yet: a repeat would be a repeat of
+    # nothing, so the bulk button is not offered.
+    await expect(opener).to_be_visible()
+    await expect(bulk).to_have_count(0)
 
-    # By keyboard: one press saves it, says so, and focus moves on. The
-    # panel keeps its height, so the saved page below does not move.
-    height = (await panel.bounding_box() or {}).get("height")
-    await _tab_to(page, shortcut)
+    # Report the first element; then the other two can be marked.
+    await opener.click()
+    await dialog.get_by_role("radio", name="Checked: a problem to report").check()
+    await dialog.get_by_role("textbox", name="Issue notes").fill("No name on the button.")
+    await dialog.get_by_role("button", name="Save review").click()
+    # A note on the second, with no decision, must survive the bulk save.
+    await page.get_by_role("button", name="Next element").click()
+    await opener.click()
+    await dialog.get_by_role("textbox", name="Issue notes").fill("Looked at it.")
+    await dialog.get_by_role("button", name="Save review").click()
+
+    await expect(bulk).to_have_text("Mark 2 not checked as repeats")
+    await expect(bulk).to_have_accessible_description(
+        re.compile(r"^Every flagged element in this page state with no review yet")
+    )
+    # Its own row, under "Review this element": the full label does not fit
+    # beside it, and the label names exactly what it changes.
+    opener_box, bulk_box = await opener.bounding_box(), await bulk.bounding_box()
+    assert opener_box and bulk_box and bulk_box["y"] > opener_box["y"]
+
+    # By keyboard: one press, said in words, focus on its undo.
+    await _tab_to(page, bulk)
     await page.keyboard.press("Enter")
+    undo = panel.get_by_role("button", name="Undo 2 repeats")
+    await expect(undo).to_be_focused()
+    await expect(panel).to_contain_text("2 elements marked as repeats.")
     await expect(opener).to_have_accessible_description(
         "Your review: Checked: a repeat of one already reported"
     )
-    await expect(panel).to_contain_text("Saved as a repeat.")
-    await expect(dialog).to_be_hidden()
-    await expect(shortcut).to_have_count(0)  # already a repeat
-    await expect(opener).to_be_focused()
-    assert (await panel.bounding_box() or {}).get("height") == height
-    assert _reviews(db_path) == [("#one", "repeat", "")]
-
-    # Notes already saved are kept: report with notes, then mark as repeat.
-    await page.get_by_role("button", name="Next element").click()
-    await opener.click()
-    await dialog.get_by_role("radio", name="Checked: a problem to report").check()
-    await dialog.get_by_role("textbox", name="Issue notes").fill("The second button has no name.")
-    await dialog.get_by_role("button", name="Save review").click()
-    await expect(shortcut).to_be_visible()
-    await shortcut.click()
-    await expect(panel).to_contain_text("Saved as a repeat.")
     assert _reviews(db_path) == [
-        ("#one", "repeat", ""),
-        ("#two", "repeat", "The second button has no name."),
+        ("#one", "report", "No name on the button."),
+        ("#two", "repeat", "Looked at it."),
+        ("#three", "repeat", ""),
     ]
+
+    # Undo puts exactly those back, notes kept, and focus returns.
+    await page.keyboard.press("Enter")
+    await expect(panel).to_contain_text("2 elements set back to not checked yet.")
+    await expect(bulk).to_be_focused()
+    assert _reviews(db_path) == [
+        ("#one", "report", "No name on the button."),
+        ("#two", None, "Looked at it."),
+        ("#three", None, ""),
+    ]
+    await expect(page.get_by_role("button", name="Mark as repeat")).to_have_count(0)

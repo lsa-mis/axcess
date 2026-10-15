@@ -95,10 +95,15 @@ with this issue**), on the **Saved copy** tab.
    replaced by a suggestion.
 5. Select **Save review**. The dialog closes and the panel says **Saved.**
 
-For a repeat, **Mark as repeat**, beside **Review this element**, saves
-**Checked: a repeat of one already reported** in one press, without the
-dialog, and keeps any notes already there. **Your review:** then says
-**Saved as a repeat.**
+When the rest of the elements are repeats, such as the same menu again,
+report the first one, step through the others with the arrow buttons, then
+choose **Mark 9 not checked as repeats** (the number is how many). Every
+flagged element in the page state on screen with no review yet becomes
+**Checked: a repeat of one already reported**, in one press. Elements
+already checked, and every note, are left as they are. It is offered once
+an element of the issue has been reported, since a repeat is a repeat of
+one already reported. **Undo 9 repeats** then takes exactly those back to
+**Not checked yet**.
 
 The review covers every occurrence of the issue on that element, in the page
 state on screen. **Close without saving** (or Escape) keeps your choice and
