@@ -197,7 +197,11 @@ Each issue's title opens its [issue page](#the-full-evidence-record).
 
 The issue page is the full evidence record for one issue. It leads with
 **Pages with this issue**: page title (opens the inspector), Page URL,
-Occurrences, Screenshots, and Status. Its header names the WCAG criterion and
+Occurrences, Screenshots, Status, and **Checked by a person**: how many of
+the page's occurrences a person has checked in the inspector, as **Not
+checked yet**, **2 of 6 checked** or **All checked**. Both kinds of checked
+count (a problem to report, and a repeat). Sort by it to bring the pages not
+checked yet to the top. Its header names the WCAG criterion and
 the issue's report group, in the same words as the Issues table's **How sure** column.
 
 **Issue guidance**, at the top right, opens a dialog with every section open:

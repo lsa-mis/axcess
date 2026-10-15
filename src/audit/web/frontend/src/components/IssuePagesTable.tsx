@@ -17,7 +17,7 @@ import {
   TableStatus,
 } from "./table/Table";
 import { compareText, sortWords, type Sort, type SortKind } from "./table/sort";
-import { withReturnTrail } from "./ui";
+import { CheckedChip, withReturnTrail } from "./ui";
 import type { IssuePage, IssueRow } from "../api/types";
 import { STATUS_LABEL } from "../lib/terms";
 
@@ -64,12 +64,21 @@ const STATUS_LABELS_ORDER = [
   "false_positive",
 ] as const;
 
-type SortColumn = "Page title" | "Page URL" | "Occurrences" | "Issue screenshots" | "Status";
+type SortColumn =
+  | "Page title"
+  | "Page URL"
+  | "Occurrences"
+  | "Issue screenshots"
+  | "Status"
+  | "Checked by a person";
 export type PagesSort = Sort<SortColumn>;
 
 /**
  * What each column sorts as (./table/sort): words open A to Z, counts open
- * with the biggest first. Status counts a page's open occurrences.
+ * with the biggest first. Status counts a page's open occurrences. Checked
+ * by a person sorts by the share of a page's occurrences checked, so it
+ * opens with the finished pages, and a second press puts the pages not
+ * checked yet first: the auditor's list of what is left.
  */
 const SORT_KINDS: Record<SortColumn, SortKind> = {
   "Page title": "text",
@@ -77,6 +86,7 @@ const SORT_KINDS: Record<SortColumn, SortKind> = {
   Occurrences: "number",
   "Issue screenshots": "number",
   Status: "number",
+  "Checked by a person": "number",
 };
 export const DEFAULT_PAGES_SORT: PagesSort = { column: "Occurrences", direction: "desc" };
 
@@ -87,6 +97,7 @@ const COLUMN_LABEL: Record<SortColumn, string> = {
   Occurrences: "Occurrences",
   "Issue screenshots": "Screenshots",
   Status: "Status",
+  "Checked by a person": "Checked by a person",
 };
 
 function describeSort(sort: PagesSort): string {
@@ -98,6 +109,11 @@ function openCount(page: IssuePage): number {
   return (page.status_summary.new ?? 0)
     + (page.status_summary.reviewing ?? 0)
     + (page.status_summary.in_progress ?? 0);
+}
+
+/** How much of a page a person has checked, 0 to 1. */
+function checkedShare(page: IssuePage): number {
+  return page.occurrence_count > 0 ? page.checked_count / page.occurrence_count : 0;
 }
 
 function comparePages(a: IssuePage, b: IssuePage, column: SortColumn): number {
@@ -112,6 +128,8 @@ function comparePages(a: IssuePage, b: IssuePage, column: SortColumn): number {
       return a.screenshot_hashes.length - b.screenshot_hashes.length;
     case "Status":
       return openCount(a) - openCount(b);
+    case "Checked by a person":
+      return checkedShare(a) - checkedShare(b);
   }
 }
 
@@ -218,6 +236,23 @@ export default function IssuePagesTable({
                     Status
                   </SortHeader>
                 )}
+                {/* Checked by a person: how far the auditor has got on each
+                    page, so this table doubles as their list of what is
+                    left. Its own column after Status, not folded into it:
+                    a status is where a fix stands, this is whether a person
+                    has looked, and one cell holding both would blur them.
+                    "Checked" is the word the inspector's review uses
+                    ("Checked by a person"), never "verified", so one thing
+                    has one name (W3C COGA "Making Content Usable",
+                    paraphrased: use the same words for the same thing,
+                    https://www.w3.org/TR/coga-usable/; SC 3.2.4 Consistent
+                    Identification, Level AA). Shown for every issue, For
+                    information too, since any of them can be reviewed. Its
+                    label wraps (wrap="words"), so the table still fits a
+                    1280 px screen without clipping the column. */}
+                <SortHeader column="Checked by a person" kind="number" wrap="words" {...sortProps}>
+                  Checked by a person
+                </SortHeader>
               </tr>
             </TableHead>
             <tbody>
@@ -328,6 +363,11 @@ const IssuePageRow = memo(function IssuePageRow({
           </div>
         </Cell>
       )}
+      {/* Wide enough that its chip takes two lines at most, as the Status
+          chips do; the URL column already wraps, so it gives up the room. */}
+      <Cell className="min-w-[8.5rem] text-center">
+        <CheckedChip checked={page.checked_count} total={page.occurrence_count} />
+      </Cell>
     </Row>
   );
 });

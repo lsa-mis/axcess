@@ -151,7 +151,8 @@ of this element**:
   elements are repeats is the person's call; Axcess does not decide it.
 
 It is separate from the [status](#status): In progress means a fix is planned,
-which is a different decision.
+which is a different decision. The **Pages with this issue** table counts it
+for each page: Not checked yet, 2 of 6 checked, or All checked.
 
 ### Issue notes
 

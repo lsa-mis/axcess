@@ -855,6 +855,9 @@ export interface IssuePage {
   status_summary: Record<string, number>;
   /** Marked scan-time screenshots, one for each locatable captured instance. */
   screenshot_hashes: string[];
+  /** How many of `occurrence_count` a person has checked in the page
+   *  inspector (a problem to report, or a repeat). */
+  checked_count: number;
 }
 
 export interface IssueDetail {

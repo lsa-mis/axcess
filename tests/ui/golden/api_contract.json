@@ -346,6 +346,7 @@
       "help_url": "string",
       "pages": [
         {
+          "checked_count": "integer",
           "occurrence_count": "integer",
           "page_id": "integer",
           "page_title": "string",
@@ -420,6 +421,7 @@
       "help_url": "null",
       "pages": [
         {
+          "checked_count": "integer",
           "occurrence_count": "integer",
           "page_id": "integer",
           "page_title": "string",
@@ -487,6 +489,7 @@
       "help_url": "string",
       "pages": [
         {
+          "checked_count": "integer",
           "occurrence_count": "integer",
           "page_id": "integer",
           "page_title": "string",

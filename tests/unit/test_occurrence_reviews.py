@@ -19,6 +19,7 @@ from audit.occurrence_reviews import (
     reviews_for_page,
     save_review,
 )
+from audit.web import issues
 
 MIGRATIONS = Path(__file__).parents[2] / "src/audit/db/migrations"
 
@@ -254,3 +255,67 @@ def test_deleting_a_report_deletes_its_reviews(tmp_db: sqlite3.Connection) -> No
     )
     tmp_db.execute("DELETE FROM scans WHERE id = ?", (scan_id,))
     assert _count(tmp_db) == 0
+
+
+def _pages(conn: sqlite3.Connection, scan_id: int, issue_key: str) -> dict[int, tuple[int, int]]:
+    """``page_id -> (checked_count, occurrence_count)`` in the issue's pages table."""
+    detail = issues.get_issue_detail(conn, scan_id, issue_key)
+    assert detail is not None
+    return {p.page_id: (p.checked_count, p.occurrence_count) for p in detail.pages}
+
+
+def test_pages_table_counts_what_a_person_checked(tmp_db: sqlite3.Connection) -> None:
+    """Both kinds of checked count; not checked yet does not."""
+    scan_id = seed_rich_scan(tmp_db)
+    rows = tmp_db.execute(
+        "SELECT id, page_id FROM page_a11y_findings WHERE scan_id = ? AND rule_id = 'link-name' "
+        "ORDER BY id LIMIT 3",
+        (scan_id,),
+    ).fetchall()
+    page_id = int(rows[0][1])
+    before = _pages(tmp_db, scan_id, "axe:link-name")[page_id]
+    assert before[0] == 0
+    for (finding_id, _), decision in zip(rows, ("report", "repeat", None), strict=True):
+        save_review(
+            tmp_db,
+            scan_id=scan_id,
+            page_id=page_id,
+            a11y_finding_ids=[int(finding_id)],
+            page_image_ids=[],
+            decision=decision,  # type: ignore[arg-type]
+            notes="",
+        )
+    assert _pages(tmp_db, scan_id, "axe:link-name")[page_id] == (2, before[1])
+
+
+def test_pages_table_counts_checked_images(tmp_db: sqlite3.Connection) -> None:
+    scan_id = _scan_with_real_findings(tmp_db)
+    row = tmp_db.execute(
+        "SELECT pi.id, pi.page_id FROM page_images pi JOIN pages p ON p.id = pi.page_id "
+        "JOIN findings f ON f.image_id = pi.image_id AND f.scan_id = p.scan_id "
+        "WHERE p.scan_id = ? ORDER BY pi.id LIMIT 1",
+        (scan_id,),
+    ).fetchone()
+    image_id, page_id = int(row[0]), int(row[1])
+    (issue_key,) = [
+        r.issue_key
+        for r in issues.list_issues(tmp_db, scan_id)
+        if r.pipeline == "image" and page_id in _pages(tmp_db, scan_id, r.issue_key)
+    ][:1]
+    save_review(
+        tmp_db,
+        scan_id=scan_id,
+        page_id=page_id,
+        a11y_finding_ids=[],
+        page_image_ids=[image_id],
+        decision="report",
+        notes="",
+    )
+    assert _pages(tmp_db, scan_id, issue_key)[page_id][0] == 1
+
+
+def test_pages_table_loads_when_reviews_cannot_be_read(tmp_db: sqlite3.Connection) -> None:
+    scan_id = seed_rich_scan(tmp_db)
+    tmp_db.execute("DROP TABLE occurrence_reviews")
+    pages = _pages(tmp_db, scan_id, "axe:link-name")
+    assert pages and all(checked == 0 for checked, _ in pages.values())

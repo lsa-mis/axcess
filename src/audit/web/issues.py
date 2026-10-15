@@ -45,8 +45,11 @@ import yaml
 
 from audit.analyzer.alfa_evidence import humanize_target
 from audit.labels import FINDING_TYPES, FindingType
+from audit.logging import get_logger
 from audit.wcag_version import WcagVersion, stored_wcag_version
 from audit.web import a11y_queries, image_findings_queries
+
+log = get_logger(__name__)
 
 # Conformance label shown in the table's badge column.
 #   A   = WCAG Level A (legal floor in most jurisdictions)
@@ -143,6 +146,11 @@ class IssuePage:
     # at scan time (empty when none were captured). The Excel export reads
     # these to embed visual evidence next to each issue.
     screenshot_hashes: tuple[str, ...] = ()
+    # How many of ``occurrence_count`` a person has checked in the page
+    # inspector: decided "a problem to report" or "a repeat of one already
+    # reported" (``audit.occurrence_reviews``). Counted over the same
+    # occurrences as ``occurrence_count``, so "3 of 19 checked" adds up.
+    checked_count: int = 0
 
 
 @dataclass(frozen=True)
@@ -632,6 +640,7 @@ def _pages_for_issue(
             (*row.finding_ids, scan_id),
         ).fetchall()
 
+    checked = _checked_counts(conn, scan_id, row)
     out: list[IssuePage] = []
     for r in rows:
         statuses = (r["statuses"] or "").split(",")
@@ -656,9 +665,48 @@ def _pages_for_issue(
                 occurrence_count=int(r["occurrence_count"]),
                 status_summary=counts,
                 screenshot_hashes=shots,
+                checked_count=checked.get(int(r["page_id"]), 0),
             )
         )
     return out
+
+
+def _checked_counts(conn: sqlite3.Connection, scan_id: int, row: IssueRow) -> dict[int, int]:
+    """Per page, how many of this issue's occurrences a person has checked.
+
+    The occurrences are the ones ``_pages_for_issue`` counts: the row's
+    finding ids for a DOM pipeline, and each placement of the row's images
+    on a page for the image pipeline (the unit the inspector reviews). A
+    database whose review table is missing or out of date counts none, so
+    the pages table still loads.
+    """
+    if not row.finding_ids:
+        return {}
+    ids = json.dumps(list(row.finding_ids))
+    if row.pipeline == "image":
+        sql = """
+            SELECT pi.page_id, COUNT(*)
+              FROM occurrence_reviews r
+              JOIN page_images pi ON pi.id = r.page_image_id
+              JOIN findings f ON f.image_id = pi.image_id AND f.scan_id = r.scan_id
+             WHERE r.scan_id = ? AND r.decision IS NOT NULL
+               AND f.id IN (SELECT value FROM json_each(?))
+             GROUP BY pi.page_id
+        """
+    else:
+        sql = """
+            SELECT a.page_id, COUNT(*)
+              FROM occurrence_reviews r
+              JOIN page_a11y_findings a ON a.id = r.a11y_finding_id
+             WHERE r.scan_id = ? AND r.decision IS NOT NULL
+               AND a.id IN (SELECT value FROM json_each(?))
+             GROUP BY a.page_id
+        """
+    try:
+        return {int(page_id): int(n) for page_id, n in conn.execute(sql, (scan_id, ids))}
+    except sqlite3.OperationalError as exc:
+        log.warning("issues.checked_counts_unreadable", error=str(exc))
+        return {}
 
 
 def _sort_pages(pages: list[IssuePage], sort: str) -> list[IssuePage]:

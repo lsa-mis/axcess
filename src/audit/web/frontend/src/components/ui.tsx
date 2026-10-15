@@ -50,6 +50,27 @@ export function ReviewDecisionChip({ value }: { value: ReviewDecision | null }) 
 }
 
 /**
+ * How far a person has got checking a page's occurrences in the page
+ * inspector: "Not checked yet", "3 of 19 checked" or "All checked". The
+ * same neutral chip as StatusChip and ReviewDecisionChip: it is a person's
+ * progress, not a severity, so it is not colour-coded. "All checked" adds a
+ * check mark, so a finished page stands out by shape, not only by words,
+ * and in forced colors too (the icon is drawn in the text colour). The
+ * words say the count, so "partly checked" says how much is left.
+ */
+export function CheckedChip({ checked, total }: { checked: number; total: number }) {
+  const done = total > 0 && checked >= total;
+  return (
+    // Its words may wrap, as the Status column's chips beside it do, so the
+    // pages table still fits a 1280 px screen.
+    <span className={cn(WORKFLOW_CHIP, "gap-1")}>
+      {done && <Check className="h-3 w-3 shrink-0" aria-hidden />}
+      {checked <= 0 ? "Not checked yet" : done ? "All checked" : `${checked} of ${total} checked`}
+    </span>
+  );
+}
+
+/**
  * A report's number as a small tinted tag, "Report #6", the form
  * docs/plain-language.md uses for a numbered report. The word says what is
  * numbered; a bare "#6" did not. The tint is translucent so the tag still
