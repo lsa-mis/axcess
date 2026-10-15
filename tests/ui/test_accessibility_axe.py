@@ -662,15 +662,15 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
         workspace.get_by_role("link", name="Issues", exact=True)
     ).to_have_attribute("aria-current", "page")
     await playwright_async.expect(page.get_by_role("link", name="Overview")).to_have_count(0)
-    # The summary leads with what was found: kinds of issue, the places they
-    # appear, then the pages visited. Pages that could not be loaded are said
+    # The summary leads with what was found: the places issues appear, the
+    # kinds of issue, then the pages visited. Pages that could not be loaded are said
     # in words, never as "errors", which readers took for accessibility
     # errors, and only when there are some.
     summary = page.locator("dl").filter(has_text="Pages visited")
     await playwright_async.expect(summary.get_by_role("term")).to_have_text(
         [
-            re.compile(r"^Kinds? of issue found$"),
             "Places issues appear (occurrences)",
+            re.compile(r"^Kinds? of issue found$"),
             "Pages visited",
         ]
     )

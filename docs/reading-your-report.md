@@ -142,8 +142,8 @@ report** menu sits at the top right. Three numbers above the table count:
 
 | Number | What it counts |
 | --- | --- |
-| Kinds of issue found | Rows in the Issues table, across all three report groups. |
 | Places issues appear (occurrences) | [Occurrences](glossary.md#occurrence) in every issue, including Not sure and For information, so it is not a count of confirmed problems. |
+| Kinds of issue found | Rows in the Issues table, across all three report groups. |
 | Pages visited | Every page the scan recorded, including pages that answered with an error and most pages that failed to load. |
 
 Two lines under **Pages visited** say more about it:

@@ -78,15 +78,23 @@ export function ReportSummary({
   return (
     <>
       {scan.blocked && <BlockedScanNotice scanId={scan.id} blocked={scan.blocked} />}
-      {/* Three numbers, main point first: how many issues, how many places
-          they appear, then how much of the site was scanned to find them.
+      {/* Three numbers: how many places issues appear, how many kinds of
+          issue, then how much of the site was scanned to find them.
           The first version read left to right as the scan ran (pages, then
           occurrences, then issues), and a coworker testing it misread it in
           three ways: "errors" as accessibility errors, "Occurrences found"
           as the issue count, and "Issues found" as a part of that count.
           Leading with what the reader came for is the first rule of the U.S.
-          Federal Plain Language Guidelines, and the issue count now sits
-          next to the table whose rows it counts.
+          Federal Plain Language Guidelines.
+
+          The places come first and the kinds second, as the developer chose
+          (October 2026), replacing kinds first: an evaluator now works
+          element by element (each occurrence is reviewed in the inspector
+          and becomes a row of the ITS technical review), so the count of
+          places is the number they act on. The tradeoff, accepted: kinds
+          first put the issue count beside the table whose rows it counts,
+          and the coworker above read the occurrences count as the issue
+          count; the labels below are what keep the two apart.
 
           The labels carry the difference between the two issue numbers, not
           the lines under them, because a reader scanning the numbers reads
@@ -151,14 +159,14 @@ export function ReportSummary({
           nothing is squeezed at 320px (SC 1.4.10 Reflow, Level AA). */}
       <dl className="mt-10 mb-5 grid grid-cols-2 gap-x-8 gap-y-8 sm:grid-cols-3 lg:gap-x-12">
         <SummaryStat
-          label={issueGroups === 1 ? "Kind of issue found" : "Kinds of issue found"}
-          value={issueGroups}
-          details={[{ text: "One per row in the table below" }]}
-        />
-        <SummaryStat
           label="Places issues appear (occurrences)"
           value={occurrences}
           details={[{ text: "Each one is an element on a page" }]}
+        />
+        <SummaryStat
+          label={issueGroups === 1 ? "Kind of issue found" : "Kinds of issue found"}
+          value={issueGroups}
+          details={[{ text: "One per row in the table below" }]}
         />
         <SummaryStat
           label="Pages visited"
