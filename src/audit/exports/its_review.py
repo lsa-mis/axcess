@@ -16,8 +16,15 @@ tests pin both:
   48th. Their ``DIVIDE()`` is a Google Sheets function, so Excel shows
   ``#NAME?`` for the percentages.
 * Rows past the template's own (Findings Issues row 49, Test Plan row 138)
-  are written as plain cells, with no dropdown or styling. Every occurrence
-  is still listed rather than dropped.
+  are written as plain cells, with no dropdown or styling. Every reported
+  element is still listed rather than dropped.
+
+Only what a person confirmed is listed. In the page inspector, the auditor
+reviews each flagged element and chooses "Checked: a problem to report",
+"Checked: a repeat of one already reported", or leaves it "Not checked yet"
+(``audit.occurrence_reviews``). The workbook lists the first kind only:
+the barriers the team hands to the vendor, each element once. Elements not
+checked yet, and repeats of a problem already reported, are left out.
 
 What each sheet receives:
 
@@ -28,20 +35,23 @@ What each sheet receives:
   person knows (U-M contact, vendor contact, VPAT, description, login info)
   keep the template's own prompt so they read as unfilled, not as blank
   facts, and IT provenance and IT type keep the template's values.
-* **Test Plan**: every page the scan checked, one row each, with its Test
-  name and URL; the Description column is left for the team. Column A feeds
-  the Test dropdown on Findings Issues through the template's
-  ``GenericTestList`` name.
+* **Test Plan**: each place a reported element is: a page, or a page state
+  reached by clicking (the click chain the inspector shows), one row each,
+  with its Test name, and its URL with the clicks to reach it. The
+  Description column is left for the team. Column A feeds the Test dropdown
+  on Findings Issues through the template's ``GenericTestList`` name.
 * **Summary**: a short factual narrative in the Narrative Summary cell.
-* **Findings Issues**: one row per occurrence (one element on one page) of
-  each Axcess issue a person may need to act on, as the ITS team asked: the
-  team tracks, fixes and verifies each barrier on its own row. An issue's
-  rows sit together, in the app's priority order, and each row's Test is
-  the page it is on. Category, Criterion, Impact and "Most affects" use the
-  template's own Reference and Reference Impact wording wherever the
-  criterion is listed there, so the team's dropdowns and Summary counts
-  match. Issues Axcess marks "For information", and occurrences someone
-  marked "Not a problem", are left out: the template asks for barriers only.
+* **Findings Issues**: one row per reported element, as the ITS team asked:
+  the team tracks, fixes and verifies each barrier on its own row. Issue
+  notes are the notes the auditor saved in Axcess, as written; a reported
+  element saved without notes gets the issue's plain-language title, so no
+  row is blank. An element carrying several occurrences of one issue (the
+  inspector saves one review for all of them) is one row. An issue's rows
+  sit together, in the app's priority order, and each row's Test is the
+  page or page state it is in. Category, Criterion, Impact and "Most
+  affects" use the template's own Reference and Reference Impact wording
+  wherever the criterion is listed there, so the team's dropdowns and
+  Summary counts match.
 * **Reference**, **Reference Impact**: unchanged.
 
 Severity is a first estimate. The template's scale judges access to core
@@ -57,6 +67,7 @@ not become a live formula in the team's spreadsheet.
 from __future__ import annotations
 
 import io
+import json
 import re
 import sqlite3
 from dataclasses import dataclass
@@ -71,10 +82,12 @@ from openpyxl.workbook.workbook import Workbook
 from openpyxl.worksheet.worksheet import Worksheet
 
 from audit import coverage_matrix, evaluation
-from audit.exports.audit_report import IssueLocation, issue_locations, plain_text
+from audit.exports.audit_report import plain_text
 from audit.exports.collector import ExportScan
-from audit.labels import REVIEW_LANE_LABELS
+from audit.logging import get_logger
 from audit.web import issues
+
+log = get_logger(__name__)
 
 _TEMPLATE_PACKAGE = "audit.exports"
 _TEMPLATE_PATH = ("templates", "its_technical_review.xlsx")
@@ -187,29 +200,6 @@ _CHECK_LABEL = {
     "image": "Image text check",
 }
 
-# Occurrence statuses as the app shows them (STATUS_LABEL in terms.ts).
-_STATUS_LABEL = {
-    "new": "New",
-    "reviewing": "Reviewing",
-    "in_progress": "In progress",
-    "remediated": "Fixed",
-    "accepted_risk": "Accepted risk",
-    "false_positive": "Not a problem",
-}
-
-# How sure Axcess is, in the words of the app's How sure column, with what
-# that asks of the reader.
-_LANE_NOTE = {
-    "likely_barrier": (
-        f"How sure: {REVIEW_LANE_LABELS['likely_barrier']}. A rule check failed. "
-        "Check it on the page to confirm."
-    ),
-    "expert_review": (
-        f"How sure: {REVIEW_LANE_LABELS['expert_review']}. A person must decide "
-        "whether this is a real problem."
-    ),
-}
-
 # The template writes each criterion as "<number> <en dash> <name>".
 _EN_DASH = "\u2013"
 _SC_PREFIX = re.compile(r"^\s*(\d+\.\d+\.\d+)")
@@ -232,12 +222,25 @@ class _Reference:
 
 
 @dataclass(frozen=True)
-class _Issue:
-    """One Axcess issue and the occurrences it contributes as rows."""
+class _Place:
+    """Where a reported element is: a page, or a page state reached by clicking."""
 
-    row: issues.IssueRow
-    #: Every occurrence not marked "Not a problem", in page order.
-    occurrences: list[IssueLocation]
+    page_id: int
+    url: str
+    title: str | None
+    #: The page state's key; None for the page as it loaded.
+    state_key: str | None
+    #: The controls clicked to reach it, "“Menu” → “Help”"; None at page load.
+    click_chain: str | None
+
+
+@dataclass(frozen=True)
+class _Row:
+    """One Findings Issues row: one element a person reported."""
+
+    issue: issues.IssueRow
+    place: _Place
+    notes: str
 
 
 def _sc_of(text: Any) -> str | None:
@@ -318,48 +321,170 @@ def _read_reference(wb: Workbook) -> _Reference:
     return _Reference(criterion=criterion, category=category, affects=affects, impact=impact)
 
 
-def _collect_issues(
-    conn: sqlite3.Connection, scan_id: int, page_order: dict[str, int]
-) -> list[_Issue]:
-    """Every issue that is a barrier, with each of its occurrences.
+def _short_name(name: str, limit: int = 40) -> str:
+    """A control's name cut at a word near ``limit``, as the inspector cuts it."""
+    text = " ".join(name.split())
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    space = cut.rfind(" ")
+    return (cut[:space] if space > limit / 2 else cut).rstrip(" ·,.;:\u2013-") + "…"
 
-    The template asks for barriers only, so issues Axcess marks "For
-    information" and occurrences someone marked "Not a problem" are dropped.
+
+def _click_chain(path_labels: str | None, revealed_by: str | None) -> str:
+    """The controls clicked to reach a page state, as the inspector says it."""
+    try:
+        labels = json.loads(path_labels or "[]")
+    except json.JSONDecodeError:
+        labels = []
+    names = [str(label) for label in labels if label] or [str(revealed_by or "")]
+    return " → ".join(f"“{_short_name(name)}”" for name in names)
+
+
+def _reported_reviews(
+    conn: sqlite3.Connection, scan_id: int
+) -> list[tuple[int | None, int | None, str]]:
+    """``(a11y_finding_id, page_image_id, notes)`` of every occurrence a person reported.
+
+    A database whose review table is missing or out of date (migrations not
+    yet applied) has no reviews to list, and the workbook still renders.
     """
-    collected: list[_Issue] = []
-    for row in issues.list_issues(conn, scan_id):
-        if row.review_lane == "informational":
-            continue
-        locations, _ = issue_locations(conn, row, limit=None)
-        kept = [loc for loc in locations if loc.status != "false_positive"]
-        if not kept:
-            continue
-        kept.sort(
-            key=lambda loc: (
-                page_order.get(loc.page_url, len(page_order)),
-                loc.finding_id or 0,
-                loc.image_url or "",
-            )
+    try:
+        rows = conn.execute(
+            "SELECT a11y_finding_id, page_image_id, notes FROM occurrence_reviews "
+            "WHERE scan_id = ? AND decision = 'report' ORDER BY id",
+            (scan_id,),
+        ).fetchall()
+    except sqlite3.OperationalError as exc:
+        log.warning("its_review.reviews_unreadable", error=str(exc))
+        return []
+    return [(r[0], r[1], str(r[2] or "")) for r in rows]
+
+
+def _in_batches(ids: list[int], size: int = 500) -> list[list[int]]:
+    return [ids[start : start + size] for start in range(0, len(ids), size)]
+
+
+def _collect_rows(conn: sqlite3.Connection, scan_id: int) -> list[_Row]:
+    """One row per element a person reported, in the app's priority order.
+
+    Occurrences are grouped into elements the way the inspector outlines
+    them: one issue, one page state, one element locator and markup (or one
+    image placed on the page). The inspector saves one review for every
+    occurrence on an element, so the group shares its notes.
+    """
+    reviews = _reported_reviews(conn, scan_id)
+    if not reviews:
+        return []
+    issue_rows = issues.list_issues(conn, scan_id)
+    order = {row.issue_key: index for index, row in enumerate(issue_rows)}
+    # Which issue each occurrence belongs to. A repeat (the same element on a
+    # later page, reported once by the Issues table) is still reviewable in
+    # the inspector, so it counts for its issue too.
+    by_a11y: dict[int, issues.IssueRow] = {}
+    by_image_finding: dict[int, issues.IssueRow] = {}
+    for row in issue_rows:
+        target = by_image_finding if row.pipeline == "image" else by_a11y
+        for finding_id in (*row.finding_ids, *row.repeat_finding_ids):
+            target[int(finding_id)] = row
+
+    pages = {
+        int(r[0]): (str(r[1]), r[2])
+        for r in conn.execute(
+            "SELECT id, url_normalized, title FROM pages WHERE scan_id = ?", (scan_id,)
         )
-        collected.append(_Issue(row=row, occurrences=kept))
-    return collected
+    }
+    states: dict[tuple[int, str], str] = {}
+    try:
+        for r in conn.execute(
+            "SELECT page_id, state_key, path_labels, revealed_by FROM page_dom_states "
+            "WHERE scan_id = ?",
+            (scan_id,),
+        ):
+            states[(int(r[0]), str(r[1]))] = _click_chain(r[2], r[3])
+    except sqlite3.OperationalError:
+        pass  # A report from before page states were saved.
+
+    def place(page_id: int, state_key: str | None) -> _Place | None:
+        if page_id not in pages:
+            return None
+        url, title = pages[page_id]
+        chain = states.get((page_id, state_key)) if state_key else None
+        return _Place(page_id, url, title, state_key if chain else None, chain)
+
+    notes_by_a11y = {int(a): notes for a, _, notes in reviews if a is not None}
+    notes_by_image = {int(i): notes for _, i, notes in reviews if i is not None}
+    # element key -> (issue, place, notes, sort key)
+    elements: dict[tuple[Any, ...], tuple[issues.IssueRow, _Place, str, tuple[Any, ...]]] = {}
+
+    for batch in _in_batches(sorted(notes_by_a11y)):
+        marks = ",".join("?" for _ in batch)
+        for r in conn.execute(
+            f"SELECT id, page_id, revealed_state_key, target_selector, html_snippet "  # noqa: S608
+            f"FROM page_a11y_findings WHERE scan_id = ? AND id IN ({marks})",
+            (scan_id, *batch),
+        ):
+            a11y_issue = by_a11y.get(int(r[0]))
+            a11y_place = place(int(r[1]), r[2])
+            if a11y_issue is None or a11y_place is None:
+                continue
+            snippet = " ".join(str(r[4] or "").split())
+            selector = str(r[3] or "")
+            a11y_key: tuple[Any, ...] = (
+                a11y_issue.issue_key,
+                a11y_place.page_id,
+                a11y_place.state_key or "",
+                selector,
+                snippet,
+            )
+            notes = notes_by_a11y[int(r[0])]
+            # One element, several occurrences: keep the notes if any has them.
+            if a11y_key in elements and (elements[a11y_key][2] or not notes):
+                continue
+            # In the order the scan recorded them, which follows the page.
+            sort = (
+                order[a11y_issue.issue_key],
+                a11y_place.page_id,
+                a11y_place.state_key or "",
+                int(r[0]),
+            )
+            elements[a11y_key] = (a11y_issue, a11y_place, notes, sort)
+
+    for batch in _in_batches(sorted(notes_by_image)):
+        marks = ",".join("?" for _ in batch)
+        for r in conn.execute(
+            f"SELECT pi.id, pi.page_id, f.id FROM page_images pi "  # noqa: S608
+            f"JOIN findings f ON f.image_id = pi.image_id AND f.scan_id = ? "
+            f"WHERE pi.id IN ({marks})",
+            (scan_id, *batch),
+        ):
+            image_issue = by_image_finding.get(int(r[2]))
+            image_place = place(int(r[1]), None)
+            if image_issue is None or image_place is None:
+                continue
+            image_key: tuple[Any, ...] = (
+                image_issue.issue_key,
+                image_place.page_id,
+                "",
+                "image",
+                int(r[0]),
+            )
+            sort = (order[image_issue.issue_key], image_place.page_id, "", int(r[0]))
+            elements[image_key] = (image_issue, image_place, notes_by_image[int(r[0])], sort)
+
+    ordered = sorted(elements.values(), key=lambda item: item[3])
+    return [_Row(issue=row, place=where, notes=notes) for row, where, notes, _ in ordered]
 
 
-def _scan_pages(conn: sqlite3.Connection, scan_id: int) -> list[tuple[str, str | None]]:
-    rows = conn.execute(
-        "SELECT url_normalized, title FROM pages WHERE scan_id = ? ORDER BY id",
-        (scan_id,),
-    ).fetchall()
-    return [(str(r[0]), r[1]) for r in rows]
-
-
-def _test_names(pages: list[tuple[str, str | None]]) -> dict[str, str]:
-    """A unique Test name per page URL: its title, told apart by path if needed."""
+def _test_names(places: list[_Place]) -> dict[tuple[int, str | None], str]:
+    """A unique Test name per place: the page's title, then the clicks to the state."""
     taken: set[str] = set()
-    names: dict[str, str] = {}
-    for url, title in pages:
-        path = urlsplit(url).path or "/"
-        base = " ".join(str(title or "").split()) or path
+    names: dict[tuple[int, str | None], str] = {}
+    for where in places:
+        path = urlsplit(where.url).path or "/"
+        base = " ".join(str(where.title or "").split()) or path
+        if where.click_chain:
+            base = f"{base}, after clicking {where.click_chain}"
         name = base
         if name in taken:
             name = f"{base} ({path})"
@@ -368,7 +493,7 @@ def _test_names(pages: list[tuple[str, str | None]]) -> dict[str, str]:
             name = f"{base} ({path}) {suffix}"
             suffix += 1
         taken.add(name)
-        names[url] = name
+        names[(where.page_id, where.state_key)] = name
     return names
 
 
@@ -402,55 +527,12 @@ def _severity(row: issues.IssueRow) -> str:
     return _SEVERITY_FROM_IMPACT.get((row.impact or "").lower(), _SEV_MINOR)
 
 
-def _notes(issue: _Issue, number: int, loc: IssueLocation, scan_date: str) -> str:
-    """One occurrence's Issue notes: what is wrong, where, how sure, how to fix it."""
-    row = issue.row
-    total = len(issue.occurrences)
-    lines = [
-        f"{scan_date}, Axcess scan: {plain_text(row.title)} (occurrence {number:,} of {total:,})"
-    ]
-    if row.description:
-        lines.append(plain_text(row.description))
-
-    page = loc.page_url or "No page recorded"
-    if loc.page_title:
-        page = f"{' '.join(loc.page_title.split())}: {page}"
-    lines.append(f"Page: {page}")
-    if loc.selector:
-        lines.append(f"Element locator (CSS selector): {loc.selector}")
-    elif loc.image_url:
-        lines.append(f"Image: {loc.image_url}")
-    if loc.detail:
-        lines.append(f"What the check found: {plain_text(loc.detail)}")
-    if loc.revealed_by:
-        lines.append(f'To see it, first open "{loc.revealed_by}".')
-
-    found_by = _CHECK_LABEL.get(row.pipeline, row.pipeline)
-    lane = _LANE_NOTE.get(row.review_lane, "")
-    lines.append(f"Found by: {found_by}. {lane}".strip())
-    if row.repeat_page_count:
-        lines.append(
-            "Some elements with this issue also appear, unchanged, on "
-            f"{_plural(row.repeat_page_count, 'more page', 'more pages')}, so they are "
-            "likely part of a shared header, menu or footer. Axcess lists each one once, "
-            "on the first page it was found."
-        )
-
-    steps = [plain_text(step) for step in row.fix_steps if step and step.strip()]
-    if steps:
-        lines.append("How to fix:")
-        lines.extend(f"• {step}" for step in steps)
-    if loc.status and loc.status != "new":
-        lines.append(f"Status in Axcess: {_STATUS_LABEL.get(loc.status, loc.status)}.")
-    return "\n".join(lines)
-
-
 def _fill_coversheet(
     ws: Worksheet,
     scan: ExportScan,
     scan_day: datetime | None,
     evaluation_record: dict[str, Any],
-    issues_found: list[_Issue],
+    rows: list[_Row],
 ) -> None:
     if scan_day is not None:
         ws["B3"].value = scan_day
@@ -467,8 +549,8 @@ def _fill_coversheet(
         checks.append(_CHECK_LABEL["axe"])
     if scan.alfa_pages_scanned:
         checks.append(_CHECK_LABEL["alfa"])
-    for issue in issues_found:
-        label = _CHECK_LABEL.get(issue.row.pipeline)
+    for item in rows:
+        label = _CHECK_LABEL.get(item.issue.pipeline)
         if label and label not in checks:
             checks.append(label)
     tools = (
@@ -481,34 +563,45 @@ def _fill_coversheet(
     _put_text(ws, "B19", tools)
 
 
+def _places(rows: list[_Row]) -> list[_Place]:
+    """Each place a reported element is, once, in page order, page load first."""
+    seen: dict[tuple[int, str | None], _Place] = {}
+    for item in rows:
+        seen.setdefault((item.place.page_id, item.place.state_key), item.place)
+    return sorted(seen.values(), key=lambda where: (where.page_id, where.state_key or ""))
+
+
 def _fill_test_plan(
     ws: Worksheet,
-    pages: list[tuple[str, str | None]],
-    names: dict[str, str],
+    places: list[_Place],
+    names: dict[tuple[int, str | None], str],
 ) -> None:
-    """One row per scanned page: the Test name and its URL.
+    """One row per place: its Test name, and its URL with the clicks to reach it.
 
-    The Description column is left empty for the team to write.
+    For a page state, "URL or location" says the clicks first and the URL
+    under them, the way the team writes a location reached by clicking. The
+    cell links to the page. The Description column is left for the team.
     """
     for row in range(_FIRST_PLAN_ROW, _TEMPLATE_LAST_PLAN_ROW + 1):
         for col in "ABCD":
             ws[f"{col}{row}"].value = None
-    for offset, (url, _title) in enumerate(pages):
+    for offset, where in enumerate(places):
         row = _FIRST_PLAN_ROW + offset
-        _put_text(ws, f"A{row}", names[url])
-        _put_link(ws, f"B{row}", url, url)
+        _put_text(ws, f"A{row}", names[(where.page_id, where.state_key)])
+        text = (
+            f"After clicking {where.click_chain}\n{where.url}" if where.click_chain else where.url
+        )
+        _put_link(ws, f"B{row}", text, where.url)
 
 
 def _fill_findings(
     ws: Worksheet,
-    issues_found: list[_Issue],
+    rows: list[_Row],
     ref: _Reference,
-    names: dict[str, str],
-    scan_date: str,
+    names: dict[tuple[int, str | None], str],
 ) -> None:
-    """Write one row per occurrence, starting at row 2."""
-    total = sum(len(issue.occurrences) for issue in issues_found)
-    last = max(_TEMPLATE_LAST_ISSUE_ROW, _FIRST_ISSUE_ROW + total - 1)
+    """Write one row per reported element, starting at row 2."""
+    last = max(_TEMPLATE_LAST_ISSUE_ROW, _FIRST_ISSUE_ROW + len(rows) - 1)
     criterion_names = {c.sc: c.name for c in coverage_matrix.load_matrix()}
     for row_number in range(_FIRST_ISSUE_ROW, last + 1):
         for col in "BCDEFGHI":
@@ -518,44 +611,49 @@ def _fill_findings(
         ws[f"J{row_number}"].value = False
         ws[f"K{row_number}"].value = _NOT_TESTED_BY_TEAM
 
-    r = _FIRST_ISSUE_ROW
-    for issue in issues_found:
-        row = issue.row
+    for r, item in enumerate(rows, start=_FIRST_ISSUE_ROW):
+        row = item.issue
         sc = row.wcag_sc or ""
-        # The same for every occurrence of the issue.
-        category = ref.category.get(sc) or _EXTRA_CATEGORY.get(sc)
-        criterion = _criterion_text(row, ref)
+        _put_text(ws, f"B{r}", names[(item.place.page_id, item.place.state_key)])
+        # The auditor's own notes, as saved; with none, what the problem is.
+        _put_text(ws, f"C{r}", item.notes.strip() or plain_text(row.title))
+        _put_text(ws, f"D{r}", ref.category.get(sc) or _EXTRA_CATEGORY.get(sc))
+        _put_text(ws, f"E{r}", _criterion_text(row, ref))
         info = _info_link(row, criterion_names)
-        severity = _severity(row)
+        if info:
+            _put_link(ws, f"F{r}", *info)
+        ws[f"G{r}"].value = _severity(row)
         why = ref.impact.get(sc) or (plain_text(row.why_matters) if row.why_matters else None)
+        _put_text(ws, f"H{r}", why)
         who = ref.affects.get(sc) or ", ".join(
             _ABILITY_GROUPS[a] for a in row.abilities_affected if a in _ABILITY_GROUPS
         )
-        for number, loc in enumerate(issue.occurrences, start=1):
-            _put_text(ws, f"B{r}", names.get(loc.page_url))
-            _put_text(ws, f"C{r}", _notes(issue, number, loc, scan_date))
-            _put_text(ws, f"D{r}", category)
-            _put_text(ws, f"E{r}", criterion)
-            if info:
-                _put_link(ws, f"F{r}", *info)
-            ws[f"G{r}"].value = severity
-            _put_text(ws, f"H{r}", why)
-            _put_text(ws, f"I{r}", who or None)
-            r += 1
+        _put_text(ws, f"I{r}", who or None)
 
 
 def _fill_summary(
     ws: Worksheet,
     scan: ExportScan,
-    issues_found: list[_Issue],
+    rows: list[_Row],
     scan_date: str,
 ) -> None:
     """Write the Narrative Summary cell. The template's formulas are left as they are."""
-    sure = sum(1 for issue in issues_found if issue.row.review_lane == "likely_barrier")
-    unsure = len(issues_found) - sure
-    rows = sum(len(issue.occurrences) for issue in issues_found)
+    scanned = (
+        f"Axcess scanned {_plural(scan.page_count, 'page', 'pages')} of {scan.seed_url} "
+        f"on {scan_date}. "
+    )
+    if not rows:
+        _put_text(
+            ws,
+            "A4",
+            scanned + "No element has been checked and reported yet, so Findings Issues "
+            "is empty. In Axcess, open an issue's pages in the inspector, and choose "
+            "Checked: a problem to report for each element that is a real problem.",
+        )
+        return
+    issue_count = len({item.issue.issue_key for item in rows})
     template_rows = _TEMPLATE_LAST_ISSUE_ROW - _FIRST_ISSUE_ROW + 1
-    beyond = rows - template_rows
+    beyond = len(rows) - template_rows
     # The template's counts stop at its last row; say so rather than let a
     # reader trust a total that leaves rows out.
     counted = (
@@ -568,23 +666,24 @@ def _fill_summary(
     _put_text(
         ws,
         "A4",
-        f"Axcess scanned {_plural(scan.page_count, 'page', 'pages')} of {scan.seed_url} "
-        f"on {scan_date}. It found {_plural(len(issues_found), 'issue', 'issues')} to review: "
-        f"{sure:,} where a rule check failed, and {unsure:,} that a person must confirm. "
-        f"Findings Issues has one row for each place an issue appears (an occurrence): "
-        f"{_plural(rows, 'row', 'rows')} in all. "
-        "Automated checks find only some accessibility problems, so test by hand as well.\n"
+        scanned + "A person checked its results and reported "
+        f"{_plural(len(rows), 'element', 'elements')} with "
+        f"{_plural(issue_count, 'problem', 'problems')}. Findings Issues has one row for "
+        "each, with the person's issue notes. Results not checked yet, and repeats of a "
+        "problem already reported, are left out. Automated checks find only some "
+        "accessibility problems, so test by hand as well.\n"
         "Severity is a first estimate from the automated impact rating. No issue is marked "
         "Blocker, because that depends on which tasks are core to the site, which a person "
-        "must judge. Confirm each issue and its severity before you share this report." + counted,
+        "must judge. Confirm each severity before you share this report." + counted,
     )
 
 
 def render_its_review(scan: ExportScan, *, conn: sqlite3.Connection) -> bytes:
     """Fill the U-M ITS Technical Review template from ``scan``; return .xlsx bytes.
 
-    ``conn`` is required: the issue rows come from the same
-    ``issues.list_issues()`` projection the app's Issues table shows.
+    ``conn`` is required: the rows are the elements a person reported in the
+    page inspector, matched to the issues of the same ``issues.list_issues()``
+    projection the app's Issues table shows.
     """
     source = resources.files(_TEMPLATE_PACKAGE).joinpath(*_TEMPLATE_PATH)
     wb = load_workbook(io.BytesIO(source.read_bytes()))
@@ -592,18 +691,14 @@ def render_its_review(scan: ExportScan, *, conn: sqlite3.Connection) -> bytes:
 
     scan_day = _scan_date(scan)
     scan_date = _human_date(scan_day)
-    pages = _scan_pages(conn, scan.id)
-    names = _test_names(pages)
-    issues_found = _collect_issues(
-        conn, scan.id, {url: index for index, (url, _) in enumerate(pages)}
-    )
+    rows = _collect_rows(conn, scan.id)
+    places = _places(rows)
+    names = _test_names(places)
 
-    _fill_coversheet(
-        wb[_COVER], scan, scan_day, evaluation.get_evaluation(conn, scan.id), issues_found
-    )
-    _fill_test_plan(wb[_PLAN], pages, names)
-    _fill_findings(wb[_FINDINGS], issues_found, ref, names, scan_date)
-    _fill_summary(wb[_SUMMARY], scan, issues_found, scan_date)
+    _fill_coversheet(wb[_COVER], scan, scan_day, evaluation.get_evaluation(conn, scan.id), rows)
+    _fill_test_plan(wb[_PLAN], places, names)
+    _fill_findings(wb[_FINDINGS], rows, ref, names)
+    _fill_summary(wb[_SUMMARY], scan, rows, scan_date)
 
     buf = io.BytesIO()
     wb.save(buf)

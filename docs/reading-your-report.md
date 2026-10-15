@@ -299,20 +299,24 @@ Sheets in the issue list with fixes (Excel):
 
 The ITS technical review is the ITS Accessibility Team's own form, kept
 exactly as the team wrote it: its sheets, formulas, lists, styles and
-reference tables are not changed. Axcess fills in only what the scan knows:
+reference tables are not changed. It lists only what a person reported: the
+elements reviewed in the page inspector as **Checked: a problem to report**
+(see [Record your review of an element](#record-your-review-of-an-element)).
+Elements not checked yet, and repeats of a problem already reported, are left
+out. Axcess fills in:
 
 | Sheet | What Axcess fills in |
 | --- | --- |
 | Coversheet | Scan date, site name and main web address, and the checks used. If an expert review records a purpose, it goes in Background. Tester(s), Login info and the other prompts are left for a person to answer. |
-| Test Plan | Every page the scan checked, one row each, with its name and web address. The Description column is left empty for you. These rows are the choices in the Test column. |
+| Test Plan | Each place a reported element is, one row each: a page, or a page state reached by clicking (such as "Home, after clicking “Menu”"). URL or location gives the clicks, then the web address. The Description column is left empty for you. These rows are the choices in the Test column. |
 | Summary | A short summary of the scan, in the Narrative Summary box. The form's own counts are left as they are. |
-| Findings Issues | One row for each occurrence: one place an issue appears, on one page. An issue's rows sit together. Test is the page. Category, Criterion, Impact and "Most affects" use the team's own wording. Issue notes say what is wrong, where it is (the page and the element), which check found it, how sure Axcess is, and how to fix it. |
+| Findings Issues | One row for each reported element. Issue notes are the notes you saved in Axcess, as written; an element saved without notes gets the issue's name. Test is the page or page state it is in. An issue's rows sit together. Category, Criterion, Impact and "Most affects" use the team's own wording. |
 | Reference, Reference Impact | Nothing. They stay as the team wrote them. |
 
-Issues marked For information, and occurrences marked Not a problem, are
-left out, because the form lists problems only.
+If nothing has been reported yet, Findings Issues is empty and the summary
+says how to report elements.
 
-The form has room for 48 rows. If a scan has more occurrences, Axcess still
+The form has room for 48 rows. If more elements are reported, Axcess still
 lists them all, but the rows after row 49 have no drop-down lists or formatting, and the
 Summary counts leave them out. The summary text says when this happens.
 In Excel, the Summary's percentages show `#NAME?`, because the form uses a

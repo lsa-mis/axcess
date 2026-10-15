@@ -68,7 +68,7 @@ from support.export_render import (
     render_unlabeled,
 )
 from support.golden_delta import DeltaError, apply_delta, make_delta
-from support.rich_scan import seed_rich_scan, write_evidence_blobs
+from support.rich_scan import seed_rich_reviews, seed_rich_scan, write_evidence_blobs
 from support.xlsx_fingerprint import dumps_fingerprint, fingerprint_diff, fingerprint_xlsx
 from test_exports_csv_json import scan_fixture  # noqa: F401  # fixture behind scan.csv
 
@@ -276,7 +276,11 @@ def test_scan_export_matches_golden(
 
 @pytest.fixture
 def rich_scan(tmp_db: sqlite3.Connection) -> int:
-    return seed_rich_scan(tmp_db)
+    # With a person's reviews, so the ITS technical review pins real rows.
+    # Only that workbook reads reviews; every other export is unchanged.
+    scan_id = seed_rich_scan(tmp_db)
+    seed_rich_reviews(tmp_db, scan_id)
+    return scan_id
 
 
 @pytest.fixture

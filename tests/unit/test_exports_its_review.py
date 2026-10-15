@@ -12,16 +12,16 @@ from typing import Any
 import pytest
 from openpyxl import load_workbook
 from openpyxl.workbook.workbook import Workbook
-from support.rich_scan import dom_finding, seed_rich_scan
+from support.rich_scan import dom_finding, seed_rich_reviews, seed_rich_scan
 from test_audit_report import _scan_with_real_findings  # tests/unit on sys.path
 from typer.testing import CliRunner
 
 from audit import cli
 from audit.config import Settings
 from audit.db import repo
-from audit.exports.audit_report import issue_locations
 from audit.exports.collector import collect_scan
 from audit.exports.its_review import render_its_review
+from audit.occurrence_reviews import Decision, save_review
 from audit.web import issues
 
 _HEADERS = {
@@ -72,15 +72,62 @@ def _all_text(wb: Workbook) -> str:
     )
 
 
-def _occurrence_count(conn: sqlite3.Connection, scan_id: int) -> int:
-    """Occurrences the form should list: not "For information", not "Not a problem"."""
-    return sum(
-        1
-        for row in issues.list_issues(conn, scan_id)
-        if row.review_lane != "informational"
-        for loc in issue_locations(conn, row, limit=None)[0]
-        if loc.status != "false_positive"
+def _rich(conn: sqlite3.Connection) -> int:
+    """The rich scan with a person's reviews (see ``seed_rich_reviews``)."""
+    scan_id = seed_rich_scan(conn)
+    seed_rich_reviews(conn, scan_id)
+    return scan_id
+
+
+def _review(
+    conn: sqlite3.Connection,
+    scan_id: int,
+    finding_ids: list[int],
+    *,
+    decision: Decision | None = "report",
+    notes: str = "",
+) -> None:
+    page_id = conn.execute(
+        "SELECT page_id FROM page_a11y_findings WHERE id = ?", (finding_ids[0],)
+    ).fetchone()[0]
+    save_review(
+        conn,
+        scan_id=scan_id,
+        page_id=int(page_id),
+        a11y_finding_ids=finding_ids,
+        page_image_ids=[],
+        decision=decision,
+        notes=notes,
     )
+
+
+def _finding_id(conn: sqlite3.Connection, scan_id: int, target: str) -> int:
+    return int(
+        conn.execute(
+            "SELECT id FROM page_a11y_findings WHERE scan_id = ? AND target_selector = ? "
+            "ORDER BY id DESC LIMIT 1",
+            (scan_id, target),
+        ).fetchone()[0]
+    )
+
+
+def _title(conn: sqlite3.Connection, scan_id: int, issue_key: str) -> str:
+    (row,) = [r for r in issues.list_issues(conn, scan_id) if r.issue_key == issue_key]
+    return row.title
+
+
+def _tests(wb: Workbook) -> list[tuple[str, str, str | None]]:
+    """Test Plan rows: (Test, URL or location, its link)."""
+    plan = wb["Test Plan"]
+    return [
+        (
+            str(plan[f"A{r}"].value),
+            str(plan[f"B{r}"].value),
+            plan[f"B{r}"].hyperlink.target if plan[f"B{r}"].hyperlink else None,
+        )
+        for r in range(5, plan.max_row + 1)
+        if plan[f"A{r}"].value
+    ]
 
 
 def test_keeps_the_templates_sheets_and_reference_tables(tmp_db: sqlite3.Connection) -> None:
@@ -98,8 +145,30 @@ def test_keeps_the_templates_sheets_and_reference_tables(tmp_db: sqlite3.Connect
         assert name in wb.defined_names
 
 
+def test_lists_only_the_elements_a_person_reported(tmp_db: sqlite3.Connection) -> None:
+    """Reported elements only: not checked yet, and repeats, are left out."""
+    scan_id = _rich(tmp_db)
+    wb = _render(tmp_db, scan_id)
+    rows = _issue_rows(wb)
+    contrast_title = _title(tmp_db, scan_id, "axe:color-contrast")
+
+    # Four reported elements: two contrast, one link, one image.
+    assert sorted(r["notes"] for r in rows) == sorted(
+        [
+            "Muted grey text on white fails contrast.",
+            contrast_title,  # reported without notes: what the problem is
+            "The first menu link has no name.",
+            "The banner's words are not in its alt text.",
+        ]
+    )
+    assert [r["number"] for r in rows] == [1, 2, 3, 4]
+    text = _all_text(wb)
+    assert "Same muted text as the home page." not in text  # a repeat
+    assert "nav > a:nth-child(2)" not in text  # not checked yet
+
+
 def test_an_issue_row_uses_the_templates_own_words(tmp_db: sqlite3.Connection) -> None:
-    scan_id = seed_rich_scan(tmp_db)
+    scan_id = _rich(tmp_db)
     wb = _render(tmp_db, scan_id)
     impact = {
         str(a).split(" ")[0]: (b, c)
@@ -109,12 +178,9 @@ def test_an_issue_row_uses_the_templates_own_words(tmp_db: sqlite3.Connection) -
     # The template's own spelling, with an en dash.
     criterion = "1.4.3 \u2013 Contrast (Minimum)"
     contrast = [r for r in _issue_rows(wb) if r["criterion"] == criterion]
-    # Four occurrences, one marked "Not a problem": three rows, side by side.
-    assert len(contrast) == 3
-    assert [r["number"] for r in contrast] == list(
-        range(contrast[0]["number"], contrast[0]["number"] + 3)
-    )
+    assert len(contrast) == 2
     for row in contrast:
+        assert row["test"] == "Home"
         assert row["category"] == "Contrast"
         assert row["severity"] == "3  Major"  # axe "serious"
         assert (row["affects"], row["impact"]) == impact["1.4.3"]
@@ -124,94 +190,74 @@ def test_an_issue_row_uses_the_templates_own_words(tmp_db: sqlite3.Connection) -
         )
         assert row["vendor_ready"] is False
         assert row["verified"] == "Not tested by UM A11y team"
-        assert row["notes"].startswith("April 22, 2026, Axcess scan: ")
-        assert "Found by: Rule check (axe)." in row["notes"]
-    assert [r["test"] for r in contrast] == ["Home", "Home", "About us"]
-    first, second, third = (r["notes"] for r in contrast)
-    assert "(occurrence 1 of 3)" in first
-    assert "Element locator (CSS selector): p > span.muted" in first
-    assert "Page: Home: https://example.org/" in first
-    assert "Element locator (CSS selector): footer small" in second
-    assert 'To see it, first open "Show more".' in third
-    assert "label.hint" not in "".join((first, second, third))  # Not a problem
-
-    # A criterion the ITS list does not have (AAA) still gets a category.
-    (enhanced,) = [r for r in _issue_rows(wb) if str(r["criterion"]).startswith("1.4.6")]
-    assert enhanced["category"] == "Contrast"
 
 
-def test_lists_barriers_only(tmp_db: sqlite3.Connection) -> None:
+def test_one_row_per_element(tmp_db: sqlite3.Connection) -> None:
+    """Several occurrences on one element, reviewed together, are one row."""
     scan_id = seed_rich_scan(tmp_db)
-    page = repo.upsert_page(
-        tmp_db,
-        scan_id=scan_id,
-        url_normalized="https://example.org/rejected",
-        status_code=200,
-        title="Rejected",
-        render_mode="js",
-        html_hash="9" * 64,
+    first = _finding_id(tmp_db, scan_id, "p > span.muted")
+    # The same element recorded twice (same locator and markup, its own
+    # element hash), which the inspector outlines once and reviews together.
+    tmp_db.execute(
+        "INSERT INTO page_a11y_findings (page_id, scan_id, pipeline, rule_id, wcag_sc, "
+        "wcag_level, impact, help, target_selector, failure_summary, html_snippet, "
+        "target_hash) SELECT page_id, scan_id, pipeline, rule_id, wcag_sc, wcag_level, "
+        "impact, help, target_selector, failure_summary, html_snippet, 'second-record' "
+        "FROM page_a11y_findings WHERE id = ?",
+        (first,),
     )
-    dom_finding(
-        tmp_db,
-        scan_id=scan_id,
-        page_id=page,
-        rule_id="only-rejected-rule",
-        help_text="Only rejected occurrences",
-        target="#rejected",
-        impact="serious",
-        wcag_sc="1.3.1",
-        wcag_level="A",
-        status="false_positive",
-    )
-    wb = _render(tmp_db, scan_id)
-    rows = _issue_rows(wb)
+    second = _finding_id(tmp_db, scan_id, "p > span.muted")
+    assert second != first
+    _review(tmp_db, scan_id, [first, second], notes="Low contrast.")
 
-    assert len(rows) == _occurrence_count(tmp_db, scan_id)
-    assert [r["number"] for r in rows] == list(range(1, len(rows) + 1))
-    assert "Only rejected occurrences" not in _all_text(wb)
-
-
-def test_each_row_is_one_occurrence(tmp_db: sqlite3.Connection) -> None:
-    scan_id = seed_rich_scan(tmp_db)
     rows = _issue_rows(_render(tmp_db, scan_id))
+    assert [r["notes"] for r in rows] == ["Low contrast."]
 
-    for row in rows:
-        notes = row["notes"]
-        assert notes.count("\nPage: ") == 1, notes
-        assert notes.count("Element locator (CSS selector):") + notes.count("\nImage: ") <= 1
-    # Twelve links without text on one page: twelve rows, not one.
-    links = [r for r in rows if "nav > a:nth-child(" in r["notes"]]
-    assert len(links) == 12
-    assert "(occurrence 12 of 12)" in links[-1]["notes"]
+
+def test_test_plan_lists_where_reported_elements_are(tmp_db: sqlite3.Connection) -> None:
+    """Pages and page states with reported elements: the clicks first, the URL under."""
+    scan_id = seed_rich_scan(tmp_db)
+    finding = _finding_id(tmp_db, scan_id, ".details p")
+    page_id = tmp_db.execute(
+        "SELECT page_id FROM page_a11y_findings WHERE id = ?", (finding,)
+    ).fetchone()[0]
+    tmp_db.execute(
+        "INSERT INTO page_dom_states (page_id, scan_id, state_key, revealed_by, path_labels, "
+        "dom) VALUES (?, ?, 'click:more', 'Show more', '[\"Account\", \"Show more\"]', ?)",
+        (page_id, scan_id, b"x"),
+    )
+    tmp_db.execute(
+        "UPDATE page_a11y_findings SET revealed_state_key = 'click:more' WHERE id = ?", (finding,)
+    )
+    _review(tmp_db, scan_id, [finding], notes="Grey text in the opened panel.")
+    _review(tmp_db, scan_id, [_finding_id(tmp_db, scan_id, "footer small")], notes="Footer.")
+
+    wb = _render(tmp_db, scan_id)
+    assert _tests(wb) == [
+        ("Home", "https://example.org/", "https://example.org/"),
+        (
+            "About us, after clicking “Account” → “Show more”",
+            "After clicking “Account” → “Show more”\nhttps://example.org/about",
+            "https://example.org/about",
+        ),
+    ]
+    plan = wb["Test Plan"]
+    # Only reported places, and the Description column is the team's to write.
+    assert all(plan[f"C{r}"].value is None for r in range(5, plan.max_row + 1))
+    rows = {r["notes"]: r["test"] for r in _issue_rows(wb)}
+    assert rows == {
+        "Grey text in the opened panel.": "About us, after clicking “Account” → “Show more”",
+        "Footer.": "Home",
+    }
+    assert wb.defined_names["GenericTestList"].attr_text == "'Test Plan'!$A$5:$A$138"
 
 
 def test_severity_is_conservative(tmp_db: sqlite3.Connection) -> None:
-    scan_id = seed_rich_scan(tmp_db)
+    scan_id = _rich(tmp_db)
     rows = _issue_rows(_render(tmp_db, scan_id))
 
     # Blocker needs a person's judgement of which tasks are core.
-    assert {r["severity"] for r in rows} <= _SEVERITIES
-    for row in rows:
-        if row["criterion"] == "No WCAG criterion (best practice)":
-            assert row["severity"] == "1  Best practice"
-            assert row["category"] is None
-
-
-def test_every_test_is_a_test_plan_entry(tmp_db: sqlite3.Connection) -> None:
-    scan_id = seed_rich_scan(tmp_db)
-    wb = _render(tmp_db, scan_id)
-    plan = wb["Test Plan"]
-    tests = [plan[f"A{r}"].value for r in range(5, plan.max_row + 1) if plan[f"A{r}"].value]
-    pages = tmp_db.execute("SELECT COUNT(*) FROM pages WHERE scan_id = ?", (scan_id,)).fetchone()
-
-    # One Test per scanned page, and every row's Test is the page it is on.
-    assert tests[:2] == ["Home", "About us"]
-    assert len(tests) == pages[0]
-    assert len(set(tests)) == len(tests)
-    assert {r["test"] for r in _issue_rows(wb)} <= set(tests)
-    # The Description column is the team's to write.
-    assert all(plan[f"C{r}"].value is None for r in range(5, plan.max_row + 1))
-    assert wb.defined_names["GenericTestList"].attr_text == "'Test Plan'!$A$5:$A$138"
+    assert rows and {r["severity"] for r in rows} <= _SEVERITIES
 
 
 def test_scan_text_never_becomes_a_formula(tmp_db: sqlite3.Connection) -> None:
@@ -237,6 +283,7 @@ def test_scan_text_never_becomes_a_formula(tmp_db: sqlite3.Connection) -> None:
         wcag_sc="1.3.1",
         wcag_level="A",
     )
+    _review(tmp_db, scan_id, [_finding_id(tmp_db, scan_id, "=1+1")], notes="=2+2")
     wb = _render(tmp_db, scan_id)
 
     cells = [
@@ -244,12 +291,11 @@ def test_scan_text_never_becomes_a_formula(tmp_db: sqlite3.Connection) -> None:
         for ws in (wb["Test Plan"], wb["Findings Issues"])
         for row in ws.iter_rows()
         for cell in row
-        if isinstance(cell.value, str) and "attacker.example" in cell.value
+        if isinstance(cell.value, str) and cell.value.startswith("=")
     ]
-    assert cells, "the hostile title should be listed"
+    # The page title, as the Test and in the Test Plan, and the notes: text.
+    assert {c.value for c in cells} == {hostile, "=2+2"}
     assert all(cell.data_type == "s" for cell in cells)
-    # Listed in the Test Plan and as the issue's Test, both times as text.
-    assert {c.value for c in cells if c.value.startswith("=")} == {hostile}
 
 
 def _style(cell: Any) -> tuple[Any, ...]:
@@ -272,7 +318,7 @@ def test_template_structure_is_unchanged(tmp_db: sqlite3.Connection) -> None:
     leaves out parts that are empty in the template: six blank drawings and
     an empty list of people.
     """
-    scan_id = seed_rich_scan(tmp_db)
+    scan_id = _rich(tmp_db)
     wb = _render(tmp_db, scan_id)
     buf = io.BytesIO()
     _template().save(buf)
@@ -305,18 +351,43 @@ def test_template_structure_is_unchanged(tmp_db: sqlite3.Connection) -> None:
     assert wb["Coversheet"]["B5"].value == template["Coversheet"]["B5"].value
 
 
+def test_summary_when_nothing_is_reported_yet(tmp_db: sqlite3.Connection) -> None:
+    scan_id = seed_rich_scan(tmp_db)
+    wb = _render(tmp_db, scan_id)
+
+    assert _issue_rows(wb) == []
+    assert _tests(wb) == []
+    narrative = str(wb["Summary"]["A4"].value)
+    assert "No element has been checked and reported yet" in narrative
+    assert "Checked: a problem to report" in narrative
+
+
 def test_summary_says_when_its_counts_miss_rows(tmp_db: sqlite3.Connection) -> None:
     scan_id = seed_rich_scan(tmp_db)
-    count = _occurrence_count(tmp_db, scan_id)
-    assert count > 48, "the fixture must outgrow the template's 48 rows"
+    page_id = tmp_db.execute(
+        "SELECT id FROM pages WHERE scan_id = ? ORDER BY id LIMIT 1", (scan_id,)
+    ).fetchone()[0]
+    for n in range(50):
+        dom_finding(
+            tmp_db,
+            scan_id=scan_id,
+            page_id=page_id,
+            rule_id="many-elements",
+            help_text="Many elements",
+            target=f"#el-{n}",
+            impact="moderate",
+            wcag_sc="1.3.1",
+            wcag_level="A",
+        )
+        _review(tmp_db, scan_id, [_finding_id(tmp_db, scan_id, f"#el-{n}")], notes=f"Element {n}.")
     wb = _render(tmp_db, scan_id)
     narrative = str(wb["Summary"]["A4"].value)
 
-    # Every occurrence is still listed, past the template's last row.
-    assert len(_issue_rows(wb)) == count
-    assert f"one row for each place an issue appears (an occurrence): {count} rows" in narrative
+    # Every reported element is still listed, past the template's last row.
+    assert len(_issue_rows(wb)) == 50
+    assert "reported 50 elements with 1 problem" in narrative
     assert "The counts below include the first 48 rows only." in narrative
-    assert f"{count - 48:,} more rows are listed" in narrative
+    assert "2 more rows are listed" in narrative
     assert "Blocker" in narrative
 
 
@@ -345,8 +416,8 @@ def test_coversheet_keeps_the_prompts_a_person_must_answer(tmp_db: sqlite3.Conne
 
 
 def test_never_reads_another_scan(tmp_db: sqlite3.Connection) -> None:
-    scan_a = seed_rich_scan(tmp_db)
-    scan_b = seed_rich_scan(tmp_db)
+    scan_a = _rich(tmp_db)
+    scan_b = _rich(tmp_db)
     page = repo.upsert_page(
         tmp_db,
         scan_id=scan_b,
@@ -367,11 +438,21 @@ def test_never_reads_another_scan(tmp_db: sqlite3.Connection) -> None:
         wcag_sc="1.3.1",
         wcag_level="A",
     )
+    _review(tmp_db, scan_b, [_finding_id(tmp_db, scan_b, "#b")], notes="Scan B's own note.")
     wb = _render(tmp_db, scan_a)
 
-    assert "Only in scan B" not in _all_text(wb)
-    assert "only-in-b" not in _all_text(wb)
-    assert len(_issue_rows(wb)) == _occurrence_count(tmp_db, scan_a)
+    text = _all_text(wb)
+    assert "Only in scan B" not in text
+    assert "Scan B's own note." not in text
+    assert len(_issue_rows(wb)) == 4
+
+
+def test_renders_when_reviews_cannot_be_read(tmp_db: sqlite3.Connection) -> None:
+    """A database without the review table yet still exports, with no rows."""
+    scan_id = _rich(tmp_db)
+    tmp_db.execute("DROP TABLE occurrence_reviews")
+    wb = _render(tmp_db, scan_id)
+    assert _issue_rows(wb) == []
 
 
 def test_cli_writes_the_its_review(

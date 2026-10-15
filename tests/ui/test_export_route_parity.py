@@ -29,7 +29,12 @@ from support.export_render import (
     export_filename,
     render_export,
 )
-from support.rich_scan import database_path, seed_rich_scan, write_evidence_blobs
+from support.rich_scan import (
+    database_path,
+    seed_rich_reviews,
+    seed_rich_scan,
+    write_evidence_blobs,
+)
 from support.xlsx_fingerprint import fingerprint_diff, fingerprint_xlsx
 
 from audit.web.server import create_app
@@ -48,6 +53,7 @@ def test_harness_matches_the_route_download(
 ) -> None:
     monkeypatch.delenv("AUDIT_ACCESS_TOKEN", raising=False)
     scan_id = seed_rich_scan(tmp_db)
+    seed_rich_reviews(tmp_db, scan_id)
     tmp_db.commit()
     blobs = write_evidence_blobs(tmp_path / "blobs")
     client = TestClient(
