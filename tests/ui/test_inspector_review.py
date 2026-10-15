@@ -87,6 +87,7 @@ async def test_review_by_keyboard_alone(
 
     # The review is said in words beside the facts, and on the button.
     await expect(panel).to_contain_text("Your review: Not checked yet")
+    await expect(panel).to_contain_text("Issue notes: None yet")
     await expect(opener).to_have_accessible_description("Your review: Not checked yet")
     await expect(dialog).to_be_hidden()
 
@@ -111,6 +112,7 @@ async def test_review_by_keyboard_alone(
     await expect(opener).to_be_focused()
     await expect(status).to_have_text("Saved.")
     await expect(panel).to_contain_text("Your review: Checked: a problem to report")
+    await expect(panel).to_contain_text("Issue notes: The first button has no accessible name.")
     assert _reviews(db_path) == [("#one", "report", "The first button has no accessible name.")]
 
     # Reopening shows the saved review, and focus is on the chosen radio.
@@ -135,8 +137,9 @@ async def test_review_by_keyboard_alone(
     await dialog.get_by_role("button", name="Close without saving").click()
     await expect(dialog).to_be_hidden()
     await expect(panel).to_contain_text(
-        "Your review: Checked: a repeat of one already reported (not saved yet)"
+        "Your review: Checked: a repeat of one already reported Not saved yet"
     )
+    await expect(panel).to_contain_text("Issue notes: Draft for the second button.")
     await page.get_by_role("button", name="Previous element").click()
     await expect(panel).to_contain_text("Your review: Checked: a problem to report")
     await page.get_by_role("button", name="Next element").click()

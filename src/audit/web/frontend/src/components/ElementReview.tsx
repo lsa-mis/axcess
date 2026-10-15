@@ -4,7 +4,7 @@ import type { OccurrenceReview, ReviewDecision } from "../api/types";
 import { useModalDialog } from "../hooks/useModalDialog";
 import { REVIEW_DECISION_HELP, REVIEW_DECISION_LABEL } from "../lib/terms";
 import PillGroup from "./newScan/PillGroup";
-import { Button } from "./ui";
+import { Button, ReviewDecisionChip } from "./ui";
 
 /** What the review holds while it is being edited, before Save. */
 export type ReviewDraft = { decision: ReviewDecision | null; notes: string };
@@ -18,9 +18,11 @@ const MAX_NOTES = 2000;
  * A person's review of the element the page inspector has circled:
  * "Checked by a person" and Issue notes.
  *
- * What it does. In the element facts panel, a line says the current review
- * in words ("Your review: Checked: a problem to report") beside a "Review
- * this element" button. The button opens a dialog with the choice, the
+ * What it does. In the element facts panel, a region of fixed width shows
+ * the review at a glance: the decision as a chip (ReviewDecisionChip, the
+ * neutral chip occurrence statuses use, so the three decisions look alike
+ * and differ by their words), the issue notes cut to two lines, and a
+ * "Review this element" button. The button opens a dialog with the choice, the
  * notes, "Save review" (saves and closes) and "Close without saving" (keeps
  * the unsaved edit for this element while the page is open).
  *
@@ -52,9 +54,10 @@ const MAX_NOTES = 2000;
  * (nothing stops two being pressed). "Not checked yet" is the starting
  * choice because a radio cannot be cleared; it also takes a decision back.
  *
- * The review line is the button's description (aria-describedby), so a
- * screen reader hears the current review on the button, and it is words,
- * never colour alone (SC 1.4.1 Use of Color, Level A). "Saved." is said in a
+ * The decision chip is the button's description (aria-describedby), so a
+ * screen reader hears the current decision on the button (the notes are
+ * left out: up to 2,000 characters is too long to hear on every focus),
+ * and it is words, never colour alone (SC 1.4.1 Use of Color, Level A). "Saved." is said in a
  * polite status region outside the dialog, always in the page, since the
  * dialog closes on save (SC 4.1.3 Status Messages, Level AA). A failed save
  * keeps the dialog open with the reason as an alert and the edit intact.
@@ -116,7 +119,6 @@ export default function ElementReview({
   const value = draft ?? stored;
   const dirty = value.decision !== stored.decision || value.notes !== stored.notes;
   const count = a11yFindingIds.length + pageImageIds.length;
-  const current = REVIEW_DECISION_LABEL[value.decision ?? "none"];
 
   function change(next: ReviewDraft) {
     const same = next.decision === stored.decision && next.notes === stored.notes;
@@ -160,27 +162,39 @@ export default function ElementReview({
   }
 
   return (
-    <div className="min-w-0">
-      <p id={summaryId} className="text-sm text-fg">
-        <span className="font-semibold">Your review: </span>
-        {current}
-        {dirty && <span className="font-semibold"> (not saved yet)</span>}
+    <div className="min-w-0 text-sm text-fg">
+      {/* The review at a glance: the decision as a chip, then the notes. */}
+      <p id={summaryId}>
+        <span className="block font-semibold">Your review:</span>{" "}
+        <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+          <ReviewDecisionChip value={value.decision} />
+          {dirty && <span className="font-semibold"> Not saved yet</span>}
+        </span>
       </p>
-      <Button
-        type="button"
-        variant="secondary"
-        className="mt-2"
-        aria-describedby={summaryId}
-        onClick={() => {
-          setAnnouncement("");
-          setOpen(true);
-        }}
-      >
-        Review this element
-      </Button>
-      <p role="status" className="mt-1 text-sm text-fg empty:sr-only">
-        {announcement}
+      {/* Two lines at most, so the panel stays about as tall as the element
+          facts beside it and the saved page below keeps its place; the
+          whole note is in the dialog. Clipped for the eye only: a screen
+          reader reads all of it. */}
+      <p className="mt-1.5 line-clamp-2 whitespace-pre-line [overflow-wrap:anywhere]">
+        <span className="font-semibold">Issue notes: </span>
+        {value.notes.trim() ? value.notes : <span className="text-fg-muted">None yet</span>}
       </p>
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+        <Button
+          type="button"
+          variant="secondary"
+          aria-describedby={summaryId}
+          onClick={() => {
+            setAnnouncement("");
+            setOpen(true);
+          }}
+        >
+          Review this element
+        </Button>
+        <p role="status" className="text-sm text-fg empty:sr-only">
+          {announcement}
+        </p>
+      </div>
 
       <dialog
         ref={dialogRef}

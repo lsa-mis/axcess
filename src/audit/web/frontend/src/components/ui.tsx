@@ -4,23 +4,47 @@ import { createElement, forwardRef, useEffect, useId, useRef, useState } from "r
 import { Check, ChevronDown, ChevronRight, ScanEye } from "lucide-react";
 import { Link } from "react-router";
 import { cn } from "../lib/cn";
-import type { Severity, FindingStatus, ScanStatus } from "../api/types";
-import { SCAN_STATUS_LABEL, STATUS_HELP, STATUS_LABEL } from "../lib/terms";
+import type { Severity, FindingStatus, ReviewDecision, ScanStatus } from "../api/types";
+import {
+  REVIEW_DECISION_HELP,
+  REVIEW_DECISION_LABEL,
+  SCAN_STATUS_LABEL,
+  STATUS_HELP,
+  STATUS_LABEL,
+} from "../lib/terms";
 
 /** Severity chip, pairs color + text, so the signal isn't color-only. */
 export function SeverityChip({ value }: { value: Severity }) {
   return <span className={cn("sev-chip", `sev-chip--${value}`)}>{value}</span>;
 }
 
+/** The neutral chip that workflow states share: one look for every state a
+ * person sets, so none of them reads as more urgent than another. */
+const WORKFLOW_CHIP =
+  "inline-flex items-center rounded-xs border border-border bg-surface-muted px-2 py-0.5 text-2xs font-medium text-fg-muted";
+
 /** Status chip that uses neutral surfaces, we DON'T color-code status,
  * because status is intentionally user-workflow, not severity. */
 export function StatusChip({ value }: { value: FindingStatus }) {
   return (
-    <span
-      title={STATUS_HELP[value]}
-      className="inline-flex items-center rounded-xs border border-border bg-surface-muted px-2 py-0.5 text-2xs font-medium text-fg-muted"
-    >
+    <span title={STATUS_HELP[value]} className={WORKFLOW_CHIP}>
       {STATUS_LABEL[value] ?? value.replace(/_/g, " ")}
+    </span>
+  );
+}
+
+/**
+ * What a person decided about an element in the page inspector, as a chip.
+ * The same neutral chip as StatusChip, for the same reason: it is a
+ * person's workflow decision, not a severity, so its three values look
+ * alike and differ by their words alone (the words carry the meaning, never
+ * colour, SC 1.4.1 Use of Color, Level A).
+ */
+export function ReviewDecisionChip({ value }: { value: ReviewDecision | null }) {
+  const key = value ?? "none";
+  return (
+    <span title={REVIEW_DECISION_HELP[key] || undefined} className={WORKFLOW_CHIP}>
+      {REVIEW_DECISION_LABEL[key]}
     </span>
   );
 }

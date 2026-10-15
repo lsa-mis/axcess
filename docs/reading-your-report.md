@@ -76,9 +76,9 @@ To reproduce a problem that appears only after a click:
 
 ### Record your review of an element
 
-Beside the element facts in the inspector, **Your review:** says what you
-decided about the element the arrow buttons are on, such as **Not checked
-yet**. It is there when the inspector was opened for one issue (from **Pages
+Beside the element facts in the inspector, **Your review:** shows what you
+decided about the element the arrow buttons are on, as a badge such as **Not
+checked yet**, and the first two lines of its **Issue notes**. It is there when the inspector was opened for one issue (from **Pages
 with this issue**), on the **Saved copy** tab.
 
 1. Step to the element with the arrow buttons.
@@ -92,8 +92,8 @@ with this issue**), on the **Saved copy** tab.
 
 The review covers every occurrence of the issue on that element, in the page
 state on screen. **Close without saving** (or Escape) keeps your choice and
-notes while you stay on the page, and **Your review:** then ends with **(not
-saved yet)**. Leaving the page or reloading it discards them. Any report can
+notes while you stay on the page, and **Your review:** then says **Not saved
+yet** beside the badge. Leaving the page or reloading it discards them. Any report can
 be reviewed, finished or not, except a protected report.
 
 ### If you have a ticket or a workbook row, not the app

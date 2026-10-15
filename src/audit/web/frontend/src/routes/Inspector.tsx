@@ -1280,19 +1280,21 @@ export default function InspectorRoute() {
                 labels in the same places for every flagged element, so
                 Previous / Next change only the values. The toolbar above
                 already says which one you are on, so this does not repeat it.
-                The person's review of the element (a line saying it and the
-                "Review this element" button) sits to the right of the table
-                on a wide screen and under it on a narrow one, after it in
-                reading order; see ElementReview for why. It is short, so the
-                saved page below stays where it was. Side by side only from
-                xl: narrower, the table's values would lose their width. */}
+                The person's review of the element (its decision, notes and
+                the "Review this element" button) sits to the right of the
+                table on a wide screen, in a column of fixed width so it does
+                not shift as the words change from element to element, and
+                under the table on a narrow one, after it in reading order;
+                see ElementReview for why. It is short, so the saved page
+                below stays where it was. Side by side only from xl:
+                narrower, the table's values would lose their width. */}
             {showHighlights && highlightedCount > 0 && currentElement && (
               <div
                 role="group"
                 aria-label="The flagged element you are on"
                 className="border-b border-border bg-surface px-3 py-2 text-sm text-fg"
               >
-                <div className={cn(canReview && "xl:grid xl:grid-cols-[minmax(0,1fr)_auto] xl:gap-6")}>
+                <div className={cn(canReview && "xl:grid xl:grid-cols-[minmax(0,1fr)_20rem] xl:gap-6")}>
                   <dl className="grid grid-cols-[auto_minmax(0,1fr)] content-start gap-x-3 gap-y-1 sm:gap-x-4">
                     <ElementFact term="What it is">{currentElement.kind}</ElementFact>
                     <ElementFact term="Text or label">
@@ -1350,7 +1352,7 @@ export default function InspectorRoute() {
                     )}
                   </dl>
                   {canReview && (
-                    <div className="mt-3 border-t border-border pt-3 xl:mt-0 xl:max-w-[18rem] xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
+                    <div className="mt-3 max-w-md border-t border-border pt-3 xl:mt-0 xl:max-w-none xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
                       <ElementReview
                         key={`${scan}:${page}`}
                         scanId={scan}
