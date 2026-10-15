@@ -74,6 +74,8 @@ Use the word in the first column, and never the words in the last.
 | At page load / After clicking / In an image | The values of the Issues table's "Where it shows" column: where the issue shows up. "At page load" and "After clicking" match the page state names. | Found by, Found (as the header), WCAG (as a value), Click-Through (as a value; it stays the feature's name), Alt Text (as a value), finding type |
 | Critical / Serious / Moderate / Minor | An issue's impact rating: how badly the problem affects people (glossary "Impact"). | critical, serious (lower case, as raw values), severity (for this rating) |
 | status | Where an occurrence stands in review. Values: New, Reviewing, In progress, Fixed, Accepted risk, Not a problem (false positive). | triage status, review status, remediated, raw values like `in_progress` |
+| Checked by a person | A person's choice about an element in the page inspector. Values: Not checked yet; Checked: a problem to report; Checked: a repeat of one already reported. Separate from status. | confirmed, verified, validated, approved, human-checked, triaged, redundant, duplicate |
+| Issue notes | What a person writes about one element for the vendor. Matches the ITS technical review's column. | comment, annotation, remarks, rationale (for these notes) |
 | check | One way Axcess tests pages. See the check names below. | engine, pipeline, probe, method, detector, source |
 | page state | How a page looked at one moment: "At page load" or "After clicking Menu". | DOM state, interaction state, captured state |
 | saved copy | The copy of a page the scan stored. | capture, stored capture, stored render, loaded DOM |

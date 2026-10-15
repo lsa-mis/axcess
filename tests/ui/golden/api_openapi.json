@@ -1026,6 +1026,43 @@
         }
       }
     },
+    "/api/scans/{scan_id}/pages/{page_id}/review": {
+      "put": {
+        "summary": "Api Save Occurrence Review",
+        "description": "Save a person's review of the occurrences on one element of this page.\n\nAny report can be reviewed, finished or not. A protected report is\nrefused: its ordinary tables keep only opaque aliases, and notes\nabout its pages would be the plaintext evidence they keep out.",
+        "operationId": "api_save_occurrence_review_api_scans__scan_id__pages__page_id__review_put",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "page_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Page Id"}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/OccurrenceReviewRequest"}}}
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {"schema": {"$ref": "#/components/schemas/OccurrenceReviewResponse"}}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
     "/api/scans/{scan_id}/pages/{page_id}/inspect": {
       "get": {
         "summary": "Api Page Inspect",
@@ -2149,6 +2186,41 @@
         "type": "object",
         "required": ["state", "checked", "total"],
         "title": "MethodCoverage"
+      },
+      "OccurrenceReviewRequest": {
+        "properties": {
+          "a11y_finding_ids": {
+            "items": {"type": "integer"},
+            "type": "array",
+            "maxItems": 50,
+            "title": "A11Y Finding Ids"
+          },
+          "page_image_ids": {"items": {"type": "integer"}, "type": "array", "maxItems": 50, "title": "Page Image Ids"},
+          "decision": {
+            "anyOf": [{"type": "string", "enum": ["report", "repeat"]}, {"type": "null"}],
+            "title": "Decision"
+          },
+          "notes": {"type": "string", "maxLength": 2000, "title": "Notes", "default": ""}
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["decision"],
+        "title": "OccurrenceReviewRequest",
+        "description": "A person's review of the occurrences on one circled element."
+      },
+      "OccurrenceReviewResponse": {
+        "properties": {
+          "decision": {
+            "anyOf": [{"type": "string", "enum": ["report", "repeat"]}, {"type": "null"}],
+            "title": "Decision"
+          },
+          "notes": {"type": "string", "title": "Notes"},
+          "updated_at": {"type": "string", "title": "Updated At"}
+        },
+        "type": "object",
+        "required": ["decision", "notes", "updated_at"],
+        "title": "OccurrenceReviewResponse",
+        "description": "The review as stored: notes are trimmed and redacted."
       },
       "ProtectedEnvironment": {
         "type": "string",

@@ -1085,6 +1085,25 @@ export interface ManualChecksResponse {
   checks: ManualCheck[];
 }
 
+/** What a person decided about an occurrence: a problem to report, or a
+ *  repeat of one already reported. Null means not checked yet. */
+export type ReviewDecision = "report" | "repeat";
+/** A person's review of one occurrence, made in the page inspector. */
+export interface OccurrenceReview {
+  decision: ReviewDecision | null;
+  /** Issue notes, as stored: trimmed, with email addresses, phone numbers
+   *  and sign-in tokens removed. */
+  notes: string;
+  updated_at: string;
+}
+/** ``PUT /api/scans/{id}/pages/{page}/review``: every occurrence on one element. */
+export interface OccurrenceReviewRequest {
+  a11y_finding_ids: number[];
+  page_image_ids: number[];
+  decision: ReviewDecision | null;
+  notes: string;
+}
+
 export interface PageEvidence {
   page: {
     id: number;
@@ -1125,6 +1144,8 @@ export interface PageEvidence {
     /** For an AI review finding, the element it is about, named the way a
      *  browser can count it (the 3rd of 12 `a`). Null when not worked out. */
     element_place: ElementPlace | null;
+    /** A person's review of this occurrence; null until one is saved. */
+    review: OccurrenceReview | null;
   }>;
   image_occurrences: Array<{
     occurrence_id: number;
@@ -1147,6 +1168,8 @@ export interface PageEvidence {
     /** In a <noscript> or <template> element, which the saved copy on
      *  screen does not show (usually a lazy-loaded image's backup copy). */
     hidden_in_copy: boolean;
+    /** A person's review of this image on this page; null until one is saved. */
+    review: OccurrenceReview | null;
   }>;
 }
 

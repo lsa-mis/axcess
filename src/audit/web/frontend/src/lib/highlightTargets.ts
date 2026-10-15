@@ -52,6 +52,14 @@ export type Target = {
    * element's code, and matches as a prefix. See ``snippetCutFor``.
    */
   cutAt?: number | null;
+  /**
+   * The rule-check occurrences this outline stands for: one element can be
+   * flagged more than once (two rules, identical records). A person's review
+   * is saved for every one of them.
+   */
+  findingIds?: number[];
+  /** For an image, the occurrence (the image placed on this page). */
+  imageOccurrenceId?: number;
 };
 
 /**

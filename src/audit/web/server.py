@@ -50,7 +50,7 @@ from pydantic import (
 from starlette.background import BackgroundTask
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from audit import __version__, coverage_matrix, evaluation
+from audit import __version__, coverage_matrix, evaluation, occurrence_reviews
 from audit.analyzer.alfa import AlfaAnalyzer, AlfaResult, chromium_executable_path
 from audit.analyzer.alfa import availability as alfa_availability
 from audit.analyzer.axe import AxeAnalyzer
@@ -158,6 +158,31 @@ _SEVERITY_OPTIONS = ("critical", "major", "minor", "info")
 _DESTRUCTIVE_TRANSITIONS = {"accepted_risk", "false_positive", "remediated"}
 _PAGE_SIZE = 50
 _CONTENT_HASH_RE = re.compile(r"^[0-9a-f]{64}$")
+
+
+class OccurrenceReviewRequest(BaseModel):
+    """A person's review of the occurrences on one circled element."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    a11y_finding_ids: list[int] = Field(
+        default_factory=list, max_length=occurrence_reviews.MAX_OCCURRENCES_PER_SAVE
+    )
+    page_image_ids: list[int] = Field(
+        default_factory=list, max_length=occurrence_reviews.MAX_OCCURRENCES_PER_SAVE
+    )
+    #: None: not checked yet. "report": checked, a problem to report.
+    #: "repeat": checked, a repeat of one already reported.
+    decision: occurrence_reviews.Decision | None
+    notes: str = Field(default="", max_length=occurrence_reviews.MAX_NOTES_LENGTH)
+
+
+class OccurrenceReviewResponse(BaseModel):
+    """The review as stored: notes are trimmed and redacted."""
+
+    decision: occurrence_reviews.Decision | None
+    notes: str
+    updated_at: str
 
 
 class LocalLoginScanRequest(BaseModel):
@@ -2055,6 +2080,51 @@ def create_app(
         if payload is None:
             raise HTTPException(status_code=404, detail="Page is not part of this report")
         return JSONResponse(jsonable_encoder(payload))
+
+    @app.put(
+        "/api/scans/{scan_id:int}/pages/{page_id:int}/review",
+        response_model=OccurrenceReviewResponse,
+    )
+    def api_save_occurrence_review(
+        scan_id: int, page_id: int, body: OccurrenceReviewRequest
+    ) -> OccurrenceReviewResponse:
+        """Save a person's review of the occurrences on one element of this page.
+
+        Any report can be reviewed, finished or not. A protected report is
+        refused: its ordinary tables keep only opaque aliases, and notes
+        about its pages would be the plaintext evidence they keep out.
+        """
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            if _get_protected_scan_compat(conn, scan_id=scan_id) is not None:
+                raise HTTPException(
+                    status_code=403, detail="Reviews are not kept for protected reports."
+                )
+            try:
+                saved = occurrence_reviews.save_review(
+                    conn,
+                    scan_id=scan_id,
+                    page_id=page_id,
+                    a11y_finding_ids=body.a11y_finding_ids,
+                    page_image_ids=body.page_image_ids,
+                    decision=body.decision,
+                    notes=body.notes,
+                )
+            except occurrence_reviews.ReviewScopeError as exc:
+                raise HTTPException(status_code=404, detail=str(exc)) from exc
+            except occurrence_reviews.ReviewError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            except sqlite3.OperationalError as exc:
+                if "occurrence_reviews" not in str(exc) and "decision" not in str(exc):
+                    raise
+                raise HTTPException(
+                    status_code=503,
+                    detail="Database migrations are incomplete. Restart Axcess, or run "
+                    "`make migrate`, and try again.",
+                ) from exc
+        return OccurrenceReviewResponse(
+            decision=saved.decision, notes=saved.notes, updated_at=saved.updated_at
+        )
 
     @app.get("/api/scans/{scan_id:int}/pages/{page_id:int}/inspect")
     async def api_page_inspect(

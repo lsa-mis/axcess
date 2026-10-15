@@ -1,4 +1,11 @@
-import type { AxeImpact, DetectionPipeline, FindingStatus, ReviewLane, ScanStatus } from "../api/types";
+import type {
+  AxeImpact,
+  DetectionPipeline,
+  FindingStatus,
+  ReviewDecision,
+  ReviewLane,
+  ScanStatus,
+} from "../api/types";
 
 /**
  * The words the interface uses for shared values, in one place.
@@ -86,6 +93,25 @@ export const CHECK_LABEL: Record<DetectionPipeline, string> = {
   semantic: "AI review",
   image: "Image text check",
   protected_image: "Image text check",
+};
+
+/**
+ * What a person decided about an element in the page inspector, the
+ * "Checked by a person" choice. "none" is not checked yet, the starting
+ * choice: a radio cannot be cleared, so it is also how a reviewer takes a
+ * decision back. Which elements are repeats is the person's call.
+ */
+export const REVIEW_DECISION_LABEL: Record<ReviewDecision | "none", string> = {
+  none: "Not checked yet",
+  report: "Checked: a problem to report",
+  repeat: "Checked: a repeat of one already reported",
+};
+
+export const REVIEW_DECISION_HELP: Record<ReviewDecision | "none", string> = {
+  none: "",
+  report: "You looked at it, and it is a real problem.",
+  repeat:
+    "A real problem, but the same as one you already reported, such as the same menu on another page.",
 };
 
 /** A scan's progress, for status badges. */

@@ -35,7 +35,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from audit import coverage_matrix, evaluation
+from audit import coverage_matrix, evaluation, occurrence_reviews
 from audit.blob_store import BlobStore
 from audit.crawler import live_progress
 from audit.db import repo
@@ -576,6 +576,31 @@ def _add_scan_states(conn: sqlite3.Connection) -> dict[str, int]:
     return {"running": running, "blocked": blocked, "failed": failed}
 
 
+def _add_occurrence_reviews(conn: sqlite3.Connection, scan_id: int) -> None:
+    """A person's review on every occurrence, so the inspector's review shape is pinned."""
+    for page_id in _page_ids(conn, scan_id):
+        findings = [
+            int(row[0])
+            for row in conn.execute(
+                "SELECT id FROM page_a11y_findings WHERE page_id = ?", (page_id,)
+            )
+        ]
+        images = [
+            int(row[0])
+            for row in conn.execute("SELECT id FROM page_images WHERE page_id = ?", (page_id,))
+        ]
+        if findings or images:
+            occurrence_reviews.save_review(
+                conn,
+                scan_id=scan_id,
+                page_id=page_id,
+                a11y_finding_ids=findings,
+                page_image_ids=images,
+                decision="report",
+                notes="Contract review.",
+            )
+
+
 def _add_contract_evidence(db_path: Path, blob_dir: Path, scan_id: int) -> dict[str, Any]:
     """Extend the shared seed until the SPA-facing fields have typed values.
 
@@ -587,6 +612,7 @@ def _add_contract_evidence(db_path: Path, blob_dir: Path, scan_id: int) -> dict[
         _add_a11y_evidence(conn, blob_dir, scan_id)
         _add_saved_copy(conn, scan_id)
         _add_expert_review(conn, scan_id)
+        _add_occurrence_reviews(conn, scan_id)
         states = _add_scan_states(conn)
         missing = conn.execute("SELECT MAX(id) + 1 AS id FROM scans").fetchone()
         ids = {

@@ -850,6 +850,7 @@
           "pipeline": "string",
           "revealed_by": "null|string",
           "revealed_state_key": "null|string",
+          "review": {"decision": "string", "notes": "string", "updated_at": "string"},
           "rule_id": "string",
           "screenshot_hash": "null|string",
           "status": "string",
@@ -878,6 +879,7 @@
           "occurrence_id": "integer",
           "ocr_text": "null|string",
           "position": "integer",
+          "review": {"decision": "string", "notes": "string", "updated_at": "string"},
           "src_url_canonical": "string",
           "vlm_classification": "null|string",
           "vlm_rationale": "null|string"

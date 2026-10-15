@@ -74,6 +74,28 @@ To reproduce a problem that appears only after a click:
 3. On the live page, use each control in that order, then find the element by
    its element locator (CSS selector).
 
+### Record your review of an element
+
+Beside the element facts in the inspector, **Your review:** says what you
+decided about the element the arrow buttons are on, such as **Not checked
+yet**. It is there when the inspector was opened for one issue (from **Pages
+with this issue**), on the **Saved copy** tab.
+
+1. Step to the element with the arrow buttons.
+2. Select **Review this element**.
+3. Under **Checked by a person**, choose **Checked: a problem to report**, or
+   **Checked: a repeat of one already reported** if it is the same problem as
+   one you already reported. **Not checked yet** takes a choice back.
+4. Write **Issue notes** for the vendor: where it is, what is wrong, and what
+   to fix.
+5. Select **Save review**. The dialog closes and the panel says **Saved.**
+
+The review covers every occurrence of the issue on that element, in the page
+state on screen. **Close without saving** (or Escape) keeps your choice and
+notes while you stay on the page, and **Your review:** then ends with **(not
+saved yet)**. Leaving the page or reloading it discards them. Any report can
+be reviewed, finished or not, except a protected report.
+
 ### If you have a ticket or a workbook row, not the app
 
 Reports stay where Axcess ran the scan, so you may get only an export.
@@ -276,7 +298,7 @@ reference tables are not changed. Axcess fills in only what the scan knows:
 
 | Sheet | What Axcess fills in |
 | --- | --- |
-| Coversheet | Scan date, site name and main web address, the checks used, and that no sign-in was used. If an expert review records them, the reviewer goes in Tester(s) and the purpose in Background. The other prompts are left for a person to answer. |
+| Coversheet | Scan date, site name and main web address, and the checks used. If an expert review records a purpose, it goes in Background. Tester(s), Login info and the other prompts are left for a person to answer. |
 | Test Plan | Every page the scan checked, one row each, with its name and web address. The Description column is left empty for you. These rows are the choices in the Test column. |
 | Summary | A short summary of the scan, in the Narrative Summary box. The form's own counts are left as they are. |
 | Findings Issues | One row for each occurrence: one place an issue appears, on one page. An issue's rows sit together. Test is the page. Category, Criterion, Impact and "Most affects" use the team's own wording. Issue notes say what is wrong, where it is (the page and the element), which check found it, how sure Axcess is, and how to fix it. |

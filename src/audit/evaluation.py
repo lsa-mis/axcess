@@ -13,7 +13,7 @@ import sqlite3
 from collections import defaultdict
 from typing import Any
 
-from audit import coverage_matrix
+from audit import coverage_matrix, occurrence_reviews
 from audit.analyzer.alfa_evidence import normalize_finding
 from audit.analyzer.semantic.extractor import locate_ordinals
 from audit.extractor.html_images import locate_image_refs
@@ -527,6 +527,16 @@ def get_page_evidence(
         if saved is not None:
             _add_element_places(saved[0], ordinal)
             _add_image_locators(saved[0], saved[1], images)
+    # A person's review of each occurrence (decision, issue notes), which
+    # the inspector shows and edits beside the circled element. None when
+    # there is no review, or the reviews cannot be read.
+    by_finding, by_image = occurrence_reviews.reviews_for_page(
+        conn, scan_id=scan_id, page_id=page_id
+    )
+    for finding in findings:
+        finding["review"] = by_finding.get(int(finding["id"]))
+    for image in images:
+        image["review"] = by_image.get(int(image["occurrence_id"]))
     return {"page": dict(page), "a11y_findings": findings, "image_occurrences": images}
 
 

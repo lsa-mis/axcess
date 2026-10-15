@@ -138,6 +138,28 @@ problem (a [false positive](#false-positive)). The last four need a short
 reason. The Excel workbook uses Not Started for New, Resolved for Fixed, and
 Not an Issue for Not a problem.
 
+### Checked by a person
+
+A person's choice about an element in the page inspector, under **Your review
+of this element**:
+
+- **Not checked yet**: no one has decided. This is where every element starts.
+- **Checked: a problem to report**: a person looked at it, and it is a real
+  problem.
+- **Checked: a repeat of one already reported**: a real problem, but the same
+  as one already reported, such as the same menu on another page. Which
+  elements are repeats is the person's call; Axcess does not decide it.
+
+It is separate from the [status](#status): In progress means a fix is planned,
+which is a different decision.
+
+### Issue notes
+
+What a person writes about one element in the page inspector, for the vendor:
+where the problem is, what is wrong, and what to fix. The name matches the
+Issue notes column of the ITS technical review. Email addresses, phone numbers
+and sign-in tokens are removed when the notes are saved.
+
 ## WCAG terms
 
 ### WCAG

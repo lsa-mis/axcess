@@ -1,12 +1,19 @@
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { serverDate } from "../lib/serverTime";
 import { useNavigate, useParams, useSearchParams } from "react-router";
-import { keepPreviousData, useQueries, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronDown, ChevronUp, Copy, ExternalLink, FileCode2, Layers, Loader2 } from "lucide-react";
 import DomSource from "../components/DomSource";
 import FlaggedStepper from "../components/FlaggedStepper";
+import ElementReview, { type ReviewDraft } from "../components/ElementReview";
 import { api } from "../api/client";
-import type { PageEvidence, PageInspection, SavedFrame, SavedStyles } from "../api/types";
+import type {
+  OccurrenceReview,
+  PageEvidence,
+  PageInspection,
+  SavedFrame,
+  SavedStyles,
+} from "../api/types";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import Tabs from "../components/Tabs";
 import {
@@ -138,7 +145,7 @@ export default function InspectorRoute() {
   // identical siblings are intentionally one location). This list drives both
   // the highlight pass and the auto-scroll, so it is computed once.
   const targets = useMemo<Target[]>(() => {
-    const seen = new Set<string>();
+    const seen = new Map<string, Target>();
     const out: Target[] = [];
     for (const f of currentFindings) {
       const selector = f.target_selector || null;
@@ -154,16 +161,23 @@ export default function InspectorRoute() {
         selector ?? "",
         snippet ? normalizeWhitespace(snippet) : "",
       ].join("\u0000");
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push({
+      const same = seen.get(key);
+      if (same) {
+        // The same element again: one outline, but the review covers both.
+        same.findingIds?.push(f.id);
+        continue;
+      }
+      const target: Target = {
         selector,
         snippet,
         revealedBy: f.revealed_by || null,
         stateKey: f.revealed_state_key || null,
         place: f.element_place,
         cutAt: snippetCutFor(f.pipeline),
-      });
+        findingIds: [f.id],
+      };
+      seen.set(key, target);
+      out.push(target);
     }
     // Images were read at page load. Each occurrence is its own element.
     for (const image of shownImages) {
@@ -173,6 +187,7 @@ export default function InspectorRoute() {
         revealedBy: null,
         stateKey: null,
         image: { locator: image.locator, alt: image.alt_text },
+        imageOccurrenceId: image.occurrence_id,
       });
     }
     return out;
@@ -725,6 +740,54 @@ export default function InspectorRoute() {
   const currentAddress = currentTarget?.image?.locator?.candidate ?? null;
   // How many occurrences share the element the reader is on.
   const sharedCount = highlight?.steps[pageMark]?.targets.length ?? 0;
+
+  // A person's review of the element the reader is on: every occurrence of
+  // the issue outlined there, in this page state, gets the same review.
+  const queryClient = useQueryClient();
+  // Unsaved edits, by element, while this page is open: they outlast
+  // Previous / Next, and leaving the page discards them.
+  const [reviewDrafts, setReviewDrafts] = useState<Record<string, ReviewDraft>>({});
+  // Reviews saved while this page is open, by element. Kept here rather than
+  // written into the page evidence: changing that data re-runs the
+  // highlighting, which rebuilds this panel (losing the "Saved." message)
+  // and moves the saved copy under the reader.
+  const [savedReviews, setSavedReviews] = useState<Record<string, OccurrenceReview>>({});
+  const reviewTargets = (highlight?.steps[pageMark]?.targets ?? [])
+    .map((index) => scopedTargets[index])
+    .filter((target): target is Target => Boolean(target));
+  const reviewFindingIds = [...new Set(reviewTargets.flatMap((target) => target.findingIds ?? []))];
+  const reviewImageIds = [
+    ...new Set(
+      reviewTargets.flatMap((target) =>
+        target.imageOccurrenceId === undefined ? [] : [target.imageOccurrenceId],
+      ),
+    ),
+  ];
+  const reviewKey = `${reviewFindingIds.join(",")}|${reviewImageIds.join(",")}`;
+  const savedReview: OccurrenceReview | null =
+    savedReviews[reviewKey] ??
+    pageEvidence?.a11y_findings.find((f) => reviewFindingIds.includes(f.id) && f.review)?.review ??
+    pageEvidence?.image_occurrences.find(
+      (image) => reviewImageIds.includes(image.occurrence_id) && image.review,
+    )?.review ??
+    null;
+  const canReview = reviewing && reviewFindingIds.length + reviewImageIds.length > 0;
+  const setReviewDraft = (next: ReviewDraft | undefined) =>
+    setReviewDrafts((drafts) => {
+      const rest = { ...drafts };
+      delete rest[reviewKey];
+      return next ? { ...rest, [reviewKey]: next } : rest;
+    });
+  // The saved review is shown at once, from the server's answer. The page
+  // evidence is marked stale without refetching it now, so the next visit
+  // reads the stored review.
+  const reviewSaved = (review: OccurrenceReview) => {
+    setSavedReviews((reviews) => ({ ...reviews, [reviewKey]: review }));
+    void queryClient.invalidateQueries({
+      queryKey: ["page-evidence", scan, page],
+      refetchType: "none",
+    });
+  };
   // readableLocator returns a selector unchanged and turns a Rule check
   // (Alfa) record into its XPath, so a changed string is an XPath. An AI
   // review selector such as ``a[ord=6]`` counts the analyzer's own list of
@@ -1216,69 +1279,99 @@ export default function InspectorRoute() {
             {/* What the numbered box is on, as a short table with the same
                 labels in the same places for every flagged element, so
                 Previous / Next change only the values. The toolbar above
-                already says which one you are on, so this does not repeat it. */}
+                already says which one you are on, so this does not repeat it.
+                The person's review of the element (a line saying it and the
+                "Review this element" button) sits to the right of the table
+                on a wide screen and under it on a narrow one, after it in
+                reading order; see ElementReview for why. It is short, so the
+                saved page below stays where it was. Side by side only from
+                xl: narrower, the table's values would lose their width. */}
             {showHighlights && highlightedCount > 0 && currentElement && (
               <div
                 role="group"
                 aria-label="The flagged element you are on"
                 className="border-b border-border bg-surface px-3 py-2 text-sm text-fg"
               >
-                <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 sm:gap-x-4">
-                  <ElementFact term="What it is">{currentElement.kind}</ElementFact>
-                  <ElementFact term="Text or label">
-                    {currentElement.text ? (
-                      `“${currentElement.text}”`
-                    ) : (
-                      <span className="text-fg-muted">None found</span>
-                    )}
-                  </ElementFact>
-                  <ElementFact term="Size">
-                    <span className="tabular-nums">
-                      {pixels(currentElement.width)} wide, {pixels(currentElement.height)} tall
-                    </span>
-                    {/* The row below says where the box is when it is not on the element. */}
-                    {currentElement.where === null &&
-                      (currentElement.width === 0 || currentElement.height === 0) && (
-                      <span className="block text-xs text-fg-muted">
-                        It has no visible size in this saved copy, so the box marks where it sits.
-                      </span>
-                    )}
-                  </ElementFact>
-                  {currentElement.where && (
-                    <ElementFact term="Where the box is">{BOX_NOTES[currentElement.where]}</ElementFact>
-                  )}
-                  {sharedCount > 1 && <ElementFact term="Occurrences">{sharedCount} on this element</ElementFact>}
-                  {currentPlace ? (
-                    <>
-                      <ElementFact term="Where it is in the page code" stack>
-                        Number {currentPlace.index + 1} of the {currentPlace.total}{" "}
-                        <code translate="no" className="font-mono text-xs">
-                          {currentPlace.selector}
-                        </code>{" "}
-                        {currentPlace.total === 1 ? "element" : "elements"}
-                      </ElementFact>
-                      {currentAddress && (
-                        <ElementFact term="Image address">
-                          <code translate="no" className="font-mono text-xs">
-                            {currentAddress}
-                          </code>
-                        </ElementFact>
+                <div className={cn(canReview && "xl:grid xl:grid-cols-[minmax(0,1fr)_auto] xl:gap-6")}>
+                  <dl className="grid grid-cols-[auto_minmax(0,1fr)] content-start gap-x-3 gap-y-1 sm:gap-x-4">
+                    <ElementFact term="What it is">{currentElement.kind}</ElementFact>
+                    <ElementFact term="Text or label">
+                      {currentElement.text ? (
+                        `“${currentElement.text}”`
+                      ) : (
+                        <span className="text-fg-muted">None found</span>
                       )}
-                    </>
-                  ) : (
-                    shownLocator && (
-                      <ElementFact term={locatorTerm} stack>
-                        <LocatorValue
-                          key={shownLocator}
-                          id="inspect-locator"
-                          value={shownLocator}
-                          open={locatorOpen}
-                          onOpenChange={setLocatorOpen}
-                        />
-                      </ElementFact>
-                    )
+                    </ElementFact>
+                    <ElementFact term="Size">
+                      <span className="tabular-nums">
+                        {pixels(currentElement.width)} wide, {pixels(currentElement.height)} tall
+                      </span>
+                      {/* The row below says where the box is when it is not on the element. */}
+                      {currentElement.where === null &&
+                        (currentElement.width === 0 || currentElement.height === 0) && (
+                        <span className="block text-xs text-fg-muted">
+                          It has no visible size in this saved copy, so the box marks where it sits.
+                        </span>
+                      )}
+                    </ElementFact>
+                    {currentElement.where && (
+                      <ElementFact term="Where the box is">{BOX_NOTES[currentElement.where]}</ElementFact>
+                    )}
+                    {sharedCount > 1 && <ElementFact term="Occurrences">{sharedCount} on this element</ElementFact>}
+                    {currentPlace ? (
+                      <>
+                        <ElementFact term="Where it is in the page code" stack>
+                          Number {currentPlace.index + 1} of the {currentPlace.total}{" "}
+                          <code translate="no" className="font-mono text-xs">
+                            {currentPlace.selector}
+                          </code>{" "}
+                          {currentPlace.total === 1 ? "element" : "elements"}
+                        </ElementFact>
+                        {currentAddress && (
+                          <ElementFact term="Image address">
+                            <code translate="no" className="font-mono text-xs">
+                              {currentAddress}
+                            </code>
+                          </ElementFact>
+                        )}
+                      </>
+                    ) : (
+                      shownLocator && (
+                        <ElementFact term={locatorTerm} stack>
+                          <LocatorValue
+                            key={shownLocator}
+                            id="inspect-locator"
+                            value={shownLocator}
+                            open={locatorOpen}
+                            onOpenChange={setLocatorOpen}
+                          />
+                        </ElementFact>
+                      )
+                    )}
+                  </dl>
+                  {canReview && (
+                    <div className="mt-3 border-t border-border pt-3 xl:mt-0 xl:max-w-[18rem] xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
+                      <ElementReview
+                        key={`${scan}:${page}`}
+                        scanId={scan}
+                        pageId={page}
+                        elementKey={reviewKey}
+                        elementName={[
+                          currentElement.kind,
+                          currentElement.text ? `“${currentElement.text}”` : null,
+                        ]
+                          .filter(Boolean)
+                          .join(", ")}
+                        a11yFindingIds={reviewFindingIds}
+                        pageImageIds={reviewImageIds}
+                        saved={savedReview}
+                        draft={reviewDrafts[reviewKey]}
+                        onDraftChange={setReviewDraft}
+                        onSaved={reviewSaved}
+                      />
+                    </div>
                   )}
-                </dl>
+                </div>
               </div>
             )}
             {/* Says when the saved copy may not look like the page Axcess
