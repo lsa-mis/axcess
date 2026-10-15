@@ -1,9 +1,10 @@
-import { useEffect, useId, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { ApiError, api } from "../api/client";
 import type { OccurrenceReview, ReviewDecision } from "../api/types";
 import { useModalDialog } from "../hooks/useModalDialog";
 import { REVIEW_DECISION_HELP, REVIEW_DECISION_LABEL } from "../lib/terms";
 import PillGroup from "./newScan/PillGroup";
+import { cn } from "../lib/cn";
 import { Button, ReviewDecisionChip } from "./ui";
 
 /** What the review holds while it is being edited, before Save. */
@@ -62,6 +63,23 @@ const MAX_NOTES = 2000;
  * dialog closes on save (SC 4.1.3 Status Messages, Level AA). A failed save
  * keeps the dialog open with the reason as an alert and the edit intact.
  *
+ * "Mark as repeat", beside "Review this element", saves "Checked: a
+ * repeat of one already reported" in one press, as the developer chose.
+ * Shared headers, menus and footers repeat on every page, so a repeat is
+ * often the most frequent decision, and it is the one decision that needs
+ * no notes (a repeat stays out of the ITS technical review), so skipping
+ * the dialog loses nothing; "a problem to report" keeps the dialog, where
+ * its notes are written. It is a second way to make one of the three
+ * choices, against COGA's "one way to do one thing" (W3C COGA "Making
+ * Content Usable", paraphrased, https://www.w3.org/TR/coga-usable/),
+ * accepted as a fast path for the commonest action, named in the same
+ * word as the choice it makes ("repeat"). It shows only while the element
+ * is not already a repeat; once pressed it is gone, so focus moves to
+ * "Review this element" rather than falling to the top of the page. It
+ * keeps any notes there, and its outcome ("Saved as a repeat.", or why it
+ * failed) is said on the "Your review:" line, in the same status region as
+ * a save from the dialog. Both buttons fit one row in the region's 21rem.
+ *
  * Suggested notes. An element with no saved notes opens with notes built
  * from the scan (``suggestIssueNotes``: page state, element, problem, in
  * the ITS team's own note style), as the developer chose, and the hint
@@ -73,6 +91,12 @@ const MAX_NOTES = 2000;
  * Hints say only what the code does: the server removes email addresses,
  * phone numbers and sign-in tokens from notes (``redact_text``).
  */
+function failureMessage(error: unknown): string {
+  return error instanceof ApiError
+    ? error.message
+    : "The Axcess server did not respond. Check that it is still running.";
+}
+
 export default function ElementReview({
   scanId,
   pageId,
@@ -107,13 +131,15 @@ export default function ElementReview({
   const titleId = `${idBase}-title`;
   const subjectId = `${idBase}-subject`;
   const summaryId = `${idBase}-summary`;
+  const summaryLabelId = `${idBase}-summary-label`;
+  const reviewButton = useRef<HTMLButtonElement>(null);
   const notesId = `${idBase}-notes`;
   const notesHintId = `${idBase}-notes-hint`;
   const [open, setOpen] = useState(false);
   const dialogRef = useModalDialog(open);
   const [saving, setSaving] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
-  const [announcement, setAnnouncement] = useState("");
+  const [announcement, setAnnouncement] = useState<{ text: string; error?: boolean }>({ text: "" });
   // On opening, focus the chosen radio. The browser would focus the first
   // control, "Not checked yet", even when another is chosen, and the arrow
   // keys would then move from the wrong place.
@@ -122,7 +148,7 @@ export default function ElementReview({
   }, [open, dialogRef]);
   // A message belongs to the element it was about.
   useEffect(() => {
-    setAnnouncement("");
+    setAnnouncement({ text: "" });
     setFailure(null);
   }, [elementKey]);
 
@@ -165,17 +191,44 @@ export default function ElementReview({
       onSaved(result);
       onDraftChange(undefined);
       setOpen(false);
-      setAnnouncement(
-        result.notes !== editing.notes.trim()
-          ? "Saved. Email addresses, phone numbers or sign-in tokens were removed from the notes."
-          : "Saved.",
-      );
+      setAnnouncement({
+        text:
+          result.notes !== editing.notes.trim()
+            ? "Saved. Email addresses, phone numbers or sign-in tokens were removed from the notes."
+            : "Saved.",
+      });
     } catch (error) {
-      setFailure(
-        error instanceof ApiError
-          ? error.message
-          : "The Axcess server did not respond. Check that it is still running.",
-      );
+      setFailure(failureMessage(error));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // The shortcut for the most frequent decision: a repeat needs no notes,
+  // so it is saved in one press, without the dialog. Any notes already
+  // there (saved, or typed and not yet saved) are kept and saved with it.
+  async function markRepeat() {
+    if (saving) return;
+    setSaving(true);
+    setAnnouncement({ text: "" });
+    try {
+      const result = await api.saveOccurrenceReview(scanId, pageId, {
+        a11y_finding_ids: a11yFindingIds,
+        page_image_ids: pageImageIds,
+        decision: "repeat",
+        notes: value.notes,
+      });
+      onSaved(result);
+      onDraftChange(undefined);
+      setAnnouncement({ text: "Saved as a repeat." });
+      // The shortcut is gone now that the element is a repeat; focus goes
+      // to the next control in the region, not to the top of the page.
+      reviewButton.current?.focus();
+    } catch (error) {
+      setAnnouncement({
+        text: `Axcess could not save it as a repeat. ${failureMessage(error)} Try again.`,
+        error: true,
+      });
     } finally {
       setSaving(false);
     }
@@ -183,14 +236,32 @@ export default function ElementReview({
 
   return (
     <div className="min-w-0 text-sm text-fg">
-      {/* The review at a glance: the decision as a chip, then the notes. */}
-      <p id={summaryId}>
-        <span className="block font-semibold">Your review:</span>{" "}
-        <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+      {/* The review at a glance: the decision as a chip, then the notes.
+          The outcome of a save is said on the "Your review:" line, which has
+          room to spare: beside the chip, a long decision ("Checked: a repeat
+          of one already reported") pushed it onto a line of its own, and
+          under the buttons it did the same, so the region grew and moved
+          the saved page below. */}
+      <div className="flex flex-wrap items-baseline gap-x-2">
+        <p id={summaryLabelId} className="font-semibold">
+          Your review:
+        </p>{" "}
+        <p
+          role="status"
+          className={cn(
+            "text-sm empty:sr-only",
+            announcement.error ? "font-semibold text-sev-critical" : "text-fg",
+          )}
+        >
+          {announcement.text}
+        </p>
+      </div>{" "}
+      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span id={summaryId}>
           <ReviewDecisionChip value={value.decision} />
           {dirty && <span className="font-semibold"> Not saved yet</span>}
         </span>
-      </p>
+      </div>
       {/* Two lines at most, so the panel stays about as tall as the element
           facts beside it and the saved page below keeps its place; the
           whole note is in the dialog. Clipped for the eye only: a screen
@@ -199,21 +270,30 @@ export default function ElementReview({
         <span className="font-semibold">Issue notes: </span>
         {value.notes.trim() ? value.notes : <span className="text-fg-muted">None yet</span>}
       </p>
-      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+      <div className="mt-2 flex flex-wrap items-center gap-2">
         <Button
+          ref={reviewButton}
           type="button"
           variant="secondary"
-          aria-describedby={summaryId}
+          aria-describedby={`${summaryLabelId} ${summaryId}`}
           onClick={() => {
-            setAnnouncement("");
+            setAnnouncement({ text: "" });
             setOpen(true);
           }}
         >
           Review this element
         </Button>
-        <p role="status" className="text-sm text-fg empty:sr-only">
-          {announcement}
-        </p>
+        {value.decision !== "repeat" && (
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={markRepeat}
+            // aria-disabled, not disabled: a disabled button drops focus.
+            aria-disabled={saving || undefined}
+          >
+            Mark as repeat
+          </Button>
+        )}
       </div>
 
       <dialog

@@ -1317,7 +1317,7 @@ export default function InspectorRoute() {
                 aria-label="The flagged element you are on"
                 className="border-b border-border bg-surface px-3 py-2 text-sm text-fg"
               >
-                <div className={cn(canReview && "xl:grid xl:grid-cols-[minmax(0,1fr)_20rem] xl:gap-6")}>
+                <div className={cn(canReview && "xl:grid xl:grid-cols-[minmax(0,1fr)_21rem] xl:gap-6")}>
                   <dl className="grid grid-cols-[auto_minmax(0,1fr)] content-start gap-x-3 gap-y-1 sm:gap-x-4">
                     <ElementFact term="What it is">{currentElement.kind}</ElementFact>
                     <ElementFact term="Text or label">

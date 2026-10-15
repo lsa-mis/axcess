@@ -95,6 +95,11 @@ with this issue**), on the **Saved copy** tab.
    replaced by a suggestion.
 5. Select **Save review**. The dialog closes and the panel says **Saved.**
 
+For a repeat, **Mark as repeat**, beside **Review this element**, saves
+**Checked: a repeat of one already reported** in one press, without the
+dialog, and keeps any notes already there. **Your review:** then says
+**Saved as a repeat.**
+
 The review covers every occurrence of the issue on that element, in the page
 state on screen. **Close without saving** (or Escape) keeps your choice and
 notes while you stay on the page, and **Your review:** then says **Not saved

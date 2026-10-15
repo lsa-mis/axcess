@@ -77,8 +77,10 @@ async def test_review_by_keyboard_alone(
 
     panel = page.get_by_role("group", name="The flagged element you are on")
     opener = panel.get_by_role("button", name="Review this element")
-    # The review's own status message, the one after its button.
-    status = opener.locator("xpath=following-sibling::p[@role='status']")
+    # The review's own status message, beside its decision chip.
+    status = panel.locator(
+        "xpath=.//p[@role='status'][preceding-sibling::p[contains(@id, '-summary-label')]]"
+    )
     dialog = page.get_by_role("dialog", name="Review this element")
     checked = dialog.get_by_role("group", name="Checked by a person")
     not_yet = checked.get_by_role("radio", name="Not checked yet")
@@ -88,7 +90,6 @@ async def test_review_by_keyboard_alone(
     save = dialog.get_by_role("button", name="Save review")
 
     # The review is said in words beside the facts, and on the button.
-    await expect(panel).to_contain_text("Your review: Not checked yet")
     await expect(panel).to_contain_text("Issue notes: None yet")
     await expect(opener).to_have_accessible_description("Your review: Not checked yet")
     await expect(dialog).to_be_hidden()
@@ -119,7 +120,7 @@ async def test_review_by_keyboard_alone(
     await expect(dialog).to_be_hidden()
     await expect(opener).to_be_focused()
     await expect(status).to_have_text("Saved.")
-    await expect(panel).to_contain_text("Your review: Checked: a problem to report")
+    await expect(opener).to_have_accessible_description("Your review: Checked: a problem to report")
     await expect(panel).to_contain_text("Issue notes: The first button has no accessible name.")
     assert _reviews(db_path) == [("#one", "report", "The first button has no accessible name.")]
 
@@ -136,7 +137,7 @@ async def test_review_by_keyboard_alone(
 
     # Next: the second element, with no review yet.
     await page.get_by_role("button", name="Next element").click()
-    await expect(panel).to_contain_text("Your review: Not checked yet")
+    await expect(opener).to_have_accessible_description("Your review: Not checked yet")
     await expect(status).to_have_text("")
     # An unedited suggestion is not an unsaved change.
     await opener.click()
@@ -152,12 +153,12 @@ async def test_review_by_keyboard_alone(
     await notes.fill("Draft for the second button.")
     await dialog.get_by_role("button", name="Close without saving").click()
     await expect(dialog).to_be_hidden()
-    await expect(panel).to_contain_text(
+    await expect(opener).to_have_accessible_description(
         "Your review: Checked: a repeat of one already reported Not saved yet"
     )
     await expect(panel).to_contain_text("Issue notes: Draft for the second button.")
     await page.get_by_role("button", name="Previous element").click()
-    await expect(panel).to_contain_text("Your review: Checked: a problem to report")
+    await expect(opener).to_have_accessible_description("Your review: Checked: a problem to report")
     await page.get_by_role("button", name="Next element").click()
     await opener.click()
     await expect(repeat).to_be_checked()
@@ -167,9 +168,9 @@ async def test_review_by_keyboard_alone(
 
     # Leaving the page discards the unsaved edit; the saved review stays.
     await page.reload(wait_until="networkidle")
-    await expect(panel).to_contain_text("Your review: Checked: a problem to report")
+    await expect(opener).to_have_accessible_description("Your review: Checked: a problem to report")
     await page.get_by_role("button", name="Next element").click()
-    await expect(panel).to_contain_text("Your review: Not checked yet")
+    await expect(opener).to_have_accessible_description("Your review: Not checked yet")
 
 
 async def test_review_passes_axe_and_fits_narrow_screens(
@@ -359,3 +360,50 @@ async def test_suggested_notes_leave_out_axes_other_ways_to_fix(
     assert await _suggestion(new_page, base, scan_id, page_id, "link-name") == (
         "The link: Links have no name for screen readers."
     )
+
+
+async def test_mark_as_repeat_saves_in_one_press(
+    live_server: tuple[str, int], seeded_db: tuple[Path, Path, int], new_page: Any
+) -> None:
+    """The shortcut for the most frequent decision: no dialog, notes kept."""
+    base, scan_id = live_server
+    db_path = seeded_db[0]
+    page_id = seed(db_path, scan_id, CAPTURE, RULE, FINDINGS)
+    page = await open_inspector(new_page, base, scan_id, page_id, RULE)
+    panel = page.get_by_role("group", name="The flagged element you are on")
+    opener = panel.get_by_role("button", name="Review this element")
+    shortcut = panel.get_by_role("button", name="Mark as repeat")
+    dialog = page.get_by_role("dialog", name="Review this element")
+
+    # Both buttons on one row, so the region does not grow.
+    opener_box, shortcut_box = await opener.bounding_box(), await shortcut.bounding_box()
+    assert opener_box and shortcut_box and abs(opener_box["y"] - shortcut_box["y"]) < 1
+
+    # By keyboard: one press saves it, says so, and focus moves on. The
+    # panel keeps its height, so the saved page below does not move.
+    height = (await panel.bounding_box() or {}).get("height")
+    await _tab_to(page, shortcut)
+    await page.keyboard.press("Enter")
+    await expect(opener).to_have_accessible_description(
+        "Your review: Checked: a repeat of one already reported"
+    )
+    await expect(panel).to_contain_text("Saved as a repeat.")
+    await expect(dialog).to_be_hidden()
+    await expect(shortcut).to_have_count(0)  # already a repeat
+    await expect(opener).to_be_focused()
+    assert (await panel.bounding_box() or {}).get("height") == height
+    assert _reviews(db_path) == [("#one", "repeat", "")]
+
+    # Notes already saved are kept: report with notes, then mark as repeat.
+    await page.get_by_role("button", name="Next element").click()
+    await opener.click()
+    await dialog.get_by_role("radio", name="Checked: a problem to report").check()
+    await dialog.get_by_role("textbox", name="Issue notes").fill("The second button has no name.")
+    await dialog.get_by_role("button", name="Save review").click()
+    await expect(shortcut).to_be_visible()
+    await shortcut.click()
+    await expect(panel).to_contain_text("Saved as a repeat.")
+    assert _reviews(db_path) == [
+        ("#one", "repeat", ""),
+        ("#two", "repeat", "The second button has no name."),
+    ]
