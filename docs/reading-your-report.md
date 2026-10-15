@@ -274,7 +274,7 @@ or `.../export/markdown`) or the command line (`audit export -f jira` or
 | Format | Best for | Main sheets or columns |
 | --- | --- | --- |
 | Issue list with fixes (Excel, `.xlsx`) | Assigning and tracking fixes | A summary, an issue index, a tab per issue, and supporting sheets (listed below the table) |
-| ITS technical review (Excel, `.its.xlsx`) | Handing the report to the University of Michigan Information and Technology Services (ITS) Accessibility Team | The team's own Technical Review form, filled in (described below the table) |
+| ITS technical review (Excel, `.its.xlsx`) | Handing the report to the University of Michigan Information and Technology Services (ITS) Accessibility Team | The team's own Technical Review form, with only the elements checked as a problem to report (described below the table) |
 | Written report (Markdown, `.audit.md`) | A narrative report for stakeholders | Sections from an executive summary to the appendices (listed below the table) |
 | Occurrence list (CSV, `.csv`) | Filtering in a spreadsheet | One row per occurrence (per page for an image), 24 columns such as `severity`, `status`, `wcag_criterion`, `page_url`, `target_selector`, and `revealed_by` |
 | All report data (JSON, `.json`) | Scripts and other tools | `scan`, `findings` (image results), and `a11y_findings` (everything else) |

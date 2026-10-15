@@ -40,8 +40,11 @@ import { Button } from "./ui";
  *
  * The ITS technical review is its own file in the list, not a setting on
  * the issue list workbook. It is a different document: the University of
- * Michigan ITS Accessibility Team's own template, filled in, with one row
- * per issue in their columns. A setting would add a second step to one
+ * Michigan ITS Accessibility Team's own template, filled in with only the
+ * elements a person checked and reported in the page inspector, one row
+ * each. Its hint says so, since a reader expecting every issue would
+ * otherwise take a short or empty sheet for a broken export (repo rule:
+ * never drop a limitation to make text shorter). A setting would add a second step to one
  * of the two files and hide the other behind it; a row keeps one choice
  * per file, the same as every other download here. It sits directly
  * under the other Excel file so the two spreadsheets are grouped, and it
@@ -51,6 +54,14 @@ import { Button } from "./ui";
  * https://www.w3.org/TR/coga-usable/; SC 3.2.4 Consistent
  * Identification, Level AA). The hint spells out "ITS" (SC 3.1.4
  * Abbreviations, Level AAA).
+ *
+ * Each row is top-aligned: the badge, the name and the size start on the
+ * first line, whatever the height of the hint under the name. Centred, a
+ * row whose hint wraps to several lines (the ITS one) floated its badge
+ * beside the middle of the hint, away from the name it labels, and the
+ * badges no longer lined up from row to row (W3C COGA "Making Content
+ * Usable", paraphrased: keep related things together, and a consistent
+ * layout, https://www.w3.org/TR/coga-usable/).
  */
 const FORMATS: {
   format: ExportFormat;
@@ -73,7 +84,7 @@ const FORMATS: {
     badge: "XLSX",
     tone: "bg-umich-blue/10 text-umich-blue",
     label: "ITS technical review (Excel)",
-    hint: "The University of Michigan Information and Technology Services (ITS) Accessibility Team's form, filled in",
+    hint: "The University of Michigan Information and Technology Services (ITS) Accessibility Team's form, with only the elements checked as a problem to report",
   },
   {
     format: "audit",
@@ -285,11 +296,15 @@ export default function ExportMenu({
   ]
     .filter(Boolean)
     .join(" · ");
+  // The ITS technical review is the one file that does not hold every issue
+  // (its hint says what it holds), so the scope says so rather than claim
+  // "every issue" for all five.
   const scopeNote =
-    shownIssueGroups !== undefined && issueGroups !== undefined && shownIssueGroups < issueGroups
-    ? `Includes all ${plural(issueGroups, "issue", "issues")} and their statuses, ` +
-      `not only the ${shownIssueGroups.toLocaleString()} your filters show.`
-    : "Includes every issue and status in this report, even if the table has filters on.";
+    (shownIssueGroups !== undefined && issueGroups !== undefined && shownIssueGroups < issueGroups
+      ? `Includes all ${plural(issueGroups, "issue", "issues")} and their statuses, ` +
+        `not only the ${shownIssueGroups.toLocaleString()} your filters show.`
+      : "Includes every issue and status in this report, even if the table has filters on.") +
+    " The ITS technical review lists only the elements checked as a problem to report.";
 
   return (
     <div ref={containerRef} className="relative">
@@ -374,7 +389,7 @@ export default function ExportMenu({
                   // would otherwise strike through every line inside it.
                   data-button
                   className={cn(
-                    "flex min-h-target items-center gap-3 rounded-2xs px-2.5 py-2 no-underline hover:bg-surface-muted hover:no-underline",
+                    "flex min-h-target items-start gap-3 rounded-2xs px-2.5 py-2 no-underline hover:bg-surface-muted hover:no-underline",
                     state?.kind === "preparing" && "cursor-progress",
                   )}
                 >
