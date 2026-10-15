@@ -62,6 +62,14 @@ const MAX_NOTES = 2000;
  * dialog closes on save (SC 4.1.3 Status Messages, Level AA). A failed save
  * keeps the dialog open with the reason as an alert and the edit intact.
  *
+ * Suggested notes. An element with no saved notes opens with notes built
+ * from the scan (``suggestIssueNotes``: page state, element, problem, in
+ * the ITS team's own note style), as the developer chose, and the hint
+ * says so first: "Suggested from the scan. Read and edit it before you
+ * save." It is a suggestion, not an edit: nothing is stored until Save
+ * review, and saved notes are never replaced by one. Rejected: a
+ * "Suggest issue notes" button, one more step for every element.
+ *
  * Hints say only what the code does: the server removes email addresses,
  * phone numbers and sign-in tokens from notes (``redact_text``).
  */
@@ -72,6 +80,7 @@ export default function ElementReview({
   elementName,
   a11yFindingIds,
   pageImageIds,
+  suggestedNotes,
   saved,
   draft,
   onDraftChange,
@@ -85,6 +94,8 @@ export default function ElementReview({
   elementName: string;
   a11yFindingIds: number[];
   pageImageIds: number[];
+  /** Issue notes built from the scan (``suggestIssueNotes``); "" when none. */
+  suggestedNotes: string;
   /** The review as stored, or null when no one has saved one. */
   saved: OccurrenceReview | null;
   /** This element's unsaved edit, kept by the inspector while the page is open. */
@@ -118,11 +129,20 @@ export default function ElementReview({
   const stored: ReviewDraft = { decision: saved?.decision ?? null, notes: saved?.notes ?? "" };
   const value = draft ?? stored;
   const dirty = value.decision !== stored.decision || value.notes !== stored.notes;
+  // In the dialog, an element with no saved notes starts with the notes
+  // suggested from the scan. The suggestion is not an edit: until the reader
+  // changes something, nothing is "not saved", and the region above keeps
+  // saying "None yet". Saved notes are never replaced by a suggestion.
+  const suggesting = !draft && !stored.notes && Boolean(suggestedNotes);
+  const editing: ReviewDraft = suggesting ? { ...stored, notes: suggestedNotes } : value;
   const count = a11yFindingIds.length + pageImageIds.length;
 
   function change(next: ReviewDraft) {
     const same = next.decision === stored.decision && next.notes === stored.notes;
-    onDraftChange(same ? undefined : next);
+    // Emptying a suggestion is an edit: dropping the draft would bring the
+    // suggestion straight back, and the box could never be cleared.
+    const clearedSuggestion = suggesting || (draft !== undefined && !stored.notes && !next.notes);
+    onDraftChange(same && !clearedSuggestion ? undefined : next);
   }
 
   function close() {
@@ -139,14 +159,14 @@ export default function ElementReview({
       const result = await api.saveOccurrenceReview(scanId, pageId, {
         a11y_finding_ids: a11yFindingIds,
         page_image_ids: pageImageIds,
-        decision: value.decision,
-        notes: value.notes,
+        decision: editing.decision,
+        notes: editing.notes,
       });
       onSaved(result);
       onDraftChange(undefined);
       setOpen(false);
       setAnnouncement(
-        result.notes !== value.notes.trim()
+        result.notes !== editing.notes.trim()
           ? "Saved. Email addresses, phone numbers or sign-in tokens were removed from the notes."
           : "Saved.",
       );
@@ -220,8 +240,8 @@ export default function ElementReview({
               layout="list"
               name={`${idBase}-decision`}
               label="Checked by a person"
-              value={value.decision ?? "none"}
-              onChange={(choice) => change({ ...value, decision: choice === "none" ? null : choice })}
+              value={editing.decision ?? "none"}
+              onChange={(choice) => change({ ...editing, decision: choice === "none" ? null : choice })}
               options={CHOICES.map((choice) => ({
                 value: choice,
                 label: REVIEW_DECISION_LABEL[choice],
@@ -234,14 +254,19 @@ export default function ElementReview({
               </label>
               <textarea
                 id={notesId}
-                value={value.notes}
+                value={editing.notes}
                 maxLength={MAX_NOTES}
                 rows={5}
                 aria-describedby={notesHintId}
-                onChange={(event) => change({ ...value, notes: event.target.value })}
+                onChange={(event) => change({ ...editing, notes: event.target.value })}
                 className="min-h-target w-full resize-y rounded-xs border border-border bg-surface px-3 py-2 text-base text-fg focus:border-umich-blue focus:outline-none"
               />
               <p id={notesHintId} className="text-xs text-fg-muted">
+                {suggesting && (
+                  <span className="mb-0.5 block font-semibold text-fg">
+                    Suggested from the scan. Read and edit it before you save.
+                  </span>
+                )}
                 Write it for the vendor: where the problem is, what is wrong, and what to fix. Up
                 to 2,000 characters. Email addresses, phone numbers and sign-in tokens are removed
                 when you save.

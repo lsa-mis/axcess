@@ -87,7 +87,12 @@ with this issue**), on the **Saved copy** tab.
    **Checked: a repeat of one already reported** if it is the same problem as
    one you already reported. **Not checked yet** takes a choice back.
 4. Write **Issue notes** for the vendor: where it is, what is wrong, and what
-   to fix.
+   to fix. If the element has no saved notes, the box starts with notes
+   suggested from the scan, in the order the ITS team writes them: the page
+   state (After clicking “Menu”), the element's text and what it is, the
+   problem, and any specifics from the check (such as a contrast ratio and
+   its colors). Read and edit them before you save. Saved notes are never
+   replaced by a suggestion.
 5. Select **Save review**. The dialog closes and the panel says **Saved.**
 
 The review covers every occurrence of the issue on that element, in the page

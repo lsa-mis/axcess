@@ -10,6 +10,8 @@ the page discards it.
 
 from __future__ import annotations
 
+import gzip
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -97,12 +99,18 @@ async def test_review_by_keyboard_alone(
     await expect(dialog).to_be_visible()
     await expect(dialog).to_have_accessible_description("Button")
     await expect(not_yet).to_be_focused()
+    # The notes start as a suggestion from the scan, said so in the hint.
+    await expect(notes).to_have_value("The button: Edge case.")
+    await expect(notes).to_have_accessible_description(
+        re.compile(r"^Suggested from the scan\. Read and edit it before you save\.")
+    )
 
-    # Choose with the arrow keys, write, save.
+    # Choose with the arrow keys, write over the suggestion, save.
     await page.keyboard.press("ArrowDown")
     await expect(report).to_be_checked()
     await page.keyboard.press("Tab")
     await expect(notes).to_be_focused()
+    await page.keyboard.press("ControlOrMeta+a")
     await page.keyboard.type("The first button has no accessible name.")
     await _tab_to(page, save, limit=3)
     await page.keyboard.press("Enter")
@@ -116,9 +124,11 @@ async def test_review_by_keyboard_alone(
     assert _reviews(db_path) == [("#one", "report", "The first button has no accessible name.")]
 
     # Reopening shows the saved review, and focus is on the chosen radio.
+    # Saved notes are never replaced by a suggestion.
     await page.keyboard.press("Enter")
     await expect(report).to_be_focused()
     await expect(notes).to_have_value("The first button has no accessible name.")
+    await expect(dialog).not_to_contain_text("Suggested from the scan")
     # Escape closes without saving and returns focus.
     await page.keyboard.press("Escape")
     await expect(dialog).to_be_hidden()
@@ -128,6 +138,12 @@ async def test_review_by_keyboard_alone(
     await page.get_by_role("button", name="Next element").click()
     await expect(panel).to_contain_text("Your review: Not checked yet")
     await expect(status).to_have_text("")
+    # An unedited suggestion is not an unsaved change.
+    await opener.click()
+    await expect(notes).to_have_value("The button: Edge case.")
+    await page.keyboard.press("Escape")
+    await expect(panel).to_contain_text("Issue notes: None yet")
+    await expect(panel).not_to_contain_text("Not saved yet")
 
     # An unsaved edit is kept when the dialog is closed without saving and
     # while stepping, and the line says it is not saved.
@@ -204,3 +220,142 @@ async def test_inspector_still_outlines_when_reviews_cannot_be_read(
     page = await open_inspector(new_page, base, scan_id, page_id, RULE)
     await expect(page.get_by_text("Flagged element 1 of 2")).to_be_visible()
     await expect(page.get_by_text("This issue has no element to mark")).to_have_count(0)
+
+
+def _seed_finding(
+    db_path: Path,
+    scan_id: int,
+    capture: str,
+    *,
+    rule: str,
+    target: str,
+    snippet: str,
+    summary: str,
+    state: tuple[str, str, str] | None = None,
+) -> int:
+    """One rule-check occurrence with the check's own sentence, as axe stores it.
+
+    ``state`` is ``(state_key, control label, saved document)`` for an
+    occurrence found only after clicking that control.
+    """
+    conn = sqlite3.connect(db_path)
+    try:
+        page_id = conn.execute(
+            "SELECT id FROM pages WHERE scan_id = ? ORDER BY id LIMIT 1", (scan_id,)
+        ).fetchone()[0]
+        conn.execute(
+            "UPDATE pages SET rendered_html = ? WHERE id = ?",
+            (gzip.compress(capture.encode()), page_id),
+        )
+        key = label = None
+        if state:
+            key, label, dom = state
+            conn.execute(
+                "INSERT INTO page_dom_states (page_id, scan_id, state_key, revealed_by, "
+                "path_labels, encoding, dom) VALUES (?, ?, ?, ?, ?, 'gzip', ?)",
+                (page_id, scan_id, key, label, f'["{label}"]', gzip.compress(dom.encode())),
+            )
+        conn.execute(
+            "INSERT INTO page_a11y_findings (page_id, scan_id, pipeline, rule_id, wcag_sc, "
+            "wcag_level, impact, help, target_selector, failure_summary, html_snippet, "
+            "target_hash, revealed_by, revealed_state_key) "
+            "VALUES (?, ?, 'axe', ?, '1.4.3', 'AA', 'serious', 'Rule help', ?, ?, ?, ?, ?, ?)",
+            (page_id, scan_id, rule, target, summary, snippet, f"suggest-{rule}", label, key),
+        )
+        conn.commit()
+        return int(page_id)
+    finally:
+        conn.close()
+
+
+async def _suggestion(new_page: Any, base: str, scan_id: int, page_id: int, rule: str) -> str:
+    page = await open_inspector(new_page, base, scan_id, page_id, rule)
+    await page.get_by_role("button", name="Review this element").click()
+    notes = page.get_by_role("dialog").get_by_role("textbox", name="Issue notes")
+    await expect(notes).not_to_have_value("")
+    value: str = await notes.input_value()
+    await page.context.close()
+    return value
+
+
+async def test_suggested_notes_use_the_checks_own_contrast_sentence(
+    live_server: tuple[str, int], seeded_db: tuple[Path, Path, int], new_page: Any
+) -> None:
+    """The ITS team's contrast notes are this sentence, with the element as its subject."""
+    base, scan_id = live_server
+    page_id = _seed_finding(
+        seeded_db[0],
+        scan_id,
+        '<!doctype html><html><body><p id="low">Low text</p></body></html>',
+        rule="color-contrast",
+        target="#low",
+        snippet='<p id="low">Low text</p>',
+        summary=(
+            "Fix any of the following:\n  Element has insufficient color contrast of 2.81 "
+            "(foreground color: #555555, background color: #000000, font size: 13.2pt "
+            "(17.6px), font weight: normal). Expected contrast ratio of 4.5:1"
+        ),
+    )
+    assert await _suggestion(new_page, base, scan_id, page_id, "color-contrast") == (
+        "“Low text” <p> element has insufficient color contrast of 2.81 (foreground color: "
+        "#555555, background color: #000000, font size: 13.2pt (17.6px), font weight: "
+        "normal). Expected contrast ratio of 4.5:1."
+    )
+
+
+async def test_suggested_notes_start_with_the_page_state(
+    live_server: tuple[str, int], seeded_db: tuple[Path, Path, int], new_page: Any
+) -> None:
+    """An element found after a click: the click, the element, the problem, the detail."""
+    base, scan_id = live_server
+    dom = (
+        '<!doctype html><html><body><div id="acc" tabindex="0" aria-expanded="true">'
+        "Bonus Points</div></body></html>"
+    )
+    page_id = _seed_finding(
+        seeded_db[0],
+        scan_id,
+        "<!doctype html><html><body><p>Before clicking.</p></body></html>",
+        rule="aria-allowed-attr",
+        target="#acc",
+        snippet='<div id="acc" tabindex="0" aria-expanded="true">',
+        summary='Fix all of the following:\n  ARIA attribute is not allowed: aria-expanded="true"',
+        state=("click:bonus", "Bonus Points", dom),
+    )
+    assert await _suggestion(new_page, base, scan_id, page_id, "aria-allowed-attr") == (
+        "After clicking “Bonus Points”, “Bonus Points” <div> element has an ARIA attribute "
+        'its role does not support. ARIA attribute is not allowed: aria-expanded="true".'
+    )
+
+
+async def test_suggested_notes_leave_out_axes_other_ways_to_fix(
+    live_server: tuple[str, int], seeded_db: tuple[Path, Path, int], new_page: Any
+) -> None:
+    """ "Fix any of the following" lists other ways to fix it, not the problem.
+
+    A link with no name fails every way a link can get one; listing them all,
+    or taking "Element has no title attribute" as the problem, misleads.
+    """
+    base, scan_id = live_server
+    page_id = _seed_finding(
+        seeded_db[0],
+        scan_id,
+        '<!doctype html><html><body><a id="x" href="/next"></a></body></html>',
+        rule="link-name",
+        target="#x",
+        snippet='<a id="x" href="/next"></a>',
+        summary="\n".join(
+            [
+                "Fix all of the following:",
+                "  Element is in tab order and does not have accessible text",
+                "",
+                "Fix any of the following:",
+                "  Element does not have text that is visible to screen readers",
+                "  aria-label attribute does not exist or is empty",
+                "  Element has no title attribute",
+            ]
+        ),
+    )
+    assert await _suggestion(new_page, base, scan_id, page_id, "link-name") == (
+        "The link: Links have no name for screen readers."
+    )

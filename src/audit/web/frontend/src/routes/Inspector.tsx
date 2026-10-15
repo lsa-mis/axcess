@@ -28,6 +28,7 @@ import {
 } from "../components/ui";
 import { useScanQuery } from "../hooks/useScanQuery";
 import { cn } from "../lib/cn";
+import { suggestIssueNotes } from "../lib/suggestedNotes";
 import {
   boxPlace,
   type BoxNote,
@@ -772,6 +773,28 @@ export default function InspectorRoute() {
     )?.review ??
     null;
   const canReview = reviewing && reviewFindingIds.length + reviewImageIds.length > 0;
+  // The issue's plain-language title, for the suggested notes. The same
+  // query, and so the same cache, as the issue page the reader came from.
+  const { data: issueDetail } = useQuery({
+    queryKey: ["issue-detail", scan, issueKey, "occurrences_desc"],
+    queryFn: () => api.getIssueDetail(scan, issueKey ?? "", "occurrences_desc"),
+    enabled: canReview && Boolean(issueKey),
+    staleTime: 60_000,
+  });
+  // Issue notes suggested from the scan: page state, element, problem.
+  const activeState = data?.states.find((state) => state.state_key === activeStateKey) ?? null;
+  const suggestedNotes =
+    canReview && currentElement && issueDetail
+      ? suggestIssueNotes({
+          clickChain: activeState ? clickChain(activeState) : null,
+          kind: currentElement.kind,
+          text: currentElement.text,
+          title: issueDetail.row.title,
+          details: currentFindings
+            .filter((f) => reviewFindingIds.includes(f.id))
+            .map((f) => f.failure_summary ?? ""),
+        })
+      : "";
   const setReviewDraft = (next: ReviewDraft | undefined) =>
     setReviewDrafts((drafts) => {
       const rest = { ...drafts };
@@ -1366,6 +1389,7 @@ export default function InspectorRoute() {
                           .join(", ")}
                         a11yFindingIds={reviewFindingIds}
                         pageImageIds={reviewImageIds}
+                        suggestedNotes={suggestedNotes}
                         saved={savedReview}
                         draft={reviewDrafts[reviewKey]}
                         onDraftChange={setReviewDraft}
