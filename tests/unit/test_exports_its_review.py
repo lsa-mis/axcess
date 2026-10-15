@@ -325,11 +325,13 @@ def test_coversheet_says_only_what_the_scan_knows(tmp_db: sqlite3.Connection) ->
     cover = _render(tmp_db, scan_id)["Coversheet"]
 
     assert cover["B3"].value == datetime(2026, 4, 22)
-    assert cover["B4"].value == "Fixture Reviewer"  # the evaluation's reviewer
+    # Tester(s) is the team's to fill, even when the evaluation names a reviewer.
+    assert cover["B4"].value == _template()["Coversheet"]["B4"].value
     assert cover["B8"].value == "example.org"
     assert cover["B17"].value == "https://example.org/"
     assert cover["B17"].hyperlink.target == "https://example.org/"
-    assert cover["B18"].value.startswith("None.")
+    # A sign-in scan is not recorded as one, so Login info is the team's to fill.
+    assert cover["B18"].value == _template()["Coversheet"]["B18"].value
     assert "Rule check (axe)" in cover["B19"].value
 
 

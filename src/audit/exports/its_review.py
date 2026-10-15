@@ -22,11 +22,12 @@ tests pin both:
 What each sheet receives:
 
 * **Coversheet**: the scan date, the site's host as the IT name, its start
-  URL, the tools the scan used, and, when an expert evaluation records them,
-  the reviewer as Tester(s) and the purpose as Background. Fields only a
-  person knows (U-M contact, vendor contact, VPAT, description) keep the
-  template's own prompt so they read as unfilled, not as blank facts, and
-  IT provenance and IT type keep the template's values.
+  URL, the tools the scan used, and, when an expert evaluation records it,
+  the purpose as Background. Tester(s) is left for the team, as the team
+  asked: Axcess has no user accounts to name a tester from. Fields only a
+  person knows (U-M contact, vendor contact, VPAT, description, login info)
+  keep the template's own prompt so they read as unfilled, not as blank
+  facts, and IT provenance and IT type keep the template's values.
 * **Test Plan**: every page the scan checked, one row each, with its Test
   name and URL; the Description column is left for the team. Column A feeds
   the Test dropdown on Findings Issues through the template's
@@ -453,17 +454,13 @@ def _fill_coversheet(
 ) -> None:
     if scan_day is not None:
         ws["B3"].value = scan_day
-    reviewer = str(evaluation_record.get("reviewer") or "").strip()
-    if evaluation_record.get("exists") and reviewer:
-        _put_text(ws, "B4", reviewer)
     _put_text(ws, "B8", urlsplit(scan.seed_url).hostname or scan.seed_url)
     purpose = str(evaluation_record.get("purpose") or "").strip()
     if evaluation_record.get("exists") and purpose:
         _put_text(ws, "B13", purpose)
     _put_link(ws, "B17", scan.seed_url, scan.seed_url)
-    # The export route refuses protected (signed-in) scans, so every scan
-    # that reaches this workbook checked public pages only.
-    _put_text(ws, "B18", "None. The scan checked only pages that open without signing in.")
+    # Login info (B18) is left for the team. A sign-in scan is an ordinary
+    # report with no record that it signed in, so the scan cannot say.
 
     checks: list[str] = []
     if scan.axe_pages_scanned:
