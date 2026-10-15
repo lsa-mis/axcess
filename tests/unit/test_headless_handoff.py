@@ -8,7 +8,6 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from audit.protected.egress import LoopbackEgressProxy
 from audit.protected.session import (
     ManualAuthenticationError,
     ManualAuthenticationSession,
@@ -16,14 +15,11 @@ from audit.protected.session import (
 )
 
 
-def prepared_session(monkeypatch):  # type: ignore[no-untyped-def]
+def prepared_session():  # type: ignore[no-untyped-def]
     session = ManualAuthenticationSession(
         seed_url="https://app.example.test/",
         approved_target_origins=("https://app.example.test",),
         resolver=lambda _: ("8.8.8.8",),
-    )
-    monkeypatch.setattr(
-        LoopbackEgressProxy, "server_url", property(lambda _: "http://127.0.0.1:1234")
     )
     old = SimpleNamespace(
         close=AsyncMock(), storage_state=AsyncMock(return_value={"cookies": [], "origins": []})
@@ -48,8 +44,8 @@ def prepared_session(monkeypatch):  # type: ignore[no-untyped-def]
     return session, old, browser, context, pw
 
 
-async def test_transferred_context_is_owned_and_closed(monkeypatch):  # type: ignore[no-untyped-def]
-    session, old, browser, context, pw = prepared_session(monkeypatch)
+async def test_transferred_context_is_owned_and_closed():  # type: ignore[no-untyped-def]
+    session, old, browser, context, pw = prepared_session()
     pages = await session.switch_to_headless(2)
     assert len(pages) == 2
     assert session.context is context
@@ -61,7 +57,7 @@ async def test_transferred_context_is_owned_and_closed(monkeypatch):  # type: ig
     assert browser.new_context.call_args.kwargs["storage_state"] == old.storage_state.return_value
     assert browser.new_context.call_args.kwargs["service_workers"] == "block"
     assert browser.new_context.call_args.kwargs["accept_downloads"] is False
-    assert browser.new_context.call_args.kwargs["proxy"]["server"] == "http://127.0.0.1:1234"
+    assert "proxy" not in browser.new_context.call_args.kwargs
     context.route.assert_awaited_once_with("**/*", session._route_guard.handle_route)
     context.route_web_socket.assert_awaited_once()
     with pytest.raises(ManualAuthenticationError, match="already running"):
@@ -72,8 +68,8 @@ async def test_transferred_context_is_owned_and_closed(monkeypatch):  # type: ig
 
 
 @pytest.mark.parametrize("failure", ["capture", "launch", "context", "page", "cancel"])
-async def test_failed_handoff_never_starts_an_anonymous_crawl(monkeypatch, failure):  # type: ignore[no-untyped-def]
-    session, old, browser, context, pw = prepared_session(monkeypatch)
+async def test_failed_handoff_never_starts_an_anonymous_crawl(failure):  # type: ignore[no-untyped-def]
+    session, old, browser, context, pw = prepared_session()
     target = {
         "capture": old.storage_state,
         "launch": pw.chromium.launch,
@@ -92,8 +88,8 @@ async def test_failed_handoff_never_starts_an_anonymous_crawl(monkeypatch, failu
     old.close.assert_awaited_once()
 
 
-async def test_handoff_requires_confirmation_and_bounded_workers(monkeypatch):  # type: ignore[no-untyped-def]
-    session, old, _, _, pw = prepared_session(monkeypatch)
+async def test_handoff_requires_confirmation_and_bounded_workers():  # type: ignore[no-untyped-def]
+    session, old, _, _, pw = prepared_session()
     session._state = ManualAuthState.AWAITING_MANUAL_AUTHENTICATION
     with pytest.raises(ManualAuthenticationError, match="Confirm sign-in"):
         await session.switch_to_headless(1)
@@ -106,7 +102,7 @@ async def test_handoff_requires_confirmation_and_bounded_workers(monkeypatch):  
 
 
 async def test_handoff_timeout_closes_new_browser(monkeypatch):  # type: ignore[no-untyped-def]
-    session, old, browser, context, _ = prepared_session(monkeypatch)
+    session, old, browser, context, _ = prepared_session()
     real_timeout = asyncio.timeout
     monkeypatch.setattr(asyncio, "timeout", lambda _: real_timeout(0.01))
 

@@ -2,13 +2,24 @@
 
 Protected scans must not turn an authenticated browser into a general-purpose
 request proxy.  This module admits only explicitly approved HTTPS origins,
-re-resolves a host for every request to defend against DNS rebinding, and
-blocks non-public addresses.  It intentionally does *not* store, inspect, or
-serialize any browser session material.
+re-resolves a host for every request, and blocks non-public addresses.  It
+intentionally does *not* store, inspect, or serialize any browser session
+material.
 
-The policy is synchronous so it can be used by HTTP redirect handlers and by
-Playwright's asynchronous routing callback.  Inject ``resolver`` in tests or
-in a deployment that supplies an approved DNS resolver.
+The browser then connects on its own, with its own DNS lookup. A DNS answer
+that changes between this check and the browser's lookup (DNS rebinding) is
+not caught here. Axcess used to close that gap with a loopback CONNECT proxy
+that dialed the checked address itself. It was removed: it connected one
+address at a time with a 15-second wait each and no IPv6-to-IPv4 fallback,
+and blocked the event loop on every lookup, so sign-in pages behind a
+full-tunnel VPN loaded very slowly or not at all, while ordinary Chrome on
+the same network worked.
+
+The policy is synchronous so it can be used by HTTP redirect handlers. The
+per-request route checks (here and in ``session.py``) run it with
+``asyncio.to_thread``: the lookup blocks, and on the event loop it would
+stall every other request and the Axcess API with it. Inject ``resolver`` in
+tests or in a deployment that supplies an approved DNS resolver.
 """
 
 from __future__ import annotations
@@ -20,7 +31,7 @@ import re
 import socket
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 from urllib.parse import unquote_plus, urlsplit, urlunsplit
 
 from audit.protected.models import normalize_exact_https_origin
@@ -119,11 +130,6 @@ class ValidatedUrl:
 
     url: str
     origin: ApprovedOrigin
-    # The exact public answers checked for this request.  A loopback proxy
-    # connects to one of these literals rather than asking the OS resolver a
-    # second time, closing the normal DNS-rebinding time-of-check/time-of-use
-    # gap for browser traffic.
-    resolved_addresses: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -182,11 +188,10 @@ class ProtectedEgressPolicy:
         parsed = _parse_request_url(url)
         if parsed.origin not in self._origins:
             raise EgressViolation("origin_not_approved")
-        addresses = _require_public_resolution(parsed.host, self._resolver)
+        _require_public_resolution(parsed.host, self._resolver)
         return ValidatedUrl(
             url=parsed.canonical_url,
             origin=parsed.origin,
-            resolved_addresses=addresses,
         )
 
     def validate_transient_auth_url(self, url: str) -> ValidatedUrl:
@@ -202,11 +207,10 @@ class ProtectedEgressPolicy:
         parsed = _parse_request_url(url, allow_sensitive_query=True)
         if parsed.origin not in self._origins:
             raise EgressViolation("origin_not_approved")
-        addresses = _require_public_resolution(parsed.host, self._resolver)
+        _require_public_resolution(parsed.host, self._resolver)
         return ValidatedUrl(
             url=parsed.canonical_url,
             origin=parsed.origin,
-            resolved_addresses=addresses,
         )
 
     def validate_page_url(self, url: str) -> ValidatedUrl:
@@ -291,173 +295,11 @@ class PublicHttpsManualAuthPolicy(ProtectedEgressPolicy):
 
     def _validate_public(self, url: str, *, allow_sensitive_query: bool) -> ValidatedUrl:
         parsed = _parse_request_url(url, allow_sensitive_query=allow_sensitive_query)
-        addresses = _require_public_resolution(parsed.host, self._resolver)
+        _require_public_resolution(parsed.host, self._resolver)
         return ValidatedUrl(
             url=parsed.canonical_url,
             origin=parsed.origin,
-            resolved_addresses=addresses,
         )
-
-
-class LoopbackEgressProxy:
-    """A tiny CONNECT-only browser egress guard bound to ``127.0.0.1``.
-
-    Playwright routing is useful for request method and resource-type policy,
-    but it is not a transport boundary: redirects and a browser DNS lookup
-    can otherwise escape a preflight check.  This proxy accepts only HTTPS
-    ``CONNECT`` tunnels, reuses :class:`ProtectedEgressPolicy` for every
-    connection, and dials an already-validated public IP literal.  It never
-    logs request lines, headers, or bytes flowing through a tunnel.
-
-    It is intentionally an in-process companion component, not a public
-    proxy.  The browser receives it only through a loopback context proxy;
-    closing the manual-authentication session closes every tunnel and the
-    listening socket.
-    """
-
-    def __init__(self, policy: ProtectedEgressPolicy) -> None:
-        self._policy = policy
-        self._policy_generation = 0
-        self._server: asyncio.AbstractServer | None = None
-        self._server_url: str | None = None
-        # These contain only live socket writer objects. They are never
-        # logged, inspected, or serialized; retaining them lets a change from
-        # the manual-auth setup policy to the narrower scan policy actively
-        # tear down pre-authentication tunnels instead of relying on browser
-        # connection pooling to eventually retire them.
-        self._active_client_writers: set[asyncio.StreamWriter] = set()
-        self._active_upstream_writers: set[asyncio.StreamWriter] = set()
-
-    @property
-    def server_url(self) -> str:
-        if self._server is None or self._server_url is None:
-            raise RuntimeError("Protected loopback egress proxy is not running.")
-        return self._server_url
-
-    def set_policy(self, policy: ProtectedEgressPolicy) -> None:
-        """Tighten the allowed connection set after manual sign-in.
-
-        Existing CONNECT tunnels were admitted under the preceding policy.
-        They may carry an IdP or other setup-origin session, so they are not
-        safe to keep after the authenticated crawler becomes target-scoped.
-        Closing both tunnel ends forces Chromium to reconnect; each new
-        CONNECT is then admitted under ``policy`` and freshly DNS-validated.
-        The generation check in :meth:`_handle_client` also closes a tunnel
-        that happened to be opening while the policy changed.
-        """
-
-        if not all(self._policy.allows_origin(origin) for origin in policy.allowed_origins):
-            raise ValueError("Loopback egress policy may only be tightened.")
-
-        self._policy = policy
-        self._policy_generation += 1
-        self._close_active_tunnels()
-
-    async def start(self) -> None:
-        if self._server is not None:
-            return
-        self._server = await asyncio.start_server(
-            self._handle_client,
-            host="127.0.0.1",
-            port=0,
-            limit=16 * 1024,
-            start_serving=True,
-        )
-        # Typeshed's ``AbstractServer`` omits ``sockets`` even though the
-        # asyncio server returned by ``start_server`` exposes the bound
-        # listener sequence. Read it once, retain only a loopback URL, and
-        # avoid leaking socket objects into the companion API.
-        sockets = cast(list[socket.socket] | None, getattr(self._server, "sockets", None))
-        if not sockets:
-            await self.close()
-            raise RuntimeError("Protected loopback egress proxy did not bind a listener.")
-        host, port = sockets[0].getsockname()[:2]
-        self._server_url = f"http://{host}:{port}"
-
-    async def close(self) -> None:
-        self._close_active_tunnels()
-        server = self._server
-        self._server = None
-        self._server_url = None
-        if server is not None:
-            server.close()
-            await server.wait_closed()
-
-    async def _handle_client(
-        self,
-        reader: asyncio.StreamReader,
-        writer: asyncio.StreamWriter,
-    ) -> None:
-        upstream_writer: asyncio.StreamWriter | None = None
-        self._active_client_writers.add(writer)
-        try:
-            header = await asyncio.wait_for(reader.readuntil(b"\r\n\r\n"), timeout=10.0)
-            host, port = _parse_connect_authority(header)
-            # A CONNECT request contains no path/query. Build a synthetic
-            # canonical HTTPS URL solely for exact-origin/DNS admission.
-            host_part = f"[{host}]" if _is_ip_literal(host, version=6) else host
-            suffix = "" if port == _DEFAULT_HTTPS_PORT else f":{port}"
-            generation = self._policy_generation
-            policy = self._policy
-            validated = policy.validate_url(f"https://{host_part}{suffix}/")
-            # ``validated`` always carries freshly resolved, public-only
-            # answers. Dial the literal so a later OS resolver answer cannot
-            # turn a permitted name into private/metadata traffic.
-            upstream_reader, upstream_writer = await _open_validated_connection(validated)
-            # ``set_policy`` may run while opening a socket. Do not ever send
-            # a successful CONNECT response for a tunnel admitted by an old
-            # policy after scan mode has taken effect.
-            if generation != self._policy_generation:
-                raise EgressViolation("policy_changed")
-            self._active_upstream_writers.add(upstream_writer)
-            writer.write(b"HTTP/1.1 200 Connection Established\r\n\r\n")
-            await writer.drain()
-            if generation != self._policy_generation:
-                raise EgressViolation("policy_changed")
-            to_upstream = asyncio.create_task(_copy_stream(reader, upstream_writer))
-            to_client = asyncio.create_task(_copy_stream(upstream_reader, writer))
-            done, pending = await asyncio.wait(
-                {to_upstream, to_client}, return_when=asyncio.FIRST_COMPLETED
-            )
-            for task in pending:
-                task.cancel()
-            for task in done | pending:
-                with contextlib.suppress(asyncio.CancelledError, Exception):
-                    await task
-        except Exception:
-            # Do not reflect a hostname, request line, or DNS error to the
-            # browser. A generic proxy rejection is enough for the companion
-            # to surface its safe re-authentication/scope message.
-            with contextlib.suppress(Exception):
-                writer.write(b"HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n")
-                await writer.drain()
-        finally:
-            if upstream_writer is not None:
-                self._active_upstream_writers.discard(upstream_writer)
-                upstream_writer.close()
-                with contextlib.suppress(Exception):
-                    await upstream_writer.wait_closed()
-            self._active_client_writers.discard(writer)
-            writer.close()
-            with contextlib.suppress(Exception):
-                await writer.wait_closed()
-
-    def _close_active_tunnels(self) -> None:
-        """Initiate close on every accepted tunnel without retaining bytes.
-
-        ``StreamWriter.close`` is intentionally non-blocking. The serving
-        coroutines own their corresponding ``wait_closed`` calls and remove
-        the writers from these sets in ``finally``; keeping this operation
-        synchronous makes it safe to invoke during the state transition that
-        verifies a manual login.
-        """
-
-        for tunnel_writer in (
-            *tuple(self._active_client_writers),
-            *tuple(self._active_upstream_writers),
-        ):
-            with contextlib.suppress(Exception):
-                tunnel_writer.close()
 
 
 class PlaywrightRoutePolicy:
@@ -485,7 +327,8 @@ class PlaywrightRoutePolicy:
             await route.abort("blockedbyclient")
             return
         try:
-            self._egress.validate_url(request.url)
+            # Off the event loop: the check includes a blocking DNS lookup.
+            await asyncio.to_thread(self._egress.validate_url, request.url)
         except EgressViolation:
             await route.abort("blockedbyclient")
             return
@@ -748,14 +591,14 @@ def _resolve_hostname(host: str) -> Sequence[str]:
     return tuple(sorted(addresses))
 
 
-def _require_public_resolution(host: str, resolver: HostResolver) -> tuple[str, ...]:
+def _require_public_resolution(host: str, resolver: HostResolver) -> None:
     try:
         literal = ipaddress.ip_address(host)
     except ValueError:
         literal = None
     if literal is not None:
         _require_global_ip(literal)
-        return (literal.compressed,)
+        return
     try:
         addresses = resolver(host)
     except EgressViolation:
@@ -764,15 +607,12 @@ def _require_public_resolution(host: str, resolver: HostResolver) -> tuple[str, 
         raise EgressViolation("dns_resolution_failed") from exc
     if not addresses:
         raise EgressViolation("dns_resolution_failed")
-    normalized: list[str] = []
     for raw_address in addresses:
         try:
             address = ipaddress.ip_address(raw_address)
         except ValueError as exc:
             raise EgressViolation("dns_resolution_failed") from exc
         _require_global_ip(address)
-        normalized.append(address.compressed)
-    return tuple(sorted(set(normalized)))
 
 
 def _require_global_ip(address: ipaddress.IPv4Address | ipaddress.IPv6Address) -> None:
@@ -787,67 +627,3 @@ def _is_ip_literal(host: str, *, version: int) -> bool:
         return ipaddress.ip_address(host).version == version
     except ValueError:
         return False
-
-
-def _parse_connect_authority(header: bytes) -> tuple[str, int]:
-    """Parse one minimal HTTP CONNECT preface without retaining it.
-
-    The listener is loopback-only and accepts no authentication, absolute
-    HTTP URL, or arbitrary method.  The policy performs the definitive exact
-    origin and DNS checks after this syntax boundary.
-    """
-
-    try:
-        first_line = header.split(b"\r\n", 1)[0].decode("ascii", errors="strict")
-        method, authority, version = first_line.split(" ", 2)
-    except (UnicodeDecodeError, ValueError) as exc:
-        raise EgressViolation("invalid_proxy_request") from exc
-    if method != "CONNECT" or version not in {"HTTP/1.0", "HTTP/1.1"}:
-        raise EgressViolation("invalid_proxy_request")
-    try:
-        parsed = urlsplit(f"//{authority}")
-        port = parsed.port
-    except ValueError as exc:
-        raise EgressViolation("invalid_proxy_request") from exc
-    if (
-        not parsed.hostname
-        or parsed.username is not None
-        or parsed.password is not None
-        or "@" in parsed.netloc
-        or parsed.path
-        or parsed.query
-        or parsed.fragment
-        or port is None
-        or not 1 <= port <= 65535
-    ):
-        raise EgressViolation("invalid_proxy_request")
-    return _canonical_host(parsed.hostname), port
-
-
-async def _open_validated_connection(
-    validated: ValidatedUrl,
-) -> tuple[asyncio.StreamReader, asyncio.StreamWriter]:
-    """Connect to a freshly policy-validated literal address.
-
-    Try each current public DNS answer. A failed address does not trigger a
-    second hostname lookup, which preserves the validation/connection binding.
-    """
-
-    last_error: OSError | None = None
-    for address in validated.resolved_addresses:
-        try:
-            return await asyncio.wait_for(
-                asyncio.open_connection(address, validated.origin.port), timeout=15.0
-            )
-        except OSError as exc:
-            last_error = exc
-    raise EgressViolation("egress_connection_failed") from last_error
-
-
-async def _copy_stream(
-    source: asyncio.StreamReader,
-    destination: asyncio.StreamWriter,
-) -> None:
-    while chunk := await source.read(64 * 1024):
-        destination.write(chunk)
-        await destination.drain()
