@@ -189,7 +189,7 @@ export const QUESTIONS: Question[] = [
       { href: "/about/", text: "About Axcess" },
     ],
   },
-  // .github/workflows/desktop-build.yml release files; README.md
+  // .github/workflows/desktop-release.yml release files; README.md
   // "Get started" and "Run from source".
   {
     id: "platforms",
