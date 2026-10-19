@@ -59,10 +59,16 @@ const rows = [
 
 <StarlightPage
   frontmatter={{
-    title: "Axcess: accessibility testing that runs on your computer",
+    // Starlight adds " | Axcess" to every page title, so the name is not
+    // repeated here: search results read "Accessibility testing that runs on
+    // your computer | Axcess", not "Axcess: ... | Axcess".
+    title: "Accessibility testing that runs on your computer",
     description:
       "A free, open-source accessibility scanner that runs on your computer. It opens menus and dialogs, checks the pages behind your sign-in, and keeps every result on your machine.",
     template: "splash",
+    // The home page is the website, not an article, which is what Starlight
+    // marks every page as for link previews and search engines.
+    head: [{ tag: "meta", attrs: { property: "og:type", content: "website" } }],
     tableOfContents: false,
     hero: {
       title: "Test the site your users actually see.",
