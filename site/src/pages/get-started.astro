@@ -1456,16 +1456,20 @@ const SMARTSCREEN_TEXT =
   .mock-side li {
     padding: 0.2rem 0.45rem;
   }
+  /* Inset from the list's edges by its own padding, as macOS insets the
+     selected row: the mark's outline is drawn 6px outside the row, and a
+     row stretched to the list's edges put it against the window's border
+     (in the one-column layout, past it; found by the developer). */
   .mock-selected {
     display: block;
-    margin: 0.15rem -0.45rem;
+    margin: 0.15rem 0;
     padding: 0.2rem 0.45rem;
     background: #0050c0;
     color: #fff;
     font-weight: 600;
   }
-  /* The selected row is as wide as the list, so its number sits inside the
-     row's end, not past the drawing's edge. */
+  /* The selected row is nearly as wide as the list, so its number sits
+     inside the row's end, not past the drawing's edge. */
   .mock-selected::after {
     right: 0.3em;
   }
