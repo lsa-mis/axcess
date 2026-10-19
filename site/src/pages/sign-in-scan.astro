@@ -11,6 +11,8 @@
  */
 import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
 import Card from "../components/Card.astro";
+import Step from "../components/Step.astro";
+import Steps from "../components/Steps.astro";
 import { url } from "../lib/site";
 
 /*
@@ -74,24 +76,21 @@ const shot = (name: Shot) => ({
     code. They are not available when Axcess runs on a shared server for a team.
   </p>
   <h2 id="steps">Sign in and scan, step by step</h2>
-  <ol class="not-content ax-prose steps">
-    <li>
-      <h3>Choose the sign-in tab</h3>
+  <Steps>
+    <Step heading="Choose the sign-in tab">
       <p>Select <em>New scan</em>, then the <em>Site with a sign-in or two-step sign-in (2FA)</em> tab.</p>
-      <img class="step-shot" loading="lazy" {...shot("sign-in-tab")} />
-    </li>
-    <li>
-      <h3>Enter where to start, and confirm you may scan</h3>
+      <img slot="picture" class="step-shot" loading="lazy" {...shot("sign-in-tab")} />
+    </Step>
+    <Step heading="Enter where to start, and confirm you may scan">
       <p>
         In <em>Website address to scan after you sign in</em>, enter the address of the page the scan should start
         from. It must start with https://. Axcess shows which pages it will scan. Then check the box that says the
         site owner allows this scan and that you will sign in with a test account that has only the access it
         needs.
       </p>
-      <img class="step-shot" loading="lazy" {...shot("sign-in-address")} />
-    </li>
-    <li>
-      <h3>Sign in in the browser window</h3>
+      <img slot="picture" class="step-shot" loading="lazy" {...shot("sign-in-address")} />
+    </Step>
+    <Step heading="Sign in in the browser window">
       <p>
         Select <em>Open browser to sign in</em>. A browser window opens at the site's own sign-in page, which looks
         different for every organization. Sign in there as you usually do, including any two-step sign-in. If
@@ -105,9 +104,8 @@ const shot = (name: Shot) => ({
         <a href={url("/docs/troubleshooting/#i-closed-the-sign-in-window-before-starting")}>If you closed the
         sign-in window</a>.
       </p>
-    </li>
-    <li>
-      <h3>Start the scan</h3>
+    </Step>
+    <Step heading="Start the scan">
       <p>
         Come back to Axcess. Under <em>Finished signing in?</em>, select <em>I’m signed in, start scan</em>. The
         scan starts from the page in the newest tab that is still open in the browser, or, if you closed the
@@ -115,9 +113,9 @@ const shot = (name: Shot) => ({
         address you entered, the scan starts from that address instead. Either way, it stays inside the address you
         entered.
       </p>
-      <img class="step-shot" loading="lazy" {...shot("signed-in-start")} />
-    </li>
-  </ol>
+      <img slot="picture" class="step-shot" loading="lazy" {...shot("signed-in-start")} />
+    </Step>
+  </Steps>
 
   {
     /* Three short cards for the three questions people ask about a
@@ -158,94 +156,6 @@ const shot = (name: Shot) => ({
 </StarlightPage>
 
 <style>
-  /* First-scan steps: numbered panels. The number comes from a CSS counter
-     on the <ol>, so the list keeps its meaning without the styles. */
-  .steps {
-    counter-reset: step;
-    display: grid;
-    gap: 1rem;
-    margin: 1.5rem 0;
-    padding: 0;
-    list-style: none;
-  }
-  .steps > li {
-    position: relative;
-    min-width: 0;
-    padding: 1.25rem 1.25rem 1.25rem 4.25rem;
-    border: 1px solid var(--ax-border);
-    border-radius: 0.75rem;
-    background: var(--ax-surface-subtle);
-  }
-  .steps > li::before {
-    counter-increment: step;
-    content: counter(step);
-    position: absolute;
-    top: 1.15rem;
-    left: 1.25rem;
-    display: grid;
-    place-items: center;
-    width: 2.25rem;
-    height: 2.25rem;
-    border-radius: 50%;
-    background: var(--ax-inverse-bg);
-    color: var(--ax-inverse-fg);
-    font-weight: 700;
-  }
-  .steps h3 {
-    margin: 0 0 0.375rem;
-    color: var(--ax-fg);
-    font-size: 1.1875rem;
-    line-height: 1.3;
-  }
-  .steps p {
-    margin: 0;
-    color: var(--ax-fg-muted);
-    line-height: 1.6;
-  }
-  .steps code {
-    overflow-wrap: anywhere;
-    padding: 0.1em 0.35em;
-    border-radius: 0.25rem;
-    background: var(--ax-surface-muted);
-    color: var(--ax-fg);
-    font-family: var(--sl-font-mono);
-    font-size: 0.875em;
-  }
-  .steps .tip {
-    margin-top: 0.75rem;
-    padding: 0.5rem 0.75rem;
-    border-inline-start: 4px solid var(--ax-maize);
-    border-radius: 0.25rem;
-    background: var(--ax-surface-muted);
-    color: var(--ax-fg);
-  }
-  /* A screenshot is never larger than its own size (a small crop blown up
-     would blur) and never wider than its step. No CSS width: the width
-     attribute sets it, and with height: auto the browser reserves the
-     picture's space from width and height before it loads. */
-  .step-shot {
-    display: block;
-    max-width: 100%;
-    height: auto;
-    margin-top: 0.875rem;
-    border: 1px solid var(--ax-border-strong);
-    border-radius: 0.5rem;
-  }
-  /* On a phone, the screenshot also uses the space under the step number:
-     every pixel makes its words easier to read. The text keeps its indent. */
-  @media (max-width: 37.5rem) {
-    .steps > li {
-      padding-left: 3.75rem;
-    }
-    .steps > li::before {
-      left: 0.875rem;
-    }
-    .step-shot {
-      margin-left: -2.75rem;
-      max-width: calc(100% + 2.75rem);
-    }
-  }
-
   .facts {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));

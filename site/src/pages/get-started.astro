@@ -20,12 +20,13 @@
  * - a numbered menu of the four parts under the opening paragraph;
  * - the downloads as a 2 by 2 grid of cards, each button at its foot;
  * - a "choose your computer" row that jumps to that system's steps;
- * - on a wide screen, each step's words beside its drawing or screenshot,
- *   so the reader never scrolls between a step and its picture;
+ * - every list of steps in the same numbered panels (components/Steps),
+ *   each step's words first and its drawing or screenshot under them;
  * - a thin rule above each part, as on the home page.
- * Running text keeps a readable line (46rem); the grids use the full
- * 66rem. The sign-in scan is its own page (/sign-in-scan/), linked under
- * "When you're ready": it is a next step, not part of a first try.
+ * Running text keeps a readable line (35em); steps, cards and grids use the
+ * full 48rem column. The sign-in scan is its own page (/sign-in-scan/),
+ * linked under "When you're ready": it is a next step, not part of a first
+ * try.
  *
  * Layout frame: full width without the "On this page" list, like the home
  * page. The sidebar stays below 72rem, where the header has no room for its
@@ -43,6 +44,8 @@
 import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
 import Card from "../components/Card.astro";
 import DownloadLink from "../components/DownloadLink.astro";
+import Step from "../components/Step.astro";
+import Steps from "../components/Steps.astro";
 import { HONESTY, RELEASES, REPO, url } from "../lib/site";
 
 /*
@@ -106,7 +109,7 @@ const shot = (name: Shot) => ({
   alt: shots[name].alt,
 });
 /*
- * Drawings of the install screens, beside the step that needs each one.
+ * Drawings of the install screens, under the step that needs each one.
  * (Ported from site/build.py, "Drawings of the install screens".)
  *
  * What: each drawing is plain HTML and CSS, not a screenshot. A two-colour
@@ -325,18 +328,14 @@ const SMARTSCREEN_TEXT =
     <p class="os-note">Showing the steps for your computer, picked from your browser. If that is wrong, choose another tab.</p>
     <div class="os-panel" id="mac">
     <h3>On a Mac with Apple silicon</h3>
-    <ol class="install-steps">
-      <li>
+    <Steps>
+      <Step>
         Select <strong>Download for Mac (Apple silicon)</strong> and wait for <code data-release-name="Mac-Apple-Silicon.dmg">Axcess-(version)-Mac-Apple-Silicon.dmg</code> to finish
         downloading.
-      </li>
-      <li>
-        <div class="step-row">
-          <div class="step-text">
+      </Step>
+      <Step>
           Open the downloaded file, then drag <strong>Axcess</strong> into your <strong>Applications</strong> folder.
-          </div>
-          <div class="step-pic">
-          <div
+          <div slot="picture"
             class="mock not-content"
             role="img"
             aria-label="Drawing of the window that opens with the downloaded file. It shows the Applications folder on the left and the Axcess app on the right, with an arrow from Axcess to Applications. Axcess is marked 2."
@@ -350,17 +349,11 @@ const SMARTSCREEN_TEXT =
               </div>
             </div>
           </div>
-          </div>
-        </div>
-      </li>
-      <li>
-        <div class="step-row">
-          <div class="step-text">
+      </Step>
+      <Step>
           Open <strong>Applications</strong> and double-click <strong>Axcess</strong>. macOS says it could not verify the
           app. Choose <strong>Done</strong>, not <em>Move to Trash</em>.
-          </div>
-          <div class="step-pic">
-          <div
+          <div slot="picture"
             class="mock not-content"
             role="img"
             aria-label="Drawing of the macOS message “Axcess” Not Opened, which says Apple could not verify Axcess. It has two buttons, one above the other: the blue Move to Trash button on top, and below it the pale Done button, marked 3."
@@ -372,12 +365,8 @@ const SMARTSCREEN_TEXT =
               <div class="mock-stack"><span class="mock-btn mock-btn-mac">Move to Trash</span><span class="mock-mark mock-btn mock-btn-pale" data-step="3">Done</span></div>
             </div>
           </div>
-          </div>
-        </div>
-      </li>
-      <li>
-        <div class="step-row">
-          <div class="step-text">
+      </Step>
+      <Step>
           Open <strong>System Settings</strong>, choose <strong>Privacy &amp; Security</strong>, and scroll down to the <strong>Security</strong> section.
           {
             /* Only the names people need to find Privacy & Security are written
@@ -386,9 +375,7 @@ const SMARTSCREEN_TEXT =
                "Making Content Usable": keep only what helps the task,
                https://www.w3.org/TR/coga-usable/, paraphrased). */
           }
-          </div>
-          <div class="step-pic">
-          <div
+          <div slot="picture"
             class="mock not-content"
             role="img"
             aria-label="Drawing of System Settings. The list on the left has Privacy & Security selected, marked 4, below General, Appearance and Accessibility. On the right, below other settings, is the Security heading. Under it, the message “Axcess” was blocked to protect your Mac has an Open Anyway button on its right, marked 5."
@@ -415,17 +402,15 @@ const SMARTSCREEN_TEXT =
               </div>
             </div>
           </div>
-          </div>
-        </div>
-      </li>
-      <li>
+      </Step>
+      <Step>
         Next to the message that Axcess was blocked, choose <strong>Open Anyway</strong>. Then confirm with your Mac
         password or Touch ID.
-      </li>
-      <li>
+      </Step>
+      <Step>
         Choose <strong>Open</strong> in the last message. Axcess starts, and from now on it opens like any other app.
-      </li>
-    </ol>
+      </Step>
+    </Steps>
     <p>
       On macOS 14 (Sonoma) or earlier there is a shortcut: in Applications, right-click <strong>Axcess</strong>,
       choose <strong>Open</strong>, then choose <strong>Open</strong> again in the message.
@@ -433,19 +418,15 @@ const SMARTSCREEN_TEXT =
     </div>
     <div class="os-panel" id="windows">
     <h3>On Windows 10 or 11</h3>
-    <ol class="install-steps">
-      <li>
+    <Steps>
+      <Step>
         Select <strong>Download the Windows installer</strong> and wait for <code data-release-name="Windows-Installer.exe">Axcess-(version)-Windows-Installer.exe</code> to finish
         downloading.
-      </li>
-      <li>
-        <div class="step-row">
-          <div class="step-text">
+      </Step>
+      <Step>
           If your browser says the file is not commonly downloaded, open the download's menu (the three dots) and
           choose <strong>Keep</strong>, then <strong>Keep anyway</strong>.
-          </div>
-          <div class="step-pic">
-          <div
+          <div slot="picture"
             class="mock not-content"
             role="img"
             aria-label="Drawing of the browser’s list of downloads. The Axcess installer has a warning that it is not commonly downloaded. The three dots button to its right is marked 2, and so is Keep in the menu that opens below it."
@@ -460,17 +441,11 @@ const SMARTSCREEN_TEXT =
               <ul class="mock-menu"><li>Delete</li><li><span class="mock-mark" data-step="2">Keep</span></li></ul>
             </div>
           </div>
-          </div>
-        </div>
-      </li>
-      <li>Open the downloaded file. Windows shows a blue <em>Windows protected your PC</em> window.</li>
-      <li>
-        <div class="step-row">
-          <div class="step-text">
+      </Step>
+      <Step>Open the downloaded file. Windows shows a blue <em>Windows protected your PC</em> window.</Step>
+      <Step>
           Choose <strong>More info</strong>. A <strong>Run anyway</strong> button appears. Choose it.
-          </div>
-          <div class="step-pic">
-          <div
+          <div slot="picture"
             class="mock not-content"
             role="img"
             aria-label="Two drawings of the blue Windows protected your PC window. In the first, the More info link under the message is marked 4. In the second, after you choose More info, it shows the app and Unknown publisher, and the Run anyway button at the bottom is marked 4."
@@ -499,12 +474,8 @@ const SMARTSCREEN_TEXT =
               </div>
             </div>
           </div>
-          </div>
-        </div>
-      </li>
-      <li>
-        <div class="step-row">
-          <div class="step-text">
+      </Step>
+      <Step>
           Setup asks who can use Axcess. Choose <strong>Only for me</strong>, then <strong>Next</strong>. This works
           without administrator permission. For <strong>Everyone who uses this computer</strong>, Windows asks for it.
           {
@@ -514,9 +485,7 @@ const SMARTSCREEN_TEXT =
                "Space needed" are left out: both change with every build, and
                the steps should stay true after the next one. */
           }
-          </div>
-          <div class="step-pic">
-          <div
+          <div slot="picture"
             class="mock not-content"
             role="img"
             aria-label="Drawing of the Axcess Setup screen Choose who can use Axcess. It has two choices: Everyone who uses this computer, and below it Only for me, followed by your account name. Only for me is selected and marked 5. The Next button at the bottom right is marked 5."
@@ -536,17 +505,11 @@ const SMARTSCREEN_TEXT =
               <div class="mock-btns mock-foot"><span class="mock-mark mock-btn mock-btn-win mock-btn-default" data-step="5">Next &gt;</span><span class="mock-btn mock-btn-win">Cancel</span></div>
             </div>
           </div>
-          </div>
-        </div>
-      </li>
-      <li>
-        <div class="step-row">
-          <div class="step-text">
+      </Step>
+      <Step>
           The next screen shows the folder Axcess will be installed in. Leave it, or choose <strong>Browse</strong> to
           pick another. Then choose <strong>Install</strong>.
-          </div>
-          <div class="step-pic">
-          <div
+          <div slot="picture"
             class="mock not-content"
             role="img"
             aria-label="Drawing of the Axcess Setup screen Choose a folder. It shows the install folder in a box, with a Browse button to its right. The Install button at the bottom right is marked 6."
@@ -565,16 +528,10 @@ const SMARTSCREEN_TEXT =
               <div class="mock-btns mock-foot"><span class="mock-btn mock-btn-win">&lt; Back</span><span class="mock-mark mock-btn mock-btn-win mock-btn-default" data-step="6">Install</span><span class="mock-btn mock-btn-win">Cancel</span></div>
             </div>
           </div>
-          </div>
-        </div>
-      </li>
-      <li>
-        <div class="step-row">
-          <div class="step-text">
+      </Step>
+      <Step>
           The last screen shows where Axcess is installed. Leave <strong>Open Axcess now</strong> checked and choose <strong>Finish</strong>.
-          </div>
-          <div class="step-pic">
-          <div
+          <div slot="picture"
             class="mock not-content"
             role="img"
             aria-label="Drawing of the last Axcess Setup screen, Axcess is installed. A blue picture of a laptop is on the left. On the right, it shows the install folder, and below it Open Axcess now is checked. Of the buttons at the bottom, only Finish can be chosen, and it is marked 7."
@@ -595,11 +552,9 @@ const SMARTSCREEN_TEXT =
               <div class="mock-btns mock-foot"><span class="mock-btn mock-btn-win mock-off">&lt; Back</span><span class="mock-mark mock-btn mock-btn-win mock-btn-default" data-step="7">Finish</span><span class="mock-btn mock-btn-win mock-off">Cancel</span></div>
             </div>
           </div>
-          </div>
-        </div>
-      </li>
-      <li>Next time, open <strong>Axcess</strong> from the Start menu.</li>
-    </ol>
+      </Step>
+      <Step>Next time, open <strong>Axcess</strong> from the Start menu.</Step>
+    </Steps>
     <p>
       If <strong>Run anyway</strong> does not appear, your organization manages your computer and blocks apps that
       are not signed. Ask your IT support to allow it.
@@ -607,30 +562,30 @@ const SMARTSCREEN_TEXT =
 
     <h4 id="windows-portable">Windows, without installing</h4>
     <p>Use <strong>Download the portable Windows zip</strong>.</p>
-    <ol>
-      <li>Unzip it into a folder you can change, such as Documents. Do not use a network drive.</li>
-      <li>Open <strong>Axcess.exe</strong> in that folder, and approve it as in the steps above.</li>
-      <li>
+    <Steps>
+      <Step>Unzip it into a folder you can change, such as Documents. Do not use a network drive.</Step>
+      <Step>Open <strong>Axcess.exe</strong> in that folder, and approve it as in the steps above.</Step>
+      <Step>
         Axcess keeps your reports and settings in the <strong>Axcess data</strong> folder next to it. To move Axcess,
         move the whole folder. On a USB drive, close Axcess before you unplug the drive, or the reports can be
         damaged.
-      </li>
-    </ol>
+      </Step>
+    </Steps>
     </div>
     <div class="os-panel" id="linux">
     <h3>On Linux</h3>
-    <ol>
-      <li>
+    <Steps>
+      <Step>
         Select <strong>Download for Linux (AppImage)</strong> and wait for <code data-release-name="Linux.AppImage">Axcess-(version)-Linux.AppImage</code> to finish downloading. It is the
         whole app in one file.
-      </li>
-      <li>Move it where you keep programs, such as a folder named Applications in your home folder.</li>
-      <li>
+      </Step>
+      <Step>Move it where you keep programs, such as a folder named Applications in your home folder.</Step>
+      <Step>
         Allow it to run: open its <strong>Properties</strong> in your file manager and turn on <strong>Allow executing file as program</strong>. Or run <code>chmod +x Axcess-*-Linux.AppImage</code> in a
         terminal.
-      </li>
-      <li>Double-click it to open Axcess.</li>
-    </ol>
+      </Step>
+      <Step>Double-click it to open Axcess.</Step>
+    </Steps>
     <p>
       On Ubuntu 23.10 and later, an AppImage can't use the browser sandbox, which keeps web pages apart from the rest
       of your computer. There, Axcess opens with that sandbox off, so open saved copies only of sites you trust in the
@@ -656,48 +611,43 @@ const SMARTSCREEN_TEXT =
     for the tool.
   </p>
   {
-    /* Numbered panels with a heading per step: the heading is the action,
-       the paragraph says where, the screenshot shows where. The number is
-       drawn by CSS from the list's own order, so a screen reader still
-       hears an ordered list (SC 1.3.1 Info and Relationships, Level A).
-       Rejected: screenshots without step text. A picture shrinks at 320 px
-       and cannot be read by everyone, so the text says it all. */
+    /* The shared numbered panels (components/Steps), with a heading per
+       step: the heading is the action, the paragraph says where, the
+       screenshot shows where. Rejected: screenshots without step text. A
+       picture shrinks at 320 px and cannot be read by everyone, so the text
+       says it all. */
   }
-  <ol class="not-content ax-prose steps">
-    <li>
-      <h3>Select "New scan"</h3>
+  <Steps>
+    <Step heading={'Select "New scan"'}>
       <p>It is at the top of the sidebar. The <em>Public website</em> tab is chosen first. Keep it.</p>
-      <img class="step-shot" loading="lazy" {...shot("new-scan-button")} />
-    </li>
-    <li>
-      <h3>Enter the address of one section</h3>
+      <img slot="picture" class="step-shot" loading="lazy" {...shot("new-scan-button")} />
+    </Step>
+    <Step heading="Enter the address of one section">
       <p>
         In <em>Website address</em>, enter something like <code>www.example.edu/admissions/</code>. Axcess adds https:// for you. The scan
         stays inside <em>/admissions/</em>. Leave <em>Scan the whole website</em>, under <em>Pages to scan</em>,
         turned off.
       </p>
-      <img class="step-shot" loading="lazy" {...shot("new-scan-public")} />
-    </li>
-    <li>
-      <h3>Set "Maximum pages" to about 25</h3>
+      <img slot="picture" class="step-shot" loading="lazy" {...shot("new-scan-public")} />
+    </Step>
+    <Step heading={'Set "Maximum pages" to about 25'}>
       <p>
         You find it under <em>Limits and rule check tool</em>. The other settings are fine as they are. The <em>What this scan will do</em> panel lists exactly which checks will run.
       </p>
-      <img class="step-shot" loading="lazy" {...shot("maximum-pages")} />
-      <p class="tip">
+      <img slot="picture" class="step-shot" loading="lazy" {...shot("maximum-pages")} />
+      <p slot="note" class="tip">
         Want to watch it work? Turn on <em>Show the scanning browser window</em> under <em>Speed and browser
         window</em>.
       </p>
-    </li>
-    <li>
-      <h3>Start the scan</h3>
+    </Step>
+    <Step heading="Start the scan">
       <p>
         Select <em>Start scan</em>. The progress updates as Axcess finds and checks pages. You can select <em>Stop
         scan</em> at any time.
       </p>
-      <img class="step-shot" loading="lazy" {...shot("start-scan")} />
-    </li>
-  </ol>
+      <img slot="picture" class="step-shot" loading="lazy" {...shot("start-scan")} />
+    </Step>
+  </Steps>
 
   <h2 id="first-report">Read your first report</h2>
   <p>
@@ -712,11 +662,11 @@ const SMARTSCREEN_TEXT =
        screen shows and where (SC 1.1.1 Non-text Content, Level A). */
   }
   <figure class="not-content report-shot">
-    <img class="step-shot" loading="lazy" {...shot("issues-tab")} />
+    <img loading="lazy" {...shot("issues-tab")} />
     <figcaption>The Issues tab: one row per kind of problem, with how sure Axcess is and where it shows.</figcaption>
   </figure>
   <figure class="not-content report-shot">
-    <img class="step-shot" loading="lazy" {...shot("inspector-flagged")} />
+    <img loading="lazy" {...shot("inspector-flagged")} />
     <figcaption>A flagged element in the Page inspector: its details on top, and the saved copy of the page below with the element outlined.</figcaption>
   </figure>
   <div class="not-content ax-prose facts">
@@ -886,8 +836,8 @@ const SMARTSCREEN_TEXT =
 <style>
   /* One readable column, centred, on the full-width layout: the page title
      and the body share it, so their left edges line up. 48rem, about as
-     wide as what is in it: running text at 35em, and steps that set a
-     drawing beside its words. It was 66rem, while nearly everything in it
+     wide as what is in it: running text at 35em, and step panels with a
+     drawing or screenshot up to 34rem under the words. It was 66rem, while nearly everything in it
      was held to 35em at its left edge, so the page had an empty band down
      its right side and looked off centre (found by the developer). Centred
      by sizing the column to its content, not by centring each block:
@@ -905,11 +855,11 @@ const SMARTSCREEN_TEXT =
      width. */
   .gs > p,
   .gs > ul:not(.downloads),
-  .gs > ol:not(.steps):not(.install-steps),
+  .gs > ol:not(.steps),
   .gs > .callout,
   .os-panel > p,
   .os-panel > ul,
-  .os-panel > ol:not(.install-steps) {
+  .os-panel > ol:not(.steps) {
     max-width: 35em;
   }
   .gs {
@@ -1123,10 +1073,27 @@ const SMARTSCREEN_TEXT =
     padding-top: 2rem;
     border-top: 1px solid var(--ax-border);
   }
+  /* The two report screenshots: centred in the column, as wide as it at
+     most and never wider than their own size, so a small one is not blown
+     up and a large one never makes the page scroll sideways (SC 1.4.10
+     Reflow, Level AA). The width and height attributes reserve their space
+     before they load. The caption under each keeps the reading width. Their
+     styles used to come from the step screenshots' class, and when those
+     moved into the steps component (components/Steps) these were left at
+     full size, 1469px wide (found by the developer and the 320px test). */
   .report-shot {
     margin: 1.5rem 0;
   }
+  .report-shot img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin-inline: auto;
+    border: 1px solid var(--ax-border-strong);
+    border-radius: 0.5rem;
+  }
   .report-shot figcaption {
+    max-width: 35em;
     margin-top: 0.5rem;
     color: var(--ax-fg-muted);
     font-size: 0.9375rem;
@@ -1205,157 +1172,6 @@ const SMARTSCREEN_TEXT =
     text-decoration: underline;
     text-underline-offset: 0.2em;
   }
-  /* A drawing step: its words and its drawing side by side when the list
-     has room for both, so the reader matches the words to the picture
-     without scrolling between them. The <li> keeps its list number.
-
-     The drawing keeps its own width (20rem, what the drawings are made for)
-     and the words take the rest, at least 22rem, about 50 characters a line.
-     The words used to get 0.8 of the row, inside list items held to 35em by
-     the site's running-text rule (theme.css): about 210px, 28 characters a
-     line, so phrases broke apart and the eye jumped back every few words
-     (found by the developer). WCAG sets no lower limit, only the upper one
-     (SC 1.4.8 Visual Presentation, Level AAA: "Width is no more than 80
-     characters or glyphs (40 if CJK)"); about 45 to 75 characters is the
-     common typographic range (paraphrased). So a drawing step's <li> is not
-     held to 35em: it is a layout box, and its words stay under 80
-     characters by the grid. A step with no drawing keeps the cap.
-
-     Side by side is decided by the list's width (a container query), not
-     the window's: below 72rem the docs sidebar comes back and the column is
-     narrower, and a window rule put the two side by side in a column that
-     could not hold both. Below 44rem of list they stack, words first.
-
-     A step with two drawings to compare (Windows' "First" and "After you
-     choose More info") always stacks, words first, so the two sit side by
-     side under them and read as before and after. In the 20rem drawing
-     column the two stood one above the other, and the step ran a screen
-     and a half tall. */
-  .install-steps {
-    container-type: inline-size;
-  }
-  .install-steps > li:has(.step-row) {
-    max-width: none;
-  }
-  .step-row {
-    display: grid;
-    gap: 0.75rem 2rem;
-  }
-  @container (min-width: 44rem) {
-    .step-row {
-      grid-template-columns: minmax(22rem, 1fr) 20rem;
-      align-items: start;
-    }
-    .step-row:has(.mock-pair) {
-      grid-template-columns: minmax(0, 1fr);
-    }
-  }
-  /* First-scan steps: numbered panels. The number comes from a CSS counter
-     on the <ol>, so the list keeps its meaning without the styles. */
-  .steps {
-    counter-reset: step;
-    display: grid;
-    gap: 1rem;
-    margin: 1.5rem 0;
-    padding: 0;
-    list-style: none;
-  }
-  /* A step card is a layout box, not running text: it uses the column's
-     full width, and the paragraphs in it keep the 35em reading width
-     (theme.css). Held to 35em itself, it sat at the column's left edge,
-     narrower than the column it was in. */
-  .steps > li {
-    position: relative;
-    min-width: 0;
-    max-width: none;
-    padding: 1.25rem 1.25rem 1.25rem 4.25rem;
-    border: 1px solid var(--ax-border);
-    border-radius: 0.75rem;
-    background: var(--ax-surface-subtle);
-  }
-  .steps > li::before {
-    counter-increment: step;
-    content: counter(step);
-    position: absolute;
-    top: 1.15rem;
-    left: 1.25rem;
-    display: grid;
-    place-items: center;
-    width: 2.25rem;
-    height: 2.25rem;
-    border-radius: 50%;
-    background: var(--ax-inverse-bg);
-    color: var(--ax-inverse-fg);
-    font-weight: 700;
-  }
-  .steps h3 {
-    margin: 0 0 0.375rem;
-    color: var(--ax-fg);
-    font-size: 1.1875rem;
-    line-height: 1.3;
-  }
-  .steps p {
-    margin: 0;
-    color: var(--ax-fg-muted);
-    line-height: 1.6;
-  }
-  .steps code {
-    overflow-wrap: anywhere;
-    padding: 0.1em 0.35em;
-    border-radius: 0.25rem;
-    background: var(--ax-surface-muted);
-    color: var(--ax-fg);
-    font-family: var(--sl-font-mono);
-    font-size: 0.875em;
-  }
-  .steps .tip {
-    margin-top: 0.75rem;
-    padding: 0.5rem 0.75rem;
-    border-inline-start: 4px solid var(--ax-maize);
-    border-radius: 0.25rem;
-    background: var(--ax-surface-muted);
-    color: var(--ax-fg);
-  }
-  /* A screenshot is never larger than its own size (a small crop blown up
-     would blur) and never wider than its step. No CSS width: the width
-     attribute sets it, and with height: auto the browser reserves the
-     picture's space from width and height before it loads. */
-  .step-shot {
-    display: block;
-    max-width: 100%;
-    height: auto;
-    margin-top: 0.875rem;
-    border: 1px solid var(--ax-border-strong);
-    border-radius: 0.5rem;
-  }
-  /* At every width a step's words come first, across the whole step, and
-     its screenshot sits under them, at up to its own size. The words and the
-     picture used to sit side by side on a wide screen, as the install steps
-     sit beside their drawings. In a 48rem column that left the words about
-     230px, so the example address broke mid-word, and shrank a 1000px
-     screenshot of the New scan page to about 350px, where its text could not
-     be read; the developer asked for both to be fixed. Rejected: side by side
-     only for the small crops. Steps would then change shape from one to the
-     next, and even the smallest crop (386px) left the words too narrow. The
-     install drawings stay beside their steps: they are drawn to fit a narrow
-     column, a screenshot is not (W3C COGA, "Making Content Usable",
-     https://www.w3.org/TR/coga-usable/: make content easy to read,
-     paraphrased; SC 1.4.10 Reflow, Level AA). */
-  /* On a phone, the screenshot also uses the space under the step number:
-     every pixel makes its words easier to read. The text keeps its indent. */
-  @media (max-width: 37.5rem) {
-    .steps > li {
-      padding-left: 3.75rem;
-    }
-    .steps > li::before {
-      left: 0.875rem;
-    }
-    .step-shot {
-      margin-left: -2.75rem;
-      max-width: calc(100% + 2.75rem);
-    }
-  }
-
   .facts {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
@@ -1367,10 +1183,6 @@ const SMARTSCREEN_TEXT =
      column, which reads as an afterthought; stacked, they read in order. */
   .facts.stack {
     grid-template-columns: 1fr;
-  }
-
-  .install-steps > li + li {
-    margin-top: 0.75rem;
   }
 
   /* -------------------------------------------------------------------
