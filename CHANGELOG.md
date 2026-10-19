@@ -58,6 +58,14 @@ merge.
 
 ### Changed
 
+- **The numbers over the Issues table lead with what was found.** There are
+  three now: Kinds of issue found, Places issues appear (occurrences), and
+  Pages visited. Page states opened by clicking is a line under the pages,
+  not a number of its own. "Pages checked" is now "Pages visited", because
+  the count includes pages that could not be loaded. When some pages failed,
+  a line under it says "3 pages could not be loaded", not "3 errors while
+  scanning", which read as accessibility errors; when none failed, it says
+  nothing.
 - **Sign-in scans start when you start them.** "Open browser to sign in"
   no longer creates a scan. Until you select "I'm signed in, start scan",
   New scan shows a "Sign-in" card, not "Sign-in scan #N", and Reports
@@ -171,6 +179,9 @@ merge.
 
 ### Fixed
 
+- About: the desktop app now shows the version you are running, such as
+  "Desktop preview 0.2.3". It always said 0.2.0, because the page took the
+  number from the web part of the app, which each release does not change.
 - Stopping a scan: the page now says "Partial report", with "Review what
   the scan found", as soon as you press Stop. It said "No report was
   produced" for about 15 seconds, even when the scan had saved pages,

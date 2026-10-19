@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Saved frames</title></head>
+<body>
+  <main>
+    <h1>Saved frames</h1>
+    <!-- With scripts on, this is text, not a frame: it must not shift the count. -->
+    <noscript><iframe src="noscript.html" title="Never a frame"></iframe></noscript>
+    <iframe src="frame.html" title="Same-site frame"></iframe>
+    <iframe srcdoc="<p>From srcdoc</p>" title="Srcdoc frame"></iframe>
+  </main>
+</body>
+</html>

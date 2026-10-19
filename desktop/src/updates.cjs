@@ -2,9 +2,10 @@
  * Pure helpers behind the launch-time update check. Nothing here touches
  * Electron so the decisions can be unit-tested with plain Node.
  *
- * Every push to `main` publishes a GitHub Release tagged with the next
- * two-part version, `desktop-v0.61` after `desktop-v0.60` (see
- * .github/workflows/desktop-build.yml and `nextReleaseVersion`). The packaged app asks the GitHub
+ * A person runs .github/workflows/desktop-release.yml by hand on `main`, and
+ * it publishes a GitHub Release tagged with the next version,
+ * `desktop-v0.2.1` after `desktop-v0.2.0` (see `nextReleaseVersion`). Merges
+ * only run the test build, which publishes nothing. The packaged app asks the GitHub
  * API for the latest release once per launch and compares it with its own
  * stamped version. What it can do with a newer release depends on the
  * platform: on Windows electron-updater installs it in place from the

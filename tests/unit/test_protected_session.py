@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import os
+import threading
 from dataclasses import dataclass, field
 
 import pytest
@@ -403,10 +404,8 @@ async def test_manual_session_is_headed_ephemeral_and_scans_after_verification()
     )
     assert chromium.context_options["accept_downloads"] is False
     assert chromium.context_options["service_workers"] == "block"
-    assert chromium.context_options["proxy"] == {
-        "server": session._egress_proxy.server_url,
-        "bypass": "",
-    }
+    # Chromium connects on its own, like ordinary Chrome; see egress.py.
+    assert "proxy" not in chromium.context_options
     assert (
         "--force-webrtc-ip-handling-policy=disable_non_proxied_udp"
         in chromium.context_options["args"]
@@ -733,3 +732,39 @@ async def test_a_popup_opened_during_sign_in_is_kept() -> None:
 
     assert not popup.closed
     assert session.page is popup, "the handoff window should become the live tab"
+
+
+@pytest.mark.asyncio
+async def test_route_guard_looks_up_hosts_off_the_event_loop() -> None:
+    """Both sign-in and scan checks keep their DNS lookup off the event loop.
+
+    On the loop, one slow lookup stalled every other request and the Axcess
+    API with it, which is how a full-tunnel VPN made sign-in pages hang.
+    """
+
+    loop_thread = threading.get_ident()
+    lookup_threads: list[int] = []
+
+    def recording_resolver(host: str) -> tuple[str, ...]:
+        lookup_threads.append(threading.get_ident())
+        return _resolver(host)
+
+    session = ManualAuthenticationSession(
+        seed_url="https://app.example.edu/start",
+        approved_target_origins=["https://app.example.edu"],
+        resolver=recording_resolver,
+    )
+    # The seed is checked once, synchronously, when the session is created.
+    lookup_threads.clear()
+    guard = session._route_guard
+
+    sign_in = _FakeRoute(_FakeRequest("GET", "https://app.example.edu/login"))
+    await guard.handle_route(sign_in)  # type: ignore[arg-type]
+    guard.activate_scan_mode()
+    scan = _FakeRoute(_FakeRequest("GET", "https://app.example.edu/api/data", "fetch"))
+    await guard.handle_route(scan)  # type: ignore[arg-type]
+
+    assert sign_in.actions == [("continue", None)]
+    assert scan.actions == [("continue", None)]
+    assert len(lookup_threads) == 2
+    assert loop_thread not in lookup_threads

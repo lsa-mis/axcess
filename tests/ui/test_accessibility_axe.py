@@ -662,11 +662,25 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
         workspace.get_by_role("link", name="Issues", exact=True)
     ).to_have_attribute("aria-current", "page")
     await playwright_async.expect(page.get_by_role("link", name="Overview")).to_have_count(0)
-    # The summary is one line of term and value pairs. Each term also carries
-    # a short explanation in parentheses, so it is matched as contained text.
-    terms = page.get_by_role("term")
-    await playwright_async.expect(terms.filter(has_text="Issues found")).to_be_visible()
-    await playwright_async.expect(terms.filter(has_text="Pages checked")).to_be_visible()
+    # The summary leads with what was found: kinds of issue, the places they
+    # appear, then the pages visited. Pages that could not be loaded are said
+    # in words, never as "errors", which readers took for accessibility
+    # errors, and only when there are some.
+    summary = page.locator("dl").filter(has_text="Pages visited")
+    await playwright_async.expect(summary.get_by_role("term")).to_have_text(
+        [
+            re.compile(r"^Kinds? of issue found$"),
+            "Places issues appear (occurrences)",
+            "Pages visited",
+        ]
+    )
+    await playwright_async.expect(summary.get_by_text(re.compile(r"error", re.I))).to_have_count(0)
+    failed = summary.get_by_text(re.compile(r"pages? could not be loaded$"))
+    await playwright_async.expect(failed).to_have_count(0)
+    with sqlite3.connect(seeded_db[0]) as conn:
+        conn.execute("UPDATE scans SET error_count = 3 WHERE id = ?", (scan_id,))
+    await page.reload(wait_until="networkidle")
+    await playwright_async.expect(failed).to_have_text("3 pages could not be loaded")
     # Under the title, only when the evidence was captured: no site name, no
     # disclaimer line, and no ACT rule note among the notes.
     await playwright_async.expect(

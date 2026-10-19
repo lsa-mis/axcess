@@ -104,7 +104,7 @@ async def test_the_box_goes_on_what_shows_for_an_element_without_a_box(
         )
 
         # An option: on its list box.
-        await group.get_by_role("button", name="Next flagged element").click()
+        await group.get_by_role("button", name="Next element").click()
         await playwright_async.expect(box).to_have_text("2 of 3")
         await page.wait_for_function(_around(rect_of("#pick")))
         await settled(page)
@@ -119,7 +119,7 @@ async def test_the_box_goes_on_what_shows_for_an_element_without_a_box(
 
         # An image map area: on the part of its image it covers, the left
         # 120 by 120 pixels of a 240 by 120 image.
-        await group.get_by_role("button", name="Next flagged element").click()
+        await group.get_by_role("button", name="Next element").click()
         await playwright_async.expect(box).to_have_text("3 of 3")
         await page.wait_for_function(_around(_AREA))
         await settled(page)

@@ -1,6 +1,6 @@
 import { ExternalLink, Info } from "lucide-react";
 import BrandMark from "../components/BrandMark";
-import { isDesktopApp } from "../hooks/useSwipeNavigation";
+import { desktopAppVersion, isDesktopApp } from "../hooks/useSwipeNavigation";
 import { CLICK_THROUGH } from "../lib/labels";
 
 /**
@@ -79,7 +79,11 @@ const RESOURCES: Resource[] = [
  * static public pages, opened only when someone clicks one.
  */
 export default function AboutRoute() {
-  const build = `${isDesktopApp() ? "Desktop preview" : "Preview"} ${__APP_VERSION__}`;
+  // The desktop app shows its own build number, which goes up with every
+  // release; the browser shows the version the web bundle was built from.
+  const build = isDesktopApp()
+    ? `Desktop preview ${desktopAppVersion() ?? __APP_VERSION__}`
+    : `Preview ${__APP_VERSION__}`;
   return (
     <div className="space-y-8">
       <header className="flex items-start gap-4">
@@ -91,7 +95,7 @@ export default function AboutRoute() {
           <p className="mt-2 text-lg text-fg">
             A local-first accessibility evidence workbench for expert web audits.
           </p>
-          <p className="mt-3 text-sm leading-6 text-fg-muted">
+          <p className="mt-3 max-w-measure text-sm leading-6 text-fg-muted">
             Scan a public or login-protected website, watch each test run, review a clear
             issue table, and export a report backed by source-level evidence. Each result
             keeps the detection method that found it (axe-core, Siteimprove Alfa, keyboard,
@@ -118,7 +122,7 @@ export default function AboutRoute() {
         className="flex items-start gap-3 rounded-xs border border-l-4 border-border border-l-umich-blue bg-surface px-5 py-4 text-sm leading-6 text-fg"
       >
         <Info className="mt-1 h-4 w-4 shrink-0 text-fg-muted" aria-hidden />
-        <p>
+        <p className="max-w-measure">
           <strong>Evidence, not a verdict.</strong> Automated and AI-assisted results do not
           prove WCAG conformance, legal compliance, or the accessibility of a whole website.
           They are evidence for an expert to review.

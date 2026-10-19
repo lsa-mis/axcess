@@ -208,6 +208,29 @@
     outline-offset: 2px;
     border-radius: 2px;
   }
+  /* An iframe that holds focus (the Inspector's saved copy, where keys
+     scroll the page) gets the same ring. A focused iframe matches no focus
+     selector in this page, so the Inspector marks it with data-focused from
+     the frame's own focus and blur (routes/Inspector.tsx), and keyboard
+     users can see that focus moved into the copy (SC 2.4.7 Focus Visible,
+     Level AA; October 2026 AAA audit). Focus only lands there by tabbing or
+     clicking in, so the ring is right for both. */
+  iframe[data-focused] {
+    outline: 3px solid rgb(var(--c-umich-blue));
+    outline-offset: 2px;
+  }
+  /* Room for the sticky top bar (72 px), the only sticky bar at every
+     width, when the page scrolls to a focused element or a #link, plus
+     16 px to spare. Without it, tabbing could
+     leave a control half under the bar, as on Images ("Back to Report",
+     "Group by issue"). SC 2.4.11 Focus Not Obscured (Minimum), Level AA,
+     and SC 2.4.12 Focus Not Obscured (Enhanced), Level AAA; October 2026
+     AAA audit. (Narrow screens once had a second sticky bar for the
+     report trail, with room reserved for it; the trail is now in the top
+     bar, as on a desktop.) */
+  html {
+    scroll-padding-top: 88px;
+  }
   a {
     @apply text-umich-blue underline-offset-2;
   }

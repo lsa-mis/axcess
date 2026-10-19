@@ -57,7 +57,7 @@ export default function PillGroup<T extends string>({
               key={option.value}
               htmlFor={optionId}
               className={cn(
-                "relative inline-flex min-h-target items-center gap-2 rounded-xs px-4 text-sm font-semibold transition-colors duration-200 motion-reduce:transition-none",
+                "relative inline-flex min-h-target min-w-target items-center gap-2 rounded-xs px-4 text-sm font-semibold transition-colors duration-200 motion-reduce:transition-none",
                 // The fill is dropped in forced colors and the radio is
                 // invisible, so the chosen segment also gets an outline there.
                 selected

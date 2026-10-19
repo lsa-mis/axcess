@@ -182,7 +182,6 @@ async def test_protected_alfa_hides_runner_stderr_and_closes_its_input(
             storage_state={"cookies": [{"name": "session", "value": "secret"}]},
             allowed_origins=("https://protected.example.test",),
             target_origins=("https://protected.example.test",),
-            egress_proxy="http://127.0.0.1:9999",
         )
 
     assert str(raised.value) == "The protected Alfa engine could not complete this page."

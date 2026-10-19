@@ -174,7 +174,7 @@ export function PageHeader({
             {title}
           </h1>
           {subtitle && (
-            <p className="mt-1 max-w-4xl text-sm leading-6 text-fg-muted">
+            <p className="mt-1 max-w-measure text-sm leading-6 text-fg-muted">
               {subtitle}
             </p>
           )}
@@ -187,19 +187,30 @@ export function PageHeader({
   );
 }
 
-/** Empty-state block, used when lists come back empty. */
+/**
+ * Empty-state block, used when lists come back empty.
+ *
+ * `level` is the title's heading level: 2 inside a page that has its own
+ * title, 1 when the empty state is the whole page (Not found), so every
+ * page still has one level 1 heading (SC 1.3.1 Info and Relationships,
+ * Level A, and SC 2.4.6 Headings and Labels, Level AA; axe
+ * page-has-heading-one; October 2026 AAA audit).
+ */
 export function EmptyState({
   title,
   message,
   action,
+  level = 2,
 }: {
   title: string;
   message?: ReactNode;
   action?: ReactNode;
+  level?: 1 | 2;
 }) {
+  const Heading = level === 1 ? "h1" : "h2";
   return (
     <Card className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center">
-      <h2 className="text-base font-semibold text-fg">{title}</h2>
+      <Heading className="text-base font-semibold text-fg">{title}</Heading>
       {message && <p className="max-w-md text-sm text-fg-muted">{message}</p>}
       {action && <div className="mt-2">{action}</div>}
     </Card>
@@ -694,7 +705,7 @@ export function Checkbox({
       <span className="flex flex-col gap-0.5 text-fg">
         <span className="leading-snug">{label}</span>
         {hint && (
-          <span id={hintId} className="text-xs leading-snug text-fg-muted">
+          <span id={hintId} className="text-xs text-fg-muted">
             {hint}
           </span>
         )}
@@ -771,7 +782,12 @@ const TYPEAHEAD_RESET_MS = 500;
  *
  * `label` is always rendered and always associated. Pass `hideLabel` for a
  * control whose meaning is already obvious from its surroundings; the name
- * stays available to a screen reader rather than being dropped.
+ * stays available to a screen reader rather than being dropped. The trigger
+ * is named by `aria-labelledby` pointing at the label, as the APG example
+ * does, as well as by the label's `for`: a `<label>` naming a button that
+ * carries `role="combobox"` is not read the same way by every browser and
+ * checker, and Siteimprove Alfa found the Inspector's page-state picker
+ * unnamed (SC 4.1.2 Name, Role, Value, Level A; October 2026 AAA audit).
  *
  * `stacked` puts the label above rather than beside it, for a filter bar of
  * several controls where inline captions would eat the width the values need.
@@ -964,6 +980,7 @@ export function Select({
           aria-expanded={open}
           aria-controls={listId}
           aria-activedescendant={open && active >= 0 ? optionId(active) : undefined}
+          aria-labelledby={labelId}
           aria-describedby={describedBy || undefined}
           data-value={value}
           disabled={disabled}
@@ -1104,6 +1121,8 @@ export function PageLink({
   pageTitle,
   showUrlBelow = true,
   selector = null,
+  elementName = null,
+  occurrenceId = null,
   snippet = null,
   issue = null,
   origin,
@@ -1120,6 +1139,10 @@ export function PageLink({
   showUrlBelow?: boolean;
   /** Target selector to outline on the inspected page (when known directly). */
   selector?: string | null;
+  /** A short readable name for the element (target_display), when known. */
+  elementName?: string | null;
+  /** The occurrence's ID, where a view lists occurrences (see below). */
+  occurrenceId?: number | null;
   /** Exact element markup (html_snippet), the most reliable locator. */
   snippet?: string | null;
   /** Issue key to resolve the selector for (used when ``selector`` is absent). */
@@ -1134,6 +1157,18 @@ export function PageLink({
   backTo?: string;
 }) {
   const display = pageTitle?.trim() || pageUrl;
+  // Screen-reader-only context, so each link names where it goes by itself:
+  // one view lists many occurrences, and the same words ("Open live page",
+  // a page title) led to different pages or elements (SC 2.4.9 Link Purpose
+  // (Link Only), Level AAA; WCAG technique C7; October 2026 AAA audit). The
+  // element is its short display name where the view has one, else the last
+  // two steps of its locator, kept short (see shortLocator). Short names can
+  // still match: two elements whose locators end in the same two steps, or
+  // repeated elements with the same tag and attributes. So a view of
+  // occurrences also gives the occurrence's ID, which is unique and is the
+  // name the page's evidence uses for it ("Occurrence 1234"; found by
+  // review).
+  const element = elementName || selector ? shortLocator(elementName || selector || "") : null;
 
   // Build the inspector URL with whatever orientation/selector context the
   // caller can offer. The params are kept sparse so the route stays legible.
@@ -1158,14 +1193,23 @@ export function PageLink({
       {inspectTo ? (
         <Link
           to={inspectTo}
-          className="inline-flex items-baseline gap-1 break-words text-umich-blue underline underline-offset-2"
+          className="inline-flex min-h-target items-start gap-1 break-words py-2.5 text-umich-blue underline underline-offset-2"
         >
-          {/* self-start, not self-center: the flex line is as tall as the wrapped
-              title, so centring drops the icon into the gap between lines on
-              any title that wraps. Top-aligned it stays beside the first line. */}
-          <ScanEye className="h-5 w-5 shrink-0 self-start pt-0.5 text-fg-subtle" aria-hidden />
+          {/* Icon and text both start at the top, so the icon sits beside the
+              first line whether the title fits on one line or wraps.
+              Rejected: centring them (items-center), which drops the icon
+              into the gap between lines on a title that wraps; and centring
+              the text with the icon at the top, which left the icon above a
+              one-line title. The 10 px above and below (py-2.5) make a
+              one-line title the full 44 px target (SC 2.5.5 Target Size
+              (Enhanced), Level AAA) while keeping the text beside the icon;
+              min-h-target holds it at 44 px where the line is shorter. */}
+          <ScanEye className="mt-0.5 h-5 w-5 shrink-0 text-fg-subtle" aria-hidden />
           <span className="break-words">{display}</span>
-          <span className="sr-only">, opens in the page inspector</span>
+          <span className="sr-only">
+            , opens in the page inspector{element ? ` at ${element}` : ""}
+            {occurrenceId != null ? `, occurrence ${occurrenceId}` : ""}
+          </span>
         </Link>
       ) : (
         // Without a scan scope there is no in-app inspector to link to; keep
@@ -1174,7 +1218,7 @@ export function PageLink({
           href={pageUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-baseline gap-1 break-words text-umich-blue underline underline-offset-2"
+          className="inline-flex min-h-target items-center gap-1 break-words text-umich-blue underline underline-offset-2"
         >
           <span className="break-words">{display}</span>
           <span aria-hidden className="text-2xs">
@@ -1193,10 +1237,10 @@ export function PageLink({
           href={pageUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="underline underline-offset-2 hover:text-fg"
+          className="inline-flex min-h-target items-center underline underline-offset-2 hover:text-fg"
         >
           Open live page ↗
-          <span className="sr-only"> (opens in a new tab)</span>
+          <span className="sr-only"> of {display} (opens in a new tab)</span>
         </a>
         {scanId != null && (
           <>
@@ -1205,9 +1249,10 @@ export function PageLink({
             </span>
             <Link
               to={pageEvidencePath({ scanId, pageId, origin, backTo })}
-              className="underline underline-offset-2 hover:text-fg"
+              className="inline-flex min-h-target items-center underline underline-offset-2 hover:text-fg"
             >
               Page details
+              <span className="sr-only"> for {display}</span>
             </Link>
           </>
         )}
@@ -1245,4 +1290,20 @@ export function relativeTime(iso: string | null): string {
   if (months < 12) return ago(months, "month");
   const years = Math.floor(days / 365);
   return ago(years, "year");
+}
+
+/**
+ * The last two steps of an element locator, each kept short, to name an
+ * element. Two, not one: the same button repeated under different headings
+ * (a "copy link" icon on every heading) shares its last step, and the step
+ * above it is what tells them apart.
+ */
+export function shortLocator(selector: string): string {
+  const steps = selector
+    .split(">")
+    .map((step) => step.trim())
+    .filter(Boolean)
+    .slice(-2)
+    .map((step) => (step.length > 32 ? `${step.slice(0, 31)}…` : step));
+  return steps.join(" > ") || selector;
 }

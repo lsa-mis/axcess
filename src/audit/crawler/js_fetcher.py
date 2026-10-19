@@ -35,6 +35,7 @@ from audit.analyzer.responsive import ResponsiveFinding, ResponsiveProbe
 from audit.analyzer.visual import VisualFinding, VisualProbe
 from audit.crawler import live_progress
 from audit.crawler.fetcher import FetchError, FetchResult
+from audit.crawler.frame_snapshot import SavedFrame, capture_frames
 from audit.crawler.search import SearchExplorer
 from audit.crawler.style_snapshot import SheetCache, StyleSnapshot, capture_styles
 from audit.crawler.url_policy import normalize
@@ -345,8 +346,16 @@ class JsFetcher:
             # touches the page. Never fatal (``capture_styles`` returns None
             # on any failure), like the screenshot pass below.
             styles: StyleSnapshot | None = None
+            frames: tuple[SavedFrame, ...] = ()
             if 200 <= status < 300 and "text/html" in headers.get("content-type", "text/html"):
                 styles = await self._snapshot_styles(page)
+                # The frames' documents, at the same moment as the page's, so
+                # the inspector can show them as the scan saw them. Not in a
+                # sign-in scan: a frame there can hold another service's
+                # signed-in content, and the inspector does not open those
+                # reports anyway.
+                if not self._private_context:
+                    frames = await capture_frames(page)
             # ``Response.url`` omits the fragment because fragments are not
             # sent over HTTP. ``Page.url`` retains React/Vue hash-router
             # routes such as ``#/projects`` and also reflects client-side
@@ -526,6 +535,7 @@ class JsFetcher:
                 search_result=search_result,
                 screenshots=screenshots,
                 styles=styles,
+                frames=frames,
             )
         finally:
             # A shared authenticated context belongs to the companion, which

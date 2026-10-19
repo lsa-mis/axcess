@@ -269,7 +269,7 @@ function FindingsTable({
                     "critical" or "info": a severity, not where the link goes
                     (SC 2.4.4 Link Purpose (In Context), Level AA). */}
                 <div role="cell" className="flex flex-col items-start gap-1">
-                  <Link to={`/findings/${f.id}`} className="text-xs font-semibold">
+                  <Link to={`/findings/${f.id}`} className="inline-flex min-h-target items-center text-xs font-semibold">
                     Image #{f.id}
                   </Link>
                   <SeverityChip value={f.severity} />
@@ -325,7 +325,7 @@ function FindingsTable({
                       href={f.sample_page}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block truncate text-xs text-umich-blue underline underline-offset-2"
+                      className="block min-h-target truncate text-xs leading-[2.75rem] text-umich-blue underline underline-offset-2"
                       title={f.sample_page}
                     >
                       {f.sample_page}{" "}

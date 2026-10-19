@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from audit.analyzer.keyboard import KeyboardTrap
     from audit.analyzer.responsive import ResponsiveFinding
     from audit.analyzer.visual import VisualFinding
+    from audit.crawler.frame_snapshot import SavedFrame
     from audit.crawler.search import SearchResult
     from audit.crawler.style_snapshot import StyleSnapshot
 
@@ -102,6 +103,10 @@ class FetchResult:
     # reads it; None from the static fetcher, for a non-HTML response, or when
     # reading failed. It is stored wherever the saved copy itself is stored.
     styles: StyleSnapshot | None = None
+    # The documents of the page's frames, read with the page, before any probe
+    # touched it (see ``audit.crawler.frame_snapshot``). JsFetcher only, and
+    # never for a sign-in scan.
+    frames: tuple[SavedFrame, ...] = field(default=())
 
     @property
     def is_html(self) -> bool:

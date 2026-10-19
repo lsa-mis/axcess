@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router";
 import { useQueries } from "@tanstack/react-query";
-import { ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { api } from "../api/client";
 import { cn } from "../lib/cn";
 import { ScanTag } from "./ui";
@@ -383,7 +383,24 @@ function reportTrail(
   };
 }
 
-export default function ReportCrumb() {
+/**
+ * The trail, or with ``compact`` only the step up from here.
+ *
+ * Compact is for a phone's top bar (below 640 px), where the whole trail
+ * does not fit: at 320 px it showed "Reports › accessi… R" and cut off
+ * everything after it, so the part that says where the reader is was lost.
+ * The step up is the part of the trail a reader on a phone uses, as a back
+ * link with an arrow ("‹ Text is cut off when the page is zoomed"); where
+ * they are is the page's heading just below. This follows the U.S. Web
+ * Design System's breadcrumb on small screens, which shows only the parent
+ * (https://designsystem.digital.gov/components/breadcrumb/). Its name says
+ * where it goes, "Back to …", the visible words and screen-reader-only text
+ * before them (WCAG technique C7; SC 2.4.4 Link Purpose (In Context), Level
+ * A). Still a "Breadcrumb" navigation landmark, so it is found where the
+ * trail is found on a wider screen (SC 3.2.3 Consistent Navigation, Level
+ * AA). Rejected: the trail on two lines, which made the bar two lines tall.
+ */
+export default function ReportCrumb({ compact = false }: { compact?: boolean }) {
   const { match, trail } = useReportTrail();
   const { pathname } = useLocation();
   // The same shared report-summary query the gate and the route use, so
@@ -413,6 +430,37 @@ export default function ReportCrumb() {
   const crumbs = report ? report.crumbs : trail;
   const ancestors = crumbs.slice(0, -1);
   const current = crumbs[crumbs.length - 1];
+
+  if (compact) {
+    const parent = ancestors[ancestors.length - 1];
+    const up =
+      parent
+        ? { to: parent.to, label: <span className="truncate">{parent.label}</span>, title: parent.label }
+        : report && current
+          ? {
+              to: report.reportTo,
+              label: <ReportName site={report.site} id={report.id} cap={null} />,
+              title: report.site ? `${report.site} · Report #${report.id}` : `Report #${report.id}`,
+            }
+          : { to: "/scans", label: <span className="truncate">Reports</span>, title: "Reports" };
+    return (
+      <nav aria-label="Breadcrumb" className="min-w-0 text-sm">
+        <ol className="-m-[3px] flex min-w-0 overflow-hidden p-[3px]">
+          <li className="flex min-w-0">
+            <Link
+              to={up.to}
+              title={up.title}
+              className="report-link flex min-h-target min-w-0 items-center gap-1 py-2 pr-2 font-semibold"
+            >
+              <ChevronLeft aria-hidden className="h-4 w-4 shrink-0" />
+              <span className="sr-only">Back to </span>
+              {up.label}
+            </Link>
+          </li>
+        </ol>
+      </nav>
+    );
+  }
 
   // WAI-ARIA breadcrumb pattern: a navigation landmark named "Breadcrumb"
   // around an ordered list, one item per crumb, the separators drawn inside

@@ -27,6 +27,7 @@ from audit.exports.xlsx_export import (
     _TRACK_HEADERS,
     render_xlsx,
 )
+from audit.labels import REVIEW_LANE_LABELS
 
 
 def _render(conn: sqlite3.Connection) -> bytes:
@@ -74,9 +75,9 @@ def test_summary_dashboard_has_metadata_and_rollups(tmp_db: sqlite3.Connection) 
     assert cells.get("Pages crawled") == 2
     # Section bars + at least one severity + coverage-method row are present.
     labels = set(cells)
-    assert "Likely barriers by severity" in labels  # a section header (col A, no value)
-    assert "Likely-barrier issue groups" in labels
-    assert "Review-only / informational groups" in labels
+    assert "Issues to fix, by severity" in labels  # a section header (col A, no value)
+    assert "Issues to fix" in labels
+    assert "Other issues (to check, best practice, or for information)" in labels
     assert "Manual only" in labels  # coverage-method rollup row
     assert {"Critical", "Serious", "Moderate", "Minor"} <= labels
 
@@ -114,9 +115,19 @@ def test_issues_overview_indexes_every_issue_and_links_to_its_tab(
     ids = [str(ws.cell(row=r, column=1).value) for r in data_rows]
     assert ids == [f"I{n:02d}" for n in range(1, len(ids) + 1)]
 
+    def column(name: str) -> int:
+        return _ISSUE_HEADERS.index(name) + 1
+
     # Instance and page counts are numbers, not prose, so the index sorts.
-    assert all(isinstance(ws.cell(row=r, column=7).value, int) for r in data_rows)
-    assert all(isinstance(ws.cell(row=r, column=8).value, int) for r in data_rows)
+    assert all(isinstance(ws.cell(row=r, column=column("Instances")).value, int) for r in data_rows)
+    assert all(isinstance(ws.cell(row=r, column=column("Pages")).value, int) for r in data_rows)
+
+    # Every row says how sure Axcess is, in the app's own words, and the
+    # guidance points at that column rather than one the sheet lacks.
+    how_sure = {ws.cell(row=r, column=column("How sure")).value for r in data_rows}
+    assert how_sure and how_sure <= set(REVIEW_LANE_LABELS.values()), how_sure
+    assert "How sure column" in meta[4]
+    assert "Evidence decision" not in meta[4] and "Likely Barrier" not in meta[4]
 
     # Every row links to a tab that actually exists in this workbook.
     for row in data_rows:
@@ -126,7 +137,7 @@ def test_issues_overview_indexes_every_issue_and_links_to_its_tab(
         sheet = str(link.location).split("!")[0].strip("'")
         assert sheet in wb.sheetnames
 
-    conformance = {ws.cell(row=r, column=4).value for r in data_rows}
+    conformance = {ws.cell(row=r, column=column("Conformance Level")).value for r in data_rows}
     assert "S" in conformance  # page-has-heading-one is best-practice → S
     assert conformance & {"A", "AA"}  # real SCs present too
 

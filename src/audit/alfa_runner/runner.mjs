@@ -91,7 +91,6 @@ try {
     // outliving the one-use in-memory runner context.
     acceptDownloads: false,
     serviceWorkers: "block",
-    ...(auth?.egress_proxy ? { proxy: { server: auth.egress_proxy, bypass: "" } } : {}),
     ...(auth?.storage_state ? { storageState: auth.storage_state } : {}),
   };
   if (auth) {
@@ -274,9 +273,6 @@ async function readRunnerInput() {
   if (!origins.length || !targetOrigins.length) {
     fail("Authenticated Alfa requires approved target and resource origins.");
   }
-  if (!isLoopbackProxy(parsed.egress_proxy)) {
-    fail("Authenticated Alfa requires the companion loopback egress proxy.");
-  }
   return {
     url: parsed.url,
     level: parsed.level,
@@ -285,21 +281,7 @@ async function readRunnerInput() {
     storage_state: parsed.storage_state,
     allowed_origins: origins,
     target_origins: targetOrigins,
-    egress_proxy: parsed.egress_proxy,
   };
-}
-
-function isLoopbackProxy(value) {
-  try {
-    const parsed = new URL(value);
-    return (
-      parsed.protocol === "http:" &&
-      ["127.0.0.1", "[::1]", "::1"].includes(parsed.hostname) &&
-      !parsed.username && !parsed.password && !parsed.search && !parsed.hash
-    );
-  } catch {
-    return false;
-  }
 }
 
 async function installReadOnlyRoute(context, allowedOrigins, targetOrigins) {
@@ -336,8 +318,7 @@ async function installReadOnlyRoute(context, allowedOrigins, targetOrigins) {
     // Playwright retains APIResponse bodies until disposed, which would turn
     // every script/font/image into an unbounded in-process buffer. Native
     // continuation streams through Chromium. Each routed request is still
-    // checked here, and the companion's loopback CONNECT proxy independently
-    // validates every actual destination origin and freshly resolved IP.
+    // checked here.
     await route.continue();
   });
 }

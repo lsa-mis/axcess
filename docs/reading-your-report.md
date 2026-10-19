@@ -101,14 +101,23 @@ the inspector's **Page state** list shows.
 
 A finished report opens on **Issues**. Under the title, "Based on the report
 generated" gives the date and time the scan finished, and the **Export
-report** menu sits at the top right. Four numbers above the table count:
+report** menu sits at the top right. Three numbers above the table count:
 
 | Number | What it counts |
 | --- | --- |
-| Pages checked | Every page the scan recorded, including pages that answered with an error and most pages that failed to load. Beside it, in parentheses, is the number of [errors while scanning](glossary.md#pages-not-reached), and most of those pages are already in this number. |
-| Occurrences found | [Occurrences](glossary.md#occurrence) in every issue, including Not sure and For information, so it is not a count of confirmed problems. |
-| Issues found | Rows in the Issues table, across all three report groups. |
-| Page states opened by clicking | [Page states](glossary.md#page-state) the scan reached by using menus, tabs, dialogs, and other controls. |
+| Kinds of issue found | Rows in the Issues table, across all three report groups. |
+| Places issues appear (occurrences) | [Occurrences](glossary.md#occurrence) in every issue, including Not sure and For information, so it is not a count of confirmed problems. |
+| Pages visited | Every page the scan recorded, including pages that answered with an error and most pages that failed to load. |
+
+Two lines under **Pages visited** say more about it:
+
+- How many [page states](glossary.md#page-state) the scan opened by clicking
+  menus, tabs, dialogs, and other controls, such as "Plus 30 page states
+  opened by clicking".
+- How many pages could not be loaded, such as "3 pages could not be
+  loaded". This line shows only when some pages failed. These are the
+  [pages not reached](glossary.md#pages-not-reached), and most of them are
+  already counted in **Pages visited**.
 
 Below the numbers, two closed rows open more detail. **What was checked**
 shows how many checks ran, such as "7 of 9 checks ran". It opens a table with
@@ -122,7 +131,7 @@ checks have no row here. The second row, **What "Mostly sure", "Not sure"
 and the other labels mean**, explains the words in the **How sure** and **Where it shows**
 columns.
 
-The error count says how many pages failed, not which ones. See
+The "could not be loaded" line says how many pages failed, not which ones. See
 [pages not reached](glossary.md#pages-not-reached) for what the report does and
 does not list.
 
@@ -247,8 +256,8 @@ or `.../export/markdown`) or the command line (`audit export -f jira` or
 Sheets in the issue list with fixes (Excel):
 
 - Summary
-- Issues Overview: ID, Issue, Severity, Conformance Level, Remediation
-  Ownership, Status, Instances, Pages, and Details
+- Issues Overview: ID, Issue, How sure, Severity, Conformance Level,
+  Remediation Ownership, Status, Instances, Pages, and Details
 - A tab per issue for the first 40 issues: #, Where, User action, Element,
   What to fix, and How to reproduce
 - More Issues, which holds the rest when there are more than 40
@@ -282,10 +291,11 @@ Notes on the exports:
 - Written report issue cards cover open Mostly sure issues tied to a WCAG
   criterion and Not sure issues marked In progress; other open results,
   including other Not sure results, go to Appendix B. The workbook
-  Summary's "Likely-barrier" counts follow these cards, so they can differ
+  Summary's "Issues to fix" counts follow these cards, so they can differ
   from the Issues table.
-- The workbook's Issues Overview, the CSV, the JSON, and the Jira CSV have no
-  report group column. The Jira CSV also includes Not sure and
+- The workbook's Issues Overview has a How sure column, like the Issues
+  table. The CSV, the JSON, and the Jira CSV have no report group column.
+  The Jira CSV also includes Not sure and
   For information results, so check it before you import. Edits to a downloaded
   file never flow back to Axcess.
 

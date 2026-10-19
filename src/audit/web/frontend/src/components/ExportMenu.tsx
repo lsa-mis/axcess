@@ -395,7 +395,7 @@ export default function ExportMenu({
           })}
         </ul>
 
-        <div className="space-y-1.5 border-t border-border bg-surface-subtle px-4 py-3 text-xs leading-5 text-fg-muted">
+        <div className="space-y-1.5 border-t border-border bg-surface-subtle px-4 py-3 text-xs text-fg-muted">
           {/* An empty size column said nothing about why; this says what is
               missing and that nothing else is. */}
           {options.isError && (

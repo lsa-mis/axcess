@@ -2,7 +2,8 @@ name: CI
 
 # The gates AGENTS.md asks for before handoff, run on every pull request and
 # on main. Until this existed nothing ran pytest, ruff, mypy or the frontend
-# checks, while desktop-build publishes a release from every push to main.
+# checks. Desktop releases are published only by a manual run of
+# desktop-release.yml; desktop-build.yml makes test builds and never publishes.
 #
 # The Playwright files under tests/ui (auto-marked `browser` by
 # tests/conftest.py) hold every axe-core check of the review app and the
@@ -118,7 +119,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      # The release steps desktop-build.yml runs only after a merge, run here
+      # The release steps desktop-release.yml runs only when started by hand, run here
       # first with the same scripts: pick the version from the published
       # tags, stamp it into desktop/package.json, and check the installer
       # names against the ones the publish job requires. The first 0.60
