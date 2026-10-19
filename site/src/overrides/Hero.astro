@@ -17,7 +17,15 @@
  *   numbers, because the next question after "what is it" is "what does it
  *   miss" (Articulating Design Decisions: answer the objection early).
  * - The mockup uses a made-up site (www.example.org, reserved by RFC 2606)
- *   and only words the app really shows (Dashboard and Inspector screens).
+ *   and only words the app really shows (the Issues and Inspector screens).
+ *   The back panel is the top of a report's Issues page, drawn as close to
+ *   the app as the panel's size allows (developer's direction, 2026-10-19):
+ *   the trail ("Reports", the site, "Report #12"), the "Issues" title, the
+ *   date line, the Export report button, and the three numbers as the app
+ *   shows them (ReportSummary.tsx): no tiles, the number in navy, its name,
+ *   and one line under it. It used to show three tinted tiles (Pages, Page
+ *   states opened by clicking, Mostly sure issues), the app's old summary.
+ *   At a narrow width the numbers go two and one, as in the app.
  *   It is one image to assistive technology, with a text description, so a
  *   screen reader does not read out a fake interface piece by piece
  *   (role="img" with aria-label, WCAG technique ARIA6; SC 1.1.1 Non-text
@@ -71,15 +79,28 @@ const { hero, title } = Astro.locals.starlightRoute.entry.data;
     <div
       class="mockup"
       role="img"
-      aria-label="Example of an Axcess report for www.example.org: 194 pages, 1,171 page states opened by clicking, and 12 Mostly sure issues. In front of it, the saved copy of a page outlines the first of 19 flagged elements, a link, and lists what it is, its text, its size and its element locator."
+      aria-label="Example of the Issues page of an Axcess report for www.example.org: 12 kinds of issue found, in 386 places, on 194 pages visited plus 1,171 page states opened by clicking. In front of it, the saved copy of a page outlines the first of 19 flagged elements, a link, and lists what it is, its text, its size and its element locator."
     >
       <div class="panel summary" aria-hidden="true">
-        <p class="meta">Example report</p>
-        <p class="site">www.example.org</p>
-        <div class="stats">
-          <div><span class="n">194</span><span class="l">Pages</span></div>
-          <div><span class="n">1,171</span><span class="l">Page states opened by clicking</span></div>
-          <div><span class="n">12</span><span class="l">Mostly sure issues</span></div>
+        <div class="trail">
+          <span class="crumb-link">Reports</span>
+          <svg class="crumb-sep" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+          <span class="crumb-site">www.example.org</span>
+          <span class="crumb-tag">Report #12</span>
+        </div>
+        <div class="report">
+          <div class="report-head">
+            <div>
+              <p class="report-title">Issues</p>
+              <p class="report-date">Based on the report generated Oct 6, 2026, 04:24 PM</p>
+            </div>
+            <span class="export"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>Export report<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg></span>
+          </div>
+          <div class="stats">
+            <div><span class="n">12</span><span class="l">Kinds of issue found</span><span class="d">One per row in the table below</span></div>
+            <div><span class="n">386</span><span class="l">Places issues appear (occurrences)</span><span class="d">Each one is an element on a page</span></div>
+            <div class="pages"><span class="n">194</span><span class="l">Pages visited</span><span class="d">Plus 1,171 page states opened by clicking</span></div>
+          </div>
         </div>
       </div>
       <div class="panel inspector" aria-hidden="true">
@@ -229,43 +250,124 @@ const { hero, title } = Astro.locals.starlightRoute.entry.data;
   /* Two panels of one width, offset 40 px right and down, so the front
      one reads as a closer look laid on the report. */
   .summary {
+    container-type: inline-size;
     margin-inline-end: 40px;
-    padding: 20px 22px 52px;
+    overflow: hidden;
     box-shadow: var(--h-shadow-soft);
   }
-  .meta {
-    margin: 0;
-    color: var(--h-muted);
-    font-size: 13px;
-    font-weight: 500;
-  }
-  .site {
-    margin: 2px 0 16px;
+  /* The app's top bar: the trail, on the bar's white, over a line. */
+  .trail {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 22px;
+    border-bottom: 1px solid var(--h-divider);
     color: var(--h-text);
-    font-size: 20px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .crumb-link {
+    color: var(--h-accent);
+    text-decoration: underline;
+    text-underline-offset: 0.25em;
+  }
+  .crumb-sep {
+    width: 13px;
+    height: 13px;
+    color: var(--h-muted);
+  }
+  .crumb-tag {
+    padding: 2px 7px;
+    border-radius: 5px;
+    background: var(--h-tint);
+  }
+  /* The page under it, on the app's page grey. */
+  /* The 52px at the foot sits behind the front panel. */
+  .report {
+    padding: 18px 22px 52px;
+    background: var(--h-page);
+  }
+  .report-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .report-title {
+    margin: 0;
+    color: var(--h-text);
+    font-size: 22px;
     font-weight: 700;
     letter-spacing: -0.01em;
   }
+  .report-date {
+    margin: 2px 0 0;
+    color: var(--h-muted);
+    font-size: 12px;
+  }
+  .export {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 10px;
+    border: 1px solid var(--h-chip-line);
+    border-radius: 7px;
+    background: var(--h-band);
+    color: var(--h-text);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .export svg {
+    width: 14px;
+    height: 14px;
+  }
+  /* The app's three numbers (ReportSummary.tsx): no panel, the number
+     first and largest in navy, its name, then one line in the muted
+     colour; the space between the columns does the grouping. */
   .stats {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 10px;
+    gap: 18px 20px;
+    padding: 22px 0 6px;
   }
   .stats > div {
     display: flex;
     flex-direction: column;
-    padding: 10px 12px;
-    border-radius: 8px;
-    background: var(--h-page);
+    gap: 3px;
   }
   .n {
-    color: var(--h-text);
-    font-size: 20px;
-    font-weight: 700;
+    margin-bottom: 2px;
+    color: var(--h-accent);
+    font-size: 26px;
+    font-weight: 650;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
   }
   .l {
-    color: var(--h-muted);
+    color: var(--h-text);
     font-size: 12px;
+    font-weight: 650;
+    line-height: 1.3;
+  }
+  .d {
+    color: var(--h-muted);
+    font-size: 11px;
+    line-height: 1.4;
+  }
+  /* Narrow, as in the app below 640px: the two issue numbers share a row,
+     and the pages take the row under them. */
+  @container (max-width: 27rem) {
+    .stats {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .stats .pages {
+      grid-column: span 2;
+    }
+    .report-head {
+      flex-direction: column;
+    }
   }
   .inspector {
     position: relative;
