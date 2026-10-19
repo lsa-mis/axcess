@@ -47,6 +47,36 @@ export const GUIDES: Record<string, string> = {
   "coverage-tracker": "docs/coverage-tracker",
 };
 
+/**
+ * One sentence per guide, for search results and link previews (the page's
+ * meta description). The guides have no frontmatter to hold it (see above),
+ * so it lives here, beside the list of guides. Without it every guide showed
+ * the site's own description, so eight different search results read the
+ * same and nobody could tell which guide answers their question. Plain
+ * language, in the terms table's words (docs/plain-language.md), and true to
+ * what each guide covers: update the sentence when a guide's contents change.
+ * A guide without one stops the build, so a new guide cannot fall back to
+ * the site's description unnoticed.
+ */
+export const DESCRIPTIONS: Record<string, string> = {
+  README:
+    "Every Axcess guide in one list: reading a report, fixing common problems, scanning search-driven sites, hosting Axcess for a team, and the glossary.",
+  "desktop-app":
+    "The Axcess desktop app for Mac, Windows and Linux: where it keeps your reports, how updates arrive, and how to build an installer yourself.",
+  "reading-your-report":
+    "How to read an Axcess report: the summary, the Issues table, the evidence for each occurrence, recording decisions, exports, and comparing reports after a fix.",
+  troubleshooting:
+    "Fixes for common problems: a scan that stops at one page, scans that are too big, too small or slow, the sign-in window, the local AI checks, and starting over.",
+  hosting:
+    "How to run Axcess on an always-on computer for a small team, on your own network or over Tailscale, behind a shared access token.",
+  "spa-search-scans":
+    "How Axcess scans sites whose pages appear only after a search or a click: Click-Through, its limits, the controls it skips, and configured searches.",
+  glossary:
+    "What the words in Axcess and its reports mean, in plain language: issue, occurrence, page state, Mostly sure, Not sure and more.",
+  "coverage-tracker":
+    "Which WCAG 2.2 A and AA criteria Axcess checks and how, how each check collects evidence, and what is planned next.",
+};
+
 const LINK = /(\]\()([^)\s]+)(\))/g;
 
 /** Rewrite one Markdown link target found in `docs/<file>.md`. */
@@ -112,9 +142,11 @@ export function repoDocsLoader(): Loader {
         const { title, body } = splitTitle(raw);
         const rewritten = dropContentsList(body).replace(LINK, (_m, open, target, close) => open + rewriteTarget(target) + close);
         const id = GUIDES[name];
+        const description = DESCRIPTIONS[name];
+        if (!description) throw new Error(`docs/${name}.md has no description in DESCRIPTIONS`);
         const data = await parseData({
           id,
-          data: { title, editUrl: `${REPO}/edit/main/docs/${name}.md` },
+          data: { title, description, editUrl: `${REPO}/edit/main/docs/${name}.md` },
         });
         store.set({
           id,
