@@ -885,9 +885,18 @@ const SMARTSCREEN_TEXT =
 
 <style>
   /* One readable column, centred, on the full-width layout: the page title
-     and the body share it, so their left edges line up. */
+     and the body share it, so their left edges line up. 48rem, about as
+     wide as what is in it: running text at 35em, and steps that set a
+     drawing beside its words. It was 66rem, while nearly everything in it
+     was held to 35em at its left edge, so the page had an empty band down
+     its right side and looked off centre (found by the developer). Centred
+     by sizing the column to its content, not by centring each block:
+     left-aligned lines all start in the same place, which is easier to read
+     than centred ones (W3C COGA, "Making Content Usable",
+     https://www.w3.org/TR/coga-usable/, paraphrased: keep the layout simple
+     and predictable). */
   :global(:root:has(.gs) .content-panel .sl-container) {
-    max-width: 66rem;
+    max-width: 48rem;
     margin-inline: auto;
   }
   /* Running text keeps a readable line, the site's 35em (about 75
@@ -1196,18 +1205,49 @@ const SMARTSCREEN_TEXT =
     text-decoration: underline;
     text-underline-offset: 0.2em;
   }
-  /* A drawing step: its words and its drawing side by side on a wide
-     screen, so the reader matches the words to the picture without
-     scrolling between them; stacked below 56rem, where side by side would
-     squeeze both. The <li> keeps its list number. */
+  /* A drawing step: its words and its drawing side by side when the list
+     has room for both, so the reader matches the words to the picture
+     without scrolling between them. The <li> keeps its list number.
+
+     The drawing keeps its own width (20rem, what the drawings are made for)
+     and the words take the rest, at least 22rem, about 50 characters a line.
+     The words used to get 0.8 of the row, inside list items held to 35em by
+     the site's running-text rule (theme.css): about 210px, 28 characters a
+     line, so phrases broke apart and the eye jumped back every few words
+     (found by the developer). WCAG sets no lower limit, only the upper one
+     (SC 1.4.8 Visual Presentation, Level AAA: "Width is no more than 80
+     characters or glyphs (40 if CJK)"); about 45 to 75 characters is the
+     common typographic range (paraphrased). So a drawing step's <li> is not
+     held to 35em: it is a layout box, and its words stay under 80
+     characters by the grid. A step with no drawing keeps the cap.
+
+     Side by side is decided by the list's width (a container query), not
+     the window's: below 72rem the docs sidebar comes back and the column is
+     narrower, and a window rule put the two side by side in a column that
+     could not hold both. Below 44rem of list they stack, words first.
+
+     A step with two drawings to compare (Windows' "First" and "After you
+     choose More info") always stacks, words first, so the two sit side by
+     side under them and read as before and after. In the 20rem drawing
+     column the two stood one above the other, and the step ran a screen
+     and a half tall. */
+  .install-steps {
+    container-type: inline-size;
+  }
+  .install-steps > li:has(.step-row) {
+    max-width: none;
+  }
   .step-row {
     display: grid;
     gap: 0.75rem 2rem;
   }
-  @media (min-width: 56rem) {
+  @container (min-width: 44rem) {
     .step-row {
-      grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+      grid-template-columns: minmax(22rem, 1fr) 20rem;
       align-items: start;
+    }
+    .step-row:has(.mock-pair) {
+      grid-template-columns: minmax(0, 1fr);
     }
   }
   /* First-scan steps: numbered panels. The number comes from a CSS counter
@@ -1220,9 +1260,14 @@ const SMARTSCREEN_TEXT =
     padding: 0;
     list-style: none;
   }
+  /* A step card is a layout box, not running text: it uses the column's
+     full width, and the paragraphs in it keep the 35em reading width
+     (theme.css). Held to 35em itself, it sat at the column's left edge,
+     narrower than the column it was in. */
   .steps > li {
     position: relative;
     min-width: 0;
+    max-width: none;
     padding: 1.25rem 1.25rem 1.25rem 4.25rem;
     border: 1px solid var(--ax-border);
     border-radius: 0.75rem;
