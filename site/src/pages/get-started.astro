@@ -108,6 +108,9 @@ const shot = (name: Shot) => ({
   height: shots[name].h,
   alt: shots[name].alt,
 });
+// A report screenshot that may grow past the reading column (`.report-shot`):
+// its own width goes to CSS, which cannot read the width attribute.
+const wideShot = (name: Shot) => ({ ...shot(name), style: `--shot-w: ${shots[name].w}px` });
 /*
  * Drawings of the install screens, under the step that needs each one.
  * (Ported from site/build.py, "Drawings of the install screens".)
@@ -662,11 +665,11 @@ const SMARTSCREEN_TEXT =
        screen shows and where (SC 1.1.1 Non-text Content, Level A). */
   }
   <figure class="not-content report-shot">
-    <img loading="lazy" {...shot("issues-tab")} />
+    <img loading="lazy" {...wideShot("issues-tab")} />
     <figcaption>The Issues tab: one row per kind of problem, with how sure Axcess is and where it shows.</figcaption>
   </figure>
   <figure class="not-content report-shot">
-    <img loading="lazy" {...shot("inspector-flagged")} />
+    <img loading="lazy" {...wideShot("inspector-flagged")} />
     <figcaption>A flagged element in the Page inspector: its details on top, and the saved copy of the page below with the element outlined.</figcaption>
   </figure>
   <div class="not-content ax-prose facts">
@@ -1091,6 +1094,27 @@ const SMARTSCREEN_TEXT =
     margin-inline: auto;
     border: 1px solid var(--ax-border-strong);
     border-radius: 0.5rem;
+  }
+  /* From 72rem, where the docs sidebar is hidden and the column sits in the
+     middle of the window, the two grow past the 48rem column: up to their
+     own size, and no wider than the window less 3rem a side, still centred.
+     Both are the app at its real size (1104px and 1453px wide), and held to
+     the column they shrank to 70% and 53%, so the app's text came out at 9
+     and 7 pixels, too small to read (found by the developer). Their words
+     are also in the alt text and caption (SC 1.4.5 Images of Text, Level
+     AA), but a picture is there to be looked at (W3C COGA, "Making Content
+     Usable", https://www.w3.org/TR/coga-usable/, paraphrased: use images
+     that help understanding). Below 72rem the sidebar takes the left side,
+     so they stay in the column rather than run under it or make the page
+     scroll sideways (SC 1.4.10 Reflow, Level AA). The caption keeps the
+     reading width, in line with the text. */
+  @media (min-width: 72rem) {
+    .report-shot img {
+      --shot-shown: min(var(--shot-w, 100%), calc(100vw - 6rem));
+      width: var(--shot-shown);
+      max-width: none;
+      margin-inline: calc((100% - var(--shot-shown)) / 2);
+    }
   }
   .report-shot figcaption {
     max-width: 35em;
