@@ -33,17 +33,25 @@ export default defineConfig({
       // Axcess, and a second credit is noise (COGA, one idea per chunk).
       credits: false,
       social: [{ icon: "github", label: "Axcess on GitHub", href: REPO }],
-      // A preview picture when a page is shared, as the old site had: the
-      // report groups diagram, with its own description for people who
-      // cannot see it.
+      // The picture shown when a page is shared (Slack, Teams, email, social
+      // sites), with a description for people who cannot see it. A card made
+      // for the job, 1200 by 630 (the size those services expect): the logo,
+      // the tagline, and that it is free for Mac, Windows and Linux, in large
+      // type so it still reads as a small thumbnail. It was the report
+      // groups diagram, an image of text that the site itself hides (SC
+      // 1.4.9 Images of Text (No Exception), Level AAA) and that said nothing
+      // about what Axcess is. Made from HTML with the site's own fonts and
+      // logo; remake it if the tagline changes.
       head: [
-        { tag: "meta", attrs: { property: "og:image", content: `${SITE}${BASE}/diagrams/report-groups.png` } },
+        { tag: "meta", attrs: { property: "og:image", content: `${SITE}${BASE}/social-card.png` } },
+        { tag: "meta", attrs: { property: "og:image:width", content: "1200" } },
+        { tag: "meta", attrs: { property: "og:image:height", content: "630" } },
         {
           tag: "meta",
           attrs: {
             property: "og:image:alt",
             content:
-              "Diagram of the three report groups in the How sure column: Mostly sure, Not sure and For information, and the checks that feed each one.",
+              "The Axcess logo and the words: Accessibility testing that runs on your computer. Free and open source, for Mac, Windows and Linux.",
           },
         },
         { tag: "meta", attrs: { name: "twitter:card", content: "summary_large_image" } },
