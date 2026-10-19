@@ -8,8 +8,12 @@
  * builds this" finds it in the last section and in the "On this page" list.
  *
  * The history follows the project's white paper
- * (whitepaper/AXCESS-WHITE-PAPER.md, sections 2 and 3) and the primary
- * persona (docs/internal/personas.md). The direction cards follow the white
+ * (whitepaper/AXCESS-WHITE-PAPER.md, sections 2 and 3), the primary
+ * persona (docs/internal/personas.md), and the READMEs of the two projects
+ * Axcess merged: the original Axcess (rayraycodes/Axcess) and A11y Crawler
+ * (harryg02/a11y-crawler), whose README says its page and page-state
+ * discovery now lives here. The two links name the repositories, which
+ * stay public as a record; the page still names no individual author. The direction cards follow the white
  * paper's section 5. Who builds Axcess follows README.md:17-18. The old page
  * named no individual author and did not link a personal site, so this page
  * does not either.
@@ -28,9 +32,15 @@ import { REPO, url } from "../lib/site";
 
 const { covered, total } = coverage.summary;
 const WHITEPAPER = `${REPO}/blob/main/whitepaper/AXCESS-WHITE-PAPER.md`;
+// The two projects Axcess merged, kept on GitHub as a record.
+const ORIGINAL_AXCESS = "https://github.com/rayraycodes/Axcess";
+const A11Y_CRAWLER = "https://github.com/harryg02/a11y-crawler";
 
 const headings = [
-  { depth: 2, slug: "beginning", text: "It started with one hard problem" },
+  { depth: 2, slug: "beginning", text: "It started as two projects" },
+  { depth: 3, slug: "pictures-of-text", text: "The original Axcess: pictures of text" },
+  { depth: 3, slug: "every-state", text: "A11y Crawler: every page and every click" },
+  { depth: 3, slug: "merged", text: "One tool" },
   { depth: 2, slug: "growth", text: "Finding a problem is only the first question" },
   { depth: 2, slug: "principles", text: "What the project holds itself to" },
   { depth: 2, slug: "direction", text: "Where Axcess is going" },
@@ -74,11 +84,14 @@ const direction = [
   headings={headings}
 >
   <p>
-    Axcess started with one hard problem and grew into a way of working. This is the story, the idea that guides it, and
-    where it is going.
+    Axcess started as two projects, each built for one hard problem, and grew into a way of working. This is the story,
+    the idea that guides it, and where it is going.
   </p>
 
-  <h2 id="beginning">It started with one hard problem</h2>
+  <h2 id="beginning">It started as two projects</h2>
+  <p>Axcess brings together two earlier projects. Each took on a job that was slow and error-prone to do by hand.</p>
+
+  <h3 id="pictures-of-text">The original Axcess: pictures of text</h3>
   <p>
     An accessibility lead at the University of Michigan needed to find every image that was really a picture of text,
     across a whole website, before the next report was due. Text inside an image can't be resized, restyled or read
@@ -94,6 +107,28 @@ const direction = [
     <li>scanned again to confirm the fixes</li>
   </ul>
   <p>The goal was never to replace the expert. It was to take away the repetitive search and give the expert better evidence.</p>
+
+  <h3 id="every-state">A11y Crawler: every page and every click</h3>
+  <p>
+    Web applications hide much of what they show until someone uses them. Menus, tabs, dialogs and other controls each
+    open a different state of a page. To check them, an auditor had to visit every page, use every control, and run the
+    rule check (axe) on each state by hand. Pages and states were easy to miss.
+  </p>
+  <p>A11y Crawler did that work. It:</p>
+  <ul>
+    <li>followed every link within the site</li>
+    <li>used each control it found, such as buttons, tabs and dropdowns</li>
+    <li>ran the rule check on every page and page state it reached</li>
+    <li>opened a real browser window, so the auditor could sign in to the application first</li>
+  </ul>
+
+  <h3 id="merged">One tool</h3>
+  <p>
+    The two projects then merged into Axcess. A11y Crawler's way of finding pages and page states lives on in
+    Click-Through, which opens menus and dialogs and checks what they show. Its list of links a scan must never follow,
+    such as Sign out, and its logo came too. Both earlier projects stay on GitHub as a record:{" "}
+    <a href={ORIGINAL_AXCESS}>the original Axcess</a> and <a href={A11Y_CRAWLER}>A11y Crawler</a>.
+  </p>
 
   <h2 id="growth">Finding a problem is only the first question</h2>
   <p>

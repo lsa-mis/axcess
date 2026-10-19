@@ -66,6 +66,8 @@ AXE_JS = """async tags => {
 SITE_NAMES = {
     *("Linux", "AppImage", "Duo", "Apple", "Intel", "DevTools", "Deque", "Tailscale"),
     *("React", "Vue", "Angular", "Michigan", "University"),
+    # A11y Crawler, one of the two projects Axcess merged (About page).
+    "Crawler",
     # Named parts the guides refer to: the app's "Issues" tab, and the hosting
     # guide's options "Path A", "Path B" and "Path C".
     *("Issues", "Path"),
