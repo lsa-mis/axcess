@@ -26,6 +26,7 @@ from PIL import Image, ImageDraw
 
 from audit.analyzer.axe import AxeAnalyzer, AxeViolation, Level
 from audit.analyzer.focus import FocusFinding, FocusProbe
+from audit.analyzer.forms import ErrorIdentificationProbe, FormFinding
 from audit.analyzer.interaction import (
     InteractionProbe,
     InteractionResult,
@@ -173,6 +174,7 @@ class JsFetcher:
         focus_probe: FocusProbe | None = None,
         visual_probe: VisualProbe | None = None,
         interaction_probe: InteractionProbe | None = None,
+        form_error_probe: ErrorIdentificationProbe | None = None,
         capture_screenshots: bool = False,
         shared_context: BrowserContext | None = None,
         shared_pages: tuple[Page, ...] = (),
@@ -213,6 +215,12 @@ class JsFetcher:
         # an opened menu. Off unless explicitly attached, it is the most
         # expensive pass here (one axe run per revealed state).
         self._interaction_probe = interaction_probe
+        # SC 3.3.1 form error check. Runs LAST of all, after the screenshots
+        # and site search: it presses each form's submit control and loads
+        # the page again between forms, so nothing may read the page after
+        # it. Off unless attached, and never in a sign-in scan's private
+        # context.
+        self._form_error_probe = form_error_probe
         # When set, capture an outlined screenshot of each live-page
         # finding's element before the context closes (see ``_capture_element``).
         self._capture_screenshots = capture_screenshots
@@ -505,6 +513,18 @@ class JsFetcher:
                     baseline=(*axe_violations, *(item.violation for item in interaction.findings)),
                 )
 
+            form_findings: tuple[FormFinding, ...] = ()
+            if (
+                self._form_error_probe is not None
+                and not self._private_context
+                and 200 <= status < 300
+                and "text/html" in headers.get("content-type", "text/html")
+            ):
+                form_results = await self._form_error_probe.run(page)
+                form_findings = tuple(
+                    FormFinding.from_result(r) for r in form_results if r.outcome == "fail"
+                )
+
             return FetchResult(
                 url=final_url,
                 status_code=status,
@@ -536,6 +556,7 @@ class JsFetcher:
                 screenshots=screenshots,
                 styles=styles,
                 frames=frames,
+                form_findings=form_findings,
             )
         finally:
             # A shared authenticated context belongs to the companion, which

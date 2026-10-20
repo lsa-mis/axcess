@@ -6,7 +6,7 @@ describing it in text. See ``base.py`` for the rules and ``probe.py`` for how
 the page is driven.
 """
 
-from audit.analyzer.forms.base import FormResult, classify, skip_reason
+from audit.analyzer.forms.base import FormFinding, FormResult, classify, skip_reason
 from audit.analyzer.forms.probe import ErrorIdentificationProbe
 
-__all__ = ["ErrorIdentificationProbe", "FormResult", "classify", "skip_reason"]
+__all__ = ["ErrorIdentificationProbe", "FormFinding", "FormResult", "classify", "skip_reason"]

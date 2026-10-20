@@ -167,6 +167,7 @@ _COLLECT_JS = r"""
       [f.getAttribute('autocomplete') || '', f.name || '', f.id || ''].join(' '));
     return {
       selector: path(r),
+      snippet: r.outerHTML.slice(0, 600),
       label: heading(r) || (u.submit ? nameOf(u.submit) : '') || 'form',
       submit: u.submit ? nameOf(u.submit) : '',
       words,
@@ -461,6 +462,8 @@ class ErrorIdentificationProbe:
             form=info["label"][:120],
             selector=info["selector"],
             frame_url="" if frame is None or frame is page.main_frame else frame.url,
+            submit=info["submit"][:300],
+            snippet=info["snippet"],
         )
 
     async def _attempt(

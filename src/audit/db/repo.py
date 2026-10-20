@@ -827,6 +827,7 @@ def upsert_keyboard_finding(
     criterion_sc: str,
     pipeline: str = "keyboard",
     screenshot_hash: str | None = None,
+    revealed_by: str | None = None,
 ) -> int:
     """Idempotent upsert for a keyboard-trap probe finding.
 
@@ -839,15 +840,21 @@ def upsert_keyboard_finding(
     a future audit of "which call sites write keyboard findings" is
     a single grep instead of a "find all upsert_axe_violation
     callers and check their pipeline arg" exercise.
+
+    ``revealed_by`` names the control that had to be pressed before the
+    problem existed (the form error check's submit control), so the report
+    says "After clicking" rather than "At page load". The probes that check
+    the page as it loads leave it empty.
     """
     conn.execute(
         """
         INSERT INTO page_a11y_findings (
             page_id, scan_id, rule_id, wcag_sc, wcag_scs, wcag_level,
             impact, help, help_url, target_selector, failure_summary,
-            html_snippet, target_hash, pipeline, criterion_sc, screenshot_hash
+            html_snippet, target_hash, pipeline, criterion_sc, screenshot_hash,
+            revealed_by
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(page_id, rule_id, target_hash) DO UPDATE SET
             scan_id = excluded.scan_id,
             wcag_sc = excluded.wcag_sc,
@@ -861,6 +868,8 @@ def upsert_keyboard_finding(
             html_snippet = excluded.html_snippet,
             criterion_sc = excluded.criterion_sc,
             screenshot_hash = excluded.screenshot_hash,
+            -- First write wins, as for the rule check's revealed rows.
+            revealed_by = COALESCE(page_a11y_findings.revealed_by, excluded.revealed_by),
             updated_at = CURRENT_TIMESTAMP
         """,
         (
@@ -880,6 +889,7 @@ def upsert_keyboard_finding(
             pipeline,
             criterion_sc,
             screenshot_hash,
+            revealed_by,
         ),
     )
     row = conn.execute(

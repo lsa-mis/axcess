@@ -26,9 +26,10 @@ The order of concerns is safety, then precision, then speed, then recall:
 
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Any, Literal
 
 Outcome = Literal[
     "fail",  # an error was detected but not identified or described in text
@@ -145,6 +146,79 @@ class FormResult:
     frame_url: str = ""
     fields_in_error: list[str] = field(default_factory=list)
     messages: list[str] = field(default_factory=list)
+    submit: str = ""  # the submit control's name, as pressed
+    snippet: str = ""  # the start of the form's code
+
+
+# The one rule this check reports, keyed in page_a11y_findings like the other
+# browser checks' rules (``pipeline='forms'``).
+RULE_ERROR_NOT_DESCRIBED = "form-error-not-described"
+HELP_URL = "https://www.w3.org/WAI/WCAG22/Understanding/error-identification.html"
+
+
+@dataclass(frozen=True)
+class FormFinding:
+    """One form that detected an error without describing it, as an occurrence.
+
+    Stored like the focus and keyboard checks' findings, with the submit
+    control as ``revealed_by``: the error exists only after that control is
+    pressed, so the report says "After clicking", not "At page load".
+    """
+
+    target_selector: str
+    html_snippet: str
+    failure_summary: str
+    submit: str
+    frame_url: str = ""
+
+    @property
+    def target_hash(self) -> str:
+        h = hashlib.sha256()
+        for part in (
+            RULE_ERROR_NOT_DESCRIBED,
+            self.frame_url,
+            self.target_selector,
+            self.html_snippet[:200],
+        ):
+            h.update(part.encode("utf-8", errors="replace"))
+            h.update(b"\x00")
+        return h.hexdigest()
+
+    def to_repo_kwargs(self) -> dict[str, Any]:
+        return {
+            "rule_id": RULE_ERROR_NOT_DESCRIBED,
+            "wcag_sc": "3.3.1",
+            "wcag_scs": "3.3.1",
+            "wcag_level": "A",
+            "impact": "serious",
+            "help": "Form shows an error without describing it in text",
+            "help_url": HELP_URL,
+            "target_selector": self.target_selector,
+            "failure_summary": self.failure_summary,
+            "html_snippet": self.html_snippet,
+            "target_hash": self.target_hash,
+            "pipeline": "forms",
+            "criterion_sc": "3.3.1",
+            "revealed_by": self.submit[:300] or None,
+        }
+
+    @classmethod
+    def from_result(cls, result: FormResult) -> FormFinding:
+        """The occurrence for a ``fail`` result: what was seen, in words."""
+        parts = [result.reason[:1].upper() + result.reason[1:] + "."]
+        if result.fields_in_error:
+            parts.append("Fields marked in error: " + ", ".join(result.fields_in_error[:10]) + ".")
+        if result.messages:
+            parts.append(
+                "Text that appeared: " + " | ".join(m[:120] for m in result.messages[:5]) + "."
+            )
+        return cls(
+            target_selector=result.selector,
+            html_snippet=result.snippet,
+            failure_summary=" ".join(parts)[:1000],
+            submit=result.submit,
+            frame_url=result.frame_url,
+        )
 
 
 def skip_reason(
