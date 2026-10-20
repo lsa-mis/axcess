@@ -516,7 +516,7 @@ def rule_meta_for(row: IssueRow, rules: dict[str, Any]) -> dict[str, Any]:
         sc = row.issue_key.removeprefix("semantic:")
         meta = rules.get("semantic_criteria", {}).get(sc, {})
         return dict(meta) if isinstance(meta, dict) else {}
-    if row.pipeline in ("keyboard", "responsive", "focus", "visual"):
+    if row.pipeline in ("keyboard", "responsive", "focus", "visual", "forms"):
         # Dynamic-probe rows are carded by SC (one YAML card covers
         # several rule_ids, e.g. all three keyboard-trap shapes).
         # Check semantic_criteria first (where 2.1.2 and the responsive
@@ -579,6 +579,7 @@ def _pages_for_issue(
         "responsive",
         "focus",
         "visual",
+        "forms",
         "protected_image",
     ):
         # Every DOM pipeline lives in page_a11y_findings. The row's
@@ -838,7 +839,7 @@ def _axe_issue_rows(
             # with no card of its own borrows nothing: another criterion's
             # card is about a different check (the AI review's 3.3.2 card,
             # say) and would misdescribe the rule check (axe).
-            if not meta and pipeline in ("keyboard", "responsive", "focus", "visual"):
+            if not meta and pipeline in ("keyboard", "responsive", "focus", "visual", "forms"):
                 sc_from_db = g.get("wcag_sc")
                 if sc_from_db:
                     meta = axe_rules_meta.get(sc_from_db, {}) or semantic_meta.get(sc_from_db, {})
@@ -952,6 +953,13 @@ def _axe_issue_rows(
             evidence_summary = (
                 "Found by moving keyboard focus through the page in a browser. Check it "
                 "by hand, including after you open menus and dialogs."
+            )
+        elif pipeline == "forms":
+            issue_key = f"{pipeline}:{raw_rule_id}"
+            default_title = "Form shows an error without describing it in text"
+            evidence_summary = (
+                "Found by pressing the form's submit button once, with nothing typed and "
+                "nothing sent. Check by hand that each error names its field in text."
             )
         elif pipeline == "visual":
             issue_key = f"{pipeline}:{raw_rule_id}"

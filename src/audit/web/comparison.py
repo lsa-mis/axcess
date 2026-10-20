@@ -26,7 +26,9 @@ Category = Literal["new", "still_detected", "changed", "no_longer_detected", "ca
 # only in the later report, only in the earlier one, or in both. ``Category``
 # keeps the stricter reading of the same row (whether coverage supports it).
 Change = Literal["new", "resolved", "remaining"]
-Pipeline = Literal["axe", "alfa", "keyboard", "responsive", "focus", "visual", "semantic", "image"]
+Pipeline = Literal[
+    "axe", "alfa", "keyboard", "responsive", "focus", "visual", "forms", "semantic", "image"
+]
 CATEGORIES: tuple[Category, ...] = (
     "new",
     "still_detected",
@@ -41,6 +43,7 @@ PIPELINES: tuple[Pipeline, ...] = (
     "responsive",
     "focus",
     "visual",
+    "forms",
     "semantic",
     "image",
 )
@@ -398,6 +401,7 @@ _FLAGS = {
     "keyboard": "keyboard_probe_enabled",
     "responsive": "responsive_checks_enabled",
     "focus": "focus_checks_enabled",
+    "forms": "form_error_checks_enabled",
     "visual": "visual_checks_enabled",
 }
 
@@ -457,7 +461,7 @@ def _coverage(
         flag = _FLAGS.get(pipeline)
         if flag and cfg.get(flag) is False:
             limitations.append(note(f"{pipeline} was disabled.", in_table=True))
-        elif pipeline in {"focus", "visual"}:
+        elif pipeline in {"focus", "visual", "forms"}:
             limitations.append(
                 note(f"completed {pipeline} coverage was not recorded.", in_table=True)
             )

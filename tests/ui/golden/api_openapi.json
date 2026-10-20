@@ -1552,7 +1552,17 @@
             "schema": {
               "anyOf": [
                 {
-                  "enum": ["axe", "alfa", "keyboard", "responsive", "focus", "visual", "semantic", "image"],
+                  "enum": [
+                    "axe",
+                    "alfa",
+                    "keyboard",
+                    "responsive",
+                    "focus",
+                    "visual",
+                    "forms",
+                    "semantic",
+                    "image"
+                  ],
                   "type": "string"
                 },
                 {"type": "null"}
@@ -1863,7 +1873,17 @@
           "key": {"type": "string", "title": "Key"},
           "pipeline": {
             "type": "string",
-            "enum": ["axe", "alfa", "keyboard", "responsive", "focus", "visual", "semantic", "image"],
+            "enum": [
+              "axe",
+              "alfa",
+              "keyboard",
+              "responsive",
+              "focus",
+              "visual",
+              "forms",
+              "semantic",
+              "image"
+            ],
             "title": "Pipeline"
           },
           "title": {"type": "string", "title": "Title"},
@@ -1911,7 +1931,17 @@
         "properties": {
           "pipeline": {
             "type": "string",
-            "enum": ["axe", "alfa", "keyboard", "responsive", "focus", "visual", "semantic", "image"],
+            "enum": [
+              "axe",
+              "alfa",
+              "keyboard",
+              "responsive",
+              "focus",
+              "visual",
+              "forms",
+              "semantic",
+              "image"
+            ],
             "title": "Pipeline"
           },
           "before": {"$ref": "#/components/schemas/MethodCoverage"},

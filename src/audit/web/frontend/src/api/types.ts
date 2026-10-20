@@ -677,7 +677,8 @@ export type DetectionPipeline =
   | "keyboard"
   | "responsive"
   | "focus"
-  | "visual";
+  | "visual"
+  | "forms";
 
 export interface A11yRuleSummary {
   rule_id: string;
