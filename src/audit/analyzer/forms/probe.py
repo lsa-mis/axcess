@@ -121,17 +121,40 @@ _COLLECT_JS = r"""
     taken.push(c);
     units.push({root: c, submit: b, fields: fieldsIn(c)});
   }
+  // Each field's own group: the largest ancestor that holds no other field,
+  // so its label, hint and error text count as "beside it".
+  const groupsOf = u => u.fields.map(f => {
+    let g = f;
+    while (g.parentElement && g.parentElement !== u.root &&
+           fieldsIn(g.parentElement).length === 1) g = g.parentElement;
+    return g;
+  });
   for (const u of units) {
-    // Each field's own group: the largest ancestor that holds no other field,
-    // so its label, hint and error text count as "beside it".
-    u.groups = u.fields.map(f => {
-      let g = f;
-      while (g.parentElement && g.parentElement !== u.root &&
-             fieldsIn(g.parentElement).length === 1) g = g.parentElement;
-      return g;
-    });
+    u.groups = groupsOf(u);
+    u.meta = u.fields.map(f => ({id: f.id, name: f.name, tag: f.tagName, label: labelOf(f)}));
   }
   window.__axcessForms = units;
+  // A page that redraws the whole form on submit (React, Vue, PrimeVue)
+  // replaces the field elements recorded before the click, so the record
+  // after it would describe detached elements that never changed. Find each
+  // field again, by id, then name, then label, and compare the new element
+  // with the old record. Returns whether anything had to be found again.
+  window.__axcessRebind = index => {
+    const u = units[index];
+    if (u.root.isConnected && u.fields.every(f => f.isConnected)) return false;
+    const current = fieldsIn(document);
+    u.fields = u.meta.map((m, k) => {
+      const old = u.fields[k];
+      if (old.isConnected) return old;
+      return (m.id && document.getElementById(m.id)) ||
+        current.find(f => f.tagName === m.tag && m.name && f.name === m.name) ||
+        current.find(f => f.tagName === m.tag && m.label && labelOf(f) === m.label) || old;
+    });
+    const live = u.fields.find(f => f.isConnected);
+    if (!u.root.isConnected && live) u.root = live.closest('form') || live.parentElement;
+    u.groups = groupsOf(u);
+    return true;
+  };
   const heading = root => {
     const h = root.querySelector('h1,h2,h3,h4,legend') ||
       root.previousElementSibling?.matches?.('h1,h2,h3,h4') && root.previousElementSibling;
@@ -485,6 +508,7 @@ class ErrorIdentificationProbe:
                     )
                     await page.wait_for_timeout(100)
                 watched = await frame.evaluate(_DISARM_JS)
+                await frame.evaluate("i => window.__axcessRebind(i)", form_index)
                 after = await frame.evaluate(_SNAPSHOT_JS, form_index)
         finally:
             page.remove_listener("request", on_request)

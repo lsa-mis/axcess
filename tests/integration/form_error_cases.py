@@ -309,6 +309,18 @@ onSubmit(document.getElementById('f'), () => document.querySelectorAll('x-field'
             "onSubmit(f, f => blanks(f).forEach(i => { i.style.boxShadow = '0 0 0 3px rgba(198,40,40,.6)'; }));"
         ),
     ),
+    Case(
+        "f27_redraw_red",
+        "fail",
+        "The whole form is redrawn on submit with red borders; no text.",
+        """
+<div id="app"></div>
+<script>function draw(bad) { app.innerHTML = '<form id="f" novalidate><h2>Contact us</h2>' +
+  ['Name', 'Email'].map(l => '<label for="' + l + '">' + l + '</label><input id="' + l + '"' + (bad ? ' style="border:2px solid #c62828"' : '') + '>').join('') +
+  '<p><button type="submit">Send message</button></p></form>';
+  document.getElementById('f').addEventListener('submit', e => { e.preventDefault(); draw(true); }); }
+draw(false);</script>""",
+    ),
     # ---------------------------------------------------------------- pass
     Case(
         "p01_linked_text",
@@ -499,6 +511,19 @@ onSubmit(document.getElementById('f'), () => document.querySelectorAll('x-field'
 <script>document.querySelectorAll('input').forEach(i => i.addEventListener('invalid', e => { e.preventDefault();
   if (!i.nextElementSibling) after(i, '<span class="err">' + i.labels[0].textContent + ' is required</span>'); }));</script>""",
     ),
+    Case(
+        "p20_redraw_text",
+        "pass",
+        "The whole form is redrawn on submit with a message under each field.",
+        """
+<div id="app"></div>
+<script>function draw(bad) { app.innerHTML = '<form id="f" novalidate><h2>Contact us</h2>' +
+  ['Name', 'Email'].map(l => '<div><label for="' + l + '">' + l + '</label><input id="' + l + '">' +
+    (bad ? '<span class="err">' + l + ' is required</span>' : '') + '</div>').join('') +
+  '<p><button type="submit">Send message</button></p></form>';
+  document.getElementById('f').addEventListener('submit', e => { e.preventDefault(); draw(true); }); }
+draw(false);</script>""",
+    ),
     # ------------------------------------------------------ not applicable
     Case(
         "n01_nothing_happens",
@@ -541,6 +566,18 @@ onSubmit(document.getElementById('f'), () => document.querySelectorAll('x-field'
         """
 <style>button:hover, button:active { background: #c62828; color: #fff; }</style>"""
         + _contact("onSubmit(f, () => {});"),
+    ),
+    Case(
+        "n07_redraw_same",
+        "not_applicable",
+        "The whole form is redrawn on submit exactly as it was.",
+        """
+<div id="app"></div>
+<script>function draw() { app.innerHTML = '<form id="f" novalidate><h2>Contact us</h2>' +
+  ['Name', 'Email'].map(l => '<label for="' + l + '">' + l + '</label><input id="' + l + '">').join('') +
+  '<p><button type="submit">Send message</button></p></form>';
+  document.getElementById('f').addEventListener('submit', e => { e.preventDefault(); draw(); }); }
+draw();</script>""",
     ),
     # --------------------------------------------------------- not checked
     Case(
