@@ -136,15 +136,26 @@ export default function RowActionsMenu({
     document.addEventListener("mousedown", closeOnOutsidePointer);
     document.addEventListener("focusin", closeOnOutsideFocus);
     document.addEventListener("keydown", onKeyDown);
+    // Scrolling or resizing closes the panel. If focus was on one of its
+    // links, it goes back to the button, as Escape does, so a keyboard user
+    // who scrolled with Page Down is not left focused on a hidden link
+    // (SC 2.4.7 Focus Visible, Level AA). `preventScroll`, so returning
+    // focus does not scroll the page back. Focus elsewhere is left alone.
+    const closeOnMove = () => {
+      if (panelRef.current?.contains(document.activeElement)) {
+        buttonRef.current?.focus({ preventScroll: true });
+      }
+      close();
+    };
     // Capture, so scrolling the table's own region closes it too.
-    window.addEventListener("scroll", close, true);
-    window.addEventListener("resize", close);
+    window.addEventListener("scroll", closeOnMove, true);
+    window.addEventListener("resize", closeOnMove);
     return () => {
       document.removeEventListener("mousedown", closeOnOutsidePointer);
       document.removeEventListener("focusin", closeOnOutsideFocus);
       document.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("scroll", close, true);
-      window.removeEventListener("resize", close);
+      window.removeEventListener("scroll", closeOnMove, true);
+      window.removeEventListener("resize", closeOnMove);
     };
   }, [open]);
 

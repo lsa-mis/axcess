@@ -173,7 +173,10 @@ async def test_reports_table_keyboard_and_columns(
     # ArrowDown on the closed button opens it on the first link.
     await page.keyboard.press("ArrowDown")
     await playwright_async.expect(open_link).to_be_focused()
-    await page.keyboard.press("Escape")
+    # Scrolling closes it; focus on its link goes back to the button.
+    await page.evaluate("window.dispatchEvent(new Event('scroll'))")
+    await playwright_async.expect(open_link).to_be_hidden()
+    await playwright_async.expect(actions).to_be_focused()
     await playwright_async.expect(table.locator('a[href$="/findings"]')).to_have_count(0)
     violations = await _run_axe(page)
     assert not violations, _render_violations(violations)

@@ -49,7 +49,7 @@ export default function ScanAgainLink({
     >
       <RotateCw className="h-4 w-4" aria-hidden />
       Scan again
-      <span className="sr-only">: {site}, starting from the settings of Report #{scanId}</span>
+      <span className="sr-only">: {site}, starting from the settings of report #{scanId}</span>
     </LinkButton>
   );
 }
