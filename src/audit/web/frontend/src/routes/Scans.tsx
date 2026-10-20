@@ -25,6 +25,7 @@ import type { ProtectedScanStatus, ProtectedScanSummary, ScanSummary, SiteGroup 
 import { confirmDestructive } from "../hooks/usePreferences";
 import BreakableUrl from "../components/BreakableUrl";
 import LastScannedSite from "../components/LastScannedSite";
+import ScanAgainLink from "../components/ScanAgainLink";
 import {
   Cell,
   ColumnHeader,
@@ -110,11 +111,11 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  *   that screen readers support unevenly. See Adrian Roselli, "Table with
  *   Expando Rows" (https://adrianroselli.com/2019/09/table-with-expando-rows.html).
  * - Columns: the site that names the row, when its latest completed scan
- *   finished, its Pages, Issues and Occurrences, then the link to open it.
- *   Issues and Occurrences are the two counts the Issues page shows side
- *   by side (docs/plain-language.md terms: an issue is one kind of
- *   problem, an occurrence is one place it appears), so the list and the
- *   report use the same words for the same numbers (SC 3.2.4 Consistent
+ *   finished, its Pages, Issues and Occurrences, then Actions. Issues and
+ *   Occurrences are the two counts the Issues page shows side by side
+ *   (docs/plain-language.md terms: an issue is one kind of problem, an
+ *   occurrence is one place it appears), so the list and the report use
+ *   the same words for the same numbers (SC 3.2.4 Consistent
  *   Identification, Level AA). "Images with text" and "Page states opened
  *   by clicking" were columns here and were removed (Oct 2026): the first
  *   counted every image with text, fine alt text or not, and read like a
@@ -129,34 +130,39 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  *   not add Issues or Occurrences: that would mean building the issue
  *   list for every scan of every expanded site, and an interrupted or
  *   failed scan's counts are partial.
- * - Column order: the site, when its latest completed scan finished, that
- *   scan's numbers, then the link to open it. The link
- *   stays last, the usual place for a row's action: the row is read (by eye
- *   or, cell by cell, by a screen reader) as "this site, as of then, with
- *   these results", and only then offers to open it. It was considered as
- *   the second column; that split the site from its date and numbers, and
- *   the Issues count is already a link into the same report earlier in the
- *   row. The Site column is sticky, so the row keeps its name when a narrow
- *   screen scrolls the table sideways to reach the link.
- * - "Open latest scan" is a link, styled as one, because it goes to a
- *   page; a button acts on this one. One quiet link per row rather than an
- *   outlined button in every row, which outweighed the numbers. Its
- *   accessible name starts with its visible words (WCAG 2.2 SC 2.5.3 Label
- *   in Name, Level A: "the name contains the text that is presented
- *   visually"). The site's name follows as screen-reader-only text inside
- *   the link (technique C7), not an `aria-label`, so the words are real
- *   text (AGENTS.md, Interface language rule 8).
- * - No "Scan again" here. It lives on the report's Issues page, beside
- *   "Export report" (ScanAgainLink), one click after this link. A row
- *   "Actions" dropdown holding both links was built and removed (Oct
- *   2026): it put opening a report, this screen's main task, one click
- *   further away and hid "Scan again" until opened (W3C COGA, "Making
- *   Content Usable", https://www.w3.org/TR/coga-usable/: make the main
- *   task easy to find, one way to do one thing); "Actions" named no verb
+ * - Column order: Actions stays last, the usual place for a row's
+ *   actions: the row is read (by eye or, cell by cell, by a screen reader)
+ *   as "this site, as of then, with these results", and only then offers
+ *   what to do with it. Opening the report was considered as the second
+ *   column; that split the site from its date and numbers, and the Issues
+ *   count is already a link into the same report earlier in the row. The
+ *   Site column is sticky, so the row keeps its name when a narrow screen
+ *   scrolls the table sideways to Actions.
+ * - Actions shows both of a site's actions as links, side by side: "Open
+ *   latest scan", then "Scan again". Both are always visible and one click
+ *   away, laid out like "All issues" and "Delete" in the expanded list of
+ *   scans below, so the two tables share one pattern (W3C COGA: the same
+ *   pattern for the same kind of thing). Stacking them was built and set
+ *   aside for this; the dropped columns left the room.
+ *   A row "Actions" dropdown holding the two links was built first and
+ *   removed (Oct 2026): it put opening a report, this screen's main task,
+ *   one click further away and hid "Scan again" until opened (W3C COGA:
+ *   make the main task easy to find); its button, "Actions", named no verb
  *   or object (docs/plain-language.md rule 8); and it closed on scroll,
- *   which caught screen-magnifier users who pan by scrolling. Two links
- *   shown in the cell were also considered; one home for "Scan again"
- *   avoids two controls for one function. The developer chose this.
+ *   which caught screen-magnifier users who pan by scrolling. Leaving
+ *   "Scan again" to the Issues page alone was also tried; the request was
+ *   to rescan from this list, and the same link with the same name on both
+ *   screens is consistent (SC 3.2.4). The "Actions" column header is a
+ *   label, not a control.
+ * - Both are links, styled as links, because they go to a page; a button
+ *   acts on this one. Quiet links rather than an outlined button in every
+ *   row, which outweighed the numbers. Each accessible name starts with
+ *   its visible words (WCAG 2.2 SC 2.5.3 Label in Name, Level A: "the name
+ *   contains the text that is presented visually"), then screen-reader-only
+ *   text that names the site (technique C7), not an `aria-label`, so the
+ *   words are real text (AGENTS.md, Interface language rule 8).
+ * - A site with no completed scan has nothing to open, so it shows only
+ *   "Scan again", from its latest scan.
  */
 type SortKey = "site" | "completed" | "pages" | "issues" | "occurrences";
 
@@ -436,7 +442,7 @@ export default function ScansRoute() {
                   <ColumnHeader className="whitespace-nowrap px-3 py-1.5 align-bottom">
                     {/* The height of a sort button, words at its foot like theirs,
                         so its label lines up with them. */}
-                    <span className="inline-flex min-h-target items-end px-1 pb-1.5">Report</span>
+                    <span className="inline-flex min-h-target items-end px-1 pb-1.5">Actions</span>
                   </ColumnHeader>
                 </tr>
               </TableHead>
@@ -618,21 +624,30 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
             <Cell numeric className="text-fg">
               {(site.most_recent_completed_occurrence_count ?? 0).toLocaleString()}
             </Cell>
-            <Cell className="whitespace-nowrap text-center">
-              {/* A link styled as a link: it goes to a page (SC 2.5.3 for its name). */}
-              <Link
-                to={`/scans/${completed.id}`}
-                className="report-link inline-flex min-h-target items-center px-1 font-semibold"
-              >
-                Open latest scan
-                <span className="sr-only"> of {label}, the most recent completed scan</span>
-              </Link>
+            <Cell className="whitespace-nowrap">
+              {/* Both actions shown side by side, as in the expanded list: see
+                  "Actions" in the comment above. */}
+              <div className="flex items-center justify-center gap-2">
+                <Link
+                  to={`/scans/${completed.id}`}
+                  className="report-link inline-flex min-h-target items-center px-1 font-semibold"
+                >
+                  Open latest scan
+                  <span className="sr-only"> of {label}, the most recent completed scan</span>
+                </Link>
+                <ScanAgainLink scanId={completed.id} site={label} look="link" />
+              </div>
             </Cell>
           </>
         ) : (
-          <Cell colSpan={5} className="text-fg-muted">
-            No completed scan yet. Expand the site to open its other scans.
-          </Cell>
+          <>
+            <Cell colSpan={4} className="text-fg-muted">
+              No completed scan yet. Expand the site to open its other scans.
+            </Cell>
+            <Cell className="whitespace-nowrap">
+              <ScanAgainLink scanId={site.most_recent.id} site={label} look="link" />
+            </Cell>
+          </>
         )}
       </Row>
       {expanded && (

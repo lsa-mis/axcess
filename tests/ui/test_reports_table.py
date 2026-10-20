@@ -102,7 +102,7 @@ async def test_reports_table_keyboard_and_columns(
     await playwright_async.expect(table.locator("td[headers]")).to_have_count(0)
     # The sorted header also carries its direction chip, so match the labels.
     await playwright_async.expect(table.locator("thead tr").first.locator("th")).to_contain_text(
-        ["Site", "Completed", "Pages", "Issues", "Occurrences", "Report"]
+        ["Site", "Completed", "Pages", "Issues", "Occurrences", "Actions"]
     )
     await playwright_async.expect(
         page.get_by_text(
@@ -151,6 +151,25 @@ async def test_reports_table_keyboard_and_columns(
         name=f"Open latest scan of site{newest}.example, the most recent completed scan",
     )
     await playwright_async.expect(open_link).to_have_attribute("href", f"/app/scans/{headline_id}")
+    # Both actions are shown, no menu to open: "Scan again" sits beside
+    # "Open latest scan" and starts from the same report's settings.
+    scan_again = row.get_by_role(
+        "link",
+        name=re.compile(
+            rf"^Scan again\W+site{newest}\.example, "
+            rf"starting from the settings of report #{headline_id}$"
+        ),
+    )
+    await playwright_async.expect(scan_again).to_be_visible()
+    await playwright_async.expect(scan_again).to_have_attribute(
+        "href", f"/app/scans/new?from={headline_id}"
+    )
+    actions_menu = row.get_by_role("button", name=re.compile("^Actions"))
+    await playwright_async.expect(actions_menu).to_have_count(0)
+    # Keyboard order follows the reading order: open first, then scan again.
+    await open_link.focus()
+    await page.keyboard.press("Tab")
+    await playwright_async.expect(scan_again).to_be_focused()
     await playwright_async.expect(table.locator('a[href$="/findings"]')).to_have_count(0)
     violations = await _run_axe(page)
     assert not violations, _render_violations(violations)
@@ -214,6 +233,13 @@ async def test_reports_table_keyboard_and_columns(
         # The failed-only site is last: no completed scan, so no numbers.
         last = table.locator(":scope > tbody > tr").last
         await playwright_async.expect(last).to_contain_text("No completed scan yet")
+        # Nothing to open yet, so only "Scan again", from its latest scan.
+        await playwright_async.expect(
+            last.get_by_role("link", name=re.compile(r"^Scan again\W+site\d+\.example"))
+        ).to_have_attribute("href", re.compile(r"/app/scans/new\?from=\d+$"))
+        await playwright_async.expect(
+            last.get_by_role("link", name=re.compile(r"^Open latest scan"))
+        ).to_have_count(0)
         violations = await _run_axe(page)
         assert not violations, _render_violations(violations)
         await previous.click()
