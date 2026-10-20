@@ -40,6 +40,7 @@ def _first_scan_running() -> list[dict[str, Any]]:
             "most_recent": scan,
             "most_recent_completed": None,
             "most_recent_completed_issue_count": None,
+            "most_recent_completed_occurrence_count": None,
             "scans": [scan],
         }
     ]

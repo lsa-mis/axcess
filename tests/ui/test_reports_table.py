@@ -43,6 +43,7 @@ def _site(index: int, findings: int) -> dict[str, Any]:
             "most_recent": failed,
             "most_recent_completed": None,
             "most_recent_completed_issue_count": None,
+            "most_recent_completed_occurrence_count": None,
             "scans": [failed],
         }
     completed = _scan(7 + 2 * (index - 1), "completed", site=url, findings=findings)
@@ -54,6 +55,7 @@ def _site(index: int, findings: int) -> dict[str, Any]:
         "most_recent": interrupted,
         "most_recent_completed": completed,
         "most_recent_completed_issue_count": 5,
+        "most_recent_completed_occurrence_count": 5 + findings,
         "scans": [interrupted, completed],
     }
 
@@ -100,7 +102,7 @@ async def test_reports_table_keyboard_and_columns(
     await playwright_async.expect(table.locator("td[headers]")).to_have_count(0)
     # The sorted header also carries its direction chip, so match the labels.
     await playwright_async.expect(table.locator("thead tr").first.locator("th")).to_contain_text(
-        ["Site", "Completed", "Pages", "Issues", "Images with text", "Page states", "Report"]
+        ["Site", "Completed", "Pages", "Issues", "Occurrences", "Report"]
     )
     await playwright_async.expect(
         page.get_by_text(
@@ -132,15 +134,18 @@ async def test_reports_table_keyboard_and_columns(
     # The site's newest run was interrupted ("Stopped"); the row shows only
     # the completed one.
     await playwright_async.expect(row).not_to_contain_text("Stopped")
-    await playwright_async.expect(row.locator("td")).to_have_count(6)
+    await playwright_async.expect(row.locator("td")).to_have_count(5)
     await playwright_async.expect(row.locator("td").nth(0)).to_have_text("Not recorded")
     await playwright_async.expect(row.locator("td").nth(1)).to_have_text("2")
     # The count says what it counts; "in Report #N" is screen-reader-only text.
     await playwright_async.expect(row.locator("td").nth(2)).to_have_text(
         f"5 issues in Report #{headline_id}"
     )
-    await playwright_async.expect(row.locator("td").nth(3)).to_have_text(str(count))
-    await playwright_async.expect(row.locator("td").nth(4)).to_have_text("4")
+    # Issues are kinds of problem; Occurrences counts every place they appear.
+    await playwright_async.expect(row.locator("td").nth(3)).to_have_text(str(5 + count))
+    # Images with text and page states are no longer columns.
+    await playwright_async.expect(table.locator("thead")).not_to_contain_text("Images with text")
+    await playwright_async.expect(table.locator("thead")).not_to_contain_text("Page states")
     open_link = row.get_by_role(
         "link",
         name=f"Open latest scan of site{newest}.example, the most recent completed scan",
@@ -159,6 +164,10 @@ async def test_reports_table_keyboard_and_columns(
     await playwright_async.expect(expanded).to_be_focused()
     scans = page.get_by_role("table", name=f"All scans for site{newest}.example, most recent first")
     await playwright_async.expect(scans.locator("tbody tr")).to_have_count(2)
+    # The same two columns are gone here as in the site rows.
+    await playwright_async.expect(scans.locator("thead th")).to_have_text(
+        ["Report", "Status", "Started", "Pages", "Actions"]
+    )
     # Only the expanded list shows the interrupted run, as "Stopped".
     await playwright_async.expect(scans).to_contain_text("Stopped")
     violations = await _run_axe(page)
@@ -276,6 +285,7 @@ async def test_reports_page_leads_with_the_last_scanned_site(new_page: Any) -> N
             "most_recent": running,
             "most_recent_completed": None,
             "most_recent_completed_issue_count": None,
+            "most_recent_completed_occurrence_count": None,
             "scans": [running],
         },
     ]

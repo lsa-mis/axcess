@@ -20,7 +20,6 @@ import {
 import { withoutUserinfo } from "../components/ReportCrumb";
 import { cn } from "../lib/cn";
 import { liveSearchParams } from "../lib/liveSearchParams";
-import { CLICK_THROUGH_STATES_LABEL } from "../lib/labels";
 import { TablePagination, usePagedRows } from "../components/TablePagination";
 import type { ProtectedScanStatus, ProtectedScanSummary, ScanSummary, SiteGroup } from "../api/types";
 import { confirmDestructive } from "../hooks/usePreferences";
@@ -110,8 +109,28 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  *   under a screen reader, and `treegrid` needs grid keyboard handling
  *   that screen readers support unevenly. See Adrian Roselli, "Table with
  *   Expando Rows" (https://adrianroselli.com/2019/09/table-with-expando-rows.html).
- * - Column order: the site that names the row, when its latest completed
- *   scan finished, that scan's numbers, then the link to open it. The link
+ * - Columns: the site that names the row, when its latest completed scan
+ *   finished, its Pages, Issues and Occurrences, then the link to open it.
+ *   Issues and Occurrences are the two counts the Issues page shows side
+ *   by side (docs/plain-language.md terms: an issue is one kind of
+ *   problem, an occurrence is one place it appears), so the list and the
+ *   report use the same words for the same numbers (SC 3.2.4 Consistent
+ *   Identification, Level AA). "Images with text" and "Page states opened
+ *   by clicking" were columns here and were removed (Oct 2026): the first
+ *   counted every image with text, fine alt text or not, and read like a
+ *   second count of problems; the second measured how far the scan
+ *   reached, where a 0 cannot say whether clicking was off or there was
+ *   nothing to click. Both are about how the scan ran, not how the site is
+ *   doing, and the report itself still shows them (Issues page summary,
+ *   ReportSummary). Fewer columns also means less sideways scrolling on a
+ *   narrow screen (W3C COGA, "Making Content Usable",
+ *   https://www.w3.org/TR/coga-usable/: only what helps the task). The
+ *   expanded list of a site's scans drops the same two columns. It does
+ *   not add Issues or Occurrences: that would mean building the issue
+ *   list for every scan of every expanded site, and an interrupted or
+ *   failed scan's counts are partial.
+ * - Column order: the site, when its latest completed scan finished, that
+ *   scan's numbers, then the link to open it. The link
  *   stays last, the usual place for a row's action: the row is read (by eye
  *   or, cell by cell, by a screen reader) as "this site, as of then, with
  *   these results", and only then offers to open it. It was considered as
@@ -139,17 +158,16 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  *   shown in the cell were also considered; one home for "Scan again"
  *   avoids two controls for one function. The developer chose this.
  */
-type SortKey = "site" | "completed" | "pages" | "issues" | "images" | "states";
+type SortKey = "site" | "completed" | "pages" | "issues" | "occurrences";
 
-const SORT_COLUMNS = ["site", "completed", "pages", "issues", "images", "states"] as const satisfies readonly SortKey[];
+const SORT_COLUMNS = ["site", "completed", "pages", "issues", "occurrences"] as const satisfies readonly SortKey[];
 const DEFAULT_SORT: Sort<SortKey> = { column: "completed", direction: "desc" };
 
 const SORT_KINDS: Record<SortKey, SortKind> = {
   site: "text",
   pages: "number",
   issues: "number",
-  images: "number",
-  states: "number",
+  occurrences: "number",
   completed: "date",
 };
 
@@ -157,12 +175,11 @@ const SORT_LABELS: Record<SortKey, string> = {
   site: "Site",
   pages: "Pages",
   issues: "Issues",
-  images: "Images with text",
-  states: CLICK_THROUGH_STATES_LABEL,
+  occurrences: "Occurrences",
   completed: "Completed",
 };
 
-const TOTAL_COLUMNS = 7;
+const TOTAL_COLUMNS = 6;
 
 /**
  * `https://a.example/docs/` reads as `a.example/docs`; other schemes stay
@@ -182,10 +199,8 @@ function sortValue(site: SiteGroup, key: SortKey): number | string | null {
       return completed ? completed.page_count : null;
     case "issues":
       return site.most_recent_completed_issue_count;
-    case "images":
-      return completed ? completed.finding_count : null;
-    case "states":
-      return completed ? completed.dom_state_count ?? 0 : null;
+    case "occurrences":
+      return site.most_recent_completed_occurrence_count;
     case "completed":
       // Report ids increase with creation, so they order runs without a
       // start time too.
@@ -406,7 +421,7 @@ export default function ScansRoute() {
                   >
                     {SORT_LABELS.site}
                   </SortHeader>
-                  {(["completed", "pages", "issues", "images", "states"] as const).map((column) => (
+                  {(["completed", "pages", "issues", "occurrences"] as const).map((column) => (
                     <SortHeader
                       key={column}
                       column={column}
@@ -601,10 +616,7 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
               </Link>
             </Cell>
             <Cell numeric className="text-fg">
-              {completed.finding_count.toLocaleString()}
-            </Cell>
-            <Cell numeric className="text-fg">
-              {(completed.dom_state_count ?? 0).toLocaleString()}
+              {(site.most_recent_completed_occurrence_count ?? 0).toLocaleString()}
             </Cell>
             <Cell className="whitespace-nowrap text-center">
               {/* A link styled as a link: it goes to a page (SC 2.5.3 for its name). */}
@@ -618,7 +630,7 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
             </Cell>
           </>
         ) : (
-          <Cell colSpan={6} className="text-fg-muted">
+          <Cell colSpan={5} className="text-fg-muted">
             No completed scan yet. Expand the site to open its other scans.
           </Cell>
         )}
@@ -651,8 +663,6 @@ function SiteScansTable({ site, label }: { site: SiteGroup; label: string }) {
             <ColumnHeader>Status</ColumnHeader>
             <ColumnHeader>Started</ColumnHeader>
             <ColumnHeader>Pages</ColumnHeader>
-            <ColumnHeader>Images with text</ColumnHeader>
-            <ColumnHeader>{CLICK_THROUGH_STATES_LABEL}</ColumnHeader>
             <ColumnHeader>Actions</ColumnHeader>
           </tr>
         </TableHead>
@@ -695,12 +705,6 @@ function ScanRow({ scan, index, isHeadline }: { scan: ScanSummary; index: number
       </Cell>
       <Cell numeric className="text-fg">
         {scan.page_count.toLocaleString()}
-      </Cell>
-      <Cell numeric className="text-fg">
-        {scan.finding_count.toLocaleString()}
-      </Cell>
-      <Cell numeric className="text-fg">
-        {(scan.dom_state_count ?? 0).toLocaleString()}
       </Cell>
       <Cell className="whitespace-nowrap py-1">
         {/* Default `md` size (44px tall): destructive controls in
