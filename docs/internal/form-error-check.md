@@ -1,8 +1,16 @@
 # Form error check (WCAG 3.3.1 Error Identification)
 
-Status: built and measured on synthetic pages, **not yet run in scans or shown
-in reports**. Code: `src/audit/analyzer/forms/`. Measurement:
-`tests/integration/test_form_error_identification.py`.
+Status: built, measured on synthetic pages, and wired into scans behind the
+New scan switch "Check that forms describe their errors", **off by default**
+until it is validated on real forms. Code: `src/audit/analyzer/forms/`.
+Measurement: `tests/integration/test_form_error_identification.py`. Crawl:
+`tests/integration/test_form_error_crawl.py`.
+
+In a report each failing form is one occurrence of the issue "Form shows an
+error without describing it in text" (WCAG 3.3.1, Level A), in the Not sure
+lane, with the submit control as the control that revealed it ("After
+clicking"). Stored in `page_a11y_findings` with `pipeline = 'forms'`
+(migration 0032).
 
 ## What it does
 
@@ -71,14 +79,17 @@ Ordered by what blocks using the check, then by expected value.
 
 ### 2. Wiring it into Axcess
 
-- [ ] Run it in the crawl after Click-Through (`crawler/js_fetcher.py`),
-      behind a scan setting, with its own time budget.
-- [ ] Store results in `page_a11y_findings` with its own pipeline and rule id,
-      plus the evidence: fields in error, messages seen, screenshots before
-      and after.
-- [ ] Report it: a check name in `lib/terms.ts` (plain language, for example
-      "Form error check"), a "What was checked" row with its skipped and not
-      checked counts, the glossary, `docs/reading-your-report.md`.
+- [x] Run it in the crawl (`crawler/js_fetcher.py`), last on each page,
+      behind a scan setting (off by default), with its own time budget.
+- [x] Store results in `page_a11y_findings` with its own pipeline and rule
+      id, the fields in error and the messages seen.
+- [x] Report it: the check name "Form error check" in `lib/terms.ts`, an
+      ordinary Issues row in the Not sure lane, a guidance card for 3.3.1 in
+      `audit_report.yaml`.
+- [ ] Screenshots before and after the press, for the occurrence.
+- [ ] A "What was checked" row with its pages, skipped and not checked
+      counts (needs scan-level counters, so a migration), the glossary, and
+      `docs/reading-your-report.md`.
 - [ ] Move 3.3.1 in `src/audit/rules/wcag_coverage.yaml` from `manual` to
       partly automated, and update `docs/coverage-tracker.md` ("Form errors
       and stateful criteria") and the public coverage page.

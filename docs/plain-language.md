@@ -114,6 +114,7 @@ issue is a real problem? Each word was chosen against these alternatives.
 | Keyboard | Keyboard check |
 | Responsive and zoom | Zoom and layout check |
 | Focus | Focus check |
+| Form errors (WCAG 3.3.1) | Form error check |
 | Visual order, motion, and autoplay | Motion and reading-order check |
 | Semantic (local language model) | AI review |
 | Image text (OCR and vision model) | Image text check |

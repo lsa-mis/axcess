@@ -10,6 +10,13 @@ merge.
 
 ### Added
 
+- New scan: **Check that forms describe their errors** (WCAG 3.3.1 Error
+  Identification), off by default and for public scans only. It presses
+  each form's submit button once, with nothing typed and nothing sent, and
+  reports a form that marks fields in error without saying in words what is
+  wrong. Results appear in the Issues table as "Form shows an error without
+  describing it in text", under Not sure. It never presses sign-in,
+  payment, delete or search forms.
 - Desktop app: the first time Axcess opens, the loading screen says
   "The first time Axcess opens, this can take a minute or two." under
   "Loading", since that first start sets up the reports database and the

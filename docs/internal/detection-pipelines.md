@@ -22,6 +22,7 @@ pipelines write rows to the `page_a11y_findings` table and tag each row with a
 | [Siteimprove Alfa](../glossary.md#siteimprove-alfa) | Failed and "cannot tell" outcomes from Alfa's [ACT rules](../glossary.md#act-rule), on its own capture of the page. | Per ACT rule, at the level chosen for axe. | `src/audit/analyzer/alfa.py` and the Node runner in `src/audit/alfa_runner/`. | `alfa`, with `engine_outcome` set to `failed` or `cant_tell`. | `failed`: Mostly sure (`likely_barrier`). `cantTell`: Not sure (`expert_review`). | Needs `make alfa-install` and Node 22 or later. Separate headless capture at 1440 x 900, 75 seconds per page. At most 200 findings per page, failures first. `passed` and `inapplicable` outcomes are counted, not stored. |
 | Keyboard | A [keyboard trap](../glossary.md#keyboard-trap): focus that stays on one element through repeated Tab and Shift+Tab presses. | 2.1.2 (A), rule `keyboard-trap-stuck`. | `src/audit/analyzer/keyboard/` | `keyboard` | Not sure (`expert_review`). Rows from older probe versions: For information (`informational`). | Up to `max_focusable * 2 + 4` Tab presses (104 at the default of 50). Flags an element only when 4 Tabs and then 4 Shift+Tabs all stay on it. Stops at the first trap, so at most one finding per page. Does not test focus order, focus visibility, or reachability. |
 | Focus | A focused control hidden behind a sticky or fixed header or overlay ([focus not obscured](../glossary.md#focus-not-obscured)), and elements with a positive `tabindex`. | 2.4.11 (AA) `focus-not-obscured`; 2.4.3 (A) `focus-order-positive-tabindex`. | `src/audit/analyzer/focus/` | `focus` | Not sure (`expert_review`). | Tests the first 150 focusable elements and the first 150 `[tabindex]` elements. Samples only the centre point of each element, and only when that point is inside the 1440 x 900 viewport. No model. |
+| Form errors | A form that, when submitted empty, marks fields in error (`aria-invalid`, a red or orange colour, or an error class) without saying in words which field is wrong and what is wrong. | 3.3.1 (A) `form-error-not-described`. | `src/audit/analyzer/forms/` | `forms`, with `revealed_by` set to the submit control's name. | Not sure (`expert_review`). | Off by default; public scans only. Presses each form's submit control once, with nothing typed, inside the network guard; at most 5 forms per page, a repeated form once per scan, about 1.4 s per form. Never presses sign-in, payment, CAPTCHA, search or sensitive-action forms, or forms with nothing empty. A form that tries to send itself is "not checked". See [Form error check](form-error-check.md). |
 | Responsive | Sideways scrolling at 320 CSS px ([reflow](../glossary.md#reflow)), text cut off at about 200% zoom ([resize text](../glossary.md#resize-text)), and text cut off with wider spacing ([text spacing](../glossary.md#text-spacing)). | 1.4.10 (AA) `responsive-reflow-overflow`; 1.4.4 (AA) `responsive-text-clipped`; 1.4.12 (AA) `responsive-text-spacing-clipped`. | `src/audit/analyzer/responsive/` | `responsive` | Not sure (`expert_review`). | Reflow at 320 x 900 with an 8 px tolerance; zoom uses a 640 x 450 viewport as a stand-in for 200%. Clipping means more than 4 px hidden by `overflow: hidden`, skipping `text-overflow: ellipsis`. Up to 5 offenders per check and 2,000 elements scanned. Runs last because it resizes the viewport. |
 | Visual | Audio that plays by itself with no control, autoplaying video or `<marquee>` with no pause, and a visual reading order that differs from the DOM order. | 1.4.2 (A) `visual-autoplay-audio-no-control`; 2.2.2 (A) `visual-motion-no-pause`; 1.3.2 (A) `visual-meaningful-sequence`. | `src/audit/analyzer/visual/` | `visual` | Not sure (`expert_review`). Older markup-only motion rows: For information. | Measures 350 ms of playback instead of trusting `autoplay` markup; audio must last over 3 seconds and video over 5, and every `<marquee>` is a lead. Reading order needs a reachable vision model: one screenshot and one call per page, up to 60 text blocks, at most one finding per page. No flashing (2.3.1) check exists, even though the New scan form hint mentions flashing. |
 | Interaction (click-through) | Problems that appear only after a control is used, such as an open menu, dialog, tab, or disclosure (a [DOM state](../glossary.md#page-state)). | Whatever the axe rule maps to. | `src/audit/analyzer/interaction/` | `axe`, with `revealed_by` set to the operated control's name. | Mostly sure (`likely_barrier`), because the rows are axe rows. | Needs axe. Up to 100 clicks, 20 per repeated control shape, 5 levels deep, and 120 seconds per page. Only axe re-runs in a revealed state, and problems already present at load are not reported again. Skips controls with destructive names and blocks navigation, non-GET/HEAD/OPTIONS requests, and cross-origin requests. |
@@ -37,7 +38,8 @@ A few rules apply across the table:
   pages.
 - Inside one browser fetch the order is fixed: axe, keyboard, focus, visual,
   interaction, then responsive, then element screenshots, then the search
-  journey (`JsFetcher.fetch` in `src/audit/crawler/js_fetcher.py`).
+  journey, then the form error check, which presses submit and reloads the
+  page (`JsFetcher.fetch` in `src/audit/crawler/js_fetcher.py`).
 - Keyboard, focus, responsive, visual, and semantic checks look at the page as
   it loaded. Only axe runs again in states that a click or a search reveals.
 - Image classifications come from the vision model prompt
@@ -56,6 +58,7 @@ the toggle label on the New scan form.
 | Siteimprove Alfa | Not available | Off: choose "Alfa" or "Both" | Off: `scan_engine` `alfa` or `both` | Off: `scan_engine` `alfa` or `both` |
 | Keyboard | On (`--skip-keyboard`) | On ("Check for keyboard traps") | On | On |
 | Focus | On (`--skip-focus`) | On ("Check that keyboard focus is never hidden") | On | Always on |
+| Form errors | Not available | Off ("Check that forms describe their errors") | Off: only with `skip_forms` set to false | Never |
 | Responsive | On (`--skip-responsive`) | On ("Check narrow screens and zoom") | On | On |
 | Visual | On (`--skip-visual`); reading order also needs the vision model | Off ("Check motion and animation") | On | Always off |
 | Interaction | On (`--skip-interaction`) | On ("Open menus, tabs, and pop-up windows (Click-Through)") | On | On |
@@ -70,7 +73,9 @@ Things that surprise people:
 
 - The raw API reads each `skip_*` field as `bool(body.get(...))`, so a field
   you leave out means the check is on. That is the opposite of the form for
-  the vision model, the semantic analyzers, and the visual probe.
+  the vision model, the semantic analyzers, and the visual probe. The one
+  exception is `skip_forms`: leaving it out means off, because the form
+  error check presses submit buttons.
 - The form and the raw API turn off interaction when the engine is Alfa only
   or static-only mode is on. Login scans turn it off when the engine is Alfa
   only.
