@@ -44,6 +44,8 @@ export interface SiteGroup {
   most_recent_completed: ScanSummary | null;
   /** Unified issue groups in `most_recent_completed`; null when there is none. */
   most_recent_completed_issue_count: number | null;
+  /** Occurrences across those issues (the Issues page's total); null when there is none. */
+  most_recent_completed_occurrence_count: number | null;
   scans: ScanSummary[];
 }
 

@@ -59,6 +59,7 @@ def test_headline_scan_is_most_recent_completed_not_most_recent(
     assert group.most_recent_completed.page_count == 40
     # No findings were stored for the seeded scan, so zero issue groups.
     assert group.most_recent_completed_issue_count == 0
+    assert group.most_recent_completed_occurrence_count == 0
 
 
 def test_site_without_a_completed_scan_has_no_headline(tmp_db: sqlite3.Connection) -> None:
@@ -72,6 +73,7 @@ def test_site_without_a_completed_scan_has_no_headline(tmp_db: sqlite3.Connectio
     assert group.completed_count == 0
     assert group.most_recent_completed is None
     assert group.most_recent_completed_issue_count is None
+    assert group.most_recent_completed_occurrence_count is None
 
 
 def test_empty_input(tmp_db: sqlite3.Connection) -> None:
@@ -109,6 +111,10 @@ def test_a_completed_reports_issue_count_is_reused_until_its_evidence_changes(
     [again] = group_scans(tmp_db, summaries)
     assert calls == [scan_id]
     assert again.most_recent_completed_issue_count == first.most_recent_completed_issue_count
+    assert (
+        again.most_recent_completed_occurrence_count
+        == first.most_recent_completed_occurrence_count
+    )
 
     # Changed evidence (``audit synthesize`` can rewrite a completed report's
     # image findings) is counted again.
@@ -118,3 +124,13 @@ def test_a_completed_reports_issue_count_is_reused_until_its_evidence_changes(
     )
     group_scans(tmp_db, summaries)
     assert calls == [scan_id, scan_id]
+
+
+def test_counts_match_the_issues_page_totals(tmp_db: sqlite3.Connection) -> None:
+    """Issues are kinds of problem; occurrences are every place they appear."""
+    scan_id = seed_rich_scan(tmp_db)
+    [group] = group_scans(tmp_db, [_summary(scan_id, "https://a.example/", "completed")])
+    rows = sites.issues.list_issues(tmp_db, scan_id)
+    assert group.most_recent_completed_issue_count == len(rows)
+    assert group.most_recent_completed_occurrence_count == sum(r.occurrence_count for r in rows)
+    assert group.most_recent_completed_occurrence_count > group.most_recent_completed_issue_count
