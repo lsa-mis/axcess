@@ -337,6 +337,8 @@ export interface NewScanPayload {
   skip_focus: boolean;
   /** Skip motion and vision-assisted visual probes. */
   skip_visual: boolean;
+  /** Skip the form error check (WCAG 3.3.1). Off unless chosen. */
+  skip_forms: boolean;
   /**
    * Do not persist each page's rendered HTML snapshot. Keeps the report
    * database smaller; the Page inspector then re-renders the live page on

@@ -66,6 +66,7 @@ const SETTING_KEYS = [
   "skip_semantic",
   "skip_focus",
   "skip_visual",
+  "skip_forms",
   "skip_rendered_storage",
   "axe_level",
   "wcag_version",
@@ -95,6 +96,9 @@ export const PUBLIC_DEFAULTS: ScanSettings = {
   skip_semantic: true,
   skip_focus: false,
   skip_visual: true,
+  // Off until it is validated on real forms (docs/internal/form-error-check.md):
+  // it presses submit buttons, with nothing typed and nothing sent.
+  skip_forms: true,
   skip_rendered_storage: false,
   axe_level: "AA",
   // The current U-M standard. 2.2 is a deliberate choice, and marks the
@@ -165,6 +169,9 @@ export const LOGIN_POLICY: ScanPolicy = {
     skip_semantic: true,
     skip_focus: false,
     skip_visual: true,
+    // Never in a signed-in session: pressing submit there could act as the
+    // person signed in, even with requests blocked.
+    skip_forms: true,
   },
   fixedNote: FIXED_NOTE_LOGIN,
   urlLabel: URL_COPY.login.label,
@@ -304,6 +311,7 @@ export type SwitchKey =
   | "click_through"
   | "keyboard"
   | "focus"
+  | "forms"
   | "responsive"
   | "skip_rendered_storage"
   | "ocr"
@@ -320,6 +328,7 @@ const SWITCH_FIELDS: Record<SwitchKey, { field: keyof ScanSettings; inverted: bo
   click_through: { field: "skip_interaction", inverted: true },
   keyboard: { field: "skip_keyboard", inverted: true },
   focus: { field: "skip_focus", inverted: true },
+  forms: { field: "skip_forms", inverted: true },
   responsive: { field: "skip_responsive", inverted: true },
   skip_rendered_storage: { field: "skip_rendered_storage", inverted: false },
   ocr: { field: "skip_ocr", inverted: true },
@@ -373,6 +382,7 @@ export type CheckItem = { key: SwitchKey; group: CheckGroup; label: string; on: 
 const CHECKS: ReadonlyArray<{ key: SwitchKey; group: CheckGroup; label: string; needsBrowser?: true }> = [
   { key: "keyboard", group: "checks", label: "Keyboard traps", needsBrowser: true },
   { key: "focus", group: "checks", label: "Focus visibility", needsBrowser: true },
+  { key: "forms", group: "checks", label: "Form errors", needsBrowser: true },
   { key: "responsive", group: "checks", label: "Responsive & zoom", needsBrowser: true },
   { key: "ocr", group: "localAi", label: "Image text (OCR)" },
   { key: "vision", group: "localAi", label: "Vision model" },

@@ -51,6 +51,7 @@ _CUSTOM_FORM: dict[str, Any] = {
     "skip_semantic": False,
     "skip_focus": True,
     "skip_visual": False,
+    "skip_forms": False,
     "skip_rendered_storage": True,
     "axe_level": "AAA",
     "wcag_version": "2.2",
@@ -92,6 +93,7 @@ def test_the_form_defaults_round_trip() -> None:
         "skip_semantic": True,
         "skip_focus": False,
         "skip_visual": True,
+        "skip_forms": True,
         "skip_rendered_storage": False,
         "axe_level": "AA",
         "wcag_version": "2.1",
@@ -124,6 +126,16 @@ def test_an_older_scan_without_a_limit_key_had_a_limit() -> None:
     )
     assert snapshot.settings.all_pages is False
     assert snapshot.settings.max_pages == 2500
+
+
+def test_a_request_without_the_form_setting_never_presses_submit() -> None:
+    """The form error check presses submit buttons, so it runs only when a
+    request asks for it; an older client that sends nothing leaves it off."""
+    form = {k: v for k, v in _CUSTOM_FORM.items() if k != "skip_forms"}
+    assert server._build_crawl_config(form, Settings()).form_error_checks_enabled is False
+    assert server._build_crawl_config(_CUSTOM_FORM, Settings()).form_error_checks_enabled is True
+    old = snapshot_from_config(scan_id=3, seed_url="https://old.example.test/", config_json="{}")
+    assert old.settings.skip_forms is True
 
 
 def test_fast_crawl_with_alfa_round_trips() -> None:

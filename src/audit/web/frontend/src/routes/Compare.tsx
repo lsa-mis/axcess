@@ -22,7 +22,17 @@ import { cn } from "../lib/cn";
 import { CHECK_LABEL } from "../lib/terms";
 
 // Each check by its shared interface name (terms.ts), keyed as the API names it.
-const PIPELINE_KEYS: DetectionPipeline[] = ["axe", "alfa", "keyboard", "responsive", "focus", "visual", "semantic", "image"];
+const PIPELINE_KEYS: DetectionPipeline[] = [
+  "axe",
+  "alfa",
+  "keyboard",
+  "responsive",
+  "focus",
+  "visual",
+  "forms",
+  "semantic",
+  "image",
+];
 const PIPELINES: Record<string, string> = Object.fromEntries(PIPELINE_KEYS.map((key) => [key, CHECK_LABEL[key]]));
 
 const isChange = (value: string | null): value is ComparisonChange =>
@@ -556,6 +566,7 @@ const SETTING_NAMES: Record<string, string> = {
   keyboard_probe_enabled: CHECK_LABEL.keyboard,
   responsive_checks_enabled: CHECK_LABEL.responsive,
   focus_checks_enabled: CHECK_LABEL.focus,
+  form_error_checks_enabled: CHECK_LABEL.forms,
   visual_checks_enabled: CHECK_LABEL.visual,
   semantic_enabled: CHECK_LABEL.semantic,
   ocr_enabled: CHECK_LABEL.image,

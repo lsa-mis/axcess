@@ -90,6 +90,11 @@ export const SWITCHES = {
     hint:
       "Finds the focus outline (the box that shows where the keyboard is) hidden behind sticky headers or footers. WCAG 2.4.11 is new in WCAG 2.2. A WCAG 2.1 scan reports it as Best practice.",
   },
+  forms: {
+    label: "Check that forms describe their errors",
+    hint:
+      "Presses each form’s submit button once, with nothing typed and nothing sent, and finds forms that mark a field in error without saying in words what is wrong (WCAG 3.3.1). Skips sign-in, payment, delete and search forms. Adds about 1–2 seconds per form.",
+  },
   responsive: {
     label: "Check narrow screens and zoom",
     hint: "Checks each page at 320 pixels wide, at 200% zoom, and with wider text spacing (WCAG 1.4.4, 1.4.10, 1.4.12). Adds 1–2 seconds per page.",
@@ -362,6 +367,7 @@ export const RAIL_LABELS = {
   click_through: `Opens menus and pop-up windows (${CLICK_THROUGH})`,
   keyboard: CHECK_LABEL.keyboard,
   focus: CHECK_LABEL.focus,
+  forms: CHECK_LABEL.forms,
   responsive: CHECK_LABEL.responsive,
   ocr: CHECK_LABEL.image,
   vision: "Vision model review",

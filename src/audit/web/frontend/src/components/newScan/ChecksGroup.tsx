@@ -70,6 +70,17 @@ export default function ChecksGroup({ settings, update, policy }: GroupProps) {
             hint={rendered ? SWITCHES.focus.hint : "Needs a browser. Turn off Fast scan to use it."}
           />
         )}
+        {/* Off by default and not offered for signed-in scans (fixed in the
+            login policy), so it is hidden there like the focus switch. */}
+        {!isFixed(policy, "skip_forms") && (
+          <SwitchRow
+            checked={switchOn(settings, "forms")}
+            onChange={(on) => update(switchPatch(settings, "forms", on))}
+            disabled={!rendered}
+            label={SWITCHES.forms.label}
+            hint={rendered ? SWITCHES.forms.hint : "Needs a browser. Turn off Fast scan to use it."}
+          />
+        )}
         <SwitchRow
           checked={switchOn(settings, "responsive")}
           onChange={(on) => update(switchPatch(settings, "responsive", on))}

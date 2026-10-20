@@ -1785,6 +1785,9 @@ def create_app(
             "skip_semantic": bool(body.get("skip_semantic")),
             "skip_focus": bool(body.get("skip_focus")),
             "skip_visual": bool(body.get("skip_visual")),
+            # Off unless asked for: an older client that sends nothing never
+            # starts the form error check, which presses submit buttons.
+            "skip_forms": bool(body.get("skip_forms", True)),
             "skip_rendered_storage": bool(body.get("skip_rendered_storage")),
             "axe_level": str(body.get("axe_level", "AA")),
             "wcag_version": wcag_version,
@@ -3393,6 +3396,7 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
         responsive_checks_enabled=not bool(form.get("skip_responsive")),
         focus_checks_enabled=not bool(form.get("skip_focus")),
         visual_checks_enabled=not bool(form.get("skip_visual")),
+        form_error_checks_enabled=not bool(form.get("skip_forms", True)),
         store_rendered_html=not bool(form.get("skip_rendered_storage")),
     )
 

@@ -49,6 +49,7 @@ _RAIL_NAME = {
     ),
     "Check for keyboard traps": "Keyboard check",
     "Check that keyboard focus is never hidden": "Focus check",
+    "Check that forms describe their errors": "Form error check",
     "Check narrow screens and zoom": "Zoom and layout check",
     "Read text inside images (OCR)": "Image text check",
     "Compare image text with alt text (vision model)": "Vision model review",
@@ -583,6 +584,8 @@ async def test_depth_dots_are_gone(live_server: tuple[str, int], new_page: Any) 
                 "Pages behind a sign-in",
                 "Whole website",
                 "Subdomains",
+                # Off by default: it presses submit buttons.
+                "Form error check",
                 "Vision model review",
                 "AI review",
                 "Motion and reading-order check",
