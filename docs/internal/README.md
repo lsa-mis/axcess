@@ -13,6 +13,7 @@ Every term is defined once, in the [glossary](../glossary.md).
 | [Developer guide](developer-guide.md) | The code layout, conventions, command-line scans, extension recipes, testing, and debugging. |
 | [Detection pipelines](detection-pipelines.md) | Every check, the report group it lands in, and the safeguards against false positives. |
 | [Adding a check](adding-a-check.md) | How to add a new check or tune an existing one. |
+| [Form error check](form-error-check.md) | The WCAG 3.3.1 check: how it decides, how well it does on test pages, and what is left to do. |
 | [Releases](releases.md) | Desktop releases, the in-app update check, and publishing the public site. |
 | [Protected scans](protected-scans.md) | Deploying the off-by-default protected companion for hosted scans of signed-in pages. |
 | [UI accessibility](ui-accessibility.md) | The accessibility contract for the Axcess review app itself. |
