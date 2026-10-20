@@ -100,7 +100,7 @@ async def test_reports_table_keyboard_and_columns(
     await playwright_async.expect(table.locator("td[headers]")).to_have_count(0)
     # The sorted header also carries its direction chip, so match the labels.
     await playwright_async.expect(table.locator("thead tr").first.locator("th")).to_contain_text(
-        ["Site", "Completed", "Pages", "Issues", "Images with text", "Page states", "Actions"]
+        ["Site", "Completed", "Pages", "Issues", "Images with text", "Page states", "Report"]
     )
     await playwright_async.expect(
         page.get_by_text(
@@ -141,42 +141,11 @@ async def test_reports_table_keyboard_and_columns(
     )
     await playwright_async.expect(row.locator("td").nth(3)).to_have_text(str(count))
     await playwright_async.expect(row.locator("td").nth(4)).to_have_text("4")
-    # The row's actions sit behind one disclosure button, opened here by
-    # keyboard: Enter shows both links, ArrowDown moves between them, and
-    # Escape closes it and puts focus back on the button.
-    actions = row.get_by_role("button", name=f"Actions for site{newest}.example", exact=True)
-    await playwright_async.expect(actions).to_have_attribute("aria-expanded", "false")
     open_link = row.get_by_role(
         "link",
         name=f"Open latest scan of site{newest}.example, the most recent completed scan",
     )
-    scan_again = row.get_by_role("link", name=re.compile(rf"^Scan again\W+site{newest}\.example"))
-    await playwright_async.expect(open_link).to_be_hidden()
-    await actions.focus()
-    await page.keyboard.press("Enter")
-    await playwright_async.expect(actions).to_have_attribute("aria-expanded", "true")
-    await playwright_async.expect(open_link).to_be_visible()
     await playwright_async.expect(open_link).to_have_attribute("href", f"/app/scans/{headline_id}")
-    await playwright_async.expect(scan_again).to_have_attribute(
-        "href", f"/app/scans/new?from={headline_id}"
-    )
-    await page.keyboard.press("Tab")
-    await playwright_async.expect(open_link).to_be_focused()
-    await page.keyboard.press("ArrowDown")
-    await playwright_async.expect(scan_again).to_be_focused()
-    violations = await _run_axe(page)
-    assert not violations, _render_violations(violations)
-    await page.keyboard.press("Escape")
-    await playwright_async.expect(actions).to_have_attribute("aria-expanded", "false")
-    await playwright_async.expect(actions).to_be_focused()
-    await playwright_async.expect(open_link).to_be_hidden()
-    # ArrowDown on the closed button opens it on the first link.
-    await page.keyboard.press("ArrowDown")
-    await playwright_async.expect(open_link).to_be_focused()
-    # Scrolling closes it; focus on its link goes back to the button.
-    await page.evaluate("window.dispatchEvent(new Event('scroll'))")
-    await playwright_async.expect(open_link).to_be_hidden()
-    await playwright_async.expect(actions).to_be_focused()
     await playwright_async.expect(table.locator('a[href$="/findings"]')).to_have_count(0)
     violations = await _run_axe(page)
     assert not violations, _render_violations(violations)
@@ -236,15 +205,6 @@ async def test_reports_table_keyboard_and_columns(
         # The failed-only site is last: no completed scan, so no numbers.
         last = table.locator(":scope > tbody > tr").last
         await playwright_async.expect(last).to_contain_text("No completed scan yet")
-        # Its Actions menu has only "Scan again": there is nothing to open.
-        await last.get_by_role("button", name=re.compile(r"^Actions for ")).click()
-        await playwright_async.expect(
-            last.get_by_role("link", name=re.compile(r"^Scan again\b"))
-        ).to_be_visible()
-        await playwright_async.expect(
-            last.get_by_role("link", name=re.compile(r"^Open latest scan"))
-        ).to_have_count(0)
-        await page.keyboard.press("Escape")
         violations = await _run_axe(page)
         assert not violations, _render_violations(violations)
         await previous.click()
@@ -382,15 +342,13 @@ async def test_back_brings_the_table_back_as_it_was(new_page: Any) -> None:
     await playwright_async.expect(page).to_have_url(re.compile(r"open=https%3A%2F%2Fsite3"))
     assert await page.evaluate("history.length") == 2
     await page.evaluate("window.scrollTo(0, 400)")
-    actions = table.get_by_role("button", name="Actions for site5.example", exact=True)
     link = table.get_by_role("link", name=re.compile(r"^Open latest scan of site5\.example"))
-    # Clicking scrolls the button into view first; the place to come back to
+    # Clicking scrolls the link into view first; the place to come back to
     # is where the page is when the reader leaves it.
-    await actions.scroll_into_view_if_needed()
+    await link.scroll_into_view_if_needed()
     scrolled = await page.evaluate("window.scrollY")
     assert scrolled > 0, scrolled
 
-    await actions.click()
     await link.click()
     await page.wait_for_url(re.compile(r"/app/scans/\d+$"))
     await page.go_back()
