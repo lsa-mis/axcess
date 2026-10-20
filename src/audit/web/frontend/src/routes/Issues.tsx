@@ -8,6 +8,7 @@ import { Card, withReturnTrail } from "../components/ui";
 import { siteLabel } from "../components/ReportCrumb";
 import ConformanceBadge from "../components/ConformanceBadge";
 import ExportMenu from "../components/ExportMenu";
+import ScanAgainLink from "../components/ScanAgainLink";
 import { TablePagination, usePagedRows } from "../components/TablePagination";
 import {
   Cell,
@@ -219,14 +220,21 @@ export default function IssuesRoute() {
         // the topbar trail, and the counts are in the summary line below.
         // A report that never recorded its finish time says when it started.
         meta={basedOn ? <span className="text-fg-muted">{basedOn}</span> : undefined}
+        // Scan again sits before Export report: Export stays the header's
+        // last action, the edge its panel hangs from (see ExportMenu). A
+        // protected report has none: its settings belong to the sign-in
+        // workflow, and the server refuses to copy them into New scan.
         actions={
-          <ExportMenu
-            scanId={scan.id}
-            site={siteLabel(scan.seed_url)}
-            pageCount={scan.page_count}
-            issueGroups={data.total_unfiltered}
-            shownIssueGroups={hasFilter ? rows.length : undefined}
-          />
+          <>
+            {!scan.protection && <ScanAgainLink scanId={scan.id} site={siteLabel(scan.seed_url)} />}
+            <ExportMenu
+              scanId={scan.id}
+              site={siteLabel(scan.seed_url)}
+              pageCount={scan.page_count}
+              issueGroups={data.total_unfiltered}
+              shownIssueGroups={hasFilter ? rows.length : undefined}
+            />
+          </>
         }
       />
 

@@ -26,6 +26,7 @@ import type { ProtectedScanStatus, ProtectedScanSummary, ScanSummary, SiteGroup 
 import { confirmDestructive } from "../hooks/usePreferences";
 import BreakableUrl from "../components/BreakableUrl";
 import LastScannedSite from "../components/LastScannedSite";
+import RowActionsMenu from "../components/RowActionsMenu";
 import {
   Cell,
   ColumnHeader,
@@ -111,20 +112,21 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  *   that screen readers support unevenly. See Adrian Roselli, "Table with
  *   Expando Rows" (https://adrianroselli.com/2019/09/table-with-expando-rows.html).
  * - Column order: the site that names the row, when its latest completed
- *   scan finished, that scan's numbers, then the link to open it. The link
- *   stays last, the usual place for a row's action: the row is read (by eye
- *   or, cell by cell, by a screen reader) as "this site, as of then, with
- *   these results", and only then offers to open it. It was considered as
- *   the second column; that split the site from its date and numbers, and
- *   the Issues count is already a link into the same report earlier in the
- *   row. The Site column is sticky, so the row keeps its name when a narrow
- *   screen scrolls the table sideways to reach the link.
- * - "Open latest scan" is a link, styled as one, because it goes to a
- *   page; a button acts on this one. One quiet link per row rather than an
- *   outlined button in every row, which outweighed the numbers. Its
- *   accessible name starts with its visible words (WCAG 2.2 SC 2.5.3 Label
- *   in Name, Level A: "the name contains the text that is presented
- *   visually").
+ *   scan finished, that scan's numbers, then Actions. Actions stays last,
+ *   the usual place for a row's actions: the row is read (by eye or, cell
+ *   by cell, by a screen reader) as "this site, as of then, with these
+ *   results", and only then offers what to do with it. The Site column is
+ *   sticky, so the row keeps its name when a narrow screen scrolls the
+ *   table sideways to reach Actions.
+ * - Actions is one dropdown per row holding "Open latest scan" and "Scan
+ *   again" (see RowActionsMenu). It replaced a "Report" column with the
+ *   open link alone and a "Scan again" link beside the site's name. Two
+ *   links shown in the cell were offered instead, since a dropdown hides
+ *   opening the report behind one more click (W3C COGA, "Making Content
+ *   Usable", https://www.w3.org/TR/coga-usable/); the developer chose the
+ *   dropdown (Oct 2026). The Issues count is still a one-click link into
+ *   the same report. A site with no completed scan gets the same button
+ *   with only "Scan again", from its latest scan.
  */
 type SortKey = "site" | "completed" | "pages" | "issues" | "images" | "states";
 
@@ -408,7 +410,7 @@ export default function ScansRoute() {
                   <ColumnHeader className="whitespace-nowrap px-3 py-1.5 align-bottom">
                     {/* The height of a sort button, words at its foot like theirs,
                         so its label lines up with them. */}
-                    <span className="inline-flex min-h-target items-end px-1 pb-1.5">Report</span>
+                    <span className="inline-flex min-h-target items-end px-1 pb-1.5">Actions</span>
                   </ColumnHeader>
                 </tr>
               </TableHead>
@@ -594,20 +596,20 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
               {(completed.dom_state_count ?? 0).toLocaleString()}
             </Cell>
             <Cell className="whitespace-nowrap text-center">
-              {/* A link styled as a link: it goes to a page (SC 2.5.3 for its name). */}
-              <Link
-                to={`/scans/${completed.id}`}
-                className="report-link inline-flex min-h-target items-center px-1 font-semibold"
-                aria-label={`Open latest scan of ${label}, the most recent completed scan`}
-              >
-                Open latest scan
-              </Link>
+              {/* Open the report and Scan again, behind one button. See RowActionsMenu. */}
+              <RowActionsMenu site={label} openScanId={completed.id} scanAgainFromId={completed.id} />
             </Cell>
           </>
         ) : (
-          <Cell colSpan={6} className="text-fg-muted">
-            No completed scan yet. Expand the site to open its other scans.
-          </Cell>
+          <>
+            <Cell colSpan={5} className="text-fg-muted">
+              No completed scan yet. Expand the site to open its other scans.
+            </Cell>
+            <Cell className="whitespace-nowrap text-center">
+              {/* Nothing to open yet, so only "Scan again", from the latest scan. */}
+              <RowActionsMenu site={label} scanAgainFromId={site.most_recent.id} />
+            </Cell>
+          </>
         )}
       </Row>
       {expanded && (
