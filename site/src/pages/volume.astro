@@ -1,0 +1,396 @@
+---
+/**
+ * What scans found, by volume: totals from completed scans on the
+ * development computer. Unlisted: not in the sidebar, kept out of the site
+ * search (pagefind: false) and out of search engines (robots noindex),
+ * because it is a small development sample, not a product claim.
+ *
+ * The numbers come from src/data/volume.json, written by site/volume.py.
+ * That file holds only totals: no page addresses, site names, element
+ * locators or page text. It is read with import.meta.glob so a checkout
+ * without the file still builds; the page then says how to make it.
+ *
+ * Order: the four headline totals, then where the occurrences come from
+ * (by WCAG criterion), then by how Axcess checks them, then the single
+ * checks that found the most, then the limits of the sample. The limits
+ * are a separate, labeled section rather than a footnote, so nobody reads
+ * the totals without them (repo rule: never drop a limitation).
+ */
+import StarlightPage from "@astrojs/starlight/components/StarlightPage.astro";
+import { url } from "../lib/site";
+
+interface Volume {
+  generated: string;
+  scans: number;
+  pages: number;
+  hosts: number;
+  occurrences: number;
+  image_findings: number;
+  by_method: Record<string, number>;
+  by_criterion: { sc: string; name: string; method: string; occurrences: number; pages: number }[];
+  by_rule: { rule: string; pipeline: string; sc: string; name: string; occurrences: number; pages: number }[];
+}
+
+const files = import.meta.glob<{ default: Volume }>("../data/volume.json", { eager: true });
+const vol: Volume | null = Object.values(files)[0]?.default ?? null;
+const hasData = !!vol && vol.occurrences > 0;
+
+/** Check names exactly as the app shows them (frontend lib/terms.ts,
+ *  CHECK_LABEL). volume.json carries older names, so they are not used. */
+const CHECK_LABEL: Record<string, string> = {
+  axe: "Rule check (axe)",
+  alfa: "Rule check (Alfa)",
+  keyboard: "Keyboard check",
+  responsive: "Zoom and layout check",
+  focus: "Focus check",
+  visual: "Motion and reading-order check",
+  semantic: "AI review",
+  image: "Image text check",
+};
+const METHOD_LABEL: Record<string, string> = {
+  automated: "Automated",
+  partial: "Partly automated",
+  "ai-assisted": "AI-assisted",
+  manual: "Manual only",
+  "best-practice": "Best practice",
+};
+const METHOD_ORDER = ["automated", "partial", "ai-assisted", "best-practice"];
+
+const total = vol?.occurrences ?? 0;
+const pages = vol?.pages ?? 0;
+// A share that rounds to 0 but is not zero says "under 1%", so a criterion
+// that was found is never shown as 0%.
+const pct = (n: number, d: number) => {
+  if (!d || !n) return "0%";
+  const p = Math.round((n / d) * 100);
+  return p === 0 ? "under 1%" : `${p}%`;
+};
+const rows = (vol?.by_criterion ?? []).filter((r) => r.occurrences > 0);
+const top = Math.max(1, ...rows.map((r) => r.occurrences));
+const criteriaWithOccurrences = rows.filter((r) => r.sc).length;
+const methods = METHOD_ORDER.filter((m) => vol?.by_method[m]);
+const has22Only = rows.some((r) => ["2.4.11", "2.5.7", "2.5.8", "3.2.6", "3.3.7", "3.3.8"].includes(r.sc));
+
+const headings = hasData
+  ? [
+      { depth: 2, slug: "totals", text: "Totals" },
+      { depth: 2, slug: "by-criterion", text: "Where the occurrences come from" },
+      { depth: 2, slug: "by-method", text: "By how Axcess checks each criterion" },
+      { depth: 2, slug: "by-check", text: "The checks that found the most" },
+      { depth: 2, slug: "read-carefully", text: "Read this carefully" },
+    ]
+  : [];
+---
+
+<StarlightPage
+  frontmatter={{
+    title: "What scans found, by volume",
+    description:
+      "What completed Axcess scans found, added up: occurrences by WCAG criterion, by how Axcess checks it, and by check. A small development sample, kept for reference and not linked from the site.",
+    pagefind: false,
+    head: [{ tag: "meta", attrs: { name: "robots", content: "noindex" } }],
+  }}
+  headings={headings}
+>
+  <p class="lede">
+    Counting criteria says what Axcess can look for. Counting what it found says where the work is. These totals come
+    from the completed scans on the development computer, with no page addresses or site names. This page is for
+    reference and is not linked from the main site. For what Axcess can check, see{" "}
+    <a href={url("/coverage/")}>What Axcess checks</a>.
+  </p>
+
+  {
+    !hasData || !vol ? (
+      <p class="callout">
+        No volume totals are in this build. To add them, run <code>uv run python site/volume.py</code> on a computer
+        with scan data, then build the site again.
+      </p>
+    ) : (
+      <>
+        <h2 id="totals">Totals</h2>
+        {/* A description list of four totals: each number has its label, and
+            the label is read first (SC 1.3.1 Info and Relationships, Level A),
+            although the number is drawn larger. One column at 320 px. */}
+        <dl class="not-content stats">
+          <div>
+            <dt>Occurrences found in all completed scans</dt>
+            <dd>{total.toLocaleString("en-US")}</dd>
+          </div>
+          <div>
+            <dt>
+              Pages tested in {vol.scans} scans of {vol.hosts} websites
+            </dt>
+            <dd>{pages.toLocaleString("en-US")}</dd>
+          </div>
+          <div>
+            <dt>Occurrences per page on average, before grouping into issues</dt>
+            <dd>{pages ? (total / pages).toFixed(1) : "0"}</dd>
+          </div>
+          <div>
+            <dt>WCAG criteria with at least one occurrence</dt>
+            <dd>{criteriaWithOccurrences}</dd>
+          </div>
+        </dl>
+
+        <h2 id="by-criterion">Where the occurrences come from</h2>
+        <p>
+          Occurrences by WCAG criterion. The last column shows how many of the tested pages had at least one
+          occurrence. That is often the more useful number: a problem on half the pages usually has one cause.
+        </p>
+        {/* A data table, with a short bar beside each count so the biggest
+            rows stand out. The bar is hidden from assistive technology
+            because the count and share in the same row say the same thing in
+            text (SC 1.1.1 Non-text Content, Level A). One colour for one
+            measure, so no legend is needed and colour carries no category
+            (SC 1.4.1 Use of Color, Level A). Only the table scrolls sideways
+            at 320 px, inside a focusable, named region (SC 1.4.10 Reflow,
+            Level AA). Captions name each table and its scroll region for screen
+            readers but are hidden visually, because a caption inside the
+            scroll area is as wide as the table and is cut off on small
+            screens; the heading above each table says the same. */}
+        <div class="not-content table-wrap" role="region" aria-labelledby="crit-caption" tabindex="0">
+          <table>
+            <caption id="crit-caption" class="sr-only">
+              Occurrences by WCAG criterion, with each one's share of all occurrences and of the pages tested
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Criterion</th>
+                <th scope="col">How Axcess checks it</th>
+                <th scope="col" class="n">Occurrences</th>
+                <th scope="col" class="n">Share</th>
+                <th scope="col" class="n">Pages affected</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr>
+                  <th scope="row">
+                    {r.sc && <span class="sc">{r.sc}</span>} {r.sc ? r.name : "Best practice rules (no single criterion)"}
+                  </th>
+                  <td>{METHOD_LABEL[r.method] ?? r.method}</td>
+                  <td class="n">
+                    <span class="bar-cell">
+                      <span class="track" aria-hidden="true">
+                        <span class="fill" style={`inline-size: ${Math.max((r.occurrences / top) * 100, 1).toFixed(1)}%`} />
+                      </span>
+                      <span class="count">{r.occurrences.toLocaleString("en-US")}</span>
+                    </span>
+                  </td>
+                  <td class="n">{pct(r.occurrences, total)}</td>
+                  <td class="n">{pct(r.pages, pages)} of pages</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <h2 id="by-method">By how Axcess checks each criterion</h2>
+        <p>
+          By number of criteria, most of WCAG needs a person. By volume, almost everything so far came from the checks
+          that use fixed rules or measure the page in a browser. That is what they are for: the mechanical, repeated
+          failures that nobody should have to find by hand.
+        </p>
+        <div class="not-content table-wrap" role="region" aria-labelledby="method-caption" tabindex="0">
+          <table class="narrow">
+            <caption id="method-caption" class="sr-only">Occurrences by how Axcess checks the criterion</caption>
+            <thead>
+              <tr>
+                <th scope="col">How Axcess checks it</th>
+                <th scope="col" class="n">Occurrences</th>
+                <th scope="col" class="n">Share</th>
+              </tr>
+            </thead>
+            <tbody>
+              {methods.map((m) => (
+                <tr>
+                  <th scope="row">{METHOD_LABEL[m]}</th>
+                  <td class="n">{vol.by_method[m].toLocaleString("en-US")}</td>
+                  <td class="n">{pct(vol.by_method[m], total)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <h2 id="by-check">The checks that found the most</h2>
+        <div class="not-content table-wrap" role="region" aria-labelledby="rule-caption" tabindex="0">
+          <table>
+            <caption id="rule-caption" class="sr-only">Single rules, ranked by occurrences found</caption>
+            <thead>
+              <tr>
+                <th scope="col">What it found</th>
+                <th scope="col">Check and rule</th>
+                <th scope="col" class="n">Occurrences</th>
+                <th scope="col" class="n">Pages</th>
+              </tr>
+            </thead>
+            <tbody>
+              {vol.by_rule.slice(0, 8).map((r) => (
+                <tr>
+                  <th scope="row">
+                    {r.name}
+                    {r.sc && <span class="small"> (WCAG {r.sc})</span>}
+                  </th>
+                  <td>
+                    {CHECK_LABEL[r.pipeline] ?? r.pipeline}, rule <code>{r.rule}</code>
+                  </td>
+                  <td class="n">{r.occurrences.toLocaleString("en-US")}</td>
+                  <td class="n">{r.pages.toLocaleString("en-US")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <h2 id="read-carefully">Read this carefully</h2>
+        <ul>
+          <li>
+            This is a small development sample of {vol.hosts} websites, not a picture of the web.
+          </li>
+          <li>
+            No expert has reviewed these occurrences yet. They are found, not confirmed.
+          </li>
+          <li>
+            The checks that use a local AI model (the AI review, the Motion and reading-order check, and the vision
+            model in the Image text check) were off for every one of these scans. Their totals are zero because of
+            the settings, not because those checks cannot find anything.
+          </li>
+          <li>
+            The Image text check, using text recognition (OCR) alone, flagged {vol.image_findings} images. They are
+            counted separately and are not in the totals above.
+          </li>
+          {has22Only && (
+            <li>
+              Some of these scans used the WCAG 2.2 rules, so the totals include WCAG 2.2 criteria such as target size
+              (2.5.8). New scans check WCAG 2.1 by default, which does not include them.
+            </li>
+          )}
+          <li>
+            Totals made on <time datetime={vol.generated}>{vol.generated}</time>.
+          </li>
+        </ul>
+      </>
+    )
+  }
+</StarlightPage>
+
+<style>
+  .lede {
+    font-size: 1.1875rem;
+    line-height: 1.55;
+  }
+  .callout {
+    padding: 1rem 1.25rem;
+    border: 1px solid var(--ax-border);
+    border-inline-start: 4px solid var(--ax-link);
+    border-radius: 0.5rem;
+    background: var(--ax-surface-subtle);
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+    gap: 1rem;
+    margin: 1.25rem 0 0;
+  }
+  .stats div {
+    display: flex;
+    flex-direction: column-reverse;
+    justify-content: flex-end;
+    gap: 0.25rem;
+    padding: 1.25rem;
+    border: 1px solid var(--ax-border);
+    border-radius: 0.75rem;
+    background: var(--ax-surface-subtle);
+  }
+  .stats dt {
+    color: var(--ax-fg-muted);
+    line-height: 1.45;
+  }
+  .stats dd {
+    margin: 0;
+    color: var(--ax-fg);
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .table-wrap {
+    margin-top: 1.25rem;
+    overflow-x: auto;
+    border: 1px solid var(--ax-border);
+    border-radius: 0.75rem;
+  }
+  table {
+    width: 100%;
+    min-width: 40rem;
+    border-collapse: collapse;
+    font-size: 1rem;
+    line-height: 1.45;
+  }
+  table.narrow {
+    min-width: 20rem;
+  }
+  caption {
+    padding: 0.875rem 1.25rem;
+    color: var(--ax-fg);
+    font-weight: 700;
+    text-align: start;
+  }
+  th,
+  td {
+    padding: 0.75rem 1rem;
+    border-top: 1px solid var(--ax-border);
+    color: var(--ax-fg-muted);
+    text-align: start;
+    vertical-align: top;
+  }
+  thead th {
+    background: var(--ax-surface-muted);
+    color: var(--ax-fg);
+  }
+  tbody th {
+    color: var(--ax-fg);
+    font-weight: 700;
+  }
+  .n {
+    text-align: end;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .sc {
+    font-family: var(--sl-font-mono);
+  }
+  .small {
+    color: var(--ax-fg-subtle);
+    font-weight: 400;
+  }
+  code {
+    font-family: var(--sl-font-mono);
+    font-size: 0.875rem;
+    overflow-wrap: anywhere;
+  }
+  .bar-cell {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    min-inline-size: 10rem;
+  }
+  .count {
+    min-inline-size: 4.5rem;
+    text-align: end;
+  }
+  .track {
+    display: block;
+    flex: 0 0 6rem;
+  }
+  .fill {
+    display: block;
+    block-size: 0.625rem;
+    border-radius: 0 4px 4px 0;
+    background: var(--ax-link);
+  }
+</style>

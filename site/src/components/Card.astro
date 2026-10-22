@@ -1,0 +1,69 @@
+---
+/**
+ * A bordered panel holding one idea: an optional short label, a heading, the
+ * text, and an optional "proof" area pinned to the bottom (a figure, a
+ * number, a sample of the app's wording).
+ *
+ * One component for every card on the site, so the same kind of content
+ * always looks the same (SC 3.2.4 Consistent Identification, Level AA). The
+ * heading level is a prop because cards sit under different section levels
+ * and headings must not skip (SC 1.3.1 Info and Relationships, Level A).
+ */
+interface Props {
+  heading: string;
+  level?: 2 | 3 | 4;
+  label?: string;
+}
+const { heading, level = 3, label } = Astro.props;
+const H = `h${level}` as "h2" | "h3" | "h4";
+---
+
+<div class="ax-card">
+  {label && <p class="label">{label}</p>}
+  <H class="heading">{heading}</H>
+  <div class="body"><slot /></div>
+  {Astro.slots.has("proof") && <div class="proof"><slot name="proof" /></div>}
+</div>
+
+<style>
+  .ax-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    height: 100%;
+    padding: 1.5rem;
+    border: 1px solid var(--ax-border);
+    border-radius: 0.75rem;
+    background: var(--ax-surface-subtle);
+  }
+  .label {
+    margin: 0;
+    color: var(--ax-fg-subtle);
+    font-size: 0.875rem;
+    font-weight: 700;
+  }
+  .heading {
+    margin: 0;
+    color: var(--ax-fg);
+    font-size: 1.25rem;
+    line-height: 1.25;
+  }
+  .body {
+    color: var(--ax-fg-muted);
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+  .body :global(p) {
+    margin: 0;
+  }
+  .body :global(p + p) {
+    margin-top: 0.75rem;
+  }
+  .proof {
+    margin-top: auto;
+    padding-top: 0.875rem;
+    border-top: 1px solid var(--ax-border);
+    color: var(--ax-fg);
+    font-size: 0.9375rem;
+  }
+</style>

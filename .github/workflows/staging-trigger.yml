@@ -1,0 +1,38 @@
+name: Update the staging site
+
+# Pushes to the staging branch refresh https://lsa-mis.github.io/axcess/staging/.
+# This workflow cannot deploy by itself: the github-pages environment lets
+# only main deploy, and every deploy replaces the whole site. So it asks the
+# Pages workflow on main to run, and that run builds the live copy from main
+# and the staging copy from this branch (see pages.yml and site/README.md).
+#
+# If the staging branch changes, change the branch below and STAGING_BRANCH
+# in main's pages.yml.
+
+on:
+  push:
+    branches:
+      - website-refresh
+    paths:
+      - .github/workflows/pages.yml
+      - .github/workflows/staging-trigger.yml
+      - site/**
+      - docs/**
+      - src/audit/rules/wcag_coverage.yaml
+      - src/audit/coverage_matrix.py
+      - src/audit/web/coverage_status.py
+      - tests/public_site/**
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  trigger:
+    name: Start the Pages workflow on main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run pages.yml on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --ref main --repo "${{ github.repository }}"

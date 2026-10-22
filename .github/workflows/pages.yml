@@ -1,18 +1,23 @@
 name: Deploy GitHub Pages
 
-# Publishes two copies of the public site in one deploy:
+# Builds the public site (site/, Astro + Starlight) and publishes it. The
+# site is built here rather than committed: product pages read the coverage
+# numbers exported from src/audit/rules/wcag_coverage.yaml, and the guides
+# are read straight from docs/, so a change to either redeploys the site.
+# The site tests (tests/public_site) must pass before anything is published.
+#
+# Two copies are published in one deploy (site/README.md has the diagram):
 #
 #   main            -> https://lsa-mis.github.io/axcess/          (live)
-#   STAGING_BRANCH  -> https://lsa-mis.github.io/axcess/staging/  (draft for testers)
+#   STAGING_BRANCH  -> https://lsa-mis.github.io/axcess/staging/  (draft)
 #
 # Why one run builds both: every Pages deploy replaces the whole site, and
 # the github-pages environment lets only main deploy. So the live copy is
-# rebuilt from main each time, exactly as before (site/ copied as-is), and
-# the draft is added under staging/. The live copy never depends on the
-# draft: a failed staging build is left out of the deploy, and the assemble
-# job stops the deploy if the draft would change any live file. Pushes to
-# the staging branch start this workflow through its staging-trigger.yml.
-# The staging branch's site/README.md explains the flow with a diagram.
+# rebuilt from main each time, and the draft is added under staging/.
+# The live copy never depends on the draft: a failed staging build is left
+# out of the deploy, and the assemble job stops the deploy if the draft
+# would change any live file. Pushes to the staging branch start this
+# workflow through staging-trigger.yml.
 
 on:
   push:
@@ -21,6 +26,11 @@ on:
     paths:
       - .github/workflows/pages.yml
       - site/**
+      - docs/**
+      - src/audit/rules/wcag_coverage.yaml
+      - src/audit/coverage_matrix.py
+      - src/audit/web/coverage_status.py
+      - tests/public_site/**
   workflow_dispatch:
 
 permissions:
@@ -38,61 +48,59 @@ env:
   STAGING_BRANCH: website-refresh
 
 jobs:
-  build-live:
-    name: Prepare the live site
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Stage public files
-        run: |
-          rsync -a --exclude build.py site/ _site/
-      - uses: actions/upload-artifact@v4
-        with:
-          name: site-live
-          path: _site
-          retention-days: 1
-
-  build-staging:
-    name: Build and test the staging site
+  build:
+    name: Build and test the ${{ matrix.part }} site
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     # A broken draft must never block the live site.
-    continue-on-error: true
+    continue-on-error: ${{ matrix.part == 'staging' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - part: live
+            base: /axcess
+            staging: "0"
+          - part: staging
+            base: /axcess/staging
+            staging: "1"
     env:
-      AXCESS_SITE_BASE: /axcess/staging
-      AXCESS_SITE_STAGING: "1"
+      AXCESS_SITE_BASE: ${{ matrix.base }}
+      AXCESS_SITE_STAGING: ${{ matrix.staging }}
     steps:
-      - name: Check that the staging branch exists
+      - name: Pick the branch to build
         id: ref
         run: |
-          if git ls-remote --exit-code --heads "https://github.com/${{ github.repository }}" "$STAGING_BRANCH" >/dev/null; then
-            echo "found=true" >> "$GITHUB_OUTPUT"
+          if [ "${{ matrix.part }}" = live ]; then
+            echo "ref=main" >> "$GITHUB_OUTPUT"
+          elif git ls-remote --exit-code --heads "https://github.com/${{ github.repository }}" "$STAGING_BRANCH" >/dev/null; then
+            echo "ref=$STAGING_BRANCH" >> "$GITHUB_OUTPUT"
           else
             echo "::notice::Branch $STAGING_BRANCH does not exist, so there is no staging copy this time."
-            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "ref=" >> "$GITHUB_OUTPUT"
           fi
       - uses: actions/checkout@v4
-        if: steps.ref.outputs.found == 'true'
+        if: steps.ref.outputs.ref != ''
         with:
-          ref: ${{ env.STAGING_BRANCH }}
+          ref: ${{ steps.ref.outputs.ref }}
       - uses: astral-sh/setup-uv@v6
-        if: steps.ref.outputs.found == 'true'
+        if: steps.ref.outputs.ref != ''
         with:
           enable-cache: true
           python-version: "3.13"
       - uses: actions/setup-node@v4
-        if: steps.ref.outputs.found == 'true'
+        if: steps.ref.outputs.ref != ''
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: site/package-lock.json
       - name: Install locked dependencies
-        if: steps.ref.outputs.found == 'true'
+        if: steps.ref.outputs.ref != ''
         run: |
           uv sync --frozen --no-install-project
           npm ci --prefix site
       - name: Export coverage data, type-check and build
-        if: steps.ref.outputs.found == 'true'
+        if: steps.ref.outputs.ref != ''
         env:
           PYTHONPATH: src
         run: |
@@ -100,24 +108,24 @@ jobs:
           npm run check --prefix site
           npm run build --prefix site
       - name: Install Chromium
-        if: steps.ref.outputs.found == 'true'
+        if: steps.ref.outputs.ref != ''
         run: uv run --no-sync playwright install --with-deps chromium
       - name: Test the built site
-        if: steps.ref.outputs.found == 'true'
+        if: steps.ref.outputs.ref != ''
         env:
           PYTHONPATH: src
           AXCESS_SITE_REQUIRED: "1"
         run: uv run --no-sync pytest -p no:cacheprovider tests/public_site
       - uses: actions/upload-artifact@v4
-        if: steps.ref.outputs.found == 'true'
+        if: steps.ref.outputs.ref != ''
         with:
-          name: site-staging
+          name: site-${{ matrix.part }}
           path: site/dist
           retention-days: 1
 
   assemble:
     name: Put the live and staging copies together
-    needs: [build-live, build-staging]
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4

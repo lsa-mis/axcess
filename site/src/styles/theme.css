@@ -1,0 +1,504 @@
+/* Axcess site theme.
+ *
+ * Colours are the app's own tokens (src/audit/web/frontend/src/styles.css),
+ * so the site looks like the product people will install. Every text pair
+ * clears 7:1 in both themes (SC 1.4.6 Contrast (Enhanced), Level AAA, which
+ * the app already meets): light fg 17.7:1, muted 10.3:1, subtle 7.2:1 on the
+ * greyest panel; dark fg 16.6:1, muted 12.2:1, subtle 7.8:1.
+ *
+ * Only the --ax-* tokens change between themes. Starlight's --sl-* colours
+ * are mapped from them once, below, so light and dark cannot drift apart.
+ * This file is not in a cascade layer, so it wins over Starlight's layered
+ * defaults without !important.
+ */
+
+/* Dark: the light palette inverted, as in the app. */
+:root {
+  --ax-fg: #edf1f6;
+  --ax-fg-muted: #c8d1dc;
+  --ax-fg-subtle: #aeb9c7;
+  --ax-border: #2c3a4d;
+  --ax-border-strong: #5b6e86;
+  --ax-surface: #111a26;
+  --ax-surface-subtle: #0b121b;
+  --ax-surface-muted: #1a2533;
+  --ax-link: #9ec5ee;
+  --ax-link-hover: #b8d5f3;
+  --ax-tint: #1a2533;
+  --ax-inverse-bg: #cfe0f3;
+  --ax-inverse-fg: #0b121b;
+  --ax-inverse-fg-subtle: #22303f;
+  --ax-inverse-focus: #0b121b;
+  --ax-focus: #9ec5ee;
+  --ax-maize: #ffcb05;
+  --ax-shadow: 0 24px 60px -30px rgb(0 0 0 / 0.7);
+}
+
+/* Light, the U-M palette. Written twice on purpose: once for the switch,
+ * once for a reader whose scripts are off. Starlight always writes
+ * data-theme="dark" into the HTML, and only its script changes it, so when
+ * scripts have not run (no ax-js class, see overrides/ThemeProvider.astro)
+ * the system setting decides. This is what
+ * keeps "Every page can be read and navigated without JavaScript" true for
+ * colour too. */
+:root[data-theme="light"] {
+  --ax-fg: #111827;
+  --ax-fg-muted: #374151;
+  --ax-fg-subtle: #475263;
+  --ax-border: #dce3ec;
+  --ax-border-strong: #b8c4d2;
+  --ax-surface: #ffffff;
+  --ax-surface-subtle: #f7f9fc;
+  --ax-surface-muted: #f1f4f8;
+  --ax-link: #00274c;
+  --ax-link-hover: #003a6c;
+  --ax-tint: #e6ebf2;
+  --ax-inverse-bg: #00274c;
+  --ax-inverse-fg: #ffffff;
+  --ax-inverse-fg-subtle: #c9d4e0;
+  --ax-inverse-focus: #ffcb05;
+  --ax-focus: #00274c;
+  --ax-shadow: 0 24px 60px -30px rgb(0 39 76 / 0.35);
+}
+@media (prefers-color-scheme: light) {
+  :root:not(.ax-js) {
+    --ax-fg: #111827;
+    --ax-fg-muted: #374151;
+    --ax-fg-subtle: #475263;
+    --ax-border: #dce3ec;
+    --ax-border-strong: #b8c4d2;
+    --ax-surface: #ffffff;
+    --ax-surface-subtle: #f7f9fc;
+    --ax-surface-muted: #f1f4f8;
+    --ax-link: #00274c;
+    --ax-link-hover: #003a6c;
+    --ax-tint: #e6ebf2;
+    --ax-inverse-bg: #00274c;
+    --ax-inverse-fg: #ffffff;
+    --ax-inverse-fg-subtle: #c9d4e0;
+    --ax-inverse-focus: #ffcb05;
+    --ax-focus: #00274c;
+    --ax-shadow: 0 24px 60px -30px rgb(0 39 76 / 0.35);
+  }
+}
+
+:root {
+  --sl-font: "Atkinson Hyperlegible Next", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --sl-font-mono: "Atkinson Hyperlegible Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --sl-color-white: var(--ax-fg);
+  --sl-color-gray-1: var(--ax-fg);
+  --sl-color-gray-2: var(--ax-fg-muted);
+  --sl-color-gray-3: var(--ax-fg-subtle);
+  --sl-color-gray-4: var(--ax-fg-subtle);
+  --sl-color-gray-5: var(--ax-border);
+  --sl-color-gray-6: var(--ax-surface-muted);
+  --sl-color-gray-7: var(--ax-surface-subtle);
+  --sl-color-black: var(--ax-surface);
+  --sl-color-accent-low: var(--ax-tint);
+  --sl-color-accent: var(--ax-link);
+  --sl-color-accent-high: var(--ax-link);
+
+  --sl-color-text: var(--ax-fg);
+  --sl-color-text-accent: var(--ax-link);
+  --sl-color-text-invert: var(--ax-surface);
+  --sl-color-bg: var(--ax-surface);
+  --sl-color-bg-nav: var(--ax-surface);
+  --sl-color-bg-sidebar: var(--ax-surface-subtle);
+  --sl-color-bg-inline-code: var(--ax-surface-muted);
+  --sl-color-bg-accent: var(--ax-link);
+  --sl-color-hairline-light: var(--ax-border);
+  --sl-color-hairline: var(--ax-border);
+  --sl-color-hairline-shade: var(--ax-border);
+
+  /* Long guides read better a little wider than Starlight's default. */
+  --sl-content-width: 48rem;
+  --sl-menu-button-size: 44px;
+  --ax-target: 44px;
+}
+
+/* Focus: a solid 3px ring in the theme's strongest colour, never maize on a
+ * light background (about 1.6:1, which fails SC 1.4.11 Non-text Contrast,
+ * Level AA). Navy here is 15:1 on white. Matches the app's focus ring
+ * (tailwind.config.ts, shadow-focus). On the dark .ax-inverse band the ring
+ * switches to maize (9.9:1 on navy). */
+:focus-visible {
+  outline: 3px solid var(--ax-focus);
+  outline-offset: 2px;
+}
+.ax-inverse :focus-visible {
+  outline-color: var(--ax-inverse-focus);
+}
+
+/* Code that is not highlighted (an unknown language) wraps too, for the
+ * same reasons as the highlighted blocks (astro.config.mjs). */
+.sl-markdown-content pre:not(.expressive-code pre) {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Guide tables sit in a focusable scroll area (src/loaders/repo-docs.ts),
+ * so the area scrolls, not the table itself. */
+.sl-markdown-content .ax-table-scroll {
+  overflow-x: auto;
+}
+.sl-markdown-content .ax-table-scroll > table {
+  display: table;
+  overflow: visible;
+}
+
+/* Links are underlined everywhere except in menus, so they never rely on
+ * colour alone (SC 1.4.1 Use of Color, Level A). Not inside .not-content,
+ * where components such as LinkButton set their own colours: without the
+ * exclusion this rule beat the button's scoped style and painted a filled
+ * button's text in the link colour (1.33:1 in dark mode). Starlight excludes
+ * .not-content the same way. */
+.sl-markdown-content a:not(:where(.not-content *)),
+.ax-prose a {
+  color: var(--ax-link);
+  text-underline-offset: 0.2em;
+}
+.sl-markdown-content a:not(:where(.not-content *)):hover,
+.ax-prose a:hover {
+  color: var(--ax-link-hover);
+  text-decoration-thickness: 2px;
+}
+
+/* 44 by 44 px targets for every menu link and header control (SC 2.5.5
+ * Target Size (Enhanced), Level AAA, which the app meets with min-h-target).
+ * Starlight's defaults are about 32 px tall. */
+.sidebar-content a,
+.sidebar-content summary,
+starlight-toc a,
+mobile-starlight-toc a {
+  min-height: var(--ax-target);
+  display: flex;
+  align-items: center;
+}
+/* Navigation at reading size. Starlight sets sidebar links at 14 px and the
+ * "On this page" links at 13 px, below the 16 px body text they lead to;
+ * at that size the words people use to find their way are the hardest to
+ * read on the page. Sidebar links now match the body (16 px) and the page
+ * contents list is one step smaller (15 px), so the order of importance
+ * still shows. Group names stay bold, so they still read as headings.
+ * There is no WCAG minimum size; this follows the repo's plain-language
+ * rules and W3C COGA "Making Content Usable" (make text easy to read,
+ * https://www.w3.org/TR/coga-usable/, paraphrased). */
+.sidebar-content a {
+  font-size: var(--sl-text-base);
+  line-height: 1.4;
+}
+starlight-toc a,
+mobile-starlight-toc a {
+  font-size: 0.9375rem;
+  line-height: 1.4;
+}
+starlight-toc h2,
+mobile-starlight-toc summary {
+  font-size: var(--sl-text-base);
+}
+/* The section you are reading, in "On this page": a thin grey rail runs
+ * down the whole list, and the current section's part of it is a straight
+ * bar in the link colour, with the name in semibold, not only Starlight's
+ * colour change (SC 1.4.1 Use of Color, Level A). The same idea as the
+ * sidebar's current page. A bar drawn inside each link's rounded corners
+ * was tried first and read as a curved bracket (developer's review). The
+ * rail is a border of the same width on every link, so nothing shifts when
+ * the current section changes. */
+starlight-toc a {
+  border-inline-start: 2px solid var(--ax-border);
+  border-radius: 0;
+}
+starlight-toc a[aria-current="true"] {
+  border-inline-start-color: var(--ax-link);
+  font-weight: 600;
+}
+/* The code copy button and the "Edit this page on GitHub" link. */
+.expressive-code .copy button {
+  width: var(--ax-target) !important;
+  height: var(--ax-target) !important;
+}
+footer .meta a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--ax-target);
+}
+.social-icons a,
+site-search > button,
+.pagination-links a,
+.sl-skip-link {
+  min-height: var(--ax-target);
+  min-width: var(--ax-target);
+}
+
+/* Previous and next page links, at the foot of each page: a quiet way on,
+ * not a second headline. Starlight draws them with a drop shadow and the
+ * page name at 24 px, larger than most headings on the page, with the arrow
+ * centred on both lines. Here: a light border and no shadow, the page name
+ * at 18 px in the link colour, the "Previous" or "Next" label small and
+ * muted above it, and the arrow on the name's line. On hover the border
+ * darkens and the name is underlined, so the change is not colour alone
+ * (SC 1.4.1 Use of Color, Level A). The whole box stays the link, at least
+ * 44 px tall (SC 2.5.5 Target Size (Enhanced), Level AAA). */
+/* Two equal columns, Previous always left and Next always right, so a lone
+ * link takes half the width, not all of it. One column on a narrow
+ * screen. */
+.pagination-links {
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 40rem) {
+  .pagination-links {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .pagination-links a[rel="next"] {
+    grid-column: 2;
+  }
+}
+.pagination-links a {
+  align-items: flex-end;
+  gap: 0.75rem;
+  padding: 0.875rem 1.125rem;
+  border-color: var(--ax-border);
+  border-radius: 0.75rem;
+  box-shadow: none;
+  color: var(--ax-fg-muted);
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+.pagination-links a:hover {
+  border-color: var(--ax-fg);
+}
+.pagination-links .link-title {
+  color: var(--ax-link);
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.pagination-links a:hover .link-title {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.pagination-links svg {
+  width: 1.125rem;
+  height: 1.125rem;
+  margin-bottom: 0.2rem;
+}
+
+/* The phone menu button, flat and centred like the search icon beside it.
+ * Starlight draws it as a floating white circle with a shadow below, which
+ * next to the flat search icon read as sitting high and clipped. The open
+ * state keeps Starlight's grey fill, so open and closed still differ. */
+button.sl-menu-button {
+  align-items: center;
+  justify-content: center;
+  background-color: transparent;
+  color: var(--ax-fg);
+  box-shadow: none;
+}
+
+/* Running text no wider than about 75 characters a line. SC 1.4.8 Visual
+ * Presentation (Level AAA) asks for 80 characters or fewer; Starlight's
+ * column and the wider product layouts gave 81 to 107. In em, not ch: this
+ * font's zero (what ch measures) is wide, so 70ch came to about 90
+ * characters of real text. Applied to the text itself, not its column, so
+ * tables, code, cards and pictures keep their width. */
+.sl-markdown-content :is(p, li, dd, blockquote),
+.site-footer p {
+  max-width: 35em;
+}
+
+/* The report groups diagram is an image of text. In the guide it comes from
+ * (docs/reading-your-report.md, also read on GitHub) it is followed by a
+ * table that says the same in real text, so the site does not show the
+ * picture (SC 1.4.9 Images of Text (No Exception), Level AAA). */
+.sl-markdown-content img[src$="report-groups.png"] {
+  display: none;
+}
+
+/* "Reduce motion" turns off every transition and animation the site has
+ * (the theme switch's knob, the tabs, hover fades), not only the ones that
+ * remembered to ask, and scrolling jumps instead of gliding. SC 2.3.3
+ * Animation from Interactions, Level AAA. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------------------------------------------------------------------
+ * Without JavaScript. overrides/ThemeProvider.astro adds the ax-js class to
+ * <html> when scripts run, so its absence means they did not. The code copy
+ * button is hidden too: it needs scripts, and the code can still be
+ * selected and copied by hand. Hide the controls that would do
+ * nothing and show their plain-HTML stand-ins (class ax-nojs). See
+ * src/overrides/Search.astro.
+ * ------------------------------------------------------------------- */
+.ax-nojs {
+  display: none;
+}
+:root:not(.ax-js) .ax-nojs {
+  display: revert;
+}
+:root:not(.ax-js) site-search > button[data-open-modal],
+:root:not(.ax-js) ax-theme-toggle,
+:root:not(.ax-js) .expressive-code .copy {
+  display: none;
+}
+
+/* Controls that only work with scripts, such as "Copy link". Hidden until
+ * scripts run rather than shown and broken. */
+.ax-js-only {
+  display: none;
+}
+.ax-js .ax-js-only {
+  display: inline-flex;
+}
+
+/* ---------------------------------------------------------------------
+ * Home page (the only page with a hero).
+ *
+ * The home page copies the v3 design artifact's layout and palette exactly
+ * (the developer's choice, 2026-10-03): full-width bands on a #f5f7fa page,
+ * a 1200 px column with 32 px sides, 96 px between sections, and the
+ * artifact's navy #0a2647. Three things differ from the artifact, also by
+ * the developer's choice: the app's font, sentence-case section labels,
+ * and a navy focus ring (the artifact's yellow ring is about 1.6:1 on this
+ * page, which fails SC 1.4.11 Non-text Contrast, Level AA). The label grey
+ * is #475263 instead of the artifact's #4a5b6e (6.5:1), so it clears 7:1.
+ * The artifact has no dark theme; the dark values follow the app's.
+ *
+ * Changed from the artifact on 2026-10-06, by the developer's direction, to
+ * look calmer: a lighter hero heading, the facts as a 2 by 2 grid, the two
+ * report panels on one left edge, and a paler saved-copy area (#e6ecf2
+ * with #173f7a text, 8.7:1, instead of #b3c0cc, the heaviest block on the
+ * page). See overrides/Hero.astro.
+ *
+ * The page keeps the sidebar for the phone menu and between 50 and 72rem,
+ * where the header has no room for its links, so at every width there is
+ * one way to every page. From 72rem the header links take over and the
+ * sidebar is hidden here.
+ * ------------------------------------------------------------------- */
+:root[data-has-hero] {
+  --sl-content-width: none;
+  --sl-color-bg: var(--h-page);
+  --h-page: #0b121b;
+  --h-band: #111a26;
+  --h-line: #2c3a4d;
+  --h-card: #16202d;
+  --h-card-line: #2c3a4d;
+  --h-divider: #2c3a4d;
+  --h-text: #edf1f6;
+  --h-muted: #c8d1dc;
+  --h-label: #aeb9c7;
+  --h-accent: #9ec5ee;
+  --h-primary-bg: #cfe0f3;
+  --h-primary-hover: #b8d5f3;
+  --h-primary-fg: #0b121b;
+  --h-tint: #1a2533;
+  --h-th: #1a2533;
+  --h-th-ours: #1f2c3d;
+  --h-td-ours: #16202d;
+  --h-button-line: #5b6e86;
+  --h-chip-line: #5b6e86;
+  --h-cta-bg: #cfe0f3;
+  --h-cta-fg: #0b121b;
+  --h-cta-muted: #22303f;
+  --h-cta-line: #22303f;
+  --h-saved: #2c3a4d;
+  --h-saved-link: #b8d5f3;
+  --h-shadow-soft: 0 10px 30px -20px rgb(0 0 0 / 0.6);
+  --h-shadow: 0 30px 70px -30px rgb(0 0 0 / 0.8);
+}
+:root[data-has-hero][data-theme="light"] {
+  --h-page: #f5f7fa;
+  --h-band: #ffffff;
+  --h-line: #e1e6ed;
+  --h-card: #f8fafc;
+  --h-card-line: #dfe5ec;
+  --h-divider: #e6ebf1;
+  --h-text: #0d1b2a;
+  --h-muted: #3a4a5c;
+  --h-label: #475263;
+  --h-accent: #0a2647;
+  --h-primary-bg: #0a2647;
+  --h-primary-hover: #123a66;
+  --h-primary-fg: #ffffff;
+  --h-tint: #e8eef6;
+  --h-th: #eef2f7;
+  --h-th-ours: #e3eaf4;
+  --h-td-ours: #f6f9fc;
+  --h-button-line: #c9d2de;
+  --h-chip-line: #d3dae3;
+  --h-cta-bg: #0a2647;
+  --h-cta-fg: #ffffff;
+  --h-cta-muted: #d4deea;
+  --h-cta-line: #5d7a9e;
+  --h-saved: #e6ecf2;
+  --h-saved-link: #173f7a;
+  --h-shadow-soft: 0 10px 30px -20px rgb(10 38 71 / 0.3);
+  --h-shadow: 0 30px 70px -30px rgb(10 38 71 / 0.45);
+}
+@media (prefers-color-scheme: light) {
+  :root[data-has-hero]:not(.ax-js) {
+  --h-page: #f5f7fa;
+  --h-band: #ffffff;
+  --h-line: #e1e6ed;
+  --h-card: #f8fafc;
+  --h-card-line: #dfe5ec;
+  --h-divider: #e6ebf1;
+  --h-text: #0d1b2a;
+  --h-muted: #3a4a5c;
+  --h-label: #475263;
+  --h-accent: #0a2647;
+  --h-primary-bg: #0a2647;
+  --h-primary-hover: #123a66;
+  --h-primary-fg: #ffffff;
+  --h-tint: #e8eef6;
+  --h-th: #eef2f7;
+  --h-th-ours: #e3eaf4;
+  --h-td-ours: #f6f9fc;
+  --h-button-line: #c9d2de;
+  --h-chip-line: #d3dae3;
+  --h-cta-bg: #0a2647;
+  --h-cta-fg: #ffffff;
+  --h-cta-muted: #d4deea;
+  --h-cta-line: #5d7a9e;
+  --h-saved: #e6ecf2;
+  --h-saved-link: #173f7a;
+  --h-shadow-soft: 0 10px 30px -20px rgb(10 38 71 / 0.3);
+  --h-shadow: 0 30px 70px -30px rgb(10 38 71 / 0.45);
+  }
+}
+/* The bands run edge to edge of the main column, so the content panel
+   gives up its own padding and width here; each band centres a 1200 px
+   column itself. */
+:root[data-has-hero] .content-panel {
+  padding: 0;
+}
+:root[data-has-hero] .sl-container > * + * {
+  margin-top: 0;
+}
+:root[data-has-hero] .content-panel footer,
+:root[data-has-hero] .site-footer {
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-inline: 32px;
+}
+:root[data-has-hero] .site-footer {
+  margin-top: 0;
+  padding-bottom: 2rem;
+}
+@media (min-width: 72rem) {
+  :root[data-has-hero] .sidebar-pane {
+    display: none;
+  }
+  :root[data-has-hero] {
+    --sl-content-inline-start: 0rem;
+  }
+}
