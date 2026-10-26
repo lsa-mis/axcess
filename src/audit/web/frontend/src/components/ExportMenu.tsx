@@ -311,7 +311,7 @@ export default function ExportMenu({
         aria-labelledby={headingId}
         hidden={!open}
         className={cn(
-          "absolute z-30 mt-1.5 w-[23rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xs border border-border bg-surface shadow-raised",
+          "absolute z-30 mt-1.5 w-[23rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xs border border-border bg-surface-raised shadow-raised",
           hangLeft ? "left-0" : "right-0",
         )}
       >

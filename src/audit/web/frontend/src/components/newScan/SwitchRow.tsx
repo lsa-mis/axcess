@@ -69,7 +69,7 @@ export default function SwitchRow({
           className={cn(
             "relative mt-0.5 h-[26px] w-[46px] shrink-0 cursor-[inherit] appearance-none rounded-full border-0 bg-border-strong transition-colors duration-200 motion-reduce:transition-none",
             "checked:bg-umich-blue",
-            "before:absolute before:left-[3px] before:top-[3px] before:h-5 before:w-5 before:rounded-full before:bg-surface before:shadow-[0_1px_2px_rgba(0,0,0,0.3)] before:transition-transform before:duration-200 before:ease-out before:content-[''] motion-reduce:before:transition-none",
+            "before:absolute before:left-[3px] before:top-[3px] before:h-5 before:w-5 before:rounded-full before:bg-surface before:shadow-switch-knob before:transition-transform before:duration-200 before:ease-out before:content-[''] motion-reduce:before:transition-none",
             "checked:before:translate-x-5",
             "focus:outline-none focus-visible:outline focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-umich-blue",
           )}

@@ -12,13 +12,20 @@
  * defaults without !important.
  */
 
-/* Dark: the light palette inverted, as in the app. */
+/* Dark: the light palette inverted, as in the app. Text is off-white
+   (#e3e9f0, 15.4:1 on the page) rather than near-white, for less glare
+   (halation) for readers with astigmatism, and the strong border is
+   #687c96 so a control's edge reaches 3:1 on every dark surface (WCAG 2.2
+   SC 1.4.11 Non-text Contrast, Level AA); #5b6e86 fell to 2.96:1 on
+   #1a2533. The app uses the same values; see its styles.css. Shadows stay
+   dark (black at 60-80%), as the dark themes of Primer, Carbon and Fluent
+   do; a light glow was tried on 2026-10-26 and rejected. */
 :root {
-  --ax-fg: #edf1f6;
+  --ax-fg: #e3e9f0;
   --ax-fg-muted: #c8d1dc;
   --ax-fg-subtle: #aeb9c7;
   --ax-border: #2c3a4d;
-  --ax-border-strong: #5b6e86;
+  --ax-border-strong: #687c96;
   --ax-surface: #111a26;
   --ax-surface-subtle: #0b121b;
   --ax-surface-muted: #1a2533;
@@ -393,7 +400,7 @@ button.sl-menu-button {
   --h-card: #16202d;
   --h-card-line: #2c3a4d;
   --h-divider: #2c3a4d;
-  --h-text: #edf1f6;
+  --h-text: #e3e9f0;
   --h-muted: #c8d1dc;
   --h-label: #aeb9c7;
   --h-accent: #9ec5ee;
@@ -404,7 +411,7 @@ button.sl-menu-button {
   --h-th: #1a2533;
   --h-th-ours: #1f2c3d;
   --h-td-ours: #16202d;
-  --h-button-line: #5b6e86;
+  --h-button-line: #687c96;
   --h-chip-line: #5b6e86;
   --h-cta-bg: #cfe0f3;
   --h-cta-fg: #0b121b;

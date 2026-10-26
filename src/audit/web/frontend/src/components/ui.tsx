@@ -1024,7 +1024,7 @@ export function Select({
           aria-labelledby={labelId}
           hidden={!open}
           onMouseDown={(event) => event.preventDefault()}
-          className="absolute left-0 z-30 mt-1.5 max-h-80 w-max min-w-full max-w-[calc(100vw-2rem)] overflow-auto rounded-xs border border-border bg-surface p-1.5 shadow-raised"
+          className="absolute left-0 z-30 mt-1.5 max-h-80 w-max min-w-full max-w-[calc(100vw-2rem)] overflow-auto rounded-xs border border-border bg-surface-raised p-1.5 shadow-raised"
         >
           {options.map((option, index) => (
             // Keyboard selection lives on the trigger, which keeps focus and

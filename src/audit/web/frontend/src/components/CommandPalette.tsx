@@ -234,7 +234,7 @@ export default function CommandPalette({
         role="dialog"
         aria-modal="true"
         aria-label="Search everything"
-        className="relative z-10 w-full max-w-xl overflow-hidden rounded-xl border border-border bg-surface shadow-2xl"
+        className="relative z-10 w-full max-w-xl overflow-hidden rounded-xl border border-border bg-surface-raised shadow-2xl"
       >
         <div className="flex items-center gap-2 border-b border-border px-3 py-2.5">
           <Search className="h-4 w-4 shrink-0 text-fg-subtle" aria-hidden />

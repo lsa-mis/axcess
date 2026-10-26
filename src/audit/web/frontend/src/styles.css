@@ -15,6 +15,20 @@
    Settings writes `data-theme`, `data-contrast` and `data-color-vision` on
    <html>; nothing else should switch these. */
 :root {
+  /* Shadows, one token per use. Light mode keeps the soft navy shadows it
+     always had (and Tailwind's own black ones for sm, lg and 2xl). Dark
+     mode redefines them below. */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-card: 0 1px 2px rgba(0, 39, 76, 0.05), 0 6px 18px rgba(0, 39, 76, 0.045);
+  --shadow-raised: 0 18px 42px rgba(0, 39, 76, 0.12), 0 4px 12px rgba(0, 39, 76, 0.08);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  --shadow-nav-current: 0 2px 10px rgba(0, 39, 76, 0.1);
+  --shadow-sidebar: 8px 0 30px rgba(0, 39, 76, 0.05);
+  --shadow-topbar: 0 1px 0 rgba(0, 39, 76, 0.03);
+  --shadow-card-hover: 0 4px 16px rgba(0, 39, 76, 0.1);
+  --shadow-sticky-footer: 0 -10px 16px -12px rgba(0, 39, 76, 0.28);
+  --shadow-switch-knob: 0 1px 2px rgba(0, 0, 0, 0.3);
   --c-umich-blue: 0 39 76;
   --c-umich-blue-600: 0 58 108;
   --c-umich-blue-700: 0 30 60;
@@ -81,6 +95,42 @@
    `bg-umich-blue text-fg-inverse` (the primary button) is light blue with
    near-black text, the same 12:1+ pairing turned over. Maize stays maize. */
 :root[data-theme="dark"] {
+  /* Dark mode: depth, lines and text (2026-10-26, from a survey of
+     Material 2 and 3, Apple HIG, GitHub Primer, Radix Colors, IBM Carbon
+     g100, Atlassian and Fluent 2 dark themes).
+     - Depth comes first from lighter surfaces: page (surface-subtle), then
+       surface, raised, muted, each a few OKLab lightness points up, as those
+       systems step theirs. Menus, dialogs and tooltips use surface-raised
+       so they sit one step above the page; in light mode it is white, the
+       same as surface, so light mode does not change.
+     - Shadows stay shadows. A navy shadow at light mode's 3-12% opacity
+       vanishes on a navy page, and a light glow (tried and rejected the
+       same day) looked like a smudge and is used by none of those systems.
+       So the shadows are navy-black (2 6 12) at 2-5 times the opacity, as
+       Primer, Carbon and Fluent darken theirs (Carbon: 80% in g100 against
+       30% in white).
+     - Lines come in two strengths. border stays a quiet 1.3-1.6:1 for card
+       edges and dividers, which only decorate. border-strong marks controls
+       (fields, menus), so it must reach 3:1 on every surface it sits on
+       (WCAG 2.2 SC 1.4.11 Non-text Contrast, Level AA): 91 110 134 measured
+       2.96:1 on surface-muted; 104 124 150 measures 3.6:1 there and 4.4:1 on
+       the page.
+     - Text is off-white, not near-white: 227 233 240 is 15.4:1 on the page,
+       still past 7:1 (SC 1.4.6 Contrast (Enhanced), Level AAA), with less
+       glare (halation) for readers with astigmatism. Level Access, "Accessibility
+       for people with astigmatism"
+       (https://www.levelaccess.com/blog/accessibility-for-people-with-astigmatism/). */
+  --shadow-sm: 0 1px 2px 0 rgb(2 6 12 / 0.5);
+  --shadow-card: 0 1px 2px rgb(2 6 12 / 0.45), 0 6px 18px rgb(2 6 12 / 0.2);
+  --shadow-raised: 0 18px 42px rgb(2 6 12 / 0.55), 0 4px 12px rgb(2 6 12 / 0.4);
+  --shadow-lg: 0 10px 15px -3px rgb(2 6 12 / 0.5), 0 4px 6px -4px rgb(2 6 12 / 0.4);
+  --shadow-2xl: 0 25px 50px -12px rgb(2 6 12 / 0.7);
+  --shadow-nav-current: 0 2px 10px rgb(2 6 12 / 0.35);
+  --shadow-sidebar: 8px 0 30px rgb(2 6 12 / 0.25);
+  --shadow-topbar: 0 1px 0 rgb(2 6 12 / 0.4);
+  --shadow-card-hover: 0 4px 16px rgb(2 6 12 / 0.45);
+  --shadow-sticky-footer: 0 -10px 16px -12px rgb(2 6 12 / 0.7);
+  --shadow-switch-knob: 0 1px 2px rgb(2 6 12 / 0.6);
   --c-umich-blue: 158 197 238;
   --c-umich-blue-600: 184 213 243;
   --c-umich-blue-700: 134 179 230;
@@ -102,9 +152,9 @@
   --c-surface-inverse-fg: 11 18 27;
   --c-surface-inverse-fg-subtle: 34 48 63;
   --c-border: 44 58 77;
-  --c-border-strong: 91 110 134;
+  --c-border-strong: 104 124 150;
   --c-border-focus: 158 197 238;
-  --c-fg: 237 241 246;
+  --c-fg: 227 233 240;
   --c-fg-muted: 200 209 220;
   --c-fg-subtle: 174 185 199;
   --c-fg-inverse: 11 18 27;

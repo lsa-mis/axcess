@@ -189,7 +189,7 @@ function FocusHint() {
   return (
     <div
       aria-hidden
-      className="pointer-events-none fixed z-[60] max-w-[320px] rounded-xs border border-border-strong bg-surface px-2.5 py-1.5 text-xs text-fg shadow-raised"
+      className="pointer-events-none fixed z-[60] max-w-[320px] rounded-xs border border-border-strong bg-surface-raised px-2.5 py-1.5 text-xs text-fg shadow-raised"
       style={{ top: hint.top, left: hint.left }}
     >
       {hint.text}

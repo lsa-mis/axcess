@@ -617,7 +617,7 @@ function TermsDialog({
       ref={ref}
       aria-labelledby="compare-terms-title"
       onClose={onClose}
-      className="w-[min(92vw,34rem)] rounded-xs border border-border bg-surface p-0 text-fg shadow-raised backdrop:bg-black/40"
+      className="w-[min(92vw,34rem)] rounded-xs border border-border bg-surface-raised p-0 text-fg shadow-raised backdrop:bg-black/40"
     >
       <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-3">
         <h2 id="compare-terms-title" className="text-base font-semibold">What these terms mean</h2>
