@@ -71,6 +71,23 @@ async def _open_reports(
             api_paths.append(path)
         if path == "/api/sites":
             await route.fulfill(json=sites)
+        elif counts := re.fullmatch(r"/api/scans/(\d+)/issue-counts", path):
+            # Only completed reports are counted, as the server does.
+            completed = {
+                s["most_recent_completed"]["id"]: s
+                for s in sites
+                if s["most_recent_completed"] is not None
+            }
+            site = completed.get(int(counts.group(1)))
+            if site is None:
+                await route.fulfill(status=409, json={"detail": "Not finished"})
+            else:
+                await route.fulfill(
+                    json={
+                        "issue_count": site["most_recent_completed_issue_count"],
+                        "occurrence_count": site["most_recent_completed_occurrence_count"],
+                    }
+                )
         elif path.startswith("/api/"):
             await route.fulfill(status=404, json={"detail": "Unavailable"})
         elif path.startswith("/app/assets/"):
@@ -102,7 +119,7 @@ async def test_reports_table_keyboard_and_columns(
     await playwright_async.expect(table.locator("td[headers]")).to_have_count(0)
     # The sorted header also carries its direction chip, so match the labels.
     await playwright_async.expect(table.locator("thead tr").first.locator("th")).to_contain_text(
-        ["Site", "Completed", "Pages", "Issues", "Occurrences", "Actions"]
+        ["Site", "Completed", "Pages", "Issues", "Kinds of issue", "Actions"]
     )
     await playwright_async.expect(
         page.get_by_text(
@@ -137,12 +154,13 @@ async def test_reports_table_keyboard_and_columns(
     await playwright_async.expect(row.locator("td")).to_have_count(5)
     await playwright_async.expect(row.locator("td").nth(0)).to_have_text("Not recorded")
     await playwright_async.expect(row.locator("td").nth(1)).to_have_text("2")
-    # The count says what it counts; "in Report #N" is screen-reader-only text.
+    # Issues counts every place a problem appears, and says so; "in Report
+    # #N" is screen-reader-only text. Kinds of issue counts the report's rows.
     await playwright_async.expect(row.locator("td").nth(2)).to_have_text(
-        f"5 issues in Report #{headline_id}"
+        f"{5 + count} issues in Report #{headline_id}"
     )
-    # Issues are kinds of problem; Occurrences counts every place they appear.
-    await playwright_async.expect(row.locator("td").nth(3)).to_have_text(str(5 + count))
+    await playwright_async.expect(row.locator("td").nth(3)).to_have_text("5")
+    await playwright_async.expect(table.locator("thead")).not_to_contain_text("Occurrences")
     # Images with text and page states are no longer columns.
     await playwright_async.expect(table.locator("thead")).not_to_contain_text("Images with text")
     await playwright_async.expect(table.locator("thead")).not_to_contain_text("Page states")
@@ -183,10 +201,17 @@ async def test_reports_table_keyboard_and_columns(
     await playwright_async.expect(expanded).to_be_focused()
     scans = page.get_by_role("table", name=f"All scans for site{newest}.example, most recent first")
     await playwright_async.expect(scans.locator("tbody tr")).to_have_count(2)
-    # The same two columns are gone here as in the site rows.
+    # The same columns as the site rows, without the two that were dropped.
     await playwright_async.expect(scans.locator("thead th")).to_have_text(
-        ["Report", "Status", "Started", "Pages", "Actions"]
+        ["Report", "Status", "Started", "Pages", "Issues", "Kinds of issue", "Actions"]
     )
+    # Fetched when the list opens. The completed scan is counted; the
+    # interrupted one says so in words rather than showing a 0.
+    stopped, done = scans.locator("tbody tr").nth(0), scans.locator("tbody tr").nth(1)
+    await playwright_async.expect(done.locator("td").nth(3)).to_have_text(str(5 + count))
+    await playwright_async.expect(done.locator("td").nth(4)).to_have_text("5")
+    await playwright_async.expect(stopped.locator("td").nth(3)).to_have_text("Not counted")
+    await playwright_async.expect(stopped.locator("td").nth(4)).to_have_text("Not counted")
     # Only the expanded list shows the interrupted run, as "Stopped".
     await playwright_async.expect(scans).to_contain_text("Stopped")
     violations = await _run_axe(page)
