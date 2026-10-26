@@ -49,6 +49,16 @@ export interface SiteGroup {
   scans: ScanSummary[];
 }
 
+/**
+ * One completed report's counts, from `GET /api/scans/{id}/issue-counts`.
+ * Data names: `issue_count` is rows of the Issues table ("kinds of issue"
+ * on screen); `occurrence_count` is every place they appear ("issues").
+ */
+export interface ScanIssueCounts {
+  issue_count: number;
+  occurrence_count: number;
+}
+
 export interface ScanProgress {
   /** Durable pipeline stage derived from queue state; never an estimated percentage. */
   stage: "starting" | "scanning" | "preparing_report";

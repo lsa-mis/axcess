@@ -54,6 +54,28 @@ class SiteGroup(BaseModel):
     scans: list[ScanSummaryModel]
 
 
+class ReportCounts(BaseModel):
+    """The two issue counts of one completed report, as the Issues page counts them.
+
+    Field names are the data's: ``issue_count`` is unified issue groups (the
+    interface's "kinds of issue") and ``occurrence_count`` is every place
+    they appear (the interface's "issues").
+    """
+
+    issue_count: int
+    occurrence_count: int
+
+
+def report_counts(conn: sqlite3.Connection, scan_id: int) -> ReportCounts:
+    """Counts for one completed report, from the same cache as the site list.
+
+    The caller checks that the report exists and is completed; a partial
+    scan's counts would stand in for evidence it never gathered.
+    """
+    issue_count, occurrence_count = _issue_count(conn, scan_id)
+    return ReportCounts(issue_count=issue_count, occurrence_count=occurrence_count)
+
+
 def group_scans(conn: sqlite3.Connection, summaries: Iterable[dict[str, Any]]) -> list[SiteGroup]:
     """Group scan summaries by site, most recently scanned site first.
 

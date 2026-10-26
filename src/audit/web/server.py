@@ -1072,6 +1072,26 @@ def create_app(
             )
         return JSONResponse([group.model_dump(mode="json") for group in groups])
 
+    @app.get("/api/scans/{scan_id:int}/issue-counts")
+    def api_scan_issue_counts(scan_id: int) -> JSONResponse:
+        """One completed report's two issue counts, for the Reports list.
+
+        Fetched when a site's list of scans is opened, not with ``/api/sites``:
+        counting means building the issue list, and the site list is fetched
+        every few seconds while a scan runs.
+        """
+        from audit.web import sites
+
+        with get_conn() as conn:
+            scan = _load_scan_or_404(conn, scan_id)
+            if scan["status"] != "completed":
+                raise HTTPException(
+                    status_code=409,
+                    detail="Issues are counted only for a scan that finished.",
+                )
+            counts = sites.report_counts(conn, scan_id)
+        return JSONResponse(counts.model_dump())
+
     @app.get("/api/scans/{scan_id:int}")
     def api_scan_detail(scan_id: int) -> JSONResponse:
         with get_conn() as conn:

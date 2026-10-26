@@ -112,8 +112,7 @@ def test_a_completed_reports_issue_count_is_reused_until_its_evidence_changes(
     assert calls == [scan_id]
     assert again.most_recent_completed_issue_count == first.most_recent_completed_issue_count
     assert (
-        again.most_recent_completed_occurrence_count
-        == first.most_recent_completed_occurrence_count
+        again.most_recent_completed_occurrence_count == first.most_recent_completed_occurrence_count
     )
 
     # Changed evidence (``audit synthesize`` can rewrite a completed report's
@@ -134,3 +133,18 @@ def test_counts_match_the_issues_page_totals(tmp_db: sqlite3.Connection) -> None
     assert group.most_recent_completed_issue_count == len(rows)
     assert group.most_recent_completed_occurrence_count == sum(r.occurrence_count for r in rows)
     assert group.most_recent_completed_occurrence_count > group.most_recent_completed_issue_count
+
+
+def test_report_counts_reads_only_the_report_asked_for(tmp_db: sqlite3.Connection) -> None:
+    """One report's counts never include another report's evidence."""
+    first = seed_rich_scan(tmp_db)
+    second = seed_rich_scan(tmp_db)
+    rows = sites.issues.list_issues(tmp_db, first)
+    counts = sites.report_counts(tmp_db, first)
+    assert counts.issue_count == len(rows)
+    assert counts.occurrence_count == sum(r.occurrence_count for r in rows)
+    # Deleting the second report's evidence leaves the first one's counts.
+    tmp_db.execute("DELETE FROM findings WHERE scan_id = ?", (second,))
+    tmp_db.execute("DELETE FROM page_a11y_findings WHERE scan_id = ?", (second,))
+    assert sites.report_counts(tmp_db, first) == counts
+    assert sites.report_counts(tmp_db, second).occurrence_count == 0

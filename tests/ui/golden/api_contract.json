@@ -52,6 +52,7 @@
           ]
         },
         "most_recent_completed_issue_count": "integer|null",
+        "most_recent_completed_occurrence_count": "integer|null",
         "scan_count": "integer",
         "scans": [
           {
@@ -270,6 +271,12 @@
     }
   },
   "GET /api/scans/{scan_id} (unknown scan)": {"status": 404, "content_type": "application/json", "body": {"detail": "string"}},
+  "GET /api/scans/{scan_id}/issue-counts": {
+    "status": 200,
+    "content_type": "application/json",
+    "body": {"issue_count": "integer", "occurrence_count": "integer"}
+  },
+  "GET /api/scans/{scan_id}/issue-counts (running)": {"status": 409, "content_type": "application/json", "body": {"detail": "string"}},
   "GET /api/scans/{scan_id}/issues": {
     "status": 200,
     "content_type": "application/json",

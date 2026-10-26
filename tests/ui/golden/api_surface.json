@@ -242,6 +242,16 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/issue-counts",
+        "methods": ["GET"],
+        "name": "api_scan_issue_counts",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/scans/{scan_id:int}",
         "methods": ["GET"],
         "name": "api_scan_detail",
@@ -998,6 +1008,16 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/issue-counts",
+        "methods": ["GET"],
+        "name": "api_scan_issue_counts",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/scans/{scan_id:int}",
         "methods": ["GET"],
         "name": "api_scan_detail",
@@ -1735,6 +1755,16 @@
         "name": "api_list_sites",
         "async": false,
         "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/issue-counts",
+        "methods": ["GET"],
+        "name": "api_scan_issue_counts",
+        "async": false,
+        "params": {"path": ["scan_id"]},
         "request_param": null,
         "background_tasks_param": null
       },
@@ -2490,6 +2520,16 @@
         "name": "api_list_sites",
         "async": false,
         "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/issue-counts",
+        "methods": ["GET"],
+        "name": "api_scan_issue_counts",
+        "async": false,
+        "params": {"path": ["scan_id"]},
         "request_param": null,
         "background_tasks_param": null
       },
