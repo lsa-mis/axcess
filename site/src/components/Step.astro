@@ -1,0 +1,29 @@
+---
+/**
+ * One step in a `Steps` list: an optional heading, the words, then an
+ * optional picture (slot "picture") and an optional note under it (slot
+ * "note", such as a tip).
+ *
+ * The heading is optional. The first-scan and sign-in steps have one: each
+ * step there is an action plus a paragraph of detail, and the heading names
+ * the action. Each install step is one short instruction, so a heading
+ * would repeat the instruction word for word and put about 20 more entries
+ * in the page's list of headings; there the words alone are the step, in
+ * the text colour (see `Steps`). The heading level is a prop because steps
+ * sit under different section levels and headings must not skip (SC 1.3.1
+ * Info and Relationships, Level A).
+ */
+interface Props {
+  heading?: string;
+  level?: 3 | 4;
+}
+const { heading, level = 3 } = Astro.props;
+const H = `h${level}` as "h3" | "h4";
+---
+
+<li class:list={{ "step-headed": Boolean(heading) }}>
+  {heading && <H class="step-heading">{heading}</H>}
+  <div class="step-body"><slot /></div>
+  {Astro.slots.has("picture") && <div class="step-pic"><slot name="picture" /></div>}
+  {Astro.slots.has("note") && <div class="step-note"><slot name="note" /></div>}
+</li>
