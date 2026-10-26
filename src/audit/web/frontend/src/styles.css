@@ -146,8 +146,12 @@
   --c-ok-bg: 13 49 30;
   --c-surface: 17 26 38;
   --c-surface-subtle: 11 18 27;
-  --c-surface-muted: 26 37 51;
-  --c-surface-raised: 22 32 45;
+  /* Floating panels sit 6 CIE L* above a card (Atlassian's overlay and
+     Material 3's menu layer step about as much); muted stays above raised
+     so a highlighted menu item is lighter than its menu, and stops at the
+     lightest navy that keeps fg-subtle at 7:1 (7.10:1 here). */
+  --c-surface-muted: 32 44 60;
+  --c-surface-raised: 28 39 54;
   --c-surface-inverse: 207 224 243;
   --c-surface-inverse-fg: 11 18 27;
   --c-surface-inverse-fg-subtle: 34 48 63;
