@@ -65,7 +65,7 @@ def enriched(seeded_db: tuple[Path, Path, int]) -> None:
 async def _open(page: Any, base: str, scan_id: int, query: str = "") -> None:
     await page.goto(f"{base}/app/scans/{scan_id}/issues{query}", wait_until="networkidle")
     await pw.expect(
-        page.get_by_role("table", name=re.compile(r"^Accessibility issues", re.I))
+        page.get_by_role("table", name=re.compile(r"^Kinds of accessibility issue", re.I))
     ).to_be_visible()
 
 
@@ -90,7 +90,7 @@ def _params(page: Any) -> dict[str, str]:
 
 async def _shown_keys(page: Any) -> set[str]:
     await page.wait_for_load_state("networkidle")
-    table = page.get_by_role("table", name=re.compile(r"^Accessibility issues", re.I))
+    table = page.get_by_role("table", name=re.compile(r"^Kinds of accessibility issue", re.I))
     hrefs = (
         await table.get_by_role("rowheader")
         .get_by_role("link")

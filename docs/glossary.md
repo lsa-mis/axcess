@@ -2,12 +2,12 @@
 
 Plain-language definitions of the words you will see in Axcess and in its
 reports. Every other Axcess page links here instead of defining these terms
-again. If a word is missing or unclear, please open an issue.
+again. If a word is missing or unclear, please open an issue on GitHub.
 
 ## Report groups
 
-The Issues table's **How sure** column puts every issue in one of these three
-groups: how sure Axcess is that the issue is a real problem.
+The Issues table's **How sure** column puts every [kind of issue](#kind-of-issue)
+in one of these three groups: how sure Axcess is that it is a real problem.
 
 ### Mostly sure
 
@@ -50,28 +50,46 @@ need to act on it, and it should not be reported as an issue.
 
 ## Issues and findings
 
-### Finding
+### Issue
 
-One result a check recorded, with its page, [element](#element), and
-[evidence](#evidence). The app calls each one an
-[occurrence](#occurrence); exports and developer tools still say finding.
+One place a problem appears: one element on one page, or in one
+[page state](#page-state). A report counts these as "476 issues", and the
+Issues table counts them in its Issues column.
+
+- Exports use other words for an issue: the Excel workbook calls each one an
+  Instance, and the CSV, the JSON, and the written report call each one a
+  finding.
+
+### Kind of issue
+
+All the issues one check found for the same reason (for images, the same kind
+of image with the same [alt text](#alt-text) problem). Each kind of issue is
+one row in the Issues table, such as "6 kinds of issue". Its name is in the
+table's Kind of issue column.
+
+- Exports use other words: the Excel workbook and the written report call a
+  kind of issue an Issue, and the written report also says issue type.
 
 ### Occurrence
 
-One place a problem appears: one element on one page, or in one
-[page state](#page-state). The Issues table counts these in its Occurrences
-column, and the Excel workbook calls them Instances.
+The old word in the app for an [issue](#issue): one place a problem appears.
+Until October 2026 the app said "occurrence" for one place and "issue" for
+one row of the Issues table. Some exports still say occurrence: the Excel
+workbook (its Summary sheet, its Page References sheet, and the heading above
+the table on the tab for each kind of issue), and the list of pages for an
+image in a Jira ticket and in the Markdown evidence inventory. The data that scripts read keeps
+the old name too, such as `occurrence_count`.
 
-### Issue
+### Finding
 
-One row in the Issues table: every occurrence found by the same check (for
-images, the same kind of image with the same [alt text](#alt-text) problem). The
-Issues page shows the number of issues and occurrences side by side.
+One result a check recorded, with its page, [element](#element), and
+[evidence](#evidence). The app calls each one an [issue](#issue); exports and
+developer tools still say finding.
 
 ### Where it shows
 
-Where an issue shows up, shown in the Issues table's Where it shows column and
-filter.
+Where a [kind of issue](#kind-of-issue) shows up, shown in the Issues table's
+Where it shows column and filter.
 
 - At page load: found on the page as it first loads, by a
   [rule engine](#rule-engine) ([axe-core](#axe-core) or
@@ -80,9 +98,9 @@ filter.
 - After clicking: found only after [Click-Through](#click-through) clicked
   something that opens more of the page, such as a menu, tab, or pop-up
   window, so it is in a [page state](#page-state) of its own. It shows only
-  when at least one of the issue's occurrences needed the click. One issue
-  can show both At page load and After clicking when the same problem
-  appears in both places.
+  when at least one of its issues needed the click. One kind of issue can
+  show both At page load and After clicking when the same problem appears in
+  both places.
 - In an image: words inside an image, and whether its [alt text](#alt-text)
   says the same words.
 - Called "Found by", with the values WCAG, Click-Through, and Alt Text, in
@@ -91,9 +109,9 @@ filter.
 ### Root cause
 
 The underlying reason a problem repeats, such as one template or shared style
-file (stylesheet) used on 40 pages. Axcess groups occurrences by the check that
-found them, not by root cause, so look for a shared source before fixing page by
-page.
+file (stylesheet) used on 40 pages. Axcess groups issues into kinds by the check
+that found them, not by root cause, so look for a shared source before fixing page
+by page.
 
 ### Evidence
 
@@ -127,12 +145,12 @@ Moderate.
 ### Priority
 
 A High, Medium, or Low label in the Issues table that combines
-[impact](#impact) with how many pages an issue touches. Because it rewards
+[impact](#impact) with how many pages a kind of issue touches. Because it rewards
 spread, a severe problem on a single page shows as Low, so check its impact too.
 
 ### Status
 
-Where an occurrence stands in review: New, Reviewing, In progress, Fixed,
+Where an [issue](#issue) stands in review: New, Reviewing, In progress, Fixed,
 Accepted risk (a known problem your team chose not to fix for now), or Not a
 problem (a [false positive](#false-positive)). The last four need a short
 reason. The Excel workbook uses Not Started for New, Resolved for Fixed, and
@@ -381,10 +399,10 @@ sign-in window first, Axcess keeps your sign-in in memory for 30 minutes.
 ### Rescan comparison
 
 Two reports of the same [scope](#scope) lined up on a report's **Compare
-reports** view, with each issue marked New, No longer found, or Still found. No
-longer found means only that the later scan did not find the issue again. It
-is not proof of a fix, so check the page yourself before you mark the issue
-Fixed.
+reports** view, with each [kind of issue](#kind-of-issue) marked New, No longer
+found, or Still found. No longer found means only that the later scan did not
+find that kind of issue again. It is not proof of a fix, so check the page
+yourself before you mark its issues Fixed.
 
 ### Draft export
 
@@ -403,8 +421,8 @@ up.
 
 The report you download as **Written report (Markdown)** from the **Export
 report** menu. It is a plain text file with headings (Markdown format). The Excel
-workbook is a separate export, **Issue list with fixes (Excel)**, with one row
-per issue.
+workbook is a separate export, **Kinds of issue with fixes (Excel)**, with one
+row for each kind of issue in its Issues Overview sheet.
 
 ### Local-first
 

@@ -325,10 +325,10 @@ export default function FindingDetailRoute() {
             {data.occurrences.length === 1 ? "" : "s"}
           </div>
           {paged.pages > 1 && (
-            <TableBar pager={<TablePagination label="Occurrences" noun="occurrences" {...paged} />} />
+            <TableBar pager={<TablePagination label="Pages with this image" noun="pages" {...paged} />} />
           )}
-          <TableRegion label="Occurrences table" paged={paged}>
-            <Table caption={`Occurrences of image #${data.id}`}>
+          <TableRegion label="Pages with this image table" paged={paged}>
+            <Table caption={`Pages with image #${data.id}`}>
               <TableHead>
                 <tr>
                   <ColumnHeader>Page</ColumnHeader>

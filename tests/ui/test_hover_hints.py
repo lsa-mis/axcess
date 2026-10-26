@@ -22,7 +22,7 @@ playwright_async = pytest.importorskip("playwright.async_api")
 LANE_HELP = {
     "Mostly sure": (
         "A rule check (axe or Alfa) failed. These checks follow fixed rules, so they give the "
-        "same result every time. Look at the issue on the page, fix it, test the fix, then "
+        "same result every time. Look at each issue on the page, fix it, test the fix, then "
         "scan again to see if it is still found."
     ),
     "Not sure": (
@@ -72,7 +72,7 @@ async def test_issue_tags_headers_and_bands_explain_themselves(
     page = await new_page(viewport={"width": 1280, "height": 900})
     try:
         await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
-        table = page.get_by_role("table", name="Accessibility issues")
+        table = page.get_by_role("table", name="Kinds of accessibility issue")
         body = table.locator("tbody")
 
         lanes = await _hints(body, LANE_HELP)
@@ -83,11 +83,11 @@ async def test_issue_tags_headers_and_bands_explain_themselves(
 
         headers = {
             "How sure": (
-                "How sure Axcess is that the issue is a real problem: "
+                "How sure Axcess is that this kind of issue is a real problem: "
                 "Mostly sure, Not sure, or For information."
             ),
             "Where it shows": (
-                "Where the issue shows up: at page load, after clicking, or in an image."
+                "Where this kind of issue shows up: at page load, after clicking, or in an image."
             ),
         }
         # On the sort button, the header's focusable part, so a screen reader
@@ -99,7 +99,8 @@ async def test_issue_tags_headers_and_bands_explain_themselves(
         await playwright_async.expect(
             table.get_by_role("columnheader", name="Priority", exact=False).get_by_role("button")
         ).to_have_attribute(
-            "title", re.compile(r"^High, Medium, or Low, from the issue's impact rating")
+            "title",
+            re.compile(r"^High, Medium, or Low, from the impact rating of this kind of issue"),
         )
 
         bands = await _hints(body, {"High": "", "Medium": "", "Low": ""})
@@ -124,7 +125,9 @@ async def test_issue_tags_headers_and_bands_explain_themselves(
         await playwright_async.expect(terms.filter(has_text="Not sure")).to_be_visible()
         assert await terms.locator("[title]").count() == 0
         await playwright_async.expect(
-            page.get_by_role("heading", name="Priority: which issues to look at first", level=3)
+            page.get_by_role(
+                "heading", name="Priority: which kinds of issue to look at first", level=3
+            )
         ).to_be_visible()
         await playwright_async.expect(
             page.get_by_role("definition").filter(has_text="a critical problem on 1 page is Low")
@@ -163,12 +166,12 @@ async def test_keyboard_focus_keeps_the_hint_as_the_description(
     )
     try:
         await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
-        table = page.get_by_role("table", name="Accessibility issues")
+        table = page.get_by_role("table", name="Kinds of accessibility issue")
         button = table.get_by_role("columnheader", name="How sure", exact=False).get_by_role(
             "button"
         )
         hint = (
-            "How sure Axcess is that the issue is a real problem: "
+            "How sure Axcess is that this kind of issue is a real problem: "
             "Mostly sure, Not sure, or For information."
         )
         await button.focus()
@@ -194,12 +197,12 @@ async def test_hovering_keeps_the_hint_as_the_description(
     )
     try:
         await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
-        table = page.get_by_role("table", name="Accessibility issues")
+        table = page.get_by_role("table", name="Kinds of accessibility issue")
         button = table.get_by_role("columnheader", name="How sure", exact=False).get_by_role(
             "button"
         )
         hint = (
-            "How sure Axcess is that the issue is a real problem: "
+            "How sure Axcess is that this kind of issue is a real problem: "
             "Mostly sure, Not sure, or For information."
         )
         await button.hover()

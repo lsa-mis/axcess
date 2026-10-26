@@ -116,7 +116,7 @@ export default function ProtectedIssueIndexRoute() {
         <>
           <Card className="mb-4 border-umich-blue/30 bg-umich-blue/5 p-4 text-sm text-fg">
             <p>
-              Each row is a possible problem that an automatic check found. It does not prove
+              Each row is a kind of issue: possible problems that one automatic check found for one rule. It does not prove
               that the site passes or fails the Web Content Accessibility Guidelines (WCAG).
               Check each one yourself before you assign a fix. Use the approved account and
               only the approved pages.
@@ -136,7 +136,7 @@ export default function ProtectedIssueIndexRoute() {
           ) : (
             <Card>
               {paged.pages > 1 && (
-                <TableBar pager={<TablePagination label="Sign-in scan issues" noun="issues" {...paged} />} />
+                <TableBar pager={<TablePagination label="Sign-in scan issues" noun="kinds of issue" {...paged} />} />
               )}
               <TableRegion label="Sign-in scan issues table" paged={paged}>
                 <Table caption="Sign-in scan issues, grouped by check and rule">
@@ -146,7 +146,7 @@ export default function ProtectedIssueIndexRoute() {
                       <ColumnHeader>Rule</ColumnHeader>
                       <ColumnHeader>WCAG criterion</ColumnHeader>
                       <ColumnHeader>Result</ColumnHeader>
-                      <ColumnHeader>Occurrences</ColumnHeader>
+                      <ColumnHeader>Issues</ColumnHeader>
                       <ColumnHeader>Pages</ColumnHeader>
                     </tr>
                   </TableHead>

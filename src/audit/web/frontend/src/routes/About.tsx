@@ -27,7 +27,7 @@ const RESOURCES: Resource[] = [
   },
   {
     title: "How it works",
-    description: "The crawl, the detection layers, and how findings become issue groups.",
+    description: "The crawl, the detection layers, and how issues are grouped by kind.",
     href: `${SITE}/how-it-works/`,
     display: "/axcess/how-it-works",
   },

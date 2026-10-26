@@ -33,7 +33,7 @@ const VIEWS: Array<[RegExp, string]> = [
   [/^\/scans\/\d+\/compare\/?$/, "Compare reports"],
   [/^\/scans\/\d+\/pages\/\d+\/inspect\/?$/, "Page inspector"],
   [/^\/scans\/\d+\/pages\/\d+\/?$/, "Page details"],
-  [/^\/scans\/\d+\/findings\/grouped\/?$/, "Images, grouped by issue"],
+  [/^\/scans\/\d+\/findings\/grouped\/?$/, "Images, grouped by kind of issue"],
   [/^\/scans\/\d+\/findings\/?$/, "Images"],
   [/^\/scans\/\d+\/a11y\/by-rule\/?$/, "Rule check issues by rule"],
   [/^\/scans\/\d+\/a11y\/?$/, "Rule check issues by WCAG criterion"],
@@ -58,8 +58,8 @@ export function siteLabel(seedUrl: string): string {
 /**
  * What a crumb names, when it names one thing rather than a view.
  *
- * Every crumb says *which* thing it leads to: an issue by its title, a page
- * by its title, an issue's page list by how many pages it has. A view name
+ * Every crumb says *which* thing it leads to: a kind of issue by its title, a
+ * page by its title, a kind of issue's page list by how many pages it has. A view name
  * ("Page inspector", "Pages") says what kind of screen is behind the link,
  * which the reader could already see; it does not say which one, and two
  * different pages read the same. The label is resolved from data the routes

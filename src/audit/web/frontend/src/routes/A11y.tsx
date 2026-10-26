@@ -147,7 +147,7 @@ export default function A11yRoute() {
           value={coverage.alfa_pages_scanned}
           hint={`of ${coverage.pages_total}`}
         />
-        <StatCard label="Occurrences (axe)" value={coverage.axe_violations_total} />
+        <StatCard label="Issues (axe)" value={coverage.axe_violations_total} />
         <StatCard label="Failed (Alfa)" value={coverage.alfa_failed_total} />
         <StatCard label={`${REVIEW_TYPE_LABEL.expert_review} (Alfa)`} value={coverage.alfa_cant_tell_total} />
         <StatCard label="Level A" value={rollup.by_level.A} tone="critical" />
@@ -206,7 +206,7 @@ function ScopeBanner() {
           aria-hidden
         />
         <p className="max-w-measure text-sm text-fg">
-          <strong>What this page shows.</strong> Each occurrence names the check
+          <strong>What this page shows.</strong> Each issue names the check
           that found it: <strong>Rule check (axe)</strong> or{" "}
           <strong>Rule check (Alfa)</strong>. Both test pages against fixed
           rules. Alfa is a separate tool. It opens its own copy of each page in a
@@ -263,7 +263,7 @@ function SCGroupCard({ scanId, group }: { scanId: number; group: A11ySCGroup }) 
         </h3>
         <span className="text-sm text-fg-muted">
           <strong className="text-fg">{group.violation_count}</strong>{" "}
-          occurrence{group.violation_count !== 1 ? "s" : ""} on{" "}
+          issue{group.violation_count !== 1 ? "s" : ""} on{" "}
           <strong className="text-fg">{group.page_count}</strong> page
           {group.page_count !== 1 ? "s" : ""}
         </span>
@@ -281,7 +281,7 @@ function SCGroupCard({ scanId, group }: { scanId: number; group: A11ySCGroup }) 
               </span>
               {r.impact && <ImpactChip value={r.impact} />}
               <span className="text-xs text-fg-muted">
-                {r.violation_count} occurrence{r.violation_count !== 1 ? "s" : ""} on{" "}
+                {r.violation_count} issue{r.violation_count !== 1 ? "s" : ""} on{" "}
                 {r.page_count} page
                 {r.page_count !== 1 ? "s" : ""}
               </span>
@@ -333,7 +333,7 @@ function DrillDownView({
   // A new SC or status filter starts the table over at page 1.
   const paged = usePagedRows(drill, { resetKey: `${wcagSc}|${status}` });
   // The option labels carry the count so the triager can see at a glance
-  // how many occurrences sit in each status before choosing.
+  // how many issues sit in each status before choosing.
   const filters: FilterGroup[] = [
     {
       key: "status",
@@ -356,7 +356,7 @@ function DrillDownView({
           {wcagSc ? `WCAG ${wcagSc}` : "Best practice (no WCAG criterion)"}
           {group && (
             <span className="ml-2 text-sm font-normal text-fg-muted">
-              · {group.violation_count} occurrence
+              · {group.violation_count} issue
               {group.violation_count !== 1 ? "s" : ""} on {group.page_count}{" "}
               page{group.page_count !== 1 ? "s" : ""}
               {group.wcag_level && ` · Level ${group.wcag_level}`}
@@ -376,7 +376,7 @@ function DrillDownView({
           emptied the table is still there to undo. */}
       <Card>
         <TableBar
-          pager={<TablePagination label="Occurrences" noun="occurrences" {...paged} />}
+          pager={<TablePagination label="Issues" noun="issues" {...paged} />}
           footer={<ActiveFilters items={activeFilterItems(filters)} onClear={() => onStatusFilterChange("")} />}
         >
           <FilterMenu
@@ -389,11 +389,11 @@ function DrillDownView({
         <TableStatus>
           {loading
             ? "Loading…"
-            : `${drill.length.toLocaleString()} ${drill.length === 1 ? "occurrence" : "occurrences"}, most serious impact first.`}
+            : `${drill.length.toLocaleString()} ${drill.length === 1 ? "issue" : "issues"}, most serious impact first.`}
         </TableStatus>
         {loading ? null : drill.length === 0 ? (
           <TableEmpty>
-            No occurrences
+            No issues
             {status && (
               <>
                 {" "}
@@ -411,9 +411,9 @@ function DrillDownView({
             {!status && <> for this WCAG criterion.</>}
           </TableEmpty>
         ) : (
-          <TableRegion label="Rule check occurrences table" paged={paged}>
+          <TableRegion label="Rule check issues table" paged={paged}>
             <Table
-              caption={`Rule check occurrences for ${wcagSc ? `WCAG ${wcagSc}` : "best practice"}, most serious impact first`}
+              caption={`Rule check issues for ${wcagSc ? `WCAG ${wcagSc}` : "best practice"}, most serious impact first`}
             >
               <TableHead>
                 <tr>
@@ -481,7 +481,7 @@ function DrillDownView({
                         </details>
                       )}
                       <AlfaEvidenceNote evidence={f} />
-                      <Link className="report-link inline-flex min-h-target items-center text-xs" to={pageEvidencePath({ scanId, pageId: f.page_id, origin: "Rule check issues by WCAG criterion", backTo: `/scans/${scanId}/a11y?wcag_sc=${wcagSc}`, hash: `#finding-${f.id}` })}>Open the evidence for this occurrence</Link>
+                      <Link className="report-link inline-flex min-h-target items-center text-xs" to={pageEvidencePath({ scanId, pageId: f.page_id, origin: "Rule check issues by WCAG criterion", backTo: `/scans/${scanId}/a11y?wcag_sc=${wcagSc}`, hash: `#finding-${f.id}` })}>Open the evidence for this issue</Link>
                       {f.failure_summary && (
                         <div className="mt-1 text-2xs text-fg-muted">
                           {f.failure_summary}
@@ -540,12 +540,12 @@ function StatusCell({
       <Select
         hideLabel
         id={`status-${findingId}`}
-        label={`Status for occurrence ${findingId}`}
+        label={`Status for issue ${findingId}`}
         value={current}
         onChange={(next) => {
           const rationale = requestStatusRationale(
             next as FindingStatus,
-            `occurrence #${findingId}`,
+            `issue #${findingId}`,
           );
           // Declining the rationale leaves the value where it was. The select
           // is controlled, so React restores it on the next render without the

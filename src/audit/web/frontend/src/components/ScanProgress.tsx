@@ -158,7 +158,7 @@ function ProgressCard({
     {
       title: "Prepare report",
       status: preparing ? "active" : "waiting",
-      detail: preparing ? "Grouping occurrences into issues" : "After every page is checked",
+      detail: preparing ? "Grouping issues by kind" : "After every page is checked",
     },
   ];
   // Finding and checking run together, so two steps can be in progress at

@@ -15,7 +15,7 @@ A scan starts at the crawler, which fetches each page in scope and renders it
 in Chromium. The checks run on the [rendered page](../glossary.md#rendered-page),
 their results are stored as [evidence](../glossary.md#evidence) in SQLite and a
 folder of files, and the review app and exports read that evidence back as
-[issue groups](../glossary.md#issue).
+[issue groups](../glossary.md#kind-of-issue).
 
 ## Where the code lives
 

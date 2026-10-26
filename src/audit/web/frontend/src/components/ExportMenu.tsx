@@ -51,8 +51,12 @@ const FORMATS: {
     format: "xlsx",
     badge: "XLSX",
     tone: "bg-umich-blue/10 text-umich-blue",
-    label: "Issue list with fixes (Excel)",
-    hint: "One row per issue, with how to fix it",
+    // The workbook's index has one row per kind of issue (one per Issues
+    // table row); the CSV has one row per issue (one place). Named so the
+    // two cannot be mistaken for each other. Changed on 2026-10-26 with the
+    // terms; see docs/plain-language.md, "Why "issue" and "kind of issue"".
+    label: "Kinds of issue with fixes (Excel)",
+    hint: "One row for each kind of issue, with how to fix it",
   },
   {
     format: "audit",
@@ -65,8 +69,8 @@ const FORMATS: {
     format: "csv",
     badge: "CSV",
     tone: "bg-sev-minor-bg text-sev-minor",
-    label: "Occurrence list (CSV)",
-    hint: "One row for each place an issue appears",
+    label: "Issue list (CSV)",
+    hint: "One row for each issue: one place on one page",
   },
   {
     format: "json",
@@ -101,12 +105,12 @@ export default function ExportMenu({
   shownIssueGroups,
 }: {
   scanId: number;
-  /** The report's site, pages and issues, under the panel's heading,
+  /** The report's site, pages and kinds of issue, under the panel's heading,
    *  so the reader can see which report they are taking away. */
   site?: string;
   pageCount?: number;
   issueGroups?: number;
-  /** Issues the table shows now; pass it only while a filter or a
+  /** Kinds of issue (rows) the table shows now; pass it only while a filter or a
    *  search narrows the table. */
   shownIssueGroups?: number;
 }) {
@@ -260,13 +264,13 @@ export default function ExportMenu({
   const facts = [
     site,
     pageCount === undefined ? "" : plural(pageCount, "page", "pages"),
-    issueGroups === undefined ? "" : plural(issueGroups, "issue", "issues"),
+    issueGroups === undefined ? "" : plural(issueGroups, "kind of issue", "kinds of issue"),
   ]
     .filter(Boolean)
     .join(" · ");
   const scopeNote =
     shownIssueGroups !== undefined && issueGroups !== undefined && shownIssueGroups < issueGroups
-    ? `Includes all ${plural(issueGroups, "issue", "issues")} and their statuses, ` +
+    ? `Includes all ${plural(issueGroups, "kind of issue", "kinds of issue")} and every status, ` +
       `not only the ${shownIssueGroups.toLocaleString()} your filters show.`
     : "Includes every issue and status in this report, even if the table has filters on.";
 

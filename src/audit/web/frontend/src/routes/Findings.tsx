@@ -125,7 +125,7 @@ export default function FindingsRoute() {
           <>
             {/* Promote the grouped view as the *primary* action from
                 this flat-table page, most of the time the user wants
-                to act on issue *kinds*, not on individual rows. The
+                to act on *kinds of issue*, not on individual rows. The
                 flat table stays the dwell page for one-off lookups
                 and bulk power-user work. */}
             <LinkButton
@@ -133,7 +133,7 @@ export default function FindingsRoute() {
               variant="primary"
             >
               <Layers className="h-4 w-4" aria-hidden />
-              Group by issue
+              Group by kind of issue
             </LinkButton>
             <LinkButton to={`/scans/${id}`} variant="secondary">
               <ArrowLeft className="h-4 w-4" aria-hidden />

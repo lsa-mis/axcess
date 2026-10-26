@@ -21,9 +21,9 @@ playwright_async = pytest.importorskip("playwright.async_api")
 expect = playwright_async.expect
 
 _FORMATS = (
-    "Issue list with fixes (Excel)",
+    "Kinds of issue with fixes (Excel)",
     "Written report (Markdown)",
-    "Occurrence list (CSV)",
+    "Issue list (CSV)",
     "All report data (JSON)",
 )
 
@@ -79,15 +79,15 @@ async def test_arrow_keys_move_between_downloads(
     trigger = await _open_by_keyboard(page)
 
     link = lambda name: page.get_by_role("link", name=name, exact=True)  # noqa: E731
-    await expect(link("Issue list with fixes (Excel)")).to_be_focused()
+    await expect(link("Kinds of issue with fixes (Excel)")).to_be_focused()
     await page.keyboard.press("ArrowDown")
     await expect(link("Written report (Markdown)")).to_be_focused()
     await page.keyboard.press("End")
     await expect(link("All report data (JSON)")).to_be_focused()
     await page.keyboard.press("ArrowUp")
-    await expect(link("Occurrence list (CSV)")).to_be_focused()
+    await expect(link("Issue list (CSV)")).to_be_focused()
     await page.keyboard.press("Home")
-    await expect(link("Issue list with fixes (Excel)")).to_be_focused()
+    await expect(link("Kinds of issue with fixes (Excel)")).to_be_focused()
     await page.keyboard.press("Escape")
     await expect(trigger).to_be_focused()
     await expect(trigger).to_have_attribute("aria-expanded", "false")
@@ -100,7 +100,7 @@ async def test_download_reports_its_outcome_and_keeps_focus(
     page = await new_page(accept_downloads=True)
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
     await _open_by_keyboard(page)
-    workbook = page.get_by_role("link", name="Issue list with fixes (Excel)", exact=True)
+    workbook = page.get_by_role("link", name="Kinds of issue with fixes (Excel)", exact=True)
 
     async with page.expect_download() as download_info:
         await page.keyboard.press("Enter")
@@ -133,7 +133,7 @@ async def test_a_failed_download_is_reported_in_words(
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
     await page.get_by_role("button", name="Export").click()
 
-    table = page.get_by_role("link", name="Occurrence list (CSV)", exact=True)
+    table = page.get_by_role("link", name="Issue list (CSV)", exact=True)
     await table.click()
 
     await expect(table).to_contain_text(
@@ -141,7 +141,7 @@ async def test_a_failed_download_is_reported_in_words(
     )
     announcement = page.get_by_role("status").filter(has_text="could not download")
     await expect(announcement).to_have_text(
-        "Axcess could not download \u201cOccurrence list (CSV)\u201d. Export renderer crashed."
+        "Axcess could not download \u201cIssue list (CSV)\u201d. Export renderer crashed."
     )
     assert downloads == []
 

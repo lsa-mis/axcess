@@ -466,7 +466,7 @@ async def test_occurrences_in_other_page_states_are_counted_under_the_one_picker
             wait_until="domcontentloaded",
         )
         from_load = (
-            "1 more occurrence appears only after clicking a control, in 1 page state. "
+            "1 more issue appears only after clicking a control, in 1 page state. "
             "Choose it in the Page state list."
         )
         await playwright_async.expect(page.get_by_text(from_load, exact=True)).to_be_visible(
@@ -484,7 +484,7 @@ async def test_occurrences_in_other_page_states_are_counted_under_the_one_picker
         await page.locator(f'[role="option"][data-value="{state_key}"]').click()
         await playwright_async.expect(picker).to_have_attribute("data-value", state_key)
         # From the revealed state, the other one is page load.
-        from_state = "1 more occurrence is in another page state. Choose it in the Page state list."
+        from_state = "1 more issue is in another page state. Choose it in the Page state list."
         await playwright_async.expect(page.get_by_text(from_state, exact=True)).to_be_visible()
         await playwright_async.expect(picker).to_have_accessible_description(
             re.compile(re.escape(from_state))

@@ -10,13 +10,12 @@ import { useScanQuery } from "../hooks/useScanQuery";
 export { ISSUE_PAGES_VIEW, issueInspectorPath } from "../components/IssuePagesTable";
 
 /**
- * Every page an issue group appears on, one page per row
+ * Every page a kind of issue appears on, one page per row
  * (``/scans/:id/issues/:key/pages``).
  *
  * The Issues table links here from its page count. Each fact about a page
  * has a column of its own: title, URL, the live page, its stored evidence,
- * how many times the issue occurs on it, and the captured instance
- * screenshots. The screenshots open on a page of their own rather than in a
+ * how many issues of this kind are on it, and their screenshots. The screenshots open on a page of their own rather than in a
  * side panel, in the current tab, with the trail carrying the way back; the
  * desktop app has no browser back button, so the topbar trail is the only
  * return path and every drill-down here feeds it.
@@ -45,9 +44,9 @@ export default function IssuePagesRoute() {
   if (detailQuery.error) {
     return (
       <EmptyState
-        title="Issue not found"
+        title="Kind of issue not found"
         message={
-          "This issue is not part of this report. It may have been fixed, " +
+          "This kind of issue is not part of this report. It may have been fixed, " +
           "or the link may be out of date. Go back to the Issues table to find it."
         }
         action={
@@ -92,10 +91,10 @@ export default function IssuePagesRoute() {
             )}
             {pages.length} page{pages.length === 1 ? "" : "s"}
             {" · "}
-            {occurrences} occurrence{occurrences === 1 ? "" : "s"}
+            {occurrences} issue{occurrences === 1 ? "" : "s"}
             {" · "}
             <Link to={issuePath} className="text-umich-blue underline underline-offset-2">
-              Full issue details
+              Full details of this kind of issue
             </Link>
           </>
         }
@@ -104,7 +103,7 @@ export default function IssuePagesRoute() {
       <Card className="overflow-hidden">
         <div className="flex flex-wrap items-baseline justify-between gap-3 border-b border-border bg-surface-muted px-4 py-3">
           <h2 className="text-base font-semibold">
-            Pages with this issue
+            Pages with this kind of issue
             <span className="ml-2 text-sm font-normal text-fg-muted">
               {pages.length} page{pages.length !== 1 ? "s" : ""}
             </span>

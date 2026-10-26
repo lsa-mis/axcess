@@ -27,7 +27,7 @@ export const COLUMNS = ["Change", "Issue", "WCAG", "Before", "After", "Differenc
 export type SortColumn = (typeof COLUMNS)[number];
 export type SortState = Sort<SortColumn>;
 
-/** New issues first, then what is still there, then what went away. */
+/** New kinds of issue first, then what is still there, then what went away. */
 const CHANGE_RANK: Record<ComparisonChange, number> = { new: 0, remaining: 1, resolved: 2 };
 /**
  * Which way each column sorts first, and the words for its order. Change
@@ -132,13 +132,15 @@ export function parseChanges(raw: string | null): string {
 function headerText(column: SortColumn, baselineId?: number, currentId?: number): string {
   if (column === "Before") return baselineId ? `Before (report #${baselineId})` : "Before";
   if (column === "After") return currentId ? `After (report #${currentId})` : "After";
-  if (column === "Difference") return "Change in occurrences";
+  if (column === "Difference") return "Change in issues";
   if (column === "WCAG") return "WCAG criterion";
+  // The `Issue` key stays for `?sort=issue_asc`; each row is a kind of issue.
+  if (column === "Issue") return "Kind of issue";
   return column;
 }
 
 /**
- * Every compared issue group, in the one table design: search and a Filter
+ * Every compared kind of issue, in the one table design: search and a Filter
  * menu (its Change group is the same `?change=` the stat cards above set)
  * with the pager beside them, a status line, and sortable columns, laid out
  * like the Issues table so the two read the same way.
@@ -212,7 +214,7 @@ export default function ComparedIssuesTable({
   return (
     <>
       <TableBar
-        pager={<TablePagination label="Compared issues" noun="issues" {...paged} />}
+        pager={<TablePagination label="Compared issues" noun="kinds of issue" {...paged} />}
         footer={<ActiveFilters items={filtered} onClear={onClearFilters} />}
       >
         <TableSearch label="Search issues" value={q} onChange={onQuery} />
@@ -226,13 +228,13 @@ export default function ComparedIssuesTable({
         />
       </TableBar>
       <TableStatus>
-        {describeSort(sort)}. {rows.length} of {counts.all} issues shown.
+        {describeSort(sort)}. {rows.length} of {counts.all} {counts.all === 1 ? "kind of issue" : "kinds of issue"} shown.
       </TableStatus>
       {rows.length === 0 ? (
         <TableEmpty>
           {counts.all === 0
             ? "Neither scan found any issues."
-            : "No issues match. Clear the filters to see them all."}
+            : "No kinds of issue match. Clear the filters to see them all."}
         </TableEmpty>
       ) : (
         <TableRegion label="Compared issues" paged={paged}>

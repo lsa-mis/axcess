@@ -51,9 +51,9 @@ async def test_export_menu_offers_every_format_with_the_draft_label_in_urls(
     await trigger.click()
     await playwright_async.expect(trigger).to_have_attribute("aria-expanded", "true")
     for name, fmt in (
-        ("Issue list with fixes (Excel)", "xlsx"),
+        ("Kinds of issue with fixes (Excel)", "xlsx"),
         ("Written report (Markdown)", "audit"),
-        ("Occurrence list (CSV)", "csv"),
+        ("Issue list (CSV)", "csv"),
         ("All report data (JSON)", "json"),
     ):
         link = page.get_by_role("link", name=name)
@@ -75,11 +75,11 @@ async def test_export_menu_closes_on_escape_and_returns_focus(
     trigger = page.get_by_role("button", name="Export report")
     await trigger.click()
     await playwright_async.expect(
-        page.get_by_role("link", name="Issue list with fixes (Excel)")
+        page.get_by_role("link", name="Kinds of issue with fixes (Excel)")
     ).to_be_visible()
     await page.keyboard.press("Escape")
     await playwright_async.expect(
-        page.get_by_role("link", name="Issue list with fixes (Excel)")
+        page.get_by_role("link", name="Kinds of issue with fixes (Excel)")
     ).to_be_hidden()
     await playwright_async.expect(trigger).to_be_focused()
 

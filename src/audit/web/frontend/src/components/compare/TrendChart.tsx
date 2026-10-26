@@ -4,10 +4,10 @@ import type { SiteHistoryPoint } from "../../api/types";
 import { Button, LinkButton, relativeTime } from "../ui";
 import { cn } from "../../lib/cn";
 import { Cell, ColumnHeader, Row, RowHeader, Table, TableHead } from "../table/Table";
-import { agoLong, count, plural } from "./format";
+import { agoLong, count, countKinds, plural } from "./format";
 
 type Measure = "occurrences" | "groups";
-const MEASURES: Record<Measure, string> = { occurrences: "Occurrences", groups: "Issues" };
+const MEASURES: Record<Measure, string> = { occurrences: "Issues", groups: "Kinds of issue" };
 
 const HEIGHT = 300;
 const MARGIN = { top: 40, right: 36, bottom: 60, left: 52 };
@@ -352,8 +352,8 @@ function HistoryTable({
           <tr>
             <ColumnHeader>Report</ColumnHeader>
             <ColumnHeader>Scanned</ColumnHeader>
-            <ColumnHeader>Occurrences</ColumnHeader>
             <ColumnHeader>Issues</ColumnHeader>
+            <ColumnHeader>Kinds of issue</ColumnHeader>
             <ColumnHeader><span className="sr-only">Actions</span></ColumnHeader>
           </tr>
         </TableHead>
@@ -419,7 +419,7 @@ function Swatch({ kind }: { kind: "current" | "baseline" | "other" }) {
 }
 
 function totalsSentence(point: SiteHistoryPoint): string {
-  return `${count(point.occurrences, "occurrence")} in ${count(point.groups, "issue")}.`;
+  return `${count(point.occurrences, "issue")} in ${countKinds(point.groups)}.`;
 }
 
 function trendSummary(
@@ -432,7 +432,7 @@ function trendSummary(
   const from = value(first);
   const to = value(last);
   const diff = to - from;
-  // From a handful of occurrences a percentage runs to thousands and says
+  // From a handful of issues a percentage runs to thousands and says
   // nothing the count does not, so it is given only up to a fivefold change.
   const ratio = from > 0 ? Math.abs(diff) / from : Infinity;
   const percent = ratio <= 5 ? ` (${Math.round(ratio * 100)}%)` : "";
