@@ -1217,7 +1217,10 @@ async def test_search_changes_a_setting_from_its_results(
 
         dark = dialog.get_by_role("option", name=re.compile(r"^Theme: Dark"))
         light = dialog.get_by_role("option", name=re.compile(r"^Theme: Light"))
-        await playwright_async.expect(light).to_contain_text("Current setting")
+        device = dialog.get_by_role("option", name=re.compile(r"^Theme: Match device"))
+        # Axcess starts on Match device (DEFAULT_PREFERENCES).
+        await playwright_async.expect(device).to_contain_text("Current setting")
+        await playwright_async.expect(light).not_to_contain_text("Current setting")
         await playwright_async.expect(dark).not_to_contain_text("Current setting")
 
         # Arrow down from the first result (the Settings page) to Dark.
@@ -1242,6 +1245,7 @@ async def test_search_changes_a_setting_from_its_results(
         )
         await playwright_async.expect(page.locator("html")).to_have_attribute("data-theme", "dark")
         await playwright_async.expect(dark).to_contain_text("Current setting")
+        await playwright_async.expect(device).not_to_contain_text("Current setting")
         await playwright_async.expect(light).not_to_contain_text("Current setting")
     finally:
         await page.context.close()
