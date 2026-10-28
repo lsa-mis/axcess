@@ -113,26 +113,28 @@ async def test_reports_table_keyboard_and_columns(
     table = page.get_by_role("table", name="Public reports by site", exact=False)
     # One header row (a simple table: scope="col" only, no column group),
     # and every column after Site is about the latest completed scan, as the
-    # sentence over the table and its caption say.
+    # caption says.
     await playwright_async.expect(table.locator("thead tr")).to_have_count(1)
     await playwright_async.expect(table.locator("thead th[scope='colgroup']")).to_have_count(0)
     await playwright_async.expect(table.locator("td[headers]")).to_have_count(0)
     # The sorted header also carries its direction chip, so match the labels.
     await playwright_async.expect(table.locator("thead tr").first.locator("th")).to_contain_text(
-        ["Site", "Completed", "Pages", "Issues", "Kinds of issues", "Actions"]
+        ["Site", "Scanned", "Pages", "Issues", "Kinds of issues", "Actions"]
     )
-    await playwright_async.expect(
-        page.get_by_text(
-            "Each row shows the report from the site\u2019s most recent completed scan.", exact=True
-        )
-    ).to_be_visible()
+    # The caption says where a site row's numbers come from; the sentence
+    # that repeated it over the table was removed after user testing.
+    await playwright_async.expect(table).to_have_accessible_name(
+        "Public reports by site. A site\u2019s row shows its most recent completed scan. "
+        "Open a site to list each of its scans under it."
+    )
+    await playwright_async.expect(page.get_by_text("Each row shows", exact=False)).to_have_count(0)
     completed = table.locator("thead th").nth(1)
     await playwright_async.expect(completed).to_have_attribute("aria-sort", "descending")
     await playwright_async.expect(completed).to_contain_text("new → old")
     # The order is still announced, in a live region, though no longer shown
     # as a line of its own: the chip shows it.
     order = page.get_by_role("status").filter(has_text="Sorted by")
-    await playwright_async.expect(order).to_have_text("Sorted by Completed, newest first.")
+    await playwright_async.expect(order).to_have_text("Sorted by Scanned, newest first.")
     box = await order.bounding_box()
     assert box and box["width"] <= 1 and box["height"] <= 1, box
     await playwright_async.expect(table.locator(":scope > tbody > tr")).to_have_count(
@@ -192,28 +194,42 @@ async def test_reports_table_keyboard_and_columns(
     violations = await _run_axe(page)
     assert not violations, _render_violations(violations)
 
-    # Expand by keyboard: the site's scans appear in their own captioned table.
+    # Expand by keyboard: the site's scans appear as rows of the same table,
+    # under its own column headers, so their columns line up with the site's.
     toggle = row.get_by_role("button", name=f"Show all 2 scans for site{newest}.example")
     await toggle.focus()
     await page.keyboard.press("Enter")
     expanded = row.get_by_role("button", name=f"Hide all 2 scans for site{newest}.example")
     await playwright_async.expect(expanded).to_have_attribute("aria-expanded", "true")
     await playwright_async.expect(expanded).to_be_focused()
-    scans = page.get_by_role("table", name=f"All scans for site{newest}.example, most recent first")
-    await playwright_async.expect(scans.locator("tbody tr")).to_have_count(2)
-    # The same columns as the site rows, without the two that were dropped.
-    await playwright_async.expect(scans.locator("thead th")).to_have_text(
-        ["Report", "Status", "Started", "Pages", "Issues", "Kinds of issues", "Actions"]
+    scans = table.locator(":scope > tbody > tr").filter(
+        has=page.get_by_role("link", name=re.compile(r"^Open Report #\d+$"))
     )
-    # Fetched when the list opens. The completed scan is counted; the
-    # interrupted one says so in words rather than showing a 0.
-    stopped, done = scans.locator("tbody tr").nth(0), scans.locator("tbody tr").nth(1)
-    await playwright_async.expect(done.locator("td").nth(3)).to_have_text(str(5 + count))
-    await playwright_async.expect(done.locator("td").nth(4)).to_have_text("5")
+    await playwright_async.expect(scans).to_have_count(2)
+    # No table inside the table, and still one header row.
+    await playwright_async.expect(table.locator("table")).to_have_count(0)
+    await playwright_async.expect(table.locator("thead tr")).to_have_count(1)
+    # The toggle names the rows it shows.
+    controlled = (await expanded.get_attribute("aria-controls") or "").split()
+    assert len(controlled) == 2, controlled
+    for row_id in controlled:
+        await playwright_async.expect(table.locator(f"tr#{row_id}")).to_have_count(1)
+    # Fetched when the rows are shown. The completed scan is counted; the
+    # interrupted one says so in words rather than showing a 0. Its cells
+    # sit under the site's: Scanned, Pages, Issues, Kinds of issues, Actions.
+    stopped, done = scans.nth(0), scans.nth(1)
+    await playwright_async.expect(done.locator("td")).to_have_count(5)
+    await playwright_async.expect(done.locator("td").nth(2)).to_have_text(str(5 + count))
+    await playwright_async.expect(done.locator("td").nth(3)).to_have_text("5")
+    await playwright_async.expect(stopped.locator("td").nth(2)).to_have_text("Not counted")
     await playwright_async.expect(stopped.locator("td").nth(3)).to_have_text("Not counted")
-    await playwright_async.expect(stopped.locator("td").nth(4)).to_have_text("Not counted")
-    # Only the expanded list shows the interrupted run, as "Stopped".
-    await playwright_async.expect(scans).to_contain_text("Stopped")
+    # A status shows only when the scan did not complete: "Stopped" beside
+    # the interrupted run's number, nothing beside the completed one.
+    await playwright_async.expect(stopped.get_by_role("rowheader")).to_contain_text("Stopped")
+    await playwright_async.expect(done.get_by_role("rowheader")).to_have_text(
+        f"Open Report #{headline_id}"
+    )
+    await playwright_async.expect(table).not_to_contain_text("shown in the site row")
     violations = await _run_axe(page)
     assert not violations, _render_violations(violations)
 
@@ -223,7 +239,7 @@ async def test_reports_table_keyboard_and_columns(
     await name.click()
     await playwright_async.expect(scans).to_have_count(0)
     await name.click()
-    await playwright_async.expect(scans.locator("tbody tr")).to_have_count(2)
+    await playwright_async.expect(scans).to_have_count(2)
 
     region = page.get_by_role("region", name="Public reports table")
     await region.focus()
@@ -278,8 +294,10 @@ async def test_reports_table_keyboard_and_columns(
     # and the count of matches is announced.
     search = page.get_by_role("searchbox", name="Search sites")
     status = page.get_by_role("status").filter(has_text="match")
-    # Site rows only: an expanded site adds a row holding its scan list.
-    site_rows = table.locator(":scope > tbody > tr > th[scope='row']")
+    # Site rows only: an expanded site adds a row per scan.
+    site_rows = table.locator(":scope > tbody > tr").filter(
+        has=page.locator("button[aria-expanded]")
+    )
     await search.fill(f"site{newest}.example")
     await playwright_async.expect(status).to_have_text(
         f"1 of {site_count} sites match \u201csite{newest}.example\u201d."
@@ -294,7 +312,7 @@ async def test_reports_table_keyboard_and_columns(
     await playwright_async.expect(search).to_have_value("")
     await playwright_async.expect(site_rows).to_have_count(min(10, site_count))
 
-    link = scans.get_by_role("link", name=f"All issues for Report #{headline_id}")
+    link = table.get_by_role("link", name=f"All issues for Report #{headline_id}")
     await link.focus()
     await playwright_async.expect(link).to_be_focused()
     await page.keyboard.press("Enter")
@@ -307,7 +325,7 @@ async def test_a_new_sort_order_is_announced(new_page: Any) -> None:
         pytest.skip("Build the frontend first")
     page = await _open_reports(new_page, [_site(index, 1) for index in reversed(range(3))])
     order = page.get_by_role("status").filter(has_text="Sorted by")
-    await playwright_async.expect(order).to_have_text("Sorted by Completed, newest first.")
+    await playwright_async.expect(order).to_have_text("Sorted by Scanned, newest first.")
     table = page.get_by_role("table", name="Public reports by site", exact=False)
     await table.get_by_role("button", name="Pages", exact=False).click()
     await playwright_async.expect(order).to_contain_text("Sorted by Pages")

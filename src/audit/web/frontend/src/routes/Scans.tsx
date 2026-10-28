@@ -37,7 +37,6 @@ import {
   TableRegion,
   TableSearch,
   TableBar,
-  rowBand,
 } from "../components/table/Table";
 import { parseSortParam, sortParam, sortWords, type Sort, type SortKind } from "../components/table/sort";
 
@@ -76,16 +75,13 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  *   group existed only because one column (Scans) was not about the latest
  *   scan. Scans now sits under the site's name, so every column is about the
  *   same scan, and the caption says so once, in words.
- * - A sentence over the table says where the numbers come from, and the
- *   caption (technique H39, the table's accessible name) says it too. WCAG
- *   2.2 SC 1.3.1 Info and Relationships (Level A): "Information, structure,
- *   and relationships conveyed through presentation can be programmatically
- *   determined or are available in text." The sentence sits outside the
- *   scrolling region, not in a visible caption: WCAG 2.2 SC 1.4.10 Reflow
- *   (Level AA) asks that content be usable at 320 CSS pixels "without
- *   requiring scrolling in two dimensions", and excepts only content that
- *   needs a two-dimensional layout, such as the table's data. A caption
- *   scrolls sideways with the table and was cut off at 320 pixels.
+ * - The caption (technique H39, the table's accessible name) says where a
+ *   site row's numbers come from. A sentence over the table said it too,
+ *   and was removed after user testing (2026-10-28): testers read it as
+ *   noise, and "2 scans, 1 completed" under each site name already shows
+ *   that a row is one scan of several. A visible caption was not the
+ *   answer either: it scrolls sideways with the table and was cut off at
+ *   320 pixels (WCAG 2.2 SC 1.4.10 Reflow, Level AA).
  * - No visible "Sorted by" line. The sorted header already shows the order
  *   in words (the chip), and `aria-sort` gives it to a screen reader, as in
  *   the WAI-ARIA Authoring Practices sortable table
@@ -105,11 +101,32 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  *   https://www.w3.org/TR/coga-usable/: one idea per chunk, and help people
  *   see what just happened).
  * - Rows expand with a disclosure button (`aria-expanded`, `aria-controls`)
- *   in the row header and a detail row under it, not a `treegrid` and not
- *   columns that open and close. Hidden columns change a table's shape
- *   under a screen reader, and `treegrid` needs grid keyboard handling
- *   that screen readers support unevenly. See Adrian Roselli, "Table with
- *   Expando Rows" (https://adrianroselli.com/2019/09/table-with-expando-rows.html).
+ *   in the row header, which adds one row per scan under it, not a
+ *   `treegrid` and not columns that open and close. Hidden columns change a
+ *   table's shape under a screen reader, and `treegrid` needs grid keyboard
+ *   handling that screen readers support unevenly. See Adrian Roselli,
+ *   "Table with Expando Rows"
+ *   (https://adrianroselli.com/2019/09/table-with-expando-rows.html).
+ * - A site's scans are rows of this table, under its own column headers,
+ *   not a second table nested in one wide cell. The nested table had its
+ *   own header row and columns that did not line up with the ones above
+ *   it, so testers (2026-10-28) could not read a scan's Pages under the
+ *   site's Pages; they asked for the columns aligned and the second header
+ *   row gone. Shared headers give both: each scan cell is announced with
+ *   the column header above it (technique H63; SC 1.3.1 Info and
+ *   Relationships, Level A), with no headers to repeat. That is why the
+ *   date column is "Scanned", not "Completed": it now heads a stopped or
+ *   running scan too. The scan rows still look like the separate box they
+ *   were (`scanCardCell`): framed, raised on the open site's shade and
+ *   indented under the site's name, so they read as belonging to it.
+ * - Thin lines between columns (Table's `ruled`), asked for in the same
+ *   test, so a number can be followed up to its header across a site and
+ *   its scans.
+ * - A scan's status shows only when it is not Complete ("Stopped",
+ *   "Failed", "Scanning"), beside its report number. A Status column that
+ *   read "Complete" on nearly every row was noise to testers; the
+ *   exception is what needs the eye (W3C COGA, "Making Content Usable":
+ *   only what helps the task).
  * - Columns: the site that names the row, when its latest completed scan
  *   finished, its Pages, Issues and Kinds of issues, then Actions. Issues
  *   counts every place a problem appears; Kinds of issues counts the rows
@@ -135,9 +152,9 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  *   also means less sideways scrolling on a narrow screen (W3C COGA,
  *   "Making Content Usable", https://www.w3.org/TR/coga-usable/: only what
  *   helps the task).
- * - The expanded list of a site's scans has the same Issues and Kinds of
- *   issue columns, so a site's past scans can be compared by the same
- *   numbers. They are fetched when the list opens (one request per
+ * - A site's scan rows fill the same Issues and Kinds of issues columns,
+ *   so a site's past scans can be compared by the same numbers. They are
+ *   fetched when the scans are shown (one request per
  *   completed scan, `/api/scans/{id}/issue-counts`), not with the site
  *   list, because counting builds the issue list and the site list is
  *   fetched every few seconds while a scan runs. A scan that did not
@@ -195,7 +212,7 @@ const SORT_LABELS: Record<SortKey, string> = {
   pages: "Pages",
   issues: "Issues",
   kinds: "Kinds of issues",
-  completed: "Completed",
+  completed: "Scanned",
 };
 
 const TOTAL_COLUMNS = 6;
@@ -418,15 +435,11 @@ export default function ScansRoute() {
           <p role="status" className="sr-only">
             Sorted by {SORT_LABELS[sort.column]}, {sortWords(SORT_KINDS[sort.column], sort.direction)}.
           </p>
-          {/* Outside the region, so it wraps at 320 pixels rather than
-              scrolling sideways with the table (SC 1.4.10). */}
-          <p className="px-4 pb-2 pt-3 text-sm text-fg-muted">
-            Each row shows the report from the site’s most recent completed scan.
-          </p>
           <TableRegion label="Public reports table" paged={sitePages}>
             <Table
+              ruled
               className="min-w-[48rem]"
-              caption="Public reports by site. Each row shows the report from the site’s most recent completed scan."
+              caption="Public reports by site. A site’s row shows its most recent completed scan. Open a site to list each of its scans under it."
             >
               <TableHead>
                 {/* One header row (H63): see the comment on this route. */}
@@ -555,10 +568,9 @@ export default function ScansRoute() {
 }
 
 /**
- * One site's summary row, plus its scan list when expanded. The expanded
- * list is its own captioned table: a nested table keeps each scan's
- * columns labelled, where extra rows in the outer table would sit under
- * headers that describe a different scan. Memoized: expanding one site
+ * One site's summary row, plus a row per scan when expanded. The scan rows
+ * sit under the table's own column headers (see "A site's scans are rows of
+ * this table" in the comment on this route). Memoized: expanding one site
  * re-renders that site's rows, not every row on the page.
  */
 const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle }: {
@@ -571,10 +583,12 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
 }) {
   const label = siteLabel(site.site_url);
   const completed = site.most_recent_completed;
-  const detailId = `${rowId}-scans`;
+  const scanRowId = (scan: ScanSummary) => `${rowId}-scan-${scan.id}`;
   return (
     <>
-      <Row index={index}>
+      {/* An open site takes the shaded stripe whatever its place, so its
+          scan rows' white box stands out from it on every row. */}
+      <Row index={index} className={cn(expanded && OPEN_SITE_SHADE)}>
         <RowHeader id={rowId} sticky className="min-w-52 max-w-xs py-1 font-normal">
           {/* The site's name toggles its scans too, not only the chevron:
               the whole block is one button. Its name starts with what it
@@ -584,7 +598,7 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
           <button
             type="button"
             aria-expanded={expanded}
-            aria-controls={expanded ? detailId : undefined}
+            aria-controls={expanded ? site.scans.map(scanRowId).join(" ") : undefined}
             onClick={() => onToggle(site.site_url)}
             className="group flex w-full items-start gap-1 rounded-xs text-left hover:bg-surface-muted focus-visible:outline-none focus-visible:shadow-focus"
           >
@@ -637,7 +651,7 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
               {(site.most_recent_completed_issue_count ?? 0).toLocaleString()}
             </Cell>
             <Cell className="whitespace-nowrap">
-              {/* Both actions shown side by side, as in the expanded list: see
+              {/* Both actions shown side by side, as in the scan rows: see
                   "Actions" in the comment above. */}
               <div className="flex items-center justify-center gap-2">
                 <Link
@@ -662,57 +676,76 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
           </>
         )}
       </Row>
-      {expanded && (
-        // The site's stripe, and no rule above: it reads as part of the site row.
-        <tr id={detailId} className={rowBand(index)}>
-          <td colSpan={TOTAL_COLUMNS} className="px-4 pb-4 pt-2">
-            <SiteScansTable site={site} label={label} />
-          </td>
-        </tr>
-      )}
+      {expanded &&
+        site.scans.map((scan, position) => (
+          <ScanRow
+            key={scan.id}
+            id={scanRowId(scan)}
+            scan={scan}
+            first={position === 0}
+            last={position === site.scans.length - 1}
+          />
+        ))}
     </>
   );
 });
 
-function SiteScansTable({ site, label }: { site: SiteGroup; label: string }) {
-  // Framed by its own scroll region (see TableRegion's className): rounded
-  // corners the rows are clipped to, and a wide list scrolls here rather
-  // than widening the whole reports table.
-  return (
-    <TableRegion label={`All scans for ${label}`} className="rounded-xs border border-border bg-surface">
-      <Table
-        captionClassName="px-3 py-2 text-left text-sm font-semibold text-fg"
-        caption={`All scans for ${label}, most recent first`}
-      >
-        <TableHead>
-          <tr>
-            <ColumnHeader>Report</ColumnHeader>
-            <ColumnHeader>Status</ColumnHeader>
-            <ColumnHeader>Started</ColumnHeader>
-            <ColumnHeader>Pages</ColumnHeader>
-            <ColumnHeader>Issues</ColumnHeader>
-            <ColumnHeader>Kinds of issues</ColumnHeader>
-            <ColumnHeader>Actions</ColumnHeader>
-          </tr>
-        </TableHead>
-        <tbody>
-          {site.scans.map((scan, index) => (
-            <ScanRow key={scan.id} scan={scan} index={index} isHeadline={scan.id === site.most_recent_completed?.id} />
-          ))}
-        </tbody>
-      </Table>
-    </TableRegion>
+/** The stripe an open site and its scan rows share. */
+const OPEN_SITE_SHADE = "bg-surface-subtle";
+
+/**
+ * One cell's share of the box drawn around a site's scan rows, so the rows
+ * keep the look of the separate, framed list they were (see "A site's scans
+ * are rows of this table" in the comment on this route) while their cells
+ * stay in the table's columns.
+ *
+ * A box cannot wrap table rows, so each cell paints its piece in a
+ * `::before` layer behind its content: white, with the frame's edge on the
+ * sides it touches, rounded at the box's four corners, and inset from the
+ * table's edges (16px at the sides and the foot, 8px at the top) so the
+ * open site's shade shows round it. A line on the right of each piece is
+ * the column line inside the box (Table's `ruled` draws it outside); a line
+ * on top of each later row parts one scan from the next. The first and last
+ * rows take the inset in extra padding, so their content stays centred in
+ * the white part.
+ *
+ * The cell becomes a stacking context (`isolate`, or the sticky header's own
+ * `z-index`) so the layer's `-z-10` puts it over the cell's background and
+ * under its content.
+ */
+function scanCardCell({ first, last, edge }: { first: boolean; last: boolean; edge?: "start" | "end" }): string {
+  return cn(
+    "before:absolute before:-z-10 before:border-border before:bg-surface before:content-['']",
+    edge === "start" ? "before:left-4 before:border-l" : "before:left-0",
+    edge === "end" ? "before:right-4" : "before:right-0",
+    "before:border-r",
+    first ? "before:top-2 pt-[1.375rem]" : "before:top-0",
+    "before:border-t",
+    last ? "before:bottom-4 before:border-b before:shadow-sm pb-[1.875rem]" : "before:bottom-0",
+    first && edge === "start" && "before:rounded-tl-xs",
+    first && edge === "end" && "before:rounded-tr-xs",
+    last && edge === "start" && "before:rounded-bl-xs",
+    last && edge === "end" && "before:rounded-br-xs",
+    edge !== "start" && "relative isolate",
   );
 }
 
 /**
- * One scan in a site's expanded list. Pulled out so the delete mutation's
- * loading state is local to the row that owns it.
+ * One scan of an open site, as a row of the reports table. Pulled out so the
+ * delete mutation's loading state is local to the row that owns it.
  */
-function ScanRow({ scan, index, isHeadline }: { scan: ScanSummary; index: number; isHeadline: boolean }) {
+function ScanRow({ id, scan, first, last }: { id: string; scan: ScanSummary; first: boolean; last: boolean }) {
+  const piece = (edge?: "start" | "end") => scanCardCell({ first, last, edge });
   return (
-    <Row index={index}>
-      <RowHeader className="whitespace-nowrap py-1 text-xs font-normal tabular-nums text-fg-muted">
+    // The open site's shade, and no rule above: it reads as part of the site row.
+    <tr id={id} className={OPEN_SITE_SHADE}>
+      {/* Indented so "Report #" lines up under the site's name, past the
+          chevron: the rows read as the site's own (W3C COGA, "Making
+          Content Usable": group related content). */}
+      <RowHeader
+        sticky
+        className={cn("whitespace-nowrap py-1 pl-14 text-xs font-normal tabular-nums text-fg-muted", piece("start"))}
+      >
         <Link
           to={`/scans/${scan.id}`}
           className="report-link inline-flex min-h-target items-center px-1 font-semibold"
@@ -720,23 +753,25 @@ function ScanRow({ scan, index, isHeadline }: { scan: ScanSummary; index: number
         >
           <span className="sr-only">Open </span>Report #{scan.id}
         </Link>
-        {isHeadline && (
-          <span className="ml-2 font-sans text-xs font-normal text-fg-muted">
-            (shown in the site row)
+        {/* Only a scan that did not complete says so: see "A scan's status"
+            in the comment on this route. A word, not a colour (SC 1.4.1). */}
+        {scan.status !== "completed" && (
+          <span className="ml-2 font-sans">
+            <ScanStatusBadge value={scan.status} />
           </span>
         )}
       </RowHeader>
-      <Cell className="text-center">
-        <ScanStatusBadge value={scan.status} />
+      <Cell
+        className={cn("whitespace-nowrap text-center text-xs text-fg-muted", piece())}
+        title={scan.finished_at ?? scan.started_at ?? undefined}
+      >
+        {relativeTime(scan.finished_at ?? scan.started_at)}
       </Cell>
-      <Cell className="whitespace-nowrap text-center text-xs text-fg-muted" title={scan.started_at ?? undefined}>
-        {relativeTime(scan.started_at)}
-      </Cell>
-      <Cell numeric className="text-fg">
+      <Cell numeric className={cn("text-fg", piece())}>
         {scan.page_count.toLocaleString()}
       </Cell>
-      <ScanCountCells scan={scan} />
-      <Cell className="whitespace-nowrap py-1">
+      <ScanCountCells scan={scan} className={piece()} />
+      <Cell className={cn("whitespace-nowrap py-1", piece("end"))}>
         {/* Default `md` size (44px tall): destructive controls in
             particular must be a real target (SC 2.5.5). */}
         <div className="flex items-center justify-center gap-2">
@@ -752,7 +787,7 @@ function ScanRow({ scan, index, isHeadline }: { scan: ScanSummary; index: number
           <DeleteScanButton scan={scan} />
         </div>
       </Cell>
-    </Row>
+    </tr>
   );
 }
 
@@ -762,14 +797,14 @@ function issueCountText(count: number): string {
 }
 
 /**
- * Issues and Kinds of issues for one scan in a site's expanded list, fetched
- * when the list opens (see "The expanded list" in the comment on this
+ * Issues and Kinds of issues for one scan row of an open site, fetched
+ * when the rows are shown (see "A site's scan rows" in the comment on this
  * route). Only a completed scan is counted; the others say "Not counted",
- * since the Status cell beside them already says why. While a count loads,
+ * since the status beside their report number already says why. While a count loads,
  * the cells say "Counting" rather than showing an empty cell or a 0, which
  * would read as a result.
  */
-function ScanCountCells({ scan }: { scan: ScanSummary }) {
+function ScanCountCells({ scan, className }: { scan: ScanSummary; className?: string }) {
   const completed = scan.status === "completed";
   const counts = useQuery({
     queryKey: ["scans", "issue-counts", scan.id],
@@ -781,25 +816,25 @@ function ScanCountCells({ scan }: { scan: ScanSummary }) {
   if (!completed || counts.isError) {
     return (
       <>
-        <Cell className="whitespace-nowrap text-center text-fg-muted">Not counted</Cell>
-        <Cell className="whitespace-nowrap text-center text-fg-muted">Not counted</Cell>
+        <Cell className={cn("whitespace-nowrap text-center text-fg-muted", className)}>Not counted</Cell>
+        <Cell className={cn("whitespace-nowrap text-center text-fg-muted", className)}>Not counted</Cell>
       </>
     );
   }
   if (!counts.data) {
     return (
       <>
-        <Cell className="whitespace-nowrap text-center text-fg-muted">Counting</Cell>
-        <Cell className="whitespace-nowrap text-center text-fg-muted">Counting</Cell>
+        <Cell className={cn("whitespace-nowrap text-center text-fg-muted", className)}>Counting</Cell>
+        <Cell className={cn("whitespace-nowrap text-center text-fg-muted", className)}>Counting</Cell>
       </>
     );
   }
   return (
     <>
-      <Cell numeric className="text-fg">
+      <Cell numeric className={cn("text-fg", className)}>
         {counts.data.occurrence_count.toLocaleString()}
       </Cell>
-      <Cell numeric className="text-fg">
+      <Cell numeric className={cn("text-fg", className)}>
         {counts.data.issue_count.toLocaleString()}
       </Cell>
     </>

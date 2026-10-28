@@ -281,16 +281,35 @@ export function TableRegion({
 export function Table({
   caption,
   captionClassName = "sr-only",
+  ruled = false,
   className,
   children,
 }: {
   caption: ReactNode;
   captionClassName?: string;
+  /**
+   * A thin line between columns, top to bottom, for a table whose rows are
+   * read down a column as much as across (Reports, where a site's scans are
+   * compared by their numbers). Off by default: most tables are read a row
+   * at a time, and the stripes already guide the eye across.
+   *
+   * The line is an inset shadow on each cell's right, not a border. The
+   * sticky row header draws its own edge the same way (see RowHeader), and
+   * a border beside it doubled the line; a collapsed border also stays put
+   * while a sticky cell scrolls, and a shadow moves with it.
+   */
+  ruled?: boolean;
   className?: string;
   children: ReactNode;
 }) {
   return (
-    <table className={cn("w-full text-sm", className)}>
+    <table
+      className={cn(
+        "w-full text-sm",
+        ruled && "[&_:is(th,td):not(:last-child)]:shadow-[inset_-1px_0_0_theme(colors.border.DEFAULT)]",
+        className,
+      )}
+    >
       <caption className={captionClassName}>{caption}</caption>
       {children}
     </table>
