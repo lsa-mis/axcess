@@ -259,7 +259,7 @@ export default function IssuesRoute() {
       <p role="status" className="sr-only">
         {issuesQuery.isFetching
           ? "Updating issues…"
-          : `${rows.length} of ${data.total_unfiltered} ${data.total_unfiltered === 1 ? "kind" : "kinds"} of issue shown` +
+          : `${rows.length} of ${data.total_unfiltered} ${data.total_unfiltered === 1 ? "kind of issue" : "kinds of issues"} shown` +
             (hasFilter ? ", filtered" : "") +
             // By "How sure" value too, so a reader hears how many are Mostly
             // sure without walking the How sure column.

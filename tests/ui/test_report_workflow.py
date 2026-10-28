@@ -350,7 +350,7 @@ async def test_compare_scans_keyboard_filters_trend_and_axe(
     ).to_have_attribute("aria-current", "page")
     # One request for every group: the page sorts, filters and pages them.
     assert requests[-1]["page_size"] == ["500"]
-    status = page.get_by_role("status").filter(has_text="of issue shown")
+    status = page.get_by_role("status").filter(has_text=re.compile(r"of issues? shown"))
     await playwright_async.expect(status).to_contain_text("12 of 12 kinds of issues shown")
 
     # A number is a filter, and says so by its pressed state. It is the
@@ -529,7 +529,7 @@ async def test_issue_filters_announce_results_and_keep_large_targets(
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
     # The sort line is a status region of its own; this one reports
     # how many groups the filters left.
-    status = page.get_by_role("status").filter(has_text="of issue shown")
+    status = page.get_by_role("status").filter(has_text=re.compile(r"of issues? shown"))
     await playwright_async.expect(status).to_contain_text("kinds of issues shown")
     search = page.get_by_label("Search issues")
     await search.fill("logo")
@@ -577,7 +577,7 @@ async def test_issue_table_recommended_order_is_lane_first_and_headers_sort_flat
         ]
         assert lanes and lanes == sorted(lanes, key=lane_order.index), lanes
         await playwright_async.expect(
-            page.get_by_role("status").filter(has_text="of issue shown")
+            page.get_by_role("status").filter(has_text=re.compile(r"of issues? shown"))
         ).to_have_text(
             re.compile(
                 r"kinds of issues shown: Mostly sure \d+, Not sure \d+, For information \d+$"
@@ -722,7 +722,7 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
     # No row-group header rows split the types; the live status counts each.
     await playwright_async.expect(table.locator("th[scope='rowgroup']")).to_have_count(0)
     await playwright_async.expect(
-        page.get_by_role("status").filter(has_text="of issue shown")
+        page.get_by_role("status").filter(has_text=re.compile(r"of issues? shown"))
     ).to_contain_text("Mostly sure")
 
     # The glossary defines both sets of words, closed until asked for, under

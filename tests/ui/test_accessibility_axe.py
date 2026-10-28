@@ -671,7 +671,7 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     await playwright_async.expect(summary.get_by_role("term")).to_have_text(
         [
             re.compile(r"^Issues? found$"),
-            re.compile(r"^Kinds? of issue$"),
+            re.compile(r"^(Kind of issue|Kinds of issues)$"),
             "Pages visited",
         ]
     )

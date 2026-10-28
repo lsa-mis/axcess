@@ -245,7 +245,7 @@ function findingsFor(
           count: 0,
         }
       : {
-          text: `Found: ${revealed.length} ${revealed.length === 1 ? "kind" : "kinds"} of issue with at least one issue that appears only after you use a control, such as a menu.`,
+          text: `Found: ${revealed.length} ${revealed.length === 1 ? "kind of issue" : "kinds of issues"} with at least one issue that appears only after you use a control, such as a menu.`,
           count: revealed.length,
         };
   }
@@ -256,7 +256,7 @@ function findingsFor(
   return count === 0
     ? { text: "Found: no issues.", count: 0 }
     : {
-        text: `Found: ${count} ${count === 1 ? "kind" : "kinds"} of issue.`,
+        text: `Found: ${count} ${count === 1 ? "kind of issue" : "kinds of issues"}.`,
         count,
       };
 }

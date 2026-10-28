@@ -10,11 +10,11 @@ export function plural(n: number, noun: string): string {
 }
 
 /**
- * "1 kind of issue", "6 kinds of issues": the plural is on "kind", so
+ * "1 kind of issue", "6 kinds of issues": both words change with the count, so
  * `count` cannot build it (docs/plain-language.md, Terms).
  */
 export function countKinds(n: number): string {
-  return `${n.toLocaleString()} ${n === 1 ? "kind" : "kinds"} of issue`;
+  return `${n.toLocaleString()} ${n === 1 ? "kind of issue" : "kinds of issues"}`;
 }
 
 /** A signed change as the table prints it: "+141", "−4" (a true minus), "±0". */
