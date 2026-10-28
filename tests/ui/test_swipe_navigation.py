@@ -52,7 +52,7 @@ async def _point_at_heading(page: Any) -> None:
 async def _open_issue_from_list(page: Any, base: str, scan_id: int) -> tuple[str, str]:
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
     issues_url = page.url
-    table = page.get_by_role("table", name="Accessibility issues")
+    table = page.get_by_role("table", name="Kinds of accessibility issue")
     await table.get_by_role("rowheader").get_by_role("link").first.click()
     await page.wait_for_url("**/issues/**")
     await _point_at_heading(page)

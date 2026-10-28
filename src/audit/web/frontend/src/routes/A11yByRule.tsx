@@ -133,8 +133,8 @@ export default function A11yByRuleRoute() {
         <div className="flex items-start gap-3">
           <Info className="mt-0.5 h-5 w-5 shrink-0 text-umich-blue" aria-hidden />
           <p className="max-w-measure text-sm text-fg">
-            <strong>How this page groups issues.</strong> Each issue is one
-            rule from one check. This view helps you <em>plan fixes</em>. For
+            <strong>How this page groups issues.</strong> Each kind of issue is
+            one rule from one check. This view helps you <em>plan fixes</em>. For
             example, the <code>color-contrast</code> rule may fail 800 times.
             Often one style (CSS class) in one page template causes all of
             them, so one fix solves all 800. To report by requirement,{" "}
@@ -151,8 +151,12 @@ export default function A11yByRuleRoute() {
       </Card>
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <StatCard label="Issues" value={groups.length} />
-        <StatCard label="Occurrences (axe)" value={coverage.axe_violations_total} />
+        {/* Issues first, then kinds of issues: the order the developer set on
+            2026-10-26 for every screen that shows both counts. Why the words
+            changed:
+            docs/plain-language.md, "Why "issue" and "kind of issue"". */}
+        <StatCard label="Issues (axe)" value={coverage.axe_violations_total} />
+        <StatCard label="Kinds of issues" value={groups.length} />
         <StatCard label="Failed (Alfa)" value={coverage.alfa_failed_total} />
         <StatCard label={`${REVIEW_TYPE_LABEL.expert_review} (Alfa)`} value={coverage.alfa_cant_tell_total} />
         <StatCard
@@ -176,7 +180,7 @@ export default function A11yByRuleRoute() {
           />
         </TableBar>
         <TableStatus className="border-b-0">
-          {groups.length.toLocaleString()} {groups.length === 1 ? "issue" : "issues"}.
+          {groups.length.toLocaleString()} {groups.length === 1 ? "kind of issue" : "kinds of issues"}.
         </TableStatus>
       </Card>
 
@@ -262,7 +266,7 @@ function RuleGroupCard({
         </span>
         <span className="text-sm text-fg-muted">
           <strong className="text-fg">{group.violation_count}</strong>{" "}
-          occurrence{group.violation_count !== 1 ? "s" : ""} on{" "}
+          issue{group.violation_count !== 1 ? "s" : ""} on{" "}
           <strong className="text-fg">{group.page_count}</strong> page
           {group.page_count !== 1 ? "s" : ""}
         </span>
@@ -311,7 +315,7 @@ function RuleGroupCard({
           {group.pipeline === "alfa" && group.engine_outcomes.cant_tell > 0 && (
             <p className="mb-2 text-xs text-fg-muted">
               <strong className="text-fg">{REVIEW_TYPE_LABEL.expert_review}:</strong> For{" "}
-              {group.engine_outcomes.cant_tell} occurrence
+              {group.engine_outcomes.cant_tell} issue
               {group.engine_outcomes.cant_tell === 1 ? "" : "s"}, Alfa could not
               tell (<code>cantTell</code>) if the rule passed. A person needs to
               check {group.engine_outcomes.cant_tell === 1 ? "it" : "them"}.{" "}
@@ -327,10 +331,10 @@ function RuleGroupCard({
           />
 
           {paged.pages > 1 && (
-            <TableBar pager={<TablePagination label={`${group.rule_id} occurrences`} noun="occurrences" {...paged} />} />
+            <TableBar pager={<TablePagination label={`${group.rule_id} issues`} noun="issues" {...paged} />} />
           )}
-          <TableRegion label={`${group.rule_id} occurrences table`} paged={paged}>
-            <Table caption={`${group.rule_id} occurrences`}>
+          <TableRegion label={`${group.rule_id} issues table`} paged={paged}>
+            <Table caption={`${group.rule_id} issues`}>
               <TableHead>
                 <tr>
                   <ColumnHeader>Page</ColumnHeader>
@@ -404,14 +408,14 @@ function FindingRow({
         )}
         <AlfaEvidenceNote evidence={finding} />
         <Link className="report-link inline-flex min-h-target items-center text-xs" to={pageEvidencePath({ scanId, pageId: finding.page_id, origin: "Rule check issues by rule", backTo: `/scans/${scanId}/a11y/by-rule`, hash: `#finding-${finding.id}` })}>
-          Open the evidence for this occurrence
-          {/* Which occurrence, by page, element and ID, for the same reason
+          Open the evidence for this issue
+          {/* Which issue, by page, element and ID, for the same reason
               as PageLink's context (SC 2.4.9 Link Purpose (Link Only), Level
               AAA; WCAG technique C7). The ID is what makes it unique: two
               elements' short locators can match. */}
           <span className="sr-only">
             {" "}on {finding.page_title?.trim() || finding.page_url}, at{" "}
-            {shortLocator(finding.target_display || finding.target_selector)}, occurrence {finding.id}
+            {shortLocator(finding.target_display || finding.target_selector)}, issue {finding.id}
           </span>
         </Link>
         {finding.failure_summary && (
@@ -448,7 +452,7 @@ function RuleBulkBar({
   const onApply = () => {
     const rationale = requestStatusRationale(
       target,
-      `all ${findingIds.length} occurrences of "${ruleId}"`,
+      `all ${findingIds.length} issues of "${ruleId}"`,
     );
     if (rationale === null) return;
     mutation.mutate({ next: target, rationale });

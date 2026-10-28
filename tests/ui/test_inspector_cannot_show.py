@@ -67,7 +67,7 @@ async def test_an_element_in_shadow_dom_is_said_not_guessed(
     try:
         await playwright_async.expect(
             page.get_by_text(
-                "1 occurrence is not outlined: it is inside a part of the page that keeps its "
+                "1 issue is not outlined: it is inside a part of the page that keeps its "
                 "own page code (shadow DOM). The saved copy does not keep that code."
             )
         ).to_be_visible()
@@ -89,7 +89,7 @@ async def test_an_element_in_an_iframe_is_said_not_guessed(
     try:
         await playwright_async.expect(
             page.get_by_text(
-                "1 occurrence is not outlined: it is inside another page shown within this one "
+                "1 issue is not outlined: it is inside another page shown within this one "
                 "(an iframe). The saved copy does not keep that page."
             )
         ).to_be_visible()

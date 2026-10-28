@@ -7,8 +7,9 @@ disagree about whether two reports cover the same site.
 Each group names two scans that can differ: the most recent scan of any
 status, and the most recent *completed* one. The headline numbers come only
 from the completed one; an interrupted or failed crawl has partial evidence
-and must not stand in for the site. Issue counts use the canonical issue
-projection, so they match the total the Issues page shows for that report.
+and must not stand in for the site. Issue and occurrence counts use the
+canonical issue projection, so they match the totals the Issues page shows
+for that report.
 """
 
 from __future__ import annotations
@@ -47,7 +48,32 @@ class SiteGroup(BaseModel):
     most_recent_completed: ScanSummaryModel | None
     # Unified issue groups in ``most_recent_completed``; null when there is none.
     most_recent_completed_issue_count: int | None
+    # Occurrences across those issues, the Issues page's "all evidence"
+    # total; null when there is no completed scan.
+    most_recent_completed_occurrence_count: int | None
     scans: list[ScanSummaryModel]
+
+
+class ReportCounts(BaseModel):
+    """The two issue counts of one completed report, as the Issues page counts them.
+
+    Field names are the data's: ``issue_count`` is unified issue groups (the
+    interface's "kinds of issues") and ``occurrence_count`` is every place
+    they appear (the interface's "issues").
+    """
+
+    issue_count: int
+    occurrence_count: int
+
+
+def report_counts(conn: sqlite3.Connection, scan_id: int) -> ReportCounts:
+    """Counts for one completed report, from the same cache as the site list.
+
+    The caller checks that the report exists and is completed; a partial
+    scan's counts would stand in for evidence it never gathered.
+    """
+    issue_count, occurrence_count = _issue_count(conn, scan_id)
+    return ReportCounts(issue_count=issue_count, occurrence_count=occurrence_count)
 
 
 def group_scans(conn: sqlite3.Connection, summaries: Iterable[dict[str, Any]]) -> list[SiteGroup]:
@@ -64,6 +90,7 @@ def group_scans(conn: sqlite3.Connection, summaries: Iterable[dict[str, Any]]) -
     for site_url, scans in by_site.items():
         completed = [scan for scan in scans if scan["status"] == "completed"]
         latest_completed = completed[0] if completed else None
+        counts = _issue_count(conn, int(latest_completed["id"])) if latest_completed else None
         groups.append(
             SiteGroup(
                 site_url=site_url,
@@ -73,9 +100,8 @@ def group_scans(conn: sqlite3.Connection, summaries: Iterable[dict[str, Any]]) -
                 most_recent_completed=(
                     ScanSummaryModel(**latest_completed) if latest_completed else None
                 ),
-                most_recent_completed_issue_count=(
-                    _issue_count(conn, int(latest_completed["id"])) if latest_completed else None
-                ),
+                most_recent_completed_issue_count=counts[0] if counts else None,
+                most_recent_completed_occurrence_count=counts[1] if counts else None,
                 scans=[ScanSummaryModel(**scan) for scan in scans],
             )
         )
@@ -88,7 +114,7 @@ def group_scans(conn: sqlite3.Connection, summaries: Iterable[dict[str, Any]]) -
 # number of sites times their evidence. A completed report's count changes
 # only if its evidence does (``audit synthesize`` rewrites image findings),
 # so the cheap fingerprint below decides when to count again.
-_issue_counts: dict[tuple[str, int], tuple[tuple[int, ...], int]] = {}
+_issue_counts: dict[tuple[str, int], tuple[tuple[int, ...], tuple[int, int]]] = {}
 _issue_counts_lock = threading.Lock()
 
 
@@ -105,8 +131,8 @@ def _evidence_fingerprint(conn: sqlite3.Connection, scan_id: int) -> tuple[int, 
     return tuple(int(value) for value in row)
 
 
-def _issue_count(conn: sqlite3.Connection, scan_id: int) -> int:
-    """Issues in a completed report, as the Issues page counts them."""
+def _issue_count(conn: sqlite3.Connection, scan_id: int) -> tuple[int, int]:
+    """Issues and occurrences in a completed report, as the Issues page counts them."""
     # The file as well as the id: report ids start at 1 in every database.
     key = (str(conn.execute("PRAGMA database_list").fetchone()[2]), scan_id)
     fingerprint = _evidence_fingerprint(conn, scan_id)
@@ -114,7 +140,8 @@ def _issue_count(conn: sqlite3.Connection, scan_id: int) -> int:
         cached = _issue_counts.get(key)
     if cached is not None and cached[0] == fingerprint:
         return cached[1]
-    count = len(issues.list_issues(conn, scan_id))
+    rows = issues.list_issues(conn, scan_id)
+    counts = (len(rows), sum(row.occurrence_count for row in rows))
     with _issue_counts_lock:
-        _issue_counts[key] = (fingerprint, count)
-    return count
+        _issue_counts[key] = (fingerprint, counts)
+    return counts

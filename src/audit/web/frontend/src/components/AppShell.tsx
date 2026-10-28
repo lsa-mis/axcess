@@ -273,7 +273,7 @@ const SIDEBAR_ROW_IDLE = "text-fg-muted hover:bg-umich-blue/10 hover:text-umich-
  * aria-current="page", so it never rests on colour alone.
  */
 const SIDEBAR_ROW_ACTIVE =
-  "bg-surface text-umich-blue shadow-[0_2px_10px_rgba(0,39,76,0.10)] before:absolute before:inset-y-2.5 before:left-0 before:w-1 before:rounded-r-full before:bg-umich-blue dark:bg-umich-blue/20 dark:text-fg dark:shadow-none";
+  "bg-surface text-umich-blue shadow-nav-current before:absolute before:inset-y-2.5 before:left-0 before:w-1 before:rounded-r-full before:bg-umich-blue dark:bg-umich-blue/20 dark:text-fg dark:shadow-none";
 
 /**
  * Search and feedback: reachable from every screen, so they live in the
@@ -481,7 +481,7 @@ function Sidebar({
         // uses the standard foreground ramp rather than the inverse one: at the
         // darkest stop (#E6EBF2) `fg` is 14.8:1 and `fg-muted` 8.6:1, both AAA.
         // `fg-subtle` would fall to 6.6:1 here, so it is deliberately not used.
-        "sticky top-0 hidden h-screen shrink-0 flex-col overflow-y-auto border-r border-border text-fg shadow-[8px_0_30px_rgba(0,39,76,0.05)] transition-[width] duration-150 md:flex",
+        "sticky top-0 hidden h-screen shrink-0 flex-col overflow-y-auto border-r border-border text-fg shadow-sidebar transition-[width] duration-150 md:flex",
         SIDEBAR_FILL,
         collapsed ? "w-16" : "w-64",
       )}
@@ -634,7 +634,7 @@ function TopBar({
   return (
     <header
       ref={headerRef}
-      className="sticky top-0 z-20 flex h-[72px] items-center gap-4 border-b border-border bg-surface/95 px-4 shadow-[0_1px_0_rgba(0,39,76,0.03)] backdrop-blur sm:px-6 lg:px-8"
+      className="sticky top-0 z-20 flex h-[72px] items-center gap-4 border-b border-border bg-surface/95 px-4 shadow-topbar backdrop-blur sm:px-6 lg:px-8"
       role="banner"
     >
       {/* Below md, one line: the menu button, then where you are, then New
@@ -789,10 +789,10 @@ function routeTitle(pathname: string): string {
     [/^\/scans\/\d+\/pages\/\d+\/inspect\/?$/, "Page inspector"],
     [/^\/scans\/\d+\/pages\/\d+\/?$/, "Page details"],
     [/^\/scans\/\d+\/issues\/[^/]+\/pages\/\d+\/screenshots\/?$/, "Issue screenshots"],
-    [/^\/scans\/\d+\/issues\/[^/]+\/pages\/?$/, "Pages with this issue"],
+    [/^\/scans\/\d+\/issues\/[^/]+\/pages\/?$/, "Pages with this kind of issue"],
     [/^\/scans\/\d+\/issues\/[^/]+\/?$/, "Issue evidence"],
     [/^\/scans\/\d+\/issues\/?$/, "Accessibility issues"],
-    [/^\/scans\/\d+\/findings\/grouped\/?$/, "Images, grouped by issue"],
+    [/^\/scans\/\d+\/findings\/grouped\/?$/, "Images, grouped by kind of issue"],
     [/^\/scans\/\d+\/findings\/?$/, "Images"],
     [/^\/scans\/\d+\/a11y\/by-rule\/?$/, "Rule check issues by rule"],
     [/^\/scans\/\d+\/a11y\/?$/, "Rule check issues by WCAG criterion"],

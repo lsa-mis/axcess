@@ -132,7 +132,8 @@ login and MFA experience remains a manual-only criterion.
 
 Shipped reporting behavior includes:
 
-- issue groups and detected occurrences labeled separately;
+- kinds of issues (one row each) and issues (each place one appears) labeled
+  separately;
 - source layer, confidence, WCAG criterion, affected users, exact location,
   evidence, remediation, and verification guidance;
 - scan-scoped page-evidence links with scan/page relationship validation;
@@ -142,8 +143,8 @@ Shipped reporting behavior includes:
 - clickable workbook links and source-layer columns;
 - final-export readiness that requires expert disposition, with an explicit
   acknowledged draft path;
-- status-filtered report projections so false positives and other terminal
-  occurrences do not inflate open issue counts or locations.
+- status-filtered report projections so false positives and other issues
+  with a final status do not inflate open counts or locations.
 
 The versioned detector-quality corpus enforces a false-discovery-rate gate,
 but that measured corpus result is not a universal real-world false-positive

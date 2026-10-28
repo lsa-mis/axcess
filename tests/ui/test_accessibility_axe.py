@@ -420,16 +420,16 @@ async def test_issue_card_answers_what_why_fix_and_where(
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
     await choose_filter(page, "How sure", "expert_review")
     await page.wait_for_url("**type=expert_review*")
-    issues = page.get_by_role("table", name="Accessibility issues")
+    issues = page.get_by_role("table", name="Kinds of accessibility issue")
     # Contains, not equals: the sorted header also carries its direction chip.
     await playwright_async.expect(issues.get_by_role("columnheader")).to_contain_text(
         [
-            "Issue",
+            "Kind of issue",
             "How sure",
             "WCAG",
             "Priority",
             "Pages",
-            "Occurrences",
+            "Issues",
         ]
     )
     # Hidden for now (HIDDEN_ISSUE_FIELDS in the SPA); the data still exports.
@@ -481,10 +481,10 @@ async def test_issue_table_fits_the_default_desktop_width(
     base, scan_id = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
-    issues = page.get_by_role("table", name="Accessibility issues")
+    issues = page.get_by_role("table", name="Kinds of accessibility issue")
     scroller = page.get_by_role("region", name="Issues table")
     # Who fixes it is hidden for now (HIDDEN_ISSUE_FIELDS), so Pages stands in.
-    for column in (None, "Issue", "Occurrences", "Pages"):
+    for column in (None, "Kind of issue", "Issues", "Pages"):
         if column:
             await issues.get_by_role("button", name=column, exact=False).first.click()
         widths = await scroller.evaluate("el => ({scroll: el.scrollWidth, client: el.clientWidth})")
@@ -507,7 +507,7 @@ async def test_issue_list_reaches_exact_locations_without_sideways_scrolling(
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
     await choose_filter(page, "How sure", "expert_review")
     await page.wait_for_url("**type=expert_review*")
-    issues = page.get_by_role("table", name="Accessibility issues")
+    issues = page.get_by_role("table", name="Kinds of accessibility issue")
     await playwright_async.expect(issues).to_be_visible()
 
     widths = await page.evaluate(
@@ -531,7 +531,7 @@ async def test_issue_list_reaches_exact_locations_without_sideways_scrolling(
     await page.wait_for_url("**/issues/**")
     await playwright_async.expect(
         page.get_by_role(
-            "link", name="opens the saved copy with this issue marked", exact=False
+            "link", name="opens the saved copy with this kind of issue marked", exact=False
         ).first
     ).to_be_attached()
     # The protected-identity context refreshes every 15 seconds even
@@ -565,7 +565,7 @@ async def test_informational_evidence_is_read_only_and_not_barrier_language(
         ),
     )
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
-    issues = page.get_by_role("table", name="Accessibility issues")
+    issues = page.get_by_role("table", name="Kinds of accessibility issue")
     logo_title = load_report_rules()["image_findings"]["logo_adequate"]["title"]
     row_link = issues.get_by_role("rowheader").get_by_role("link", name=logo_title, exact=False)
     informational_row = row_link.locator("xpath=ancestor::tr[1]")
@@ -662,15 +662,16 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
         workspace.get_by_role("link", name="Issues", exact=True)
     ).to_have_attribute("aria-current", "page")
     await playwright_async.expect(page.get_by_role("link", name="Overview")).to_have_count(0)
-    # The summary leads with what was found: kinds of issue, the places they
-    # appear, then the pages visited. Pages that could not be loaded are said
-    # in words, never as "errors", which readers took for accessibility
-    # errors, and only when there are some.
+    # The summary leads with what was found: the issues (each place a
+    # problem appears), the kinds of issues they group into, then the pages
+    # visited. Pages that could not be loaded are said in words, never as
+    # "errors", which readers took for accessibility errors, and only when
+    # there are some.
     summary = page.locator("dl").filter(has_text="Pages visited")
     await playwright_async.expect(summary.get_by_role("term")).to_have_text(
         [
-            re.compile(r"^Kinds? of issue found$"),
-            "Places issues appear (occurrences)",
+            re.compile(r"^Issues? found$"),
+            re.compile(r"^(Kind of issue|Kinds of issues)$"),
             "Pages visited",
         ]
     )
@@ -999,7 +1000,7 @@ async def test_every_spa_route_has_an_accurate_document_title(
         (f"/app/scans/{scan_id}/issues", "Accessibility issues"),
         (f"/app/scans/{scan_id}/issues/image:logo_adequate", "Issue evidence"),
         (f"/app/scans/{scan_id}/findings", "Images"),
-        (f"/app/scans/{scan_id}/findings/grouped", "Images, grouped by issue"),
+        (f"/app/scans/{scan_id}/findings/grouped", "Images, grouped by kind of issue"),
         (f"/app/scans/{scan_id}/a11y", "Rule check issues by WCAG criterion"),
         (f"/app/scans/{scan_id}/a11y/by-rule", "Rule check issues by rule"),
         (f"/app/scans/{scan_id}/compare", "Compare reports"),
@@ -1216,7 +1217,10 @@ async def test_search_changes_a_setting_from_its_results(
 
         dark = dialog.get_by_role("option", name=re.compile(r"^Theme: Dark"))
         light = dialog.get_by_role("option", name=re.compile(r"^Theme: Light"))
-        await playwright_async.expect(light).to_contain_text("Current setting")
+        device = dialog.get_by_role("option", name=re.compile(r"^Theme: Match device"))
+        # Axcess starts on Match device (DEFAULT_PREFERENCES).
+        await playwright_async.expect(device).to_contain_text("Current setting")
+        await playwright_async.expect(light).not_to_contain_text("Current setting")
         await playwright_async.expect(dark).not_to_contain_text("Current setting")
 
         # Arrow down from the first result (the Settings page) to Dark.
@@ -1241,6 +1245,7 @@ async def test_search_changes_a_setting_from_its_results(
         )
         await playwright_async.expect(page.locator("html")).to_have_attribute("data-theme", "dark")
         await playwright_async.expect(dark).to_contain_text("Current setting")
+        await playwright_async.expect(device).not_to_contain_text("Current setting")
         await playwright_async.expect(light).not_to_contain_text("Current setting")
     finally:
         await page.context.close()
@@ -1543,12 +1548,12 @@ async def test_instance_screenshots_describe_the_outline_and_pass_axe(
             wait_until="networkidle",
         )
         await playwright_async.expect(
-            page.get_by_text(re.compile(r"^Occurrence 1 of \d+\."))
+            page.get_by_text(re.compile(r"^Issue 1 of \d+\."))
         ).to_have_text(re.compile(r"The outline marks where it was found\.$"))
         await playwright_async.expect(
             page.get_by_role(
                 "img",
-                name=re.compile(r"^Occurrence 1 on .+\. An outline marks where it was found\.$"),
+                name=re.compile(r"^Issue 1 on .+\. An outline marks where it was found\.$"),
             )
         ).to_be_visible()
         violations = await _run_axe(page)

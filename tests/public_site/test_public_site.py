@@ -169,7 +169,10 @@ def test_staging_marking_only_on_staging_builds(pages: dict[str, str]) -> None:
         if STAGING:
             assert '<meta name="robots" content="noindex"' in html, route
             assert notice in html, route
-            live_link = r'<a href="https://lsa-mis\.github\.io/axcess/"[^>]*>Go to the live Axcess site</a>'
+            live_link = (
+                r'<a href="https://lsa-mis\.github\.io/axcess/"[^>]*>'
+                r"Go to the live Axcess site</a>"
+            )
             assert re.search(live_link, html), route
         else:
             assert notice not in html, route

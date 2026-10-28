@@ -3,13 +3,13 @@ import type { AxeImpact, DetectionPipeline, FindingStatus, ReviewLane, ScanStatu
 /**
  * The words the interface uses for shared values, in one place.
  *
- * Every screen that shows a status, an issue type, or a check reads its
+ * Every screen that shows a status, a "How sure" value, or a check reads its
  * label from here, so one thing always has one name (W3C COGA: consistent
  * terms). The stored values never change; only what people see and hear.
  * See docs/plain-language.md for the full list of terms.
  */
 
-/** An occurrence's review status, as a short label for chips and tables. */
+/** An issue's review status (one place on a page), as a short label for chips and tables. */
 export const STATUS_LABEL: Record<FindingStatus, string> = {
   new: "New",
   reviewing: "Reviewing",
@@ -39,8 +39,9 @@ export const STATUS_OPTION_LABEL: Record<FindingStatus, string> = {
 };
 
 /**
- * The three types of issue, as the Issues table's "How sure" column names
- * them: how sure Axcess is that the issue is a real problem.
+ * The three "How sure" values, as the Issues table's "How sure" column names
+ * them: how sure Axcess is that a kind of issue is a real problem. (They were
+ * once called the three types of issue; "type" is not used for them now.)
  *
  * "Mostly sure" and "Not sure" are opposites in short, common words, so the
  * two cannot be read as the same thing (SC 3.1.5 Reading Level, Level AAA).
@@ -65,7 +66,7 @@ export const REVIEW_TYPE_LABEL: Record<ReviewLane, string> = {
 };
 
 /**
- * An issue's impact rating, in the glossary's words ("Impact"), not axe's
+ * A kind of issue's impact rating, in the glossary's words ("Impact"), not axe's
  * raw lower-case values.
  */
 export const IMPACT_LABEL: Record<AxeImpact, string> = {

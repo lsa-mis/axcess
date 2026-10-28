@@ -111,7 +111,7 @@ export default function GroupedFindingsRoute() {
   return (
     <>
       <PageHeader
-        title="Images, grouped by issue"
+        title="Images, grouped by kind of issue"
         subtitle={withoutUserinfo(scan.seed_url)}
         actions={
           <LinkButton to={`/scans/${scan.id}/findings`} variant="secondary">
@@ -132,7 +132,7 @@ export default function GroupedFindingsRoute() {
           <Info className="mt-0.5 h-5 w-5 shrink-0 text-umich-blue" aria-hidden />
           <p className="text-sm text-fg">
             <strong>How this page groups images.</strong> Each group is one
-            issue. Axcess groups images by two things: the kind of image
+            kind of issue. Axcess groups images by two things: the kind of image
             (classification), and whether its alt text is good enough. Alt
             text is the text a screen reader reads for an image. Every image
             in a group has the <em>same suggested fix</em>, so you can decide
@@ -144,8 +144,11 @@ export default function GroupedFindingsRoute() {
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard label="Images" value={coverage.finding_count} />
-        <StatCard label="Issues" value={groups.length} />
-        <StatCard label="Occurrences" value={coverage.occurrence_total} />
+        {/* Issues first, then kinds of issues: the order the developer set on
+            2026-10-26 for every screen that shows both counts. Why the words
+            changed: docs/plain-language.md, "Why "issue" and "kind of issue"". */}
+        <StatCard label="Issues" value={coverage.occurrence_total} />
+        <StatCard label="Kinds of issues" value={groups.length} />
         <StatCard label="Pages scanned" value={coverage.page_count} />
       </div>
 
@@ -164,7 +167,7 @@ export default function GroupedFindingsRoute() {
           />
         </TableBar>
         <TableStatus className="border-b-0">
-          {groups.length.toLocaleString()} {groups.length === 1 ? "issue" : "issues"}.
+          {groups.length.toLocaleString()} {groups.length === 1 ? "kind of issue" : "kinds of issues"}.
         </TableStatus>
       </Card>
 
@@ -242,7 +245,7 @@ function GroupCard({
           image{group.finding_count !== 1 ? "s" : ""}
           {" · "}
           <strong className="text-fg">{group.occurrence_count}</strong>{" "}
-          occurrence{group.occurrence_count !== 1 ? "s" : ""}
+          issue{group.occurrence_count !== 1 ? "s" : ""}
         </span>
       </button>
 

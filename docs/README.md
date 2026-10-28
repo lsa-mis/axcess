@@ -2,7 +2,7 @@
 
 Axcess is a free accessibility scanner that runs on your computer. It scans a
 website you are allowed to test, keeps the evidence on your machine, and helps
-you decide what to fix first. Terms such as "barrier" and "occurrence" are
+you decide what to fix first. Terms such as "barrier" and "kind of issue" are
 defined once, in the [glossary](./glossary.md).
 
 ## Using Axcess

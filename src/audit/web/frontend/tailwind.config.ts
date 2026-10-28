@@ -100,10 +100,19 @@ const config: Config = {
         ],
       },
       boxShadow: {
-        card:
-          "0 1px 2px rgba(0, 39, 76, 0.05), 0 6px 18px rgba(0, 39, 76, 0.045)",
-        raised:
-          "0 18px 42px rgba(0, 39, 76, 0.12), 0 4px 12px rgba(0, 39, 76, 0.08)",
+        // Values live in styles.css (--shadow-*) so dark mode can redefine
+        // them; see the dark-mode comment there.
+        sm: "var(--shadow-sm)",
+        card: "var(--shadow-card)",
+        raised: "var(--shadow-raised)",
+        lg: "var(--shadow-lg)",
+        "2xl": "var(--shadow-2xl)",
+        "nav-current": "var(--shadow-nav-current)",
+        sidebar: "var(--shadow-sidebar)",
+        topbar: "var(--shadow-topbar)",
+        "card-hover": "var(--shadow-card-hover)",
+        "sticky-footer": "var(--shadow-sticky-footer)",
+        "switch-knob": "var(--shadow-switch-knob)",
         // Focus ring: solid UMich Blue (15:1 on white; SC 1.4.11 needs ≥3:1).
         // Use `shadow-focus-inverse` for elements on the dark sidebar.
         focus: "0 0 0 3px rgb(var(--c-umich-blue))",

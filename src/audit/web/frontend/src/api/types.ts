@@ -44,7 +44,19 @@ export interface SiteGroup {
   most_recent_completed: ScanSummary | null;
   /** Unified issue groups in `most_recent_completed`; null when there is none. */
   most_recent_completed_issue_count: number | null;
+  /** Occurrences across those issues (the Issues page's total); null when there is none. */
+  most_recent_completed_occurrence_count: number | null;
   scans: ScanSummary[];
+}
+
+/**
+ * One completed report's counts, from `GET /api/scans/{id}/issue-counts`.
+ * Data names: `issue_count` is rows of the Issues table ("kinds of issues"
+ * on screen); `occurrence_count` is every place they appear ("issues").
+ */
+export interface ScanIssueCounts {
+  issue_count: number;
+  occurrence_count: number;
 }
 
 export interface ScanProgress {

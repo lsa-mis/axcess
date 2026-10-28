@@ -59,7 +59,7 @@ const PLACES: ReadonlyArray<{ id: string; label: string; to: string; terms?: rea
  * Cmd/Ctrl+K command palette, search everything across the app.
  *
  * Every place (Reports, New scan, About, Settings), every report (by site
- * URL), and, when you're inside a report, every issue in it. A query that
+ * URL), and, when you're inside a report, every kind of issue in it. A query that
  * names a setting ("dark", "text size", "motion") also lists that setting's
  * choices, so it can be changed right here: Enter applies the choice, Search
  * stays open, and a status message says what changed. Fully keyboard
@@ -176,7 +176,7 @@ export default function CommandPalette({
         if (!q || hay.includes(q)) {
           out.push({
             id: `issue-${scanId}-${i.issue_key}`,
-            group: "Issues",
+            group: "Kinds of issues",
             label: i.title,
             sublabel: `${i.issue_key} · ${CHECK_LABEL[i.pipeline] ?? i.pipeline}`,
             to: i.detail_url,
@@ -234,7 +234,7 @@ export default function CommandPalette({
         role="dialog"
         aria-modal="true"
         aria-label="Search everything"
-        className="relative z-10 w-full max-w-xl overflow-hidden rounded-xl border border-border bg-surface shadow-2xl"
+        className="relative z-10 w-full max-w-xl overflow-hidden rounded-xl border border-border bg-surface-raised shadow-2xl"
       >
         <div className="flex items-center gap-2 border-b border-border px-3 py-2.5">
           <Search className="h-4 w-4 shrink-0 text-fg-subtle" aria-hidden />
@@ -250,7 +250,7 @@ export default function CommandPalette({
               setMessage("");
             }}
             onKeyDown={onKeyDown}
-            placeholder="Search reports, issues, and settings…"
+            placeholder="Search reports, kinds of issues, and settings…"
             aria-label="Search"
             className="min-w-0 flex-1 bg-transparent text-base text-fg outline-none placeholder:text-fg-subtle"
           />
@@ -270,7 +270,7 @@ export default function CommandPalette({
             among the options as list items of their own). */}
         {items.length === 0 ? (
           <p className="px-4 py-8 text-center text-sm text-fg-muted">
-            Nothing matches “{query}”. Try a site name, a report number, an issue name, or a setting.
+            Nothing matches “{query}”. Try a site name, a report number, a kind of issue, or a setting.
           </p>
         ) : (
           <div ref={listRef} role="listbox" aria-label="Results" className="max-h-[50vh] overflow-y-auto py-1">

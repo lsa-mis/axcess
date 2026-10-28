@@ -27,7 +27,7 @@ const RESOURCES: Resource[] = [
   },
   {
     title: "How it works",
-    description: "The crawl, the detection layers, and how findings become issue groups.",
+    description: "The crawl, the detection layers, and how issues are grouped by kind.",
     href: `${SITE}/how-it-works/`,
     display: "/axcess/how-it-works",
   },
@@ -153,7 +153,7 @@ export default function AboutRoute() {
  */
 function ResourceCard({ resource }: { resource: Resource }) {
   return (
-    <div className="relative flex h-full flex-col rounded-xs border border-border bg-surface p-4 shadow-card transition-[border-color,box-shadow] focus-within:ring-2 focus-within:ring-umich-blue hover:border-umich-blue/40 hover:shadow-[0_4px_16px_rgba(0,39,76,0.10)]">
+    <div className="relative flex h-full flex-col rounded-xs border border-border bg-surface p-4 shadow-card transition-[border-color,box-shadow] focus-within:ring-2 focus-within:ring-umich-blue hover:border-umich-blue/40 hover:shadow-card-hover">
       <h3 className="flex items-start justify-between gap-3 text-sm font-semibold text-fg">
         <a
           href={resource.href}

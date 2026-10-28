@@ -62,6 +62,8 @@ _ENDPOINTS: tuple[tuple[str, str], ...] = (
     ("GET /api/scans/{scan_id} (blocked)", "/api/scans/{blocked}"),
     ("GET /api/scans/{scan_id} (failed)", "/api/scans/{failed}"),
     ("GET /api/scans/{scan_id} (unknown scan)", "/api/scans/{missing}"),
+    ("GET /api/scans/{scan_id}/issue-counts", "/api/scans/{scan}/issue-counts"),
+    ("GET /api/scans/{scan_id}/issue-counts (running)", "/api/scans/{running}/issue-counts"),
     ("GET /api/scans/{scan_id}/issues", "/api/scans/{scan}/issues"),
     (
         "GET /api/scans/{scan_id}/issues/{issue_key} (axe issue)",

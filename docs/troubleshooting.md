@@ -185,11 +185,11 @@ ORDER BY f.priority_score DESC
 LIMIT 20;
 
 -- Page-level results for one scan (rule engines, browser checks, AI), by check
-SELECT pipeline, rule_id, COUNT(*) AS occurrences
+SELECT pipeline, rule_id, COUNT(*) AS issues
 FROM page_a11y_findings
 WHERE scan_id = <id>
 GROUP BY pipeline, rule_id
-ORDER BY occurrences DESC;
+ORDER BY issues DESC;
 
 -- Why is the queue big?
 SELECT state, COUNT(*) FROM jobs

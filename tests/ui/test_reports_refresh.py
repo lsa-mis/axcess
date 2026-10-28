@@ -40,6 +40,7 @@ def _first_scan_running() -> list[dict[str, Any]]:
             "most_recent": scan,
             "most_recent_completed": None,
             "most_recent_completed_issue_count": None,
+            "most_recent_completed_occurrence_count": None,
             "scans": [scan],
         }
     ]
@@ -85,8 +86,7 @@ async def test_a_first_scan_shows_on_reports_while_it_runs(
     # Well inside the five seconds the old list counted as fresh: the site's
     # row, and in its list of scans the report, marked as scanning.
     table = page.get_by_role("table", name="Public reports by site", exact=False)
-    # The toggle, not the row's "Actions for first.example" button.
-    site = table.get_by_role("button", name=re.compile(r"^Show all .*first\.example"))
+    site = table.get_by_role("button", name=re.compile("first.example"))
     await playwright_async.expect(site).to_be_visible(timeout=3000)
     await site.click()
     scans = page.get_by_role("table", name=re.compile("All scans for first.example"))

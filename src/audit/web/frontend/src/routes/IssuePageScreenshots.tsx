@@ -12,7 +12,7 @@ import { useScanQuery } from "../hooks/useScanQuery";
 export const ISSUE_SCREENSHOTS_VIEW = "Issue screenshots";
 
 /**
- * The screenshots of each occurrence of one issue on one page
+ * The screenshots of each issue of one kind on one page
  * (``/scans/:id/issues/:key/pages/:pageId/screenshots``).
  *
  * The pages table links here from its screenshots column. This is a page
@@ -54,12 +54,12 @@ export default function IssuePageScreenshotsRoute() {
       <EmptyState
         title="Screenshots not found"
         message={
-          "This page does not have this issue in this report. The issue may have been fixed, " +
+          "This page does not have this kind of issue in this report. It may have been fixed, " +
           "or the link may be out of date."
         }
         action={
           <LinkButton to={pagesPath} variant="primary">
-            Back to pages with this issue
+            Back to pages with this kind of issue
           </LinkButton>
         }
       />
@@ -97,7 +97,7 @@ export default function IssuePageScreenshotsRoute() {
               </>
             )}
             {" · "}
-            {found.occurrence_count} occurrence{found.occurrence_count === 1 ? "" : "s"}
+            {found.occurrence_count} issue{found.occurrence_count === 1 ? "" : "s"}
             {", "}
             {found.screenshot_hashes.length} with a screenshot
             {" · "}
@@ -141,10 +141,10 @@ export default function IssuePageScreenshotsRoute() {
       />
 
       <Card className="p-4">
-        <h2 className="text-base font-semibold">Screenshots of each occurrence</h2>
+        <h2 className="text-base font-semibold">Screenshots of each issue</h2>
         {found.screenshot_hashes.length === 0 ? (
           <p className="mt-2 text-sm text-fg-muted">
-            Axcess could not find any of these occurrences on screen, so there are no screenshots.
+            Axcess could not find any of these issues on screen, so there are no screenshots.
           </p>
         ) : (
           <ul className="mt-3 grid list-none gap-3 p-0 md:grid-cols-2 xl:grid-cols-3">
@@ -153,12 +153,12 @@ export default function IssuePageScreenshotsRoute() {
                 <figure className="rounded-xs border border-border bg-surface p-2">
                   <img
                     src={blobUrl(hash)}
-                    alt={`Occurrence ${index + 1} on ${label}. An outline marks where it was found.`}
+                    alt={`Issue ${index + 1} on ${label}. An outline marks where it was found.`}
                     className="max-h-80 w-full rounded-xs object-contain"
                     loading="lazy"
                   />
                   <figcaption className="mt-2 text-xs text-fg-muted">
-                    Occurrence {index + 1} of {found.occurrence_count}. The outline marks where it was found.
+                    Issue {index + 1} of {found.occurrence_count}. The outline marks where it was found.
                   </figcaption>
                 </figure>
               </li>
@@ -167,7 +167,7 @@ export default function IssuePageScreenshotsRoute() {
         )}
         {missing > 0 && (
           <p className="mt-3 text-xs text-fg-muted">
-            {missing} more occurrence{missing === 1 ? " has" : "s have"} no screenshot. Axcess could not find{" "}
+            {missing} more issue{missing === 1 ? " has" : "s have"} no screenshot. Axcess could not find{" "}
             {missing === 1 ? "it" : "them"} on screen, or the page reached its safety limit for screenshots.
           </p>
         )}

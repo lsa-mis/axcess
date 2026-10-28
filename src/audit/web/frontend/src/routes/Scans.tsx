@@ -20,13 +20,12 @@ import {
 import { withoutUserinfo } from "../components/ReportCrumb";
 import { cn } from "../lib/cn";
 import { liveSearchParams } from "../lib/liveSearchParams";
-import { CLICK_THROUGH_STATES_LABEL } from "../lib/labels";
 import { TablePagination, usePagedRows } from "../components/TablePagination";
 import type { ProtectedScanStatus, ProtectedScanSummary, ScanSummary, SiteGroup } from "../api/types";
 import { confirmDestructive } from "../hooks/usePreferences";
 import BreakableUrl from "../components/BreakableUrl";
 import LastScannedSite from "../components/LastScannedSite";
-import RowActionsMenu from "../components/RowActionsMenu";
+import ScanAgainLink from "../components/ScanAgainLink";
 import {
   Cell,
   ColumnHeader,
@@ -111,34 +110,83 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  *   under a screen reader, and `treegrid` needs grid keyboard handling
  *   that screen readers support unevenly. See Adrian Roselli, "Table with
  *   Expando Rows" (https://adrianroselli.com/2019/09/table-with-expando-rows.html).
- * - Column order: the site that names the row, when its latest completed
- *   scan finished, that scan's numbers, then Actions. Actions stays last,
- *   the usual place for a row's actions: the row is read (by eye or, cell
- *   by cell, by a screen reader) as "this site, as of then, with these
- *   results", and only then offers what to do with it. The Site column is
- *   sticky, so the row keeps its name when a narrow screen scrolls the
- *   table sideways to reach Actions.
- * - Actions is one dropdown per row holding "Open latest scan" and "Scan
- *   again" (see RowActionsMenu). It replaced a "Report" column with the
- *   open link alone and a "Scan again" link beside the site's name. Two
- *   links shown in the cell were offered instead, since a dropdown hides
- *   opening the report behind one more click (W3C COGA, "Making Content
- *   Usable", https://www.w3.org/TR/coga-usable/); the developer chose the
- *   dropdown (Oct 2026). The Issues count is still a one-click link into
- *   the same report. A site with no completed scan gets the same button
- *   with only "Scan again", from its latest scan.
+ * - Columns: the site that names the row, when its latest completed scan
+ *   finished, its Pages, Issues and Kinds of issues, then Actions. Issues
+ *   counts every place a problem appears; Kinds of issues counts the rows
+ *   of that report's Issues table. They are the words and the order the
+ *   Issues page summary uses (ReportSummary), so the list and the report
+ *   name the same numbers the same way (SC 3.2.4 Consistent
+ *   Identification, Level AA). Issues leads: it is the number people mean
+ *   when they say "issues". These columns were "Issues" (the rows) and
+ *   "Occurrences" (the places) until the developer renamed the terms
+ *   across the app (2026-10-26): people called the places issues, and
+ *   "occurrence" is an advanced word. See docs/plain-language.md, "Why
+ *   "issue" and "kind of issue"", for the research.
+ * - The Issues count is the link into the report ("476 issues", with "in
+ *   Report #12" as screen-reader-only text), as the count of problems was
+ *   before; the Kinds of issues count is a plain number beside it.
+ * - "Images with text" and "Page states opened by clicking" were columns
+ *   here and were removed (Oct 2026): the first counted every image with
+ *   text, fine alt text or not, and read like a second count of problems;
+ *   the second measured how far the scan reached, where a 0 cannot say
+ *   whether clicking was off or there was nothing to click. Both are about
+ *   how the scan ran, not how the site is doing, and the report itself
+ *   still shows them (Issues page summary, ReportSummary). Fewer columns
+ *   also means less sideways scrolling on a narrow screen (W3C COGA,
+ *   "Making Content Usable", https://www.w3.org/TR/coga-usable/: only what
+ *   helps the task).
+ * - The expanded list of a site's scans has the same Issues and Kinds of
+ *   issue columns, so a site's past scans can be compared by the same
+ *   numbers. They are fetched when the list opens (one request per
+ *   completed scan, `/api/scans/{id}/issue-counts`), not with the site
+ *   list, because counting builds the issue list and the site list is
+ *   fetched every few seconds while a scan runs. A scan that did not
+ *   finish says "Not counted": its counts would be partial, and the site
+ *   row uses only completed scans for the same reason.
+ * - Column order: Actions stays last, the usual place for a row's
+ *   actions: the row is read (by eye or, cell by cell, by a screen reader)
+ *   as "this site, as of then, with these results", and only then offers
+ *   what to do with it. Opening the report was considered as the second
+ *   column; that split the site from its date and numbers, and the Issues
+ *   count is already a link into the same report earlier in the row. The
+ *   Site column is sticky, so the row keeps its name when a narrow screen
+ *   scrolls the table sideways to Actions.
+ * - Actions shows both of a site's actions as links, side by side: "Open
+ *   latest scan", then "Scan again". Both are always visible and one click
+ *   away, laid out like "All issues" and "Delete" in the expanded list of
+ *   scans below, so the two tables share one pattern (W3C COGA: the same
+ *   pattern for the same kind of thing). Stacking them was built and set
+ *   aside for this; the dropped columns left the room.
+ *   A row "Actions" dropdown holding the two links was built first and
+ *   removed (Oct 2026): it put opening a report, this screen's main task,
+ *   one click further away and hid "Scan again" until opened (W3C COGA:
+ *   make the main task easy to find); its button, "Actions", named no verb
+ *   or object (docs/plain-language.md rule 8); and it closed on scroll,
+ *   which caught screen-magnifier users who pan by scrolling. Leaving
+ *   "Scan again" to the Issues page alone was also tried; the request was
+ *   to rescan from this list, and the same link with the same name on both
+ *   screens is consistent (SC 3.2.4). The "Actions" column header is a
+ *   label, not a control.
+ * - Both are links, styled as links, because they go to a page; a button
+ *   acts on this one. Quiet links rather than an outlined button in every
+ *   row, which outweighed the numbers. Each accessible name starts with
+ *   its visible words (WCAG 2.2 SC 2.5.3 Label in Name, Level A: "the name
+ *   contains the text that is presented visually"), then screen-reader-only
+ *   text that names the site (technique C7), not an `aria-label`, so the
+ *   words are real text (AGENTS.md, Interface language rule 8).
+ * - A site with no completed scan has nothing to open, so it shows only
+ *   "Scan again", from its latest scan.
  */
-type SortKey = "site" | "completed" | "pages" | "issues" | "images" | "states";
+type SortKey = "site" | "completed" | "pages" | "issues" | "kinds";
 
-const SORT_COLUMNS = ["site", "completed", "pages", "issues", "images", "states"] as const satisfies readonly SortKey[];
+const SORT_COLUMNS = ["site", "completed", "pages", "issues", "kinds"] as const satisfies readonly SortKey[];
 const DEFAULT_SORT: Sort<SortKey> = { column: "completed", direction: "desc" };
 
 const SORT_KINDS: Record<SortKey, SortKind> = {
   site: "text",
   pages: "number",
   issues: "number",
-  images: "number",
-  states: "number",
+  kinds: "number",
   completed: "date",
 };
 
@@ -146,12 +194,11 @@ const SORT_LABELS: Record<SortKey, string> = {
   site: "Site",
   pages: "Pages",
   issues: "Issues",
-  images: "Images with text",
-  states: CLICK_THROUGH_STATES_LABEL,
+  kinds: "Kinds of issues",
   completed: "Completed",
 };
 
-const TOTAL_COLUMNS = 7;
+const TOTAL_COLUMNS = 6;
 
 /**
  * `https://a.example/docs/` reads as `a.example/docs`; other schemes stay
@@ -170,11 +217,9 @@ function sortValue(site: SiteGroup, key: SortKey): number | string | null {
     case "pages":
       return completed ? completed.page_count : null;
     case "issues":
+      return site.most_recent_completed_occurrence_count;
+    case "kinds":
       return site.most_recent_completed_issue_count;
-    case "images":
-      return completed ? completed.finding_count : null;
-    case "states":
-      return completed ? completed.dom_state_count ?? 0 : null;
     case "completed":
       // Report ids increase with creation, so they order runs without a
       // start time too.
@@ -395,7 +440,7 @@ export default function ScansRoute() {
                   >
                     {SORT_LABELS.site}
                   </SortHeader>
-                  {(["completed", "pages", "issues", "images", "states"] as const).map((column) => (
+                  {(["completed", "pages", "issues", "kinds"] as const).map((column) => (
                     <SortHeader
                       key={column}
                       column={column}
@@ -485,7 +530,7 @@ export default function ScansRoute() {
                       <ColumnHeader>Status</ColumnHeader>
                       <ColumnHeader>Environment and data classification</ColumnHeader>
                       <ColumnHeader>Pages</ColumnHeader>
-                      <ColumnHeader>Occurrences</ColumnHeader>
+                      <ColumnHeader>Issues</ColumnHeader>
                       <ColumnHeader>Updated</ColumnHeader>
                       <ColumnHeader>Open</ColumnHeader>
                     </tr>
@@ -580,34 +625,39 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
                 to={`/scans/${completed.id}/issues`}
                 className="report-link inline-flex min-h-target items-center px-1 font-semibold"
               >
-                {/* Real words instead of an aria-label: "2 issues" shows, and
+                {/* Real words instead of an aria-label: "476 issues" shows, and
                     "in Report #12" is read out with it, so the link says what it
                     opens (SC 2.4.4 Link Purpose (In Context), Level AA; W3C
                     "Using ARIA", rule 1). */}
-                {(site.most_recent_completed_issue_count ?? 0).toLocaleString()}{" "}
-                {site.most_recent_completed_issue_count === 1 ? "issue" : "issues"}
+                {issueCountText(site.most_recent_completed_occurrence_count ?? 0)}
                 <span className="sr-only"> in Report #{completed.id}</span>
               </Link>
             </Cell>
             <Cell numeric className="text-fg">
-              {completed.finding_count.toLocaleString()}
+              {(site.most_recent_completed_issue_count ?? 0).toLocaleString()}
             </Cell>
-            <Cell numeric className="text-fg">
-              {(completed.dom_state_count ?? 0).toLocaleString()}
-            </Cell>
-            <Cell className="whitespace-nowrap text-center">
-              {/* Open the report and Scan again, behind one button. See RowActionsMenu. */}
-              <RowActionsMenu site={label} openScanId={completed.id} scanAgainFromId={completed.id} />
+            <Cell className="whitespace-nowrap">
+              {/* Both actions shown side by side, as in the expanded list: see
+                  "Actions" in the comment above. */}
+              <div className="flex items-center justify-center gap-2">
+                <Link
+                  to={`/scans/${completed.id}`}
+                  className="report-link inline-flex min-h-target items-center px-1 font-semibold"
+                >
+                  Open latest scan
+                  <span className="sr-only"> of {label}, the most recent completed scan</span>
+                </Link>
+                <ScanAgainLink scanId={completed.id} site={label} look="link" />
+              </div>
             </Cell>
           </>
         ) : (
           <>
-            <Cell colSpan={5} className="text-fg-muted">
+            <Cell colSpan={4} className="text-fg-muted">
               No completed scan yet. Expand the site to open its other scans.
             </Cell>
-            <Cell className="whitespace-nowrap text-center">
-              {/* Nothing to open yet, so only "Scan again", from the latest scan. */}
-              <RowActionsMenu site={label} scanAgainFromId={site.most_recent.id} />
+            <Cell className="whitespace-nowrap">
+              <ScanAgainLink scanId={site.most_recent.id} site={label} look="link" />
             </Cell>
           </>
         )}
@@ -640,8 +690,8 @@ function SiteScansTable({ site, label }: { site: SiteGroup; label: string }) {
             <ColumnHeader>Status</ColumnHeader>
             <ColumnHeader>Started</ColumnHeader>
             <ColumnHeader>Pages</ColumnHeader>
-            <ColumnHeader>Images with text</ColumnHeader>
-            <ColumnHeader>{CLICK_THROUGH_STATES_LABEL}</ColumnHeader>
+            <ColumnHeader>Issues</ColumnHeader>
+            <ColumnHeader>Kinds of issues</ColumnHeader>
             <ColumnHeader>Actions</ColumnHeader>
           </tr>
         </TableHead>
@@ -685,12 +735,7 @@ function ScanRow({ scan, index, isHeadline }: { scan: ScanSummary; index: number
       <Cell numeric className="text-fg">
         {scan.page_count.toLocaleString()}
       </Cell>
-      <Cell numeric className="text-fg">
-        {scan.finding_count.toLocaleString()}
-      </Cell>
-      <Cell numeric className="text-fg">
-        {(scan.dom_state_count ?? 0).toLocaleString()}
-      </Cell>
+      <ScanCountCells scan={scan} />
       <Cell className="whitespace-nowrap py-1">
         {/* Default `md` size (44px tall): destructive controls in
             particular must be a real target (SC 2.5.5). */}
@@ -708,6 +753,56 @@ function ScanRow({ scan, index, isHeadline }: { scan: ScanSummary; index: number
         </div>
       </Cell>
     </Row>
+  );
+}
+
+/** "1 issue", "476 issues": the words the Issues page uses. */
+function issueCountText(count: number): string {
+  return `${count.toLocaleString()} ${count === 1 ? "issue" : "issues"}`;
+}
+
+/**
+ * Issues and Kinds of issues for one scan in a site's expanded list, fetched
+ * when the list opens (see "The expanded list" in the comment on this
+ * route). Only a completed scan is counted; the others say "Not counted",
+ * since the Status cell beside them already says why. While a count loads,
+ * the cells say "Counting" rather than showing an empty cell or a 0, which
+ * would read as a result.
+ */
+function ScanCountCells({ scan }: { scan: ScanSummary }) {
+  const completed = scan.status === "completed";
+  const counts = useQuery({
+    queryKey: ["scans", "issue-counts", scan.id],
+    queryFn: () => api.getScanIssueCounts(scan.id),
+    enabled: completed,
+    // A completed report's counts change only if its evidence is rebuilt.
+    staleTime: 5 * 60 * 1000,
+  });
+  if (!completed || counts.isError) {
+    return (
+      <>
+        <Cell className="whitespace-nowrap text-center text-fg-muted">Not counted</Cell>
+        <Cell className="whitespace-nowrap text-center text-fg-muted">Not counted</Cell>
+      </>
+    );
+  }
+  if (!counts.data) {
+    return (
+      <>
+        <Cell className="whitespace-nowrap text-center text-fg-muted">Counting</Cell>
+        <Cell className="whitespace-nowrap text-center text-fg-muted">Counting</Cell>
+      </>
+    );
+  }
+  return (
+    <>
+      <Cell numeric className="text-fg">
+        {counts.data.occurrence_count.toLocaleString()}
+      </Cell>
+      <Cell numeric className="text-fg">
+        {counts.data.issue_count.toLocaleString()}
+      </Cell>
+    </>
   );
 }
 

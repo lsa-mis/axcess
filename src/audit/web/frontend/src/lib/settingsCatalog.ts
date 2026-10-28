@@ -43,10 +43,12 @@ export const SETTING_SECTIONS: ReadonlyArray<{ id: string; title: string; settin
         label: "Theme",
         description:
           "Dark shows light text on a dark background and is just as easy to read. Match device follows your computer.",
+        // Match device is what Axcess starts with, so it comes first, as
+        // in Animations below.
         options: [
+          { value: "system", label: "Match device" },
           { value: "light", label: "Light" },
           { value: "dark", label: "Dark" },
-          { value: "system", label: "Match device" },
         ],
       }),
       setting({

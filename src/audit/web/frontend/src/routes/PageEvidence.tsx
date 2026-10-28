@@ -86,7 +86,7 @@ export default function PageEvidenceRoute() {
             counts={
               findings.length === 0
                 ? "No accessibility problems found on this page"
-                : `${findings.length} occurrence${findings.length === 1 ? "" : "s"}` +
+                : `${findings.length} issue${findings.length === 1 ? "" : "s"}` +
                   ` · ${data.image_occurrences.length} image${data.image_occurrences.length === 1 ? "" : "s"} checked`
             }
             note={data.page.url_normalized}
@@ -100,7 +100,7 @@ export default function PageEvidenceRoute() {
           <ul className="mt-2 flex flex-wrap gap-x-6 gap-y-1.5 text-sm text-fg-muted">
             {failed > 0 && (
               <li>
-                <strong className="font-semibold tabular-nums text-fg">{failed}</strong> occurrence
+                <strong className="font-semibold tabular-nums text-fg">{failed}</strong> issue
                 {failed === 1 ? "" : "s"} failed a check
               </li>
             )}
@@ -123,7 +123,7 @@ export default function PageEvidenceRoute() {
 
       <section className="mb-6">
         <h2 className="mb-2.5 text-base font-semibold text-fg">
-          {findings.length === 0 ? "Accessibility checks" : "Occurrences"}
+          {findings.length === 0 ? "Accessibility checks" : "Issues"}
         </h2>
         {findings.length === 0 ? (
           <Card className="p-4 text-sm text-fg-muted">
@@ -144,7 +144,7 @@ export default function PageEvidenceRoute() {
                 <h3 className="mb-2 text-sm font-semibold text-fg">
                   {group.label}{" "}
                   <span className="font-normal text-fg-muted">
-                    ({group.findings.length} {group.findings.length === 1 ? "occurrence" : "occurrences"})
+                    ({group.findings.length} {group.findings.length === 1 ? "issue" : "issues"})
                   </span>
                 </h3>
                 <div className="space-y-3">
@@ -265,7 +265,7 @@ function FindingCard({
       id={`finding-${finding.id}`}
       tabIndex={-1}
       className="p-4"
-      aria-label={`Occurrence ${finding.id}: ${finding.help}`}
+      aria-label={`Issue ${finding.id}: ${finding.help}`}
     >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
@@ -336,7 +336,7 @@ function FindingCard({
           <ImageOff className="h-3.5 w-3.5 shrink-0" aria-hidden />
           {finding.pipeline === "alfa"
             ? "No screenshot: the rule check (Alfa) runs in a separate browser that Axcess cannot take pictures of."
-            : "Axcess did not take a screenshot of this occurrence."}
+            : "Axcess did not take a screenshot of this issue."}
         </p>
       )}
     </Card>

@@ -22,8 +22,9 @@ import type { IssuePage, IssueRow } from "../api/types";
 import { STATUS_LABEL } from "../lib/terms";
 
 /** The trail label for the pages view; ReportCrumb shows the same words. */
-// "Pages" and not "Pages with this issue": the trail already names the
-// issue right before it, so the longer label said the same thing twice.
+// "Pages" and not "Pages with this kind of issue": the trail already names
+// the kind of issue right before it, so the longer label said the same thing
+// twice.
 export const ISSUE_PAGES_VIEW = "Pages";
 
 /**
@@ -84,7 +85,10 @@ export const DEFAULT_PAGES_SORT: PagesSort = { column: "Occurrences", direction:
 const COLUMN_LABEL: Record<SortColumn, string> = {
   "Page title": "Page title",
   "Page URL": "Page URL",
-  Occurrences: "Occurrences",
+  // "Issues", not "Occurrences": each place on the page is one issue. The
+  // label changed on 2026-10-26 by the developer's decision; see
+  // docs/plain-language.md, "Why "issue" and "kind of issue"".
+  Occurrences: "Issues",
   "Issue screenshots": "Screenshots",
   Status: "Status",
 };
@@ -179,7 +183,7 @@ export default function IssuePagesTable({
 
   return (
     <>
-      <TableBar pager={<TablePagination label="Pages with this issue" noun="pages" {...paged} />}>
+      <TableBar pager={<TablePagination label="Pages with this kind of issue" noun="pages" {...paged} />}>
         <TableSearch label="Search pages" placeholder="Search by page title or URL" value={query} onChange={setQuery} />
       </TableBar>
       <TableStatus>
@@ -189,12 +193,12 @@ export default function IssuePagesTable({
       {visible.length === 0 ? (
         <TableEmpty>
           {pages.length === 0
-            ? "No pages have this issue."
+            ? "No pages have this kind of issue."
             : "No pages match that search."}
         </TableEmpty>
       ) : (
         <TableRegion label="Pages table" paged={paged}>
-          <Table className="min-w-[44rem]" caption={`Pages with the issue ${row.title}`}>
+          <Table className="min-w-[44rem]" caption={`Pages with ${row.title}`}>
             <TableHead>
               <tr>
                 <ColumnHeader className="w-10 whitespace-nowrap">
@@ -208,7 +212,7 @@ export default function IssuePagesTable({
                   Page URL
                 </SortHeader>
                 <SortHeader column="Occurrences" kind="number" {...sortProps}>
-                  Occurrences
+                  {COLUMN_LABEL.Occurrences}
                 </SortHeader>
                 <SortHeader column="Issue screenshots" kind="number" {...sortProps}>
                   {COLUMN_LABEL["Issue screenshots"]}
@@ -287,7 +291,7 @@ const IssuePageRow = memo(function IssuePageRow({
         >
           <ScanEye className="mt-0.5 h-5 w-5 shrink-0 text-fg-subtle" aria-hidden />
           <span>{page.page_title?.trim() || <span className="font-normal">Untitled</span>}</span>
-          <span className="sr-only">, opens the saved copy with this issue marked</span>
+          <span className="sr-only">, opens the saved copy with this kind of issue marked</span>
         </Link>
       </Cell>
       <Cell className="min-w-[14rem] max-w-md break-all text-xs text-fg-muted">{page.page_url}</Cell>
@@ -298,7 +302,7 @@ const IssuePageRow = memo(function IssuePageRow({
         {shots > 0 ? (
           <Link to={screenshotsPath} className="inline-flex min-h-target items-center text-umich-blue underline underline-offset-2">
             {shots} screenshot{shots === 1 ? "" : "s"}
-            <span className="sr-only"> of this issue on {label}</span>
+            <span className="sr-only"> of this kind of issue on {label}</span>
           </Link>
         ) : (
           <span className="text-fg-muted">No screenshots</span>
