@@ -53,7 +53,7 @@ import {
   REVIEW_LANE_HELP,
   isFindingType,
 } from "../lib/labels";
-import { REVIEW_TYPE_LABEL } from "../lib/terms";
+import { CHECK_LABEL, REVIEW_TYPE_LABEL } from "../lib/terms";
 import { useScanQuery } from "../hooks/useScanQuery";
 import type {
   ConformanceLabel,
@@ -454,6 +454,7 @@ const COLUMNS = [
   "Issue",
   "Type",
   "Finding type",
+  "Check",
   "WCAG",
   "Priority",
   "Pages",
@@ -485,6 +486,13 @@ const COLUMN_LABEL: Record<SortColumn, string> = {
   // REVIEW_TYPE_LABEL in lib/terms.ts).
   Type: "How sure",
   "Finding type": "Where it shows",
+  // Which check found the row, by its interface name (CHECK_LABEL), after
+  // where it shows: both say where the evidence came from. Testers who use
+  // Siteimprove asked whether an issue came from axe or from Siteimprove
+  // (user testing, 2026-10-28); the header's hint names who makes each
+  // rule check. Each row comes from one check (IssueRow.pipeline), so the
+  // cell is one name, never a list.
+  Check: "Check",
   WCAG: "WCAG",
   Priority: "Priority",
   Pages: "Pages",
@@ -517,6 +525,7 @@ const SORT_KEYS: Record<SortColumn, string> = {
   Issue: "title",
   Type: "type",
   "Finding type": "finding_type",
+  Check: "check",
   WCAG: "wcag",
   Priority: "score",
   Pages: "pages",
@@ -533,6 +542,7 @@ const SORT_KINDS: Record<SortColumn, SortKind> = {
   Issue: "text",
   Type: "text",
   "Finding type": "text",
+  Check: "text",
   WCAG: "text",
   Priority: "number",
   Pages: "number",
@@ -600,6 +610,8 @@ function compareRows(a: IssueRow, b: IssueRow, column: SortColumn): number {
       return LANE_RANK[a.review_lane] - LANE_RANK[b.review_lane];
     case "Finding type":
       return compareLists(findingTypeRank(a), findingTypeRank(b));
+    case "Check":
+      return compareText(CHECK_LABEL[a.pipeline], CHECK_LABEL[b.pipeline]);
     case "WCAG":
       return compareLists(wcagRank(a), wcagRank(b));
     case "Priority":
@@ -806,6 +818,7 @@ const IssueTableRow = memo(function IssueTableRow({
       <Cell className={cell}>
         <FindingTypeCell row={row} />
       </Cell>
+      <Cell className={cell}>{CHECK_LABEL[row.pipeline] ?? row.pipeline}</Cell>
       <Cell className={cn(cell, "whitespace-nowrap")}>
         {row.wcag_sc ? (
           <span className="inline-flex items-center gap-1.5">

@@ -23,6 +23,7 @@ def _scan(scan_id: int, status: str, *, site: str, findings: int = 0) -> dict[st
         "page_count": 2 if status == "completed" else 0,
         "dom_state_count": 4 if status == "completed" else 0,
         "finding_count": findings,
+        "rule_checks": ["axe", "alfa"] if status == "completed" else [],
         "started_at": None,
         "finished_at": None,
     }
@@ -119,7 +120,7 @@ async def test_reports_table_keyboard_and_columns(
     await playwright_async.expect(table.locator("td[headers]")).to_have_count(0)
     # The sorted header also carries its direction chip, so match the labels.
     await playwright_async.expect(table.locator("thead tr").first.locator("th")).to_contain_text(
-        ["Site", "Scanned", "Pages", "Issues", "Kinds of issues", "Actions"]
+        ["Site", "Scanned", "Pages", "Issues", "Kinds of issues", "Rule check", "Actions"]
     )
     # The caption says where a site row's numbers come from; the sentence
     # that repeated it over the table was removed after user testing.
@@ -153,7 +154,7 @@ async def test_reports_table_keyboard_and_columns(
     # The site's newest run was interrupted ("Stopped"); the row shows only
     # the completed one.
     await playwright_async.expect(row).not_to_contain_text("Stopped")
-    await playwright_async.expect(row.locator("td")).to_have_count(5)
+    await playwright_async.expect(row.locator("td")).to_have_count(6)
     await playwright_async.expect(row.locator("td").nth(0)).to_have_text("Not recorded")
     await playwright_async.expect(row.locator("td").nth(1)).to_have_text("2")
     # Issues counts every place a problem appears, and says so; "in Report
@@ -162,6 +163,11 @@ async def test_reports_table_keyboard_and_columns(
         f"{5 + count} issues in Report #{headline_id}"
     )
     await playwright_async.expect(row.locator("td").nth(3)).to_have_text("5")
+    # Which rule checks tested pages, and, on the header, who makes each.
+    await playwright_async.expect(row.locator("td").nth(4)).to_have_text("axe and Alfa")
+    await playwright_async.expect(
+        table.locator("thead").get_by_role("button", name=re.compile(r"^Rule check"))
+    ).to_have_attribute("title", re.compile(r"Alfa \(made by Siteimprove\)"))
     await playwright_async.expect(table.locator("thead")).not_to_contain_text("Occurrences")
     # Images with text and page states are no longer columns.
     await playwright_async.expect(table.locator("thead")).not_to_contain_text("Images with text")
@@ -216,13 +222,16 @@ async def test_reports_table_keyboard_and_columns(
         await playwright_async.expect(table.locator(f"tr#{row_id}")).to_have_count(1)
     # Fetched when the rows are shown. The completed scan is counted; the
     # interrupted one says so in words rather than showing a 0. Its cells
-    # sit under the site's: Scanned, Pages, Issues, Kinds of issues, Actions.
+    # sit under the site's: Scanned, Pages, Issues, Kinds of issues, Rule
+    # check, Actions.
     stopped, done = scans.nth(0), scans.nth(1)
-    await playwright_async.expect(done.locator("td")).to_have_count(5)
+    await playwright_async.expect(done.locator("td")).to_have_count(6)
     await playwright_async.expect(done.locator("td").nth(2)).to_have_text(str(5 + count))
     await playwright_async.expect(done.locator("td").nth(3)).to_have_text("5")
     await playwright_async.expect(stopped.locator("td").nth(2)).to_have_text("Not counted")
     await playwright_async.expect(stopped.locator("td").nth(3)).to_have_text("Not counted")
+    await playwright_async.expect(done.locator("td").nth(4)).to_have_text("axe and Alfa")
+    await playwright_async.expect(stopped.locator("td").nth(4)).to_have_text("None")
     # A status shows only when the scan did not complete: "Stopped" beside
     # the interrupted run's number, nothing beside the completed one.
     await playwright_async.expect(stopped.get_by_role("rowheader")).to_contain_text("Stopped")

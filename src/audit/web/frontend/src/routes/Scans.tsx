@@ -19,6 +19,8 @@ import {
 } from "../components/ui";
 import { withoutUserinfo } from "../components/ReportCrumb";
 import { cn } from "../lib/cn";
+import { RULE_CHECK_HELP } from "../lib/labels";
+import { ruleChecksText } from "../lib/terms";
 import { liveSearchParams } from "../lib/liveSearchParams";
 import { TablePagination, usePagedRows } from "../components/TablePagination";
 import type { ProtectedScanStatus, ProtectedScanSummary, ScanSummary, SiteGroup } from "../api/types";
@@ -128,7 +130,8 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  *   exception is what needs the eye (W3C COGA, "Making Content Usable":
  *   only what helps the task).
  * - Columns: the site that names the row, when its latest completed scan
- *   finished, its Pages, Issues and Kinds of issues, then Actions. Issues
+ *   finished, its Pages, Issues and Kinds of issues, the Rule check it
+ *   ran, then Actions. Issues
  *   counts every place a problem appears; Kinds of issues counts the rows
  *   of that report's Issues table. They are the words and the order the
  *   Issues page summary uses (ReportSummary), so the list and the report
@@ -139,6 +142,13 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  *   across the app (2026-10-26): people called the places issues, and
  *   "occurrence" is an advanced word. See docs/plain-language.md, "Why
  *   "issue" and "kind of issue"", for the research.
+ * - Rule check says which rule checks tested pages in that scan: "axe",
+ *   "Alfa", "axe and Alfa" or "None". Testers who use Siteimprove asked
+ *   (2026-10-28) whether a report came from axe or from Siteimprove, so
+ *   the header's hint names who makes each tool (RULE_CHECK_HELP). It
+ *   counts what ran, not what was chosen: a check that never reached a
+ *   page is not listed. Just before Actions, after the numbers it
+ *   qualifies; the Issues table names the check for each kind of issue.
  * - The Issues count is the link into the report ("476 issues", with "in
  *   Report #12" as screen-reader-only text), as the count of problems was
  *   before; the Kinds of issues count is a plain number beside it.
@@ -194,9 +204,9 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  * - A site with no completed scan has nothing to open, so it shows only
  *   "Scan again", from its latest scan.
  */
-type SortKey = "site" | "completed" | "pages" | "issues" | "kinds";
+type SortKey = "site" | "completed" | "pages" | "issues" | "kinds" | "checks";
 
-const SORT_COLUMNS = ["site", "completed", "pages", "issues", "kinds"] as const satisfies readonly SortKey[];
+const SORT_COLUMNS = ["site", "completed", "pages", "issues", "kinds", "checks"] as const satisfies readonly SortKey[];
 const DEFAULT_SORT: Sort<SortKey> = { column: "completed", direction: "desc" };
 
 const SORT_KINDS: Record<SortKey, SortKind> = {
@@ -204,6 +214,7 @@ const SORT_KINDS: Record<SortKey, SortKind> = {
   pages: "number",
   issues: "number",
   kinds: "number",
+  checks: "text",
   completed: "date",
 };
 
@@ -212,10 +223,11 @@ const SORT_LABELS: Record<SortKey, string> = {
   pages: "Pages",
   issues: "Issues",
   kinds: "Kinds of issues",
+  checks: "Rule check",
   completed: "Scanned",
 };
 
-const TOTAL_COLUMNS = 6;
+const TOTAL_COLUMNS = 7;
 
 /**
  * `https://a.example/docs/` reads as `a.example/docs`; other schemes stay
@@ -237,6 +249,8 @@ function sortValue(site: SiteGroup, key: SortKey): number | string | null {
       return site.most_recent_completed_occurrence_count;
     case "kinds":
       return site.most_recent_completed_issue_count;
+    case "checks":
+      return completed?.rule_checks ? ruleChecksText(completed.rule_checks).toLowerCase() : null;
     case "completed":
       // Report ids increase with creation, so they order runs without a
       // start time too.
@@ -453,13 +467,14 @@ export default function ScansRoute() {
                   >
                     {SORT_LABELS.site}
                   </SortHeader>
-                  {(["completed", "pages", "issues", "kinds"] as const).map((column) => (
+                  {(["completed", "pages", "issues", "kinds", "checks"] as const).map((column) => (
                     <SortHeader
                       key={column}
                       column={column}
                       kind={SORT_KINDS[column]}
                       wrap="words"
                       className="align-bottom"
+                      hint={column === "checks" ? RULE_CHECK_HELP : undefined}
                       {...sortProps}
                     >
                       {SORT_LABELS[column]}
@@ -650,6 +665,7 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
             <Cell numeric className="text-fg">
               {(site.most_recent_completed_issue_count ?? 0).toLocaleString()}
             </Cell>
+            <RuleChecksCell scan={completed} />
             <Cell className="whitespace-nowrap">
               {/* Both actions shown side by side, as in the scan rows: see
                   "Actions" in the comment above. */}
@@ -667,7 +683,7 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
           </>
         ) : (
           <>
-            <Cell colSpan={4} className="text-fg-muted">
+            <Cell colSpan={5} className="text-fg-muted">
               No completed scan yet. Expand the site to open its other scans.
             </Cell>
             <Cell className="whitespace-nowrap">
@@ -771,6 +787,7 @@ function ScanRow({ id, scan, first, last }: { id: string; scan: ScanSummary; fir
         {scan.page_count.toLocaleString()}
       </Cell>
       <ScanCountCells scan={scan} className={piece()} />
+      <RuleChecksCell scan={scan} className={piece()} />
       <Cell className={cn("whitespace-nowrap py-1", piece("end"))}>
         {/* Default `md` size (44px tall): destructive controls in
             particular must be a real target (SC 2.5.5). */}
@@ -788,6 +805,20 @@ function ScanRow({ id, scan, first, last }: { id: string; scan: ScanSummary; fir
         </div>
       </Cell>
     </tr>
+  );
+}
+
+/**
+ * Which rule checks tested pages in a scan: "axe", "Alfa", "axe and Alfa",
+ * or "None"; "Not recorded" when the scan did not record it. See "Rule
+ * check" in the comment on this route.
+ */
+function RuleChecksCell({ scan, className }: { scan: ScanSummary; className?: string }) {
+  const checks = scan.rule_checks;
+  return (
+    <Cell className={cn("whitespace-nowrap text-center", checks?.length ? "text-fg" : "text-fg-muted", className)}>
+      {checks ? ruleChecksText(checks) : "Not recorded"}
+    </Cell>
   );
 }
 

@@ -10,6 +10,11 @@ merge.
 
 ### Added
 
+- Reports and Issues say which check found what. On Reports, a **Rule
+  check** column shows whether each scan ran axe, Alfa or both; on the
+  Issues page, a **Check** column names the check behind each kind of
+  issue. Their hints say who makes each rule check: axe-core by Deque,
+  Alfa by Siteimprove.
 - Desktop app: the first time Axcess opens, the loading screen says
   "The first time Axcess opens, this can take a minute or two." under
   "Loading", since that first start sets up the reports database and the
@@ -57,6 +62,13 @@ merge.
   Axcess does not check it).
 
 ### Changed
+
+- Reports: opening a site lists its scans as rows of the same table,
+  lined up under the site's columns, in a box indented under the site's
+  name, instead of in a second table with its own headers. Thin lines part
+  the columns. A scan shows its status only when it did not complete
+  ("Stopped", "Failed", "Scanning"). The date column is now **Scanned**,
+  and the sentence over the table is gone.
 
 - **The numbers over the Issues table lead with what was found.** There are
   three now: Kinds of issue found, Places issues appear (occurrences), and

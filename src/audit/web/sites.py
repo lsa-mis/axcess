@@ -17,7 +17,7 @@ from __future__ import annotations
 import sqlite3
 import threading
 from collections.abc import Iterable
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -34,6 +34,9 @@ class ScanSummaryModel(BaseModel):
     page_count: int
     dom_state_count: int
     finding_count: int
+    #: The rule checks that checked at least one page ("axe", "alfa"), or
+    #: ``None`` when the scan row did not carry the counters.
+    rule_checks: list[Literal["axe", "alfa"]] | None = None
     started_at: str | None
     finished_at: str | None
 

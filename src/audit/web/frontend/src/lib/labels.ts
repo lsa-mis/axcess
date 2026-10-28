@@ -106,7 +106,18 @@ export const ISSUE_COLUMN_HELP = {
     "Pages with at least one issue of this kind. An element repeated on many pages, such as a shared menu, counts only on the first page it was found on. An image counts on every page it appears on.",
   Issues:
     "How many issues of this kind were found: one for each place. An element repeated on many pages, such as a shared menu, counts once. An image counts every time it appears.",
+  Check:
+    "Which check found this kind of issue. Rule check (axe) uses axe-core, made by Deque. Rule check (Alfa) uses Alfa, made by Siteimprove.",
 } as const;
+
+/**
+ * What the Reports list's "Rule check" column holds. It names who makes each
+ * tool, because testers who use Siteimprove asked whether a report came from
+ * axe or from Siteimprove (user testing, 2026-10-28), and "Alfa" alone did
+ * not tell them.
+ */
+export const RULE_CHECK_HELP =
+  "Which rule checks tested pages in this scan: axe (axe-core, made by Deque), Alfa (made by Siteimprove), or both.";
 
 /**
  * What each priority band means. Priority is the impact rating's weight

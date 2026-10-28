@@ -3196,7 +3196,8 @@ def _protected_summary(record: Any) -> dict[str, Any]:
 
 _SCANS_PUBLIC_WITH_STATES = (
     "SELECT id, seed_url, status, page_count, finding_count, "
-    "interaction_states_total, started_at, finished_at FROM scans "
+    "interaction_states_total, axe_pages_scanned, alfa_pages_scanned, "
+    "started_at, finished_at FROM scans "
     "WHERE NOT EXISTS (SELECT 1 FROM protected_scans p WHERE p.scan_id = scans.id) "
     "ORDER BY id DESC"
 )
@@ -3208,7 +3209,8 @@ _SCANS_PUBLIC_LEGACY = (
 )
 _SCANS_ALL_WITH_STATES = (
     "SELECT id, seed_url, status, page_count, finding_count, "
-    "interaction_states_total, started_at, finished_at FROM scans ORDER BY id DESC"
+    "interaction_states_total, axe_pages_scanned, alfa_pages_scanned, "
+    "started_at, finished_at FROM scans ORDER BY id DESC"
 )
 _SCANS_ALL_LEGACY = (
     "SELECT id, seed_url, status, page_count, finding_count, "
@@ -3325,9 +3327,26 @@ def _scan_row_to_summary(scan: Any) -> dict[str, Any]:
         # application whose content mostly does not exist until it is used.
         "dom_state_count": int(row.get("interaction_states_total") or 0),
         "finding_count": int(row.get("finding_count") or 0),
+        "rule_checks": _rule_checks_run(row),
         "started_at": _to_iso_string(row.get("started_at")),
         "finished_at": _to_iso_string(row.get("finished_at")),
     }
+
+
+def _rule_checks_run(row: dict[str, Any]) -> list[str] | None:
+    """The rule checks that checked at least one page of this scan, in order.
+
+    From the per-scan page counters, so it says what ran, not what was
+    chosen: a check that was on but never reached a page is left out, as
+    ``_methods_used`` counts it. ``None`` when the row does not carry the
+    counters (a legacy query), so the list can say "Not recorded" rather
+    than claim that nothing ran.
+    """
+    if "axe_pages_scanned" not in row or "alfa_pages_scanned" not in row:
+        return None
+    return [
+        check for check in ("axe", "alfa") if int(row.get(f"{check}_pages_scanned") or 0) > 0
+    ]
 
 
 def _to_iso_string(value: Any) -> str | None:

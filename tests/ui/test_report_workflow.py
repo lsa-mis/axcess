@@ -685,7 +685,8 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
     headers = await table.locator("thead th").all_inner_texts()
     names = [re.sub(r"\s+", " ", text).strip() for text in headers]
     # The Finding type column reads "Where it shows" ("finding" is not an interface word).
-    assert names[:4] == ["Kind of issue", "How sure", "Where it shows", "WCAG"], names
+    # Check, beside it, names the check that found the row.
+    assert names[:5] == ["Kind of issue", "How sure", "Where it shows", "Check", "WCAG"], names
 
     def row(title: str) -> Any:
         return table.locator("tbody tr").filter(
@@ -717,6 +718,13 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
     )
     assert (await row("Adequate alternative").locator(finding_type).inner_text()).strip() == (
         "In an image"
+    )
+    check = "td:nth-child(4)"
+    assert (await row("Load-state rule failure").locator(check).inner_text()).strip() == (
+        "Rule check (axe)"
+    )
+    assert (await row("Image of text needs review").locator(check).inner_text()).strip() == (
+        "Image text check"
     )
 
     # No row-group header rows split the types; the live status counts each.

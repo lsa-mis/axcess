@@ -89,6 +89,11 @@ async def test_issue_tags_headers_and_bands_explain_themselves(
             "Where it shows": (
                 "Where this kind of issue shows up: at page load, after clicking, or in an image."
             ),
+            # Names who makes each rule check: testers asked "axe or Siteimprove?".
+            "Check": (
+                "Which check found this kind of issue. Rule check (axe) uses axe-core, made by "
+                "Deque. Rule check (Alfa) uses Alfa, made by Siteimprove."
+            ),
         }
         # On the sort button, the header's focusable part, so a screen reader
         # reads it as the button's description.
