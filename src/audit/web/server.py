@@ -3344,9 +3344,7 @@ def _rule_checks_run(row: dict[str, Any]) -> list[str] | None:
     """
     if "axe_pages_scanned" not in row or "alfa_pages_scanned" not in row:
         return None
-    return [
-        check for check in ("axe", "alfa") if int(row.get(f"{check}_pages_scanned") or 0) > 0
-    ]
+    return [check for check in ("axe", "alfa") if int(row.get(f"{check}_pages_scanned") or 0) > 0]
 
 
 def _to_iso_string(value: Any) -> str | None:
