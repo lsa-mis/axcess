@@ -111,8 +111,8 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  *   that screen readers support unevenly. See Adrian Roselli, "Table with
  *   Expando Rows" (https://adrianroselli.com/2019/09/table-with-expando-rows.html).
  * - Columns: the site that names the row, when its latest completed scan
- *   finished, its Pages, Issues and Kinds of issue, then Actions. Issues
- *   counts every place a problem appears; Kinds of issue counts the rows
+ *   finished, its Pages, Issues and Kinds of issues, then Actions. Issues
+ *   counts every place a problem appears; Kinds of issues counts the rows
  *   of that report's Issues table. They are the words and the order the
  *   Issues page summary uses (ReportSummary), so the list and the report
  *   name the same numbers the same way (SC 3.2.4 Consistent
@@ -124,7 +124,7 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  *   "issue" and "kind of issue"", for the research.
  * - The Issues count is the link into the report ("476 issues", with "in
  *   Report #12" as screen-reader-only text), as the count of problems was
- *   before; Kinds of issue is a plain number beside it.
+ *   before; the Kinds of issues count is a plain number beside it.
  * - "Images with text" and "Page states opened by clicking" were columns
  *   here and were removed (Oct 2026): the first counted every image with
  *   text, fine alt text or not, and read like a second count of problems;
@@ -194,7 +194,7 @@ const SORT_LABELS: Record<SortKey, string> = {
   site: "Site",
   pages: "Pages",
   issues: "Issues",
-  kinds: "Kinds of issue",
+  kinds: "Kinds of issues",
   completed: "Completed",
 };
 
@@ -691,7 +691,7 @@ function SiteScansTable({ site, label }: { site: SiteGroup; label: string }) {
             <ColumnHeader>Started</ColumnHeader>
             <ColumnHeader>Pages</ColumnHeader>
             <ColumnHeader>Issues</ColumnHeader>
-            <ColumnHeader>Kinds of issue</ColumnHeader>
+            <ColumnHeader>Kinds of issues</ColumnHeader>
             <ColumnHeader>Actions</ColumnHeader>
           </tr>
         </TableHead>
@@ -762,7 +762,7 @@ function issueCountText(count: number): string {
 }
 
 /**
- * Issues and Kinds of issue for one scan in a site's expanded list, fetched
+ * Issues and Kinds of issues for one scan in a site's expanded list, fetched
  * when the list opens (see "The expanded list" in the comment on this
  * route). Only a completed scan is counted; the others say "Not counted",
  * since the Status cell beside them already says why. While a count loads,

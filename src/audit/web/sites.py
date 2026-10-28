@@ -58,7 +58,7 @@ class ReportCounts(BaseModel):
     """The two issue counts of one completed report, as the Issues page counts them.
 
     Field names are the data's: ``issue_count`` is unified issue groups (the
-    interface's "kinds of issue") and ``occurrence_count`` is every place
+    interface's "kinds of issues") and ``occurrence_count`` is every place
     they appear (the interface's "issues").
     """
 

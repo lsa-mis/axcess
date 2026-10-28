@@ -79,7 +79,7 @@ export function ReportSummary({
     <>
       {scan.blocked && <BlockedScanNotice scanId={scan.id} blocked={scan.blocked} />}
       {/* Three numbers, main point first: how many issues (every place a
-          problem shows up), how many kinds of issue they fall into, then how
+          problem shows up), how many kinds of issues they fall into, then how
           much of the site was scanned to find them. The first version read
           left to right as the scan ran (pages, then occurrences, then
           issues), and a coworker testing it misread it in three ways:
@@ -91,7 +91,7 @@ export function ReportSummary({
           The labels carry the difference between the two numbers, not the
           lines under them, because a reader scanning the numbers reads the
           label and skips the rest: "Issues found" for every place a problem
-          shows up, "Kinds of issue" for the rows of the table below. Each
+          shows up, "Kinds of issues" for the rows of the table below. Each
           label is the same word as the table's matching column ("Issues")
           or its row name ("Kind of issue"), so one thing keeps one name
           (W3C COGA, "Making Content Usable",
@@ -109,7 +109,7 @@ export function ReportSummary({
           choice: an issue is now one place, a kind of issue is one row,
           and the places count leads, as the number people already called
           "issues". The research is in docs/plain-language.md, "Why "issue"
-          and "kind of issue"". "Kinds of issue", not "Types of issues": the
+          and "kind of issue"". "Kinds of issues", not "Types of issues": the
           "How sure" values were once called the three types of issue, and
           "issue type" is a field in the Jira export.
 
@@ -154,7 +154,7 @@ export function ReportSummary({
           one) and 32px between rows, against 8px from a number to its name
           and 4px between the lines under it, which read as one unit. Three
           across from 640px; below that the two issue numbers (Issues found
-          and Kinds of issue) share a row, as the pair they are, and the
+          and Kinds of issues) share a row, as the pair they are, and the
           pages take the row under them, so nothing is squeezed at 320px (SC
           1.4.10 Reflow, Level AA). */}
       <dl className="mt-10 mb-5 grid grid-cols-2 gap-x-8 gap-y-8 sm:grid-cols-3 lg:gap-x-12">
@@ -164,7 +164,7 @@ export function ReportSummary({
           details={[{ text: "Each one is an element on a page" }]}
         />
         <SummaryStat
-          label={issueGroups === 1 ? "Kind of issue" : "Kinds of issue"}
+          label={issueGroups === 1 ? "Kind of issue" : "Kinds of issues"}
           value={issueGroups}
           details={[{ text: "One per row in the table below" }]}
         />

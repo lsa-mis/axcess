@@ -663,7 +663,7 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     ).to_have_attribute("aria-current", "page")
     await playwright_async.expect(page.get_by_role("link", name="Overview")).to_have_count(0)
     # The summary leads with what was found: the issues (each place a
-    # problem appears), the kinds of issue they group into, then the pages
+    # problem appears), the kinds of issues they group into, then the pages
     # visited. Pages that could not be loaded are said in words, never as
     # "errors", which readers took for accessibility errors, and only when
     # there are some.

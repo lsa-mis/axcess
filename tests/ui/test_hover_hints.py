@@ -126,7 +126,7 @@ async def test_issue_tags_headers_and_bands_explain_themselves(
         assert await terms.locator("[title]").count() == 0
         await playwright_async.expect(
             page.get_by_role(
-                "heading", name="Priority: which kinds of issue to look at first", level=3
+                "heading", name="Priority: which kinds of issues to look at first", level=3
             )
         ).to_be_visible()
         await playwright_async.expect(

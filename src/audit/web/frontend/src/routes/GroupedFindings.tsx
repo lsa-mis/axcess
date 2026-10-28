@@ -144,11 +144,11 @@ export default function GroupedFindingsRoute() {
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard label="Images" value={coverage.finding_count} />
-        {/* Issues first, then kinds of issue: the order the developer set on
+        {/* Issues first, then kinds of issues: the order the developer set on
             2026-10-26 for every screen that shows both counts. Why the words
             changed: docs/plain-language.md, "Why "issue" and "kind of issue"". */}
         <StatCard label="Issues" value={coverage.occurrence_total} />
-        <StatCard label="Kinds of issue" value={groups.length} />
+        <StatCard label="Kinds of issues" value={groups.length} />
         <StatCard label="Pages scanned" value={coverage.page_count} />
       </div>
 
@@ -167,7 +167,7 @@ export default function GroupedFindingsRoute() {
           />
         </TableBar>
         <TableStatus className="border-b-0">
-          {groups.length.toLocaleString()} {groups.length === 1 ? "kind of issue" : "kinds of issue"}.
+          {groups.length.toLocaleString()} {groups.length === 1 ? "kind of issue" : "kinds of issues"}.
         </TableStatus>
       </Card>
 

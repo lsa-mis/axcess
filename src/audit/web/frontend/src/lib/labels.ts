@@ -101,7 +101,7 @@ export const ISSUE_COLUMN_HELP = {
   "How sure": "How sure Axcess is that this kind of issue is a real problem: Mostly sure, Not sure, or For information.",
   "Where it shows": "Where this kind of issue shows up: at page load, after clicking, or in an image.",
   Priority:
-    "High, Medium, or Low, from the impact rating of this kind of issue and how many pages it is on. Kinds of issue from the rule check (Alfa) have no rating, so they count as the lowest. A serious kind of issue on one page can still be Low. Kinds of issue marked For information show Does not apply.",
+    "High, Medium, or Low, from the impact rating of this kind of issue and how many pages it is on. Kinds of issues from the rule check (Alfa) have no rating, so they count as the lowest. A serious kind of issue on one page can still be Low. Kinds of issues marked For information show Does not apply.",
   Pages:
     "Pages with at least one issue of this kind. An element repeated on many pages, such as a shared menu, counts only on the first page it was found on. An image counts on every page it appears on.",
   Issues:
@@ -119,10 +119,10 @@ export const ISSUE_COLUMN_HELP = {
  * a kind of issue (docs/plain-language.md, "Why "issue" and "kind of issue"").
  */
 export const PRIORITY_HELP = {
-  High: "Look at these first among kinds of issue with the same How sure value: a high impact rating on many pages, such as a critical problem on 4 or more pages or a moderate one on 20 or more (pages a shared element repeats on count too).",
+  High: "Look at these first among kinds of issues with the same How sure value: a high impact rating on many pages, such as a critical problem on 4 or more pages or a moderate one on 20 or more (pages a shared element repeats on count too).",
   Medium:
     "Look at these after the High ones with the same How sure value. Priority combines the impact rating with how many pages have it.",
-  Low: "Look at these last among kinds of issue with the same How sure value. Low can still be serious: a critical problem on 1 page is Low, so open it before you skip it.",
+  Low: "Look at these last among kinds of issues with the same How sure value. Low can still be serious: a critical problem on 1 page is Low, so open it before you skip it.",
 } as const;
 
 export const isReviewLane = (value: string): value is ReviewLane =>

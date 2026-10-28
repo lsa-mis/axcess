@@ -64,7 +64,7 @@ Issues table counts them in its Issues column.
 
 All the issues one check found for the same reason (for images, the same kind
 of image with the same [alt text](#alt-text) problem). Each kind of issue is
-one row in the Issues table, such as "6 kinds of issue". Its name is in the
+one row in the Issues table, such as "6 kinds of issues". Its name is in the
 table's Kind of issue column.
 
 - Exports use other words: the Excel workbook and the written report call a
@@ -421,7 +421,7 @@ up.
 
 The report you download as **Written report (Markdown)** from the **Export
 report** menu. It is a plain text file with headings (Markdown format). The Excel
-workbook is a separate export, **Kinds of issue with fixes (Excel)**, with one
+workbook is a separate export, **Kinds of issues with fixes (Excel)**, with one
 row for each kind of issue in its Issues Overview sheet.
 
 ### Local-first

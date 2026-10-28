@@ -132,7 +132,7 @@ login and MFA experience remains a manual-only criterion.
 
 Shipped reporting behavior includes:
 
-- kinds of issue (one row each) and issues (each place one appears) labeled
+- kinds of issues (one row each) and issues (each place one appears) labeled
   separately;
 - source layer, confidence, WCAG criterion, affected users, exact location,
   evidence, remediation, and verification guidance;

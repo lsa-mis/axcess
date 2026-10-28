@@ -151,12 +151,12 @@ export default function A11yByRuleRoute() {
       </Card>
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {/* Issues first, then kinds of issue: the order the developer set on
+        {/* Issues first, then kinds of issues: the order the developer set on
             2026-10-26 for every screen that shows both counts. Why the words
             changed:
             docs/plain-language.md, "Why "issue" and "kind of issue"". */}
         <StatCard label="Issues (axe)" value={coverage.axe_violations_total} />
-        <StatCard label="Kinds of issue" value={groups.length} />
+        <StatCard label="Kinds of issues" value={groups.length} />
         <StatCard label="Failed (Alfa)" value={coverage.alfa_failed_total} />
         <StatCard label={`${REVIEW_TYPE_LABEL.expert_review} (Alfa)`} value={coverage.alfa_cant_tell_total} />
         <StatCard
@@ -180,7 +180,7 @@ export default function A11yByRuleRoute() {
           />
         </TableBar>
         <TableStatus className="border-b-0">
-          {groups.length.toLocaleString()} {groups.length === 1 ? "kind of issue" : "kinds of issue"}.
+          {groups.length.toLocaleString()} {groups.length === 1 ? "kind of issue" : "kinds of issues"}.
         </TableStatus>
       </Card>
 

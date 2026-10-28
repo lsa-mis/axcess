@@ -119,7 +119,7 @@ async def test_reports_table_keyboard_and_columns(
     await playwright_async.expect(table.locator("td[headers]")).to_have_count(0)
     # The sorted header also carries its direction chip, so match the labels.
     await playwright_async.expect(table.locator("thead tr").first.locator("th")).to_contain_text(
-        ["Site", "Completed", "Pages", "Issues", "Kinds of issue", "Actions"]
+        ["Site", "Completed", "Pages", "Issues", "Kinds of issues", "Actions"]
     )
     await playwright_async.expect(
         page.get_by_text(
@@ -155,7 +155,7 @@ async def test_reports_table_keyboard_and_columns(
     await playwright_async.expect(row.locator("td").nth(0)).to_have_text("Not recorded")
     await playwright_async.expect(row.locator("td").nth(1)).to_have_text("2")
     # Issues counts every place a problem appears, and says so; "in Report
-    # #N" is screen-reader-only text. Kinds of issue counts the report's rows.
+    # #N" is screen-reader-only text. Kinds of issues counts the report's rows.
     await playwright_async.expect(row.locator("td").nth(2)).to_have_text(
         f"{5 + count} issues in Report #{headline_id}"
     )
@@ -203,7 +203,7 @@ async def test_reports_table_keyboard_and_columns(
     await playwright_async.expect(scans.locator("tbody tr")).to_have_count(2)
     # The same columns as the site rows, without the two that were dropped.
     await playwright_async.expect(scans.locator("thead th")).to_have_text(
-        ["Report", "Status", "Started", "Pages", "Issues", "Kinds of issue", "Actions"]
+        ["Report", "Status", "Started", "Pages", "Issues", "Kinds of issues", "Actions"]
     )
     # Fetched when the list opens. The completed scan is counted; the
     # interrupted one says so in words rather than showing a 0.

@@ -27,7 +27,7 @@ export const COLUMNS = ["Change", "Issue", "WCAG", "Before", "After", "Differenc
 export type SortColumn = (typeof COLUMNS)[number];
 export type SortState = Sort<SortColumn>;
 
-/** New kinds of issue first, then what is still there, then what went away. */
+/** New kinds of issues first, then what is still there, then what went away. */
 const CHANGE_RANK: Record<ComparisonChange, number> = { new: 0, remaining: 1, resolved: 2 };
 /**
  * Which way each column sorts first, and the words for its order. Change
@@ -214,7 +214,7 @@ export default function ComparedIssuesTable({
   return (
     <>
       <TableBar
-        pager={<TablePagination label="Compared issues" noun="kinds of issue" {...paged} />}
+        pager={<TablePagination label="Compared issues" noun="kinds of issues" {...paged} />}
         footer={<ActiveFilters items={filtered} onClear={onClearFilters} />}
       >
         <TableSearch label="Search issues" value={q} onChange={onQuery} />
@@ -228,13 +228,13 @@ export default function ComparedIssuesTable({
         />
       </TableBar>
       <TableStatus>
-        {describeSort(sort)}. {rows.length} of {counts.all} {counts.all === 1 ? "kind of issue" : "kinds of issue"} shown.
+        {describeSort(sort)}. {rows.length} of {counts.all} {counts.all === 1 ? "kind of issue" : "kinds of issues"} shown.
       </TableStatus>
       {rows.length === 0 ? (
         <TableEmpty>
           {counts.all === 0
             ? "Neither scan found any issues."
-            : "No kinds of issue match. Clear the filters to see them all."}
+            : "No kinds of issues match. Clear the filters to see them all."}
         </TableEmpty>
       ) : (
         <TableRegion label="Compared issues" paged={paged}>

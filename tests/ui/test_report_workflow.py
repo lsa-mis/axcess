@@ -351,7 +351,7 @@ async def test_compare_scans_keyboard_filters_trend_and_axe(
     # One request for every group: the page sorts, filters and pages them.
     assert requests[-1]["page_size"] == ["500"]
     status = page.get_by_role("status").filter(has_text="of issue shown")
-    await playwright_async.expect(status).to_contain_text("12 of 12 kinds of issue shown")
+    await playwright_async.expect(status).to_contain_text("12 of 12 kinds of issues shown")
 
     # A number is a filter, and says so by its pressed state. It is the
     # table's Change filter too, written out under the table's bar.
@@ -360,11 +360,11 @@ async def test_compare_scans_keyboard_filters_trend_and_axe(
     await new_card.focus()
     await page.keyboard.press("Enter")
     await playwright_async.expect(new_card).to_have_attribute("aria-pressed", "true")
-    await playwright_async.expect(status).to_contain_text("1 of 12 kinds of issue shown")
+    await playwright_async.expect(status).to_contain_text("1 of 12 kinds of issues shown")
     await playwright_async.expect(page.get_by_text("Filtered by Change: New")).to_be_visible()
     await page.keyboard.press("Enter")
     await playwright_async.expect(new_card).to_have_attribute("aria-pressed", "false")
-    await playwright_async.expect(status).to_contain_text("12 of 12 kinds of issue shown")
+    await playwright_async.expect(status).to_contain_text("12 of 12 kinds of issues shown")
 
     # The table's Filter menu from the keyboard: Enter opens it, Tab reaches
     # the Change checkboxes, Space checks the focused one at once (the card
@@ -379,23 +379,23 @@ async def test_compare_scans_keyboard_filters_trend_and_axe(
     await playwright_async.expect(new_box).to_be_focused()
     await page.keyboard.press("Space")
     await playwright_async.expect(new_box).to_be_checked()
-    await playwright_async.expect(status).to_contain_text("1 of 12 kinds of issue shown")
+    await playwright_async.expect(status).to_contain_text("1 of 12 kinds of issues shown")
     await playwright_async.expect(new_card).to_have_attribute("aria-pressed", "true")
     await page.keyboard.press("Escape")
     await playwright_async.expect(filter_button).to_be_focused()
     await playwright_async.expect(filter_button).to_have_attribute("aria-expanded", "false")
     await choose_filter(page, "Change", "")
     await playwright_async.expect(new_card).to_have_attribute("aria-pressed", "false")
-    await playwright_async.expect(status).to_contain_text("12 of 12 kinds of issue shown")
+    await playwright_async.expect(status).to_contain_text("12 of 12 kinds of issues shown")
 
     search = page.get_by_role("searchbox", name="Search issues")
     await search.focus()
     await page.keyboard.type("contrast")
-    await playwright_async.expect(status).to_contain_text("1 of 12 kinds of issue shown")
+    await playwright_async.expect(status).to_contain_text("1 of 12 kinds of issues shown")
     await page.wait_for_url(re.compile(r"[?&]q=contrast"))
     await page.keyboard.press("ControlOrMeta+a")
     await page.keyboard.press("Backspace")
-    await playwright_async.expect(status).to_contain_text("12 of 12 kinds of issue shown")
+    await playwright_async.expect(status).to_contain_text("12 of 12 kinds of issues shown")
 
     issue_header = page.get_by_role("columnheader", name=re.compile(r"^Kind of issue"))
     await issue_header.get_by_role("button").focus()
@@ -471,7 +471,7 @@ async def test_compare_scans_keyboard_filters_trend_and_axe(
     # Sorted A to Z it is on the second page, so find it first.
     await search.focus()
     await page.keyboard.type("contrast")
-    await playwright_async.expect(status).to_contain_text("1 of 12 kinds of issue shown")
+    await playwright_async.expect(status).to_contain_text("1 of 12 kinds of issues shown")
     # Chrome puts a space before the visually hidden words: "contrast , evidence".
     link = page.get_by_role(
         "link", name=re.compile(r"^Text contrast\s*, evidence in the later scan$")
@@ -530,7 +530,7 @@ async def test_issue_filters_announce_results_and_keep_large_targets(
     # The sort line is a status region of its own; this one reports
     # how many groups the filters left.
     status = page.get_by_role("status").filter(has_text="of issue shown")
-    await playwright_async.expect(status).to_contain_text("kinds of issue shown")
+    await playwright_async.expect(status).to_contain_text("kinds of issues shown")
     search = page.get_by_label("Search issues")
     await search.fill("logo")
     await page.wait_for_url("**q=logo*")
@@ -579,7 +579,9 @@ async def test_issue_table_recommended_order_is_lane_first_and_headers_sort_flat
         await playwright_async.expect(
             page.get_by_role("status").filter(has_text="of issue shown")
         ).to_have_text(
-            re.compile(r"kinds of issue shown: Mostly sure \d+, Not sure \d+, For information \d+$")
+            re.compile(
+                r"kinds of issues shown: Mostly sure \d+, Not sure \d+, For information \d+$"
+            )
         )
         sorted_headers = issues.locator("thead th[aria-sort]:not([aria-sort='none'])")
         await playwright_async.expect(sorted_headers).to_have_count(0)

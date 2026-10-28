@@ -109,7 +109,7 @@ report** menu sits at the top right. Three numbers above the table count:
 | Number | What it counts |
 | --- | --- |
 | Issues found | Every [issue](glossary.md#issue), in every report group, including Not sure and For information, so it is not a count of confirmed problems. |
-| Kinds of issue | Rows in the Issues table, across all three report groups. |
+| Kinds of issues | Rows in the Issues table, across all three report groups. |
 | Pages visited | Every page the scan recorded, including pages that answered with an error and most pages that failed to load. |
 
 Two lines under **Pages visited** say more about it:
@@ -141,7 +141,7 @@ does not list.
 ## The Issues tab
 
 Each row of the table is one [kind of issue](glossary.md#kind-of-issue). The
-summary line counts issues and kinds of issue. The table's columns, in order:
+summary line counts issues and kinds of issues. The table's columns, in order:
 
 | Column | What it shows |
 | --- | --- |
@@ -162,8 +162,8 @@ one **Where it shows** value, a link to its detailed view appears above the tabl
 The table opens in the recommended order: Mostly sure, then Not sure, then
 For information, each by priority. Select a column header to sort by that
 column, and **Back to recommended order** to return. As the filters change, a
-screen reader hears how many kinds of issue show and how many of them are in
-each report group, such as "12 of 40 kinds of issue shown, filtered: Mostly
+screen reader hears how many kinds of issues show and how many of them are in
+each report group, such as "12 of 40 kinds of issues shown, filtered: Mostly
 sure 3, Not sure 7, For information 2".
 
 The name of each kind of issue opens [its page](#the-full-evidence-record).
@@ -252,14 +252,14 @@ or `.../export/markdown`) or the command line (`audit export -f jira` or
 
 | Format | Best for | Main sheets or columns |
 | --- | --- | --- |
-| Kinds of issue with fixes (Excel, `.xlsx`) | Assigning and tracking fixes | A summary, an index with one row per kind of issue, a tab for each kind of issue, and supporting sheets (listed below the table) |
+| Kinds of issues with fixes (Excel, `.xlsx`) | Assigning and tracking fixes | A summary, an index with one row per kind of issue, a tab for each kind of issue, and supporting sheets (listed below the table) |
 | Written report (Markdown, `.audit.md`) | A narrative report for stakeholders | Sections from an executive summary to the appendices (listed below the table) |
 | Issue list (CSV, `.csv`) | Filtering in a spreadsheet | One row per issue (per page for an image), 24 columns such as `severity`, `status`, `wcag_criterion`, `page_url`, `target_selector`, and `revealed_by` |
 | All report data (JSON, `.json`) | Scripts and other tools | `scan`, `findings` (image results), and `a11y_findings` (everything else) |
 | Jira CSV (`.jira.csv`) | Importing tickets | Summary, Description, Priority, Issue Type, Labels, Component; one row per issue not marked Fixed, Accepted risk, or Not a problem (one row per image for an image of text) |
 | Markdown evidence inventory (`.md`) | A raw list of every result | Every result with its status, including Not sure results |
 
-Sheets in the Excel workbook (Kinds of issue with fixes). The workbook uses
+Sheets in the Excel workbook (Kinds of issues with fixes). The workbook uses
 its own words: it calls a kind of issue an Issue, and each issue an Instance.
 
 - Summary

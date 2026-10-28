@@ -280,7 +280,7 @@ export default function IssuesRoute() {
           onParam={setParam}
           onResetFilters={resetFilters}
           onClearFilters={() => setParams(new URLSearchParams(), { replace: true })}
-          pager={<TablePagination label="Issues" noun="kinds of issue" {...paged} />}
+          pager={<TablePagination label="Issues" noun="kinds of issues" {...paged} />}
         />
         {/* Only for exactly one finding type: the link names one view. */}
         {isFindingType(findingType) && (
@@ -954,7 +954,7 @@ function IssueGlossary() {
         {/* The bands' limits, such as a critical problem on one page showing
             as Low, in words everyone can reach, not only in a hover hint. */}
         <GlossaryList
-          heading={`${COLUMN_LABEL.Priority}: which kinds of issue to look at first`}
+          heading={`${COLUMN_LABEL.Priority}: which kinds of issues to look at first`}
           items={(["High", "Medium", "Low"] as const).map((key) => ({
             key,
             term: <span className="font-semibold text-fg">{key}</span>,

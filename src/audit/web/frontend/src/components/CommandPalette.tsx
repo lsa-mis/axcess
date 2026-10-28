@@ -176,7 +176,7 @@ export default function CommandPalette({
         if (!q || hay.includes(q)) {
           out.push({
             id: `issue-${scanId}-${i.issue_key}`,
-            group: "Kinds of issue",
+            group: "Kinds of issues",
             label: i.title,
             sublabel: `${i.issue_key} · ${CHECK_LABEL[i.pipeline] ?? i.pipeline}`,
             to: i.detail_url,
@@ -250,7 +250,7 @@ export default function CommandPalette({
               setMessage("");
             }}
             onKeyDown={onKeyDown}
-            placeholder="Search reports, kinds of issue, and settings…"
+            placeholder="Search reports, kinds of issues, and settings…"
             aria-label="Search"
             className="min-w-0 flex-1 bg-transparent text-base text-fg outline-none placeholder:text-fg-subtle"
           />

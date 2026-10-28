@@ -55,7 +55,7 @@ const FORMATS: {
     // table row); the CSV has one row per issue (one place). Named so the
     // two cannot be mistaken for each other. Changed on 2026-10-26 with the
     // terms; see docs/plain-language.md, "Why "issue" and "kind of issue"".
-    label: "Kinds of issue with fixes (Excel)",
+    label: "Kinds of issues with fixes (Excel)",
     hint: "One row for each kind of issue, with how to fix it",
   },
   {
@@ -105,12 +105,12 @@ export default function ExportMenu({
   shownIssueGroups,
 }: {
   scanId: number;
-  /** The report's site, pages and kinds of issue, under the panel's heading,
+  /** The report's site, pages and kinds of issues, under the panel's heading,
    *  so the reader can see which report they are taking away. */
   site?: string;
   pageCount?: number;
   issueGroups?: number;
-  /** Kinds of issue (rows) the table shows now; pass it only while a filter or a
+  /** Kinds of issues (rows) the table shows now; pass it only while a filter or a
    *  search narrows the table. */
   shownIssueGroups?: number;
 }) {
@@ -264,13 +264,13 @@ export default function ExportMenu({
   const facts = [
     site,
     pageCount === undefined ? "" : plural(pageCount, "page", "pages"),
-    issueGroups === undefined ? "" : plural(issueGroups, "kind of issue", "kinds of issue"),
+    issueGroups === undefined ? "" : plural(issueGroups, "kind of issue", "kinds of issues"),
   ]
     .filter(Boolean)
     .join(" · ");
   const scopeNote =
     shownIssueGroups !== undefined && issueGroups !== undefined && shownIssueGroups < issueGroups
-    ? `Includes all ${plural(issueGroups, "kind of issue", "kinds of issue")} and every status, ` +
+    ? `Includes all ${plural(issueGroups, "kind of issue", "kinds of issues")} and every status, ` +
       `not only the ${shownIssueGroups.toLocaleString()} your filters show.`
     : "Includes every issue and status in this report, even if the table has filters on.";
 

@@ -10,7 +10,7 @@ export function plural(n: number, noun: string): string {
 }
 
 /**
- * "1 kind of issue", "6 kinds of issue": the plural is on "kind", so
+ * "1 kind of issue", "6 kinds of issues": the plural is on "kind", so
  * `count` cannot build it (docs/plain-language.md, Terms).
  */
 export function countKinds(n: number): string {

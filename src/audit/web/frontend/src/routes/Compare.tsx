@@ -32,7 +32,7 @@ const isChange = (value: string | null): value is ComparisonChange =>
  * Compare reports: what changed between this report and an earlier scan of the
  * same site, and how the site has trended across every completed scan.
  *
- * The page reads top down: which two scans, how many kinds of issue are new,
+ * The page reads top down: which two scans, how many kinds of issues are new,
  * resolved or remaining (each a filter for the table), the coverage notes,
  * the trend, then every compared kind of issue in a table.
  *
@@ -119,7 +119,7 @@ export default function CompareRoute() {
         scanId={id}
         previousScanId={scanQuery.data?.previous_scan_id ?? null}
         title="Compare reports"
-        meta="What changed since an earlier report of this site: which kinds of issue are new, still found, or no longer found. The trend shows how the site changed over time."
+        meta="What changed since an earlier report of this site: which kinds of issues are new, still found, or no longer found. The trend shows how the site changed over time."
         actions={
           <Button type="button" onClick={() => setTermsOpen(true)} className="rounded-full">
             <CircleHelp className="h-4 w-4" aria-hidden />
@@ -219,7 +219,7 @@ export default function CompareRoute() {
           )}
           {data.baseline && data.rows.length < data.total && (
             <p className="mt-2 text-xs text-fg-muted">
-              Showing the first {data.rows.length} of {data.total} {data.total === 1 ? "kind of issue" : "kinds of issue"}.
+              Showing the first {data.rows.length} of {data.total} {data.total === 1 ? "kind of issue" : "kinds of issues"}.
             </p>
           )}
           {/* Last: the caveats behind the numbers above, read once the
@@ -282,8 +282,8 @@ function Comparison({
           <span>
             The checks or pages were different in these two scans. So{" "}
             {unsure === data.changes.new + data.changes.resolved
-              ? "the new kinds of issue and those no longer found"
-              : `${unsure} of the new kinds of issue and those no longer found (marked in the table)`}{" "}
+              ? "the new kinds of issues and those no longer found"
+              : `${unsure} of the new kinds of issues and those no longer found (marked in the table)`}{" "}
             may come from what was scanned, not from changes to the site. Check them on the page. &ldquo;What was checked in each report&rdquo;, at the end of this page, says what was different.
           </span>
         </p>
@@ -311,7 +311,7 @@ function Comparison({
               <span className="mt-2 block text-3xl font-semibold leading-none tabular-nums text-fg">
                 {data.changes[key].toLocaleString()}
               </span>
-              <span className="sr-only"> {data.changes[key] === 1 ? "kind of issue" : "kinds of issue"}</span>
+              <span className="sr-only"> {data.changes[key] === 1 ? "kind of issue" : "kinds of issues"}</span>
             </button>
           );
         })}

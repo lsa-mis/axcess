@@ -180,7 +180,7 @@ export function TablePagination({
   hold?: unknown;
   /** The table's name, for the controls' accessible names ("Issues"). */
   label: string;
-  /** What a row is, plural ("kinds of issue", "pages"). */
+  /** What a row is, plural ("kinds of issues", "pages"). */
   noun: string;
   page: number;
   pages: number;

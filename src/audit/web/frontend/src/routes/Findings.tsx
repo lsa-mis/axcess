@@ -125,7 +125,7 @@ export default function FindingsRoute() {
           <>
             {/* Promote the grouped view as the *primary* action from
                 this flat-table page, most of the time the user wants
-                to act on *kinds of issue*, not on individual rows. The
+                to act on *kinds of issues*, not on individual rows. The
                 flat table stays the dwell page for one-off lookups
                 and bulk power-user work. */}
             <LinkButton

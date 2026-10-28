@@ -7,7 +7,7 @@ import { Cell, ColumnHeader, Row, RowHeader, Table, TableHead } from "../table/T
 import { agoLong, count, countKinds, plural } from "./format";
 
 type Measure = "occurrences" | "groups";
-const MEASURES: Record<Measure, string> = { occurrences: "Issues", groups: "Kinds of issue" };
+const MEASURES: Record<Measure, string> = { occurrences: "Issues", groups: "Kinds of issues" };
 
 const HEIGHT = 300;
 const MARGIN = { top: 40, right: 36, bottom: 60, left: 52 };
@@ -353,7 +353,7 @@ function HistoryTable({
             <ColumnHeader>Report</ColumnHeader>
             <ColumnHeader>Scanned</ColumnHeader>
             <ColumnHeader>Issues</ColumnHeader>
-            <ColumnHeader>Kinds of issue</ColumnHeader>
+            <ColumnHeader>Kinds of issues</ColumnHeader>
             <ColumnHeader><span className="sr-only">Actions</span></ColumnHeader>
           </tr>
         </TableHead>

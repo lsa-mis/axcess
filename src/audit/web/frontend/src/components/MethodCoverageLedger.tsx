@@ -222,7 +222,7 @@ function MethodRow({
 /**
  * What one method found, under its result in the Result column.
  *
- * Detector methods answer with their own kinds of issue (rows of the Issues table). ``interaction`` is the
+ * Detector methods answer with their own kinds of issues (rows of the Issues table). ``interaction`` is the
  * exception worth spelling out: Click-Through does not detect
  * anything itself, it just reaches markup that would otherwise be invisible to
  * the scan, so what it "found" is the evidence that only exists after a

@@ -21,7 +21,7 @@ playwright_async = pytest.importorskip("playwright.async_api")
 expect = playwright_async.expect
 
 _FORMATS = (
-    "Kinds of issue with fixes (Excel)",
+    "Kinds of issues with fixes (Excel)",
     "Written report (Markdown)",
     "Issue list (CSV)",
     "All report data (JSON)",
@@ -79,7 +79,7 @@ async def test_arrow_keys_move_between_downloads(
     trigger = await _open_by_keyboard(page)
 
     link = lambda name: page.get_by_role("link", name=name, exact=True)  # noqa: E731
-    await expect(link("Kinds of issue with fixes (Excel)")).to_be_focused()
+    await expect(link("Kinds of issues with fixes (Excel)")).to_be_focused()
     await page.keyboard.press("ArrowDown")
     await expect(link("Written report (Markdown)")).to_be_focused()
     await page.keyboard.press("End")
@@ -87,7 +87,7 @@ async def test_arrow_keys_move_between_downloads(
     await page.keyboard.press("ArrowUp")
     await expect(link("Issue list (CSV)")).to_be_focused()
     await page.keyboard.press("Home")
-    await expect(link("Kinds of issue with fixes (Excel)")).to_be_focused()
+    await expect(link("Kinds of issues with fixes (Excel)")).to_be_focused()
     await page.keyboard.press("Escape")
     await expect(trigger).to_be_focused()
     await expect(trigger).to_have_attribute("aria-expanded", "false")
@@ -100,7 +100,7 @@ async def test_download_reports_its_outcome_and_keeps_focus(
     page = await new_page(accept_downloads=True)
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
     await _open_by_keyboard(page)
-    workbook = page.get_by_role("link", name="Kinds of issue with fixes (Excel)", exact=True)
+    workbook = page.get_by_role("link", name="Kinds of issues with fixes (Excel)", exact=True)
 
     async with page.expect_download() as download_info:
         await page.keyboard.press("Enter")
