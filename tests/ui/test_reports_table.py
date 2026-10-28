@@ -449,3 +449,67 @@ async def test_back_brings_the_table_back_as_it_was(new_page: Any) -> None:
     )
     await page.wait_for_function(f"Math.abs(window.scrollY - {scrolled}) < 40")
     await page.context.close()
+
+
+async def test_sites_stay_open_when_coming_back_by_the_navigation(new_page: Any) -> None:
+    """The navigation's "Reports" carries no view; the tab remembers it.
+
+    Testers opened a site, went to a report, came back by the navigation
+    and had to open the site again every time (2026-10-28).
+    """
+    if not (DIST / "index.html").exists():
+        pytest.skip("Build the frontend first")
+    sites = [_site(index, 1) for index in reversed(range(4))]
+    page = await new_page(viewport={"width": 1280, "height": 800})
+
+    async def respond(route: Any) -> None:
+        path = route.request.url.split("reports.test", 1)[-1].split("?", 1)[0]
+        if path == "/api/sites":
+            await route.fulfill(json=sites)
+        elif path.startswith("/api/"):
+            await route.fulfill(status=404, json={"detail": "Unavailable"})
+        elif path.startswith("/app/assets/"):
+            await route.fulfill(path=str(DIST / path.removeprefix("/app/")))
+        else:
+            await route.fulfill(path=str(DIST / "index.html"))
+
+    await page.route("**/*", respond)
+    await page.goto("http://reports.test/app/scans", wait_until="networkidle")
+    table = page.get_by_role("table", name="Public reports by site", exact=False)
+    reports_nav = page.get_by_role("navigation").get_by_role("link", name="Reports", exact=True)
+
+    async def leave_and_come_back() -> None:
+        await table.get_by_role("link", name=re.compile(r"^Open latest scan of site1\.")).click()
+        await page.wait_for_url(re.compile(r"/app/scans/\d+$"))
+        await reports_nav.first.click()
+        await page.wait_for_url(re.compile(r"/app/scans(\?|$)"))
+
+    await table.get_by_role("button", name="Show all 2 scans for site2.example").click()
+    await table.locator("thead").get_by_role("button", name=re.compile(r"^Pages\b")).click()
+    await leave_and_come_back()
+    await playwright_async.expect(
+        table.get_by_role("button", name="Hide all 2 scans for site2.example")
+    ).to_have_attribute("aria-expanded", "true")
+    await playwright_async.expect(table.locator("thead th").nth(2)).not_to_have_attribute(
+        "aria-sort", "none"
+    )
+    # Put back by replacing the entry, so Back still leaves the page.
+    await playwright_async.expect(page).to_have_url(re.compile(r"open=https%3A%2F%2Fsite2"))
+
+    # Closing is remembered the same way.
+    await table.get_by_role("button", name="Hide all 2 scans for site2.example").click()
+    await leave_and_come_back()
+    await playwright_async.expect(
+        table.get_by_role("button", name="Show all 2 scans for site2.example")
+    ).to_have_attribute("aria-expanded", "false")
+
+    # A link that names a view opens that view, not the remembered one.
+    await table.get_by_role("button", name="Show all 2 scans for site3.example").click()
+    await page.goto("http://reports.test/app/scans?open=https%3A%2F%2Fsite1.example%2F")
+    await playwright_async.expect(
+        table.get_by_role("button", name="Hide all 2 scans for site1.example")
+    ).to_be_visible()
+    await playwright_async.expect(
+        table.get_by_role("button", name="Show all 2 scans for site3.example")
+    ).to_be_visible()
+    await page.context.close()

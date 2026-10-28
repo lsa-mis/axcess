@@ -69,6 +69,9 @@ merge.
   the columns. A scan shows its status only when it did not complete
   ("Stopped", "Failed", "Scanning"). The date column is now **Scanned**,
   and the sentence over the table is gone.
+- Reports remembers which sites you opened, and the order, until you
+  close the tab: going to another page and back through **Reports** in
+  the menu no longer closes them.
 
 - **The numbers over the Issues table lead with what was found.** There are
   three now: Kinds of issue found, Places issues appear (occurrences), and

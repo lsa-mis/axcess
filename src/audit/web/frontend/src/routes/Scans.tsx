@@ -22,6 +22,7 @@ import { cn } from "../lib/cn";
 import { RULE_CHECK_HELP } from "../lib/labels";
 import { ruleChecksText } from "../lib/terms";
 import { liveSearchParams } from "../lib/liveSearchParams";
+import { useRememberedParams } from "../hooks/useRememberedParams";
 import { TablePagination, usePagedRows } from "../components/TablePagination";
 import type { ProtectedScanStatus, ProtectedScanSummary, ScanSummary, SiteGroup } from "../api/types";
 import { confirmDestructive } from "../hooks/usePreferences";
@@ -282,6 +283,9 @@ function sortSites(sites: SiteGroup[], { column, direction }: Sort<SortKey>): Si
 // One empty list, so the memoized views below do not recompute while loading.
 const NO_SITES: SiteGroup[] = [];
 
+/** The view parameters Reports keeps for the tab (see ScansRoute). */
+const REMEMBERED_VIEW = ["open", "sort"] as const;
+
 /** How often Reports refreshes while a scan is running. */
 const RUNNING_REFRESH_MS = 5_000;
 
@@ -298,6 +302,14 @@ export default function ScansRoute() {
   // one, so Back leaves the page instead of undoing a sort or a click; and
   // a copied link opens the same view. The Issues table keeps its view the
   // same way.
+  //
+  // The sites opened and the order are also remembered for the tab, so
+  // coming back by the navigation's "Reports", which carries no view,
+  // finds them as they were (useRememberedParams says why). Not the search:
+  // arriving at Reports from the navigation, the reader expects every site,
+  // and a remembered search would hide some without being asked. Not the
+  // page either: which sites are on it depends on the search.
+  useRememberedParams("axcess-reports-view", REMEMBERED_VIEW);
   const [params, setParams] = useSearchParams();
   const rawSort = params.get("sort");
   const sort = useMemo(() => parseSortParam(rawSort, SORT_COLUMNS) ?? DEFAULT_SORT, [rawSort]);
