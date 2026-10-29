@@ -385,10 +385,17 @@ function ReportPane({
               </Button>
             )}
           </div>
-          {/* One row when it fits, Go back first; the picker's label sits
-              above it (`stacked`), so at 320 px the box keeps the whole
-              width for the report's name instead of sharing it with the
-              label. */}
+          {/* One row when it fits, Go back first. The picker's label
+              "Report" sits beside its box when there is room and above it
+              when there is not (`stacked="when-narrow"`, see Select): the
+              developer asked for it beside the box (2026-10-29), to save a
+              line. It stays a visible label either way, never only an
+              `aria-label`: a visible label is what SC 3.3.2 Labels or
+              Instructions (Level A) asks for, voice control users say the
+              word they see, and without it the box reads as a fact about
+              the panel rather than a choice. Above, in a narrow panel (320
+              px, or side by side at 1024 px), the box keeps the whole width
+              for the report's name instead of sharing it with the label. */}
           <div className="mt-2 flex flex-wrap items-end gap-2">
             <Button
               type="button"
@@ -409,7 +416,7 @@ function ReportPane({
               <form onSubmit={submit} className="flex min-w-0 flex-wrap items-end gap-2">
                 <Select
                   id={selectId}
-                  stacked
+                  stacked="when-narrow"
                   label="Report"
                   value={choice}
                   onChange={(value) => {

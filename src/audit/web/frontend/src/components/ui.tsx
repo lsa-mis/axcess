@@ -791,6 +791,14 @@ const TYPEAHEAD_RESET_MS = 500;
  *
  * `stacked` puts the label above rather than beside it, for a filter bar of
  * several controls where inline captions would eat the width the values need.
+ * `stacked="when-narrow"` puts it beside the box when both fit on one line,
+ * and above it when they do not (the row wraps). It follows the width the
+ * control has, not the window's: a control in a narrow column of a wide
+ * window wraps too, which a screen-width breakpoint would get wrong. The
+ * label is the same element in the same place in the reading order either
+ * way; only where it is drawn changes (SC 1.4.10 Reflow, Level AA). Used on
+ * Compare reports (routes/CompareReports.tsx), whose panels can be anything
+ * from about 300 to 1000 pixels wide.
  *
  * `hint` sits between the label and the control and is wired to
  * `aria-describedby`, so the explanation a sighted user reads before choosing
@@ -814,7 +822,7 @@ export function Select({
 }: {
   label: string;
   hideLabel?: boolean;
-  stacked?: boolean;
+  stacked?: boolean | "when-narrow";
   hint?: ReactNode;
   value: string;
   onChange: (value: string) => void;
@@ -951,7 +959,11 @@ export function Select({
     <div
       className={cn(
         "min-w-0",
-        stacked ? "flex flex-col gap-1" : "inline-flex items-center gap-2",
+        stacked === "when-narrow"
+          ? "inline-flex flex-wrap items-center gap-x-2 gap-y-1"
+          : stacked
+            ? "flex flex-col gap-1"
+            : "inline-flex items-center gap-2",
         className,
       )}
     >
@@ -960,7 +972,7 @@ export function Select({
         htmlFor={triggerId}
         className={cn(
           "shrink-0 font-semibold text-fg",
-          stacked ? "text-xs text-fg-subtle" : "text-sm",
+          stacked === true ? "text-xs text-fg-subtle" : "text-sm",
           hideLabel && "sr-only",
         )}
       >

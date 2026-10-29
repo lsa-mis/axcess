@@ -329,6 +329,20 @@ async def test_opened_from_a_report_the_second_panel_is_empty_until_chosen(
     else:
         assert abs(other["y"] - top["y"]) < 2
     assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+    # The picker's label, "Report", is beside its box when the panel has room
+    # (the developer asked for that, 2026-10-29) and above it when it does
+    # not; it is a visible label either way, not an aria-label.
+    label = chosen.locator("label", has_text=re.compile(r"^Report$"))
+    picker = chosen.get_by_role("combobox", name="Report")
+    await expect(picker).not_to_have_attribute("aria-label", re.compile(".*"))
+    label_box, picker_box = await label.bounding_box(), await picker.bounding_box()
+    assert label_box and picker_box
+    if width == 320:
+        assert label_box["y"] + label_box["height"] <= picker_box["y"], (label_box, picker_box)
+    else:
+        assert label_box["x"] + label_box["width"] <= picker_box["x"], (label_box, picker_box)
+        assert label_box["y"] > picker_box["y"], (label_box, picker_box)
+        assert label_box["y"] + label_box["height"] < picker_box["y"] + picker_box["height"]
 
     # Only the second panel can be closed. Its visible word leads the name;
     # the report is screen-reader-only text, not an aria-label.
