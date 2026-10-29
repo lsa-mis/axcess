@@ -322,8 +322,14 @@ draft. The command-line `audit export` adds no draft label.
 ## Compare reports after a fix
 
 After you publish fixes, scan the same site again with the same checks.
-**Compare reports** shows this report beside the latest earlier completed
-report for the same start address, each in its own panel:
+**Compare reports** shows two reports of the same start address side by
+side, each in its own panel. There are two ways to open it:
+
+- From a report, choose the **Compare reports** tab. The report opens in the
+  first panel. The second panel is empty and lists the site's other
+  completed reports, newest first. Choose one to show it there.
+- On **Reports**, open a site and choose **Compare with** on one of its
+  scans, then the report to compare it with. Both panels open at once.
 
 - Each panel is that report's Issues page, and works on its own. Open an
   issue, filter, or search in one panel, and the other stays as it is.
@@ -332,6 +338,9 @@ report for the same start address, each in its own panel:
 - To show a different report in a panel, choose it in the panel's
   **Report** list, then choose **Show this report**. A report cannot be in
   both panels.
+- **Close**, at the top of the second panel, takes its report out and
+  empties the panel again, so you can choose another. The browser's Back
+  button brings it back.
 - Wide screens show the panels side by side. Narrow screens show them one
   above the other.
 

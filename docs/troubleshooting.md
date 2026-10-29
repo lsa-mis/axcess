@@ -101,8 +101,9 @@ continues without those checks.
 
 ## Compare reports has nothing to compare, or shows a surprise
 
-A report's **Compare reports** view shows it beside the latest earlier
-completed report of the same start address, each in its own panel. The
+A report's **Compare reports** view shows it beside another completed
+report of the same start address, each in its own panel. From the report's
+tab, the second panel starts empty: choose a report from its list. The
 [rescan comparison](./glossary.md#rescan-comparison) itself, what is new,
 still found or no longer found, is on **What changed**: choose **See what
 changed between these reports** on Compare reports.
@@ -111,8 +112,11 @@ changed between these reports** on Compare reports.
   the host name and a missing trailing slash don't matter, but
   `www.example.edu` and `example.edu`, or two different ports, count as
   different sites. Start the new scan from the same address as the old one.
+- **No reports to choose in the empty panel.** The site has one completed
+  report, or the others have a different start address (see above).
 - **The wrong earlier report.** On Compare reports, choose another report
-  in the panel's **Report** list, then **Show this report**. On What
+  in the panel's **Report** list, then **Show this report**, or choose
+  **Close** on the second panel and pick again. On What
   changed, select the earlier scan in **Trend over time** (or in its data
   table) and choose **Compare with this report**, or add
   `?compare_to=<earlier report id>` to the address

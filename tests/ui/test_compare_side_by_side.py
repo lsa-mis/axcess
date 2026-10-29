@@ -257,35 +257,70 @@ async def test_report_picker_changes_one_panel_and_the_address(
 
 
 @pytest.mark.parametrize("width", [320, 1280])
-async def test_first_report_has_nothing_earlier_and_the_layout_reflows(
+async def test_opened_from_a_report_the_second_panel_is_empty_until_chosen(
     live_server: tuple[str, int],
     three_reports: tuple[int, int, int],
     new_page: Any,
     width: int,
 ) -> None:
-    """With no earlier report the second panel says so, and offers the later ones."""
+    """The report's tab opens one report and an empty, dashed second panel.
+
+    The developer asked for this (2026-10-29): the reader chooses the second
+    report from a list in the empty panel, and can close it again.
+    """
     base, _ = live_server
-    first, _, third = three_reports
-    page = await _open(new_page, base, f"/scans/{first}/compare", width=width)
-    await _frame(page, first)
-    empty = page.get_by_role("region", name="Nothing earlier to compare with")
+    first, second, third = three_reports
+    page = await _open(new_page, base, f"/scans/{third}/compare", width=width)
+    await _frame(page, third)
+    # The report's own tab opens this page, with no pair in the address.
+    tab = page.get_by_role("navigation", name="Report views").get_by_role(
+        "link", name="Compare reports"
+    )
+    await expect(tab).to_have_attribute("href", f"/app/scans/{third}/compare")
+    empty = page.get_by_role("region", name="Choose a report to compare with")
     await expect(empty).to_be_visible()
-    await expect(empty).to_contain_text(f"Report #{first} is the first completed report")
     await expect(empty.locator("iframe")).to_have_count(0)
+    box_of_empty = empty.locator("> div")
+    edge = await box_of_empty.evaluate("e => getComputedStyle(e).borderTopStyle")
+    assert edge == "dashed", edge
     await expect(
         page.get_by_role("link", name="See what changed between these reports")
     ).to_have_count(0)
-    picker = empty.get_by_role("combobox", name="Report")
-    await expect(picker).to_have_attribute("data-value", str(third))
+    # The site's other reports, newest first, each a link to the pair.
+    links = empty.get_by_role("link")
+    await expect(links).to_have_count(2)
+    for index, report in enumerate((second, first)):
+        link = links.nth(index)
+        await expect(link).to_have_attribute(
+            "href", f"/app/scans/{third}/compare?compare_to={report}"
+        )
+        name = await link.evaluate("e => e.textContent")
+        assert name.startswith(f"Report #{report}"), name
+        assert "kinds of issue" in name or "kind of issue" in name, name
+        assert name.endswith(f"(compare with Report #{third})"), name
+        box = await link.bounding_box()
+        assert box and box["height"] >= 44, box
+    # As tall as the report's panel beside it, when side by side.
+    if width == 1280:
+        panel_box = await _panel(page, third).bounding_box()
+        empty_box = await box_of_empty.bounding_box()
+        assert panel_box and empty_box
+        assert abs(panel_box["y"] - empty_box["y"]) < 2
+        assert abs(panel_box["height"] - empty_box["height"]) < 2, (panel_box, empty_box)
     assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth")
     violations = await _run_axe(page)
     assert not violations, _render_violations(violations)
 
-    await empty.get_by_role("button", name=re.compile(r"^Show this report")).click()
-    await page.wait_for_url(f"**/app/scans/{first}/compare?compare_to={third}")
-    await _frame(page, third)
-    top = await _panel(page, first).bounding_box()
-    other = await _panel(page, third).bounding_box()
+    # Choose one by keyboard: the pair is in the address, and focus moves to
+    # the new panel's heading, not the top of the page.
+    await links.nth(0).focus()
+    await page.keyboard.press("Enter")
+    await page.wait_for_url(f"**/app/scans/{third}/compare?compare_to={second}")
+    await _frame(page, second)
+    chosen = _panel(page, second)
+    await expect(chosen.get_by_role("heading", level=2)).to_be_focused()
+    top = await _panel(page, third).bounding_box()
+    other = await chosen.bounding_box()
     assert top and other
     if width == 320:
         # Stacked, the first panel first, nothing sideways.
@@ -294,6 +329,40 @@ async def test_first_report_has_nothing_earlier_and_the_layout_reflows(
     else:
         assert abs(other["y"] - top["y"]) < 2
     assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+
+    # Only the second panel can be closed. Its visible word leads the name;
+    # the report is screen-reader-only text, not an aria-label.
+    await expect(
+        _panel(page, third).get_by_role("button", name=re.compile(r"^Close"))
+    ).to_have_count(0)
+    close = chosen.get_by_role("button", name=f"Close report #{second}", exact=True)
+    await expect(close).to_be_visible()
+    await expect(close).not_to_have_attribute("aria-label", re.compile(".*"))
+    assert (await close.inner_text()).strip().startswith("Close")
+    close_box = await close.bounding_box()
+    assert close_box and close_box["height"] >= 44, close_box
+    violations = await _run_axe(page)
+    assert not violations, _render_violations(violations)
+    # Closing empties the panel; focus goes to the empty panel's heading.
+    await close.focus()
+    await page.keyboard.press("Enter")
+    await page.wait_for_url(f"**/app/scans/{third}/compare")
+    await expect(empty.get_by_role("heading", level=2)).to_be_focused()
+    await expect(page.locator("iframe")).to_have_count(1)
+    # The browser's Back brings the closed report back.
+    await page.go_back()
+    await page.wait_for_url(f"**/app/scans/{third}/compare?compare_to={second}")
+    await _frame(page, second)
+
+
+async def test_a_site_with_one_report_has_nothing_to_compare_yet(
+    live_server: tuple[str, int], new_page: Any
+) -> None:
+    base, scan_id = live_server
+    page = await _open(new_page, base, f"/scans/{scan_id}/compare")
+    empty = page.get_by_role("region", name="Nothing to compare with yet")
+    await expect(empty).to_contain_text("This site has one completed report so far.")
+    await expect(empty.get_by_role("link")).to_have_count(0)
     violations = await _run_axe(page)
     assert not violations, _render_violations(violations)
 
@@ -327,9 +396,10 @@ async def test_saved_verify_changes_link_lands_on_what_changed(
     await page.goto(f"{base}/app/scans/{third}/diff?compare_to={second}", wait_until="networkidle")
     await page.wait_for_url(f"**/app/scans/{third}/compare/changes?compare_to={second}")
     await expect(page.get_by_role("heading", name="What changed", level=1)).to_be_visible()
-    # Its tab is still Compare reports, which opens the side-by-side page.
+    # Its tab is still Compare reports, which opens the side-by-side page
+    # with the second panel empty.
     tab = page.get_by_role("navigation", name="Report views").get_by_role(
         "link", name="Compare reports"
     )
     await expect(tab).to_have_attribute("aria-current", "page")
-    await expect(tab).to_have_attribute("href", f"/app/scans/{third}/compare?compare_to={second}")
+    await expect(tab).to_have_attribute("href", f"/app/scans/{third}/compare")

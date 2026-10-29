@@ -1088,7 +1088,7 @@ async def test_first_report_has_no_compare_tab(live_server: tuple[str, int], new
     ).to_have_count(0)
     await page.goto(f"{base}/app/scans/{scan_id}/compare", wait_until="networkidle")
     await playwright_async.expect(
-        page.get_by_role("heading", name="Nothing earlier to compare with")
+        page.get_by_role("heading", name="Nothing to compare with yet")
     ).to_be_visible()
     tabs = page.get_by_role("navigation", name="Report views").get_by_role("link")
     await playwright_async.expect(tabs).to_have_text(["Issues", "Compare reports"])

@@ -19,6 +19,10 @@ merge.
   other panel stays as it is. A **Report** list above each panel, with
   **Show this report**, changes that panel's report. The panels sit side by
   side on a wide screen and one above the other on a narrow one.
+- Compare reports, opened from a report's tab, starts with the second panel
+  empty: a dashed box that lists the site's other reports to choose from.
+  It no longer picks the report before for you. **Close** on the second
+  panel empties it again.
 - Reports and Issues say which check found what. On Reports, a **Rule
   check** column shows whether each scan ran axe, Alfa or both; on the
   Issues page, a **Check** column names the check behind each kind of

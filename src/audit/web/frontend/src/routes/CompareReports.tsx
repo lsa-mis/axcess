@@ -1,11 +1,12 @@
-import { useEffect, useId, useRef, useState, type FormEvent } from "react";
-import { useHref, useLocation, useNavigate, useParams, useSearchParams } from "react-router";
+import { useEffect, useId, useRef, useState, type FormEvent, type MutableRefObject } from "react";
+import { Link, useHref, useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, CircleAlert } from "lucide-react";
+import { ArrowLeft, CircleAlert, X } from "lucide-react";
 import { api } from "../api/client";
 import type { SiteHistoryPoint } from "../api/types";
 import { Button, Card, LinkButton, Select, type SelectOption } from "../components/ui";
 import ReportHeader from "../components/ReportHeader";
+import { count, countKinds } from "../components/compare/format";
 import { scanQueryKey, useScanQuery } from "../hooks/useScanQuery";
 import { useProtectedIdentityPartition } from "../hooks/useProtectedIdentityContext";
 import { cn } from "../lib/cn";
@@ -18,8 +19,9 @@ import { serverDate } from "../lib/serverTime";
  *
  * The address names the pair: `/scans/:scanId/compare?compare_to=N` shows
  * report :scanId in the first panel and report N in the second. Without
- * `compare_to` the second panel shows the report before this one (the scan
- * detail's `previous_scan_id`), as the report's "Compare reports" tab does.
+ * `compare_to` the second panel is empty and lists the site's other reports
+ * to choose from (EmptyPane): that is where the report's "Compare reports"
+ * tab opens. "Compare with" on Reports opens a pair.
  *
  * Why it is built this way (keep these when you change it):
  *
@@ -56,9 +58,24 @@ import { serverDate } from "../lib/serverTime";
  *   page up and down (SC 1.4.10 Reflow, Level AA), and keyboard focus moves
  *   into a frame with Tab, so its content is reachable without a pointer
  *   (SC 2.1.1 Keyboard, Level A).
+ * - **Opened from a report, the second panel starts empty.** The developer
+ *   asked for this (2026-10-29): coming from one report, the reader has not
+ *   said which report to compare it with yet, so the page asks rather than
+ *   guess. Until then the second panel showed the report before this one,
+ *   which loaded a whole second report the reader may not have wanted and
+ *   made the choice look already made. The empty panel is a dashed box that
+ *   lists the site's other reports; see EmptyPane.
+ * - **The second panel can be closed** ("Close report #20", ReportPane),
+ *   which empties it again, as closing a browser tab leaves a new-tab page.
+ *   The first panel has no Close: it is the report the page belongs to.
+ * - **Focus follows the panel that changed.** Choosing a report in the empty
+ *   panel, or closing the second panel, removes the control that was
+ *   pressed. Focus then moves to the heading of what replaced it, so it is
+ *   not dropped to the top of the page (SC 2.4.3 Focus Order, Level A).
  * - **The address holds the two reports, and only they change it.** Choosing
- *   a report with "Show this report" adds a history entry, so the browser's
- *   Back undoes it. Moving inside a panel does not: see "Go back" in
+ *   a report with "Show this report", choosing one in the empty panel, and
+ *   closing the second panel each add a history entry, so the browser's Back
+ *   undoes them. Moving inside a panel does not: see "Go back" in
  *   ReportPane.
  */
 export default function CompareReportsRoute() {
@@ -97,15 +114,16 @@ function CompareReports() {
     enabled: Number.isSafeInteger(first) && first > 0,
   });
 
-  // A pair of one report is no pair: the second panel then falls back to the
-  // report before, as with no `compare_to`.
+  // A pair of one report is no pair: the second panel is then empty, as with
+  // no `compare_to`.
   const askedId = positiveId(params.get("compare_to"));
-  const asked = askedId === first ? null : askedId;
+  const second = askedId === first ? null : askedId;
   const previous = scanQuery.data?.previous_scan_id ?? null;
-  // Undefined while the report is still loading and no pair was asked for.
-  const second: number | null | undefined = asked ?? (scanQuery.data ? previous : undefined);
   const points = historyQuery.data?.scans;
   const history = { points, failed: Boolean(historyQuery.error) };
+  // Which heading takes focus once the address has changed: see "Focus
+  // follows the panel that changed" above. Read once, by the panel it names.
+  const focusNext = useRef<"second" | "empty" | null>(null);
 
   // Choosing a report changes only its own panel, and records the pair in
   // the address: the first panel is the path, the second is `compare_to`.
@@ -126,7 +144,11 @@ function CompareReports() {
         .fetchQuery({ queryKey: scanQueryKey(id, identityPartition), queryFn: () => api.getScan(id) })
         .catch(() => undefined);
     }
-    navigate(`/scans/${firstId}/compare${secondId != null ? `?compare_to=${secondId}` : ""}`);
+    navigate(pairPath(firstId, secondId));
+  };
+  const close = () => {
+    focusNext.current = "empty";
+    navigate(pairPath(first, null));
   };
 
   // What changed compares a later report with an earlier one of the same
@@ -161,16 +183,17 @@ function CompareReports() {
       />
       {/* Side by side from `lg` (1024 px), stacked below it, first panel first. */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <ReportPane panel="first" reportId={first} otherId={second ?? null} history={history} onShow={(id) => void show("first", id)} />
-        {second === undefined ? (
-          <p role="status" className="text-sm text-fg-muted">Loading report…</p>
+        <ReportPane reportId={first} otherId={second} history={history} onShow={(id) => void show("first", id)} />
+        {second === null ? (
+          <EmptyPane reportId={first} history={history} focusNext={focusNext} />
         ) : (
           <ReportPane
-            panel="second"
             reportId={second}
             otherId={first}
             history={history}
             onShow={(id) => void show("second", id)}
+            onClose={close}
+            focusNext={focusNext}
           />
         )}
       </div>
@@ -179,6 +202,22 @@ function CompareReports() {
 }
 
 type History = { points: SiteHistoryPoint[] | undefined; failed: boolean };
+type FocusNext = MutableRefObject<"second" | "empty" | null>;
+
+/** The page's address for a pair, or for one report and an empty panel. */
+const pairPath = (first: number, second: number | null) =>
+  `/scans/${first}/compare${second != null ? `?compare_to=${second}` : ""}`;
+
+/** Moves focus to `heading` once, when `focusNext` names `which`. */
+function useTakeFocus(focusNext: FocusNext | undefined, which: "second" | "empty") {
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (focusNext?.current !== which) return;
+    focusNext.current = null;
+    heading.current?.focus();
+  }, [focusNext, which]);
+  return heading;
+}
 
 /**
  * One panel: its report's name, a "Go back" for the panel's own history, a
@@ -218,25 +257,36 @@ type History = { points: SiteHistoryPoint[] | undefined; failed: boolean };
  *   the other controls write it (docs/plain-language.md rule 11). They say "panel", never "left" or "right":
  *   below 1024 pixels the panels are one above the other (SC 1.3.3 Sensory
  *   Characteristics, Level A).
+ * - **"Close" empties the second panel** (CompareReports, "The second panel
+ *   can be closed"). It sits at the panel's top edge, after the heading,
+ *   where a browser tab has its close button, and is the X icon with the
+ *   word "Close" beside it: an icon alone asks the reader to know what an X
+ *   means (W3C COGA, "Making Content Usable", objective 3, use clear and
+ *   understandable content; paraphrased). Screen-reader-only words name the
+ *   report, "Close report #20" (technique C7). A quiet (`ghost`) button, so
+ *   it does not compete with "Go back" and the picker, the panel's main
+ *   controls; still 44 pixels (SC 2.5.5 Target Size (Enhanced), Level AAA).
  * - **A new report is a new frame** (keyed by report): changing an
  *   existing frame's address would add an entry to the window's history,
  *   and the new report's panel would start with a step back into the old
  *   one.
  */
 function ReportPane({
-  panel,
   reportId,
   otherId,
   history,
   onShow,
+  onClose,
+  focusNext,
 }: {
-  panel: "first" | "second";
-  /** The report shown, or null when there is none to show yet. */
-  reportId: number | null;
-  /** The report in the other panel, which this one may not show too. */
+  reportId: number;
+  /** The report in the other panel, which this one may not show too; null when that panel is empty. */
   otherId: number | null;
   history: History;
   onShow: (id: number) => void;
+  /** Empties this panel. Only the second panel has it. */
+  onClose?: () => void;
+  focusNext?: FocusNext;
 }) {
   const ids = useId();
   const headingId = `${ids}-heading`;
@@ -246,6 +296,7 @@ function ReportPane({
   const [generation, setGeneration] = useState(0);
   const [place, setPlace] = useState<PaneLocation | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const heading = useTakeFocus(focusNext, "second");
 
   // Newest first, as Reports lists them. A report outside the site's list
   // (another site, or older than the list keeps) is still named.
@@ -254,21 +305,17 @@ function ReportPane({
     value: String(point.id),
     label: [reportName(point.id), scanDay(point)].filter(Boolean).join(", "),
   }));
-  if (reportId !== null && !listed.some((point) => point.id === reportId)) {
+  if (!listed.some((point) => point.id === reportId)) {
     options.unshift({ value: String(reportId), label: reportName(reportId) });
   }
-  const fallback = options.find((option) => option.value !== String(otherId))?.value ?? "";
-  const [choice, setChoice] = useState(reportId !== null ? String(reportId) : fallback);
+  const [choice, setChoice] = useState(String(reportId));
   // A new report from the address (Back, or the other panel's choice) resets
   // the picker and what the panel last said about itself.
   useEffect(() => {
-    setChoice(reportId !== null ? String(reportId) : "");
+    setChoice(String(reportId));
     setError(null);
     setPlace(null);
   }, [reportId]);
-  useEffect(() => {
-    if (choice === "" && fallback !== "") setChoice(fallback);
-  }, [choice, fallback]);
 
   // The panel says where it is after every move (lib/framed.ts). Only this
   // panel's own frame, from this origin, is listened to.
@@ -287,8 +334,8 @@ function ReportPane({
   const send = (message: PaneMessage) =>
     frameRef.current?.contentWindow?.postMessage(message, window.location.origin);
 
-  const src = useHref(reportId !== null ? `/scans/${reportId}/issues` : "/scans");
-  const name = reportId !== null ? reportName(reportId) : null;
+  const src = useHref(`/scans/${reportId}/issues`);
+  const name = reportName(reportId);
   const point = history.points?.find((p) => p.id === reportId);
   const day = scanDay(point);
   const canGoBack = place?.canGoBack ?? false;
@@ -316,38 +363,49 @@ function ReportPane({
     <section aria-labelledby={headingId} className="min-w-0">
       <Card className="flex min-w-0 flex-col">
         <div className="border-b border-border p-3">
-          <h2 id={headingId} className="text-base font-semibold text-fg">
-            {name ?? "Nothing earlier to compare with"}
-            {day && (
-              <>
-                <span className="sr-only">,</span>{" "}
-                <span className="text-sm font-normal text-fg-muted">scanned {day}</span>
-              </>
+          {/* As tall as the Close button in both panels (`min-h-target`), so
+              the two frames start at the same height side by side. */}
+          <div className="flex min-h-target items-center justify-between gap-2">
+            {/* `tabIndex={-1}`: a target for focus after a choice, not a stop in the tab order. */}
+            <h2 ref={heading} id={headingId} tabIndex={-1} className="min-w-0 text-base font-semibold text-fg">
+              {name}
+              {day && (
+                <>
+                  <span className="sr-only">,</span>{" "}
+                  <span className="text-sm font-normal text-fg-muted">scanned {day}</span>
+                </>
+              )}
+            </h2>
+            {onClose && (
+              <Button type="button" variant="ghost" onClick={onClose} className="shrink-0 px-3">
+                <X className="h-4 w-4" aria-hidden />
+                <span>
+                  Close<span className="sr-only"> {name.toLowerCase()}</span>
+                </span>
+              </Button>
             )}
-          </h2>
+          </div>
           {/* One row when it fits, Go back first; the picker's label sits
               above it (`stacked`), so at 320 px the box keeps the whole
               width for the report's name instead of sharing it with the
               label. */}
           <div className="mt-2 flex flex-wrap items-end gap-2">
-            {name && (
-              <Button
-                type="button"
-                aria-disabled={!canGoBack || undefined}
-                onClick={() => canGoBack && send({ source: PANE_MESSAGE_SOURCE, type: "back" })}
-                className="aria-disabled:cursor-not-allowed aria-disabled:border-border aria-disabled:bg-surface-muted aria-disabled:text-fg-subtle aria-disabled:opacity-60 aria-disabled:shadow-none aria-disabled:hover:border-border aria-disabled:hover:bg-surface-muted aria-disabled:active:translate-y-0"
-              >
-                <ArrowLeft className="h-4 w-4" aria-hidden />
-                <span>
-                  Go back<span className="sr-only"> in the {name.toLowerCase()} panel</span>
-                </span>
-              </Button>
-            )}
+            <Button
+              type="button"
+              aria-disabled={!canGoBack || undefined}
+              onClick={() => canGoBack && send({ source: PANE_MESSAGE_SOURCE, type: "back" })}
+              className="aria-disabled:cursor-not-allowed aria-disabled:border-border aria-disabled:bg-surface-muted aria-disabled:text-fg-subtle aria-disabled:opacity-60 aria-disabled:shadow-none aria-disabled:hover:border-border aria-disabled:hover:bg-surface-muted aria-disabled:active:translate-y-0"
+            >
+              <ArrowLeft className="h-4 w-4" aria-hidden />
+              <span>
+                Go back<span className="sr-only"> in the {name.toLowerCase()} panel</span>
+              </span>
+            </Button>
             {history.failed ? (
               <p className="text-sm text-fg-muted">The list of reports could not load. Try again later.</p>
             ) : !history.points ? (
               <p role="status" className="text-sm text-fg-muted">Loading the list of reports…</p>
-            ) : options.length > (name ? 1 : 0) ? (
+            ) : options.length > 1 ? (
               <form onSubmit={submit} className="flex min-w-0 flex-wrap items-end gap-2">
                 <Select
                   id={selectId}
@@ -363,7 +421,7 @@ function ReportPane({
                 />
                 <Button type="submit">
                   <span>
-                    Show this report<span className="sr-only">{name ? ` in place of ${name.toLowerCase()}` : ` in the ${panel} panel`}</span>
+                    Show this report<span className="sr-only"> in place of {name.toLowerCase()}</span>
                   </span>
                 </Button>
               </form>
@@ -376,30 +434,129 @@ function ReportPane({
             </p>
           )}
         </div>
-        {name ? (
-          // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- the frame's load event, not a reader's action
-          <iframe
-            key={`${reportId}-${generation}`}
-            ref={frameRef}
-            src={src}
-            title={`${name}, ${place?.title || "Accessibility issues"}`}
-            loading="eager"
-            // Ask the panel where it is once it has loaded, in case its first
-            // word came before this page was listening.
-            onLoad={() => send({ source: PANE_MESSAGE_SOURCE, type: "report" })}
-            className={cn(
-              "block w-full rounded-b-xs border-0 bg-surface-subtle",
-              "h-[80vh] min-h-[28rem] lg:h-[calc(100vh-7rem)] lg:min-h-[32rem]",
-            )}
-          />
-        ) : (
-          <p className="p-4 text-sm leading-relaxed text-fg-muted">
-            {otherId !== null && listed.length > 1
-              ? `${reportName(otherId)} is the first completed report of this site. Choose a later report to show here.`
-              : "This site has one completed report so far. Scan the site again after you fix issues, then compare the two reports here."}
-          </p>
-        )}
+        {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- the frame's load event, not a reader's action */}
+        <iframe
+          key={`${reportId}-${generation}`}
+          ref={frameRef}
+          src={src}
+          title={`${name}, ${place?.title || "Accessibility issues"}`}
+          loading="eager"
+          // Ask the panel where it is once it has loaded, in case its first
+          // word came before this page was listening.
+          onLoad={() => send({ source: PANE_MESSAGE_SOURCE, type: "report" })}
+          className={cn("block w-full rounded-b-xs border-0 bg-surface-subtle", PANEL_HEIGHT)}
+        />
       </Card>
+    </section>
+  );
+}
+
+/** A report frame's height: the window below the top bar side by side, 80% of it stacked. */
+const PANEL_HEIGHT = "h-[80vh] min-h-[28rem] lg:h-[calc(100vh-7rem)] lg:min-h-[32rem]";
+
+/**
+ * The second panel before a report is chosen for it: a dashed box listing the
+ * site's other completed reports, each a link that shows it here.
+ *
+ * Why (keep these when you change it):
+ *
+ * - **A dashed edge, not a card.** The developer asked for "a dashed blank"
+ *   (2026-10-29). Dashed reads as a place to put something, the way an empty
+ *   slot or a drop zone does, and sets this panel apart from the solid card
+ *   of a report. The words say the same thing, so the edge is not the only
+ *   cue (SC 1.4.1 Use of Color, Level A, in spirit: no meaning by look
+ *   alone). It is as tall as a report's frame, so the two panels line up
+ *   side by side.
+ * - **The choices are in the box, one click each.** The request was to click
+ *   the box to choose a report. One big button that then opened a list was
+ *   considered and rejected: it adds a step, and hides the choices until it
+ *   is pressed (W3C COGA, "Making Content Usable", objective 4, help users
+ *   focus, and objective 5, help users avoid mistakes; paraphrased: fewer
+ *   steps, nothing hidden). So the box lists the reports itself, each a whole
+ *   row to press, at least 44 pixels tall (SC 2.5.5 Target Size (Enhanced),
+ *   Level AAA). They are links, because each opens an address
+ *   (`?compare_to=N`) that can be bookmarked or opened in a new tab; a
+ *   button would do neither. A picker with "Show this report", as above a
+ *   report's panel, was the other option; a list shows every report's date
+ *   and size at once, which is what picking one needs.
+ * - **Newest first, without the first panel's report**, as Reports and the
+ *   panels' pickers list them. Each row names the report, the day it was
+ *   scanned, and how many kinds of issues and occurrences it found, in the
+ *   words the rest of the app uses (docs/plain-language.md, Terms).
+ *   Screen-reader-only words end each link's name, "(compare with Report
+ *   #24)", as the "Compare with" list on Reports ends its links (technique
+ *   C7; SC 2.4.4 Link Purpose (In Context), Level A).
+ * - **A site with one report** gets the box with a sentence saying how to
+ *   get a second report, not an empty list.
+ */
+function EmptyPane({
+  reportId,
+  history,
+  focusNext,
+}: {
+  /** The first panel's report. */
+  reportId: number;
+  history: History;
+  focusNext: FocusNext;
+}) {
+  const ids = useId();
+  const headingId = `${ids}-heading`;
+  const heading = useTakeFocus(focusNext, "empty");
+  const others = [...(history.points ?? [])].reverse().filter((point) => point.id !== reportId);
+  const title = history.points && others.length === 0 ? "Nothing to compare with yet" : "Choose a report to compare with";
+
+  return (
+    // Side by side, the grid row is as tall as the report's panel; the box
+    // fills it (`flex-1`), so the two panels end together. Stacked, it is
+    // at least as tall as a frame's minimum, and grows with a long list.
+    <section aria-labelledby={headingId} className="flex min-w-0 flex-col">
+      <div className="flex min-h-[28rem] flex-1 flex-col rounded-xs border-2 border-dashed border-border-strong bg-surface-subtle p-4">
+        {/* `tabIndex={-1}`: a target for focus after Close, not a stop in the tab order. */}
+        <h2 ref={heading} id={headingId} tabIndex={-1} className="text-base font-semibold text-fg">
+          {title}
+        </h2>
+        {history.failed ? (
+          <p className="mt-1 text-sm text-fg-muted">The list of reports could not load. Try again later.</p>
+        ) : !history.points ? (
+          <p role="status" className="mt-1 text-sm text-fg-muted">Loading the list of reports…</p>
+        ) : others.length === 0 ? (
+          <p className="mt-1 text-sm leading-relaxed text-fg-muted">
+            This site has one completed report so far. Scan the site again after you fix issues, then compare the two
+            reports here.
+          </p>
+        ) : (
+          <>
+            <p className="mt-1 text-sm leading-relaxed text-fg-muted">
+              Choose one of this site’s reports to show here, beside {reportName(reportId)}.
+            </p>
+            <ul className="mt-3 flex flex-col gap-2">
+              {others.map((point) => {
+                const day = scanDay(point);
+                return (
+                  <li key={point.id}>
+                    <Link
+                      to={pairPath(reportId, point.id)}
+                      onClick={() => {
+                        focusNext.current = "second";
+                      }}
+                      className="flex min-h-target flex-col justify-center rounded-xs border border-border bg-surface px-3 py-2 text-sm text-fg no-underline shadow-sm hover:border-umich-blue hover:bg-surface-muted"
+                    >
+                      <span className="font-semibold text-umich-blue underline underline-offset-2">
+                        {reportName(point.id)}
+                      </span>
+                      <span className="text-fg-muted">
+                        {day && <>Scanned {day}. </>}
+                        {countKinds(point.groups)}, {count(point.occurrences, "occurrence")}
+                      </span>
+                      <span className="sr-only"> (compare with {reportName(reportId)})</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        )}
+      </div>
     </section>
   );
 }

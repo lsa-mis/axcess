@@ -39,8 +39,10 @@ export interface ReportView {
 /**
  * In tab order. The first is the report's landing view.
  *
- * Compare reports opens with the report before this one, the comparison a
- * reader most often wants; its pickers change either side.
+ * Compare reports opens with this report alone and its second panel empty,
+ * listing the site's other reports to choose from (routes/CompareReports.tsx,
+ * EmptyPane). It used to open with the report before this one; the developer
+ * asked for the reader to choose instead (2026-10-29).
  */
 export const REPORT_VIEWS: readonly ReportView[] = [
   {
@@ -55,8 +57,7 @@ export const REPORT_VIEWS: readonly ReportView[] = [
     segment: "compare",
     // A site's first report has nothing earlier to compare with.
     available: (previousScanId) => previousScanId != null,
-    path: (scanId, previousScanId) =>
-      `/scans/${scanId}/compare${previousScanId != null ? `?compare_to=${previousScanId}` : ""}`,
+    path: (scanId) => `/scans/${scanId}/compare`,
   },
 ];
 
