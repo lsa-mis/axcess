@@ -778,9 +778,11 @@ function ScanRow({ id, scan, first, last }: { id: string; scan: ScanSummary; fir
     // The open site's shade, and no rule above: it reads as part of the site row.
     <tr id={id} className={OPEN_SITE_SHADE}>
       {/* Indented into the box, which starts under the site's name (see
-          scanCardCell): "Report #" sits 16px inside its edge, the box's
-          own padding, so the rows read as the site's own (W3C COGA,
-          "Making Content Usable": group related content).
+          scanCardCell). "Report #" keeps the 44px it had inside the box's
+          left edge before the box moved in, so the whole block shifts
+          right rather than the padding shrinking (the developer's
+          correction, 2026-10-29). The rows read as the site's own (W3C
+          COGA, "Making Content Usable": group related content).
 
           "Report #N" is the one way into a scan's report. A completed scan
           goes straight to its Issues page; any other goes to its scan page,
@@ -796,7 +798,7 @@ function ScanRow({ id, scan, first, last }: { id: string; scan: ScanSummary; fir
           row's header. */}
       <RowHeader
         sticky
-        className={cn("whitespace-nowrap py-1 pl-[4.5rem] text-xs font-normal tabular-nums text-fg-muted", piece("start"))}
+        className={cn("whitespace-nowrap py-1 pl-[6.25rem] text-xs font-normal tabular-nums text-fg-muted", piece("start"))}
       >
         <Link
           to={scan.status === "completed" ? `/scans/${scan.id}/issues` : `/scans/${scan.id}`}
