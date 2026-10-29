@@ -29,6 +29,7 @@ import { confirmDestructive } from "../hooks/usePreferences";
 import BreakableUrl from "../components/BreakableUrl";
 import LastScannedSite from "../components/LastScannedSite";
 import ScanAgainLink from "../components/ScanAgainLink";
+import LinkMenu from "../components/LinkMenu";
 import {
   Cell,
   ColumnHeader,
@@ -64,7 +65,7 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  * the site is expanded.
  *
  * Expanding a site lists all of its scans, each a link to its report, with
- * the per-report action (Delete) the flat list used to carry.
+ * the per-report actions (Compare with, Delete) the flat list used to carry.
  *
  * Why the table looks the way it does (keep these when you change it):
  *
@@ -187,13 +188,43 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  *   away, laid out side by side as the scan rows' actions are, so the
  *   site rows and scan rows share one pattern (W3C COGA: the same
  *   pattern for the same kind of thing). Stacking them was built and set
- *   aside for this; the dropped columns left the room.
+ *   aside for this.
+ * - Side by side costs width. The dropped columns once left room for two
+ *   links, but the Rule check column and the longer word "Occurrences"
+ *   took it back: at 1280 pixels with the sidebar open the table scrolls
+ *   sideways (the developer measured about 113 pixels), which the
+ *   developer accepted (2026-10-28). Sideways scrolling is allowed here:
+ *   SC 1.4.10 Reflow (Level AA) excepts content that needs
+ *   two-dimensional layout, and its Understanding document names data
+ *   tables as such content (paraphrased). The Site column is sticky, so a
+ *   row keeps its name while the table scrolls.
+ * - Comparing starts from a scan row: each completed scan row of an open
+ *   site has "Compare with", beside "Delete" (ScanRow).
+ *   The developer chose this place (2026-10-29), so any report can be
+ *   compared with any other of its site in one step, without opening a
+ *   report first; a "Compare reports" link on the site row was built the
+ *   day before and dropped. "Compare with" opens a short list of the
+ *   site's other completed reports, "Report #20" and so on; each opens
+ *   Compare reports for the pair, side by side (routes/CompareReports.tsx):
+ *   the newer report in the address, so in the first panel, and the older
+ *   as `compare_to`, in the second. Always that order, so the same pair has
+ *   one address whichever row it was chosen from, and it is the order What
+ *   changed requires too (the baseline must be the earlier report,
+ *   src/audit/web/comparison.py). It is a
+ *   button that shows links, not a select that goes somewhere when a value
+ *   is chosen (SC 3.2.2 On Input, Level A); LinkMenu says how it opens and
+ *   closes. It shows only on a completed scan with at least one other
+ *   completed scan in the site: a disabled control would be one that does
+ *   nothing. The site's completed scans are its public ones (sites.py),
+ *   the ones the comparison accepts.
  *   A row "Actions" dropdown holding the two links was built first and
  *   removed (Oct 2026): it put opening a report, this screen's main task,
  *   one click further away and hid "Scan again" until opened (W3C COGA:
  *   make the main task easy to find); its button, "Actions", named no verb
  *   or object (docs/plain-language.md rule 8); and it closed on scroll,
- *   which caught screen-magnifier users who pan by scrolling. Leaving
+ *   which caught screen-magnifier users who pan by scrolling. "Compare
+ *   with" is a dropdown again, but it holds one task and names it, the
+ *   main links stay outside it, and it never closes on scroll. Leaving
  *   "Scan again" to the Issues page alone was also tried; the request was
  *   to rescan from this list, and the same link with the same name on both
  *   screens is consistent (SC 3.2.4). The "Actions" column header is a
@@ -616,6 +647,8 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
   const label = siteLabel(site.site_url);
   const completed = site.most_recent_completed;
   const scanRowId = (scan: ScanSummary) => `${rowId}-scan-${scan.id}`;
+  // Newest first, as the scan rows are: what "Compare with" offers.
+  const completedScans = site.scans.filter((scan) => scan.status === "completed");
   return (
     <>
       {/* An open site takes the shaded stripe whatever its place, so its
@@ -715,6 +748,7 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
             key={scan.id}
             id={scanRowId(scan)}
             scan={scan}
+            completedScans={completedScans}
             first={position === 0}
             last={position === site.scans.length - 1}
           />
@@ -772,8 +806,26 @@ function scanCardCell({ first, last, edge }: { first: boolean; last: boolean; ed
  * One scan of an open site, as a row of the reports table. Pulled out so the
  * delete mutation's loading state is local to the row that owns it.
  */
-function ScanRow({ id, scan, first, last }: { id: string; scan: ScanSummary; first: boolean; last: boolean }) {
+function ScanRow({
+  id,
+  scan,
+  completedScans,
+  first,
+  last,
+}: {
+  id: string;
+  scan: ScanSummary;
+  /** The site's completed scans, newest first. */
+  completedScans: readonly ScanSummary[];
+  first: boolean;
+  last: boolean;
+}) {
   const piece = (edge?: "start" | "end") => scanCardCell({ first, last, edge });
+  // "Compare with" on a completed scan, with every other completed scan of
+  // the site: see "Comparing starts from a scan row" in the comment on this
+  // route.
+  const others =
+    scan.status === "completed" ? completedScans.filter((other) => other.id !== scan.id) : [];
   return (
     // The open site's shade, and no rule above: it reads as part of the site row.
     <tr id={id} className={OPEN_SITE_SHADE}>
@@ -826,10 +878,34 @@ function ScanRow({ id, scan, first, last }: { id: string; scan: ScanSummary; fir
       </Cell>
       <ScanCountCells scan={scan} className={piece()} />
       <RuleChecksCell scan={scan} className={piece()} />
-      <Cell className={cn("whitespace-nowrap py-1", piece("end"))}>
+      {/* While "Compare with" is open, its cell rises over the rows after
+          it: each cell here is its own layer (`isolate`, for the box drawn
+          behind it), so a later row would otherwise paint over the list.
+          Still under the top bar (z-20). */}
+      <Cell className={cn("whitespace-nowrap py-1 has-[[data-menu-open]]:z-10", piece("end"))}>
         {/* Default `md` size (44px tall): destructive controls in
-            particular must be a real target (SC 2.5.5). */}
+            particular must be a real target (SC 2.5.5). In reading order:
+            compare this report, then delete it. */}
         <div className="flex items-center justify-center gap-2">
+          {others.length > 0 && (
+            <LinkMenu
+              label="Compare with"
+              labelContext={` another report, for Report #${scan.id}`}
+              intro={`Compare Report #${scan.id} with:`}
+              items={others.map((other) => {
+                // Report ids increase with creation, so the higher id is the
+                // newer report: it goes in the address (the first panel),
+                // the older one is `compare_to` (the second).
+                const [newer, older] = other.id > scan.id ? [other.id, scan.id] : [scan.id, other.id];
+                return {
+                  key: String(other.id),
+                  to: `/scans/${newer}/compare?compare_to=${older}`,
+                  label: `Report #${other.id}`,
+                  context: ` (compare with Report #${scan.id})`,
+                };
+              })}
+            />
+          )}
           <DeleteScanButton scan={scan} />
         </div>
       </Cell>

@@ -345,6 +345,171 @@ async def test_reports_table_keyboard_and_columns(
     await page.wait_for_url(f"**/app/scans/{headline_id}/issues")
 
 
+def _comparable_site() -> dict[str, Any]:
+    """A site with two completed reports (21 the latest) and a stopped one."""
+    url = "https://compared.example/"
+    latest = _scan(21, "completed", site=url, findings=2)
+    earlier = _scan(20, "completed", site=url, findings=4)
+    stopped = _scan(22, "interrupted", site=url)
+    return {
+        "site_url": url,
+        "scan_count": 3,
+        "completed_count": 2,
+        "most_recent": stopped,
+        "most_recent_completed": latest,
+        "most_recent_completed_issue_count": 3,
+        "most_recent_completed_occurrence_count": 6,
+        "scans": [stopped, latest, earlier],
+    }
+
+
+@pytest.mark.parametrize("width", [320, 1280])
+async def test_compare_with_on_each_completed_scan_row(width: int, new_page: Any) -> None:
+    """A completed scan row offers "Compare with" and the site's other completed reports.
+
+    The developer chose the scan rows for comparing (2026-10-29). The
+    button shows a list of links (the APG disclosure pattern), never a
+    select that navigates on choice (SC 3.2.2), and it does not close when
+    the page scrolls.
+    """
+    if not (DIST / "index.html").exists():
+        pytest.skip("Build the frontend first")
+    page = await _open_reports(new_page, [_comparable_site(), _site(1, 0)])
+    await page.set_viewport_size({"width": width, "height": 700})
+    table = page.get_by_role("table", name="Public reports by site", exact=False)
+    rows = table.locator(":scope > tbody > tr")
+    compared = rows.nth(0)
+    # The site row has no compare link any more: its two links stay.
+    await playwright_async.expect(
+        table.get_by_role("link", name=re.compile(r"^Compare"))
+    ).to_have_count(0)
+    await playwright_async.expect(
+        table.get_by_role("button", name=re.compile(r"^Compare with"))
+    ).to_have_count(0)
+    open_link = compared.get_by_role("link", name=re.compile(r"^Open latest scan of compared"))
+    scan_again = compared.get_by_role("link", name=re.compile(r"^Scan again\W+compared\.example"))
+    await open_link.focus()
+    await page.keyboard.press("Tab")
+    await playwright_async.expect(scan_again).to_be_focused()
+
+    await compared.get_by_role("button", name=re.compile(r"^Show all 3 scans")).click()
+    scan_rows = rows.filter(has=page.get_by_role("link", name=re.compile(r"^Open Report #\d+$")))
+    await playwright_async.expect(scan_rows).to_have_count(3)
+    latest = scan_rows.filter(has=page.get_by_role("link", name="Open Report #21", exact=True))
+    stopped = scan_rows.filter(has=page.get_by_role("link", name="Open Report #22", exact=True))
+    earlier = scan_rows.filter(has=page.get_by_role("link", name="Open Report #20", exact=True))
+    # Only on a completed scan with another completed scan in the site; a
+    # stopped scan has nothing, not a disabled control.
+    await playwright_async.expect(
+        stopped.get_by_role("button", name=re.compile(r"^Compare with"))
+    ).to_have_count(0)
+    await playwright_async.expect(
+        earlier.get_by_role(
+            "button", name="Compare with another report, for Report #20", exact=True
+        )
+    ).to_have_count(1)
+
+    # The visible words lead the name; the row's report is screen-reader-only
+    # text inside it (technique C7), not an aria-label.
+    button = latest.get_by_role(
+        "button", name="Compare with another report, for Report #21", exact=True
+    )
+    await playwright_async.expect(button).to_be_visible()
+    await playwright_async.expect(button).not_to_have_attribute("aria-label", re.compile(".*"))
+    assert (await button.inner_text()).strip().startswith("Compare with")
+    await playwright_async.expect(button).to_have_attribute("aria-expanded", "false")
+    panel_id = await button.get_attribute("aria-controls")
+    assert panel_id
+    button_box = await button.bounding_box()
+    assert button_box and button_box["height"] >= 44, button_box
+
+    # Reading order: the report's link, Compare with, then Delete.
+    report_link = latest.get_by_role("link", name="Open Report #21", exact=True)
+    delete = latest.get_by_role("button", name="Delete report 21")
+    await report_link.focus()
+    await page.keyboard.press("Tab")
+    await playwright_async.expect(button).to_be_focused()
+    await page.keyboard.press("Tab")
+    await playwright_async.expect(delete).to_be_focused()
+
+    # Enter opens it; the links follow the button in the tab order.
+    await button.focus()
+    await page.keyboard.press("Enter")
+    await playwright_async.expect(button).to_have_attribute("aria-expanded", "true")
+    panel = page.locator(f"[id='{panel_id}']")
+    await playwright_async.expect(panel).to_be_visible()
+    link = panel.get_by_role("link", name="Report #20 (compare with Report #21)", exact=True)
+    await playwright_async.expect(panel.get_by_role("link")).to_have_count(1)
+    await playwright_async.expect(link).to_have_attribute(
+        "href", "/app/scans/21/compare?compare_to=20"
+    )
+    assert (await link.inner_text()).strip().startswith("Report #20")
+    link_box = await link.bounding_box()
+    assert link_box and link_box["height"] >= 44, link_box
+    await page.keyboard.press("Tab")
+    await playwright_async.expect(link).to_be_focused()
+    violations = await _run_axe(page)
+    assert not violations, _render_violations(violations)
+    # Escape closes it and puts focus back on the button.
+    await page.keyboard.press("Escape")
+    await playwright_async.expect(button).to_have_attribute("aria-expanded", "false")
+    await playwright_async.expect(panel).to_be_hidden()
+    await playwright_async.expect(button).to_be_focused()
+
+    # Down arrow opens it on the first link.
+    await page.keyboard.press("ArrowDown")
+    await playwright_async.expect(link).to_be_focused()
+    # Scrolling never closes it (screen-magnifier users pan by scrolling);
+    # the list moves with its button.
+    before, button_before = await panel.bounding_box(), await button.bounding_box()
+    await page.evaluate("document.querySelector('main').scrollBy(0, 40); window.scrollBy(0, 40)")
+    await page.mouse.wheel(0, 60)
+    await page.wait_for_timeout(150)
+    await playwright_async.expect(button).to_have_attribute("aria-expanded", "true")
+    await playwright_async.expect(panel).to_be_visible()
+    after = await panel.bounding_box()
+    button_after = await button.bounding_box()
+    assert before and after and button_before and button_after
+    assert button_after["y"] != button_before["y"], "the page did not scroll"
+    # Still right under or right over its button, wherever that is now: it
+    # followed (it may flip to the side with more room).
+
+    def beside(panel_box: dict[str, float], anchor: dict[str, float]) -> bool:
+        under = abs(panel_box["y"] - (anchor["y"] + anchor["height"]) - 6) < 2
+        over = abs(panel_box["y"] + panel_box["height"] - anchor["y"] + 6) < 2
+        return under or over
+
+    assert beside(before, button_before), (before, button_before)
+    assert beside(after, button_after), (after, button_after)
+    # A press outside closes it.
+    await page.get_by_role("heading", name="Reports", level=1).click()
+    await playwright_async.expect(button).to_have_attribute("aria-expanded", "false")
+    if width == 320:
+        assert await page.evaluate("document.body.scrollWidth <= innerWidth")
+
+    # From the older row, the same pair opens the same address: the newer
+    # report goes in the path, the older is compare_to (the comparison needs
+    # the baseline to be the earlier report).
+    older_button = earlier.get_by_role(
+        "button", name="Compare with another report, for Report #20", exact=True
+    )
+    # By keyboard: at 320 pixels a click would land on the sticky Site
+    # column, which the scrolled region slides the Actions cell under.
+    await older_button.focus()
+    await page.keyboard.press("Enter")
+    older_panel = page.locator(f"[id='{await older_button.get_attribute('aria-controls')}']")
+    await playwright_async.expect(
+        older_panel.get_by_role("link", name="Report #21 (compare with Report #20)", exact=True)
+    ).to_have_attribute("href", "/app/scans/21/compare?compare_to=20")
+    await page.keyboard.press("Escape")
+
+    # Following a link opens Compare reports for the pair.
+    await button.focus()
+    await page.keyboard.press("ArrowDown")
+    await page.keyboard.press("Enter")
+    await page.wait_for_url("**/app/scans/21/compare?compare_to=20")
+
+
 async def test_a_new_sort_order_is_announced(new_page: Any) -> None:
     """The order is said in a live region (SC 4.1.3), not in a visible line."""
     if not (DIST / "index.html").exists():

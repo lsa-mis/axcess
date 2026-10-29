@@ -10,6 +10,9 @@ merge.
 
 ### Added
 
+- Reports: each completed scan of an opened site has **Compare with**,
+  a short list of the site's other completed reports. Choosing one opens
+  Compare reports for the two, without opening a report first.
 - Reports and Issues say which check found what. On Reports, a **Rule
   check** column shows whether each scan ran axe, Alfa or both; on the
   Issues page, a **Check** column names the check behind each kind of
