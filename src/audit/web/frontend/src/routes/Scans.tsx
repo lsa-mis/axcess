@@ -735,8 +735,13 @@ const OPEN_SITE_SHADE = "bg-surface-subtle";
  * A box cannot wrap table rows, so each cell paints its piece in a
  * `::before` layer behind its content: white, with the frame's edge on the
  * sides it touches, rounded at the box's four corners, and inset from the
- * table's edges (16px at the sides and the foot, 8px at the top) so the
- * open site's shade shows round it. A line on the right of each piece is
+ * table's edges so the open site's shade shows round it: 60px on the left,
+ * so the box starts under the site's name like a nested list; 16px on the
+ * right and at the foot; 8px at the top. The left inset was 16px, the same
+ * as the right, until user testing (2026-10-29) asked for the box to sit
+ * further in, so it reads as the site's own (W3C COGA, "Making Content
+ * Usable": group related content). Only the box moves: its cells stay in
+ * the table's columns, so the numbers still line up under the site's. A line on the right of each piece is
  * the column line inside the box (Table's `ruled` draws it outside); a line
  * on top of each later row parts one scan from the next. The first and last
  * rows take the inset in extra padding, so their content stays centred in
@@ -749,7 +754,7 @@ const OPEN_SITE_SHADE = "bg-surface-subtle";
 function scanCardCell({ first, last, edge }: { first: boolean; last: boolean; edge?: "start" | "end" }): string {
   return cn(
     "before:absolute before:-z-10 before:border-border before:bg-surface before:content-['']",
-    edge === "start" ? "before:left-4 before:border-l" : "before:left-0",
+    edge === "start" ? "before:left-[3.75rem] before:border-l" : "before:left-0",
     edge === "end" ? "before:right-4" : "before:right-0",
     "before:border-r",
     first ? "before:top-2 pt-[1.375rem]" : "before:top-0",
@@ -772,9 +777,10 @@ function ScanRow({ id, scan, first, last }: { id: string; scan: ScanSummary; fir
   return (
     // The open site's shade, and no rule above: it reads as part of the site row.
     <tr id={id} className={OPEN_SITE_SHADE}>
-      {/* Indented so "Report #" lines up under the site's name, past the
-          chevron: the rows read as the site's own (W3C COGA, "Making
-          Content Usable": group related content).
+      {/* Indented into the box, which starts under the site's name (see
+          scanCardCell): "Report #" sits 16px inside its edge, the box's
+          own padding, so the rows read as the site's own (W3C COGA,
+          "Making Content Usable": group related content).
 
           "Report #N" is the one way into a scan's report. A completed scan
           goes straight to its Issues page; any other goes to its scan page,
@@ -790,7 +796,7 @@ function ScanRow({ id, scan, first, last }: { id: string; scan: ScanSummary; fir
           row's header. */}
       <RowHeader
         sticky
-        className={cn("whitespace-nowrap py-1 pl-14 text-xs font-normal tabular-nums text-fg-muted", piece("start"))}
+        className={cn("whitespace-nowrap py-1 pl-[4.5rem] text-xs font-normal tabular-nums text-fg-muted", piece("start"))}
       >
         <Link
           to={scan.status === "completed" ? `/scans/${scan.id}/issues` : `/scans/${scan.id}`}
