@@ -39,7 +39,7 @@ import {
 } from "../components/table/sort";
 import ReportHeader from "../components/ReportHeader";
 import ReportDangerZone from "../components/ReportDangerZone";
-import { ReportNote, ReportNotes, ReportSummary } from "../components/ReportSummary";
+import { ReportCoverageNote, ReportNote, ReportNotes, ReportSummary } from "../components/ReportSummary";
 import { cn } from "../lib/cn";
 import { liveSearchParams } from "../lib/liveSearchParams";
 import { HIDDEN_ISSUE_FIELDS } from "../lib/hiddenIssueFields";
@@ -65,9 +65,10 @@ import type {
 /**
  * The primary report: every kind of issue as one row of a flat table.
  *
- * This is where a report opens. The numbers and scan coverage that used to
- * be an Overview tab sit above the table (``ReportSummary``), and the expert
- * tools sit closed below it, so the first thing on screen is the table.
+ * This is where a report opens. The numbers that used to be an Overview tab
+ * sit above the table (``ReportSummary``); what was checked, what the labels
+ * mean and the expert tools sit closed below it, so the table follows the
+ * numbers directly.
  *
  * Each column is one of the facts the old right-hand evidence pane listed
  * for the selected issue (type, criterion, priority, spread, difficulty,
@@ -193,7 +194,6 @@ export default function IssuesRoute() {
   const data = issuesQuery.data;
   const isComplete = scan.status === "completed";
   const summaryRows = hasFilter ? summaryQuery.data?.rows : data.rows;
-  const notes = <IssueGlossary />;
   const basedOn = !isComplete
     ? null
     : scan.finished_at
@@ -238,16 +238,12 @@ export default function IssuesRoute() {
         }
       />
 
-      {isComplete ? (
+      {isComplete && (
         <ReportSummary
           scan={scan}
           issueGroups={data.total_unfiltered}
           occurrences={data.occurrence_counts.all_evidence}
-          rows={summaryRows}
-          notes={notes}
         />
-      ) : (
-        <ReportNotes>{notes}</ReportNotes>
       )}
 
       {/* Filtering changed the table silently: the visible count updated,
@@ -320,7 +316,7 @@ export default function IssuesRoute() {
           <TableEmpty>
             {hasFilter
               ? "No issues match these filters. Clear a filter to see more results."
-              : "Axcess found no issues. That does not mean the site meets WCAG, because some checks may not have run. See what was checked, above this table."}
+              : "Axcess found no issues. That does not mean the site meets WCAG, because some checks may not have run. See “What was checked”, below this table."}
           </TableEmpty>
         ) : (
           <IssueTable
@@ -334,6 +330,14 @@ export default function IssuesRoute() {
           />
         )}
       </Card>
+
+      {/* Under the table since user testing (2026-10-28): the table follows
+          the numbers with nothing to step over. Why, and what keeps the
+          limit in view, is on ReportCoverageNote. */}
+      <ReportNotes className="mt-8">
+        {isComplete && <ReportCoverageNote scan={scan} rows={summaryRows} />}
+        <IssueGlossary />
+      </ReportNotes>
 
       <ReportDangerZone scan={scan} />
     </>
@@ -943,7 +947,14 @@ function FindingTypePill({ type, hint = true }: { type: FindingType; hint?: bool
 }
 
 /**
- * What the Type and Finding type words mean, closed until asked for.
+ * What the counts and the Type and Finding type words mean, closed until
+ * asked for.
+ *
+ * The counts lead: what an occurrence and a kind of issue are. The summary
+ * numbers lost the lines that said so (user testing, 2026-10-28), and
+ * "occurrence" is an advanced word, so its meaning must stay in words
+ * everyone can reach, not only in the column's hover hint (SC 3.1.3 Unusual
+ * Words, Level AAA).
  *
  * The tags in the table carry the same sentences as hover hints, but a hint
  * on a tag reaches only a mouse: this list is how keyboard and touch users,
@@ -956,6 +967,21 @@ function IssueGlossary() {
       title={`What "${REVIEW_TYPE_LABEL.likely_barrier}", "${REVIEW_TYPE_LABEL.expert_review}" and the other labels mean`}
     >
       <div className="grid max-w-5xl gap-x-10 gap-y-4 text-sm leading-relaxed text-fg-muted md:grid-cols-2 xl:grid-cols-3">
+        <GlossaryList
+          heading="The numbers: what is counted"
+          items={[
+            {
+              key: "occurrence",
+              term: <span className="font-semibold text-fg">Occurrence</span>,
+              help: "One place a problem appears: one element on one page, or in one page state. \"Occurrences found\" counts them all.",
+            },
+            {
+              key: "kind",
+              term: <span className="font-semibold text-fg">Kind of issue</span>,
+              help: "All the occurrences one check found for the same reason. Each is one row in the Issues table.",
+            },
+          ]}
+        />
         <GlossaryList
           heading={`${COLUMN_LABEL.Type}: how sure Axcess is that a kind of issue is a real problem`}
           items={REVIEW_LANES.map((key) => ({ key, term: <LaneTag lane={key} hint={false} />, help: REVIEW_LANE_HELP[key] }))}

@@ -757,7 +757,19 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
             "In an image",
         ]
     )
+    # What the two summary numbers count, now that no line under them says it.
+    for term, meaning in (
+        ("Occurrence", "One place a problem appears: one element on one page"),
+        ("Kind of issue", "All the occurrences one check found for the same reason."),
+    ):
+        await playwright_async.expect(
+            page.get_by_role("term").filter(has_text=re.compile(rf"^{term}$"))
+        ).to_be_visible()
+        await playwright_async.expect(
+            page.get_by_role("definition").filter(has_text=meaning)
+        ).to_be_visible()
     for heading in (
+        "The numbers: what is counted",
         "How sure: how sure Axcess is that a kind of issue is a real problem",
         "Where it shows: where the problem shows up",
     ):

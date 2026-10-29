@@ -706,6 +706,20 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     ).to_be_visible()
     ledger = page.get_by_role("region", name="What was checked")
     await playwright_async.expect(ledger).to_be_hidden()
+    # Under the table since user testing (2026-10-28), not between it and
+    # the numbers; the summary numbers carry no line under them.
+    table_box = await page.get_by_role("region", name="Issues table").bounding_box()
+    coverage_box = await coverage.bounding_box()
+    assert table_box and coverage_box and coverage_box["y"] > table_box["y"], (
+        table_box,
+        coverage_box,
+    )
+    await playwright_async.expect(
+        page.get_by_text("Each one is an element on a page")
+    ).to_have_count(0)
+    await playwright_async.expect(page.get_by_text("One per row in the table below")).to_have_count(
+        0
+    )
     await coverage.focus()
     await page.keyboard.press("Enter")
     await playwright_async.expect(ledger).to_be_visible()

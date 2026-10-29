@@ -77,6 +77,11 @@ merge.
   the columns. A scan shows its status only when it did not complete
   ("Stopped", "Failed", "Scanning"). The date column is now **Scanned**,
   and the sentence over the table is gone.
+- Issues page: the table now comes straight after the numbers. **What was
+  checked** (with how many checks ran) and what the labels mean moved
+  under the table, and the lines under "Occurrences found" and "Kinds of
+  issues" are gone; what the two numbers count is now explained in what
+  the labels mean.
 - Reports remembers which sites you opened, and the order, until you
   close the tab: going to another page and back through **Reports** in
   the menu no longer closes them.

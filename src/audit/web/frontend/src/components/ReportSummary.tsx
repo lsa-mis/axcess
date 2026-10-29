@@ -20,12 +20,12 @@ import { CLICK_THROUGH_STATES, clickThroughStates } from "../lib/labels";
 function SummaryStat({
   label,
   value,
-  details,
+  details = [],
   className,
 }: {
   label: string;
   value: number;
-  details: { text: string; flag?: boolean }[];
+  details?: { text: string; flag?: boolean }[];
   className?: string;
 }) {
   return (
@@ -46,35 +46,21 @@ function SummaryStat({
 /**
  * What the old Overview tab said about a completed report, above its table.
  *
- * The report opens on Issues now, so the numbers and the coverage disclosure
- * that used to take a page of their own sit over the table instead: one row
- * of stat cards, then an accordion whose first row says how many checks ran.
- * The full ledger is behind that row, because what a scan did and did not check is something a
- * reader goes to on purpose, not something every visit should scroll past.
+ * The report opens on Issues now, so the numbers that used to take a page of
+ * their own sit over the table instead, as one row of stat cards.
  *
- * ``rows`` is the unfiltered issue list (the per-method "Found" lines count
- * it); undefined while it loads, which the ledger already handles.
- *
- * ``notes`` are the page's other closed explanations (what the table's
- * labels mean), as ``ReportNote`` rows. They join the
- * coverage row in one accordion, so the report's context reads as one short
- * list of things to open rather than loose sentences between the numbers
- * and the table.
+ * The notes that explain the report ("What was checked", what the labels
+ * mean) are not here: they sit under the table (see ReportCoverageNote).
  */
 export function ReportSummary({
   scan,
   issueGroups,
   occurrences,
-  rows,
-  notes,
 }: {
   scan: ScanDetail;
   issueGroups: number;
   occurrences: number;
-  rows: IssueRow[] | undefined;
-  notes?: ReactNode;
 }) {
-  const ran = methodsRan(scan.methods_used).length;
   return (
     <>
       {scan.blocked && <BlockedScanNotice scanId={scan.id} blocked={scan.blocked} />}
@@ -91,15 +77,25 @@ export function ReportSummary({
           apart from the row count is the other label, "Kinds of issues",
           not "Issues found".
 
-          The labels carry the difference between the two numbers, not the
-          lines under them, because a reader scanning the numbers reads the
-          label and skips the rest: "Occurrences found" for every place a
+          The labels carry the difference between the two numbers, because a
+          reader scanning the numbers reads the label and skips the rest:
+          "Occurrences found" for every place a
           problem shows up, "Kinds of issues" for the rows of the table
           below. Each label is the same word as the table's matching column
           ("Occurrences") or its row name ("Kind of issue"), so one thing
           keeps one name (W3C COGA, "Making Content Usable",
           https://www.w3.org/TR/coga-usable/: the same word for the same
           thing; SC 3.2.4 Consistent Identification, Level AA).
+
+          No line under these two. "Each one is an element on a page" and
+          "One per row in the table below" were there, and user testing
+          (2026-10-28) found them noise; the developer removed them. What
+          each number counts is still said in words everyone can reach:
+          "What the labels mean" under the table defines an occurrence and a
+          kind of issue, and the Occurrences column's hint does too (SC 3.1.3
+          Unusual Words, Level AAA). "Pages visited" keeps its lines: they
+          are facts (page states reached, pages that failed), not
+          definitions.
 
           History, short. Until 2026-10-26 the pair was "Kinds of issue
           found" (the rows, first) and "Places issues appear (occurrences)".
@@ -154,7 +150,8 @@ export function ReportSummary({
           the space inside it: 32px above (with the header's margin) and
           below it, 48px between columns on a wide screen (32px on a narrow
           one) and 32px between rows, against 8px from a number to its name
-          and 4px between the lines under it, which read as one unit. Three
+          and 4px between the lines under "Pages visited", which read as one
+          unit. Three
           across from 640px; below that the two problem numbers (Occurrences
           found and Kinds of issues) share a row, as the pair they are, and the
           pages take the row under them, so nothing is squeezed at 320px (SC
@@ -163,13 +160,8 @@ export function ReportSummary({
         <SummaryStat
           label={occurrences === 1 ? "Occurrence found" : "Occurrences found"}
           value={occurrences}
-          details={[{ text: "Each one is an element on a page" }]}
         />
-        <SummaryStat
-          label={issueGroups === 1 ? "Kind of issue" : "Kinds of issues"}
-          value={issueGroups}
-          details={[{ text: "One per row in the table below" }]}
-        />
+        <SummaryStat label={issueGroups === 1 ? "Kind of issue" : "Kinds of issues"} value={issueGroups} />
         <SummaryStat
           label="Pages visited"
           value={scan.page_count}
@@ -195,36 +187,45 @@ export function ReportSummary({
         />
       </dl>
 
-      {/* What was checked leads the notes: whether the scan checked
-          something comes before what its labels mean. The count stays on
-          the closed row, so the fact is on screen without opening anything.
-
-          The notes come after the numbers, not before them. Putting them
-          first was considered and rejected: the numbers are what the report
-          found, and leading with the main point is the first rule of the
-          U.S. Federal Plain Language Guidelines; two closed rows above them
-          would start every visit with things to open. Each note sits by
-          what it explains instead: "What was checked" (how many checks ran)
-          qualifies the numbers just above it, and what the labels mean
-          explains the table just below it. The count of checks that ran
-          stays visible on the closed row, so nobody reads the numbers
-          without the limitation beside them. Reading order for a screen
-          reader is the same: heading, numbers, notes, table. */}
-      <ReportNotes className="mt-8">
-        <ReportNote
-          id="report-coverage"
-          title="What was checked"
-          meta={
-            <span className="tabular-nums">
-              {ran} of {scan.methods_used.length} checks ran
-            </span>
-          }
-        >
-          <MethodCoverageLedger scanId={scan.id} methods={scan.methods_used} rows={rows} embedded />
-        </ReportNote>
-        {notes}
-      </ReportNotes>
     </>
+  );
+}
+
+/**
+ * "What was checked", as a closed row of ``ReportNotes``, with how many
+ * checks ran on the row itself. ``rows`` is the unfiltered issue list (the
+ * per-check "Found" lines count it); undefined while it loads, which the
+ * ledger already handles.
+ *
+ * Where it sits (Issues page): under the table, with what the labels mean,
+ * since user testing (2026-10-28). Testers wanted the table to follow the
+ * numbers with nothing to step over, and asked for both notes to move
+ * down; the developer chose to move them all the way, count included.
+ *
+ * The tradeoff, told to the developer before building it: the notes were
+ * above the table so that nobody read the numbers without the limit beside
+ * them ("6 of 7 checks ran"). Keeping that count by the numbers was offered
+ * and set aside. What still holds: the count stays visible on the closed
+ * row, without opening anything; the empty table says that some checks may
+ * not have run and points down to this row; and the order for a screen
+ * reader is heading, numbers, table, notes, the same as on screen. Never
+ * drop the count from the row to make it shorter (AGENTS.md, Interface
+ * language rule 4).
+ */
+export function ReportCoverageNote({ scan, rows }: { scan: ScanDetail; rows: IssueRow[] | undefined }) {
+  const ran = methodsRan(scan.methods_used).length;
+  return (
+    <ReportNote
+      id="report-coverage"
+      title="What was checked"
+      meta={
+        <span className="tabular-nums">
+          {ran} of {scan.methods_used.length} checks ran
+        </span>
+      }
+    >
+      <MethodCoverageLedger scanId={scan.id} methods={scan.methods_used} rows={rows} embedded />
+    </ReportNote>
   );
 }
 
