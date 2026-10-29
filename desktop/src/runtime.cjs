@@ -44,9 +44,26 @@ function isSafeExternalUrl(candidate) {
  * `script-src 'self'` is the boundary that matters and is deliberately NOT
  * relaxed: the capture's own scripts never run, enforced both here and by the
  * iframe's `sandbox` (which withholds `allow-scripts`). `object-src`,
- * `frame-src`, `connect-src` and `form-action` stay locked down too, so the
- * untrusted markup can style itself but cannot execute, embed, phone home or
- * submit anything.
+ * `connect-src` and `form-action` stay locked down too, so the untrusted
+ * markup can style itself but cannot execute, embed, phone home or submit
+ * anything.
+ *
+ * Framing is `'self'` both ways (`frame-src` and `frame-ancestors`), not
+ * `'none'`, since 2026-10-29: Compare reports shows two reports side by side,
+ * each one of Axcess's own pages in an `<iframe>` (routes/CompareReports.tsx in
+ * the web app). Only Axcess's own origin may frame Axcess, so a page from any
+ * other origin still cannot frame it, and clickjacking from other sites stays
+ * blocked. Axcess may frame only its own pages, so a scanned site still cannot
+ * be framed by the app.
+ *
+ * The Page inspector stays safe with `frame-src 'self'`. Its `srcdoc` frame
+ * carries `sandbox="allow-same-origin"`, without `allow-scripts`
+ * (src/audit/web/frontend/src/routes/Inspector.tsx). A frame nested in a
+ * sandboxed frame inherits its sandbox, so if captured markup holds an
+ * `<iframe>` that loads an Axcess page (the one origin `'self'` now admits),
+ * that page cannot run any script: it shows only the app's static HTML,
+ * an empty page, and does nothing. Relative frame addresses in a capture resolve against the scanned
+ * site through its `<base href>`, another origin, which `frame-src` refuses.
  */
 function contentSecurityPolicy() {
   return [
@@ -59,13 +76,14 @@ function contentSecurityPolicy() {
     "font-src 'self' data: http: https:",
     "connect-src 'self'",
     "object-src 'none'",
-    // A `srcdoc` frame is not subject to frame-src, so the inspector still
-    // works while URL-based framing stays blocked.
-    "frame-src 'none'",
+    // Compare reports frames Axcess's own pages (see above). A `srcdoc`
+    // frame is not subject to frame-src, so the inspector works either way.
+    "frame-src 'self'",
     // Must admit the scanned page's origin for the inspector's <base href>.
     "base-uri 'self' http: https:",
     "form-action 'self'",
-    "frame-ancestors 'none'",
+    // Only Axcess's own Compare reports page may frame Axcess.
+    "frame-ancestors 'self'",
   ].join("; ");
 }
 

@@ -339,9 +339,9 @@ async def test_compare_scans_keyboard_filters_trend_and_axe(
     await page.route(
         f"**/api/scans/{scan_id}/history", lambda route: route.fulfill(json=_history(scan_id))
     )
-    await page.goto(f"{base}/app/scans/{scan_id}/compare", wait_until="networkidle")
+    await page.goto(f"{base}/app/scans/{scan_id}/compare/changes", wait_until="networkidle")
     await playwright_async.expect(
-        page.get_by_role("heading", name="Compare reports", exact=True)
+        page.get_by_role("heading", name="What changed", exact=True)
     ).to_be_visible()
     await playwright_async.expect(
         page.get_by_role("navigation", name="Report views").get_by_role(
@@ -423,7 +423,7 @@ async def test_compare_scans_keyboard_filters_trend_and_axe(
     ).to_be_visible()
     await playwright_async.expect(
         page.get_by_role("link", name="Compare with this report")
-    ).to_have_attribute("href", f"/app/scans/{scan_id}/compare?compare_to=98")
+    ).to_have_attribute("href", f"/app/scans/{scan_id}/compare/changes?compare_to=98")
     await page.get_by_role("button", name="Close report #98 details").focus()
     await page.keyboard.press("Enter")
     await playwright_async.expect(point).to_be_focused()
@@ -479,7 +479,9 @@ async def test_compare_scans_keyboard_filters_trend_and_axe(
     await link.focus()
     await page.keyboard.press("Enter")
     await page.wait_for_url(
-        re.compile(rf"/app/scans/{scan_id}/issues/alfa%3Ar69%3Afailed\?.*origin=Compare")
+        re.compile(
+            rf"/app/scans/{scan_id}/issues/alfa%3Ar69%3Afailed\?.*origin=What(?:\+|%20)changed"
+        )
     )
 
 
@@ -1207,7 +1209,7 @@ async def test_actual_comparison_links_reach_the_issue(
     width: int,
     new_page: Any,
 ) -> None:
-    """Follow the real service's issue URL from Compare reports, and the way back."""
+    """Follow the real service's issue URL from What changed, and the way back."""
     db_path, _, old = seeded_db
     base, _ = live_server
     with sqlite3.connect(db_path) as conn:
@@ -1251,7 +1253,7 @@ async def test_actual_comparison_links_reach_the_issue(
     assert row["category"] == "changed"
     target = row["after"]["evidence"][0]["url"]
     assert "#finding-" in target
-    await page.goto(f"{base}/app/scans/{new}/compare", wait_until="networkidle")
+    await page.goto(f"{base}/app/scans/{new}/compare/changes", wait_until="networkidle")
     coverage = page.get_by_role("button", name=re.compile(r"^What was checked in each report"))
     await coverage.focus()
     await page.keyboard.press("Enter")
@@ -1274,19 +1276,23 @@ async def test_actual_comparison_links_reach_the_issue(
     ).to_have_count(0)
     await playwright_async.expect(
         page.get_by_role("navigation", name="Breadcrumb").filter(visible=True)
-    ).to_contain_text("Compare reports")
+    ).to_contain_text("What changed")
     items = await _breadcrumb(page)
     if width < 640:
         # On a phone only the step up shows: back to the comparison.
-        assert [item["text"] for item in items] == ["Back to Compare reports"], items
-        assert items[0]["link"] and items[0]["link"].startswith(f"/app/scans/{new}/compare"), items
+        assert [item["text"] for item in items] == ["Back to What changed"], items
+        assert items[0]["link"] and items[0]["link"].startswith(
+            f"/app/scans/{new}/compare/changes"
+        ), items
     else:
         assert [item["text"] for item in items][:3] == [
             "Reports",
             f"example.com Report #{new}",
-            "Compare reports",
+            "What changed",
         ], items
-        assert items[2]["link"] and items[2]["link"].startswith(f"/app/scans/{new}/compare"), items
+        assert items[2]["link"] and items[2]["link"].startswith(
+            f"/app/scans/{new}/compare/changes"
+        ), items
         _assert_current_is_plain_text(items)
 
 

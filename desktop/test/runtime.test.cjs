@@ -72,10 +72,12 @@ test("relaxing the inspector's styling does not loosen script execution", () => 
   // execute, embed, call out or submit.
   assert.deepEqual(directive("script-src"), ["'self'"]);
   assert.deepEqual(directive("object-src"), ["'none'"]);
-  assert.deepEqual(directive("frame-src"), ["'none'"]);
+  // Axcess frames only its own pages (Compare reports), never a scanned site.
+  assert.deepEqual(directive("frame-src"), ["'self'"]);
   assert.deepEqual(directive("connect-src"), ["'self'"]);
   assert.deepEqual(directive("form-action"), ["'self'"]);
-  assert.deepEqual(directive("frame-ancestors"), ["'none'"]);
+  // Only Axcess may frame Axcess: other sites still cannot (clickjacking).
+  assert.deepEqual(directive("frame-ancestors"), ["'self'"]);
   assert.deepEqual(directive("default-src"), ["'self'"]);
   assert.ok(!contentSecurityPolicy().includes("unsafe-eval"));
 });

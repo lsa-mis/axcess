@@ -29,8 +29,17 @@ const isChange = (value: string | null): value is ComparisonChange =>
   (CHANGES as string[]).includes(value ?? "");
 
 /**
- * Compare reports: what changed between this report and an earlier scan of the
+ * What changed: what changed between this report and an earlier scan of the
  * same site, and how the site has trended across every completed scan.
+ *
+ * Its address is `/scans/:id/compare/changes?compare_to=N`. It was Compare
+ * reports, at `/scans/:id/compare`, until 2026-10-29; that address is now the
+ * side-by-side page (routes/CompareReports.tsx), whose "See what changed
+ * between these reports" link opens this one. Its own name, "What changed",
+ * keeps two pages from sharing one heading and one document title (SC 2.4.2
+ * Page Titled, Level A; SC 2.4.6 Headings and Labels, Level AA). It stays
+ * under the Compare reports tab: it is part of comparing. Its links that
+ * choose another pair stay on this address.
  *
  * The page reads top down: which two scans, how many kinds of issues are new,
  * resolved or remaining (each a filter for the table), the coverage notes,
@@ -108,7 +117,7 @@ export default function CompareRoute() {
     return sortRows(filtered, sort);
   }, [data, change, q, sort]);
 
-  const backTo = `/scans/${id}/compare${params.toString() ? `?${params.toString()}` : ""}`;
+  const backTo = `/scans/${id}/compare/changes${params.toString() ? `?${params.toString()}` : ""}`;
   const history = historyQuery.data;
   const error = scanQuery.error ?? comparisonQuery.error;
 
@@ -118,7 +127,7 @@ export default function CompareRoute() {
         tabs
         scanId={id}
         previousScanId={scanQuery.data?.previous_scan_id ?? null}
-        title="Compare reports"
+        title="What changed"
         meta="What changed since an earlier report of this site: which kinds of issues are new, still found, or no longer found. The trend shows how the site changed over time."
         actions={
           <Button type="button" onClick={() => setTermsOpen(true)} className="rounded-full">
@@ -271,7 +280,7 @@ function Comparison({
           Choose a number to filter the table.
         </p>
         {previousId !== null && previousId !== baseline.id && (
-          <Link className="report-link" to={`/scans/${data.current.id}/compare?compare_to=${previousId}`}>
+          <Link className="report-link" to={`/scans/${data.current.id}/compare/changes?compare_to=${previousId}`}>
             Compare with the previous report (Report #{previousId}) instead
           </Link>
         )}

@@ -31,6 +31,7 @@ const VIEWS: Array<[RegExp, string]> = [
   [/^\/scans\/\d+\/issues\/[^/]+\/?$/, "Issue evidence"],
   [/^\/scans\/\d+\/issues\/?$/, "Issues"],
   [/^\/scans\/\d+\/compare\/?$/, "Compare reports"],
+  [/^\/scans\/\d+\/compare\/changes\/?$/, "What changed"],
   [/^\/scans\/\d+\/pages\/\d+\/inspect\/?$/, "Page inspector"],
   [/^\/scans\/\d+\/pages\/\d+\/?$/, "Page details"],
   [/^\/scans\/\d+\/findings\/grouped\/?$/, "Images, grouped by kind of issue"],

@@ -326,14 +326,16 @@ function CompareLink({
  * A comparison belongs to the later report and takes the earlier one as its
  * baseline. "Later" is the trend's own order (start time, as the server
  * orders a baseline); ids only decide when this report is outside the window.
+ * It stays on What changed, the page this chart is on (routes/Compare.tsx),
+ * not the side-by-side Compare reports page.
  */
 function compareHref(point: SiteHistoryPoint, currentId: number, points: SiteHistoryPoint[]): string {
   const at = points.findIndex((p) => p.id === point.id);
   const current = points.findIndex((p) => p.id === currentId);
   const earlier = current >= 0 ? at < current : point.id < currentId;
   return earlier
-    ? `/scans/${currentId}/compare?compare_to=${point.id}`
-    : `/scans/${point.id}/compare?compare_to=${currentId}`;
+    ? `/scans/${currentId}/compare/changes?compare_to=${point.id}`
+    : `/scans/${point.id}/compare/changes?compare_to=${currentId}`;
 }
 
 function HistoryTable({

@@ -135,6 +135,22 @@ clicks it. In the packaged desktop app the Electron shell hands
 http(s) links to the system browser rather than opening a window
 inside the app; see [Desktop app](./desktop-app.md).
 
+### Framing headers behind a proxy
+
+**Compare reports** shows two reports side by side. Each side is one of
+Axcess's own pages in a frame (an `<iframe>`) from the same address. The
+server sends no header that limits framing. If you put Axcess behind a
+reverse proxy, the proxy must let Axcess frame its own pages:
+
+* do not send `X-Frame-Options: DENY`; send `SAMEORIGIN`, or nothing;
+* do not send `Content-Security-Policy: frame-ancestors 'none'`; use
+  `frame-ancestors 'self'`, or leave it out.
+
+With `DENY` or `'none'`, both sides of Compare reports stay blank. The
+rest of the app still works. `SAMEORIGIN` and `'self'` still stop other
+websites from framing Axcess. The desktop app sets its own policy, with
+`frame-ancestors 'self'`.
+
 ## Protected authenticated scans are a separate deployment
 
 The LAN/Tailscale and shared-token setup above is for **public scans only**.

@@ -406,9 +406,10 @@ sign-in window first, Axcess keeps your sign-in in memory for 30 minutes.
 
 ### Rescan comparison
 
-Two reports of the same [scope](#scope) lined up on a report's **Compare
-reports** view, with each [kind of issue](#kind-of-issue) marked New, No longer
-found, or Still found. No longer found means only that the later scan did not
+Two reports of the same [scope](#scope) lined up on the **What changed**
+page, with each [kind of issue](#kind-of-issue) marked New, No longer found,
+or Still found. A report's **Compare reports** view shows the two reports
+side by side and links to it. No longer found means only that the later scan did not
 find that kind of issue again. It is not proof of a fix, so check the page
 yourself before you mark its occurrences Fixed.
 

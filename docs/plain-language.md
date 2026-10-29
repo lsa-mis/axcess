@@ -88,6 +88,8 @@ Use the word in the first column, and never the words in the last.
 | element code (HTML) | The code of one flagged element. | snippet, outerHTML, markup |
 | element locator (CSS selector) | The text that finds an element in the page code. | selector (alone) |
 | element locator (XPath) | The path that finds an element in the page code, as the rule check (Alfa) records it. | selector, path (alone) |
+| panel | One of the two reports on Compare reports, each in its own frame: "Go back in the report #24 panel". Never "left" or "right": on a narrow screen the panels are one above the other. | pane, side, left, right |
+| What changed | The page that lists what is new, still found and no longer found between two reports. | Compare reports (for this page), diff, verify changes |
 | Does not apply | A table cell with no value for this row. | n/a |
 
 ### Why "occurrence" and "kind of issue"

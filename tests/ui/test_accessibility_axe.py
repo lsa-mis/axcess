@@ -1018,6 +1018,7 @@ async def test_every_spa_route_has_an_accurate_document_title(
         (f"/app/scans/{scan_id}/a11y", "Rule check issues by WCAG criterion"),
         (f"/app/scans/{scan_id}/a11y/by-rule", "Rule check issues by rule"),
         (f"/app/scans/{scan_id}/compare", "Compare reports"),
+        (f"/app/scans/{scan_id}/compare/changes", "What changed"),
         ("/app/findings/1", "Image details"),
         ("/app/tracking", "Product roadmap"),
         ("/app/about", "About"),

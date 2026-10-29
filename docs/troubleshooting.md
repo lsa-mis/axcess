@@ -101,19 +101,25 @@ continues without those checks.
 
 ## Compare reports has nothing to compare, or shows a surprise
 
-A [rescan comparison](./glossary.md#rescan-comparison) lives on a report's
-**Compare reports** view. It compares the report with the latest earlier
-completed report of the same start address.
+A report's **Compare reports** view shows it beside the latest earlier
+completed report of the same start address, each in its own panel. The
+[rescan comparison](./glossary.md#rescan-comparison) itself, what is new,
+still found or no longer found, is on **What changed**: choose **See what
+changed between these reports** on Compare reports.
 
 - **Nothing to compare.** The two start addresses must match. Letter case in
   the host name and a missing trailing slash don't matter, but
   `www.example.edu` and `example.edu`, or two different ports, count as
   different sites. Start the new scan from the same address as the old one.
-- **The wrong earlier report.** Select the earlier scan in **Trend over
-  time** (or in its data table) and choose **Compare with this report**, or
-  add `?compare_to=<earlier report id>` to the Compare reports address
-  (`/app/scans/<new id>/compare`). Both reports must be completed and share
-  a start address. Old `/diff` links still open the same comparison.
+- **The wrong earlier report.** On Compare reports, choose another report
+  in the panel's **Report** list, then **Show this report**. On What
+  changed, select the earlier scan in **Trend over time** (or in its data
+  table) and choose **Compare with this report**, or add
+  `?compare_to=<earlier report id>` to the address
+  (`/app/scans/<new id>/compare/changes`). Both reports must be completed
+  and share a start address. Old `/diff` links open What changed.
+- **A panel of Compare reports is blank.** Behind a reverse proxy, the
+  proxy may block frames. See [Hosting](./hosting.md#framing-headers-behind-a-proxy).
 - **The command-line image diff.** `audit crawl` picks the earlier scan for
   its image findings by itself, and ignores the port on `localhost` addresses.
   To choose it yourself, pass `--compare-to <id>` to `audit crawl` or

@@ -15,6 +15,7 @@ import {
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "../lib/cn";
 import { FEEDBACK_FORM_URL } from "../lib/scanCopy";
+import { FRAMED, reportPaneLocation } from "../lib/framed";
 import { Button, LinkButton } from "./ui";
 import BrandMark from "./BrandMark";
 import CommandPalette from "./CommandPalette";
@@ -84,9 +85,24 @@ function isTyping(target: EventTarget | null): boolean {
  * App shell: UMich-Blue sidebar with Maize accent for the active item, the
  * single global "New scan" CTA, search and feedback; topbar with the
  * breadcrumb; skip-link for a11y, main content area.
+ *
+ * **As a panel of Compare reports** (`FRAMED`, lib/framed.ts) the shell draws
+ * only the main content: no sidebar, no top bar, no skip link. Two panels sit
+ * side by side, each about 460 px wide on a 1280 px screen, and a sidebar and
+ * a top bar in each would repeat the outer page's own, twice, in the room the
+ * report needs (W3C COGA, "Making Content Usable",
+ * https://www.w3.org/TR/coga-usable/: keep the page simple; no duplicate
+ * controls for one function). The skip link goes with them: it skips blocks
+ * repeated on every page (SC 2.4.1 Bypass Blocks, Level A), and without them
+ * nothing comes before the main content. The `<main>` landmark stays, so a
+ * screen reader user still lands on the page's content and its one `<h1>`.
+ * The keyboard shortcuts are off in a panel too: they belong to the whole
+ * window (search everything, the sidebar, the places), and inside a panel they
+ * would act on that panel alone. Rejected: keeping the top bar for its trail,
+ * as a way back; each panel has its own "Go back" on the outer page instead.
  */
 export default function AppShell({ children }: { children: ReactNode }) {
-  const { pathname } = useLocation();
+  const { pathname, search, key } = useLocation();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const closeMobileNav = useCallback(() => setMobileNavOpen(false), []);
   const prefs = usePreferences();
@@ -116,7 +132,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   // and "?" lists them. All of it can be turned off in Settings, for readers
   // whose assistive tech wants the keys.
   useEffect(() => {
-    if (!shortcutsOn) return;
+    if (!shortcutsOn || FRAMED) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && (event.key === "k" || event.key === "K")) {
         event.preventDefault();
@@ -167,9 +183,13 @@ export default function AppShell({ children }: { children: ReactNode }) {
       // took the sidebar brand and the topbar with it. Every navigation
       // nudged the page down by the height of the chrome. Focus still moves
       // for screen-reader and keyboard users; the viewport just stays put.
-      window.requestAnimationFrame(() =>
-        document.getElementById("main")?.focus({ preventScroll: true }),
-      );
+      // In a panel, only while the panel has focus: its "Go back" button is
+      // on the outer page, and a reader pressing it again and again must
+      // keep focus there, not be pulled into the panel each time.
+      window.requestAnimationFrame(() => {
+        if (FRAMED && !document.hasFocus()) return;
+        document.getElementById("main")?.focus({ preventScroll: true });
+      });
       previousPath.current = pathname;
     }
   }, [pathname, routeLabel]);
@@ -181,6 +201,10 @@ export default function AppShell({ children }: { children: ReactNode }) {
   // depend on whether anyone was watching it load.
   useScrollRestoration();
 
+  // As a panel, tell Compare reports where this panel is after every change,
+  // a filter or a search included (lib/framed.ts). Nothing outside a panel.
+  useEffect(() => reportPaneLocation(routeLabel), [pathname, search, key, routeLabel]);
+
   // While Search is open, everything behind it is `inert`: it cannot take
   // focus, be clicked or be read, as behind a native modal <dialog>. Search
   // only said it was modal (aria-modal), so the page behind could still take
@@ -191,6 +215,20 @@ export default function AppShell({ children }: { children: ReactNode }) {
   // `inert` is the HTML that means "not now". WAI-ARIA APG Dialog (Modal)
   // pattern, https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/ (content
   // outside the dialog is inert); SC 2.4.3 Focus Order, Level A.
+  if (FRAMED) {
+    // A panel: the page alone (see the comment on this component).
+    return (
+      <div className="min-h-screen bg-surface-subtle">
+        <div className="sr-only" aria-live="polite">
+          {routeLabel} page loaded
+        </div>
+        <main id="main" tabIndex={-1} className="min-w-0 px-4 py-5 sm:px-6">
+          <div className="mx-auto min-w-0 max-w-[1440px]">{children}</div>
+        </main>
+        <PreferenceEffects />
+      </div>
+    );
+  }
   return (
     <div className="min-h-screen bg-surface-subtle">
       <a
@@ -797,6 +835,7 @@ function routeTitle(pathname: string): string {
     [/^\/scans\/\d+\/a11y\/by-rule\/?$/, "Rule check issues by rule"],
     [/^\/scans\/\d+\/a11y\/?$/, "Rule check issues by WCAG criterion"],
     [/^\/scans\/\d+\/compare\/?$/, "Compare reports"],
+    [/^\/scans\/\d+\/compare\/changes\/?$/, "What changed"],
     // Only running and failed scans render here; a completed report
     // redirects to its issue table.
     [/^\/scans\/\d+\/?$/, "Scan status"],

@@ -1,8 +1,12 @@
 import { useLocation } from "react-router";
 import Tabs from "./Tabs";
+import { FRAMED } from "../lib/framed";
 
 /**
- * Report navigation: the issue table, and the comparison with earlier scans.
+ * Report navigation: the issue table, and Compare reports, which shows this
+ * report and another of the site side by side. (What changed between the
+ * two, the older comparison page, opens from Compare reports and keeps this
+ * tab lit: it is part of that view.)
  *
  * These are two *views of the same report*, not two steps of a task. An
  * early numbered-pill treatment read as a wizard ("1 Overview → 2 Issues →
@@ -32,7 +36,12 @@ export interface ReportView {
   available?: (previousScanId: number | null) => boolean;
 }
 
-/** In tab order. The first is the report's landing view. */
+/**
+ * In tab order. The first is the report's landing view.
+ *
+ * Compare reports opens with the report before this one, the comparison a
+ * reader most often wants; its pickers change either side.
+ */
 export const REPORT_VIEWS: readonly ReportView[] = [
   {
     key: "issues",
@@ -66,9 +75,14 @@ export default function ReportWorkspaceNav({
 }) {
   const { pathname } = useLocation();
   const active = activeReportView(pathname);
-  // The current view stays, so a saved link to it still has its tab.
+  // The current view stays, so a saved link to it still has its tab. As a
+  // panel of Compare reports (lib/framed.ts) there is no Compare reports tab:
+  // it would open the comparison inside one of its own panels. With Issues
+  // alone left, the row is not drawn at all (below).
   const views = REPORT_VIEWS.filter(
-    (view) => view === active || (view.available?.(previousScanId) ?? true),
+    (view) =>
+      !(FRAMED && view.key === "compare") &&
+      (view === active || (view.available?.(previousScanId) ?? true)),
   );
   // One view is not a choice; the heading already names it.
   if (views.length < 2) return null;

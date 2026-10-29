@@ -13,6 +13,12 @@ merge.
 - Reports: each completed scan of an opened site has **Compare with**,
   a short list of the site's other completed reports. Choosing one opens
   Compare reports for the two, without opening a report first.
+- **Compare reports** shows two reports side by side, each in its own
+  panel. Each panel is the report's Issues page, and works like its own
+  browser tab: open an issue, filter or search, and **Go back**, while the
+  other panel stays as it is. A **Report** list above each panel, with
+  **Show this report**, changes that panel's report. The panels sit side by
+  side on a wide screen and one above the other on a narrow one.
 - Reports and Issues say which check found what. On Reports, a **Rule
   check** column shows whether each scan ran axe, Alfa or both; on the
   Issues page, a **Check** column names the check behind each kind of
@@ -66,6 +72,13 @@ merge.
 
 ### Changed
 
+- The comparison table (new, still found and no longer found kinds of
+  issues, and the trend) is now its own page, **What changed**, at
+  `/scans/<id>/compare/changes`. Compare reports links to it with **See
+  what changed between these reports**. Old "Verify changes" (`/diff`)
+  links open What changed. The desktop app now lets Axcess show its own
+  pages in a frame, for Compare reports; other websites still cannot frame
+  it.
 - Each place a problem appears is called an **occurrence** again, not an
   issue, everywhere you see or hear it: "Occurrences found" over the
   Issues table, the **Occurrences** column on Reports and in the Issues

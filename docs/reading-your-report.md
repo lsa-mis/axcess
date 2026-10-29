@@ -322,9 +322,21 @@ draft. The command-line `audit export` adds no draft label.
 ## Compare reports after a fix
 
 After you publish fixes, scan the same site again with the same checks.
-**Compare reports** compares this report with the latest earlier completed
-report for the same start address. It marks each
-[kind of issue](glossary.md#kind-of-issue), not each occurrence, as one of these:
+**Compare reports** shows this report beside the latest earlier completed
+report for the same start address, each in its own panel:
+
+- Each panel is that report's Issues page, and works on its own. Open an
+  issue, filter, or search in one panel, and the other stays as it is.
+- **Go back**, above a panel, steps back in that panel only. The browser's
+  Back button undoes a change of report instead.
+- To show a different report in a panel, choose it in the panel's
+  **Report** list, then choose **Show this report**. A report cannot be in
+  both panels.
+- Wide screens show the panels side by side. Narrow screens show them one
+  above the other.
+
+**See what changed between these reports** opens **What changed**. It marks
+each [kind of issue](glossary.md#kind-of-issue), not each occurrence, as one of these:
 
 | Change | What it means |
 | --- | --- |
@@ -332,7 +344,7 @@ report for the same start address. It marks each
 | No longer found | Found in the earlier report but not found again in this one. That is not proof of a fix. Check the page yourself before you mark its occurrences Fixed. |
 | Still found | Found in both reports. Its number of occurrences can still go up or down. |
 
-The page opens with **Trend over time**, which plots every completed scan of
+What changed opens with **Trend over time**, which plots every completed scan of
 the site. Select a point in the trend, or use **Show as data table**, to open
 that scan's issues or compare it with this report. Below it are the three
 numbers; each is also a filter for the table under them. The table has one
@@ -359,7 +371,7 @@ Progress Over Perfection: each barrier you fix helps someone use the site today.
    [root cause](glossary.md#root-cause), so look for one template or component
    behind a kind of issue on many pages, and route the fix to whoever owns
    it.
-4. **Rescan** and check your work in **Compare reports**.
+4. **Rescan** and check your work in **Compare reports** and **What changed**.
 
 ## Delete a report
 
