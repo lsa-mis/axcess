@@ -63,7 +63,10 @@ async def test_a_table_that_fits_has_no_tab_stop(new_page: Any) -> None:
 async def test_keyboard_focus_shows_the_top_of_a_scrolling_table(new_page: Any) -> None:
     if not (DIST / "index.html").exists():
         pytest.skip("Build the frontend first")
-    page = await _open(new_page, 320, 480, 10)
+    # 420 tall, so the table starts below the window: it sits higher since
+    # the sentence over it was removed (user testing, 2026-10-28).
+    height = 420
+    page = await _open(new_page, 320, height, 10)
     try:
         region = page.get_by_role("region", name="Public reports table")
         # Wider than a phone: it scrolls sideways, so it takes a tab stop.
@@ -71,7 +74,7 @@ async def test_keyboard_focus_shows_the_top_of_a_scrolling_table(new_page: Any) 
         # Out of view below the window, as when a reader tabs to it from above.
         await page.evaluate("window.scrollTo(0, 0)")
         top = await region.evaluate("(el) => el.getBoundingClientRect().top")
-        assert top > 480, top
+        assert top > height, top
         await page.keyboard.press("Shift")  # keyboard modality, so focus is :focus-visible
         await region.evaluate("(el) => el.focus({ focusVisible: true })")
         await playwright_async.expect(region).to_be_focused()
@@ -80,6 +83,6 @@ async def test_keyboard_focus_shows_the_top_of_a_scrolling_table(new_page: Any) 
         # the middle of the table.
         assert TOPBAR <= top <= TOPBAR + 32, top
         header = await region.locator("thead").evaluate("(el) => el.getBoundingClientRect().top")
-        assert header < 480, header
+        assert header < height, header
     finally:
         await page.context.close()
