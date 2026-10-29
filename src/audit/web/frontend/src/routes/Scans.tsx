@@ -1,6 +1,6 @@
 import { Link, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, ListChecks, PlusCircle, Trash2 } from "lucide-react";
+import { ChevronRight, PlusCircle, Trash2 } from "lucide-react";
 import { memo, useCallback, useMemo, useState } from "react";
 import { api } from "../api/client";
 import {
@@ -63,8 +63,8 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  * scans never reach the row; they are listed, with every other scan, when
  * the site is expanded.
  *
- * Expanding a site lists all of its scans with the per-report actions
- * (All issues, Delete) the flat list used to carry.
+ * Expanding a site lists all of its scans, each a link to its report, with
+ * the per-report action (Delete) the flat list used to carry.
  *
  * Why the table looks the way it does (keep these when you change it):
  *
@@ -184,8 +184,8 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  *   scrolls the table sideways to Actions.
  * - Actions shows both of a site's actions as links, side by side: "Open
  *   latest scan", then "Scan again". Both are always visible and one click
- *   away, laid out like "All issues" and "Delete" in the expanded list of
- *   scans below, so the two tables share one pattern (W3C COGA: the same
+ *   away, laid out side by side as the scan rows' actions are, so the
+ *   site rows and scan rows share one pattern (W3C COGA: the same
  *   pattern for the same kind of thing). Stacking them was built and set
  *   aside for this; the dropped columns left the room.
  *   A row "Actions" dropdown holding the two links was built first and
@@ -774,13 +774,26 @@ function ScanRow({ id, scan, first, last }: { id: string; scan: ScanSummary; fir
     <tr id={id} className={OPEN_SITE_SHADE}>
       {/* Indented so "Report #" lines up under the site's name, past the
           chevron: the rows read as the site's own (W3C COGA, "Making
-          Content Usable": group related content). */}
+          Content Usable": group related content).
+
+          "Report #N" is the one way into a scan's report. A completed scan
+          goes straight to its Issues page; any other goes to its scan page,
+          which says why it did not finish and offers "Review what the scan
+          found" when pages were saved (ScanDetail). An "All issues" link
+          sat in Actions until user testing (2026-10-29): for a completed
+          scan it opened the same page as this link, two controls for one
+          job (W3C COGA, "Making Content Usable": one way to do one thing).
+          The visible words stay "Report #N", the place it goes, as an
+          image is "Image #12" (docs/plain-language.md rule 8); "Open" is
+          screen-reader-only. Shown, "Open" would be repeated down the
+          column and read with every cell of the row, since this is the
+          row's header. */}
       <RowHeader
         sticky
         className={cn("whitespace-nowrap py-1 pl-14 text-xs font-normal tabular-nums text-fg-muted", piece("start"))}
       >
         <Link
-          to={`/scans/${scan.id}`}
+          to={scan.status === "completed" ? `/scans/${scan.id}/issues` : `/scans/${scan.id}`}
           className="report-link inline-flex min-h-target items-center px-1 font-semibold"
           title={withoutUserinfo(scan.seed_url)}
         >
@@ -809,15 +822,6 @@ function ScanRow({ id, scan, first, last }: { id: string; scan: ScanSummary; fir
         {/* Default `md` size (44px tall): destructive controls in
             particular must be a real target (SC 2.5.5). */}
         <div className="flex items-center justify-center gap-2">
-          <LinkButton
-            to={`/scans/${scan.id}/issues`}
-            variant="ghost"
-            className="report-link"
-            aria-label={`All issues for Report #${scan.id}`}
-          >
-            <ListChecks className="h-4 w-4" aria-hidden />
-            All issues
-          </LinkButton>
           <DeleteScanButton scan={scan} />
         </div>
       </Cell>

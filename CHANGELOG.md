@@ -82,6 +82,8 @@ merge.
   under the table, and the lines under "Occurrences found" and "Kinds of
   issues" are gone; what the two numbers count is now explained in what
   the labels mean.
+- Reports: a scan's **Report #** link is now the one way into its report;
+  the **All issues** link beside it, which opened the same page, is gone.
 - Reports remembers which sites you opened, and the order, until you
   close the tab: going to another page and back through **Reports** in
   the menu no longer closes them.

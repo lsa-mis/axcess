@@ -326,7 +326,19 @@ async def test_reports_table_keyboard_and_columns(
     await playwright_async.expect(search).to_have_value("")
     await playwright_async.expect(site_rows).to_have_count(min(10, site_count))
 
-    link = table.get_by_role("link", name=f"All issues for Report #{headline_id}")
+    # The report number is the one way into a scan: a completed scan's goes
+    # straight to its Issues page, and no "All issues" link repeats it.
+    await playwright_async.expect(
+        table.get_by_role("link", name=re.compile(r"^All issues"))
+    ).to_have_count(0)
+    link = table.get_by_role("link", name=f"Open Report #{headline_id}", exact=True)
+    await playwright_async.expect(link).to_have_attribute(
+        "href", f"/app/scans/{headline_id}/issues"
+    )
+    stopped_link = table.get_by_role("link", name=f"Open Report #{headline_id + 1}", exact=True)
+    await playwright_async.expect(stopped_link).to_have_attribute(
+        "href", f"/app/scans/{headline_id + 1}"
+    )
     await link.focus()
     await playwright_async.expect(link).to_be_focused()
     await page.keyboard.press("Enter")
