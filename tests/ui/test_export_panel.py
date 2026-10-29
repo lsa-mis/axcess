@@ -23,7 +23,7 @@ expect = playwright_async.expect
 _FORMATS = (
     "Kinds of issues with fixes (Excel)",
     "Written report (Markdown)",
-    "Issue list (CSV)",
+    "Occurrence list (CSV)",
     "All report data (JSON)",
 )
 
@@ -85,7 +85,7 @@ async def test_arrow_keys_move_between_downloads(
     await page.keyboard.press("End")
     await expect(link("All report data (JSON)")).to_be_focused()
     await page.keyboard.press("ArrowUp")
-    await expect(link("Issue list (CSV)")).to_be_focused()
+    await expect(link("Occurrence list (CSV)")).to_be_focused()
     await page.keyboard.press("Home")
     await expect(link("Kinds of issues with fixes (Excel)")).to_be_focused()
     await page.keyboard.press("Escape")
@@ -133,7 +133,7 @@ async def test_a_failed_download_is_reported_in_words(
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
     await page.get_by_role("button", name="Export").click()
 
-    table = page.get_by_role("link", name="Issue list (CSV)", exact=True)
+    table = page.get_by_role("link", name="Occurrence list (CSV)", exact=True)
     await table.click()
 
     await expect(table).to_contain_text(
@@ -141,7 +141,7 @@ async def test_a_failed_download_is_reported_in_words(
     )
     announcement = page.get_by_role("status").filter(has_text="could not download")
     await expect(announcement).to_have_text(
-        "Axcess could not download \u201cIssue list (CSV)\u201d. Export renderer crashed."
+        "Axcess could not download \u201cOccurrence list (CSV)\u201d. Export renderer crashed."
     )
     assert downloads == []
 

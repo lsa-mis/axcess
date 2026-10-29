@@ -470,14 +470,18 @@ type SortColumn = (typeof COLUMNS)[number];
  * interface word (docs/plain-language.md) and every value answers that
  * question (see FINDING_TYPE_LABELS in lib/labels.ts).
  *
- * "Issue" reads "Kind of issue" and "Occurrences" reads "Issues": an issue
- * is one place a problem shows up, and a row gathers every place one check
- * found for one reason. Until 2026-10-26 the row was "an issue" and each
- * place "an occurrence"; the developer changed the terms that day, because
- * people called each place an issue and "occurrence" is an advanced word.
- * The research is in docs/plain-language.md, "Why "issue" and "kind of
- * issue"" (W3C COGA, "Making Content Usable",
- * https://www.w3.org/TR/coga-usable/: use common words).
+ * "Issue" reads "Kind of issue": a row gathers every place one check found
+ * for one reason. "Occurrences" counts those places: an occurrence is one
+ * place a problem shows up, and the column's hint says so (ISSUE_COLUMN_HELP,
+ * lib/labels.ts). Until 2026-10-26 the row was "an issue"; that day the
+ * developer made the row "a kind of issue" and each place "an issue",
+ * because people called each place an issue and "occurrence" is an
+ * advanced word. On 2026-10-28 user testing with Siteimprove users, who
+ * know Siteimprove's "issues" and "occurrences", led the developer to bring
+ * back "Occurrences" for the places; the row stays "Kind of issue". The
+ * research and the reason are in docs/plain-language.md, "Why "occurrence"
+ * and "kind of issue"" (W3C COGA, "Making Content Usable",
+ * https://www.w3.org/TR/coga-usable/: the same word for the same thing).
  */
 const COLUMN_LABEL: Record<SortColumn, string> = {
   Issue: "Kind of issue",
@@ -496,7 +500,7 @@ const COLUMN_LABEL: Record<SortColumn, string> = {
   WCAG: "WCAG",
   Priority: "Priority",
   Pages: "Pages",
-  Occurrences: "Issues",
+  Occurrences: "Occurrences",
   Difficulty: "Difficulty",
   Responsibility: "Who fixes it",
 };
@@ -1032,7 +1036,7 @@ function FindingTypeViewLink({
       : {
           to: `/scans/${scanId}/a11y`,
           label: "Rule check issues by WCAG criterion",
-          note: "Every issue from the rule checks (axe and Alfa), grouped by WCAG criterion, with its page and element.",
+          note: "Every occurrence from the rule checks (axe and Alfa), grouped by WCAG criterion, with its page and element.",
         };
   return (
     <p className="flex flex-wrap items-center gap-x-2 border-b border-border px-3 py-1 text-xs text-fg-muted">

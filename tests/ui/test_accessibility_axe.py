@@ -429,7 +429,7 @@ async def test_issue_card_answers_what_why_fix_and_where(
             "WCAG",
             "Priority",
             "Pages",
-            "Issues",
+            "Occurrences",
         ]
     )
     # Hidden for now (HIDDEN_ISSUE_FIELDS in the SPA); the data still exports.
@@ -484,7 +484,7 @@ async def test_issue_table_fits_the_default_desktop_width(
     issues = page.get_by_role("table", name="Kinds of accessibility issue")
     scroller = page.get_by_role("region", name="Issues table")
     # Who fixes it is hidden for now (HIDDEN_ISSUE_FIELDS), so Pages stands in.
-    for column in (None, "Kind of issue", "Issues", "Pages"):
+    for column in (None, "Kind of issue", "Occurrences", "Pages"):
         if column:
             await issues.get_by_role("button", name=column, exact=False).first.click()
         widths = await scroller.evaluate("el => ({scroll: el.scrollWidth, client: el.clientWidth})")
@@ -662,7 +662,7 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
         workspace.get_by_role("link", name="Issues", exact=True)
     ).to_have_attribute("aria-current", "page")
     await playwright_async.expect(page.get_by_role("link", name="Overview")).to_have_count(0)
-    # The summary leads with what was found: the issues (each place a
+    # The summary leads with what was found: the occurrences (each place a
     # problem appears), the kinds of issues they group into, then the pages
     # visited. Pages that could not be loaded are said in words, never as
     # "errors", which readers took for accessibility errors, and only when
@@ -670,7 +670,7 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     summary = page.locator("dl").filter(has_text="Pages visited")
     await playwright_async.expect(summary.get_by_role("term")).to_have_text(
         [
-            re.compile(r"^Issues? found$"),
+            re.compile(r"^Occurrences? found$"),
             re.compile(r"^(Kind of issue|Kinds of issues)$"),
             "Pages visited",
         ]
@@ -1548,12 +1548,12 @@ async def test_instance_screenshots_describe_the_outline_and_pass_axe(
             wait_until="networkidle",
         )
         await playwright_async.expect(
-            page.get_by_text(re.compile(r"^Issue 1 of \d+\."))
+            page.get_by_text(re.compile(r"^Occurrence 1 of \d+\."))
         ).to_have_text(re.compile(r"The outline marks where it was found\.$"))
         await playwright_async.expect(
             page.get_by_role(
                 "img",
-                name=re.compile(r"^Issue 1 on .+\. An outline marks where it was found\.$"),
+                name=re.compile(r"^Occurrence 1 on .+\. An outline marks where it was found\.$"),
             )
         ).to_be_visible()
         violations = await _run_axe(page)

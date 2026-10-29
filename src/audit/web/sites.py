@@ -62,7 +62,7 @@ class ReportCounts(BaseModel):
 
     Field names are the data's: ``issue_count`` is unified issue groups (the
     interface's "kinds of issues") and ``occurrence_count`` is every place
-    they appear (the interface's "issues").
+    they appear (the interface's "occurrences").
     """
 
     issue_count: int

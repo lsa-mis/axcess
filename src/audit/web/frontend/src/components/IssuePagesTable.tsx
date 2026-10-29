@@ -85,10 +85,10 @@ export const DEFAULT_PAGES_SORT: PagesSort = { column: "Occurrences", direction:
 const COLUMN_LABEL: Record<SortColumn, string> = {
   "Page title": "Page title",
   "Page URL": "Page URL",
-  // "Issues", not "Occurrences": each place on the page is one issue. The
-  // label changed on 2026-10-26 by the developer's decision; see
-  // docs/plain-language.md, "Why "issue" and "kind of issue"".
-  Occurrences: "Issues",
+  // "Occurrences": each place on the page is one occurrence, as in the
+  // Issues table's column. It read "Issues" from 2026-10-26 to 2026-10-28;
+  // see docs/plain-language.md, "Why "occurrence" and "kind of issue"".
+  Occurrences: "Occurrences",
   "Issue screenshots": "Screenshots",
   Status: "Status",
 };

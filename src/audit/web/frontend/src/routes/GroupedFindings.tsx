@@ -144,10 +144,12 @@ export default function GroupedFindingsRoute() {
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard label="Images" value={coverage.finding_count} />
-        {/* Issues first, then kinds of issues: the order the developer set on
-            2026-10-26 for every screen that shows both counts. Why the words
-            changed: docs/plain-language.md, "Why "issue" and "kind of issue"". */}
-        <StatCard label="Issues" value={coverage.occurrence_total} />
+        {/* Occurrences first, then kinds of issues: the order the developer
+            set on 2026-10-26 for every screen that shows both counts, kept
+            when the places went back to "occurrences" on 2026-10-28. Why
+            the words changed: docs/plain-language.md, "Why "occurrence" and
+            "kind of issue"". */}
+        <StatCard label="Occurrences" value={coverage.occurrence_total} />
         <StatCard label="Kinds of issues" value={groups.length} />
         <StatCard label="Pages scanned" value={coverage.page_count} />
       </div>
@@ -245,7 +247,7 @@ function GroupCard({
           image{group.finding_count !== 1 ? "s" : ""}
           {" · "}
           <strong className="text-fg">{group.occurrence_count}</strong>{" "}
-          issue{group.occurrence_count !== 1 ? "s" : ""}
+          occurrence{group.occurrence_count !== 1 ? "s" : ""}
         </span>
       </button>
 

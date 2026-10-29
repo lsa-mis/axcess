@@ -11,10 +11,10 @@ import { REVIEW_LANE_HELP } from "../lib/labels";
 import { REVIEW_TYPE_LABEL } from "../lib/terms";
 
 /**
- * Every page one kind of issue affects, with its issues (one per place) and
- * their screenshots: the body of the kind-of-issue page. What it is, the
+ * Every page one kind of issue affects, with its occurrences (one per place)
+ * and their screenshots: the body of the kind-of-issue page. What it is, the
  * fix and how to verify it live in ``IssueGuidanceDialog``, opened from the
- * page header, so the page itself leads with where the issues are.
+ * page header, so the page itself leads with where the occurrences are.
  */
 export default function IssueEvidence({
   scanId,
@@ -243,11 +243,13 @@ function IssueGuidance({ detail }: { detail: IssueDetail }) {
             {!isInformational && (
               <FactTile label="Priority" value={priorityTier(row.priority)} />
             )}
-            {/* "Issues", not "Occurrences": one issue is one place. Changed on
-                2026-10-26 by the developer's decision; see docs/plain-language.md,
-                "Why "issue" and "kind of issue"". */}
+            {/* "Occurrences": one occurrence is one place, the same word as
+                the Issues table's column. It read "Issues" from 2026-10-26
+                to 2026-10-28; the developer brought "Occurrences" back after
+                user testing with Siteimprove users. See
+                docs/plain-language.md, "Why "occurrence" and "kind of issue"". */}
             <FactTile
-              label="Issues"
+              label="Occurrences"
               value={row.occurrence_count.toLocaleString()}
               note={`across ${row.page_count.toLocaleString()} page${row.page_count === 1 ? "" : "s"}`}
             />
@@ -310,7 +312,7 @@ function IssueGuidance({ detail }: { detail: IssueDetail }) {
                   ))}
               {isLead && (
                 <li className="font-semibold">
-                  Look at each issue on the page itself before you report it as a problem.
+                  Look at each occurrence on the page itself before you report it as a problem.
                 </li>
               )}
             </ol>

@@ -1009,7 +1009,7 @@ def _axe_issue_rows(
                 )
                 evidence_summary = (
                     f"The rule check (Alfa) could not decide on {alfa_cant_tell} "
-                    f"issue{'' if alfa_cant_tell == 1 else 's'}. That is not a failure. "
+                    f"occurrence{'' if alfa_cant_tell == 1 else 's'}. That is not a failure. "
                     f"{diagnostic_text or 'Check the element on the page.'}"
                 )
             else:
@@ -1023,7 +1023,7 @@ def _axe_issue_rows(
                 high_confidence_occurrences = alfa_failed
                 evidence_summary = (
                     f"The rule check (Alfa) failed {alfa_failed} "
-                    f"issue{'' if alfa_failed == 1 else 's'}. What it saw: "
+                    f"occurrence{'' if alfa_failed == 1 else 's'}. What it saw: "
                     f"{diagnostic_text or 'the rule was not met.'}"
                 )
             outcome_parts: list[str] = []

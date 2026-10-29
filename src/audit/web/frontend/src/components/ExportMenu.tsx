@@ -52,9 +52,11 @@ const FORMATS: {
     badge: "XLSX",
     tone: "bg-umich-blue/10 text-umich-blue",
     // The workbook's index has one row per kind of issue (one per Issues
-    // table row); the CSV has one row per issue (one place). Named so the
-    // two cannot be mistaken for each other. Changed on 2026-10-26 with the
-    // terms; see docs/plain-language.md, "Why "issue" and "kind of issue"".
+    // table row); the CSV has one row per occurrence (one place). Named so
+    // the two cannot be mistaken for each other. The workbook's label
+    // changed on 2026-10-26 with the terms; the CSV was "Issue list (CSV)"
+    // from then until 2026-10-28, when "occurrence" came back. See
+    // docs/plain-language.md, "Why "occurrence" and "kind of issue"".
     label: "Kinds of issues with fixes (Excel)",
     hint: "One row for each kind of issue, with how to fix it",
   },
@@ -69,8 +71,8 @@ const FORMATS: {
     format: "csv",
     badge: "CSV",
     tone: "bg-sev-minor-bg text-sev-minor",
-    label: "Issue list (CSV)",
-    hint: "One row for each issue: one place on one page",
+    label: "Occurrence list (CSV)",
+    hint: "One row for each occurrence: one place on one page",
   },
   {
     format: "json",
@@ -272,7 +274,7 @@ export default function ExportMenu({
     shownIssueGroups !== undefined && issueGroups !== undefined && shownIssueGroups < issueGroups
     ? `Includes all ${plural(issueGroups, "kind of issue", "kinds of issues")} and every status, ` +
       `not only the ${shownIssueGroups.toLocaleString()} your filters show.`
-    : "Includes every issue and status in this report, even if the table has filters on.";
+    : "Includes every kind of issue and every status in this report, even if the table has filters on.";
 
   return (
     <div ref={containerRef} className="relative">

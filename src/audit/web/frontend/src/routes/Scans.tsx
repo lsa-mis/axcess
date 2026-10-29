@@ -131,18 +131,20 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  *   exception is what needs the eye (W3C COGA, "Making Content Usable":
  *   only what helps the task).
  * - Columns: the site that names the row, when its latest completed scan
- *   finished, its Pages, Issues and Kinds of issues, the Rule check it
- *   ran, then Actions. Issues
- *   counts every place a problem appears; Kinds of issues counts the rows
- *   of that report's Issues table. They are the words and the order the
- *   Issues page summary uses (ReportSummary), so the list and the report
- *   name the same numbers the same way (SC 3.2.4 Consistent
- *   Identification, Level AA). Issues leads: it is the number people mean
- *   when they say "issues". These columns were "Issues" (the rows) and
- *   "Occurrences" (the places) until the developer renamed the terms
- *   across the app (2026-10-26): people called the places issues, and
- *   "occurrence" is an advanced word. See docs/plain-language.md, "Why
- *   "issue" and "kind of issue"", for the research.
+ *   finished, its Pages, Occurrences and Kinds of issues, the Rule check
+ *   it ran, then Actions. Occurrences counts every place a problem
+ *   appears; Kinds of issues counts the rows of that report's Issues
+ *   table. They are the words and the order the Issues page summary uses
+ *   (ReportSummary), so the list and the report name the same numbers the
+ *   same way (SC 3.2.4 Consistent Identification, Level AA). The places
+ *   lead: they are the number people mean when they ask how much was
+ *   found. History: these columns were "Issues" (the rows) and
+ *   "Occurrences" (the places) until 2026-10-26, then "Issues" (the
+ *   places) and "Kinds of issues" (the rows). On 2026-10-28 user testing
+ *   with Siteimprove users, who know Siteimprove's "issues" and
+ *   "occurrences", led the developer to bring back "Occurrences" for the
+ *   places and keep "Kinds of issues" for the rows. See
+ *   docs/plain-language.md, "Why "occurrence" and "kind of issue"".
  * - Rule check says which rule checks tested pages in that scan: "axe",
  *   "Alfa", "axe and Alfa" or "None". Testers who use Siteimprove asked
  *   (2026-10-28) whether a report came from axe or from Siteimprove, so
@@ -150,9 +152,10 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  *   counts what ran, not what was chosen: a check that never reached a
  *   page is not listed. Just before Actions, after the numbers it
  *   qualifies; the Issues table names the check for each kind of issue.
- * - The Issues count is the link into the report ("476 issues", with "in
- *   Report #12" as screen-reader-only text), as the count of problems was
- *   before; the Kinds of issues count is a plain number beside it.
+ * - The Occurrences count is the link into the report ("476 occurrences",
+ *   with "in Report #12" as screen-reader-only text), as the count of
+ *   problems was before; the Kinds of issues count is a plain number
+ *   beside it.
  * - "Images with text" and "Page states opened by clicking" were columns
  *   here and were removed (Oct 2026): the first counted every image with
  *   text, fine alt text or not, and read like a second count of problems;
@@ -163,7 +166,7 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  *   also means less sideways scrolling on a narrow screen (W3C COGA,
  *   "Making Content Usable", https://www.w3.org/TR/coga-usable/: only what
  *   helps the task).
- * - A site's scan rows fill the same Issues and Kinds of issues columns,
+ * - A site's scan rows fill the same Occurrences and Kinds of issues columns,
  *   so a site's past scans can be compared by the same numbers. They are
  *   fetched when the scans are shown (one request per
  *   completed scan, `/api/scans/{id}/issue-counts`), not with the site
@@ -175,8 +178,8 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  *   actions: the row is read (by eye or, cell by cell, by a screen reader)
  *   as "this site, as of then, with these results", and only then offers
  *   what to do with it. Opening the report was considered as the second
- *   column; that split the site from its date and numbers, and the Issues
- *   count is already a link into the same report earlier in the row. The
+ *   column; that split the site from its date and numbers, and the
+ *   Occurrences count is already a link into the same report earlier in the row. The
  *   Site column is sticky, so the row keeps its name when a narrow screen
  *   scrolls the table sideways to Actions.
  * - Actions shows both of a site's actions as links, side by side: "Open
@@ -222,7 +225,9 @@ const SORT_KINDS: Record<SortKey, SortKind> = {
 const SORT_LABELS: Record<SortKey, string> = {
   site: "Site",
   pages: "Pages",
-  issues: "Issues",
+  // The key stays "issues" for saved `?sort=issues_desc` links; the column
+  // it sorts counts occurrences (see "Columns" above).
+  issues: "Occurrences",
   kinds: "Kinds of issues",
   checks: "Rule check",
   completed: "Scanned",
@@ -570,7 +575,7 @@ export default function ScansRoute() {
                       <ColumnHeader>Status</ColumnHeader>
                       <ColumnHeader>Environment and data classification</ColumnHeader>
                       <ColumnHeader>Pages</ColumnHeader>
-                      <ColumnHeader>Issues</ColumnHeader>
+                      <ColumnHeader>Occurrences</ColumnHeader>
                       <ColumnHeader>Updated</ColumnHeader>
                       <ColumnHeader>Open</ColumnHeader>
                     </tr>
@@ -666,7 +671,7 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
                 to={`/scans/${completed.id}/issues`}
                 className="report-link inline-flex min-h-target items-center px-1 font-semibold"
               >
-                {/* Real words instead of an aria-label: "476 issues" shows, and
+                {/* Real words instead of an aria-label: "476 occurrences" shows, and
                     "in Report #12" is read out with it, so the link says what it
                     opens (SC 2.4.4 Link Purpose (In Context), Level AA; W3C
                     "Using ARIA", rule 1). */}
@@ -834,13 +839,13 @@ function RuleChecksCell({ scan, className }: { scan: ScanSummary; className?: st
   );
 }
 
-/** "1 issue", "476 issues": the words the Issues page uses. */
+/** "1 occurrence", "476 occurrences": the words the Issues page uses. */
 function issueCountText(count: number): string {
-  return `${count.toLocaleString()} ${count === 1 ? "issue" : "issues"}`;
+  return `${count.toLocaleString()} ${count === 1 ? "occurrence" : "occurrences"}`;
 }
 
 /**
- * Issues and Kinds of issues for one scan row of an open site, fetched
+ * Occurrences and Kinds of issues for one scan row of an open site, fetched
  * when the rows are shown (see "A site's scan rows" in the comment on this
  * route). Only a completed scan is counted; the others say "Not counted",
  * since the status beside their report number already says why. While a count loads,

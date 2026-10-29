@@ -23,7 +23,7 @@ export const CHANGE_HELP: Record<ComparisonChange, string> = {
   new: "Found in the later scan but not in the earlier one. The site may have changed, or the scans used different pages or checks. Check the page.",
   resolved:
     "Found in the earlier scan but not in the later one. That is not proof of a fix, especially if the scans used different pages or checks. Check the page yourself before you mark it Fixed.",
-  remaining: "Found in both scans. Its number of issues can still go up or down.",
+  remaining: "Found in both scans. Its number of occurrences can still go up or down.",
 };
 
 /**

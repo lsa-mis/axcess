@@ -63,6 +63,14 @@ merge.
 
 ### Changed
 
+- Each place a problem appears is called an **occurrence** again, not an
+  issue, everywhere you see or hear it: "Occurrences found" over the
+  Issues table, the **Occurrences** column on Reports and in the Issues
+  table, the **Occurrence list (CSV)** export, and the counts on the other
+  screens. A row of the Issues table stays a **kind of issue**, so a report
+  reads "7 kinds of issues, 22 occurrences". People who use Siteimprove
+  know these words from it. The Occurrences column's hint and the glossary
+  say what an occurrence is: one place a problem appears.
 - Reports: opening a site lists its scans as rows of the same table,
   lined up under the site's columns, in a box indented under the site's
   name, instead of in a second table with its own headers. Thin lines part

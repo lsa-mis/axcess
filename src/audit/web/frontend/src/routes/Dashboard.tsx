@@ -119,10 +119,10 @@ export default function DashboardRoute() {
                     confirm each one (docs/glossary.md, "Zero false positive
                     goal"). */}
                 {likelyBarriers > 0
-                  ? `${likelyBarriers} ${likelyBarriers === 1 ? "kind of issue is" : "kinds of issues are"} marked ${REVIEW_TYPE_LABEL.likely_barrier}: a fixed rule failed. Check ${likelyBarriers === 1 ? "its" : "their"} issues on the page, then fix them. `
+                  ? `${likelyBarriers} ${likelyBarriers === 1 ? "kind of issue is" : "kinds of issues are"} marked ${REVIEW_TYPE_LABEL.likely_barrier}: a fixed rule failed. Check ${likelyBarriers === 1 ? "its" : "their"} occurrences on the page, then fix them. `
                   : `No kinds of issues are marked ${REVIEW_TYPE_LABEL.likely_barrier}. `}
                 {latestIssues.occurrence_counts.all_evidence.toLocaleString()}{" "}
-                {latestIssues.occurrence_counts.all_evidence === 1 ? "issue" : "issues"} across{" "}
+                {latestIssues.occurrence_counts.all_evidence === 1 ? "occurrence" : "occurrences"} across{" "}
                 {latest.page_count.toLocaleString()} page
                 {latest.page_count === 1 ? "" : "s"}.
               </p>
@@ -139,10 +139,11 @@ export default function DashboardRoute() {
         // Counts in the report's own vocabulary. "Pages crawled" and "image
         // evidence · raw image records" measured the crawler, not the audit.
         // The two "How sure" cards count kinds of issues (rows of the Issues
-        // table) and the "Issues" card counts places, so each hint names its
-        // unit: without it, "Mostly sure 3" beside "Issues 476" reads as 3
-        // issues. Words from the 2026-10-26 rename (docs/plain-language.md,
-        // "Why "issue" and "kind of issue""); COGA "Making Content Usable",
+        // table) and the "Occurrences" card counts places, so each hint names
+        // its unit: without it, "Mostly sure 3" beside "Occurrences 476"
+        // reads as 3 of something unknown. The places were "Issues" from
+        // 2026-10-26 to 2026-10-28 (docs/plain-language.md, "Why
+        // "occurrence" and "kind of issue""); COGA "Making Content Usable",
         // Use Clear Words (https://www.w3.org/TR/coga-usable/, paraphrased:
         // the same word for the same thing).
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -157,7 +158,7 @@ export default function DashboardRoute() {
             hint="Kinds of issues, newest report · a person must decide"
           />
           <StatCard
-            label="Issues"
+            label="Occurrences"
             value={
               latestIssues
                 ? latestIssues.occurrence_counts.all_evidence.toLocaleString()

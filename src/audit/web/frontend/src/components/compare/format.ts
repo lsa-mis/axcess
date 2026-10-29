@@ -1,6 +1,6 @@
 import { parseServerTime } from "../../lib/serverTime";
 
-/** "1 issue", "7 issues". */
+/** "1 occurrence", "7 occurrences". */
 export function count(n: number, noun: string): string {
   return `${n.toLocaleString()} ${plural(n, noun)}`;
 }

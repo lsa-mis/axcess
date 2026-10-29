@@ -15,7 +15,7 @@ export { ISSUE_PAGES_VIEW, issueInspectorPath } from "../components/IssuePagesTa
  *
  * The Issues table links here from its page count. Each fact about a page
  * has a column of its own: title, URL, the live page, its stored evidence,
- * how many issues of this kind are on it, and their screenshots. The screenshots open on a page of their own rather than in a
+ * how many occurrences of this kind of issue are on it, and their screenshots. The screenshots open on a page of their own rather than in a
  * side panel, in the current tab, with the trail carrying the way back; the
  * desktop app has no browser back button, so the topbar trail is the only
  * return path and every drill-down here feeds it.
@@ -91,7 +91,7 @@ export default function IssuePagesRoute() {
             )}
             {pages.length} page{pages.length === 1 ? "" : "s"}
             {" · "}
-            {occurrences} issue{occurrences === 1 ? "" : "s"}
+            {occurrences} occurrence{occurrences === 1 ? "" : "s"}
             {" · "}
             <Link to={issuePath} className="text-umich-blue underline underline-offset-2">
               Full details of this kind of issue

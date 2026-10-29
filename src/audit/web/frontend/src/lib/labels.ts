@@ -79,7 +79,7 @@ export const REVIEW_LANE_LABELS: Record<ReviewLane, string> = REVIEW_TYPE_LABEL;
 
 export const REVIEW_LANE_HELP: Record<ReviewLane, string> = {
   likely_barrier:
-    "A rule check (axe or Alfa) failed. These checks follow fixed rules, so they give the same result every time. Look at each issue on the page, fix it, test the fix, then scan again to see if it is still found.",
+    "A rule check (axe or Alfa) failed. These checks follow fixed rules, so they give the same result every time. Look at each occurrence on the page, fix it, test the fix, then scan again to see if it is still found.",
   expert_review:
     "Axcess found a possible problem, but it cannot be certain. This happens with checks such as the AI review, the browser checks, or a rule check that cannot decide. A person must decide whether it is a real problem before you report it.",
   informational:
@@ -93,9 +93,12 @@ export const REVIEW_LANE_HELP: Record<ReviewLane, string> = {
  * as the button's description.
  *
  * Keyed by the header's visible text (``columnHint`` in routes/Issues.tsx
- * looks hints up by it), so "Issues" is the count column that was
- * "Occurrences" until 2026-10-26 (docs/plain-language.md, "Why "issue" and
- * "kind of issue"").
+ * looks hints up by it). The count column is "Occurrences": it read
+ * "Issues" from 2026-10-26 to 2026-10-28, and went back to "Occurrences"
+ * after user testing with Siteimprove users (docs/plain-language.md, "Why
+ * "occurrence" and "kind of issue""). Its hint says what an occurrence is,
+ * because the column is where a reader first meets the word, and
+ * "occurrence" is an advanced word (SC 3.1.3 Unusual Words, Level AAA).
  */
 export const ISSUE_COLUMN_HELP = {
   "How sure": "How sure Axcess is that this kind of issue is a real problem: Mostly sure, Not sure, or For information.",
@@ -103,9 +106,9 @@ export const ISSUE_COLUMN_HELP = {
   Priority:
     "High, Medium, or Low, from the impact rating of this kind of issue and how many pages it is on. Kinds of issues from the rule check (Alfa) have no rating, so they count as the lowest. A serious kind of issue on one page can still be Low. Kinds of issues marked For information show Does not apply.",
   Pages:
-    "Pages with at least one issue of this kind. An element repeated on many pages, such as a shared menu, counts only on the first page it was found on. An image counts on every page it appears on.",
-  Issues:
-    "How many issues of this kind were found: one for each place. An element repeated on many pages, such as a shared menu, counts once. An image counts every time it appears.",
+    "Pages with at least one occurrence of this kind of issue. An element repeated on many pages, such as a shared menu, counts only on the first page it was found on. An image counts on every page it appears on.",
+  Occurrences:
+    "How many occurrences of this kind of issue were found. An occurrence is one place a problem appears: one element on one page, or in one page state. An element repeated on many pages, such as a shared menu, counts once. An image counts every time it appears.",
   Check:
     "Which check found this kind of issue. Rule check (axe) uses axe-core, made by Deque. Rule check (Alfa) uses Alfa, made by Siteimprove.",
 } as const;
@@ -127,7 +130,7 @@ export const RULE_CHECK_HELP =
  * recommended order groups by "How sure" first, so a band ranks the kinds of
  * issue in one "How sure" group. The hints said "issues of the same type"
  * until 2026-10-26; "type" was the old name of "How sure", and a row is now
- * a kind of issue (docs/plain-language.md, "Why "issue" and "kind of issue"").
+ * a kind of issue (docs/plain-language.md, "Why "occurrence" and "kind of issue"").
  */
 export const PRIORITY_HELP = {
   High: "Look at these first among kinds of issues with the same How sure value: a high impact rating on many pages, such as a critical problem on 4 or more pages or a moderate one on 20 or more (pages a shared element repeats on count too).",

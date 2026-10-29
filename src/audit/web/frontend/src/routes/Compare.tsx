@@ -451,7 +451,7 @@ function CoverageNotes({ data }: { data: ComparisonReport }) {
           <Info className="mt-1 h-4 w-4 shrink-0 text-fg-subtle" aria-hidden />
           <span>
             No longer found means the later scan did not find that kind of issue again. That is not proof of a fix. Check
-            the page yourself before you mark its issues Fixed.
+            the page yourself before you mark its occurrences Fixed.
           </span>
         </p>
 
@@ -602,15 +602,16 @@ function TermsDialog({
     [
       "resolved",
       "No longer found",
-      `Found in ${earlier}, but not found again in ${later}. That is not proof of a fix. Check the page yourself before you mark its issues Fixed, especially if the checks were different in the two scans.`,
+      `Found in ${earlier}, but not found again in ${later}. That is not proof of a fix. Check the page yourself before you mark its occurrences Fixed, especially if the checks were different in the two scans.`,
     ],
-    ["remaining", "Still found", "Found in both scans. Its number of issues can still go up or down."],
-    // Issue before kind of issue: the order of the two counts everywhere
-    // (docs/plain-language.md, Terms). Renamed from occurrence and issue on
-    // 2026-10-26 by the developer's decision; see "Why "issue" and "kind of
-    // issue"" there.
-    ["occurrence", "Issue", "One place a problem was found. It is counted as the Issues table counts it: an element repeated across pages counts once."],
-    ["group", "Kind of issue", "All the issues one check found for the same reason: one accessibility rule, or one kind of image problem. One row in the table."],
+    ["remaining", "Still found", "Found in both scans. Its number of occurrences can still go up or down."],
+    // Occurrence before kind of issue: the order of the two counts
+    // everywhere (docs/plain-language.md, Terms). The place was called an
+    // "issue" from 2026-10-26 to 2026-10-28; the developer brought back
+    // "occurrence" after user testing with Siteimprove users. See "Why
+    // "occurrence" and "kind of issue"" there.
+    ["occurrence", "Occurrence", "One place a problem was found. It is counted as the Issues table counts it: an element repeated across pages counts once."],
+    ["group", "Kind of issue", "All the occurrences one check found for the same reason: one accessibility rule, or one kind of image problem. One row in the table."],
   ];
   return (
     <dialog

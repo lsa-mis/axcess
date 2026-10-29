@@ -132,7 +132,7 @@ export function parseChanges(raw: string | null): string {
 function headerText(column: SortColumn, baselineId?: number, currentId?: number): string {
   if (column === "Before") return baselineId ? `Before (report #${baselineId})` : "Before";
   if (column === "After") return currentId ? `After (report #${currentId})` : "After";
-  if (column === "Difference") return "Change in issues";
+  if (column === "Difference") return "Change in occurrences";
   if (column === "WCAG") return "WCAG criterion";
   // The `Issue` key stays for `?sort=issue_asc`; each row is a kind of issue.
   if (column === "Issue") return "Kind of issue";

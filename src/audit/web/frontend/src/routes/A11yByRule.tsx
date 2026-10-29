@@ -151,11 +151,12 @@ export default function A11yByRuleRoute() {
       </Card>
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {/* Issues first, then kinds of issues: the order the developer set on
-            2026-10-26 for every screen that shows both counts. Why the words
-            changed:
-            docs/plain-language.md, "Why "issue" and "kind of issue"". */}
-        <StatCard label="Issues (axe)" value={coverage.axe_violations_total} />
+        {/* Occurrences first, then kinds of issues: the order the developer
+            set on 2026-10-26 for every screen that shows both counts, kept
+            when the places went back to "occurrences" on 2026-10-28. Why
+            the words changed: docs/plain-language.md, "Why "occurrence" and
+            "kind of issue"". */}
+        <StatCard label="Occurrences (axe)" value={coverage.axe_violations_total} />
         <StatCard label="Kinds of issues" value={groups.length} />
         <StatCard label="Failed (Alfa)" value={coverage.alfa_failed_total} />
         <StatCard label={`${REVIEW_TYPE_LABEL.expert_review} (Alfa)`} value={coverage.alfa_cant_tell_total} />
@@ -266,7 +267,7 @@ function RuleGroupCard({
         </span>
         <span className="text-sm text-fg-muted">
           <strong className="text-fg">{group.violation_count}</strong>{" "}
-          issue{group.violation_count !== 1 ? "s" : ""} on{" "}
+          occurrence{group.violation_count !== 1 ? "s" : ""} on{" "}
           <strong className="text-fg">{group.page_count}</strong> page
           {group.page_count !== 1 ? "s" : ""}
         </span>
@@ -315,7 +316,7 @@ function RuleGroupCard({
           {group.pipeline === "alfa" && group.engine_outcomes.cant_tell > 0 && (
             <p className="mb-2 text-xs text-fg-muted">
               <strong className="text-fg">{REVIEW_TYPE_LABEL.expert_review}:</strong> For{" "}
-              {group.engine_outcomes.cant_tell} issue
+              {group.engine_outcomes.cant_tell} occurrence
               {group.engine_outcomes.cant_tell === 1 ? "" : "s"}, Alfa could not
               tell (<code>cantTell</code>) if the rule passed. A person needs to
               check {group.engine_outcomes.cant_tell === 1 ? "it" : "them"}.{" "}
@@ -331,10 +332,10 @@ function RuleGroupCard({
           />
 
           {paged.pages > 1 && (
-            <TableBar pager={<TablePagination label={`${group.rule_id} issues`} noun="issues" {...paged} />} />
+            <TableBar pager={<TablePagination label={`${group.rule_id} occurrences`} noun="occurrences" {...paged} />} />
           )}
-          <TableRegion label={`${group.rule_id} issues table`} paged={paged}>
-            <Table caption={`${group.rule_id} issues`}>
+          <TableRegion label={`${group.rule_id} occurrences table`} paged={paged}>
+            <Table caption={`${group.rule_id} occurrences`}>
               <TableHead>
                 <tr>
                   <ColumnHeader>Page</ColumnHeader>
@@ -408,14 +409,14 @@ function FindingRow({
         )}
         <AlfaEvidenceNote evidence={finding} />
         <Link className="report-link inline-flex min-h-target items-center text-xs" to={pageEvidencePath({ scanId, pageId: finding.page_id, origin: "Rule check issues by rule", backTo: `/scans/${scanId}/a11y/by-rule`, hash: `#finding-${finding.id}` })}>
-          Open the evidence for this issue
-          {/* Which issue, by page, element and ID, for the same reason
+          Open the evidence for this occurrence
+          {/* Which occurrence, by page, element and ID, for the same reason
               as PageLink's context (SC 2.4.9 Link Purpose (Link Only), Level
               AAA; WCAG technique C7). The ID is what makes it unique: two
               elements' short locators can match. */}
           <span className="sr-only">
             {" "}on {finding.page_title?.trim() || finding.page_url}, at{" "}
-            {shortLocator(finding.target_display || finding.target_selector)}, issue {finding.id}
+            {shortLocator(finding.target_display || finding.target_selector)}, occurrence {finding.id}
           </span>
         </Link>
         {finding.failure_summary && (
@@ -452,7 +453,7 @@ function RuleBulkBar({
   const onApply = () => {
     const rationale = requestStatusRationale(
       target,
-      `all ${findingIds.length} issues of "${ruleId}"`,
+      `all ${findingIds.length} occurrences of "${ruleId}"`,
     );
     if (rationale === null) return;
     mutation.mutate({ next: target, rationale });

@@ -53,7 +53,7 @@ async def test_export_menu_offers_every_format_with_the_draft_label_in_urls(
     for name, fmt in (
         ("Kinds of issues with fixes (Excel)", "xlsx"),
         ("Written report (Markdown)", "audit"),
-        ("Issue list (CSV)", "csv"),
+        ("Occurrence list (CSV)", "csv"),
         ("All report data (JSON)", "json"),
     ):
         link = page.get_by_role("link", name=name)

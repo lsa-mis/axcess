@@ -78,40 +78,42 @@ export function ReportSummary({
   return (
     <>
       {scan.blocked && <BlockedScanNotice scanId={scan.id} blocked={scan.blocked} />}
-      {/* Three numbers, main point first: how many issues (every place a
-          problem shows up), how many kinds of issues they fall into, then how
-          much of the site was scanned to find them. The first version read
-          left to right as the scan ran (pages, then occurrences, then
+      {/* Three numbers, main point first: how many occurrences (every place
+          a problem shows up), how many kinds of issues they fall into, then
+          how much of the site was scanned to find them. The first version
+          read left to right as the scan ran (pages, then occurrences, then
           issues), and a coworker testing it misread it in three ways:
           "errors" as accessibility errors, "Occurrences found" as the issue
           count, and "Issues found" as a part of that count. Leading with
           what the reader came for is the first rule of the U.S. Federal
-          Plain Language Guidelines.
+          Plain Language Guidelines. "Occurrences found" is that first
+          version's word again (see the history below); what now keeps it
+          apart from the row count is the other label, "Kinds of issues",
+          not "Issues found".
 
           The labels carry the difference between the two numbers, not the
           lines under them, because a reader scanning the numbers reads the
-          label and skips the rest: "Issues found" for every place a problem
-          shows up, "Kinds of issues" for the rows of the table below. Each
-          label is the same word as the table's matching column ("Issues")
-          or its row name ("Kind of issue"), so one thing keeps one name
-          (W3C COGA, "Making Content Usable",
+          label and skips the rest: "Occurrences found" for every place a
+          problem shows up, "Kinds of issues" for the rows of the table
+          below. Each label is the same word as the table's matching column
+          ("Occurrences") or its row name ("Kind of issue"), so one thing
+          keeps one name (W3C COGA, "Making Content Usable",
           https://www.w3.org/TR/coga-usable/: the same word for the same
           thing; SC 3.2.4 Consistent Identification, Level AA).
 
-          Until 2026-10-26 the pair was "Kinds of issue found" (the rows,
-          shown first) and "Places issues appear (occurrences)" (the
-          places). The coworker had asked to call the places "Issues
-          found", and the developer had suggested "Issues appear"; both
-          were rejected then, because the old terms made an issue one row.
-          The coworker's misreadings showed that people call each place an
-          issue, as most accessibility tools do, and "occurrence" is an
-          advanced word. On 2026-10-26 the developer reversed the earlier
-          choice: an issue is now one place, a kind of issue is one row,
-          and the places count leads, as the number people already called
-          "issues". The research is in docs/plain-language.md, "Why "issue"
-          and "kind of issue"". "Kinds of issues", not "Types of issues": the
-          "How sure" values were once called the three types of issue, and
-          "issue type" is a field in the Jira export.
+          History, short. Until 2026-10-26 the pair was "Kinds of issue
+          found" (the rows, first) and "Places issues appear (occurrences)".
+          On 2026-10-26 the developer renamed the places "issues" ("Issues
+          found", first), because the coworker read each place as an issue
+          and "occurrence" is an advanced word. On 2026-10-28 user testing
+          with Siteimprove users, who know Siteimprove's pair of "issues" (a
+          rule) and "occurrences" (each place), led the developer to bring
+          back "occurrence" for the places, and keep "kind of issue" for a
+          row. The places count still leads. The research and the reason are
+          in docs/plain-language.md, "Why "occurrence" and "kind of issue"".
+          "Kinds of issues", not "Types of issues": the "How sure" values
+          were once called the three types of issue, and "issue type" is a
+          field in the Jira export.
 
           The page states opened by clicking are a line under the pages, not a
           fourth number: they say how much was scanned, like the pages, not
@@ -153,13 +155,13 @@ export function ReportSummary({
           below it, 48px between columns on a wide screen (32px on a narrow
           one) and 32px between rows, against 8px from a number to its name
           and 4px between the lines under it, which read as one unit. Three
-          across from 640px; below that the two issue numbers (Issues found
-          and Kinds of issues) share a row, as the pair they are, and the
+          across from 640px; below that the two problem numbers (Occurrences
+          found and Kinds of issues) share a row, as the pair they are, and the
           pages take the row under them, so nothing is squeezed at 320px (SC
           1.4.10 Reflow, Level AA). */}
       <dl className="mt-10 mb-5 grid grid-cols-2 gap-x-8 gap-y-8 sm:grid-cols-3 lg:gap-x-12">
         <SummaryStat
-          label={occurrences === 1 ? "Issue found" : "Issues found"}
+          label={occurrences === 1 ? "Occurrence found" : "Occurrences found"}
           value={occurrences}
           details={[{ text: "Each one is an element on a page" }]}
         />

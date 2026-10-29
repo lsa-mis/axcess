@@ -9,7 +9,7 @@ import type { AxeImpact, DetectionPipeline, FindingStatus, ReviewLane, RuleCheck
  * See docs/plain-language.md for the full list of terms.
  */
 
-/** An issue's review status (one place on a page), as a short label for chips and tables. */
+/** An occurrence's review status (one place on a page), as a short label for chips and tables. */
 export const STATUS_LABEL: Record<FindingStatus, string> = {
   new: "New",
   reviewing: "Reviewing",

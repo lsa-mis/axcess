@@ -111,7 +111,7 @@ async def test_identical_markup_is_not_guessed(
         ).to_have_count(0)
         await playwright_async.expect(
             page.get_by_text(
-                "1 issue is not outlined: its markup appears in more than one place in "
+                "1 occurrence is not outlined: its markup appears in more than one place in "
                 "this saved copy, and Axcess does not guess which."
             )
         ).to_be_visible()
