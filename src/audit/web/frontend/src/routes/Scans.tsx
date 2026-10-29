@@ -182,12 +182,39 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  *   Occurrences count is already a link into the same report earlier in the row. The
  *   Site column is sticky, so the row keeps its name when a narrow screen
  *   scrolls the table sideways to Actions.
- * - Actions shows both of a site's actions as links, side by side: "Open
- *   latest scan", then "Scan again". Both are always visible and one click
- *   away, laid out like "All issues" and "Delete" in the expanded list of
- *   scans below, so the two tables share one pattern (W3C COGA: the same
- *   pattern for the same kind of thing). Stacking them was built and set
- *   aside for this; the dropped columns left the room.
+ * - Actions shows a site's actions as links, side by side: "Open latest
+ *   scan", "Compare reports" (only when the site has two or more completed
+ *   scans), then "Scan again". All are always visible and one click away,
+ *   laid out like "All issues" and "Delete" in the expanded list of scans
+ *   below, so the two tables share one pattern (W3C COGA: the same pattern
+ *   for the same kind of thing). Stacking them was built and set aside for
+ *   this.
+ * - Side by side costs width. The dropped columns once left room for two
+ *   links, but the Rule check column and the longer word "Occurrences"
+ *   took it back: at 1280 pixels with the sidebar open the table already
+ *   scrolled sideways (the developer measured about 113 pixels) before
+ *   "Compare reports" was added, and the third link adds more. The
+ *   developer accepted that
+ *   (2026-10-28). Two other layouts were offered and declined: stacking the
+ *   links in the cell, and putting "Compare reports" inside the open
+ *   site's box of scans. Sideways scrolling is allowed here: SC 1.4.10
+ *   Reflow (Level AA) excepts content that needs two-dimensional layout,
+ *   and its Understanding document names data tables as such content
+ *   (paraphrased). The Site column is sticky, so a row keeps its name
+ *   while the table scrolls.
+ * - "Compare reports" opens Compare reports for the latest completed scan,
+ *   with no `compare_to`, so the server compares it with the report before
+ *   it (`previous_scan_id`), the pair most people want. Any other pair is
+ *   chosen on that page ("Reports to compare"). It shows only when there is
+ *   something to compare, the rule the report's own Compare reports tab
+ *   follows (ReportWorkspaceNav); a disabled link would be a control that
+ *   does nothing. The same words as that tab and the page title, so one
+ *   place has one name (SC 3.2.4 Consistent Identification, Level AA).
+ *   The site's completed scans are its public ones (sites.py), the ones
+ *   the comparison accepts. It is on the site row only, not on each scan
+ *   row: a link per scan row would repeat one name with a hidden number
+ *   and still cover only neighbouring pairs (research 2026-10-28, option
+ *   a, rejected).
  *   A row "Actions" dropdown holding the two links was built first and
  *   removed (Oct 2026): it put opening a report, this screen's main task,
  *   one click further away and hid "Scan again" until opened (W3C COGA:
@@ -684,7 +711,7 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
             </Cell>
             <RuleChecksCell scan={completed} />
             <Cell className="whitespace-nowrap">
-              {/* Both actions shown side by side, as in the scan rows: see
+              {/* The site's actions side by side, as in the scan rows: see
                   "Actions" in the comment above. */}
               <div className="flex items-center justify-center gap-2">
                 <Link
@@ -694,6 +721,15 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
                   Open latest scan
                   <span className="sr-only"> of {label}, the most recent completed scan</span>
                 </Link>
+                {site.completed_count >= 2 && (
+                  <Link
+                    to={`/scans/${completed.id}/compare`}
+                    className="report-link inline-flex min-h-target items-center px-1 font-semibold"
+                  >
+                    Compare reports
+                    <span className="sr-only"> for {label}</span>
+                  </Link>
+                )}
                 <ScanAgainLink scanId={completed.id} site={label} look="link" />
               </div>
             </Cell>

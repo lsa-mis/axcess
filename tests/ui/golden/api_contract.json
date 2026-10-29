@@ -1008,7 +1008,7 @@
     "content_type": "application/json",
     "body": {
       "after_totals": {"groups": "integer", "occurrences": "integer"},
-      "baseline": {"id": "integer", "seed_url": "string", "started_at": "string"},
+      "baseline": {"id": "integer", "page_count": "integer", "seed_url": "string", "started_at": "string"},
       "before_totals": {"groups": "integer", "occurrences": "integer"},
       "changes": {"new": "integer", "remaining": "integer", "resolved": "integer"},
       "counts": {
@@ -1025,7 +1025,7 @@
           "pipeline": "string"
         }
       ],
-      "current": {"id": "integer", "seed_url": "string", "started_at": "string"},
+      "current": {"id": "integer", "page_count": "integer", "seed_url": "string", "started_at": "string"},
       "limitations": ["string"],
       "notes": [{"differs": "boolean", "scans": ["integer"], "text": "string"}],
       "page": "integer",

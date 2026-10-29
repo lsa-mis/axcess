@@ -323,7 +323,8 @@ draft. The command-line `audit export` adds no draft label.
 
 After you publish fixes, scan the same site again with the same checks.
 **Compare reports** compares this report with the latest earlier completed
-report for the same start address. It marks each
+report for the same start address. Open it from the report, or from the
+site's **Compare reports** link on Reports. It marks each
 [kind of issue](glossary.md#kind-of-issue), not each occurrence, as one of these:
 
 | Change | What it means |
@@ -332,10 +333,17 @@ report for the same start address. It marks each
 | No longer found | Found in the earlier report but not found again in this one. That is not proof of a fix. Check the page yourself before you mark its occurrences Fixed. |
 | Still found | Found in both reports. Its number of occurrences can still go up or down. |
 
-The page opens with **Trend over time**, which plots every completed scan of
-the site. Select a point in the trend, or use **Show as data table**, to open
-that scan's issues or compare it with this report. Below it are the three
-numbers; each is also a filter for the table under them. The table has one
+The page opens with **Reports to compare**. It shows which two reports the
+page compares, and you can choose any other two of the site's 20 most recent
+completed reports: one under **Before (older report)**, one under **After
+(newer report)**, then **Compare these reports**.
+
+Next is **Trend over time**, which plots every completed scan of the site.
+Select a point in the trend, or use **Show as data table**, to open that
+scan's issues. Then a table shows the two reports side by side: when each
+was scanned, its pages, occurrences and kinds of issues, and the change.
+Below it are the three numbers; each is also a filter for the table under
+them. The table has one
 row for each kind of issue, and shows its number of occurrences before and after
 and the change between them. **What do
 these terms mean?**, at the top right, explains each word.

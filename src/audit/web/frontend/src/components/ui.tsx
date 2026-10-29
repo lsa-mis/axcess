@@ -796,6 +796,12 @@ const TYPEAHEAD_RESET_MS = 500;
  * `aria-describedby`, so the explanation a sighted user reads before choosing
  * is announced to everyone else as part of the same control.
  *
+ * `aria-invalid` marks a choice a form refused, for a caller that shows the
+ * error under the control and passes the error's id in `aria-describedby`
+ * (Compare reports' "Reports to compare" form). Valid on a combobox (WAI-ARIA
+ * 1.2), so the trigger reports its own state, as the app's other fields do
+ * (SC 3.3.1 Error Identification, Level A).
+ *
  * `data-value` on the trigger and on each option carries the raw value, so
  * tests and tooling can pick an option without depending on its wording.
  */
@@ -811,6 +817,7 @@ export function Select({
   className,
   disabled = false,
   "aria-describedby": extraDescribedBy,
+  "aria-invalid": invalid,
 }: {
   label: string;
   hideLabel?: boolean;
@@ -823,6 +830,7 @@ export function Select({
   className?: string;
   disabled?: boolean;
   "aria-describedby"?: string;
+  "aria-invalid"?: boolean;
 }) {
   const generated = useId();
   const triggerId = id ?? generated;
@@ -982,6 +990,7 @@ export function Select({
           aria-activedescendant={open && active >= 0 ? optionId(active) : undefined}
           aria-labelledby={labelId}
           aria-describedby={describedBy || undefined}
+          aria-invalid={invalid || undefined}
           data-value={value}
           disabled={disabled}
           onClick={() => (open ? setOpen(false) : openAt(selectedIndex))}
@@ -989,7 +998,12 @@ export function Select({
           // Clicks in the list keep focus here (see its onMouseDown), so a
           // blur means focus really went elsewhere.
           onBlur={() => setOpen(false)}
-          className="min-h-target w-full rounded-xs border border-border-strong bg-surface py-2.5 pl-3 pr-9 text-left text-sm font-semibold text-fg shadow-sm transition-colors hover:border-umich-blue hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-60"
+          className={cn(
+            "min-h-target w-full rounded-xs border bg-surface py-2.5 pl-3 pr-9 text-left text-sm font-semibold text-fg shadow-sm transition-colors hover:border-umich-blue hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-60",
+            // A refused choice is outlined as NumberField's is; the error's
+            // words, not this colour, are what say so (SC 1.4.1).
+            invalid ? "border-sev-critical" : "border-border-strong",
+          )}
         >
           {/* Every option is laid out invisibly in the same cell, so the box
               is as wide as its longest option, as a native select is, and

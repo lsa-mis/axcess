@@ -1352,10 +1352,18 @@ export interface ComparisonCoverageState {
   checked: number | null;
   total: number;
 }
+/** One of the two reports a comparison names (``comparison.ReportIdentity``). */
+export interface ComparisonReportIdentity {
+  id: number;
+  seed_url: string;
+  started_at: string;
+  /** The scan's stored page total, for the side-by-side summary. */
+  page_count: number;
+}
 export interface ComparisonReport {
   coverage: Array<{ pipeline: string; before: ComparisonCoverageState; after: ComparisonCoverageState }>;
-  current: { id: number; seed_url: string; started_at: string };
-  baseline: { id: number; seed_url: string; started_at: string } | null;
+  current: ComparisonReportIdentity;
+  baseline: ComparisonReportIdentity | null;
   counts: Record<ComparisonCategory, number>;
   changes: Record<ComparisonChange, number>;
   before_totals: ComparisonTotals | null;

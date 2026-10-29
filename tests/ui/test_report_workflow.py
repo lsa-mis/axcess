@@ -208,8 +208,18 @@ def _comparison(scan_id: int) -> dict[str, Any]:
             }
         )
     return {
-        "current": {"id": scan_id, "seed_url": "http://example.com/", "started_at": "2026-09-02"},
-        "baseline": {"id": 99, "seed_url": "http://example.com/", "started_at": "2026-09-01"},
+        "current": {
+            "id": scan_id,
+            "seed_url": "http://example.com/",
+            "started_at": "2026-09-02 12:00:00",
+            "page_count": 12,
+        },
+        "baseline": {
+            "id": 99,
+            "seed_url": "http://example.com/",
+            "started_at": "2026-09-01 12:00:00",
+            "page_count": 10,
+        },
         "counts": {
             "new": 1,
             "still_detected": 10,
@@ -421,9 +431,11 @@ async def test_compare_scans_keyboard_filters_trend_and_axe(
     await playwright_async.expect(
         page.get_by_role("link", name="Open report #98 issues")
     ).to_be_visible()
+    # The trend is a view: choosing reports is the "Reports to compare"
+    # form's job alone (2026-10-28), so the panel has no compare link.
     await playwright_async.expect(
-        page.get_by_role("link", name="Compare with this report")
-    ).to_have_attribute("href", f"/app/scans/{scan_id}/compare?compare_to=98")
+        page.get_by_role("link", name=re.compile(r"^Compare with"))
+    ).to_have_count(0)
     await page.get_by_role("button", name="Close report #98 details").focus()
     await page.keyboard.press("Enter")
     await playwright_async.expect(point).to_be_focused()
@@ -435,8 +447,13 @@ async def test_compare_scans_keyboard_filters_trend_and_axe(
     toggle = page.get_by_role("button", name="Show as data table")
     await toggle.focus()
     await page.keyboard.press("Enter")
+    trend_table = page.get_by_role("table", name="Completed scans of this site, oldest first")
+    await playwright_async.expect(trend_table).to_be_visible()
     await playwright_async.expect(
-        page.get_by_role("table", name="Completed scans of this site, oldest first")
+        trend_table.get_by_role("link", name=re.compile(r"^Compare"))
+    ).to_have_count(0)
+    await playwright_async.expect(
+        trend_table.get_by_role("link", name="Open report #98 issues")
     ).to_be_visible()
 
     # Closed, the notes still say how many differences there are.
@@ -481,6 +498,171 @@ async def test_compare_scans_keyboard_filters_trend_and_axe(
     await page.wait_for_url(
         re.compile(rf"/app/scans/{scan_id}/issues/alfa%3Ar69%3Afailed\?.*origin=Compare")
     )
+
+
+async def _open_compare(page: Any, base: str, scan_id: int, history: dict[str, Any]) -> None:
+    await page.route(
+        f"**/api/scans/{scan_id}/comparison*",
+        lambda route: route.fulfill(json=_comparison(scan_id)),
+    )
+    await page.route(f"**/api/scans/{scan_id}/history", lambda route: route.fulfill(json=history))
+    await page.goto(f"{base}/app/scans/{scan_id}/compare", wait_until="networkidle")
+
+
+@pytest.mark.parametrize("width", [1280, 320])
+async def test_compare_reports_form_and_side_by_side_by_keyboard(
+    live_server: tuple[str, int], width: int, new_page: Any
+) -> None:
+    """Choose two reports by keyboard alone; a wrong pair is refused in words."""
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": width, "height": 900})
+    await _open_compare(page, base, scan_id, _history(scan_id))
+
+    form = page.get_by_role("group", name="Reports to compare")
+    await playwright_async.expect(
+        form.get_by_role("heading", name="Reports to compare", level=2)
+    ).to_be_visible()
+    before = form.get_by_role("combobox", name="Before (older report)", exact=True)
+    after = form.get_by_role("combobox", name="After (newer report)", exact=True)
+    submit = form.get_by_role("button", name="Compare these reports", exact=True)
+    # Preset to the pair on screen.
+    await playwright_async.expect(before).to_have_attribute("data-value", "99")
+    # The chosen option's words (the trigger also lays out every option,
+    # hidden, to keep its width).
+    await playwright_async.expect(before.locator(".truncate")).to_have_text(
+        "Report #99, scanned Sep 1, 2026"
+    )
+    await playwright_async.expect(after).to_have_attribute("data-value", str(scan_id))
+    # The form replaced the sentence and the "instead" link.
+    await playwright_async.expect(page.get_by_text("Comparing this report with")).to_have_count(0)
+    await playwright_async.expect(
+        page.get_by_role("link", name=re.compile(r"instead$"))
+    ).to_have_count(0)
+    # Every report fits in the list, so there is no line about a limit.
+    await playwright_async.expect(form.get_by_text("most recent completed reports")).to_have_count(
+        0
+    )
+
+    # The two whole reports side by side, before the change cards.
+    summary = page.get_by_role("table", name=f"Report #99 and report #{scan_id} side by side")
+    await playwright_async.expect(summary).to_be_visible()
+    await playwright_async.expect(summary.get_by_role("columnheader")).to_have_text(
+        ["Detail", "Before (report #99)", f"After (report #{scan_id})", "Change"]
+    )
+    await playwright_async.expect(summary.get_by_role("rowheader")).to_have_text(
+        ["Scanned", "Pages", "Occurrences", "Kinds of issues"]
+    )
+    expected = {
+        "Pages": ["10", "12", "+2"],
+        "Occurrences": ["58", "62", "+4"],
+        # A change of none is said in words, not a bare 0.
+        "Kinds of issues": ["11", "11", "No change"],
+    }
+    for name, cells in expected.items():
+        row = summary.get_by_role("row").filter(
+            has=page.get_by_role("rowheader", name=name, exact=True)
+        )
+        await playwright_async.expect(row.get_by_role("cell")).to_have_text(cells)
+    scanned = summary.get_by_role("row").filter(has=page.get_by_role("rowheader", name="Scanned"))
+    await playwright_async.expect(scanned.get_by_role("cell")).to_have_text(
+        [re.compile(r"^Sep 1, 2026"), re.compile(r"^Sep 2, 2026"), "1 day later"]
+    )
+    cards = page.get_by_role("group", name="Filter the table by change")
+    summary_box, cards_box = await summary.bounding_box(), await cards.bounding_box()
+    assert summary_box and cards_box and summary_box["y"] < cards_box["y"]
+    # The form comes first, before the trend.
+    form_box = await form.bounding_box()
+    trend_box = await page.get_by_role("region", name="Trend over time").bounding_box()
+    assert form_box and trend_box and form_box["y"] < trend_box["y"]
+
+    # Keyboard order follows reading order: Before, After, then the button.
+    await before.focus()
+    await page.keyboard.press("Tab")
+    await playwright_async.expect(after).to_be_focused()
+    await page.keyboard.press("Tab")
+    await playwright_async.expect(submit).to_be_focused()
+
+    # The same report twice: refused here, the page does not change, and
+    # the message is tied to Before, which takes focus.
+    url = page.url
+    await before.focus()
+    await page.keyboard.press("Home")  # opens the list on the newest report
+    await page.keyboard.press("Enter")
+    await playwright_async.expect(before).to_have_attribute("data-value", str(scan_id))
+    await submit.focus()
+    await page.keyboard.press("Enter")
+    message = form.get_by_text("You chose the same report for Before and After.", exact=False)
+    await playwright_async.expect(message).to_be_visible()
+    await playwright_async.expect(before).to_be_focused()
+    await playwright_async.expect(before).to_have_attribute("aria-invalid", "true")
+    message_id = await message.get_attribute("id")
+    assert message_id
+    await playwright_async.expect(before).to_have_attribute(
+        "aria-describedby", re.compile(rf"(^|\s){re.escape(message_id)}(\s|$)")
+    )
+    await playwright_async.expect(before).to_have_accessible_description(
+        re.compile(r"Choose an older report for Before\.$")
+    )
+    assert page.url == url
+    if width == 320:
+        assert await page.evaluate("document.body.scrollWidth <= innerWidth")
+    violations = await _run_axe(page)
+    assert not violations, _render_violations(violations)
+
+    # Before newer than After: refused the same way. Changing a choice
+    # clears the old message first.
+    await after.focus()
+    await page.keyboard.press("End")  # opens the list on the oldest report
+    await page.keyboard.press("Enter")
+    await playwright_async.expect(after).to_have_attribute("data-value", "98")
+    await playwright_async.expect(message).to_have_count(0)
+    await playwright_async.expect(before).not_to_have_attribute("aria-invalid", "true")
+    await submit.focus()
+    await page.keyboard.press("Enter")
+    newer = form.get_by_text("The report for Before is newer than the one for After.", exact=False)
+    await playwright_async.expect(newer).to_be_visible()
+    await playwright_async.expect(before).to_be_focused()
+    assert page.url == url
+
+    # A good pair: Before the oldest, After this report. Only the button
+    # changes the page (SC 3.2.2).
+    await page.keyboard.press("End")
+    await page.keyboard.press("Enter")
+    await playwright_async.expect(before).to_have_attribute("data-value", "98")
+    await after.focus()
+    await page.keyboard.press("Home")
+    await page.keyboard.press("Enter")
+    await playwright_async.expect(after).to_have_attribute("data-value", str(scan_id))
+    assert page.url == url
+    await submit.focus()
+    await page.keyboard.press("Enter")
+    await page.wait_for_url(re.compile(rf"/app/scans/{scan_id}/compare\?compare_to=98$"))
+    # The form keeps the chosen pair while the new comparison loads.
+    await playwright_async.expect(before).to_have_attribute("data-value", "98")
+    await playwright_async.expect(after).to_have_attribute("data-value", str(scan_id))
+    await playwright_async.expect(newer).to_have_count(0)
+    if width == 320:
+        assert await page.evaluate("document.body.scrollWidth <= innerWidth")
+    violations = await _run_axe(page)
+    assert not violations, _render_violations(violations)
+
+
+async def test_compare_reports_form_says_when_older_reports_cannot_be_chosen(
+    live_server: tuple[str, int], new_page: Any
+) -> None:
+    """Only the site's 20 most recent reports are offered, and the form says so."""
+    base, scan_id = live_server
+    page = await new_page()
+    history = {**_history(scan_id), "total": 25}
+    await _open_compare(page, base, scan_id, history)
+    form = page.get_by_role("group", name="Reports to compare")
+    note = form.get_by_text(
+        "You can choose from the 3 most recent completed reports of this site. It has 25 in all."
+    )
+    await playwright_async.expect(note).to_be_visible()
+    note_id = await note.get_attribute("id")
+    assert note_id
+    await playwright_async.expect(form).to_have_attribute("aria-describedby", note_id)
 
 
 async def test_finding_anchor_waits_for_scan_metadata(

@@ -10,6 +10,16 @@ merge.
 
 ### Added
 
+- **Compare reports** from the Reports list. A site with two or more
+  completed scans has a "Compare reports" link beside "Open latest scan".
+  It compares the latest report with the one before it. On Compare
+  reports, **Reports to compare** lets you choose any two of the site's 20
+  most recent completed reports, Before and After, then press "Compare
+  these reports". A table shows the two reports side by side: when each
+  was scanned, its pages, occurrences and kinds of issues, and the change.
+  The trend no longer has "Compare with this report" links; the form is
+  the one way to choose. The comparison API's report fields now include
+  `page_count`.
 - Reports and Issues say which check found what. On Reports, a **Rule
   check** column shows whether each scan ran axe, Alfa or both; on the
   Issues page, a **Check** column names the check behind each kind of
