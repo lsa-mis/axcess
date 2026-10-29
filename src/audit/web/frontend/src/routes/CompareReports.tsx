@@ -526,9 +526,9 @@ function EmptyPane({
           </p>
         ) : (
           <>
-            <p className="mt-1 text-sm leading-relaxed text-fg-muted">
-              Choose one of this site’s reports to show here, beside {reportName(reportId)}.
-            </p>
+            {/* No sentence between the heading and the list: the heading says
+                what to do, and the developer removed a line repeating it
+                (2026-10-29). */}
             <ul className="mt-3 flex flex-col gap-2">
               {others.map((point) => {
                 const day = scanDay(point);
