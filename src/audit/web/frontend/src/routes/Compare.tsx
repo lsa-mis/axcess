@@ -16,8 +16,6 @@ import ComparedIssuesTable, {
   unsureChange,
 } from "../components/compare/ComparedIssuesTable";
 import TrendChart from "../components/compare/TrendChart";
-import ReportPicker, { pickerReports } from "../components/compare/ReportPicker";
-import ReportsSideBySide from "../components/compare/ReportsSideBySide";
 import { count } from "../components/compare/format";
 import { useScanQuery } from "../hooks/useScanQuery";
 import { cn } from "../lib/cn";
@@ -34,12 +32,9 @@ const isChange = (value: string | null): value is ComparisonChange =>
  * Compare reports: what changed between this report and an earlier scan of the
  * same site, and how the site has trended across every completed scan.
  *
- * The page reads top down: which two reports ("Reports to compare", also
- * the way to choose them), the trend over every completed scan, the two
- * reports side by side, how many kinds of issues are new, still found or no
- * longer found (each a filter for the table), every compared kind of issue
- * in a table, and last the coverage notes ("What was checked in each
- * report"), read once the reader has seen what changed.
+ * The page reads top down: which two scans, how many kinds of issues are new,
+ * resolved or remaining (each a filter for the table), the coverage notes,
+ * the trend, then every compared kind of issue in a table.
  *
  * "Resolved" means only that a later scan did not detect the kind of issue again.
  * The terms dialog says so, a row whose checks differed between the scans
@@ -71,11 +66,6 @@ export default function CompareRoute() {
     queryKey: ["site-history", id],
     queryFn: () => api.getSiteHistory(id),
     enabled: Number.isFinite(id),
-    // Every report of a site has the same history, so while the next pair
-    // loads, the "Reports to compare" form keeps its choices (and focus,
-    // when only Before changed) instead of unmounting. Only when the new
-    // report is in the old list: another site's history is never shown.
-    placeholderData: (previous) => (previous?.scans.some((scan) => scan.id === id) ? previous : undefined),
   });
 
   // Against the live query string, as the Issues table does: the search
@@ -121,13 +111,6 @@ export default function CompareRoute() {
   const backTo = `/scans/${id}/compare${params.toString() ? `?${params.toString()}` : ""}`;
   const history = historyQuery.data;
   const error = scanQuery.error ?? comparisonQuery.error;
-  // The pair on screen. From the URL while a chosen pair loads, so the form
-  // does not jump back to the old one; from the server's default otherwise.
-  const beforeId = compareTo ?? data?.baseline?.id ?? null;
-  const reports = pickerReports(
-    history?.scans ?? [],
-    [data?.current, data?.baseline].filter((report) => report != null),
-  );
 
   return (
     <>
@@ -157,25 +140,12 @@ export default function CompareRoute() {
           <Link className="report-link" to={`/scans/${id}/issues`}>Return to issues</Link>
         </Card>
       )}
-      {/* First, and shown even when the pair could not be compared (a saved
-          link to two reports in the wrong order), since it is how to choose
-          a pair that can be. See ReportPicker for why it is built this way. */}
-      {reports.length >= 2 && (
-        <ReportPicker
-          reports={reports}
-          afterId={id}
-          beforeId={beforeId}
-          shown={history?.scans.length ?? reports.length}
-          total={history?.total ?? reports.length}
-        />
-      )}
       {!data && !error && <p role="status" className="text-sm text-fg-muted">Loading comparison…</p>}
 
       {data && !error && (
         <>
-          {/* The trend, the long view; then the two reports side by side,
-              what changed between them, the table of it, and last the
-              coverage notes. */}
+          {/* Trend first, the long view; then what changed since the
+              chosen scan, the table of it, and last the coverage notes. */}
           <Card className="mb-5 p-4" role="region" aria-labelledby="trend-heading">
             {historyQuery.error ? (
               <>
@@ -206,6 +176,7 @@ export default function CompareRoute() {
             <Comparison
               data={data}
               total={history?.total ?? null}
+              previousId={scanQuery.data?.previous_scan_id ?? null}
               change={change}
               onChange={(next) => setParam("change", next)}
             />
@@ -214,7 +185,7 @@ export default function CompareRoute() {
               <h2 className="font-semibold">Nothing earlier to compare with</h2>
               <p className="mt-1 text-fg-muted">
                 This is the first completed scan of this site. Scan the site again after you fix issues, then compare the two here.
-                {reports.length > 1 && " To compare a later report with this one, choose both under “Reports to compare” above."}
+                {history && history.scans.length > 1 && " To compare a later scan with this one, choose it in the trend above."}
               </p>
             </Card>
           )}
@@ -267,23 +238,27 @@ export default function CompareRoute() {
 function Comparison({
   data,
   total,
+  previousId,
   change,
   onChange,
 }: {
   data: ComparisonReport;
   total: number | null;
+  previousId: number | null;
   /** The table's checked changes, comma-separated; a card is on only when it is the one. */
   change: string;
   onChange: (next: ComparisonChange | "") => void;
 }) {
+  const baseline = data.baseline!;
   const settings = data.settings_changed;
   const unsure = data.rows.filter(unsureChange).length;
   return (
     <>
-      <ReportsSideBySide data={data} />
-      {/* Which two reports, and the way to change them, is the "Reports to
-          compare" form at the top; this line says only how alike they are. */}
       <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+        <p className="font-semibold">
+          Comparing this report with{" "}
+          <Link className="report-link" to={`/scans/${baseline.id}/issues`}>report #{baseline.id}</Link>
+        </p>
         {total !== null && (
           <span className="rounded-full border border-border bg-surface-muted px-3 py-1 text-xs font-semibold">
             {count(total, "completed scan")} of this site so far
@@ -295,6 +270,11 @@ function Comparison({
             : `Same site, but ${count(settings.length, "scan setting")} ${settings.length === 1 ? "differs" : "differ"}.`}{" "}
           Choose a number to filter the table.
         </p>
+        {previousId !== null && previousId !== baseline.id && (
+          <Link className="report-link" to={`/scans/${data.current.id}/compare?compare_to=${previousId}`}>
+            Compare with the previous report (Report #{previousId}) instead
+          </Link>
+        )}
       </div>
       {unsure > 0 && (
         <p className="mb-3 flex max-w-4xl items-start gap-2 rounded-xs border border-sev-major/30 bg-sev-major-bg px-3 py-2 text-sm text-sev-major">

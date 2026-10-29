@@ -62,10 +62,6 @@ class ReportIdentity(BaseModel):
     id: int
     seed_url: str
     started_at: str
-    # The scan's stored page total (``scans.page_count``), for the Compare
-    # reports page's side-by-side summary. Added compatibly: older clients
-    # ignore it.
-    page_count: int = 0
 
 
 class EvidenceLink(BaseModel):
@@ -213,10 +209,7 @@ def previous_scan_id(conn: sqlite3.Connection, scan: dict[str, Any]) -> int | No
 
 def _identity(scan: dict[str, Any]) -> ReportIdentity:
     return ReportIdentity(
-        id=int(scan["id"]),
-        seed_url=str(scan["seed_url"]),
-        started_at=str(scan["started_at"]),
-        page_count=int(scan.get("page_count") or 0),
+        id=int(scan["id"]), seed_url=str(scan["seed_url"]), started_at=str(scan["started_at"])
     )
 
 

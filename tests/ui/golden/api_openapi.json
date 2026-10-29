@@ -2342,8 +2342,7 @@
         "properties": {
           "id": {"type": "integer", "title": "Id"},
           "seed_url": {"type": "string", "title": "Seed Url"},
-          "started_at": {"type": "string", "title": "Started At"},
-          "page_count": {"type": "integer", "title": "Page Count", "default": 0}
+          "started_at": {"type": "string", "title": "Started At"}
         },
         "type": "object",
         "required": ["id", "seed_url", "started_at"],

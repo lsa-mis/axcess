@@ -38,26 +38,3 @@ export function agoLong(iso: string | null): string {
   if (months < 24) return `${count(months, "month")} ago`;
   return `${count(Math.floor(days / 365), "year")} ago`;
 }
-
-/**
- * "Oct 20, 2026" (or "Oct 20, 2026, 2:05 PM" with `withTime`), in the
- * reader's own locale, for the "Reports to compare" choices and the
- * side-by-side Scanned row. A date, not "27 days ago": two reports are told
- * apart by when they ran, and a date stays true in a screenshot.
- */
-export function dateText(iso: string | null, withTime = false): string {
-  const at = parseServerTime(iso);
-  if (Number.isNaN(at)) return "Time not recorded";
-  return new Intl.DateTimeFormat(undefined, withTime ? { dateStyle: "medium", timeStyle: "short" } : { dateStyle: "medium" }).format(at);
-}
-
-/** How long after `from` the scan at `to` ran: "34 days later", "Less than an hour later". */
-export function laterText(from: string | null, to: string | null): string {
-  const start = parseServerTime(from);
-  const end = parseServerTime(to);
-  if (Number.isNaN(start) || Number.isNaN(end)) return "Time not recorded";
-  const hours = Math.max(0, Math.floor((end - start) / 3_600_000));
-  if (hours < 1) return "Less than an hour later";
-  if (hours < 24) return `${count(hours, "hour")} later`;
-  return `${count(Math.floor(hours / 24), "day")} later`;
-}

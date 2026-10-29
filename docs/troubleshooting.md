@@ -109,14 +109,11 @@ completed report of the same start address.
   the host name and a missing trailing slash don't matter, but
   `www.example.edu` and `example.edu`, or two different ports, count as
   different sites. Start the new scan from the same address as the old one.
-- **The wrong earlier report.** In **Reports to compare**, at the top of
-  Compare reports, choose the earlier report under **Before (older
-  report)** and the later one under **After (newer report)**, then choose
-  **Compare these reports**. It lists the site's 20 most recent completed
-  reports. For an older one, add `?compare_to=<earlier report id>` to the
-  Compare reports address (`/app/scans/<new id>/compare`). Both reports must
-  be completed and share a start address. Old `/diff` links still open the
-  same comparison.
+- **The wrong earlier report.** Select the earlier scan in **Trend over
+  time** (or in its data table) and choose **Compare with this report**, or
+  add `?compare_to=<earlier report id>` to the Compare reports address
+  (`/app/scans/<new id>/compare`). Both reports must be completed and share
+  a start address. Old `/diff` links still open the same comparison.
 - **The command-line image diff.** `audit crawl` picks the earlier scan for
   its image findings by itself, and ignores the port on `localhost` addresses.
   To choose it yourself, pass `--compare-to <id>` to `audit crawl` or

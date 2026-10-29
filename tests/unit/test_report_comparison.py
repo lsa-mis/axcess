@@ -645,21 +645,6 @@ def test_no_baseline_still_reports_this_reports_totals(tmp_db: sqlite3.Connectio
     assert result.changes == {"new": 0, "resolved": 0, "remaining": 0}
 
 
-def test_report_identity_carries_each_scans_page_count(tmp_db: sqlite3.Connection) -> None:
-    """The side-by-side summary reads Pages from each report's stored total."""
-    old = scan(tmp_db)
-    new = scan(tmp_db, date="2026-09-02 12:00:00")
-    tmp_db.execute("UPDATE scans SET page_count = 7 WHERE id = ?", (old,))
-    tmp_db.execute("UPDATE scans SET page_count = 9 WHERE id = ?", (new,))
-    result = compare_reports(tmp_db, new)
-    assert result.baseline is not None
-    assert (result.baseline.id, result.baseline.page_count) == (old, 7)
-    assert (result.current.id, result.current.page_count) == (new, 9)
-    # Without an earlier report, this report still says its own.
-    alone = compare_reports(tmp_db, old)
-    assert alone.baseline is None and alone.current.page_count == 7
-
-
 def test_site_history_is_one_sites_completed_public_reports(tmp_db: sqlite3.Connection) -> None:
     """Oldest first, in the order a baseline is chosen, with comparison totals."""
     later = scan(tmp_db, date="2026-09-03 12:00:00")

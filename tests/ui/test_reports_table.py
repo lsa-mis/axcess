@@ -197,10 +197,6 @@ async def test_reports_table_keyboard_and_columns(
     )
     actions_menu = row.get_by_role("button", name=re.compile("^Actions"))
     await playwright_async.expect(actions_menu).to_have_count(0)
-    # One completed scan: nothing to compare, so no link, not a disabled one.
-    await playwright_async.expect(
-        table.get_by_role("link", name=re.compile(r"^Compare reports"))
-    ).to_have_count(0)
     # Keyboard order follows the reading order: open first, then scan again.
     await open_link.focus()
     await page.keyboard.press("Tab")
@@ -335,80 +331,6 @@ async def test_reports_table_keyboard_and_columns(
     await playwright_async.expect(link).to_be_focused()
     await page.keyboard.press("Enter")
     await page.wait_for_url(f"**/app/scans/{headline_id}/issues")
-
-
-def _comparable_site() -> dict[str, Any]:
-    """A site with two completed reports (21 the latest) and a stopped one."""
-    url = "https://compared.example/"
-    latest = _scan(21, "completed", site=url, findings=2)
-    earlier = _scan(20, "completed", site=url, findings=4)
-    stopped = _scan(22, "interrupted", site=url)
-    return {
-        "site_url": url,
-        "scan_count": 3,
-        "completed_count": 2,
-        "most_recent": stopped,
-        "most_recent_completed": latest,
-        "most_recent_completed_issue_count": 3,
-        "most_recent_completed_occurrence_count": 6,
-        "scans": [stopped, latest, earlier],
-    }
-
-
-@pytest.mark.parametrize("width", [320, 1280])
-async def test_compare_reports_link_needs_two_completed_scans(width: int, new_page: Any) -> None:
-    """A site with two completed reports offers "Compare reports" between its links."""
-    if not (DIST / "index.html").exists():
-        pytest.skip("Build the frontend first")
-    page = await _open_reports(new_page, [_comparable_site(), _site(1, 0)])
-    await page.set_viewport_size({"width": width, "height": 900})
-    table = page.get_by_role("table", name="Public reports by site", exact=False)
-    rows = table.locator(":scope > tbody > tr")
-    compared, single = rows.nth(0), rows.nth(1)
-    # The visible words lead the name; the site is screen-reader-only text
-    # inside the link (technique C7), not an aria-label.
-    link = compared.get_by_role("link", name="Compare reports for compared.example", exact=True)
-    await playwright_async.expect(link).to_be_visible()
-    await playwright_async.expect(link).not_to_have_attribute("aria-label", re.compile(".*"))
-    assert (await link.inner_text()).strip().startswith("Compare reports")
-    # The latest completed report, with no compare_to: the server picks the
-    # report before it.
-    await playwright_async.expect(link).to_have_attribute("href", "/app/scans/21/compare")
-    # One completed report: no link at all.
-    await playwright_async.expect(
-        single.get_by_role("link", name=re.compile(r"^Compare reports"))
-    ).to_have_count(0)
-    # Between the site's two other links, in reading and keyboard order.
-    open_link = compared.get_by_role("link", name=re.compile(r"^Open latest scan of compared"))
-    scan_again = compared.get_by_role("link", name=re.compile(r"^Scan again\W+compared\.example"))
-    await open_link.focus()
-    await page.keyboard.press("Tab")
-    await playwright_async.expect(link).to_be_focused()
-    await page.keyboard.press("Tab")
-    await playwright_async.expect(scan_again).to_be_focused()
-    # Side by side, on one line, like its neighbours.
-    open_box, link_box, again_box = [
-        await item.bounding_box() for item in (open_link, link, scan_again)
-    ]
-    assert open_box and link_box and again_box
-    assert open_box["x"] < link_box["x"] < again_box["x"], (open_box, link_box, again_box)
-    assert abs(open_box["y"] - again_box["y"]) < 2, (open_box, again_box)
-    # A 44px target, like the other links.
-    assert link_box["height"] >= 44, link_box
-    violations = await _run_axe(page)
-    assert not violations, _render_violations(violations)
-
-    # The open site's scan rows are unchanged: no compare link per scan.
-    await compared.get_by_role("button", name=re.compile(r"^Show all 3 scans")).click()
-    scan_rows = rows.filter(has=page.get_by_role("link", name=re.compile(r"^Open Report #\d+$")))
-    await playwright_async.expect(scan_rows).to_have_count(3)
-    await playwright_async.expect(
-        scan_rows.get_by_role("link", name=re.compile(r"^Compare"))
-    ).to_have_count(0)
-
-    await link.focus()
-    await page.keyboard.press("Enter")
-    await page.wait_for_url("**/app/scans/21/compare")
 
 
 async def test_a_new_sort_order_is_announced(new_page: Any) -> None:

@@ -20,20 +20,10 @@ const LABEL_GAP = 96;
  * Every completed scan of the site as one line, oldest to newest.
  *
  * A point is a button: click it, or Tab to it and press Enter, and the panel
- * under the chart names the scan, with a link to its issues when it is not
- * this report. The arrow keys move between points. The same numbers are one
- * click away as a table.
- *
- * The chart and its table are a view, not a way to choose reports. Until
- * 2026-10-28 the panel and each table row also had "Compare with this
- * report", recorded here as the way to choose a scan without the chart. The
- * developer removed those links on 2026-10-28, when the "Reports to compare"
- * form (routes/Compare.tsx) became the one way to pick the two reports: two
- * ways to do one thing, one of which paired a scan only with this report,
- * is what W3C COGA, "Making Content Usable"
- * (https://www.w3.org/TR/coga-usable/, paraphrased), asks to avoid: use one
- * consistent way to do one thing. The form also works without the chart,
- * so nothing here is needed to choose a scan.
+ * under the chart names the scan with a link to its issues and, when it is a
+ * different scan from the two being compared, a link that compares it. The
+ * arrow keys move between points. The same numbers are one click away as a
+ * table, which is also the way to choose a scan without the chart at all.
  */
 export default function TrendChart({
   points,
@@ -120,6 +110,7 @@ export default function TrendChart({
             </h3>
             <p className="text-sm text-fg-muted">{totalsSentence(selected)}</p>
           </div>
+          <CompareLink point={selected} points={points} currentId={currentId} baselineId={baselineId} />
           {selected.id !== currentId && (
             <LinkButton variant="primary" to={`/scans/${selected.id}/issues`}>
               Open report #{selected.id} issues
@@ -315,6 +306,36 @@ function Plot({
   );
 }
 
+/** Where comparing with a selected scan leads: always the later scan's page. */
+function CompareLink({
+  point,
+  points,
+  currentId,
+  baselineId,
+}: {
+  point: SiteHistoryPoint;
+  points: SiteHistoryPoint[];
+  currentId: number;
+  baselineId: number | null;
+}) {
+  if (point.id === currentId || point.id === baselineId) return null;
+  return <LinkButton to={compareHref(point, currentId, points)}>Compare with this report</LinkButton>;
+}
+
+/**
+ * A comparison belongs to the later report and takes the earlier one as its
+ * baseline. "Later" is the trend's own order (start time, as the server
+ * orders a baseline); ids only decide when this report is outside the window.
+ */
+function compareHref(point: SiteHistoryPoint, currentId: number, points: SiteHistoryPoint[]): string {
+  const at = points.findIndex((p) => p.id === point.id);
+  const current = points.findIndex((p) => p.id === currentId);
+  const earlier = current >= 0 ? at < current : point.id < currentId;
+  return earlier
+    ? `/scans/${currentId}/compare?compare_to=${point.id}`
+    : `/scans/${point.id}/compare?compare_to=${currentId}`;
+}
+
 function HistoryTable({
   points,
   currentId,
@@ -349,6 +370,11 @@ function HistoryTable({
               <Cell numeric>{point.groups.toLocaleString()}</Cell>
               <Cell className="py-1">
                 <span className="flex flex-wrap justify-center gap-x-4">
+                  {point.id !== currentId && point.id !== baselineId && (
+                    <LinkButtonText to={compareHref(point, currentId, points)}>
+                      Compare<span className="sr-only"> report #{point.id}</span> with this report
+                    </LinkButtonText>
+                  )}
                   {point.id !== currentId && (
                     <LinkButtonText to={`/scans/${point.id}/issues`}>
                       Open<span className="sr-only"> report #{point.id}</span> issues
