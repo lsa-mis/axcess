@@ -1444,3 +1444,77 @@ async def test_grouped_images_row_has_one_link_holding_the_picture(
     await playwright_async.expect(page.get_by_role("heading", level=1)).not_to_have_text(
         "Page not found"
     )
+
+
+_LONG_ALT = (
+    "the first image in this section as viewed by a person with green-blind colorblindness "
+    "the colors for the normal status and the error status look almost the same"
+)
+
+
+async def test_images_table_has_a_severity_column_and_rows_do_not_overlap(
+    live_server: tuple[str, int], new_page: Any
+) -> None:
+    """Severity is its own column (2026-10-30); stacked under "Image #N" it
+    was taller than the fixed row and ran into the next row."""
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(f"{base}/app/scans/{scan_id}/findings", wait_until="networkidle")
+    table = page.get_by_role("table", name="Images")
+    await playwright_async.expect(table.get_by_role("columnheader")).to_have_text(
+        [
+            "Image",
+            "Preview",
+            "Text read from image (OCR)",
+            "Alt text",
+            "Image type",
+            "Severity",
+            "Status",
+            "Page",
+        ]
+    )
+    rows = table.get_by_role("row").filter(has=page.get_by_role("cell"))
+    assert await rows.count() >= 2
+    # The first cell is the link alone; the severity is in its own cell.
+    first_cells = rows.locator("[role=cell]:first-child")
+    await playwright_async.expect(first_cells.first).to_have_text(re.compile(r"^Image #\d+$"))
+    # Nothing in a row reaches outside it.
+    spills = await rows.evaluate_all(
+        "rows => rows.filter(r => { const b = r.getBoundingClientRect();"
+        " return [...r.querySelectorAll('[role=cell] *')].some(c => {"
+        " const d = c.getBoundingClientRect();"
+        " return d.bottom > b.bottom + 0.5 || d.top < b.top - 0.5; }); }).length"
+    )
+    assert spills == 0
+
+
+async def test_image_details_pages_table_wraps_long_alt_text(
+    seeded_db: tuple[Path, Path, int], live_server: tuple[str, int], new_page: Any
+) -> None:
+    """Long alt text wraps, so the table fits at 1280 pixels and stays short.
+
+    Cut to one line, the alt text widened its column to the whole sentence,
+    scrolled the table sideways and squeezed the other columns (2026-10-30).
+    """
+    db_path, _, _ = seeded_db
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.execute("UPDATE page_images SET alt_text=?", (_LONG_ALT,))
+        conn.commit()
+    finally:
+        conn.close()
+    base, _ = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(f"{base}/app/findings/1", wait_until="networkidle")
+    region = page.get_by_role("region", name="Pages with this image table")
+    await playwright_async.expect(region).to_contain_text("look almost the same")
+    assert not await region.evaluate("e => e.scrollWidth > e.clientWidth")
+    # The whole alt text shows, not a cut line with the rest in a tooltip.
+    alt = region.get_by_text(re.compile(r"green-blind colorblindness")).first
+    await playwright_async.expect(alt).not_to_have_attribute("title", re.compile(".*"))
+    # The page's two links sit on one line: a row is two lines, not three.
+    row = region.locator("tbody tr").first
+    box = await row.bounding_box()
+    assert box and box["height"] < 140, box
+    violations = await _run_axe(page)
+    assert not violations, _render_violations(violations)

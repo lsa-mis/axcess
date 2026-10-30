@@ -549,8 +549,19 @@ export function Disclosure({
   );
 }
 
-/** Alt-attribute pill (missing / empty / authored), Siteimprove-style tag. */
-export function AltTag({ value }: { value: string | null }) {
+/**
+ * Alt-attribute pill (missing / empty / authored), Siteimprove-style tag.
+ *
+ * Authored alt text is cut to one line by default, for a list whose rows have
+ * a fixed height (the Images page). `wrap` shows all of it instead, over as
+ * many lines as it needs. Use it wherever the row can grow: the alt text is
+ * the evidence being judged, and cut text is shown whole only in a tooltip on
+ * mouse hover, which keyboard and touch users never see (SC 1.4.13 Content on
+ * Hover or Focus, Level AA, paraphrased: hover content must also be reachable
+ * by focus). In a table, unwrapped text also widens its column to the whole
+ * sentence, squeezing the other columns and scrolling the table sideways.
+ */
+export function AltTag({ value, wrap = false }: { value: string | null; wrap?: boolean }) {
   if (value === null) {
     return (
       <span className="inline-flex items-center rounded-xs border border-sev-critical/40 bg-sev-critical-bg px-2 py-0.5 text-2xs font-semibold text-sev-critical">
@@ -566,7 +577,10 @@ export function AltTag({ value }: { value: string | null }) {
     );
   }
   return (
-    <span className="block max-w-full truncate text-xs text-fg" title={value}>
+    <span
+      className={cn("block max-w-full text-xs text-fg", wrap ? "break-words" : "truncate")}
+      title={wrap ? undefined : value}
+    >
       &ldquo;{value}&rdquo;
     </span>
   );

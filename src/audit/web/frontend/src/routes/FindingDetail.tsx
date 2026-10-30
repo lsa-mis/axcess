@@ -221,7 +221,7 @@ export default function FindingDetailRoute() {
                 )}
               </VerdictCell>
               <VerdictCell label="Alt text">
-                <AltTag value={firstAlt} />
+                <AltTag value={firstAlt} wrap />
               </VerdictCell>
             </div>
             {(data.vlm_classification || data.vlm_rationale) && (
@@ -339,7 +339,11 @@ export default function FindingDetailRoute() {
               <tbody>
                 {paged.pageRows.map((o, i) => (
                   <Row key={i} index={(paged.page - 1) * paged.pageSize + i}>
-                    <Cell>
+                    {/* Wide enough for "Open live page · Page details" on one
+                        line: squeezed by the alt text, the two links fell
+                        onto lines of their own and each row grew to three
+                        44-pixel lines. */}
+                    <Cell className="min-w-[16rem]">
                       <PageLink
                         pageId={o.page_id}
                         scanId={data.scan_id}
@@ -351,8 +355,13 @@ export default function FindingDetailRoute() {
                         backTo={`/findings/${id}`}
                       />
                     </Cell>
+                    {/* The alt text wraps (AltTag `wrap`): cut to one line, it
+                        widened its column to the whole sentence, scrolled the
+                        table sideways and squeezed "Visible without
+                        scrolling" to a word per line (developer report,
+                        2026-10-30). */}
                     <Cell>
-                      <AltTag value={o.alt_text} />
+                      <AltTag value={o.alt_text} wrap />
                     </Cell>
                     <Cell className="text-fg-muted">
                       {o.above_fold ? "Yes" : "No"}

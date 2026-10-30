@@ -202,6 +202,21 @@ export default function FindingsRoute() {
 }
 
 /**
+ * The table's columns, shared by its header row and its rows: Image, Preview,
+ * Text read from the image, Alt text, Image type, Severity, Status, Page.
+ *
+ * Severity has a column of its own (2026-10-30, the developer's suggestion):
+ * stacked under "Image #12" in the first cell, the two were taller than the
+ * fixed row height (64 pixels) and the chip ran into the next row's link.
+ * Severity and Status sit side by side, in the order the grouped images table
+ * uses (Severity, Status, Pages), so the two views of the same images read
+ * the same way (W3C COGA, "Making Content Usable": the same pattern for the
+ * same kind of thing). Page, the widest, comes last. Image type and Status
+ * are 7rem: their words fit, and the room goes to the three text columns.
+ */
+const COLUMNS = "grid-cols-[6rem_5.5rem_minmax(0,1fr)_minmax(0,1fr)_7rem_5.5rem_7rem_minmax(0,1fr)]";
+
+/**
  * Virtualized findings table. Only the visible rows are rendered to the
  * DOM, a 1000-finding scan still scrolls at 60fps. Thumbnails are a
  * fixed 72×48 and never expand; clicking a row opens the detail page.
@@ -236,15 +251,16 @@ function FindingsTable({
     >
       <div
         role="row"
-        className="grid grid-cols-[6rem_5.5rem_minmax(0,1fr)_minmax(0,1fr)_8rem_minmax(0,1fr)_8rem] items-center gap-3 border-b border-border bg-surface-muted px-4 py-2 text-2xs font-semibold text-fg-muted"
+        className={`grid ${COLUMNS} items-center gap-3 border-b border-border bg-surface-muted px-4 py-2 text-2xs font-semibold text-fg-muted`}
       >
         <span role="columnheader">Image</span>
         <span role="columnheader">Preview</span>
         <span role="columnheader">Text read from image (OCR)</span>
         <span role="columnheader">Alt text</span>
         <span role="columnheader">Image type</span>
-        <span role="columnheader">Page</span>
+        <span role="columnheader">Severity</span>
         <span role="columnheader">Status</span>
+        <span role="columnheader">Page</span>
       </div>
       <div ref={scrollRef} className="max-h-[70vh] overflow-auto">
         <div
@@ -261,18 +277,20 @@ function FindingsTable({
                   transform: `translateY(${v.start}px)`,
                   height: v.size,
                 }}
-                className="absolute inset-x-0 grid grid-cols-[6rem_5.5rem_minmax(0,1fr)_minmax(0,1fr)_8rem_minmax(0,1fr)_8rem] items-center gap-3 border-b border-border px-4 py-1.5 transition-colors hover:bg-surface-muted/60"
+                className={`absolute inset-x-0 grid ${COLUMNS} items-center gap-3 border-b border-border px-4 py-1.5 transition-colors hover:bg-surface-muted/60`}
               >
                 {/* The link names its destination, "Image #12" (the detail page's
-                    own title); the severity chip sits under it as plain text.
-                    The chip alone used to be the link, so its words were
-                    "critical" or "info": a severity, not where the link goes
-                    (SC 2.4.4 Link Purpose (In Context), Level AA). */}
-                <div role="cell" className="flex flex-col items-start gap-1">
+                    own title). The severity chip alone used to be the link, so
+                    its words were "critical" or "info": a severity, not where
+                    the link goes (SC 2.4.4 Link Purpose (In Context), Level AA).
+                    The chip then sat under the link, in the same cell, until
+                    2026-10-30: the two were taller than the fixed row, so the
+                    chip ran into the next row's link. It has its own column
+                    now (see COLUMNS). */}
+                <div role="cell">
                   <Link to={`/findings/${f.id}`} className="inline-flex min-h-target items-center text-xs font-semibold">
                     Image #{f.id}
                   </Link>
-                  <SeverityChip value={f.severity} />
                 </div>
                 <div role="cell">
                   {f.has_svg_text ? (
@@ -313,14 +331,20 @@ function FindingsTable({
                 <div role="cell" className="text-xs text-fg-muted">
                   {f.vlm_classification ? sentenceCase(f.vlm_classification) : "Not classified"}
                 </div>
+                <div role="cell">
+                  <SeverityChip value={f.severity} />
+                </div>
+                <div role="cell">
+                  <StatusChip value={f.status} />
+                </div>
                 <div role="cell" className="min-w-0">
                   {f.sample_page ? (
                     // Page URL is now a real external link (target=_blank)
                     // so a click here opens the actual page that has the
                     // issue. Previously this rendered the URL as the
                     // link text but pointed at /findings/{id}, which was
-                    // misleading. The severity chip on the same row
-                    // still links to the finding detail.
+                    // misleading. "Image #12" in the first column
+                    // links to the image's details.
                     <a
                       href={f.sample_page}
                       target="_blank"
@@ -335,9 +359,6 @@ function FindingsTable({
                   ) : (
                     <span className="text-xs text-fg-subtle">Does not apply</span>
                   )}
-                </div>
-                <div role="cell">
-                  <StatusChip value={f.status} />
                 </div>
               </div>
             );
