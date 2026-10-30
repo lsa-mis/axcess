@@ -8,6 +8,7 @@ import {
   Button,
   Card,
   LinkButton,
+  PageActionLinks,
   PageHeader,
   PageLink,
   Select,
@@ -19,6 +20,7 @@ import {
   Cell,
   ColumnHeader,
   Row,
+  RowHeader,
   Table,
   TableBar,
   TableHead,
@@ -328,22 +330,40 @@ export default function FindingDetailRoute() {
             <TableBar pager={<TablePagination label="Pages with this image" noun="pages" {...paged} />} />
           )}
           <TableRegion label="Pages with this image table" paged={paged}>
+            {/* Four columns, laid out as the Reports table is (routes/Scans.tsx):
+                the page names the row (its address is the row header, `th
+                scope="row"`, technique H63), then what was found on it, then
+                Actions last, both links side by side. The developer asked for
+                this order (2026-10-30). "Open live page" and "Page details"
+                used to sit under each address, which made every row three
+                lines tall and mixed what the row is about with what to do with
+                it; an Actions column keeps the address column to the address
+                (W3C COGA, "Making Content Usable": related content grouped,
+                one idea per chunk). The address itself still opens the page
+                inspector, as everywhere a page is named.
+
+                The alt text wraps (AltTag `wrap`): cut to one line, it widened
+                its column to the whole sentence, scrolled the table sideways
+                and squeezed the other columns (developer report, 2026-10-30).
+                It keeps at least 16rem, so on a narrow screen the table
+                scrolls sideways (SC 1.4.10 Reflow allows that for a data
+                table) instead of squeezing the alt text to a word per line.
+                "Visible without scrolling" keeps room for its heading on two
+                lines and its "Yes" or "No" centred under it, as the table's
+                short values are (Cell). */}
             <Table caption={`Pages with image #${data.id}`}>
               <TableHead>
                 <tr>
                   <ColumnHeader>Page</ColumnHeader>
                   <ColumnHeader>Alt text on that page</ColumnHeader>
-                  <ColumnHeader>Visible without scrolling</ColumnHeader>
+                  <ColumnHeader className="min-w-[9rem]">Visible without scrolling</ColumnHeader>
+                  <ColumnHeader className="whitespace-nowrap">Actions</ColumnHeader>
                 </tr>
               </TableHead>
               <tbody>
                 {paged.pageRows.map((o, i) => (
                   <Row key={i} index={(paged.page - 1) * paged.pageSize + i}>
-                    {/* Wide enough for "Open live page · Page details" on one
-                        line: squeezed by the alt text, the two links fell
-                        onto lines of their own and each row grew to three
-                        44-pixel lines. */}
-                    <Cell className="min-w-[16rem]">
+                    <RowHeader className="min-w-[12rem] font-normal">
                       <PageLink
                         pageId={o.page_id}
                         scanId={data.scan_id}
@@ -353,18 +373,26 @@ export default function FindingDetailRoute() {
                         context={`Image ${id}`}
                         contextTo={`/findings/${id}`}
                         backTo={`/findings/${id}`}
+                        actions={false}
                       />
-                    </Cell>
-                    {/* The alt text wraps (AltTag `wrap`): cut to one line, it
-                        widened its column to the whole sentence, scrolled the
-                        table sideways and squeezed "Visible without
-                        scrolling" to a word per line (developer report,
-                        2026-10-30). */}
-                    <Cell>
+                    </RowHeader>
+                    <Cell className="min-w-[16rem]">
                       <AltTag value={o.alt_text} wrap />
                     </Cell>
-                    <Cell className="text-fg-muted">
+                    <Cell className="text-center text-fg-muted">
                       {o.above_fold ? "Yes" : "No"}
+                    </Cell>
+                    <Cell className="whitespace-nowrap">
+                      <PageActionLinks
+                        look="actions"
+                        className="justify-center"
+                        pageId={o.page_id}
+                        scanId={data.scan_id}
+                        pageUrl={o.page_url}
+                        display={o.page_url}
+                        origin={`Image #${id}`}
+                        backTo={`/findings/${id}`}
+                      />
                     </Cell>
                   </Row>
                 ))}

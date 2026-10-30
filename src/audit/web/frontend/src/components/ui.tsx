@@ -1155,6 +1155,7 @@ export function PageLink({
   context,
   contextTo,
   backTo,
+  actions = true,
 }: {
   pageId: number;
   /** Report scope required for the in-app inspector route. */
@@ -1181,6 +1182,11 @@ export function PageLink({
   contextTo?: string;
   /** In-app path the inspector's "Back" link returns to. */
   backTo?: string;
+  /**
+   * Show "Open live page · Page details" under the address. A table with an
+   * Actions column turns this off and puts PageActionLinks there instead.
+   */
+  actions?: boolean;
 }) {
   const display = pageTitle?.trim() || pageUrl;
   // Screen-reader-only context, so each link names where it goes by itself:
@@ -1259,31 +1265,86 @@ export function PageLink({
           {pageUrl}
         </div>
       )}
-      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-2xs text-fg-muted">
-        <a
-          href={pageUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex min-h-target items-center underline underline-offset-2 hover:text-fg"
-        >
-          Open live page ↗
-          <span className="sr-only"> of {display} (opens in a new tab)</span>
-        </a>
-        {scanId != null && (
-          <>
+      {actions && (
+        <PageActionLinks
+          pageId={pageId}
+          scanId={scanId}
+          pageUrl={pageUrl}
+          display={display}
+          origin={origin}
+          backTo={backTo}
+          className="mt-1"
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * A page's two links, "Open live page ↗" and "Page details", with words for a
+ * screen reader that name the page. PageLink shows them under the address;
+ * a table with an Actions column shows them there, side by side, as `look`
+ * "actions" (Image details, routes/FindingDetail.tsx).
+ *
+ * `look` "quiet", under the address: small and muted, separated by a dot,
+ * secondary to the address above them. `look` "actions", in an Actions
+ * column: the report link style the Reports table uses for its row actions
+ * (routes/Scans.tsx, "Actions"), so the same kind of column looks and reads
+ * the same on both screens (SC 3.2.4 Consistent Identification, Level AA;
+ * W3C COGA, "Making Content Usable": the same pattern for the same kind of
+ * thing). One component for both, so the links' words and targets stay one.
+ */
+export function PageActionLinks({
+  pageId,
+  scanId,
+  pageUrl,
+  display,
+  origin,
+  backTo,
+  look = "quiet",
+  className,
+}: {
+  pageId: number;
+  scanId?: number;
+  pageUrl: string;
+  /** The page as the screen-reader-only words name it: its title, else its address. */
+  display: string;
+  origin?: string;
+  backTo?: string;
+  look?: "quiet" | "actions";
+  className?: string;
+}) {
+  const link =
+    look === "actions"
+      ? "report-link inline-flex min-h-target items-center whitespace-nowrap px-1 font-semibold"
+      : "inline-flex min-h-target items-center underline underline-offset-2 hover:text-fg";
+  return (
+    <div
+      className={cn(
+        "flex items-center",
+        // In an Actions column the two stay on one line, as Reports' do: the
+        // column takes their width rather than stacking them.
+        look === "actions" ? "gap-2 text-sm" : "flex-wrap gap-x-2 gap-y-0.5 text-2xs text-fg-muted",
+        className,
+      )}
+    >
+      <a href={pageUrl} target="_blank" rel="noopener noreferrer" className={link}>
+        Open live page ↗
+        <span className="sr-only"> of {display} (opens in a new tab)</span>
+      </a>
+      {scanId != null && (
+        <>
+          {look === "quiet" && (
             <span aria-hidden className="text-fg-subtle">
               ·
             </span>
-            <Link
-              to={pageEvidencePath({ scanId, pageId, origin, backTo })}
-              className="inline-flex min-h-target items-center underline underline-offset-2 hover:text-fg"
-            >
-              Page details
-              <span className="sr-only"> for {display}</span>
-            </Link>
-          </>
-        )}
-      </div>
+          )}
+          <Link to={pageEvidencePath({ scanId, pageId, origin, backTo })} className={link}>
+            Page details
+            <span className="sr-only"> for {display}</span>
+          </Link>
+        </>
+      )}
     </div>
   );
 }

@@ -1512,8 +1512,25 @@ async def test_image_details_pages_table_wraps_long_alt_text(
     # The whole alt text shows, not a cut line with the rest in a tooltip.
     alt = region.get_by_text(re.compile(r"green-blind colorblindness")).first
     await playwright_async.expect(alt).not_to_have_attribute("title", re.compile(".*"))
-    # The page's two links sit on one line: a row is two lines, not three.
+    # Laid out as Reports is: the page names the row, Actions comes last
+    # with both links side by side (2026-10-30).
+    await playwright_async.expect(region.get_by_role("columnheader")).to_have_text(
+        ["Page", "Alt text on that page", "Visible without scrolling", "Actions"]
+    )
     row = region.locator("tbody tr").first
+    await playwright_async.expect(row.get_by_role("rowheader")).to_contain_text(
+        "http://example.com"
+    )
+    await playwright_async.expect(row.get_by_role("rowheader").get_by_role("link")).to_have_count(1)
+    actions = row.get_by_role("cell").last
+    live = actions.get_by_role("link", name=re.compile(r"^Open live page"))
+    details = actions.get_by_role("link", name=re.compile(r"^Page details for "))
+    live_box, details_box = await live.bounding_box(), await details.bounding_box()
+    assert live_box and details_box
+    assert abs(live_box["y"] - details_box["y"]) < 2, (live_box, details_box)
+    for link_box in (live_box, details_box):
+        assert link_box["height"] >= 44, link_box
+    # A row is as tall as its alt text, no taller.
     box = await row.bounding_box()
     assert box and box["height"] < 140, box
     violations = await _run_axe(page)
