@@ -237,7 +237,7 @@ export default function ComparedIssuesTable({
             : "No kinds of issues match. Clear the filters to see them all."}
         </TableEmpty>
       ) : (
-        <TableRegion label="Compared issues" paged={paged}>
+        <TableRegion label="Compared issues">
           <Table caption={`Issues in report #${baselineId} and report #${currentId}. ${describeSort(sort)}.`}>
             <TableHead>
               <tr>

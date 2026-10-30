@@ -411,7 +411,7 @@ function DrillDownView({
             {!status && <> for this WCAG criterion.</>}
           </TableEmpty>
         ) : (
-          <TableRegion label="Rule check occurrences table" paged={paged}>
+          <TableRegion label="Rule check occurrences table">
             <Table
               caption={`Rule check occurrences for ${wcagSc ? `WCAG ${wcagSc}` : "best practice"}, most serious impact first`}
             >

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useSearchParams } from "react-router";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "./ui";
@@ -37,8 +37,6 @@ export function usePagedRows<T>(
   setPage: (page: number) => void;
   /** Rows per page, from Settings; row `i` on this page is number `(page - 1) * pageSize + i + 1`. */
   pageSize: number;
-  /** Spread on the element around the table: keeps its height from page to page. */
-  hold: { ref: (node: HTMLElement | null) => void; style: { minHeight?: number } };
   /** DOM id of this table's pager, unique even when a view draws the same table twice. */
   pagerId: string;
 } {
@@ -96,22 +94,14 @@ export function usePagedRows<T>(
     );
   };
 
-  // The table keeps the height of its tallest page so far, so turning to a
-  // short last page does not pull the pager, and everything under it, up
-  // the screen. Rows vary in height (titles wrap), so the height is measured
-  // rather than padded with blank rows. A new filter or sort starts over.
-  const holder = useRef<HTMLElement | null>(null);
-  const [held, setHeld] = useState(0);
-  if (restart && held !== 0) setHeld(0);
-  const ref = useCallback((node: HTMLElement | null) => {
-    holder.current = node;
-  }, []);
-  useLayoutEffect(() => {
-    const node = holder.current;
-    if (!node || pages <= 1) return;
-    const height = Math.ceil(node.getBoundingClientRect().height);
-    if (height > held) setHeld(height);
-  }, [page, pages, rows, held]);
+  // A short last page leaves the table short. From 2026-09-23 to 2026-10-30
+  // the table kept the height of its tallest page, so turning to a short last
+  // page would not pull the pager up the screen. The pager has since moved
+  // into the bar above the table (TableBar), where the table's height cannot
+  // move it, so all the hold still did was leave a block of empty rows under
+  // the last one, which read as a page that had failed to load (developer
+  // report, Reports page 2 of 2). What sits under a table moving up after a
+  // page turn is ordinary, and the reader asked for the change.
 
   const start = (page - 1) * pageSize;
   return {
@@ -121,7 +111,6 @@ export function usePagedRows<T>(
     total,
     setPage,
     pageSize,
-    hold: { ref, style: pages > 1 && held ? { minHeight: held } : {} },
     pagerId,
   };
 }
@@ -177,7 +166,6 @@ export function TablePagination({
   pagerId,
   disabled = false,
 }: {
-  hold?: unknown;
   /** The table's name, for the controls' accessible names ("Issues"). */
   label: string;
   /** What a row is, plural ("kinds of issues", "pages"). */

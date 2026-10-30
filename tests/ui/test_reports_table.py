@@ -284,6 +284,12 @@ async def test_reports_table_keyboard_and_columns(
         await pagination.get_by_role("button", name="Page 3 of public reports").click()
         await playwright_async.expect(table.locator(":scope > tbody > tr")).to_have_count(3)
         await playwright_async.expect(next_page).to_have_attribute("aria-disabled", "true")
+        # A short last page leaves the table short: no block of empty rows
+        # held from the full page before it (removed 2026-10-30).
+        region_box = await region.bounding_box()
+        table_box = await table.bounding_box()
+        assert region_box and table_box
+        assert region_box["height"] <= table_box["height"] + 2, (region_box, table_box)
         # The failed-only site is last: no completed scan, so no numbers.
         last = table.locator(":scope > tbody > tr").last
         await playwright_async.expect(last).to_contain_text("No completed scan yet")

@@ -334,7 +334,7 @@ function RuleGroupCard({
           {paged.pages > 1 && (
             <TableBar pager={<TablePagination label={`${group.rule_id} occurrences`} noun="occurrences" {...paged} />} />
           )}
-          <TableRegion label={`${group.rule_id} occurrences table`} paged={paged}>
+          <TableRegion label={`${group.rule_id} occurrences table`}>
             <Table caption={`${group.rule_id} occurrences`}>
               <TableHead>
                 <tr>

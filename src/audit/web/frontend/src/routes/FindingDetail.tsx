@@ -329,7 +329,7 @@ export default function FindingDetailRoute() {
           {paged.pages > 1 && (
             <TableBar pager={<TablePagination label="Pages with this image" noun="pages" {...paged} />} />
           )}
-          <TableRegion label="Pages with this image table" paged={paged}>
+          <TableRegion label="Pages with this image table">
             {/* Four columns, laid out as the Reports table is (routes/Scans.tsx):
                 the page names the row (its address is the row header, `th
                 scope="row"`, technique H63), then what was found on it, then

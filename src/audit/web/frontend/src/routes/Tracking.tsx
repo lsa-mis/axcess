@@ -222,7 +222,7 @@ export default function TrackingRoute() {
           >
             Sorted by {SORT_LABELS[sort]}, {sortWords(SORT_KINDS[sort], dir)}.
           </TableStatus>
-          <TableRegion label="Roadmap table" paged={criteria}>
+          <TableRegion label="Roadmap table">
             <Table caption="What Axcess checks for each WCAG 2.2 Level A and AA criterion, and planned AI reviews">
               <TableHead>
                 <tr>
@@ -293,7 +293,7 @@ export default function TrackingRoute() {
           {pipelines.pages > 1 && (
             <TableBar pager={<TablePagination label="Checks" noun="checks" {...pipelines} />} />
           )}
-          <TableRegion label="Checks table" paged={pipelines}>
+          <TableRegion label="Checks table">
             <Table caption="Checks that run in a default scan">
               <TableHead>
                 <tr>

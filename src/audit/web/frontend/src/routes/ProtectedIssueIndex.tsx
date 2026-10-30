@@ -138,7 +138,7 @@ export default function ProtectedIssueIndexRoute() {
               {paged.pages > 1 && (
                 <TableBar pager={<TablePagination label="Sign-in scan issues" noun="kinds of issues" {...paged} />} />
               )}
-              <TableRegion label="Sign-in scan issues table" paged={paged}>
+              <TableRegion label="Sign-in scan issues table">
                 <Table caption="Sign-in scan issues, grouped by check and rule">
                   <TableHead>
                     <tr>

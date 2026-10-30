@@ -20,8 +20,7 @@ import { ariaSort, nextSort, sortChip, type Sort, type SortKind } from "./sort";
  *                  the pager (../TablePagination) on the right, and the
  *                  active filters written out beneath
  *   TableStatus    the polite line that says how the rows are ordered
- *   TableRegion    the keyboard-scrollable region, and the height hold that
- *                  keeps the table's foot still between pages
+ *   TableRegion    the keyboard-scrollable region
  *     Table, TableHead, SortHeader / ColumnHeader
  *     Row, RowHeader, Cell    striped rows, one target tall
  *
@@ -170,27 +169,20 @@ export function TableStatus({
   );
 }
 
-/** What `TableRegion` needs from `usePagedRows`. */
-type Paged = {
-  hold: { ref: (node: HTMLElement | null) => void; style: { minHeight?: number } };
-};
-
 /**
  * The scroll region around a table. Keyboard users need focus on it to
- * scroll a wide table sideways, so it takes focus and carries a name. With
- * `paged`, it holds the tallest page's height, so turning to a short last
- * page does not pull everything under the table up the screen.
+ * scroll a wide table sideways, so it takes focus and carries a name. (It
+ * used to hold a paged table at its tallest page's height; see usePagedRows
+ * for why that was dropped.)
  */
 export function TableRegion({
   label,
-  paged,
   busy,
   regionRef,
   className,
   children,
 }: {
   label: string;
-  paged?: Paged;
   busy?: boolean;
   regionRef?: Ref<HTMLDivElement>;
   /**
@@ -268,7 +260,7 @@ export function TableRegion({
         className,
       )}
     >
-      {paged ? <div {...paged.hold}>{children}</div> : children}
+      {children}
     </div>
   );
 }

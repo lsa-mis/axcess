@@ -501,7 +501,7 @@ export default function ScansRoute() {
           <p role="status" className="sr-only">
             Sorted by {SORT_LABELS[sort.column]}, {sortWords(SORT_KINDS[sort.column], sort.direction)}.
           </p>
-          <TableRegion label="Public reports table" paged={sitePages}>
+          <TableRegion label="Public reports table">
             <Table
               ruled
               className="min-w-[48rem]"
@@ -602,7 +602,7 @@ export default function ScansRoute() {
               {protectedPages.pages > 1 && (
                 <TableBar pager={<TablePagination label="Sign-in scans" noun="sign-in scans" {...protectedPages} />} />
               )}
-              <TableRegion label="Sign-in scans table" paged={protectedPages}>
+              <TableRegion label="Sign-in scans table">
                 <Table className="min-w-[58rem]" caption="Your sign-in scans, most recently updated first">
                   <TableHead>
                     <tr>

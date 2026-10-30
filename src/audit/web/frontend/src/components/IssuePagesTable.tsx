@@ -197,7 +197,7 @@ export default function IssuePagesTable({
             : "No pages match that search."}
         </TableEmpty>
       ) : (
-        <TableRegion label="Pages table" paged={paged}>
+        <TableRegion label="Pages table">
           <Table className="min-w-[44rem]" caption={`Pages with ${row.title}`}>
             <TableHead>
               <tr>

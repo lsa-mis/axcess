@@ -706,9 +706,8 @@ function laneSummary(rows: IssueRow[]): string {
  * something with a name. The issue column is sticky, so the row keeps its
  * label while the rest scrolls under it.
  *
- * The rows arrive paged (the pager is in the bar over the table), and the
- * region keeps the tallest page's height, so paging never moves what sits
- * under the table.
+ * The rows arrive paged (the pager is in the bar over the table). A short
+ * last page leaves the table short (see usePagedRows).
  */
 function IssueTable({
   scanId,
@@ -720,7 +719,7 @@ function IssueTable({
   regionRef,
 }: {
   scanId: number;
-  paged: Pick<ReturnType<typeof usePagedRows<IssueRow>>, "pageRows" | "page" | "pageSize" | "hold">;
+  paged: Pick<ReturnType<typeof usePagedRows<IssueRow>>, "pageRows" | "page" | "pageSize">;
   /** Where links out of the table return to. */
   here: string;
   sort: SortState;
@@ -730,7 +729,7 @@ function IssueTable({
 }) {
   const offset = (paged.page - 1) * paged.pageSize;
   return (
-    <TableRegion label="Issues table" paged={paged} busy={busy} regionRef={regionRef}>
+    <TableRegion label="Issues table" busy={busy} regionRef={regionRef}>
       <Table caption={`Kinds of accessibility issue, one per row. ${describeSort(sort)}.`}>
         <TableHead>
           <tr>

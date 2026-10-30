@@ -403,7 +403,7 @@ function FindingsInGroup({
       {paged.pages > 1 && (
         <TableBar pager={<TablePagination label="Images in this group" noun="images" {...paged} />} />
       )}
-      <TableRegion label={`${label} images table`} paged={paged}>
+      <TableRegion label={`${label} images table`}>
         <Table caption={`Images in ${label}`}>
           <TableHead>
             <tr>
