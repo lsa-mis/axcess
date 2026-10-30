@@ -9,6 +9,7 @@ import {
   EmptyState,
   LinkButton,
   PageHeader,
+  pageEvidencePath,
   Select,
   SeverityChip,
   StatCard,
@@ -292,7 +293,7 @@ function GroupCard({
             kind="image"
           />
 
-          <FindingsInGroup findings={group.findings} label={group.label} />
+          <FindingsInGroup findings={group.findings} label={group.label} scanId={scanId} />
         </div>
       )}
     </Card>
@@ -384,7 +385,15 @@ function BulkStatusBar({
   );
 }
 
-function FindingsInGroup({ findings, label }: { findings: GroupedFinding[]; label: string }) {
+function FindingsInGroup({
+  findings,
+  label,
+  scanId,
+}: {
+  findings: GroupedFinding[];
+  label: string;
+  scanId: number;
+}) {
   // One table per group, so the page is kept per group rather than in the URL.
   // A new row set (a status filter, a bulk update) starts it over.
   const resetKey = useMemo(() => findings.map((f) => f.id).join(","), [findings]);
@@ -407,7 +416,12 @@ function FindingsInGroup({ findings, label }: { findings: GroupedFinding[]; labe
           </TableHead>
           <tbody>
             {paged.pageRows.map((f, index) => (
-              <FindingRow key={f.id} finding={f} index={(paged.page - 1) * paged.pageSize + index} />
+              <FindingRow
+                key={f.id}
+                finding={f}
+                scanId={scanId}
+                index={(paged.page - 1) * paged.pageSize + index}
+              />
             ))}
           </tbody>
         </Table>
@@ -416,7 +430,15 @@ function FindingsInGroup({ findings, label }: { findings: GroupedFinding[]; labe
   );
 }
 
-function FindingRow({ finding, index }: { finding: GroupedFinding; index: number }) {
+function FindingRow({
+  finding,
+  scanId,
+  index,
+}: {
+  finding: GroupedFinding;
+  scanId: number;
+  index: number;
+}) {
   const [showPages, setShowPages] = useState(false);
   return (
     <Row index={index}>
@@ -512,8 +534,18 @@ function FindingRow({ finding, index }: { finding: GroupedFinding; index: number
                   <span aria-hidden> ↗</span>
                   <span className="sr-only">opens in a new tab</span>
                 </a>
+                {/* The page's evidence in this report. It pointed at
+                    `/pages/:id`, an address the app never had, so it
+                    opened "Page not found" (fixed 2026-10-30). The
+                    breadcrumb leads back here, as from the other report
+                    tables (pageEvidencePath). */}
                 <Link
-                  to={`/pages/${occ.page_id}`}
+                  to={pageEvidencePath({
+                    scanId,
+                    pageId: occ.page_id,
+                    origin: "Images, grouped by kind of issue",
+                    backTo: `/scans/${scanId}/findings/grouped`,
+                  })}
                   className="ml-2 text-2xs text-fg-muted underline underline-offset-2"
                 >
                   Page details

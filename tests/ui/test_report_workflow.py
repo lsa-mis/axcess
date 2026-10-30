@@ -1377,3 +1377,30 @@ async def test_crumbs_stay_on_one_line_and_cut_the_longest_first(
                 assert all(t["natural"] <= min(widths) + 2 for t in texts if not t["cut"]), state
             finally:
                 await page.context.close()
+
+
+async def test_grouped_images_page_details_opens_the_page_in_this_report(
+    live_server: tuple[str, int], new_page: Any
+) -> None:
+    """The "Page details" link under an image's pages opens that page's evidence.
+
+    It pointed at `/pages/:id`, which the app never had, and opened "Page not
+    found" (fixed 2026-10-30).
+    """
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(f"{base}/app/scans/{scan_id}/findings/grouped", wait_until="networkidle")
+    await page.get_by_role("button", name=re.compile(r"pages? with this image")).first.click()
+    details = page.get_by_role("link", name="Page details").first
+    await playwright_async.expect(details).to_have_attribute(
+        "href", re.compile(rf"^/app/scans/{scan_id}/pages/\d+\?origin=")
+    )
+    await details.click()
+    await page.wait_for_url(re.compile(rf"/app/scans/{scan_id}/pages/\d+"))
+    await playwright_async.expect(page.get_by_role("heading", level=1)).not_to_have_text(
+        "Page not found"
+    )
+    # The breadcrumb leads back to the grouped images.
+    await playwright_async.expect(
+        page.get_by_role("link", name="Images, grouped by kind of issue")
+    ).to_have_attribute("href", f"/app/scans/{scan_id}/findings/grouped")
