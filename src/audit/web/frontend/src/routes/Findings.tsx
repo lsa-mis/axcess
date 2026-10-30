@@ -220,6 +220,25 @@ const COLUMNS = "grid-cols-[6rem_5.5rem_minmax(0,1fr)_minmax(0,1fr)_7rem_5.5rem_
  * Virtualized findings table. Only the visible rows are rendered to the
  * DOM, a 1000-finding scan still scrolls at 60fps. Thumbnails are a
  * fixed 72×48 and never expand; clicking a row opens the detail page.
+ *
+ * The header row is inside the same scrolling box as the rows, so a sideways
+ * scroll moves both and each header stays over its column. Until 2026-10-30
+ * the header sat outside the box: scrolled sideways, the rows moved and the
+ * headers did not, so every value sat under the wrong header (developer
+ * report). Up and down, the header stays pinned at the top of the box
+ * (`sticky`), as it did. The box keeps focus clear of the pinned header
+ * (`scroll-pt-16`): a link reached by Tab is scrolled to below it, not under
+ * it (SC 2.4.11 Focus Not Obscured (Minimum), Level AA).
+ *
+ * The table is at least 56rem wide. Narrower, its three text columns would
+ * shrink to nothing; it scrolls sideways instead, which SC 1.4.10 Reflow
+ * (Level AA) allows for a data table. At 1280 pixels with the sidebar open it
+ * fits.
+ *
+ * The rows' positions count from the top of their own block, under the
+ * header. The virtualizer measures from the top of the box, so the rows it
+ * draws are offset by the header's height; `overscan` (8 rows, over 500
+ * pixels) covers that, and no row is missing at either edge.
  */
 function FindingsTable({
   rows,
@@ -249,120 +268,122 @@ function FindingsTable({
       aria-busy={isLoading}
       className="flex flex-col"
     >
-      <div
-        role="row"
-        className={`grid ${COLUMNS} items-center gap-3 border-b border-border bg-surface-muted px-4 py-2 text-2xs font-semibold text-fg-muted`}
-      >
-        <span role="columnheader">Image</span>
-        <span role="columnheader">Preview</span>
-        <span role="columnheader">Text read from image (OCR)</span>
-        <span role="columnheader">Alt text</span>
-        <span role="columnheader">Image type</span>
-        <span role="columnheader">Severity</span>
-        <span role="columnheader">Status</span>
-        <span role="columnheader">Page</span>
-      </div>
-      <div ref={scrollRef} className="max-h-[70vh] overflow-auto">
-        <div
-          style={{ height: rowVirtualizer.getTotalSize() }}
-          className="relative"
-        >
-          {items.map((v) => {
-            const f = rows[v.index];
-            return (
-              <div
-                key={f.id}
-                role="row"
-                style={{
-                  transform: `translateY(${v.start}px)`,
-                  height: v.size,
-                }}
-                className={`absolute inset-x-0 grid ${COLUMNS} items-center gap-3 border-b border-border px-4 py-1.5 transition-colors hover:bg-surface-muted/60`}
-              >
-                {/* The link names its destination, "Image #12" (the detail page's
-                    own title). The severity chip alone used to be the link, so
-                    its words were "critical" or "info": a severity, not where
-                    the link goes (SC 2.4.4 Link Purpose (In Context), Level AA).
-                    The chip then sat under the link, in the same cell, until
-                    2026-10-30: the two were taller than the fixed row, so the
-                    chip ran into the next row's link. It has its own column
-                    now (see COLUMNS). */}
-                <div role="cell">
-                  <Link to={`/findings/${f.id}`} className="inline-flex min-h-target items-center text-xs font-semibold">
-                    Image #{f.id}
-                  </Link>
+      <div ref={scrollRef} className="max-h-[70vh] scroll-pt-16 overflow-auto">
+        <div className="min-w-[56rem]">
+          <div
+            role="row"
+            className={`sticky top-0 z-10 grid ${COLUMNS} items-center gap-3 border-b border-border bg-surface-muted px-4 py-2 text-2xs font-semibold text-fg-muted`}
+          >
+            <span role="columnheader">Image</span>
+            <span role="columnheader">Preview</span>
+            <span role="columnheader">Text read from image (OCR)</span>
+            <span role="columnheader">Alt text</span>
+            <span role="columnheader">Image type</span>
+            <span role="columnheader">Severity</span>
+            <span role="columnheader">Status</span>
+            <span role="columnheader">Page</span>
+          </div>
+          <div
+            style={{ height: rowVirtualizer.getTotalSize() }}
+            className="relative"
+          >
+            {items.map((v) => {
+              const f = rows[v.index];
+              return (
+                <div
+                  key={f.id}
+                  role="row"
+                  style={{
+                    transform: `translateY(${v.start}px)`,
+                    height: v.size,
+                  }}
+                  className={`absolute inset-x-0 grid ${COLUMNS} items-center gap-3 border-b border-border px-4 py-1.5 transition-colors hover:bg-surface-muted/60`}
+                >
+                  {/* The link names its destination, "Image #12" (the detail page's
+                      own title). The severity chip alone used to be the link, so
+                      its words were "critical" or "info": a severity, not where
+                      the link goes (SC 2.4.4 Link Purpose (In Context), Level AA).
+                      The chip then sat under the link, in the same cell, until
+                      2026-10-30: the two were taller than the fixed row, so the
+                      chip ran into the next row's link. It has its own column
+                      now (see COLUMNS). */}
+                  <div role="cell">
+                    <Link to={`/findings/${f.id}`} className="inline-flex min-h-target items-center text-xs font-semibold">
+                      Image #{f.id}
+                    </Link>
+                  </div>
+                  <div role="cell">
+                    {f.has_svg_text ? (
+                      <span className="flex h-12 w-[72px] items-center justify-center rounded-xs border border-border bg-umich-blue/10 font-mono text-2xs font-semibold text-umich-blue">
+                        SVG
+                      </span>
+                    ) : f.content_hash ? (
+                      <img
+                        src={blobUrl(f.content_hash)}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        width={72}
+                        height={48}
+                        className="h-12 w-[72px] rounded-xs border border-border bg-white object-contain"
+                      />
+                    ) : (
+                      <span className="flex h-12 w-[72px] items-center justify-center rounded-xs border border-border text-fg-subtle">
+                        No image
+                      </span>
+                    )}
+                  </div>
+                  <div role="cell" className="min-w-0">
+                    {f.ocr_text ? (
+                      <span
+                        className="block truncate font-mono text-xs text-fg"
+                        title={f.ocr_text}
+                      >
+                        {f.ocr_text}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-fg-subtle">No text found</span>
+                    )}
+                  </div>
+                  <div role="cell" className="min-w-0">
+                    <AltTag value={f.sample_alt} />
+                  </div>
+                  <div role="cell" className="text-xs text-fg-muted">
+                    {f.vlm_classification ? sentenceCase(f.vlm_classification) : "Not classified"}
+                  </div>
+                  <div role="cell">
+                    <SeverityChip value={f.severity} />
+                  </div>
+                  <div role="cell">
+                    <StatusChip value={f.status} />
+                  </div>
+                  <div role="cell" className="min-w-0">
+                    {f.sample_page ? (
+                      // Page URL is now a real external link (target=_blank)
+                      // so a click here opens the actual page that has the
+                      // issue. Previously this rendered the URL as the
+                      // link text but pointed at /findings/{id}, which was
+                      // misleading. "Image #12" in the first column
+                      // links to the image's details.
+                      <a
+                        href={f.sample_page}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block min-h-target truncate text-xs leading-[2.75rem] text-umich-blue underline underline-offset-2"
+                        title={f.sample_page}
+                      >
+                        {f.sample_page}{" "}
+                        <span aria-hidden>↗</span>
+                        <span className="sr-only">opens in a new tab</span>
+                      </a>
+                    ) : (
+                      <span className="text-xs text-fg-subtle">Does not apply</span>
+                    )}
+                  </div>
                 </div>
-                <div role="cell">
-                  {f.has_svg_text ? (
-                    <span className="flex h-12 w-[72px] items-center justify-center rounded-xs border border-border bg-umich-blue/10 font-mono text-2xs font-semibold text-umich-blue">
-                      SVG
-                    </span>
-                  ) : f.content_hash ? (
-                    <img
-                      src={blobUrl(f.content_hash)}
-                      alt=""
-                      loading="lazy"
-                      decoding="async"
-                      width={72}
-                      height={48}
-                      className="h-12 w-[72px] rounded-xs border border-border bg-white object-contain"
-                    />
-                  ) : (
-                    <span className="flex h-12 w-[72px] items-center justify-center rounded-xs border border-border text-fg-subtle">
-                      No image
-                    </span>
-                  )}
-                </div>
-                <div role="cell" className="min-w-0">
-                  {f.ocr_text ? (
-                    <span
-                      className="block truncate font-mono text-xs text-fg"
-                      title={f.ocr_text}
-                    >
-                      {f.ocr_text}
-                    </span>
-                  ) : (
-                    <span className="text-xs text-fg-subtle">No text found</span>
-                  )}
-                </div>
-                <div role="cell" className="min-w-0">
-                  <AltTag value={f.sample_alt} />
-                </div>
-                <div role="cell" className="text-xs text-fg-muted">
-                  {f.vlm_classification ? sentenceCase(f.vlm_classification) : "Not classified"}
-                </div>
-                <div role="cell">
-                  <SeverityChip value={f.severity} />
-                </div>
-                <div role="cell">
-                  <StatusChip value={f.status} />
-                </div>
-                <div role="cell" className="min-w-0">
-                  {f.sample_page ? (
-                    // Page URL is now a real external link (target=_blank)
-                    // so a click here opens the actual page that has the
-                    // issue. Previously this rendered the URL as the
-                    // link text but pointed at /findings/{id}, which was
-                    // misleading. "Image #12" in the first column
-                    // links to the image's details.
-                    <a
-                      href={f.sample_page}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block min-h-target truncate text-xs leading-[2.75rem] text-umich-blue underline underline-offset-2"
-                      title={f.sample_page}
-                    >
-                      {f.sample_page}{" "}
-                      <span aria-hidden>↗</span>
-                      <span className="sr-only">opens in a new tab</span>
-                    </a>
-                  ) : (
-                    <span className="text-xs text-fg-subtle">Does not apply</span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>

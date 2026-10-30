@@ -1518,3 +1518,31 @@ async def test_image_details_pages_table_wraps_long_alt_text(
     assert box and box["height"] < 140, box
     violations = await _run_axe(page)
     assert not violations, _render_violations(violations)
+
+
+async def test_images_table_header_scrolls_sideways_with_its_rows(
+    live_server: tuple[str, int], new_page: Any
+) -> None:
+    """The header and the rows share one scrolling box (2026-10-30).
+
+    The header used to sit outside it: scrolled sideways, only the rows moved
+    and each value sat under the wrong header.
+    """
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 800, "height": 900})
+    await page.goto(f"{base}/app/scans/{scan_id}/findings", wait_until="networkidle")
+    table = page.get_by_role("table", name="Images")
+    box = table.locator(".overflow-auto").first
+    assert await box.evaluate("e => e.scrollWidth > e.clientWidth"), "no sideways scroll at 800"
+    await box.evaluate("e => { e.scrollLeft = 200; }")
+    await page.wait_for_timeout(100)
+    headers = table.get_by_role("columnheader")
+    first_row = table.get_by_role("row").filter(has=page.get_by_role("cell")).first
+    cells = first_row.get_by_role("cell")
+    for index in (0, 5, 7):
+        header_box = await headers.nth(index).bounding_box()
+        cell_box = await cells.nth(index).bounding_box()
+        assert header_box and cell_box
+        assert abs(header_box["x"] - cell_box["x"]) < 1, (index, header_box, cell_box)
+    # The page itself does not scroll sideways; only the table's box does.
+    assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth")
