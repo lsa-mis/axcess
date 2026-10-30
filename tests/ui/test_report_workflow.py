@@ -1404,3 +1404,43 @@ async def test_grouped_images_page_details_opens_the_page_in_this_report(
     await playwright_async.expect(
         page.get_by_role("link", name="Images, grouped by kind of issue")
     ).to_have_attribute("href", f"/app/scans/{scan_id}/findings/grouped")
+
+
+@pytest.mark.parametrize("width", [320, 1280])
+async def test_grouped_images_row_has_one_link_holding_the_picture(
+    live_server: tuple[str, int], new_page: Any, width: int
+) -> None:
+    """Each image row has one link to the image: its picture and "Image #N".
+
+    The thumbnail and "Review this image →" were two links to one page until
+    2026-10-30 (WCAG technique H2: combine them, the picture's alt empty).
+    """
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": width, "height": 900})
+    await page.goto(f"{base}/app/scans/{scan_id}/findings/grouped", wait_until="networkidle")
+    rows = page.locator("table tbody tr").filter(has=page.locator("a[href*='/findings/']"))
+    assert await rows.count() >= 1
+    await playwright_async.expect(page.get_by_text("Review this image")).to_have_count(0)
+    for index in range(await rows.count()):
+        row = rows.nth(index)
+        links = row.locator("a[href*='/findings/']")
+        await playwright_async.expect(links).to_have_count(1)
+        link = links.first
+        finding = re.search(r"/findings/(\d+)$", await link.get_attribute("href") or "")
+        assert finding, await link.get_attribute("href")
+        # Named by its words, not by an aria-label or the picture's alt.
+        await playwright_async.expect(link).to_have_accessible_name(f"Image #{finding[1]}")
+        await playwright_async.expect(link).not_to_have_attribute("aria-label", re.compile(".*"))
+        picture = link.locator("img")
+        if await picture.count():
+            await playwright_async.expect(picture).to_have_attribute("alt", "")
+        box = await link.bounding_box()
+        assert box and box["height"] >= 44, box
+    # Pressing the picture opens the image.
+    first = rows.first.locator("a[href*='/findings/']")
+    target = await first.get_attribute("href")
+    await (first.locator("img") if await first.locator("img").count() else first).click()
+    await page.wait_for_url(f"**{target}")
+    await playwright_async.expect(page.get_by_role("heading", level=1)).not_to_have_text(
+        "Page not found"
+    )

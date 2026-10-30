@@ -443,31 +443,55 @@ function FindingRow({
   return (
     <Row index={index}>
       <Cell>
-        {finding.has_svg_text ? (
-          <span className="inline-flex h-12 w-[72px] items-center justify-center rounded-xs border border-dashed border-umich-blue/40 bg-umich-blue/5 font-mono text-2xs font-semibold text-umich-blue">
-            SVG text
-          </span>
-        ) : finding.content_hash ? (
-          // The thumbnail is the row's only link to the image's page, so its
-          // alt names where it goes ("Open image #12", the terms table's
-          // "Image #12"): with alt="" the link had no name at all (SC 2.4.4
-          // Link Purpose (In Context) and SC 4.1.2 Name, Role, Value, both
-          // Level A; technique H30). A description of the picture was
-          // rejected: it is the scanned site's image, and the link's job is
-          // to say where it leads.
-          <Link to={`/findings/${finding.id}`} className="inline-block">
-            {/* eslint-disable-next-line jsx-a11y/img-redundant-alt -- "image" names the record the link opens ("Image #12", docs/plain-language.md), not the picture */}
+        {/* The row's one way to the image's page: the picture and its name,
+            "Image #12", inside one link (WCAG technique H2, combining
+            adjacent image and text links for the same resource). The
+            picture is clickable, as the developer asked (2026-10-30), and
+            keyboard and screen reader users meet one link, not two.
+
+            Until 2026-10-30 the thumbnail was one link and "Review this
+            image →" under the Pages list was a second to the same page.
+            Researched and rejected: the whole row as one link (it would
+            cover the pages list's own button, and stop people selecting the
+            text read from the image to copy it); the thumbnail alone (rows
+            with SVG text or no saved picture would have no link, and a bare
+            picture does not look like a link, Nielsen Norman Group,
+            https://www.nngroup.com/articles/clickable-elements/); and
+            hiding one of the two links from the keyboard with ARIA (no ARIA
+            is better than bad ARIA, and voice control users could not name
+            it).
+
+            The picture's alt is empty: the words name the link, and the
+            picture repeated in words would be read twice (H2). Its border
+            darkens on hover with the underline, so it reads as part of the
+            link. "Image #12" is the terms table's name for this record and
+            the Images page's link text (SC 3.2.4 Consistent Identification,
+            Level AA), and says which image on its own (SC 2.4.9 Link Purpose
+            (Link Only), Level AAA). The link is at least 44 pixels tall
+            (SC 2.5.5 Target Size (Enhanced), Level AAA). */}
+        <Link
+          to={`/findings/${finding.id}`}
+          className="report-link group inline-flex min-h-target flex-col items-start gap-1 p-1 text-xs font-semibold"
+        >
+          {finding.has_svg_text ? (
+            <span className="inline-flex h-12 w-[72px] items-center justify-center rounded-xs border border-dashed border-umich-blue/40 bg-umich-blue/5 font-mono text-2xs font-semibold text-umich-blue no-underline group-hover:border-umich-blue">
+              SVG text
+            </span>
+          ) : finding.content_hash ? (
             <img
               src={blobUrl(finding.content_hash)}
-              alt={`Open image #${finding.id}`}
+              alt=""
               loading="lazy"
               decoding="async"
-              className="h-12 w-[72px] rounded-xs border border-border bg-white object-contain"
+              className="h-12 w-[72px] rounded-xs border border-border bg-white object-contain group-hover:border-umich-blue"
             />
-          </Link>
-        ) : (
-          <span className="text-fg-muted">No image</span>
-        )}
+          ) : (
+            <span className="inline-flex h-12 w-[72px] items-center justify-center rounded-xs border border-border text-2xs font-normal text-fg-muted no-underline group-hover:border-umich-blue">
+              No image
+            </span>
+          )}
+          <span>Image #{finding.id}</span>
+        </Link>
       </Cell>
       <Cell>
         {finding.ocr_text ? (
@@ -567,12 +591,6 @@ function FindingRow({
             ))}
           </ul>
         )}
-        <Link
-          to={`/findings/${finding.id}`}
-          className="mt-1 block text-2xs text-umich-blue underline underline-offset-2"
-        >
-          Review this image →
-        </Link>
       </Cell>
     </Row>
   );
