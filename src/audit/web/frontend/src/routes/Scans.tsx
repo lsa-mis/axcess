@@ -153,10 +153,15 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  *   counts what ran, not what was chosen: a check that never reached a
  *   page is not listed. Just before Actions, after the numbers it
  *   qualifies; the Issues table names the check for each kind of issue.
- * - The Occurrences count is the link into the report ("476 occurrences",
- *   with "in Report #12" as screen-reader-only text), as the count of
- *   problems was before; the Kinds of issues count is a plain number
- *   beside it.
+ * - The Occurrences and Kinds of issues counts are plain numbers, in the
+ *   site row as in its scan rows. The Occurrences count was a link into
+ *   the report, "476 occurrences", until the developer removed it
+ *   (2026-10-30): it opened the same report as "Open latest scan" in the
+ *   same row, two controls for one job (W3C COGA, "Making Content Usable",
+ *   https://www.w3.org/TR/coga-usable/: one way to do one thing,
+ *   paraphrased); its word repeated the column header in every cell; and
+ *   it made the site row's numbers look unlike its scan rows' (SC 3.2.4
+ *   Consistent Identification, Level AA). The header names the number.
  * - "Images with text" and "Page states opened by clicking" were columns
  *   here and were removed (Oct 2026): the first counted every image with
  *   text, fine alt text or not, and read like a second count of problems;
@@ -179,9 +184,8 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  *   actions: the row is read (by eye or, cell by cell, by a screen reader)
  *   as "this site, as of then, with these results", and only then offers
  *   what to do with it. Opening the report was considered as the second
- *   column; that split the site from its date and numbers, and the
- *   Occurrences count is already a link into the same report earlier in the row. The
- *   Site column is sticky, so the row keeps its name when a narrow screen
+ *   column; that split the site from its date and numbers. The Site
+ *   column is sticky, so the row keeps its name when a narrow screen
  *   scrolls the table sideways to Actions.
  * - Actions shows both of a site's actions as links, side by side: "Open
  *   latest scan", then "Scan again". Both are always visible and one click
@@ -699,18 +703,8 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
             <Cell numeric className="text-fg">
               {completed.page_count.toLocaleString()}
             </Cell>
-            <Cell numeric>
-              <Link
-                to={`/scans/${completed.id}/issues`}
-                className="report-link inline-flex min-h-target items-center px-1 font-semibold"
-              >
-                {/* Real words instead of an aria-label: "476 occurrences" shows, and
-                    "in Report #12" is read out with it, so the link says what it
-                    opens (SC 2.4.4 Link Purpose (In Context), Level AA; W3C
-                    "Using ARIA", rule 1). */}
-                {issueCountText(site.most_recent_completed_occurrence_count ?? 0)}
-                <span className="sr-only"> in Report #{completed.id}</span>
-              </Link>
+            <Cell numeric className="text-fg">
+              {(site.most_recent_completed_occurrence_count ?? 0).toLocaleString()}
             </Cell>
             <Cell numeric className="text-fg">
               {(site.most_recent_completed_issue_count ?? 0).toLocaleString()}
@@ -925,11 +919,6 @@ function RuleChecksCell({ scan, className }: { scan: ScanSummary; className?: st
       {checks ? ruleChecksText(checks) : "Not recorded"}
     </Cell>
   );
-}
-
-/** "1 occurrence", "476 occurrences": the words the Issues page uses. */
-function issueCountText(count: number): string {
-  return `${count.toLocaleString()} ${count === 1 ? "occurrence" : "occurrences"}`;
 }
 
 /**

@@ -157,12 +157,11 @@ async def test_reports_table_keyboard_and_columns(
     await playwright_async.expect(row.locator("td")).to_have_count(6)
     await playwright_async.expect(row.locator("td").nth(0)).to_have_text("Not recorded")
     await playwright_async.expect(row.locator("td").nth(1)).to_have_text("2")
-    # Occurrences counts every place a problem appears, and says so; "in
-    # Report #N" is screen-reader-only text. Kinds of issues counts the
-    # report's rows.
-    await playwright_async.expect(row.locator("td").nth(2)).to_have_text(
-        f"{5 + count} occurrences in Report #{headline_id}"
-    )
+    # Occurrences counts every place a problem appears; Kinds of issues counts
+    # the report's rows. Both plain numbers, as in the scan rows: the count is
+    # no longer a second link to the report "Open latest scan" opens.
+    await playwright_async.expect(row.locator("td").nth(2)).to_have_text(f"{5 + count}")
+    await playwright_async.expect(row.locator("td").nth(2).get_by_role("link")).to_have_count(0)
     await playwright_async.expect(row.locator("td").nth(3)).to_have_text("5")
     # Which rule checks tested pages, and, on the header, who makes each.
     await playwright_async.expect(row.locator("td").nth(4)).to_have_text("axe and Alfa")
