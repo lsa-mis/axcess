@@ -146,6 +146,11 @@ class IssuePage:
     # at scan time (empty when none were captured). The Excel export reads
     # these to embed visual evidence next to each issue.
     screenshot_hashes: tuple[str, ...] = ()
+    # Beside each of ``screenshot_hashes``, in the same order, the picture
+    # from before the problem showed, or None: only the form error check has
+    # one (its form before the submit press; the after picture is the
+    # screenshot). Same length as ``screenshot_hashes``.
+    before_screenshot_hashes: tuple[str | None, ...] = ()
     # How many of ``occurrence_count`` a person has checked in the page
     # inspector: decided "a problem to report" or "a repeat of one already
     # reported" (``audit.occurrence_reviews``). Counted over the same
@@ -609,7 +614,13 @@ def _pages_for_issue(
                    p.title AS page_title,
                    COUNT(*) AS occurrence_count,
                    GROUP_CONCAT(a.status) AS statuses,
-                   GROUP_CONCAT(a.screenshot_hash) AS screenshot_hashes
+                   -- "after:before" per finding with a screenshot, so the two
+                   -- lists stay paired; GROUP_CONCAT skips the NULLs.
+                   GROUP_CONCAT(
+                       CASE WHEN a.screenshot_hash IS NOT NULL
+                            THEN a.screenshot_hash || ':' || COALESCE(a.before_screenshot_hash, '')
+                       END
+                   ) AS screenshot_pairs
               FROM page_a11y_findings a
               JOIN pages p ON p.id = a.page_id
              WHERE a.scan_id = ?
@@ -660,8 +671,10 @@ def _pages_for_issue(
         # sqlite3.Row's `in` iterates values, not keys, so we must check
         # `.keys()` explicitly (the image query lacks this column).
         row_keys = r.keys()
-        raw_shots = r["screenshot_hashes"] if "screenshot_hashes" in row_keys else None
-        shots = tuple(h for h in (raw_shots or "").split(",") if h and h != "None")
+        raw_shots = r["screenshot_pairs"] if "screenshot_pairs" in row_keys else None
+        pairs = [pair.partition(":") for pair in (raw_shots or "").split(",") if pair]
+        shots = tuple(after for after, _, _before in pairs if after and after != "None")
+        befores = tuple((before or None) for after, _, before in pairs if after and after != "None")
         out.append(
             IssuePage(
                 page_id=int(r["page_id"]),
@@ -670,6 +683,7 @@ def _pages_for_issue(
                 occurrence_count=int(r["occurrence_count"]),
                 status_summary=counts,
                 screenshot_hashes=shots,
+                before_screenshot_hashes=befores,
                 checked_count=checked.get(int(r["page_id"]), (0, 0))[0],
                 reported_count=checked.get(int(r["page_id"]), (0, 0))[1],
             )

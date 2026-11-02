@@ -14,7 +14,9 @@ For each form on a rendered page, at most ``max_forms``:
    that could change anything, and every page navigation, is blocked. The
    check never types, never clears a value, and never presses Enter.
 4. Wait for the page to settle, take the second record, and hand both to
-   ``base.classify``.
+   ``base.classify``. When the scan keeps screenshots, the form is also
+   photographed, outlined, just before the press and once the page settled
+   (``capture``), as the evidence a reviewer confirms a finding against.
 5. Load the page again before the next form, so each form starts as the page
    first showed it.
 
@@ -29,6 +31,7 @@ import asyncio
 import contextlib
 import time
 from collections import Counter
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -48,6 +51,10 @@ if TYPE_CHECKING:
     from playwright.async_api import Dialog, Frame, Page, Request
 
 log = get_logger(__name__)
+
+# Photographs the element at a CSS selector on the page, outlined, or returns
+# None (the fetcher's ``_capture_element``).
+Capture = Callable[["Page", str], Awaitable[bytes | None]]
 
 DEFAULT_MAX_FORMS = 5
 # Long enough for validation that runs a moment after the click (a debounce or
@@ -357,14 +364,17 @@ class ErrorIdentificationProbe:
     timeout_s: float = DEFAULT_TIMEOUT_S
     _seen: set[str] = field(default_factory=set)
 
-    async def run(self, page: Page) -> list[FormResult]:
+    async def run(self, page: Page, *, capture: Capture | None = None) -> list[FormResult]:
+        """Check the page's forms. ``capture``, when given, photographs each
+        form pressed, before and after the press (``FormResult.before_png``,
+        ``after_png``)."""
         results: list[FormResult] = []
         with contextlib.suppress(TimeoutError):
             async with asyncio.timeout(self.timeout_s):
-                await self._run(page, results)
+                await self._run(page, results, capture)
         return results
 
-    async def _run(self, page: Page, results: list[FormResult]) -> None:
+    async def _run(self, page: Page, results: list[FormResult], capture: Capture | None) -> None:
         pinned = page.url
         attempted = 0
         plan = await self._plan(page)
@@ -397,7 +407,7 @@ class ErrorIdentificationProbe:
             if frame is None:
                 continue
             try:
-                outcome = await self._attempt(page, frame, form_index, info)
+                outcome = await self._attempt(page, frame, form_index, info, capture)
             except Exception as exc:
                 log.debug("forms.attempt_failed", error_type=type(exc).__name__)
                 continue
@@ -467,12 +477,23 @@ class ErrorIdentificationProbe:
         )
 
     async def _attempt(
-        self, page: Page, frame: Frame, form_index: int, info: dict[str, Any]
+        self,
+        page: Page,
+        frame: Frame,
+        form_index: int,
+        info: dict[str, Any],
+        capture: Capture | None = None,
     ) -> FormResult | None:
         # Collect again: a reload replaced the elements the plan described.
         forms = await frame.evaluate(_COLLECT_JS)
         if form_index >= len(forms) or self._key(forms[form_index]) != self._key(info):
             return None
+        # Screenshots only of a form in the page itself: the capture finds the
+        # element by selector on the page, and a form's selector is only good
+        # within its own frame. Before the record and the watchers, so the
+        # scroll it may need is not mistaken for anything the press did.
+        shoot = capture if capture is not None and frame is page.main_frame else None
+        before_png = await self._shot(shoot, page, info["selector"])
         before = await frame.evaluate(_SNAPSHOT_JS, form_index)
         await frame.evaluate(_ARM_JS, form_index)
         requests: list[float] = []
@@ -513,6 +534,9 @@ class ErrorIdentificationProbe:
                 watched = await frame.evaluate(_DISARM_JS)
                 await frame.evaluate("i => window.__axcessRebind(i)", form_index)
                 after = await frame.evaluate(_SNAPSHOT_JS, form_index)
+                # Still inside the guard: nothing the page does meanwhile can
+                # send or navigate.
+                after_png = await self._shot(shoot, page, info["selector"])
         finally:
             page.remove_listener("request", on_request)
             page.remove_listener("dialog", on_dialog)
@@ -525,7 +549,20 @@ class ErrorIdentificationProbe:
         )
         result.fields_in_error = [labels[k] for k in (undescribed or attempt.marked)]
         result.messages = [m.text for m in attempt.messages][:10]
+        result.before_png = before_png
+        result.after_png = after_png
         return result
+
+    @staticmethod
+    async def _shot(capture: Capture | None, page: Page, selector: str) -> bytes | None:
+        """One screenshot of the form, or None; a failed capture never stops the check."""
+        if capture is None or not selector:
+            return None
+        try:
+            return await capture(page, selector)
+        except Exception as exc:
+            log.debug("forms.capture_failed", error_type=type(exc).__name__)
+            return None
 
 
 def _is_error_colour(colour: str) -> bool:

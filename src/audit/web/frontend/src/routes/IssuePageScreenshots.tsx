@@ -148,21 +148,62 @@ export default function IssuePageScreenshotsRoute() {
           </p>
         ) : (
           <ul className="mt-3 grid list-none gap-3 p-0 md:grid-cols-2 xl:grid-cols-3">
-            {found.screenshot_hashes.map((hash, index) => (
-              <li key={`${hash}-${index}`}>
-                <figure className="rounded-xs border border-border bg-surface p-2">
-                  <img
-                    src={blobUrl(hash)}
-                    alt={`Occurrence ${index + 1} on ${label}. An outline marks where it was found.`}
-                    className="max-h-80 w-full rounded-xs object-contain"
-                    loading="lazy"
-                  />
-                  <figcaption className="mt-2 text-xs text-fg-muted">
-                    Occurrence {index + 1} of {found.occurrence_count}. The outline marks where it was found.
-                  </figcaption>
-                </figure>
-              </li>
-            ))}
+            {found.screenshot_hashes.map((hash, index) => {
+              const before = found.before_screenshot_hashes?.[index] ?? null;
+              return (
+                <li key={`${hash}-${index}`}>
+                  {before ? (
+                    // The form error check's occurrence: the form before and
+                    // after its submit button was pressed, with nothing
+                    // typed. The finding is a Not sure lead a person
+                    // confirms, and what the press changed is the evidence:
+                    // a field turned red with no words is the failure. One
+                    // card, the two pictures stacked in reading order, each
+                    // named in words above it, "Before" then "After", so the
+                    // difference is not told by position or colour alone
+                    // (SC 1.4.1 Use of Color, Level A; SC 1.3.3 Sensory
+                    // Characteristics, Level A). Stacked rather than side by
+                    // side, so each keeps the card's full width and a form
+                    // stays readable (SC 1.4.10 Reflow, Level AA).
+                    <figure className="rounded-xs border border-border bg-surface p-2">
+                      <p className="text-xs font-semibold text-fg">Before</p>
+                      <img
+                        src={blobUrl(before)}
+                        alt={`Occurrence ${index + 1} on ${label}: the form before its button was pressed. An outline marks the form.`}
+                        className="mt-1 max-h-80 w-full rounded-xs object-contain"
+                        loading="lazy"
+                      />
+                      <p className="mt-3 text-xs font-semibold text-fg">After</p>
+                      <img
+                        src={blobUrl(hash)}
+                        alt={`Occurrence ${index + 1} on ${label}: the form after its button was pressed, with nothing typed. An outline marks the form.`}
+                        className="mt-1 max-h-80 w-full rounded-xs object-contain"
+                        loading="lazy"
+                      />
+                      <figcaption className="mt-2 text-xs text-fg-muted">
+                        {/* Not "nothing sent": the guard blocks the form being
+                            sent and the page being left, not every request
+                            (docs/internal/form-error-check.md, safety review). */}
+                        Occurrence {index + 1} of {found.occurrence_count}. Axcess pressed the form’s button once,
+                        with nothing typed, and stopped the form from being sent. The outline marks the form.
+                      </figcaption>
+                    </figure>
+                  ) : (
+                    <figure className="rounded-xs border border-border bg-surface p-2">
+                      <img
+                        src={blobUrl(hash)}
+                        alt={`Occurrence ${index + 1} on ${label}. An outline marks where it was found.`}
+                        className="max-h-80 w-full rounded-xs object-contain"
+                        loading="lazy"
+                      />
+                      <figcaption className="mt-2 text-xs text-fg-muted">
+                        Occurrence {index + 1} of {found.occurrence_count}. The outline marks where it was found.
+                      </figcaption>
+                    </figure>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
         {missing > 0 && (

@@ -112,6 +112,9 @@ class FetchResult:
     # describing it. JsFetcher only, when the check is turned on, and never
     # in a sign-in scan.
     form_findings: tuple[FormFinding, ...] = field(default=())
+    # Their screenshots: target_hash -> (before the press, after it), each an
+    # outlined PNG or None. Empty when the scan keeps no screenshots.
+    form_screenshots: dict[str, tuple[bytes | None, bytes | None]] = field(default_factory=dict)
 
     @property
     def is_html(self) -> bool:

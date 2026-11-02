@@ -86,7 +86,11 @@ Ordered by what blocks using the check, then by expected value.
 - [x] Report it: the check name "Form error check" in `lib/terms.ts`, an
       ordinary Issues row in the Not sure lane, a guidance card for 3.3.1 in
       `audit_report.yaml`.
-- [ ] Screenshots before and after the press, for the occurrence.
+- [x] Screenshots before and after the press, for the occurrence: the form,
+      outlined, in the page itself (not in a frame), when the scan keeps
+      screenshots. The after picture is the finding's `screenshot_hash`, the
+      before one `before_screenshot_hash` (migration 0035); the issue's
+      screenshots page shows the pair, "Before" above "After".
 - [ ] A "What was checked" row with its pages, skipped and not checked
       counts (needs scan-level counters, so a migration), the glossary, and
       `docs/reading-your-report.md`.

@@ -2967,6 +2967,8 @@ def create_app(
             mime = row["mime"] or "application/octet-stream"
         else:
             # Per-finding screenshots live in the same content-addressed store
+            # (the after picture in `screenshot_hash`, and for the form error
+            # check the before picture in `before_screenshot_hash`, 0035)
             # but have no `images` row: the crawler captures them from the live
             # element, they are not image content extracted from the page. This
             # lookup used to consider `images` only, so every marked screenshot
@@ -2978,7 +2980,7 @@ def create_app(
                         SELECT 1
                           FROM page_a11y_findings f
                           JOIN pages p ON p.id = f.page_id
-                         WHERE f.screenshot_hash = ?
+                         WHERE (f.screenshot_hash = ? OR f.before_screenshot_hash = ?)
                            AND NOT EXISTS (
                                SELECT 1
                                  FROM protected_scans ps
@@ -2986,7 +2988,7 @@ def create_app(
                            )
                          LIMIT 1
                         """,
-                        (content_hash,),
+                        (content_hash, content_hash),
                     ).fetchone()
                 else:
                     shot = conn.execute(
@@ -2994,10 +2996,10 @@ def create_app(
                         SELECT 1
                           FROM page_a11y_findings f
                           JOIN pages p ON p.id = f.page_id
-                         WHERE f.screenshot_hash = ?
+                         WHERE (f.screenshot_hash = ? OR f.before_screenshot_hash = ?)
                          LIMIT 1
                         """,
-                        (content_hash,),
+                        (content_hash, content_hash),
                     ).fetchone()
             if shot is None:
                 raise HTTPException(status_code=404, detail="Blob not found")

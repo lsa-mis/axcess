@@ -1504,7 +1504,12 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
 
         # SC 3.3.1 form error check. Rows tagged ``pipeline='forms'``.
         if render_mode == "js" and ctx.config.form_error_checks_enabled:
-            _persist_form_errors(ctx, page_id=page_id, findings=result.form_findings)
+            _persist_form_errors(
+                ctx,
+                page_id=page_id,
+                findings=result.form_findings,
+                screenshots=result.form_screenshots,
+            )
 
         # SC 1.3.2 visual probe. Rows tagged ``pipeline='visual'``.
         if render_mode == "js" and ctx.config.visual_checks_enabled:
@@ -1884,7 +1889,11 @@ def _store_screenshot(
     Returns its content hash, or ``None`` when there's no screenshot for
     this finding or the store write fails.
     """
-    png = screenshots.get(target_hash)
+    return _store_png(ctx, screenshots.get(target_hash), target_hash)
+
+
+def _store_png(ctx: _WorkerContext, png: bytes | None, target_hash: str) -> str | None:
+    """Persist one screenshot's PNG bytes; its content hash, or ``None``."""
     if not png:
         return None
     try:
@@ -2258,12 +2267,21 @@ def _persist_form_errors(
     *,
     page_id: int,
     findings: tuple[FormFinding, ...],
+    screenshots: Mapping[str, tuple[bytes | None, bytes | None]] | None = None,
 ) -> None:
-    """Write the form error check's findings (SC 3.3.1)."""
+    """Write the form error check's findings (SC 3.3.1), each with its form's
+    screenshots before and after the press when the scan took them: the
+    after picture as the finding's screenshot, the before one beside it."""
     for f in findings:
+        before, after = (screenshots or {}).get(f.target_hash, (None, None))
         try:
             repo.upsert_keyboard_finding(
-                ctx.conn, page_id=page_id, scan_id=ctx.scan_id, **f.to_repo_kwargs()
+                ctx.conn,
+                page_id=page_id,
+                scan_id=ctx.scan_id,
+                screenshot_hash=_store_png(ctx, after, f.target_hash),
+                before_screenshot_hash=_store_png(ctx, before, f.target_hash),
+                **f.to_repo_kwargs(),
             )
         except sqlite3.Error as exc:
             log.warning("forms.persist_failed", page_id=page_id, error=str(exc))

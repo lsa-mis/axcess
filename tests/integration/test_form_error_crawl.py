@@ -72,3 +72,43 @@ def test_the_check_is_off_by_default(
     with _serve() as base:
         summary = asyncio.run(run_crawl(tmp_db, _config(base)))
     assert _form_rows(tmp_db, summary.scan_id) == []
+
+
+def test_a_failing_form_keeps_its_screenshots_before_and_after_the_press(
+    tmp_db: sqlite3.Connection, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The form, outlined, before its submit press and after it (migration 0035).
+
+    The after picture is the finding's screenshot, as for every check; the
+    before picture sits beside it. The form colours its fields on the press,
+    so the two pictures differ. With screenshots off, neither is kept.
+    """
+    blobs = tmp_path / "blobs"
+    monkeypatch.setenv("AUDIT_BLOB_DIR", str(blobs))
+    with _serve() as base:
+        summary = asyncio.run(run_crawl(tmp_db, _config(base, form_error_checks_enabled=True)))
+    row = tmp_db.execute(
+        "SELECT screenshot_hash, before_screenshot_hash FROM page_a11y_findings "
+        "WHERE scan_id = ? AND pipeline = 'forms'",
+        (summary.scan_id,),
+    ).fetchone()
+    after, before = row["screenshot_hash"], row["before_screenshot_hash"]
+    assert after and before, dict(row)
+    assert after != before, "the press changed the form, so the pictures differ"
+    for content_hash in (after, before):
+        png = blobs / content_hash[:2] / f"{content_hash}.png"
+        assert png.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n", png
+
+    with _serve() as base:
+        quiet = asyncio.run(
+            run_crawl(
+                tmp_db, _config(base, form_error_checks_enabled=True, capture_screenshots=False)
+            )
+        )
+    row = tmp_db.execute(
+        "SELECT screenshot_hash, before_screenshot_hash FROM page_a11y_findings "
+        "WHERE scan_id = ? AND pipeline = 'forms'",
+        (quiet.scan_id,),
+    ).fetchone()
+    assert row is not None
+    assert (row["screenshot_hash"], row["before_screenshot_hash"]) == (None, None)

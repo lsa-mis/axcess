@@ -876,6 +876,10 @@ export interface IssuePage {
   status_summary: Record<string, number>;
   /** Marked scan-time screenshots, one for each locatable captured instance. */
   screenshot_hashes: string[];
+  /** Beside each of `screenshot_hashes`, in the same order, the picture from
+   *  before the problem showed, or null. Only the form error check has one:
+   *  the form before its submit press (the screenshot is after it). */
+  before_screenshot_hashes: (string | null)[];
   /** How many of `occurrence_count` a person has checked in the page
    *  inspector (a problem to report, or a repeat). */
   checked_count: number;

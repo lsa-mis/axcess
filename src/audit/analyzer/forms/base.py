@@ -148,6 +148,12 @@ class FormResult:
     messages: list[str] = field(default_factory=list)
     submit: str = ""  # the submit control's name, as pressed
     snippet: str = ""  # the start of the form's code
+    # Pictures of the form, outlined, just before the press and once the page
+    # settled after it. None when screenshots are off for the scan, the form
+    # is in a frame, or the capture failed. Not part of the result's equality
+    # or its printed form: they are evidence, not the answer.
+    before_png: bytes | None = field(default=None, repr=False, compare=False)
+    after_png: bytes | None = field(default=None, repr=False, compare=False)
 
 
 # The one rule this check reports, keyed in page_a11y_findings like the other

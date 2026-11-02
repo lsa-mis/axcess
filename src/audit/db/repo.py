@@ -828,6 +828,7 @@ def upsert_keyboard_finding(
     pipeline: str = "keyboard",
     screenshot_hash: str | None = None,
     revealed_by: str | None = None,
+    before_screenshot_hash: str | None = None,
 ) -> int:
     """Idempotent upsert for a keyboard-trap probe finding.
 
@@ -845,6 +846,10 @@ def upsert_keyboard_finding(
     problem existed (the form error check's submit control), so the report
     says "After clicking" rather than "At page load". The probes that check
     the page as it loads leave it empty.
+
+    ``before_screenshot_hash`` is the picture from before that press, beside
+    ``screenshot_hash``, the picture after it (migration 0035). Only the
+    form error check has a before state; the other probes leave it empty.
     """
     conn.execute(
         """
@@ -852,9 +857,9 @@ def upsert_keyboard_finding(
             page_id, scan_id, rule_id, wcag_sc, wcag_scs, wcag_level,
             impact, help, help_url, target_selector, failure_summary,
             html_snippet, target_hash, pipeline, criterion_sc, screenshot_hash,
-            revealed_by
+            revealed_by, before_screenshot_hash
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(page_id, rule_id, target_hash) DO UPDATE SET
             scan_id = excluded.scan_id,
             wcag_sc = excluded.wcag_sc,
@@ -868,6 +873,7 @@ def upsert_keyboard_finding(
             html_snippet = excluded.html_snippet,
             criterion_sc = excluded.criterion_sc,
             screenshot_hash = excluded.screenshot_hash,
+            before_screenshot_hash = excluded.before_screenshot_hash,
             -- First write wins, as for the rule check's revealed rows.
             revealed_by = COALESCE(page_a11y_findings.revealed_by, excluded.revealed_by),
             updated_at = CURRENT_TIMESTAMP
@@ -890,6 +896,7 @@ def upsert_keyboard_finding(
             criterion_sc,
             screenshot_hash,
             revealed_by,
+            before_screenshot_hash,
         ),
     )
     row = conn.execute(

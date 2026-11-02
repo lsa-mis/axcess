@@ -514,16 +514,31 @@ class JsFetcher:
                 )
 
             form_findings: tuple[FormFinding, ...] = ()
+            form_screenshots: dict[str, tuple[bytes | None, bytes | None]] = {}
             if (
                 self._form_error_probe is not None
                 and not self._private_context
                 and 200 <= status < 300
                 and "text/html" in headers.get("content-type", "text/html")
             ):
-                form_results = await self._form_error_probe.run(page)
-                form_findings = tuple(
-                    FormFinding.from_result(r) for r in form_results if r.outcome == "fail"
+                # The form, outlined, before and after its submit press, when
+                # the scan keeps screenshots; centred, so the picture has the
+                # form's surroundings.
+                form_results = await self._form_error_probe.run(
+                    page,
+                    capture=(
+                        (lambda p, selector: self._capture_element(p, selector, center=True))
+                        if self._capture_screenshots
+                        else None
+                    ),
                 )
+                failed = [r for r in form_results if r.outcome == "fail"]
+                form_findings = tuple(FormFinding.from_result(r) for r in failed)
+                form_screenshots = {
+                    finding.target_hash: (r.before_png, r.after_png)
+                    for finding, r in zip(form_findings, failed, strict=True)
+                    if r.before_png or r.after_png
+                }
 
             return FetchResult(
                 url=final_url,
@@ -557,6 +572,7 @@ class JsFetcher:
                 styles=styles,
                 frames=frames,
                 form_findings=form_findings,
+                form_screenshots=form_screenshots,
             )
         finally:
             # A shared authenticated context belongs to the companion, which
