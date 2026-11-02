@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams } from "react-router";
+import { useLocation, useParams } from "react-router";
 import { BookOpenText } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
@@ -20,6 +20,11 @@ export default function IssueDetailRoute() {
   const { scanId, issueKey } = useParams<{ scanId: string; issueKey: string }>();
   const id = Number(scanId);
   const key = decodeURIComponent(issueKey ?? "");
+  // This page's own address with its query: the query carries the trail it
+  // was opened with (the filtered Issues list), so evidence opened from here
+  // returns through it, as from an issue type's pages (IssuePages `here`).
+  const location = useLocation();
+  const here = `${location.pathname}${location.search}`;
 
   const { data: scan, error: scanError } = useScanQuery(id);
   const [guidanceOpen, setGuidanceOpen] = useState(false);
@@ -105,13 +110,12 @@ export default function IssueDetailRoute() {
         <IssueGuidanceDialog open={guidanceOpen} onClose={() => setGuidanceOpen(false)} detail={detail} />
       )}
       {/* The trail names the issue type, not the kind of page it is, so
-          evidence opened from here returns under its own title. */}
-      <IssueEvidence
-        scanId={scan.id}
-        issueKey={key}
-        origin={row?.title ?? key}
-        backTo={`/scans/${scan.id}/issues/${encodeURIComponent(key)}`}
-      />
+          evidence opened from here returns under its own title. It returns
+          to this page as it was opened (`here`), so the report crumb still
+          leads to the Issues list the reader filtered. That was lost on this
+          path until 2026-11-02, when the Issues table's page count, the
+          other way to an issue type's pages, stopped being a link. */}
+      <IssueEvidence scanId={scan.id} issueKey={key} origin={row?.title ?? key} backTo={here} />
     </>
   );
 }
