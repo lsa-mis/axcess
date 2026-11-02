@@ -74,8 +74,18 @@ Ordered by what blocks using the check, then by expected value.
 - [ ] Decide the policy for sign-in scans. The guard holds there too, but a
       signed-in session raises the stakes; the safest start is off for
       sign-in scans.
-- [ ] Safety review of what the guard cannot block: writes over WebSockets
-      already open, and GET requests with side effects.
+- [x] Safety review of what the guard cannot block (2026-11-02). Found: it
+      let same-origin GET, HEAD and OPTIONS requests through, and it cannot
+      see sockets, so a socket open before the press could send, and a new
+      one could open. Closed for this check: the guard's strict mode blocks
+      every request of the page while a form is pressed, reads included, and
+      the probe holds WebSocket and RTCDataChannel sends, and new
+      WebSockets, in every frame (`_HOLD_JS`). A send held or a write refused
+      leaves the form "not checked". Proved by
+      `tests/integration/test_form_error_guard.py`, which fails without the
+      fix. Left open, and said in the code: a page that kept its own copy of
+      a socket's `send` before the press, and channels the browser offers
+      beyond those (WebTransport). Service workers were already blocked.
 
 ### 2. Wiring it into Axcess
 

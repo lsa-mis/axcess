@@ -1,8 +1,15 @@
 """Temporary network guard for automatic control exploration.
 
-This is defense in depth, not a transaction sandbox: sites can mutate state
-through GET or pre-existing sockets. Label filtering and manual review still
-matter. Configured search journeys have a separate authorization boundary.
+This is defense in depth, not a transaction sandbox: in its default mode,
+sites can mutate state through same-origin GET or pre-existing sockets. Label
+filtering and manual review still matter. Configured search journeys have a
+separate authorization boundary.
+
+``strict=True`` (the form error check) refuses every request the page makes
+while the guard is held, GET included, not only writes and navigation. The
+form check needs nothing from the network to see a form react, so it gives
+the server nothing at all. Sockets are not requests and are not seen here;
+the form check holds them in the page itself (``analyzer.forms.probe``).
 """
 
 from __future__ import annotations
@@ -45,13 +52,16 @@ def safe_url(url: str, blocked_labels: Sequence[str]) -> bool:
 
 @asynccontextmanager
 async def exploration_guard(
-    page: Page, urls: set[str], blocked_labels: Sequence[str]
+    page: Page, urls: set[str], blocked_labels: Sequence[str], *, strict: bool = False
 ) -> AsyncIterator[None]:
     """Block writes, new windows and document navigation before dispatch.
 
     A context route catches the first popup request, which page routes miss.
     Filter by owning page so concurrent crawl workers retain their guards.
     Allowed requests fall through to existing scope/egress policy.
+
+    ``strict`` blocks every request of the page and its popups, reads too
+    (see the module docstring).
     """
     blocked = 0
     popups: set[Page] = set()
@@ -106,7 +116,8 @@ async def exploration_guard(
         destination = urlsplit(request.url)
         same_origin = (destination.scheme, destination.netloc) == (pinned.scheme, pinned.netloc)
         if (
-            popup
+            strict
+            or popup
             or is_navigation
             or request.method not in {"GET", "HEAD", "OPTIONS"}
             or not permitted

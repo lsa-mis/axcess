@@ -9,10 +9,15 @@ For each form on a rendered page, at most ``max_forms``:
 2. Record each field's state and the page's visible text (``_SNAPSHOT_JS``),
    and start watching for text that appears, the browser's own ``invalid``
    events and ``alert()`` messages (``_ARM_JS``).
-3. Press the form's submit control once, with nothing typed, inside the same
-   network guard Click-Through uses (``interaction.safety``): every request
-   that could change anything, and every page navigation, is blocked. The
-   check never types, never clears a value, and never presses Enter.
+3. Press the form's submit control once, with nothing typed, inside
+   Click-Through's network guard in its strict mode (``interaction.safety``):
+   every request the page makes, reads included, and every page navigation,
+   is blocked. Sends over sockets the page already has open, and new
+   sockets, are held in the page for the same moment (``_HOLD_JS``): a
+   socket is not a request, so the guard cannot see it. A send held or a
+   write refused counts as the form trying to send itself, which leaves it
+   "not checked". The check never types, never clears a value, and never
+   presses Enter.
 4. Wait for the page to settle, take the second record, and hand both to
    ``base.classify``. When the scan keeps screenshots, the form is also
    photographed, outlined, just before the press and once the page settled
@@ -61,6 +66,51 @@ DEFAULT_MAX_FORMS = 5
 # a short async check); a page that takes longer is a known limit.
 DEFAULT_SETTLE_MS = 1200
 DEFAULT_TIMEOUT_S = 30.0
+
+# Held for the press, in every frame: WebSocket and RTCDataChannel sends
+# are dropped, and new WebSockets cannot open, recording when each was tried.
+# The guard blocks requests; sockets are not requests (safety review,
+# docs/internal/form-error-check.md). The prototype is patched, so a socket
+# opened before the press is held too, unless the page kept its own copy of
+# ``send``, which is the remaining known gap.
+_HOLD_JS = r"""
+() => {
+  if (window.__axcessHeld) return;
+  const tried = [];
+  const restore = [];
+  const drop = function () { tried.push(Date.now()); };
+  for (const Kind of [window.WebSocket, window.RTCDataChannel]) {
+    const proto = Kind && Kind.prototype;
+    if (proto && typeof proto.send === 'function') {
+      const original = proto.send;
+      proto.send = drop;
+      restore.push(() => { proto.send = original; });
+    }
+  }
+  if (window.WebSocket) {
+    const Original = window.WebSocket;
+    const Blocked = function () {
+      tried.push(Date.now());
+      throw new DOMException('Blocked while Axcess checks this form', 'SecurityError');
+    };
+    Blocked.prototype = Original.prototype;
+    window.WebSocket = Blocked;
+    restore.push(() => { window.WebSocket = Original; });
+  }
+  window.__axcessHeld = {tried, restore};
+}
+"""
+
+# Undo ``_HOLD_JS`` and return the times a send or a new socket was tried.
+_RELEASE_JS = r"""
+() => {
+  const held = window.__axcessHeld;
+  if (!held) return [];
+  for (const undo of held.restore) undo();
+  delete window.__axcessHeld;
+  return held.tried;
+}
+"""
 
 _COLLECT_JS = r"""
 () => {
@@ -514,8 +564,9 @@ class ErrorIdentificationProbe:
 
         page.on("request", on_request)
         page.on("dialog", on_dialog)
+        await self._hold_sends(page)
         try:
-            async with exploration_guard(page, set(), DEFAULT_BLOCKED_LABELS):
+            async with exploration_guard(page, set(), DEFAULT_BLOCKED_LABELS, strict=True):
                 submit = await frame.evaluate_handle(
                     "i => window.__axcessForms[i].submit", form_index
                 )
@@ -540,6 +591,8 @@ class ErrorIdentificationProbe:
         finally:
             page.remove_listener("request", on_request)
             page.remove_listener("dialog", on_dialog)
+            # A held send is the form trying to send itself, as a write is.
+            requests.extend(await self._release_sends(page))
 
         attempt = _attempt_from(info, before, after, watched, requests, dialogs)
         outcome, reason, undescribed = classify(attempt)
@@ -552,6 +605,22 @@ class ErrorIdentificationProbe:
         result.before_png = before_png
         result.after_png = after_png
         return result
+
+    @staticmethod
+    async def _hold_sends(page: Page) -> None:
+        """Hold socket sends and new sockets in every frame (``_HOLD_JS``)."""
+        for frame in page.frames:
+            with contextlib.suppress(Exception):
+                await frame.evaluate(_HOLD_JS)
+
+    @staticmethod
+    async def _release_sends(page: Page) -> list[float]:
+        """Undo the hold in every frame; when each send was tried, in ms."""
+        tried: list[float] = []
+        for frame in page.frames:
+            with contextlib.suppress(Exception):
+                tried.extend(float(t) for t in await frame.evaluate(_RELEASE_JS))
+        return tried
 
     @staticmethod
     async def _shot(capture: Capture | None, page: Page, selector: str) -> bytes | None:
