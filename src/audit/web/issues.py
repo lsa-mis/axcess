@@ -1031,8 +1031,9 @@ def _axe_issue_rows(
             issue_key = f"{pipeline}:{raw_rule_id}"
             default_title = "Form shows an error without describing it in text"
             evidence_summary = (
-                "Found by pressing the form's submit button once, with nothing typed and "
-                "nothing sent. Check by hand that each error names its field in text."
+                "Found by pressing the form's submit button once, with nothing typed, while "
+                "Axcess stopped the form from being sent. Check by hand that each error "
+                "names its field in text."
             )
         elif pipeline == "visual":
             issue_key = f"{pipeline}:{raw_rule_id}"

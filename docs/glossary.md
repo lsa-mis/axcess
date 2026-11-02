@@ -352,6 +352,16 @@ video or scrolling marquee text with no way to pause it (WCAG 1.4.2 and 2.2.2).
 Its results are marked [Not sure](#not-sure), and in the app it runs only
 when you turn on **Check motion and animation**.
 
+### Form error check
+
+A check for forms that show an error without saying in words what is wrong
+([error identification](#error-identification), WCAG 3.3.1). It presses each
+form's submit button once, with nothing typed, and stops the form from being
+sent. It never presses sign-in, payment, search or delete forms, and it checks
+only a form's first step. Its results are marked [Not sure](#not-sure), with a
+picture of the form before and after the press, and in the app it runs only
+when you turn on **Check that forms describe their errors**.
+
 ### Local AI model
 
 An optional AI model that reads text (a language model) or looks at images (a
@@ -405,6 +415,13 @@ paragraph spacing (WCAG 1.4.12).
 A control that has [keyboard focus](#keyboard-focus) should not be completely
 hidden behind something else on the page, such as a sticky header that stays
 on screen while you scroll (WCAG 2.4.11).
+
+### Error identification
+
+When a form finds a mistake, such as an empty required field, it should say
+in words which field is wrong and what is wrong (WCAG 3.3.1). A field that only
+turns red, or a message drawn as a picture, tells nothing to someone who cannot
+see the colour or who uses a [screen reader](#screen-reader).
 
 ### Target size
 

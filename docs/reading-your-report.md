@@ -48,7 +48,7 @@ On the **Issues** tab, select the name of a
 | The page URL | **Pages with this issue type** lists each page's title and URL. In the inspector, **Open live page** opens the page on the real site. |
 | The element locator and code | In the inspector, **Evidence from the scan**, under the page, lists the first three occurrences with their element locator (CSS selector) and element code (HTML). A page's **Page details**, linked from its screenshots view, lists every occurrence on that page, with **Element locator (CSS selector), for developers**. |
 | An image with text in it | For an [image of text](glossary.md#image-of-text), the page's **Page details** lists the image under **Images on this page**, with **Open the image** (the image's address), any alt text, and the text read from it. Search your code or content system for that image address. |
-| A screenshot | The **Screenshots** column in **Pages with this issue type** links to a screenshot of each occurrence, when the scan took one. An outline marks where the occurrence was found. Rule check (Alfa) results have no screenshots, because Alfa runs in a separate browser. |
+| A screenshot | The **Screenshots** column in **Pages with this issue type** links to a screenshot of each occurrence, when the scan took one. An outline marks where the occurrence was found. For the [form error check](glossary.md#form-error-check), it shows the form twice, **Before** and **After** its button was pressed. Rule check (Alfa) results have no screenshots, because Alfa runs in a separate browser. |
 | The page inspector | Select a page title in **Pages with this issue type**. The inspector opens the page's **Saved copy** (or the **Live page**, if the scan saved no copy) with scripts off, and red outlines mark the flagged elements. The arrow buttons beside the count, such as "Flagged element 2 of 5", step to the previous or next flagged element; the one you are on has a thicker blue outline on yellow. The **Page code (DOM)** tab shows the page code, with the same buttons. |
 
 **Issue guidance**, at the top right of the page for an issue type, opens
@@ -166,8 +166,11 @@ that ran come first. **Status** is one of Not selected, Waiting, Checking, Ran,
 Partly ran, Did not run, or Not recorded, with a check mark for Ran and Partly
 ran. **Result** says what the check ran on and what it found. **About this
 check** says in one line each what the check does and its limit, and **More
-about this check** opens its card on the Axcess website. The focus and visual
-checks have no row here. The second row, **What "Mostly sure", "Not sure"
+about this check** opens its card on the Axcess website. The **Form error
+check** row also counts the forms it pressed, the forms it did not press
+(such as sign-in, payment or search forms), and the forms it could not judge
+because they tried to send themselves. The focus and visual checks have no
+row here. The second row, **What "Mostly sure", "Not sure"
 and the other labels mean**, explains the words in the **How sure** and **Where it shows**
 columns.
 

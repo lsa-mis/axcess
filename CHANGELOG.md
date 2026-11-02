@@ -12,11 +12,13 @@ merge.
 
 - New scan: **Check that forms describe their errors** (WCAG 3.3.1 Error
   Identification), off by default and for public scans only. It presses
-  each form's submit button once, with nothing typed and nothing sent, and
-  reports a form that marks fields in error without saying in words what is
-  wrong. Results appear in the Issues table as "Form shows an error without
-  describing it in text", under Not sure. It never presses sign-in,
-  payment, delete or search forms.
+  each form's submit button once, with nothing typed, stops the form from
+  being sent, and reports a form that marks fields in error without saying
+  in words what is wrong. Results appear in the Issues table as "Form shows
+  an error without describing it in text", under Not sure. It never
+  presses sign-in, payment, delete or search forms. Each result keeps a
+  picture of the form before and after the press, and **What was checked**
+  says how many forms it pressed, did not press, and could not judge.
 - Reports: each completed scan of an opened site has **Compare with**,
   a short list of the site's other completed reports. Choosing one opens
   Compare reports for the two, without opening a report first.

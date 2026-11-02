@@ -93,7 +93,7 @@ export const SWITCHES = {
   forms: {
     label: "Check that forms describe their errors",
     hint:
-      "Presses each form’s submit button once, with nothing typed and nothing sent, and finds forms that mark a field in error without saying in words what is wrong (WCAG 3.3.1). Skips sign-in, payment, delete and search forms. Adds about 1–2 seconds per form.",
+      "Presses each form’s submit button once, with nothing typed, and stops the form from being sent. Finds forms that mark a field in error without saying in words what is wrong (WCAG 3.3.1). Skips sign-in, payment, delete and search forms. Adds about 1–2 seconds per form.",
   },
   responsive: {
     label: "Check narrow screens and zoom",

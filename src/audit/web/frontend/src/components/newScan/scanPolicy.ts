@@ -97,7 +97,8 @@ export const PUBLIC_DEFAULTS: ScanSettings = {
   skip_focus: false,
   skip_visual: true,
   // Off until it is validated on real forms (docs/internal/form-error-check.md):
-  // it presses submit buttons, with nothing typed and nothing sent.
+  // it presses submit buttons, with nothing typed, and stops the form being
+  // sent (the guard blocks the send and leaving the page, not every request).
   skip_forms: true,
   skip_rendered_storage: false,
   axe_level: "AA",

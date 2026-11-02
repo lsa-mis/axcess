@@ -94,7 +94,9 @@ Ordered by what blocks using the check, then by expected value.
 - [x] A "What was checked" row with its pages, pressed, skipped and not
       checked counts (scan counters, migration 0036; older scans say
       coverage was not recorded).
-- [ ] The glossary and `docs/reading-your-report.md`.
+- [x] The glossary ("Form error check", "Error identification") and
+      `docs/reading-your-report.md` (its screenshots and its "What was
+      checked" counts).
 - [ ] Move 3.3.1 in `src/audit/rules/wcag_coverage.yaml` from `manual` to
       partly automated, and update `docs/coverage-tracker.md` ("Form errors
       and stateful criteria") and the public coverage page.
