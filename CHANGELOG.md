@@ -82,8 +82,10 @@ merge.
   group is gone, so New scan has four groups.
 - New scan: **AI checks on this computer** is now called **Local AI
   checks**. Its description still says the AI runs on this computer only.
-- Issues: **How sure**, **Priority** and **Issue occurrences** are the
-  second, third and fourth columns, right after the issue type's name.
+- Issues: **How sure**, **Priority**, **Issue occurrences** and
+  **Affected pages** are the second to fifth columns, right after the
+  issue type's name. **Affected pages** was **Pages**, and is now a plain
+  number: its link opened the same list of pages as the issue type's name.
 - A row of the Issues table is now an **issue type** (it was a "kind of
   issue"), and the count of places is labelled **Issue occurrences**,
   everywhere you see or hear them. Every screen that shows both counts puts
