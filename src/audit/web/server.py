@@ -4224,6 +4224,7 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
     alfa_ran_counters = int(scan.get("alfa_pages_scanned") or 0) > 0
     interaction_pages = int(scan.get("interaction_pages_probed") or 0)
     interaction_states = int(scan.get("interaction_states_total") or 0)
+    forms_pages = int(scan.get("forms_pages_checked") or 0)
     coverage_version = int(cfg.get("method_coverage_version") or 0)
     scan_status = str(scan.get("status") or "")
     page_count = int(scan.get("page_count") or 0)
@@ -4369,6 +4370,30 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
                 else "It skips risky actions and may not reach every control."
             ),
         },
+        {
+            "key": "forms",
+            "label": "Form error check",
+            # Off by default everywhere, and never in a sign-in scan.
+            "enabled": flag("form_error_checks_enabled", default=False) and rendered,
+            "checked_count": forms_pages,
+            "total_count": coverage["rendered_pages"],
+            "unit": "page",
+            "verb": "checked",
+            # Scans before migration 0036 kept no counts: their zero says
+            # nothing, so they say coverage was not recorded.
+            "coverage_known": forms_pages > 0
+            or int(cfg.get("form_check_coverage_version") or 0) >= 1,
+            "description": (
+                "Presses each form's submit button once, with nothing typed, and checks "
+                "that the form says in words what is wrong."
+            ),
+            # One sentence, as every limit in this table. Which forms it never
+            # presses is the safety rule (analyzer/forms/base.skip_reason).
+            "caveat": (
+                "It never presses sign-in, payment, search or delete forms, checks only "
+                "the first step of a form, and a person confirms each result."
+            ),
+        },
     ]
 
     for method in method_specs:
@@ -4380,6 +4405,8 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
             )
         elif method["key"] == "interaction" and method["state"] == "not_run":
             method["result"] = "Selected, but no page checks were recorded"
+        elif method["key"] == "forms" and forms_pages > 0:
+            method["result"] = "; ".join([str(method["result"]), *_form_clauses(scan)])
         elif (
             method["key"] == "search" and method["enabled"] and coverage.get("search_attention", 0)
         ):
@@ -4389,6 +4416,34 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
                 "search stopped early or found no results. Check the search settings and limits."
             )
     return method_specs
+
+
+def _form_clauses(scan: dict[str, Any]) -> list[str]:
+    """What the form error check did with the forms it found, in counts.
+
+    "2 pages checked" holds for a page whose every form was skipped as a
+    sign-in form, and for one whose every form was pressed. These clauses
+    separate the two, each from a recorded count (migration 0036).
+    """
+
+    def plural(count: int, unit: str) -> str:
+        return f"{count} {unit}" if count == 1 else f"{count} {unit}s"
+
+    pressed = int(scan.get("forms_pressed") or 0)
+    skipped = int(scan.get("forms_skipped") or 0)
+    not_checked = int(scan.get("forms_not_checked") or 0)
+    clauses = [f"{plural(pressed, 'form')} pressed"]
+    if skipped:
+        clauses.append(
+            f"{plural(skipped, 'form')} not pressed, such as sign-in, payment or search forms"
+        )
+    if not_checked:
+        one = not_checked == 1
+        clauses.append(
+            f"{plural(not_checked, 'form')} tried to send {'itself' if one else 'themselves'}, "
+            f"so Axcess could not judge {'it' if one else 'them'}"
+        )
+    return clauses
 
 
 def _interaction_clauses(states: int, coverage: dict[str, int]) -> list[str]:

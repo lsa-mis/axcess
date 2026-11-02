@@ -183,6 +183,7 @@ export interface ScanMethodCoverage {
     | "keyboard"
     | "responsive"
     | "interaction"
+    | "forms"
     | "search";
   label: string;
   /** Kept for compatibility: means selected/configured, not completed. */

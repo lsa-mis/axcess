@@ -112,3 +112,30 @@ def test_a_failing_form_keeps_its_screenshots_before_and_after_the_press(
     ).fetchone()
     assert row is not None
     assert (row["screenshot_hash"], row["before_screenshot_hash"]) == (None, None)
+
+
+def test_the_scan_counts_what_the_check_did(
+    tmp_db: sqlite3.Connection, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Pages checked and forms pressed, skipped and not judged (migration 0036).
+
+    The fixture page has two forms the check may press, one failing and one
+    that describes its error, so both are pressed and nothing is skipped.
+    """
+    monkeypatch.setenv("AUDIT_BLOB_DIR", str(tmp_path / "blobs"))
+    with _serve() as base:
+        summary = asyncio.run(run_crawl(tmp_db, _config(base, form_error_checks_enabled=True)))
+    row = tmp_db.execute(
+        "SELECT forms_pages_checked, forms_pressed, forms_skipped, forms_not_checked, "
+        "config_json FROM scans WHERE id = ?",
+        (summary.scan_id,),
+    ).fetchone()
+    assert (row[0], row[1], row[2], row[3]) == (1, 2, 0, 0), tuple(row)
+    assert '"form_check_coverage_version": 1' in row["config_json"]
+
+    with _serve() as base:
+        off = asyncio.run(run_crawl(tmp_db, _config(base)))
+    row = tmp_db.execute(
+        "SELECT forms_pages_checked, forms_pressed FROM scans WHERE id = ?", (off.scan_id,)
+    ).fetchone()
+    assert (row[0], row[1]) == (0, 0)

@@ -393,6 +393,7 @@ _COUNTERS = {
     "semantic": "semantic_pages_analyzed",
     "keyboard": "keyboard_pages_probed",
     "responsive": "responsive_pages_probed",
+    "forms": "forms_pages_checked",
 }
 _FLAGS = {
     "axe": "axe_enabled",

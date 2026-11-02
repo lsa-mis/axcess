@@ -515,6 +515,8 @@ class JsFetcher:
 
             form_findings: tuple[FormFinding, ...] = ()
             form_screenshots: dict[str, tuple[bytes | None, bytes | None]] = {}
+            form_check_ran = False
+            form_outcomes: dict[str, int] = {}
             if (
                 self._form_error_probe is not None
                 and not self._private_context
@@ -532,6 +534,9 @@ class JsFetcher:
                         else None
                     ),
                 )
+                form_check_ran = True
+                for r in form_results:
+                    form_outcomes[r.outcome] = form_outcomes.get(r.outcome, 0) + 1
                 failed = [r for r in form_results if r.outcome == "fail"]
                 form_findings = tuple(FormFinding.from_result(r) for r in failed)
                 form_screenshots = {
@@ -573,6 +578,8 @@ class JsFetcher:
                 frames=frames,
                 form_findings=form_findings,
                 form_screenshots=form_screenshots,
+                form_check_ran=form_check_ran,
+                form_outcomes=form_outcomes,
             )
         finally:
             # A shared authenticated context belongs to the companion, which

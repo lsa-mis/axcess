@@ -1236,6 +1236,35 @@ def increment_scan_method_coverage(
     )
 
 
+def record_form_check(
+    conn: sqlite3.Connection,
+    *,
+    scan_id: int,
+    pressed: int,
+    skipped: int,
+    not_checked: int,
+) -> None:
+    """Count one page the form error check ran on, and what it did there.
+
+    ``pressed`` counts the forms whose submit control was pressed,
+    ``not_checked`` the pressed ones with no verdict, ``skipped`` the ones
+    never pressed (migration 0036). Called once per page the check ran on,
+    including a page with no forms, so the report can say how many pages
+    were checked.
+    """
+    conn.execute(
+        """
+        UPDATE scans
+           SET forms_pages_checked = forms_pages_checked + 1,
+               forms_pressed = forms_pressed + ?,
+               forms_skipped = forms_skipped + ?,
+               forms_not_checked = forms_not_checked + ?
+         WHERE id = ?
+        """,
+        (pressed, skipped, not_checked, scan_id),
+    )
+
+
 def upsert_alfa_finding(
     conn: sqlite3.Connection,
     *,

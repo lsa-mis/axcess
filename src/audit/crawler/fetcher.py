@@ -115,6 +115,11 @@ class FetchResult:
     # Their screenshots: target_hash -> (before the press, after it), each an
     # outlined PNG or None. Empty when the scan keeps no screenshots.
     form_screenshots: dict[str, tuple[bytes | None, bytes | None]] = field(default_factory=dict)
+    # Whether the form error check ran on this page, and how many forms ended
+    # in each outcome ("fail", "pass", "skipped", "not_checked", ...), for the
+    # report's "What was checked" counts.
+    form_check_ran: bool = False
+    form_outcomes: dict[str, int] = field(default_factory=dict)
 
     @property
     def is_html(self) -> bool:

@@ -91,9 +91,10 @@ Ordered by what blocks using the check, then by expected value.
       screenshots. The after picture is the finding's `screenshot_hash`, the
       before one `before_screenshot_hash` (migration 0035); the issue's
       screenshots page shows the pair, "Before" above "After".
-- [ ] A "What was checked" row with its pages, skipped and not checked
-      counts (needs scan-level counters, so a migration), the glossary, and
-      `docs/reading-your-report.md`.
+- [x] A "What was checked" row with its pages, pressed, skipped and not
+      checked counts (scan counters, migration 0036; older scans say
+      coverage was not recorded).
+- [ ] The glossary and `docs/reading-your-report.md`.
 - [ ] Move 3.3.1 in `src/audit/rules/wcag_coverage.yaml` from `manual` to
       partly automated, and update `docs/coverage-tracker.md` ("Form errors
       and stateful criteria") and the public coverage page.

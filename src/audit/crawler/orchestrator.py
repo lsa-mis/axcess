@@ -865,6 +865,9 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             # 2: adds the per-page scan_interaction_runs ledger, so a
             # report may state controls operated and the bounds hit.
             "interaction_coverage_version": 2,
+            # 1: the form error check's scan counts are kept (migration 0036),
+            # so a zero is a count, not a missing record.
+            "form_check_coverage_version": 1,
             "interaction_safety_version": 1,
             "interaction_max_clicks": config.interaction_max_clicks,
             "interaction_max_repeated": config.interaction_max_repeated,
@@ -1509,6 +1512,8 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
                 page_id=page_id,
                 findings=result.form_findings,
                 screenshots=result.form_screenshots,
+                ran=result.form_check_ran,
+                outcomes=result.form_outcomes,
             )
 
         # SC 1.3.2 visual probe. Rows tagged ``pipeline='visual'``.
@@ -2268,6 +2273,8 @@ def _persist_form_errors(
     page_id: int,
     findings: tuple[FormFinding, ...],
     screenshots: Mapping[str, tuple[bytes | None, bytes | None]] | None = None,
+    ran: bool = False,
+    outcomes: Mapping[str, int] | None = None,
 ) -> None:
     """Write the form error check's findings (SC 3.3.1), each with its form's
     screenshots before and after the press when the scan took them: the
@@ -2286,6 +2293,19 @@ def _persist_form_errors(
         except sqlite3.Error as exc:
             log.warning("forms.persist_failed", page_id=page_id, error=str(exc))
     ctx.summary.form_error_findings_total += len(findings)
+    if ran:
+        counts = dict(outcomes or {})
+        skipped = counts.pop("skipped", 0)
+        try:
+            repo.record_form_check(
+                ctx.conn,
+                scan_id=ctx.scan_id,
+                pressed=sum(counts.values()),
+                skipped=skipped,
+                not_checked=counts.get("not_checked", 0),
+            )
+        except sqlite3.Error as exc:
+            log.warning("forms.count_failed", page_id=page_id, error=str(exc))
 
 
 @_batched_writes
