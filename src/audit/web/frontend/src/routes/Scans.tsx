@@ -132,28 +132,30 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  *   exception is what needs the eye (W3C COGA, "Making Content Usable":
  *   only what helps the task).
  * - Columns: the site that names the row, when its latest completed scan
- *   finished, its Pages, Occurrences and Kinds of issues, the Rule check
- *   it ran, then Actions. Occurrences counts every place a problem
- *   appears; Kinds of issues counts the rows of that report's Issues
- *   table. They are the words and the order the Issues page summary uses
- *   (ReportSummary), so the list and the report name the same numbers the
- *   same way (SC 3.2.4 Consistent Identification, Level AA). The places
- *   lead: they are the number people mean when they ask how much was
- *   found. History: these columns were "Issues" (the rows) and
- *   "Occurrences" (the places) until 2026-10-26, then "Issues" (the
- *   places) and "Kinds of issues" (the rows). On 2026-10-28 user testing
- *   with Siteimprove users, who know Siteimprove's "issues" and
+ *   finished, its Issue types, Issue occurrences and Pages, the Rule
+ *   check it ran, then Actions. Issue types counts the rows of that
+ *   report's Issues table; Issue occurrences counts every place a problem
+ *   appears. They are the words and the order the Issues page summary
+ *   uses (ReportSummary), so the list and the report name the same
+ *   numbers the same way (SC 3.2.4 Consistent Identification, Level AA).
+ *   The developer set this order and these words on 2026-10-30: what was
+ *   found, then how much of the site it came from. History: these columns
+ *   were "Issues" (the rows) and "Occurrences" (the places) until
+ *   2026-10-26, then "Issues" (the places) and "Kinds of issues" (the
+ *   rows), with Pages first and the places leading. On 2026-10-28 user
+ *   testing with Siteimprove users, who know Siteimprove's "issues" and
  *   "occurrences", led the developer to bring back "Occurrences" for the
- *   places and keep "Kinds of issues" for the rows. See
- *   docs/plain-language.md, "Why "occurrence" and "kind of issue"".
+ *   places and keep "Kinds of issues" for the rows; on 2026-10-30 they
+ *   became "Issue occurrences" and "Issue types". See
+ *   docs/plain-language.md, "Why "occurrence" and "issue type"".
  * - Rule check says which rule checks tested pages in that scan: "axe",
  *   "Alfa", "axe and Alfa" or "None". Testers who use Siteimprove asked
  *   (2026-10-28) whether a report came from axe or from Siteimprove, so
  *   the header's hint names who makes each tool (RULE_CHECK_HELP). It
  *   counts what ran, not what was chosen: a check that never reached a
  *   page is not listed. Just before Actions, after the numbers it
- *   qualifies; the Issues table names the check for each kind of issue.
- * - The Occurrences and Kinds of issues counts are plain numbers, in the
+ *   qualifies; the Issues table names the check for each issue type.
+ * - The Issue types and Issue occurrences counts are plain numbers, in the
  *   site row as in its scan rows. The Occurrences count was a link into
  *   the report, "476 occurrences", until the developer removed it
  *   (2026-10-30): it opened the same report as "Open latest scan" in the
@@ -172,7 +174,7 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  *   also means less sideways scrolling on a narrow screen (W3C COGA,
  *   "Making Content Usable", https://www.w3.org/TR/coga-usable/: only what
  *   helps the task).
- * - A site's scan rows fill the same Occurrences and Kinds of issues columns,
+ * - A site's scan rows fill the same Issue types and Issue occurrences columns,
  *   so a site's past scans can be compared by the same numbers. They are
  *   fetched when the scans are shown (one request per
  *   completed scan, `/api/scans/{id}/issue-counts`), not with the site
@@ -245,7 +247,7 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  */
 type SortKey = "site" | "completed" | "pages" | "issues" | "kinds" | "checks";
 
-const SORT_COLUMNS = ["site", "completed", "pages", "issues", "kinds", "checks"] as const satisfies readonly SortKey[];
+const SORT_COLUMNS = ["site", "completed", "kinds", "issues", "pages", "checks"] as const satisfies readonly SortKey[];
 const DEFAULT_SORT: Sort<SortKey> = { column: "completed", direction: "desc" };
 
 const SORT_KINDS: Record<SortKey, SortKind> = {
@@ -262,8 +264,8 @@ const SORT_LABELS: Record<SortKey, string> = {
   pages: "Pages",
   // The key stays "issues" for saved `?sort=issues_desc` links; the column
   // it sorts counts occurrences (see "Columns" above).
-  issues: "Occurrences",
-  kinds: "Kinds of issues",
+  issues: "Issue occurrences",
+  kinds: "Issue types",
   checks: "Rule check",
   completed: "Scanned",
 };
@@ -515,7 +517,9 @@ export default function ScansRoute() {
                   >
                     {SORT_LABELS.site}
                   </SortHeader>
-                  {(["completed", "pages", "issues", "kinds", "checks"] as const).map((column) => (
+                  {/* The columns after Site, in the order the cells are drawn
+                      (SiteRows, ScanRow): SORT_COLUMNS without "site". */}
+                  {SORT_COLUMNS.filter((column) => column !== "site").map((column) => (
                     <SortHeader
                       key={column}
                       column={column}
@@ -606,7 +610,7 @@ export default function ScansRoute() {
                       <ColumnHeader>Status</ColumnHeader>
                       <ColumnHeader>Environment and data classification</ColumnHeader>
                       <ColumnHeader>Pages</ColumnHeader>
-                      <ColumnHeader>Occurrences</ColumnHeader>
+                      <ColumnHeader>Issue occurrences</ColumnHeader>
                       <ColumnHeader>Updated</ColumnHeader>
                       <ColumnHeader>Open</ColumnHeader>
                     </tr>
@@ -697,13 +701,13 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
               {relativeTime(completed.finished_at ?? completed.started_at)}
             </Cell>
             <Cell numeric className="text-fg">
-              {completed.page_count.toLocaleString()}
+              {(site.most_recent_completed_issue_count ?? 0).toLocaleString()}
             </Cell>
             <Cell numeric className="text-fg">
               {(site.most_recent_completed_occurrence_count ?? 0).toLocaleString()}
             </Cell>
             <Cell numeric className="text-fg">
-              {(site.most_recent_completed_issue_count ?? 0).toLocaleString()}
+              {completed.page_count.toLocaleString()}
             </Cell>
             <RuleChecksCell scan={completed} />
             <Cell className="whitespace-nowrap">
@@ -863,10 +867,10 @@ function ScanRow({
       >
         {relativeTime(scan.finished_at ?? scan.started_at)}
       </Cell>
+      <ScanCountCells scan={scan} className={piece()} />
       <Cell numeric className={cn("text-fg", piece())}>
         {scan.page_count.toLocaleString()}
       </Cell>
-      <ScanCountCells scan={scan} className={piece()} />
       <RuleChecksCell scan={scan} className={piece()} />
       {/* While "Compare with" is open, its cell rises over the rows after
           it: each cell here is its own layer (`isolate`, for the box drawn
@@ -918,7 +922,7 @@ function RuleChecksCell({ scan, className }: { scan: ScanSummary; className?: st
 }
 
 /**
- * Occurrences and Kinds of issues for one scan row of an open site, fetched
+ * Occurrences and Issue types for one scan row of an open site, fetched
  * when the rows are shown (see "A site's scan rows" in the comment on this
  * route). Only a completed scan is counted; the others say "Not counted",
  * since the status beside their report number already says why. While a count loads,
@@ -953,10 +957,10 @@ function ScanCountCells({ scan, className }: { scan: ScanSummary; className?: st
   return (
     <>
       <Cell numeric className={cn("text-fg", className)}>
-        {counts.data.occurrence_count.toLocaleString()}
+        {counts.data.issue_count.toLocaleString()}
       </Cell>
       <Cell numeric className={cn("text-fg", className)}>
-        {counts.data.issue_count.toLocaleString()}
+        {counts.data.occurrence_count.toLocaleString()}
       </Cell>
     </>
   );

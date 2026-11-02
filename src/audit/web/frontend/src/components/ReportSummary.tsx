@@ -64,25 +64,27 @@ export function ReportSummary({
   return (
     <>
       {scan.blocked && <BlockedScanNotice scanId={scan.id} blocked={scan.blocked} />}
-      {/* Three numbers, main point first: how many occurrences (every place
-          a problem shows up), how many kinds of issues they fall into, then
-          how much of the site was scanned to find them. The first version
+      {/* Three numbers: how many issue types (the rows of the table below),
+          how many issue occurrences (every place a problem shows up), then
+          how much of the site was scanned to find them. The developer set
+          this order and these names on 2026-10-30 ("Issue types" first,
+          "Issue occurrences" second), the same order as the Reports table's
+          columns, so one report reads the same way on both screens (SC 3.2.4
+          Consistent Identification, Level AA). The paragraphs below are the
+          history before that. The first version
           read left to right as the scan ran (pages, then occurrences, then
           issues), and a coworker testing it misread it in three ways:
           "errors" as accessibility errors, "Occurrences found" as the issue
           count, and "Issues found" as a part of that count. Leading with
           what the reader came for is the first rule of the U.S. Federal
-          Plain Language Guidelines. "Occurrences found" is that first
-          version's word again (see the history below); what now keeps it
-          apart from the row count is the other label, "Kinds of issues",
-          not "Issues found".
+          Plain Language Guidelines.
 
           The labels carry the difference between the two numbers, because a
           reader scanning the numbers reads the label and skips the rest:
-          "Occurrences found" for every place a
-          problem shows up, "Kinds of issues" for the rows of the table
-          below. Each label is the same word as the table's matching column
-          ("Occurrences") or its row name ("Kind of issue"), so one thing
+          "Issue types" for the rows of the table below, "Issue occurrences"
+          for every place a problem shows up. Each label is the same word as
+          the table's row name ("Issue type") or its matching column ("Issue
+          occurrences"), so one thing
           keeps one name (W3C COGA, "Making Content Usable",
           https://www.w3.org/TR/coga-usable/: the same word for the same
           thing; SC 3.2.4 Consistent Identification, Level AA).
@@ -91,11 +93,15 @@ export function ReportSummary({
           "One per row in the table below" were there, and user testing
           (2026-10-28) found them noise; the developer removed them. What
           each number counts is still said in words everyone can reach:
-          "What the labels mean" under the table defines an occurrence and a
-          kind of issue, and the Occurrences column's hint does too (SC 3.1.3
+          "What the labels mean" under the table defines an issue type and an
+          occurrence, and the Issue occurrences column's hint does too (SC 3.1.3
           Unusual Words, Level AAA). "Pages visited" keeps its lines: they
           are facts (page states reached, pages that failed), not
           definitions.
+
+          On 2026-10-30 the developer renamed them again, everywhere: "issue
+          type" for a row (it was "kind of issue") and "Issue occurrences" for
+          the places, with issue types first. See docs/plain-language.md.
 
           History, short. Until 2026-10-26 the pair was "Kinds of issue
           found" (the rows, first) and "Places issues appear (occurrences)".
@@ -105,11 +111,14 @@ export function ReportSummary({
           with Siteimprove users, who know Siteimprove's pair of "issues" (a
           rule) and "occurrences" (each place), led the developer to bring
           back "occurrence" for the places, and keep "kind of issue" for a
-          row. The places count still leads. The research and the reason are
-          in docs/plain-language.md, "Why "occurrence" and "kind of issue"".
-          "Kinds of issues", not "Types of issues": the "How sure" values
-          were once called the three types of issue, and "issue type" is a
-          field in the Jira export.
+          row, with the places count leading. The research and the reasons
+          are in docs/plain-language.md, "Why "occurrence" and "issue type"".
+          "Kinds of issues" was chosen over "Types of issues" then, because
+          the "How sure" values were once called the three types of issue
+          and "Issue Type" is a field in the Jira export. Neither holds the
+          reader back now: the How sure values have not been called types
+          since, and the Jira export's "Issue Type" is Jira's own field
+          (always "Bug"), which a reader sees only inside Jira.
 
           The page states opened by clicking are a line under the pages, not a
           fourth number: they say how much was scanned, like the pages, not
@@ -152,16 +161,16 @@ export function ReportSummary({
           one) and 32px between rows, against 8px from a number to its name
           and 4px between the lines under "Pages visited", which read as one
           unit. Three
-          across from 640px; below that the two problem numbers (Occurrences
-          found and Kinds of issues) share a row, as the pair they are, and the
+          across from 640px; below that the two problem numbers (Issue types
+          and Issue occurrences) share a row, as the pair they are, and the
           pages take the row under them, so nothing is squeezed at 320px (SC
           1.4.10 Reflow, Level AA). */}
       <dl className="mt-10 mb-5 grid grid-cols-2 gap-x-8 gap-y-8 sm:grid-cols-3 lg:gap-x-12">
+        <SummaryStat label={issueGroups === 1 ? "Issue type" : "Issue types"} value={issueGroups} />
         <SummaryStat
-          label={occurrences === 1 ? "Occurrence found" : "Occurrences found"}
+          label={occurrences === 1 ? "Issue occurrence" : "Issue occurrences"}
           value={occurrences}
         />
-        <SummaryStat label={issueGroups === 1 ? "Kind of issue" : "Kinds of issues"} value={issueGroups} />
         <SummaryStat
           label="Pages visited"
           value={scan.page_count}
@@ -186,7 +195,6 @@ export function ReportSummary({
           ]}
         />
       </dl>
-
     </>
   );
 }

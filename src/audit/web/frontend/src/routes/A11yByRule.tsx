@@ -133,7 +133,7 @@ export default function A11yByRuleRoute() {
         <div className="flex items-start gap-3">
           <Info className="mt-0.5 h-5 w-5 shrink-0 text-umich-blue" aria-hidden />
           <p className="max-w-measure text-sm text-fg">
-            <strong>How this page groups issues.</strong> Each kind of issue is
+            <strong>How this page groups issues.</strong> Each issue type is
             one rule from one check. This view helps you <em>plan fixes</em>. For
             example, the <code>color-contrast</code> rule may fail 800 times.
             Often one style (CSS class) in one page template causes all of
@@ -151,13 +151,13 @@ export default function A11yByRuleRoute() {
       </Card>
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {/* Occurrences first, then kinds of issues: the order the developer
-            set on 2026-10-26 for every screen that shows both counts, kept
-            when the places went back to "occurrences" on 2026-10-28. Why
-            the words changed: docs/plain-language.md, "Why "occurrence" and
-            "kind of issue"". */}
-        <StatCard label="Occurrences (axe)" value={coverage.axe_violations_total} />
-        <StatCard label="Kinds of issues" value={groups.length} />
+        {/* Issue types first, then issue occurrences: the order and the
+            words the developer set on 2026-10-30 for every screen that shows
+            both counts (it was occurrences first from 2026-10-26). Why the
+            words changed: docs/plain-language.md, "Why "occurrence" and
+            "issue type"". */}
+        <StatCard label="Issue types" value={groups.length} />
+        <StatCard label="Issue occurrences (axe)" value={coverage.axe_violations_total} />
         <StatCard label="Failed (Alfa)" value={coverage.alfa_failed_total} />
         <StatCard label={`${REVIEW_TYPE_LABEL.expert_review} (Alfa)`} value={coverage.alfa_cant_tell_total} />
         <StatCard
@@ -181,7 +181,7 @@ export default function A11yByRuleRoute() {
           />
         </TableBar>
         <TableStatus className="border-b-0">
-          {groups.length.toLocaleString()} {groups.length === 1 ? "kind of issue" : "kinds of issues"}.
+          {groups.length.toLocaleString()} {groups.length === 1 ? "issue type" : "issue types"}.
         </TableStatus>
       </Card>
 

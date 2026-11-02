@@ -72,7 +72,7 @@ async def test_issue_tags_headers_and_bands_explain_themselves(
     page = await new_page(viewport={"width": 1280, "height": 900})
     try:
         await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
-        table = page.get_by_role("table", name="Kinds of accessibility issue")
+        table = page.get_by_role("table", name="Accessibility issue types")
         body = table.locator("tbody")
 
         lanes = await _hints(body, LANE_HELP)
@@ -83,15 +83,15 @@ async def test_issue_tags_headers_and_bands_explain_themselves(
 
         headers = {
             "How sure": (
-                "How sure Axcess is that this kind of issue is a real problem: "
+                "How sure Axcess is that this issue type is a real problem: "
                 "Mostly sure, Not sure, or For information."
             ),
             "Where it shows": (
-                "Where this kind of issue shows up: at page load, after clicking, or in an image."
+                "Where this issue type shows up: at page load, after clicking, or in an image."
             ),
             # Names who makes each rule check: testers asked "axe or Siteimprove?".
             "Check": (
-                "Which check found this kind of issue. Rule check (axe) uses axe-core, made by "
+                "Which check found this issue type. Rule check (axe) uses axe-core, made by "
                 "Deque. Rule check (Alfa) uses Alfa, made by Siteimprove."
             ),
         }
@@ -105,7 +105,7 @@ async def test_issue_tags_headers_and_bands_explain_themselves(
             table.get_by_role("columnheader", name="Priority", exact=False).get_by_role("button")
         ).to_have_attribute(
             "title",
-            re.compile(r"^High, Medium, or Low, from the impact rating of this kind of issue"),
+            re.compile(r"^High, Medium, or Low, from the impact rating of this issue type"),
         )
 
         bands = await _hints(body, {"High": "", "Medium": "", "Low": ""})
@@ -131,7 +131,7 @@ async def test_issue_tags_headers_and_bands_explain_themselves(
         assert await terms.locator("[title]").count() == 0
         await playwright_async.expect(
             page.get_by_role(
-                "heading", name="Priority: which kinds of issues to look at first", level=3
+                "heading", name="Priority: which issue types to look at first", level=3
             )
         ).to_be_visible()
         await playwright_async.expect(
@@ -171,12 +171,12 @@ async def test_keyboard_focus_keeps_the_hint_as_the_description(
     )
     try:
         await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
-        table = page.get_by_role("table", name="Kinds of accessibility issue")
+        table = page.get_by_role("table", name="Accessibility issue types")
         button = table.get_by_role("columnheader", name="How sure", exact=False).get_by_role(
             "button"
         )
         hint = (
-            "How sure Axcess is that this kind of issue is a real problem: "
+            "How sure Axcess is that this issue type is a real problem: "
             "Mostly sure, Not sure, or For information."
         )
         await button.focus()
@@ -202,12 +202,12 @@ async def test_hovering_keeps_the_hint_as_the_description(
     )
     try:
         await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
-        table = page.get_by_role("table", name="Kinds of accessibility issue")
+        table = page.get_by_role("table", name="Accessibility issue types")
         button = table.get_by_role("columnheader", name="How sure", exact=False).get_by_role(
             "button"
         )
         hint = (
-            "How sure Axcess is that this kind of issue is a real problem: "
+            "How sure Axcess is that this issue type is a real problem: "
             "Mostly sure, Not sure, or For information."
         )
         await button.hover()

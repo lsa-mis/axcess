@@ -222,7 +222,7 @@ function MethodRow({
 /**
  * What one method found, under its result in the Result column.
  *
- * Detector methods answer with their own kinds of issues (rows of the Issues table). ``interaction`` is the
+ * Detector methods answer with their own issue types (rows of the Issues table). ``interaction`` is the
  * exception worth spelling out: Click-Through does not detect
  * anything itself, it just reaches markup that would otherwise be invisible to
  * the scan, so what it "found" is the evidence that only exists after a
@@ -245,7 +245,7 @@ function findingsFor(
           count: 0,
         }
       : {
-          text: `Found: ${revealed.length} ${revealed.length === 1 ? "kind of issue" : "kinds of issues"} with at least one occurrence that appears only after you use a control, such as a menu.`,
+          text: `Found: ${revealed.length} ${revealed.length === 1 ? "issue type" : "issue types"} with at least one occurrence that appears only after you use a control, such as a menu.`,
           count: revealed.length,
         };
   }
@@ -256,7 +256,7 @@ function findingsFor(
   return count === 0
     ? { text: "Found: no issues.", count: 0 }
     : {
-        text: `Found: ${count} ${count === 1 ? "kind of issue" : "kinds of issues"}.`,
+        text: `Found: ${count} ${count === 1 ? "issue type" : "issue types"}.`,
         count,
       };
 }

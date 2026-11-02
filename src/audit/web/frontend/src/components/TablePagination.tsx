@@ -7,7 +7,7 @@ import { useTablePageSize } from "../hooks/usePreferences";
 /*
  * Every table in the app shows at most Settings > Rows per page rows at a
  * time (10 by default). A long table was one long scroll: "Pages with this
- * kind of issue" alone could list 1,200 pages, and the reader lost the column
+ * issue type" alone could list 1,200 pages, and the reader lost the column
  * headers and their place in it.
  */
 
@@ -168,7 +168,7 @@ export function TablePagination({
 }: {
   /** The table's name, for the controls' accessible names ("Issues"). */
   label: string;
-  /** What a row is, plural ("kinds of issues", "pages"). */
+  /** What a row is, plural ("issue types", "pages"). */
   noun: string;
   page: number;
   pages: number;

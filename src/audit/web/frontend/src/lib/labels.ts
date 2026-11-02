@@ -31,11 +31,11 @@ export function clickThroughStates(count: number): string {
   return `${count.toLocaleString()} ${count === 1 ? CLICK_THROUGH_STATE : CLICK_THROUGH_STATES}`;
 }
 
-/** Which family of checks produced a kind of issue's evidence. Table order. */
+/** Which family of checks produced an issue type's evidence. Table order. */
 export const FINDING_TYPES = ["wcag", "click_through", "alt_text"] as const satisfies readonly FindingType[];
 
 /**
- * Where a kind of issue shows up, as the Issues table's "Where it shows" column
+ * Where an issue type shows up, as the Issues table's "Where it shows" column
  * names it: "At page load", "After clicking", "In an image". The header is a
  * plain question every value answers, like "How sure" beside it. Rejected
  * headers: "Found" (a lone verb, read as "found: yes or no" or a count),
@@ -71,7 +71,7 @@ export const FINDING_TYPE_HELP: Record<FindingType, string> = {
 export const isFindingType = (value: string): value is FindingType =>
   (FINDING_TYPES as readonly string[]).includes(value);
 
-/** How much confidence a kind of issue's evidence carries. Table order. */
+/** How much confidence an issue type's evidence carries. Table order. */
 export const REVIEW_LANES = ["likely_barrier", "expert_review", "informational"] as const satisfies readonly ReviewLane[];
 
 /** The "How sure" values' names: `REVIEW_TYPE_LABEL` from terms.ts, under the name this module used. */
@@ -93,24 +93,25 @@ export const REVIEW_LANE_HELP: Record<ReviewLane, string> = {
  * as the button's description.
  *
  * Keyed by the header's visible text (``columnHint`` in routes/Issues.tsx
- * looks hints up by it). The count column is "Occurrences": it read
- * "Issues" from 2026-10-26 to 2026-10-28, and went back to "Occurrences"
- * after user testing with Siteimprove users (docs/plain-language.md, "Why
- * "occurrence" and "kind of issue""). Its hint says what an occurrence is,
+ * looks hints up by it). The count column is "Issue occurrences": it read
+ * "Issues" from 2026-10-26 to 2026-10-28, "Occurrences" after user testing
+ * with Siteimprove users, and "Issue occurrences" from 2026-10-30
+ * (docs/plain-language.md, "Why "occurrence" and "issue type""). Its hint
+ * says what an occurrence is,
  * because the column is where a reader first meets the word, and
  * "occurrence" is an advanced word (SC 3.1.3 Unusual Words, Level AAA).
  */
 export const ISSUE_COLUMN_HELP = {
-  "How sure": "How sure Axcess is that this kind of issue is a real problem: Mostly sure, Not sure, or For information.",
-  "Where it shows": "Where this kind of issue shows up: at page load, after clicking, or in an image.",
+  "How sure": "How sure Axcess is that this issue type is a real problem: Mostly sure, Not sure, or For information.",
+  "Where it shows": "Where this issue type shows up: at page load, after clicking, or in an image.",
   Priority:
-    "High, Medium, or Low, from the impact rating of this kind of issue and how many pages it is on. Kinds of issues from the rule check (Alfa) have no rating, so they count as the lowest. A serious kind of issue on one page can still be Low. Kinds of issues marked For information show Does not apply.",
+    "High, Medium, or Low, from the impact rating of this issue type and how many pages it is on. Issue types from the rule check (Alfa) have no rating, so they count as the lowest. A serious issue type on one page can still be Low. Issue types marked For information show Does not apply.",
   Pages:
-    "Pages with at least one occurrence of this kind of issue. An element repeated on many pages, such as a shared menu, counts only on the first page it was found on. An image counts on every page it appears on.",
-  Occurrences:
-    "How many occurrences of this kind of issue were found. An occurrence is one place a problem appears: one element on one page, or in one page state. An element repeated on many pages, such as a shared menu, counts once. An image counts every time it appears.",
+    "Pages with at least one occurrence of this issue type. An element repeated on many pages, such as a shared menu, counts only on the first page it was found on. An image counts on every page it appears on.",
+  "Issue occurrences":
+    "How many occurrences of this issue type were found. An occurrence is one place a problem appears: one element on one page, or in one page state. An element repeated on many pages, such as a shared menu, counts once. An image counts every time it appears.",
   Check:
-    "Which check found this kind of issue. Rule check (axe) uses axe-core, made by Deque. Rule check (Alfa) uses Alfa, made by Siteimprove.",
+    "Which check found this issue type. Rule check (axe) uses axe-core, made by Deque. Rule check (Alfa) uses Alfa, made by Siteimprove.",
 } as const;
 
 /**
@@ -130,13 +131,13 @@ export const RULE_CHECK_HELP =
  * recommended order groups by "How sure" first, so a band ranks the kinds of
  * issue in one "How sure" group. The hints said "issues of the same type"
  * until 2026-10-26; "type" was the old name of "How sure", and a row is now
- * a kind of issue (docs/plain-language.md, "Why "occurrence" and "kind of issue"").
+ * an issue type (docs/plain-language.md, "Why "occurrence" and "issue type"").
  */
 export const PRIORITY_HELP = {
-  High: "Look at these first among kinds of issues with the same How sure value: a high impact rating on many pages, such as a critical problem on 4 or more pages or a moderate one on 20 or more (pages a shared element repeats on count too).",
+  High: "Look at these first among issue types with the same How sure value: a high impact rating on many pages, such as a critical problem on 4 or more pages or a moderate one on 20 or more (pages a shared element repeats on count too).",
   Medium:
     "Look at these after the High ones with the same How sure value. Priority combines the impact rating with how many pages have it.",
-  Low: "Look at these last among kinds of issues with the same How sure value. Low can still be serious: a critical problem on 1 page is Low, so open it before you skip it.",
+  Low: "Look at these last among issue types with the same How sure value. Low can still be serious: a critical problem on 1 page is Low, so open it before you skip it.",
 } as const;
 
 export const isReviewLane = (value: string): value is ReviewLane =>

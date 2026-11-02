@@ -296,7 +296,7 @@ async def test_opened_from_a_report_the_second_panel_is_empty_until_chosen(
         )
         name = await link.evaluate("e => e.textContent")
         assert name.startswith(f"Report #{report}"), name
-        assert "kinds of issue" in name or "kind of issue" in name, name
+        assert "issue type" in name, name
         assert name.endswith(f"(compare with Report #{third})"), name
         box = await link.bounding_box()
         assert box and box["height"] >= 44, box

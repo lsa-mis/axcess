@@ -40,7 +40,7 @@ export const STATUS_OPTION_LABEL: Record<FindingStatus, string> = {
 
 /**
  * The three "How sure" values, as the Issues table's "How sure" column names
- * them: how sure Axcess is that a kind of issue is a real problem. (They were
+ * them: how sure Axcess is that an issue type is a real problem. (They were
  * once called the three types of issue; "type" is not used for them now.)
  *
  * "Mostly sure" and "Not sure" are opposites in short, common words, so the
@@ -66,7 +66,7 @@ export const REVIEW_TYPE_LABEL: Record<ReviewLane, string> = {
 };
 
 /**
- * A kind of issue's impact rating, in the glossary's words ("Impact"), not axe's
+ * An issue type's impact rating, in the glossary's words ("Impact"), not axe's
  * raw lower-case values.
  */
 export const IMPACT_LABEL: Record<AxeImpact, string> = {

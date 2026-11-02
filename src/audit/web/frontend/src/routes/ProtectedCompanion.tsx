@@ -551,7 +551,7 @@ export default function ProtectedCompanionRoute() {
         </div>
         <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <ProgressMetric label="Pages checked" value={scan.progress.pages_indexed} />
-          <ProgressMetric label="Occurrences" value={scan.progress.issue_occurrences} />
+          <ProgressMetric label="Issue occurrences" value={scan.progress.issue_occurrences} />
           <ProgressMetric label={CHECK_LABEL.axe} value={scan.progress.axe_occurrences} />
           <ProgressMetric
             label={`${CHECK_LABEL.alfa}: failed or ${REVIEW_TYPE_LABEL.expert_review}`}

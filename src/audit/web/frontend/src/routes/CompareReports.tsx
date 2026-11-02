@@ -488,7 +488,7 @@ const PANEL_HEIGHT = "h-[80vh] min-h-[28rem] lg:h-[calc(100vh-7rem)] lg:min-h-[3
  *   and size at once, which is what picking one needs.
  * - **Newest first, without the first panel's report**, as Reports and the
  *   panels' pickers list them. Each row names the report, the day it was
- *   scanned, and how many kinds of issues and occurrences it found, in the
+ *   scanned, and how many issue types and occurrences it found, in the
  *   words the rest of the app uses (docs/plain-language.md, Terms).
  *   Screen-reader-only words end each link's name, "(compare with Report
  *   #24)", as the "Compare with" list on Reports ends its links (technique

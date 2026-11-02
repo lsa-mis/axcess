@@ -41,11 +41,11 @@ const isChange = (value: string | null): value is ComparisonChange =>
  * under the Compare reports tab: it is part of comparing. Its links that
  * choose another pair stay on this address.
  *
- * The page reads top down: which two scans, how many kinds of issues are new,
+ * The page reads top down: which two scans, how many issue types are new,
  * resolved or remaining (each a filter for the table), the coverage notes,
- * the trend, then every compared kind of issue in a table.
+ * the trend, then every compared issue type in a table.
  *
- * "Resolved" means only that a later scan did not detect the kind of issue again.
+ * "Resolved" means only that a later scan did not detect the issue type again.
  * The terms dialog says so, a row whose checks differed between the scans
  * says so, and the coverage notes list every reason a comparison may not be
  * like for like.
@@ -128,7 +128,7 @@ export default function CompareRoute() {
         scanId={id}
         previousScanId={scanQuery.data?.previous_scan_id ?? null}
         title="What changed"
-        meta="What changed since an earlier report of this site: which kinds of issues are new, still found, or no longer found. The trend shows how the site changed over time."
+        meta="What changed since an earlier report of this site: which issue types are new, still found, or no longer found. The trend shows how the site changed over time."
         actions={
           <Button type="button" onClick={() => setTermsOpen(true)} className="rounded-full">
             <CircleHelp className="h-4 w-4" aria-hidden />
@@ -228,7 +228,7 @@ export default function CompareRoute() {
           )}
           {data.baseline && data.rows.length < data.total && (
             <p className="mt-2 text-xs text-fg-muted">
-              Showing the first {data.rows.length} of {data.total} {data.total === 1 ? "kind of issue" : "kinds of issues"}.
+              Showing the first {data.rows.length} of {data.total} {data.total === 1 ? "issue type" : "issue types"}.
             </p>
           )}
           {/* Last: the caveats behind the numbers above, read once the
@@ -291,8 +291,8 @@ function Comparison({
           <span>
             The checks or pages were different in these two scans. So{" "}
             {unsure === data.changes.new + data.changes.resolved
-              ? "the new kinds of issues and those no longer found"
-              : `${unsure} of the new kinds of issues and those no longer found (marked in the table)`}{" "}
+              ? "the new issue types and those no longer found"
+              : `${unsure} of the new issue types and those no longer found (marked in the table)`}{" "}
             may come from what was scanned, not from changes to the site. Check them on the page. &ldquo;What was checked in each report&rdquo;, at the end of this page, says what was different.
           </span>
         </p>
@@ -320,7 +320,7 @@ function Comparison({
               <span className="mt-2 block text-3xl font-semibold leading-none tabular-nums text-fg">
                 {data.changes[key].toLocaleString()}
               </span>
-              <span className="sr-only"> {data.changes[key] === 1 ? "kind of issue" : "kinds of issues"}</span>
+              <span className="sr-only"> {data.changes[key] === 1 ? "issue type" : "issue types"}</span>
             </button>
           );
         })}
@@ -459,7 +459,7 @@ function CoverageNotes({ data }: { data: ComparisonReport }) {
         <p className="flex max-w-3xl items-start gap-2">
           <Info className="mt-1 h-4 w-4 shrink-0 text-fg-subtle" aria-hidden />
           <span>
-            No longer found means the later scan did not find that kind of issue again. That is not proof of a fix. Check
+            No longer found means the later scan did not find that issue type again. That is not proof of a fix. Check
             the page yourself before you mark its occurrences Fixed.
           </span>
         </p>
@@ -473,7 +473,7 @@ function CoverageNotes({ data }: { data: ComparisonReport }) {
         ) : (
           <>
             <p className="mt-1 max-w-3xl text-fg-muted">
-              These can make a kind of issue look new or no longer found when the site did not change.
+              These can make an issue type look new or no longer found when the site did not change.
             </p>
             <ul className="mt-2 max-w-3xl list-disc space-y-1.5 pl-5">
               {differences.map((item) => <li key={item.key}>{item.body}</li>)}
@@ -614,13 +614,13 @@ function TermsDialog({
       `Found in ${earlier}, but not found again in ${later}. That is not proof of a fix. Check the page yourself before you mark its occurrences Fixed, especially if the checks were different in the two scans.`,
     ],
     ["remaining", "Still found", "Found in both scans. Its number of occurrences can still go up or down."],
-    // Occurrence before kind of issue: the order of the two counts
-    // everywhere (docs/plain-language.md, Terms). The place was called an
-    // "issue" from 2026-10-26 to 2026-10-28; the developer brought back
-    // "occurrence" after user testing with Siteimprove users. See "Why
-    // "occurrence" and "kind of issue"" there.
+    // Issue type before occurrence: the order of the two counts everywhere
+    // since 2026-10-30 (occurrence came first from 2026-10-26). The place
+    // was called an "issue" from 2026-10-26 to 2026-10-28; the developer
+    // brought back "occurrence" after user testing with Siteimprove users.
+    // See docs/plain-language.md, "Why "occurrence" and "issue type"".
+    ["group", "Issue type", "All the occurrences one check found for the same reason: one accessibility rule, or one kind of image problem. One row in the table."],
     ["occurrence", "Occurrence", "One place a problem was found. It is counted as the Issues table counts it: an element repeated across pages counts once."],
-    ["group", "Kind of issue", "All the occurrences one check found for the same reason: one accessibility rule, or one kind of image problem. One row in the table."],
   ];
   return (
     <dialog

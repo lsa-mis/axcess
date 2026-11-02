@@ -41,9 +41,9 @@ export default function IssueDetailRoute() {
   if (detailError) {
     return (
       <EmptyState
-        title="Kind of issue not found"
+        title="Issue type not found"
         message={
-          "This kind of issue is not part of this report. It may have been fixed, " +
+          "This issue type is not part of this report. It may have been fixed, " +
           "or the link may be out of date. Go back to the Issues table to find it."
         }
         action={
@@ -55,7 +55,7 @@ export default function IssueDetailRoute() {
     );
   }
   if (!scan) {
-    return <div className="text-fg-muted">Loading this kind of issue…</div>;
+    return <div className="text-fg-muted">Loading this issue type…</div>;
   }
 
   const row = detail?.row;
@@ -72,7 +72,7 @@ export default function IssueDetailRoute() {
             <span>{row?.title ?? key}</span>
           </span>
         }
-        // The type rides with the criterion, so a "Not sure" kind of issue reads
+        // The type rides with the criterion, so a "Not sure" issue type reads
         // as one even with the guidance closed. The word is the Issues
         // table's (REVIEW_TYPE_LABEL), the same one the guidance dialog uses.
         meta={
@@ -104,7 +104,7 @@ export default function IssueDetailRoute() {
       {detail && (
         <IssueGuidanceDialog open={guidanceOpen} onClose={() => setGuidanceOpen(false)} detail={detail} />
       )}
-      {/* The trail names the kind of issue, not the kind of page it is, so
+      {/* The trail names the issue type, not the kind of page it is, so
           evidence opened from here returns under its own title. */}
       <IssueEvidence
         scanId={scan.id}

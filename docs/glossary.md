@@ -6,7 +6,7 @@ again. If a word is missing or unclear, please open an issue on GitHub.
 
 ## Report groups
 
-The Issues table's **How sure** column puts every [kind of issue](#kind-of-issue)
+The Issues table's **How sure** column puts every [issue type](#issue-type)
 in one of these three groups: how sure Axcess is that it is a real problem.
 
 ### Mostly sure
@@ -55,12 +55,12 @@ need to act on it, and it should not be reported as an issue.
 One place a problem appears: one element on one page, or in one
 [page state](#page-state). For example, if three links on one page have no
 name, that is three occurrences. A report counts these as "476 occurrences",
-and the Issues table counts them in its Occurrences column.
+and the Issues table counts them in its Issue occurrences column.
 
 - Exports use other words too: the Excel workbook calls each one an
   Instance, and the CSV, the JSON, and the written report call each one a
   finding. The workbook's Summary sheet, its Page References sheet, and the
-  heading above the table on the tab for each kind of issue say occurrence,
+  heading above the table on the tab for each issue type say occurrence,
   and so does the list of pages for an image in a Jira ticket and in the
   Markdown evidence inventory. The data that scripts read uses it too, such
   as `occurrence_count`.
@@ -68,25 +68,24 @@ and the Issues table counts them in its Occurrences column.
   went back to "occurrence" because people who use Siteimprove know that
   word for each place.
 
-### Kind of issue
+### Issue type
 
 All the [occurrences](#occurrence) one check found for the same reason (for
 images, the same kind of image with the same [alt text](#alt-text) problem).
-Each kind of issue is one row in the Issues table, such as "6 kinds of
-issues". Its name is in the table's Kind of issue column.
+Each issue type is one row in the Issues table, such as "6 issue types". Its name is in the table's Issue type column.
 
 - Exports use other words: the Excel workbook and the written report call a
-  kind of issue an Issue, and the written report also says issue type.
+  issue type an Issue, and the written report also says issue type.
 
 ### Issue
 
 A general word for a problem, as in the **Issues** page and table. When the
-app counts, it says [kinds of issues](#kind-of-issue) for the rows and
+app counts, it says [issue types](#issue-type) for the rows and
 [occurrences](#occurrence) for the places.
 
 - Until October 2026 the app called one row of the Issues table an issue.
   From 26 to 28 October 2026 it called one [occurrence](#occurrence) an
-  issue. Exports still call a kind of issue an Issue.
+  issue. Exports still call an issue type an Issue.
 
 ### Finding
 
@@ -96,7 +95,7 @@ exports and developer tools still say finding.
 
 ### Where it shows
 
-Where a [kind of issue](#kind-of-issue) shows up, shown in the Issues table's
+Where an [issue type](#issue-type) shows up, shown in the Issues table's
 Where it shows column and filter.
 
 - At page load: found on the page as it first loads, by a
@@ -106,7 +105,7 @@ Where it shows column and filter.
 - After clicking: found only after [Click-Through](#click-through) clicked
   something that opens more of the page, such as a menu, tab, or pop-up
   window, so it is in a [page state](#page-state) of its own. It shows only
-  when at least one of its occurrences needed the click. One kind of issue can
+  when at least one of its occurrences needed the click. One issue type can
   show both At page load and After clicking when the same problem appears in
   both places.
 - In an image: words inside an image, and whether its [alt text](#alt-text)
@@ -117,8 +116,7 @@ Where it shows column and filter.
 ### Root cause
 
 The underlying reason a problem repeats, such as one template or shared style
-file (stylesheet) used on 40 pages. Axcess groups occurrences into kinds of
-issues by the check that found them, not by root cause, so look for a shared
+file (stylesheet) used on 40 pages. Axcess groups occurrences into issue types by the check that found them, not by root cause, so look for a shared
 source before fixing page by page.
 
 ### Evidence
@@ -153,7 +151,7 @@ Moderate.
 ### Priority
 
 A High, Medium, or Low label in the Issues table that combines
-[impact](#impact) with how many pages a kind of issue touches. Because it rewards
+[impact](#impact) with how many pages an issue type touches. Because it rewards
 spread, a severe problem on a single page shows as Low, so check its impact too.
 
 ### Status
@@ -407,10 +405,10 @@ sign-in window first, Axcess keeps your sign-in in memory for 30 minutes.
 ### Rescan comparison
 
 Two reports of the same [scope](#scope) lined up on the **What changed**
-page, with each [kind of issue](#kind-of-issue) marked New, No longer found,
+page, with each [issue type](#issue-type) marked New, No longer found,
 or Still found. A report's **Compare reports** view shows the two reports
 side by side and links to it. No longer found means only that the later scan did not
-find that kind of issue again. It is not proof of a fix, so check the page
+find that issue type again. It is not proof of a fix, so check the page
 yourself before you mark its occurrences Fixed.
 
 ### Draft export
@@ -430,8 +428,8 @@ up.
 
 The report you download as **Written report (Markdown)** from the **Export
 report** menu. It is a plain text file with headings (Markdown format). The Excel
-workbook is a separate export, **Kinds of issues with fixes (Excel)**, with one
-row for each kind of issue in its Issues Overview sheet.
+workbook is a separate export, **Issue types with fixes (Excel)**, with one
+row for each issue type in its Issues Overview sheet.
 
 ### Local-first
 

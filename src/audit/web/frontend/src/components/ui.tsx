@@ -1200,7 +1200,7 @@ export function PageLink({
   // occurrences also gives the occurrence's ID, which is unique and is the
   // name the page's evidence uses for it ("Occurrence 1234"; found by
   // review). The word was "issue" from 2026-10-26 to 2026-10-28
-  // (docs/plain-language.md, "Why "occurrence" and "kind of issue"").
+  // (docs/plain-language.md, "Why "occurrence" and "issue type"").
   const element = elementName || selector ? shortLocator(elementName || selector || "") : null;
 
   // Build the inspector URL with whatever orientation/selector context the

@@ -120,7 +120,7 @@ async def test_reports_table_keyboard_and_columns(
     await playwright_async.expect(table.locator("td[headers]")).to_have_count(0)
     # The sorted header also carries its direction chip, so match the labels.
     await playwright_async.expect(table.locator("thead tr").first.locator("th")).to_contain_text(
-        ["Site", "Scanned", "Pages", "Occurrences", "Kinds of issues", "Rule check", "Actions"]
+        ["Site", "Scanned", "Issue types", "Issue occurrences", "Pages", "Rule check", "Actions"]
     )
     # The caption says where a site row's numbers come from; the sentence
     # that repeated it over the table was removed after user testing.
@@ -156,13 +156,14 @@ async def test_reports_table_keyboard_and_columns(
     await playwright_async.expect(row).not_to_contain_text("Stopped")
     await playwright_async.expect(row.locator("td")).to_have_count(6)
     await playwright_async.expect(row.locator("td").nth(0)).to_have_text("Not recorded")
-    await playwright_async.expect(row.locator("td").nth(1)).to_have_text("2")
-    # Occurrences counts every place a problem appears; Kinds of issues counts
-    # the report's rows. Both plain numbers, as in the scan rows: the count is
-    # no longer a second link to the report "Open latest scan" opens.
+    # Issue types counts the report's rows, Issue occurrences every place a
+    # problem appears, then Pages (the developer's order, 2026-10-30). Plain
+    # numbers, as in the scan rows: the count is no longer a second link to
+    # the report "Open latest scan" opens.
+    await playwright_async.expect(row.locator("td").nth(1)).to_have_text("5")
     await playwright_async.expect(row.locator("td").nth(2)).to_have_text(f"{5 + count}")
     await playwright_async.expect(row.locator("td").nth(2).get_by_role("link")).to_have_count(0)
-    await playwright_async.expect(row.locator("td").nth(3)).to_have_text("5")
+    await playwright_async.expect(row.locator("td").nth(3)).to_have_text("2")
     # Which rule checks tested pages, and, on the header, who makes each.
     await playwright_async.expect(row.locator("td").nth(4)).to_have_text("axe and Alfa")
     await playwright_async.expect(
@@ -226,14 +227,14 @@ async def test_reports_table_keyboard_and_columns(
         await playwright_async.expect(table.locator(f"tr#{row_id}")).to_have_count(1)
     # Fetched when the rows are shown. The completed scan is counted; the
     # interrupted one says so in words rather than showing a 0. Its cells
-    # sit under the site's: Scanned, Pages, Occurrences, Kinds of issues, Rule
-    # check, Actions.
+    # sit under the site's: Scanned, Issue types, Issue occurrences, Pages,
+    # Rule check, Actions.
     stopped, done = scans.nth(0), scans.nth(1)
     await playwright_async.expect(done.locator("td")).to_have_count(6)
+    await playwright_async.expect(done.locator("td").nth(1)).to_have_text("5")
     await playwright_async.expect(done.locator("td").nth(2)).to_have_text(str(5 + count))
-    await playwright_async.expect(done.locator("td").nth(3)).to_have_text("5")
+    await playwright_async.expect(stopped.locator("td").nth(1)).to_have_text("Not counted")
     await playwright_async.expect(stopped.locator("td").nth(2)).to_have_text("Not counted")
-    await playwright_async.expect(stopped.locator("td").nth(3)).to_have_text("Not counted")
     await playwright_async.expect(done.locator("td").nth(4)).to_have_text("axe and Alfa")
     await playwright_async.expect(stopped.locator("td").nth(4)).to_have_text("None")
     # A status shows only when the scan did not complete: "Stopped" beside
@@ -529,7 +530,7 @@ async def test_a_new_sort_order_is_announced(new_page: Any) -> None:
     table = page.get_by_role("table", name="Public reports by site", exact=False)
     await table.get_by_role("button", name="Pages", exact=False).click()
     await playwright_async.expect(order).to_contain_text("Sorted by Pages")
-    await playwright_async.expect(table.locator("thead th").nth(2)).not_to_have_attribute(
+    await playwright_async.expect(table.locator("thead th").nth(4)).not_to_have_attribute(
         "aria-sort", "none"
     )
     # The Scans column, and sorting by it, are gone.
@@ -682,7 +683,7 @@ async def test_sites_stay_open_when_coming_back_by_the_navigation(new_page: Any)
     await playwright_async.expect(
         table.get_by_role("button", name="Hide all 2 scans for site2.example")
     ).to_have_attribute("aria-expanded", "true")
-    await playwright_async.expect(table.locator("thead th").nth(2)).not_to_have_attribute(
+    await playwright_async.expect(table.locator("thead th").nth(4)).not_to_have_attribute(
         "aria-sort", "none"
     )
     # Put back by replacing the entry, so Back still leaves the page.

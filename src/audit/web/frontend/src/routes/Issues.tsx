@@ -61,7 +61,7 @@ import type {
 } from "../api/types";
 
 /**
- * The primary report: every kind of issue as one row of a flat table.
+ * The primary report: every issue type as one row of a flat table.
  *
  * This is where a report opens. The numbers that used to be an Overview tab
  * sit above the table (``ReportSummary``); what was checked, what the labels
@@ -246,7 +246,7 @@ export default function IssuesRoute() {
       <p role="status" className="sr-only">
         {issuesQuery.isFetching
           ? "Updating issues…"
-          : `${rows.length} of ${data.total_unfiltered} ${data.total_unfiltered === 1 ? "kind of issue" : "kinds of issues"} shown` +
+          : `${rows.length} of ${data.total_unfiltered} ${data.total_unfiltered === 1 ? "issue type" : "issue types"} shown` +
             (hasFilter ? ", filtered" : "") +
             // By "How sure" value too, so a reader hears how many are Mostly
             // sure without walking the How sure column.
@@ -267,7 +267,7 @@ export default function IssuesRoute() {
           onParam={setParam}
           onResetFilters={resetFilters}
           onClearFilters={() => setParams(new URLSearchParams(), { replace: true })}
-          pager={<TablePagination label="Issues" noun="kinds of issues" {...paged} />}
+          pager={<TablePagination label="Issues" noun="issue types" {...paged} />}
         />
         {/* Only for exactly one finding type: the link names one view. */}
         {isFindingType(findingType) && (
@@ -400,7 +400,7 @@ function IssueToolbar({
         })),
       ],
     },
-    // A kind of issue found both at page load and after clicking is listed under
+    // An issue type found both at page load and after clicking is listed under
     // both, so these counts can add up to more than the whole table. Named
     // as its column is ("Where it shows"): "finding" is not an interface word.
     {
@@ -423,7 +423,7 @@ function IssueToolbar({
     <TableBar pager={pager} footer={<ActiveFilters items={active} onClear={onClearFilters} />}>
       <TableSearch
         label="Search issues"
-        placeholder="Kind of issue or WCAG number (1.4.3)"
+        placeholder="Issue type or WCAG number (1.4.3)"
         value={q}
         onChange={(value) => onParam("q", value)}
       />
@@ -452,7 +452,9 @@ const COLUMNS = [
   "Check",
   "WCAG",
   "Priority",
-  "Pages",
+  // Occurrences right after Priority, then Pages: the developer's order
+  // (2026-10-30), the problem counts before how widely they spread, as on
+  // Reports (issue types, issue occurrences, then pages).
   "Occurrences",
   "Difficulty",
   "Responsibility",
@@ -465,23 +467,24 @@ type SortColumn = (typeof COLUMNS)[number];
  * interface word (docs/plain-language.md) and every value answers that
  * question (see FINDING_TYPE_LABELS in lib/labels.ts).
  *
- * "Issue" reads "Kind of issue": a row gathers every place one check found
+ * "Issue" reads "Issue type": a row gathers every place one check found
  * for one reason. "Occurrences" counts those places: an occurrence is one
  * place a problem shows up, and the column's hint says so (ISSUE_COLUMN_HELP,
  * lib/labels.ts). Until 2026-10-26 the row was "an issue"; that day the
- * developer made the row "a kind of issue" and each place "an issue",
+ * developer made the row "an issue type" and each place "an issue",
  * because people called each place an issue and "occurrence" is an
  * advanced word. On 2026-10-28 user testing with Siteimprove users, who
  * know Siteimprove's "issues" and "occurrences", led the developer to bring
- * back "Occurrences" for the places; the row stays "Kind of issue". The
+ * back "Occurrences" for the places; the row stays "Issue type". The
  * research and the reason are in docs/plain-language.md, "Why "occurrence"
- * and "kind of issue"" (W3C COGA, "Making Content Usable",
+ * and "issue type"" (W3C COGA, "Making Content Usable",
  * https://www.w3.org/TR/coga-usable/: the same word for the same thing).
+  "Pages",
  */
 const COLUMN_LABEL: Record<SortColumn, string> = {
-  Issue: "Kind of issue",
+  Issue: "Issue type",
   // "How sure", not "Type": the column says how sure Axcess is that a
-  // kind of issue is a real problem, and "Type" named no question (see
+  // issue type is a real problem, and "Type" named no question (see
   // REVIEW_TYPE_LABEL in lib/terms.ts).
   Type: "How sure",
   "Finding type": "Where it shows",
@@ -495,7 +498,7 @@ const COLUMN_LABEL: Record<SortColumn, string> = {
   WCAG: "WCAG",
   Priority: "Priority",
   Pages: "Pages",
-  Occurrences: "Occurrences",
+  Occurrences: "Issue occurrences",
   Difficulty: "Difficulty",
   Responsibility: "Who fixes it",
 };
@@ -721,12 +724,19 @@ function IssueTable({
   const offset = (paged.page - 1) * paged.pageSize;
   return (
     <TableRegion label="Issues table" busy={busy} regionRef={regionRef}>
-      <Table caption={`Kinds of accessibility issue, one per row. ${describeSort(sort)}.`}>
+      <Table caption={`Accessibility issue types, one per row. ${describeSort(sort)}.`}>
         <TableHead>
           <tr>
             {/* No ``whitespace-nowrap`` on a header: when nine columns are
                 tight, the sorted header's chip drops under its label
-                instead of widening the table past the region. */}
+                instead of widening the table past the region. The labels'
+                words wrap too (`wrap="words"`, as on Reports): "Issue
+                occurrences" (2026-10-30) on one line pushed the table 21
+                pixels past its region at 1280 with Pages sorted. Every
+                header wraps the same way, so their last lines stay level,
+                and is padded 1.5 at the sides as the body cells are (see
+                IssueTableRow): the shared 3 left the headers, not the data,
+                setting the columns' widths. */}
             {VISIBLE_COLUMNS.map((column) => (
               <SortHeader
                 key={column}
@@ -734,7 +744,7 @@ function IssueTable({
                 kind={SORT_KINDS[column]}
                 sort={sort}
                 onSort={onSort}
-                className={column === "Issue" ? "sticky left-0 z-[1] bg-surface-muted" : undefined}
+                className={cn("px-1.5", column === "Issue" && "sticky left-0 z-[1] bg-surface-muted")}
                 hint={columnHint(column)}
               >
                 {column === "WCAG" ? (
@@ -759,10 +769,11 @@ function IssueTable({
       </Table>
     </TableRegion>
   );
+                wrap="words"
 }
 
 /**
- * One kind of issue.
+ * One issue type.
  *
  * There used to be an "About" column whose button opened the issue's
  * description in a second row under this one. It repeated what the title
@@ -839,9 +850,12 @@ const IssueTableRow = memo(function IssueTableRow({
         )}
       </Cell>
       <Cell numeric className={cell}>
-        {/* "211 pages" says nothing about which kind of issue on its own, and a
+        {row.occurrence_count}
+      </Cell>
+      <Cell numeric className={cell}>
+        {/* "211 pages" says nothing about which issue type on its own, and a
             description is not a name: SC 2.4.9 wants the purpose from the
-            link text alone, so the kind of issue rides along inside the name while
+            link text alone, so the issue type rides along inside the name while
             the cell stays a number wide. */}
         <Link
           to={pagesPath}
@@ -850,9 +864,6 @@ const IssueTableRow = memo(function IssueTableRow({
           {row.page_count} page{row.page_count === 1 ? "" : "s"}
           <span className="sr-only"> with {row.title}</span>
         </Link>
-      </Cell>
-      <Cell numeric className={cell}>
-        {row.occurrence_count}
       </Cell>
       {shows("Difficulty") && (
         <Cell className={cn(cell, "whitespace-nowrap")}>
@@ -940,7 +951,7 @@ function FindingTypePill({ type, hint = true }: { type: FindingType; hint?: bool
  * What the counts and the Type and Finding type words mean, closed until
  * asked for.
  *
- * The counts lead: what an occurrence and a kind of issue are. The summary
+ * The counts lead: what an occurrence and an issue type are. The summary
  * numbers lost the lines that said so (user testing, 2026-10-28), and
  * "occurrence" is an advanced word, so its meaning must stay in words
  * everyone can reach, not only in the column's hover hint (SC 3.1.3 Unusual
@@ -963,17 +974,17 @@ function IssueGlossary() {
             {
               key: "occurrence",
               term: <span className="font-semibold text-fg">Occurrence</span>,
-              help: "One place a problem appears: one element on one page, or in one page state. \"Occurrences found\" counts them all.",
+              help: "One place a problem appears: one element on one page, or in one page state. \"Issue occurrences\" counts them all.",
             },
             {
               key: "kind",
-              term: <span className="font-semibold text-fg">Kind of issue</span>,
+              term: <span className="font-semibold text-fg">Issue type</span>,
               help: "All the occurrences one check found for the same reason. Each is one row in the Issues table.",
             },
           ]}
         />
         <GlossaryList
-          heading={`${COLUMN_LABEL.Type}: how sure Axcess is that a kind of issue is a real problem`}
+          heading={`${COLUMN_LABEL.Type}: how sure Axcess is that an issue type is a real problem`}
           items={REVIEW_LANES.map((key) => ({ key, term: <LaneTag lane={key} hint={false} />, help: REVIEW_LANE_HELP[key] }))}
         />
         <GlossaryList
@@ -987,7 +998,7 @@ function IssueGlossary() {
         {/* The bands' limits, such as a critical problem on one page showing
             as Low, in words everyone can reach, not only in a hover hint. */}
         <GlossaryList
-          heading={`${COLUMN_LABEL.Priority}: which kinds of issues to look at first`}
+          heading={`${COLUMN_LABEL.Priority}: which issue types to look at first`}
           items={(["High", "Medium", "Low"] as const).map((key) => ({
             key,
             term: <span className="font-semibold text-fg">{key}</span>,

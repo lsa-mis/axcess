@@ -57,7 +57,7 @@ export interface SiteGroup {
 
 /**
  * One completed report's counts, from `GET /api/scans/{id}/issue-counts`.
- * Data names: `issue_count` is rows of the Issues table ("kinds of issues"
+ * Data names: `issue_count` is rows of the Issues table ("issue types"
  * on screen); `occurrence_count` is every place they appear ("issues").
  */
 export interface ScanIssueCounts {

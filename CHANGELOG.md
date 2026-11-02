@@ -76,6 +76,15 @@ merge.
 
 ### Changed
 
+- A row of the Issues table is now an **issue type** (it was a "kind of
+  issue"), and the count of places is labelled **Issue occurrences**,
+  everywhere you see or hear them. Every screen that shows both counts puts
+  issue types first: the Issues summary reads "7 Issue types, 22 Issue
+  occurrences, 122 Pages visited", and Reports has the columns **Issue
+  types**, **Issue occurrences**, **Pages**. In the Issues table,
+  **Issue occurrences** now comes right after **Priority**, before
+  **Pages**. The Jira export's "Issue Type" field is unchanged: it is
+  Jira's own field.
 - Reports: the "11 sites · 27 scans" line and the **Last scanned** card
   are gone; the first row of the table is the latest site, with **Open
   latest scan**. A scan that is running still shows its progress above the

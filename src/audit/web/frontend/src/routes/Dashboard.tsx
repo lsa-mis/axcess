@@ -107,9 +107,9 @@ export default function DashboardRoute() {
                   thing the reader actually has to clear. */}
               <h2 className="mt-1.5 text-xl font-semibold tracking-tight text-fg sm:text-2xl">
                 {reviewLeads > 0
-                  ? `${reviewLeads} ${reviewLeads === 1 ? "kind of issue needs" : "kinds of issues need"} a person to decide`
+                  ? `${reviewLeads} ${reviewLeads === 1 ? "issue type needs" : "issue types need"} a person to decide`
                   : latestIssues.total_unfiltered > 0
-                    ? "No kinds of issues need a person to decide"
+                    ? "No issue types need a person to decide"
                     : "The checks found no issues"}
               </h2>
               <p className="mt-1.5 max-w-2xl text-sm leading-6 text-fg-muted">
@@ -119,8 +119,8 @@ export default function DashboardRoute() {
                     confirm each one (docs/glossary.md, "Zero false positive
                     goal"). */}
                 {likelyBarriers > 0
-                  ? `${likelyBarriers} ${likelyBarriers === 1 ? "kind of issue is" : "kinds of issues are"} marked ${REVIEW_TYPE_LABEL.likely_barrier}: a fixed rule failed. Check ${likelyBarriers === 1 ? "its" : "their"} occurrences on the page, then fix them. `
-                  : `No kinds of issues are marked ${REVIEW_TYPE_LABEL.likely_barrier}. `}
+                  ? `${likelyBarriers} ${likelyBarriers === 1 ? "issue type is" : "issue types are"} marked ${REVIEW_TYPE_LABEL.likely_barrier}: a fixed rule failed. Check ${likelyBarriers === 1 ? "its" : "their"} occurrences on the page, then fix them. `
+                  : `No issue types are marked ${REVIEW_TYPE_LABEL.likely_barrier}. `}
                 {latestIssues.occurrence_counts.all_evidence.toLocaleString()}{" "}
                 {latestIssues.occurrence_counts.all_evidence === 1 ? "occurrence" : "occurrences"} across{" "}
                 {latest.page_count.toLocaleString()} page
@@ -138,27 +138,27 @@ export default function DashboardRoute() {
       {!error && latest && (
         // Counts in the report's own vocabulary. "Pages crawled" and "image
         // evidence · raw image records" measured the crawler, not the audit.
-        // The two "How sure" cards count kinds of issues (rows of the Issues
+        // The two "How sure" cards count issue types (rows of the Issues
         // table) and the "Occurrences" card counts places, so each hint names
         // its unit: without it, "Mostly sure 3" beside "Occurrences 476"
         // reads as 3 of something unknown. The places were "Issues" from
         // 2026-10-26 to 2026-10-28 (docs/plain-language.md, "Why
-        // "occurrence" and "kind of issue""); COGA "Making Content Usable",
+        // "occurrence" and "issue type""); COGA "Making Content Usable",
         // Use Clear Words (https://www.w3.org/TR/coga-usable/, paraphrased:
         // the same word for the same thing).
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatCard
             label={REVIEW_TYPE_LABEL.likely_barrier}
             value={latestIssues ? likelyBarriers : "Not available"}
-            hint="Kinds of issues, newest report · check on the page, then fix"
+            hint="Issue types, newest report · check on the page, then fix"
           />
           <StatCard
             label={REVIEW_TYPE_LABEL.expert_review}
             value={latestIssues ? reviewLeads : "Not available"}
-            hint="Kinds of issues, newest report · a person must decide"
+            hint="Issue types, newest report · a person must decide"
           />
           <StatCard
-            label="Occurrences"
+            label="Issue occurrences"
             value={
               latestIssues
                 ? latestIssues.occurrence_counts.all_evidence.toLocaleString()

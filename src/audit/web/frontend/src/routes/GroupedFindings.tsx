@@ -112,7 +112,7 @@ export default function GroupedFindingsRoute() {
   return (
     <>
       <PageHeader
-        title="Images, grouped by kind of issue"
+        title="Images, grouped by issue type"
         subtitle={withoutUserinfo(scan.seed_url)}
         actions={
           <LinkButton to={`/scans/${scan.id}/findings`} variant="secondary">
@@ -133,7 +133,7 @@ export default function GroupedFindingsRoute() {
           <Info className="mt-0.5 h-5 w-5 shrink-0 text-umich-blue" aria-hidden />
           <p className="text-sm text-fg">
             <strong>How this page groups images.</strong> Each group is one
-            kind of issue. Axcess groups images by two things: the kind of image
+            issue type. Axcess groups images by two things: the kind of image
             (classification), and whether its alt text is good enough. Alt
             text is the text a screen reader reads for an image. Every image
             in a group has the <em>same suggested fix</em>, so you can decide
@@ -145,13 +145,13 @@ export default function GroupedFindingsRoute() {
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard label="Images" value={coverage.finding_count} />
-        {/* Occurrences first, then kinds of issues: the order the developer
-            set on 2026-10-26 for every screen that shows both counts, kept
-            when the places went back to "occurrences" on 2026-10-28. Why
-            the words changed: docs/plain-language.md, "Why "occurrence" and
-            "kind of issue"". */}
-        <StatCard label="Occurrences" value={coverage.occurrence_total} />
-        <StatCard label="Kinds of issues" value={groups.length} />
+        {/* Issue types first, then issue occurrences: the order and the
+            words the developer set on 2026-10-30 for every screen that shows
+            both counts (it was occurrences first from 2026-10-26). Why the
+            words changed: docs/plain-language.md, "Why "occurrence" and
+            "issue type"". */}
+        <StatCard label="Issue types" value={groups.length} />
+        <StatCard label="Issue occurrences" value={coverage.occurrence_total} />
         <StatCard label="Pages scanned" value={coverage.page_count} />
       </div>
 
@@ -170,7 +170,7 @@ export default function GroupedFindingsRoute() {
           />
         </TableBar>
         <TableStatus className="border-b-0">
-          {groups.length.toLocaleString()} {groups.length === 1 ? "kind of issue" : "kinds of issues"}.
+          {groups.length.toLocaleString()} {groups.length === 1 ? "issue type" : "issue types"}.
         </TableStatus>
       </Card>
 
@@ -567,7 +567,7 @@ function FindingRow({
                   to={pageEvidencePath({
                     scanId,
                     pageId: occ.page_id,
-                    origin: "Images, grouped by kind of issue",
+                    origin: "Images, grouped by issue type",
                     backTo: `/scans/${scanId}/findings/grouped`,
                   })}
                   className="ml-2 text-2xs text-fg-muted underline underline-offset-2"

@@ -431,16 +431,16 @@ async def test_issue_card_answers_what_why_fix_and_where(
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
     await choose_filter(page, "How sure", "expert_review")
     await page.wait_for_url("**type=expert_review*")
-    issues = page.get_by_role("table", name="Kinds of accessibility issue")
+    issues = page.get_by_role("table", name="Accessibility issue types")
     # Contains, not equals: the sorted header also carries its direction chip.
     await playwright_async.expect(issues.get_by_role("columnheader")).to_contain_text(
         [
-            "Kind of issue",
+            "Issue type",
             "How sure",
             "WCAG",
             "Priority",
+            "Issue occurrences",
             "Pages",
-            "Occurrences",
         ]
     )
     # Hidden for now (HIDDEN_ISSUE_FIELDS in the SPA); the data still exports.
@@ -492,10 +492,10 @@ async def test_issue_table_fits_the_default_desktop_width(
     base, scan_id = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
-    issues = page.get_by_role("table", name="Kinds of accessibility issue")
+    issues = page.get_by_role("table", name="Accessibility issue types")
     scroller = page.get_by_role("region", name="Issues table")
     # Who fixes it is hidden for now (HIDDEN_ISSUE_FIELDS), so Pages stands in.
-    for column in (None, "Kind of issue", "Occurrences", "Pages"):
+    for column in (None, "Issue type", "Issue occurrences", "Pages"):
         if column:
             await issues.get_by_role("button", name=column, exact=False).first.click()
         widths = await scroller.evaluate("el => ({scroll: el.scrollWidth, client: el.clientWidth})")
@@ -518,7 +518,7 @@ async def test_issue_list_reaches_exact_locations_without_sideways_scrolling(
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
     await choose_filter(page, "How sure", "expert_review")
     await page.wait_for_url("**type=expert_review*")
-    issues = page.get_by_role("table", name="Kinds of accessibility issue")
+    issues = page.get_by_role("table", name="Accessibility issue types")
     await playwright_async.expect(issues).to_be_visible()
 
     widths = await page.evaluate(
@@ -542,7 +542,7 @@ async def test_issue_list_reaches_exact_locations_without_sideways_scrolling(
     await page.wait_for_url("**/issues/**")
     await playwright_async.expect(
         page.get_by_role(
-            "link", name="opens the saved copy with this kind of issue marked", exact=False
+            "link", name="opens the saved copy with this issue type marked", exact=False
         ).first
     ).to_be_attached()
     # The protected-identity context refreshes every 15 seconds even
@@ -576,7 +576,7 @@ async def test_informational_evidence_is_read_only_and_not_barrier_language(
         ),
     )
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
-    issues = page.get_by_role("table", name="Kinds of accessibility issue")
+    issues = page.get_by_role("table", name="Accessibility issue types")
     logo_title = load_report_rules()["image_findings"]["logo_adequate"]["title"]
     row_link = issues.get_by_role("rowheader").get_by_role("link", name=logo_title, exact=False)
     informational_row = row_link.locator("xpath=ancestor::tr[1]")
@@ -673,16 +673,16 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
         workspace.get_by_role("link", name="Issues", exact=True)
     ).to_have_attribute("aria-current", "page")
     await playwright_async.expect(page.get_by_role("link", name="Overview")).to_have_count(0)
-    # The summary leads with what was found: the occurrences (each place a
-    # problem appears), the kinds of issues they group into, then the pages
-    # visited. Pages that could not be loaded are said in words, never as
-    # "errors", which readers took for accessibility errors, and only when
-    # there are some.
+    # The summary leads with what was found: the issue types, then the
+    # occurrences (each place a problem appears), then the pages visited
+    # (the developer's order and words, 2026-10-30). Pages that could not
+    # be loaded are said in words, never as "errors", which readers took for
+    # accessibility errors, and only when there are some.
     summary = page.locator("dl").filter(has_text="Pages visited")
     await playwright_async.expect(summary.get_by_role("term")).to_have_text(
         [
-            re.compile(r"^Occurrences? found$"),
-            re.compile(r"^(Kind of issue|Kinds of issues)$"),
+            re.compile(r"^Issue types?$"),
+            re.compile(r"^Issue occurrences?$"),
             "Pages visited",
         ]
     )
@@ -1026,7 +1026,7 @@ async def test_every_spa_route_has_an_accurate_document_title(
         (f"/app/scans/{scan_id}/issues", "Accessibility issues"),
         (f"/app/scans/{scan_id}/issues/image:logo_adequate", "Issue evidence"),
         (f"/app/scans/{scan_id}/findings", "Images"),
-        (f"/app/scans/{scan_id}/findings/grouped", "Images, grouped by kind of issue"),
+        (f"/app/scans/{scan_id}/findings/grouped", "Images, grouped by issue type"),
         (f"/app/scans/{scan_id}/a11y", "Rule check issues by WCAG criterion"),
         (f"/app/scans/{scan_id}/a11y/by-rule", "Rule check issues by rule"),
         (f"/app/scans/{scan_id}/compare", "Compare reports"),

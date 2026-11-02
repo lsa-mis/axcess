@@ -980,7 +980,7 @@ export default function InspectorRoute() {
           The picker shows one page state at a time, so occurrences in the
           others were out of sight: nothing said a click had revealed more
           (eb39b33). That was first fixed with a box of pill links, one per
-          page state holding occurrences. But while reviewing a kind of issue the
+          page state holding occurrences. But while reviewing an issue type the
           picker lists exactly those page states, with the same counts, so
           the pills were a second control for the same choice. Two ways to
           do one thing make a reader work out whether they differ (W3C COGA,
@@ -1183,11 +1183,11 @@ export default function InspectorRoute() {
                 </span>
               )}
               {offStateCount > 0 && (
-                // Without this the kind of issue looks smaller in a state view
+                // Without this the issue type looks smaller in a state view
                 // than it is: the picker is the only way to the rest of it.
                 <span>
                   {offStateCount} more {offStateCount === 1 ? "occurrence" : "occurrences"} of
-                  this kind of issue {offStateCount === 1 ? "is" : "are"} in another page
+                  this issue type {offStateCount === 1 ? "is" : "are"} in another page
                   state. Choose it in the Page state list.
                 </span>
               )}
@@ -1197,8 +1197,8 @@ export default function InspectorRoute() {
               {!hasTarget && (
                 <span>
                   {render.source === "stored"
-                    ? "This is the copy the scan saved. This kind of issue has no element to mark."
-                    : "Axcess loaded this page just now. This kind of issue has no element to mark."}
+                    ? "This is the copy the scan saved. This issue type has no element to mark."
+                    : "Axcess loaded this page just now. This issue type has no element to mark."}
                 </span>
               )}
               {!data.store_rendered_html && (
@@ -1248,7 +1248,7 @@ export default function InspectorRoute() {
                   {currentElement.where && (
                     <ElementFact term="Where the box is">{BOX_NOTES[currentElement.where]}</ElementFact>
                   )}
-                  {sharedCount > 1 && <ElementFact term="Occurrences">{sharedCount} on this element</ElementFact>}
+                  {sharedCount > 1 && <ElementFact term="Issue occurrences">{sharedCount} on this element</ElementFact>}
                   {currentPlace ? (
                     <>
                       <ElementFact term="Where it is in the page code" stack>
@@ -1843,12 +1843,12 @@ function MissingChip({ count }: { count: MissingCount | undefined }) {
  * every occurrence under review came after a click. The option stays, as
  * the baseline the other states are read against, but none of those
  * occurrences is in it. The chip has said "Issue not here" since before
- * the 2026-10-26 rename, and still does: it means the kind of issue under
+ * the 2026-10-26 rename, and still does: it means the issue type under
  * review is not in this page state, not one place. "Occurrence not here"
- * would name one place when it means all of them; "Kind of issue not here"
+ * would name one place when it means all of them; "Issue type not here"
  * is the exact term but is longer for a chip, and was left for the
  * developer to decide when "occurrence" came back on 2026-10-28
- * (docs/plain-language.md, "Why "occurrence" and "kind of issue"").
+ * (docs/plain-language.md, "Why "occurrence" and "issue type"").
  *
  * Literal words, not "For reference": that says the option is secondary but
  * not why, and plain-language guidance asks for the fact itself. Neutral,

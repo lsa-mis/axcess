@@ -7,7 +7,9 @@ import { Cell, ColumnHeader, Row, RowHeader, Table, TableHead } from "../table/T
 import { agoLong, count, countKinds, plural } from "./format";
 
 type Measure = "occurrences" | "groups";
-const MEASURES: Record<Measure, string> = { occurrences: "Occurrences", groups: "Kinds of issues" };
+// Issue types first, as every screen that shows both counts orders them
+// (2026-10-30), and the chart opens on them.
+const MEASURES: Record<Measure, string> = { groups: "Issue types", occurrences: "Issue occurrences" };
 
 const HEIGHT = 300;
 const MARGIN = { top: 40, right: 36, bottom: 60, left: 52 };
@@ -36,7 +38,7 @@ export default function TrendChart({
   currentId: number;
   baselineId: number | null;
 }) {
-  const [measure, setMeasure] = useState<Measure>("occurrences");
+  const [measure, setMeasure] = useState<Measure>("groups");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showTable, setShowTable] = useState(false);
   const pointRefs = useRef(new Map<number, SVGGElement>());
@@ -354,8 +356,8 @@ function HistoryTable({
           <tr>
             <ColumnHeader>Report</ColumnHeader>
             <ColumnHeader>Scanned</ColumnHeader>
-            <ColumnHeader>Occurrences</ColumnHeader>
-            <ColumnHeader>Kinds of issues</ColumnHeader>
+            <ColumnHeader>Issue types</ColumnHeader>
+            <ColumnHeader>Issue occurrences</ColumnHeader>
             <ColumnHeader><span className="sr-only">Actions</span></ColumnHeader>
           </tr>
         </TableHead>
@@ -368,8 +370,8 @@ function HistoryTable({
                 {point.id === baselineId && <span className="font-normal text-fg-muted"> · compared with</span>}
               </RowHeader>
               <Cell>{agoLong(point.started_at)}</Cell>
-              <Cell numeric>{point.occurrences.toLocaleString()}</Cell>
               <Cell numeric>{point.groups.toLocaleString()}</Cell>
+              <Cell numeric>{point.occurrences.toLocaleString()}</Cell>
               <Cell className="py-1">
                 <span className="flex flex-wrap justify-center gap-x-4">
                   {point.id !== currentId && point.id !== baselineId && (

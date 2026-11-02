@@ -62,8 +62,7 @@ import { cn } from "../lib/cn";
  * "Element", not "occurrence": the steps are flagged elements, and one
  * element can hold several occurrences (the inspector's "Occurrences: 3 on
  * this element"), so a count of elements is not a count of occurrences. An
- * occurrence is one place a problem appears and a grouped rule is a "kind of
- * issue" (docs/plain-language.md, "Why "occurrence" and "kind of issue"").
+ * occurrence is one place a problem appears and a grouped rule is a "issue type" (docs/plain-language.md, "Why "occurrence" and "issue type"").
  */
 export default function FlaggedStepper({
   count,

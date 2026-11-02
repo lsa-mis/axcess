@@ -123,7 +123,7 @@ export default function PageEvidenceRoute() {
 
       <section className="mb-6">
         <h2 className="mb-2.5 text-base font-semibold text-fg">
-          {findings.length === 0 ? "Accessibility checks" : "Occurrences"}
+          {findings.length === 0 ? "Accessibility checks" : "Issue occurrences"}
         </h2>
         {findings.length === 0 ? (
           <Card className="p-4 text-sm text-fg-muted">
