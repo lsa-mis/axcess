@@ -63,9 +63,10 @@ async def test_a_table_that_fits_has_no_tab_stop(new_page: Any) -> None:
 async def test_keyboard_focus_shows_the_top_of_a_scrolling_table(new_page: Any) -> None:
     if not (DIST / "index.html").exists():
         pytest.skip("Build the frontend first")
-    # 420 tall, so the table starts below the window: it sits higher since
-    # the sentence over it was removed (user testing, 2026-10-28).
-    height = 420
+    # 200 tall, so the table starts below the window: it sits higher since
+    # the sentence over it (user testing, 2026-10-28) and then the count line
+    # and the Last scanned card (2026-10-30) were removed.
+    height = 200
     page = await _open(new_page, 320, height, 10)
     try:
         region = page.get_by_role("region", name="Public reports table")

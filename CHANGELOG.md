@@ -76,6 +76,10 @@ merge.
 
 ### Changed
 
+- Reports: the "11 sites · 27 scans" line and the **Last scanned** card
+  are gone; the first row of the table is the latest site, with **Open
+  latest scan**. A scan that is running still shows its progress above the
+  table.
 - The comparison table (new, still found and no longer found kinds of
   issues, and the trend) is now its own page, **What changed**, at
   `/scans/<id>/compare/changes`. Compare reports links to it with **See

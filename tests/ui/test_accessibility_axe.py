@@ -137,19 +137,30 @@ async def _axe_clean(new_page: Any, base: str, path: str) -> None:
 async def test_root_opens_reports_with_the_last_scanned_site(
     live_server: tuple[str, int], new_page: Any
 ) -> None:
-    """The Dashboard is hidden: ``/app/`` lands on Reports, led by the last scanned site."""
+    """The Dashboard is hidden: ``/app/`` lands on Reports, the latest site first.
+
+    The "Last scanned" card above the table was removed (2026-10-30): the
+    table's first row is that site, with the same way in.
+    """
     base, scan_id = live_server
     page = await new_page()
     try:
         await page.goto(f"{base}/app/", wait_until="networkidle")
         await page.wait_for_url("**/app/scans")
-        card = page.get_by_role("region", name="Last scanned site")
-        await playwright_async.expect(card.get_by_role("heading", level=2)).to_have_text(
-            "example.com"
-        )
         await playwright_async.expect(
-            card.get_by_role("link", name="Open latest scan of example.com", exact=True)
-        ).to_have_attribute("href", f"/app/scans/{scan_id}/issues")
+            page.get_by_role("region", name="Last scanned site")
+        ).to_have_count(0)
+        first = (
+            page.get_by_role("table", name="Public reports by site", exact=False)
+            .locator(":scope > tbody > tr")
+            .first
+        )
+        await playwright_async.expect(first.get_by_role("rowheader")).to_contain_text("example.com")
+        await playwright_async.expect(
+            first.get_by_role(
+                "link", name=re.compile(r"^Open latest scan of http:\/\/example\.com")
+            )
+        ).to_have_attribute("href", f"/app/scans/{scan_id}")
         violations = await _run_axe(page)
         assert not violations, _render_violations(violations)
     finally:

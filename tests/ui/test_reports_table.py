@@ -379,7 +379,11 @@ async def test_compare_with_on_each_completed_scan_row(width: int, new_page: Any
     """
     if not (DIST / "index.html").exists():
         pytest.skip("Build the frontend first")
-    page = await _open_reports(new_page, [_comparable_site(), _site(1, 0)])
+    # Enough sites that the page scrolls at 700 pixels tall (see "Scrolling
+    # never closes it" below).
+    page = await _open_reports(
+        new_page, [_comparable_site(), *(_site(index, 0) for index in range(1, 8))]
+    )
     await page.set_viewport_size({"width": width, "height": 700})
     table = page.get_by_role("table", name="Public reports by site", exact=False)
     rows = table.locator(":scope > tbody > tr")
@@ -534,12 +538,17 @@ async def test_a_new_sort_order_is_announced(new_page: Any) -> None:
     ).to_have_count(0)
 
 
-async def test_reports_page_leads_with_the_last_scanned_site(new_page: Any) -> None:
+async def test_reports_page_has_no_last_scanned_card_but_shows_a_running_scan(
+    new_page: Any,
+) -> None:
+    """The heading, a running scan's banner, then the table (2026-10-30).
+
+    The "11 sites · 27 scans" line and the "Last scanned" card were removed:
+    the table's first row is the latest site, with "Open latest scan".
+    """
     if not (DIST / "index.html").exists():
         pytest.skip("Build the frontend first")
     running = _scan(20, "running", site="https://site3.example/")
-    # Listed first but older: the card picks the newest completed report by
-    # id, not the table's first row.
     sites = [
         _site(1, 0),
         _site(2, 0),
@@ -556,18 +565,14 @@ async def test_reports_page_leads_with_the_last_scanned_site(new_page: Any) -> N
     ]
     api_paths: list[str] = []
     page = await _open_reports(new_page, sites, api_paths)
-    card = page.get_by_role("region", name="Last scanned site")
-    # The site is the heading: it is what the reader recognises first.
-    await playwright_async.expect(card.get_by_role("heading", level=2)).to_have_text(
-        "site2.example"
-    )
-    await playwright_async.expect(card).to_have_text(
-        re.compile(r"^Last scanned\s*site2\.example\s*Open latest scan of site2\.example$")
-    )
     await playwright_async.expect(
-        card.get_by_role("link", name="Open latest scan of site2.example", exact=True)
-    ).to_have_attribute("href", "/app/scans/9/issues")
-    # No findings summary, so the landing page never loads a report's issues.
+        page.get_by_role("region", name="Last scanned site")
+    ).to_have_count(0)
+    await playwright_async.expect(page.locator("main h1 + p")).to_have_count(0)
+    await playwright_async.expect(
+        page.get_by_text(re.compile(r"\d+ sites? · \d+ scans?"))
+    ).to_have_count(0)
+    # The landing page never loads a report's issues.
     assert not any(re.fullmatch(r"/api/scans/\d+/issues", path) for path in api_paths), api_paths
     # The running scan's banner names the site; its page count joins once the
     # scan's own progress loads, which this test's stubbed API does not serve.

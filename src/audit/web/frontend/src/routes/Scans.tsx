@@ -27,7 +27,7 @@ import { TablePagination, usePagedRows } from "../components/TablePagination";
 import type { ProtectedScanStatus, ProtectedScanSummary, ScanSummary, SiteGroup } from "../api/types";
 import { confirmDestructive } from "../hooks/usePreferences";
 import BreakableUrl from "../components/BreakableUrl";
-import LastScannedSite from "../components/LastScannedSite";
+import RunningScanNotice from "../components/RunningScanNotice";
 import ScanAgainLink from "../components/ScanAgainLink";
 import LinkMenu from "../components/LinkMenu";
 import {
@@ -425,7 +425,6 @@ export default function ScansRoute() {
     [sites, query],
   );
   const sortedSites = useMemo(() => sortSites(matchingSites, sort), [matchingSites, sort]);
-  const scanTotal = sites.reduce((total, site) => total + site.scan_count, 0);
 
   // A new search or sort starts the table over at page 1.
   const sitePages = usePagedRows(sortedSites, { resetKey: `${query}|${sort.column}|${sort.direction}` });
@@ -448,23 +447,20 @@ export default function ScansRoute() {
     <>
       {/* No header "New scan" action, the topbar carries the single
           global CTA. The empty state below keeps its contextual one. */}
-      <PageHeader
-        title="Reports"
-        subtitle={
-          isLoading
-            ? "Loading…"
-            : isError
-              ? "Reports could not be loaded"
-              : `${sites.length} ${sites.length === 1 ? "site" : "sites"} · ${scanTotal} ${scanTotal === 1 ? "scan" : "scans"}`
-        }
-      />
+      {/* The heading alone. "11 sites · 27 scans" under it and a "Last
+          scanned" card with "Open latest scan" above the table were removed
+          at the developer's request (2026-10-30): the table's first row is
+          the latest site, its "Open latest scan" is in the row, and the
+          pager says how many sites there are, so both repeated what the
+          table already shows (W3C COGA, "Making Content Usable": only what
+          helps the task; no two controls for one job). A scan that is
+          running still gets its banner here, the one thing the table does
+          not show. No help paragraph above the table either: as the
+          table's description a screen reader read all of it on every
+          entry. */}
+      <PageHeader title="Reports" />
 
-      {/* No help paragraph above the table. It restated the "Most recent
-          completed scan" band and glossed each column, and as the table's
-          description a screen reader read all of it on every entry. The band,
-          the caption and each cell's `headers` say which scan the numbers
-          come from. */}
-      {!isLoading && !isError && <LastScannedSite sites={sites} />}
+      {!isLoading && !isError && <RunningScanNotice sites={sites} />}
 
       {isError ? (
         <p role="alert" className="mb-4 text-sm text-sev-critical">
