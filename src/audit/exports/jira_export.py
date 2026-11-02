@@ -60,6 +60,7 @@ _SOURCE_LABELS = {
     "focus": "Focus visibility probe",
     "visual": "Visual analysis",
     "protected_image": "Protected image analysis",
+    "forms": "Form error check",
 }
 
 # Statuses that mean "we're not opening a ticket for this." Jira import
