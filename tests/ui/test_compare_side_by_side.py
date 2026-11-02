@@ -130,7 +130,9 @@ async def test_each_panel_moves_on_its_own_and_goes_back_in_itself(
     base, _ = live_server
     _, second, third = three_reports
     address = f"/scans/{third}/compare?compare_to={second}"
-    page = await _open(new_page, base, address, height=700)
+    # Short enough that the panel's Issues page scrolls: it lost its date
+    # line and its order line (2026-10-30, 2026-11-02).
+    page = await _open(new_page, base, address, height=560)
     left_frame = await _frame(page, third)
     await _frame(page, second)
     right_before = _frame_url(page, second)
