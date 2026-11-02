@@ -566,9 +566,15 @@ async def test_issue_table_recommended_order_is_lane_first_and_headers_sort_flat
     lane_order = ["Mostly sure", "Not sure", "For information"]
 
     async def assert_recommended() -> None:
+        # Said to a screen reader, but no visible line over the table in the
+        # default order (removed at the developer's request, 2026-11-02):
+        # the How sure column shows the grouping.
         await playwright_async.expect(
             page.get_by_role("status").filter(has_text="Recommended order")
-        ).to_be_visible()
+        ).to_have_count(1)
+        await playwright_async.expect(
+            page.locator("main p:not([role=status])").filter(has_text="Recommended order")
+        ).to_have_count(0)
         await playwright_async.expect(back).to_have_count(0)
         await playwright_async.expect(group_headers).to_have_count(0)
         assert await issues.locator("tbody").count() == 1
@@ -1561,3 +1567,36 @@ async def test_images_table_header_scrolls_sideways_with_its_rows(
         assert abs(header_box["x"] - cell_box["x"]) < 1, (index, header_box, cell_box)
     # The page itself does not scroll sideways; only the table's box does.
     assert await page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+
+
+async def test_issues_never_shows_the_recommended_order_sentence(
+    live_server: tuple[str, int], new_page: Any, choose_filter: Any
+) -> None:
+    """The line "Recommended order: …" over the table is gone (2026-11-02).
+
+    It is still said to a screen reader. A filter brings back a line with its
+    count only; a column sort brings back "Sorted by …" and the way back.
+    """
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+    visible_sentence = page.locator("main p:not([role=status])").filter(
+        has_text="Recommended order"
+    )
+    await playwright_async.expect(visible_sentence).to_have_count(0)
+    await choose_filter(page, "Level", "A")
+    await page.wait_for_url("**conformance=A*")
+    await playwright_async.expect(
+        page.get_by_text(re.compile(r"^\d+ of \d+ shown$"))
+    ).to_be_visible()
+    await playwright_async.expect(visible_sentence).to_have_count(0)
+    await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+    table = page.get_by_role("table", name="Accessibility issue types")
+    await table.get_by_role("columnheader", name="Priority").get_by_role("button").click()
+    await playwright_async.expect(
+        page.locator("main p").filter(has_text="Sorted by Priority")
+    ).to_have_count(2)
+    back = page.get_by_role("button", name="Back to recommended order")
+    await back.click()
+    await playwright_async.expect(back).to_have_count(0)
+    await playwright_async.expect(visible_sentence).to_have_count(0)

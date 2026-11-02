@@ -83,8 +83,13 @@ merge.
   occurrences, 122 Pages visited", and Reports has the columns **Issue
   types**, **Issue occurrences**, **Pages**. In the Issues table,
   **Issue occurrences** now comes right after **Priority**, before
-  **Pages**, and the **WCAG** column is called **WCAG criterion**. The Jira export's "Issue Type" field is unchanged: it is
-  Jira's own field.
+  **Pages**, and the **WCAG** column is called **WCAG criterion**. The
+  Jira export's "Issue Type" field is unchanged: it is Jira's own field.
+- Issues: the line "Recommended order: Mostly sure, then Not sure, then
+  For information." over the table is gone; the **How sure** column shows
+  that order. A screen reader still hears the order. Sorting by a column
+  or filtering brings back a line with **Back to recommended order** or
+  the count of what the filter left.
 - Reports: the "11 sites · 27 scans" line and the **Last scanned** card
   are gone; the first row of the table is the latest site, with **Open
   latest scan**. A scan that is running still shows its progress above the

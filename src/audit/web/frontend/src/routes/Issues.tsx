@@ -273,36 +273,59 @@ export default function IssuesRoute() {
         {isFindingType(findingType) && (
           <FindingTypeViewLink scanId={scan.id} findingType={findingType} imageCount={scan.finding_count} />
         )}
-        {/* WAI-ARIA sortable table: the status line says what the order is
-            now, visibly, so sighted readers get the same confirmation
-            without hunting for the chip. The filtered count and the way
-            back to the recommended order sit beside it, outside the live
-            region, so they are not read out with every sort (the count has
-            its own announcement above). The line is one target tall either
-            way, so the button coming and going never moves the table. */}
-        <TableStatus
-          actions={
-            <>
-              {hasFilter && (
-                <span className="tabular-nums">
-                  {rows.length.toLocaleString()} of {data.total_unfiltered.toLocaleString()} shown
-                </span>
-              )}
-              {sort && (
-                // eslint-disable-next-line react/forbid-elements -- Convert: a text-link styled button; needs a link variant on Button
-                <button
-                  type="button"
-                  onClick={recommend}
-                  className="min-h-target rounded-xs px-1 font-semibold text-umich-blue underline underline-offset-2 hover:text-umich-blue-600 focus-visible:outline-none focus-visible:shadow-focus"
-                >
-                  Back to recommended order
-                </button>
-              )}
-            </>
-          }
-        >
+        {/* WAI-ARIA sortable table: the line over it says what the order is,
+            with the filtered count and the way back to the recommended order
+            beside it.
+
+            Shown only when the table is sorted by a column or filtered
+            (2026-11-02), and never with the sentence "Recommended order:
+            Mostly sure, then Not sure, then For information.", which the
+            developer asked to remove: the How sure column already shows
+            that grouping, top to bottom. Removing
+            the line in every state was the request, and was set aside here
+            because the line then holds the only way back to the recommended
+            order (a sorted header only flips between its two directions),
+            and the count of what a filter left (W3C COGA, "Making Content
+            Usable": do not take away the way back).
+
+            The order is still said to a screen reader on every change, by
+            the live region under this comment, which stays on the page
+            whether or not the line shows; the line itself is not a live
+            region (`announce={false}`), so nothing is read twice (SC 4.1.3
+            Status Messages, Level AA). The table's caption says the order
+            too. */}
+        <p role="status" className="sr-only">
           {describeSort(sort)}.
-        </TableStatus>
+        </p>
+        {(sort || hasFilter) && (
+          <TableStatus
+            announce={false}
+            actions={
+              <>
+                {hasFilter && (
+                  <span className="tabular-nums">
+                    {rows.length.toLocaleString()} of {data.total_unfiltered.toLocaleString()} shown
+                  </span>
+                )}
+                {sort && (
+                  // eslint-disable-next-line react/forbid-elements -- Convert: a text-link styled button; needs a link variant on Button
+                  <button
+                    type="button"
+                    onClick={recommend}
+                    className="min-h-target rounded-xs px-1 font-semibold text-umich-blue underline underline-offset-2 hover:text-umich-blue-600 focus-visible:outline-none focus-visible:shadow-focus"
+                  >
+                    Back to recommended order
+                  </button>
+                )}
+              </>
+            }
+          >
+            {/* The sentence "Recommended order: …" is never shown, only
+                spoken (see above): with a filter on and the default order,
+                the line holds the count alone. */}
+            {sort && `${describeSort(sort)}.`}
+          </TableStatus>
+        )}
         {rows.length === 0 ? (
           <TableEmpty>
             {hasFilter
@@ -456,6 +479,7 @@ const COLUMNS = [
   // (2026-10-30), the problem counts before how widely they spread, as on
   // Reports (issue types, issue occurrences, then pages).
   "Occurrences",
+  "Pages",
   "Difficulty",
   "Responsibility",
 ] as const;
@@ -479,7 +503,6 @@ type SortColumn = (typeof COLUMNS)[number];
  * research and the reason are in docs/plain-language.md, "Why "occurrence"
  * and "issue type"" (W3C COGA, "Making Content Usable",
  * https://www.w3.org/TR/coga-usable/: the same word for the same thing).
-  "Pages",
  */
 const COLUMN_LABEL: Record<SortColumn, string> = {
   Issue: "Issue type",
@@ -746,6 +769,7 @@ function IssueTable({
               <SortHeader
                 key={column}
                 column={column}
+                wrap="words"
                 kind={SORT_KINDS[column]}
                 sort={sort}
                 onSort={onSort}
@@ -776,7 +800,6 @@ function IssueTable({
       </Table>
     </TableRegion>
   );
-                wrap="words"
 }
 
 /**

@@ -143,14 +143,21 @@ export function TableSearch({
  * filter is confirmed to everyone, not only to a screen reader. `actions`
  * sit beside it, outside the live region, so their names are not read out
  * with every change.
+ *
+ * `announce={false}` drops the live region, for a table that shows this
+ * line only some of the time: a live region added to the page with its words
+ * already in it is not read out, so such a table keeps its own live region
+ * mounted all the time instead (the Issues table, routes/Issues.tsx).
  */
 export function TableStatus({
   children,
   actions,
+  announce = true,
   className,
 }: {
   children: ReactNode;
   actions?: ReactNode;
+  announce?: boolean;
   className?: string;
 }) {
   return (
@@ -161,9 +168,13 @@ export function TableStatus({
         className,
       )}
     >
-      <p role="status" aria-live="polite">
-        {children}
-      </p>
+      {announce ? (
+        <p role="status" aria-live="polite">
+          {children}
+        </p>
+      ) : (
+        <p>{children}</p>
+      )}
       {actions}
     </div>
   );
