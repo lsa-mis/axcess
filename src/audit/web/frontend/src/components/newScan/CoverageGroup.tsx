@@ -1,17 +1,29 @@
 import SearchSettings from "../SearchSettings";
-import { GROUPS, SWITCHES } from "./copy";
+import { ALL_PAGES, GROUPS, NUMBERS, SWITCHES } from "./copy";
 import type { GroupProps } from "./groupProps";
-import { isFixed, switchOn, switchPatch } from "./scanPolicy";
+import NumberField from "./NumberField";
+import { isFixed, LIMIT_MIN, switchOn, switchPatch } from "./scanPolicy";
 import SettingsGroup, { SwitchList } from "./SettingsGroup";
 import SwitchRow from "./SwitchRow";
 
 /**
- * Where the scan goes: host, subdomains, robots, what it keeps of each
- * page, and search discovery. The two limits sit with the rule engine in
- * `LimitsGroup`, and Click-Through is a check, so it is under Checks.
+ * Where the scan goes and how far: host, subdomains, robots, what it keeps
+ * of each page, search discovery, then the limits (scan every page it
+ * finds, maximum pages, maximum link depth). Click-Through is a check, so it
+ * is under Checks.
+ *
+ * The limits joined this group on 2026-11-02, from "Limits and rule check
+ * tool" (see ScanForm). They come last: first which pages are in reach, then
+ * how many of them to visit. Each limit states its range in its own
+ * description, and a value out of range is named beside the field as well
+ * as in the alert at the top of the form, which opens this group so the
+ * alert's link lands on a visible field (ScanForm, GROUP_FIELDS).
  */
-export default function CoverageGroup({ settings, update, policy }: GroupProps) {
+export default function CoverageGroup({ settings, update, policy, errors, fieldIds }: GroupProps) {
   const login = policy.mode === "login";
+  const errorFor = (field: "max_pages" | "max_depth") => errors.find((error) => error.field === field)?.message;
+  const offersAllPages = !isFixed(policy, "all_pages");
+  const allPages = offersAllPages && settings.all_pages;
 
   return (
     <SettingsGroup
@@ -64,7 +76,43 @@ export default function CoverageGroup({ settings, update, policy }: GroupProps) 
             disabled={settings.static_only || settings.scan_engine === "alfa"}
           />
         </div>
+        {offersAllPages && (
+          <SwitchRow
+            tone="warning"
+            checked={allPages}
+            onChange={(on) => update({ all_pages: on })}
+            label={ALL_PAGES.label}
+            hint={ALL_PAGES.hint}
+          />
+        )}
       </SwitchList>
+      <div className="grid gap-x-5 gap-y-4 sm:grid-cols-2">
+        <NumberField
+          id={fieldIds.max_pages}
+          label={NUMBERS.max_pages.label}
+          hint={allPages ? ALL_PAGES.maxPagesOff : NUMBERS.max_pages.hint(policy.caps.max_pages)}
+          error={allPages ? undefined : errorFor("max_pages")}
+          disabled={allPages}
+          value={settings.max_pages}
+          min={LIMIT_MIN}
+          max={policy.caps.max_pages}
+          step={1}
+          onChange={(value) => update({ max_pages: value })}
+          inputClassName="w-36"
+        />
+        <NumberField
+          id={fieldIds.max_depth}
+          label={NUMBERS.max_depth.label}
+          hint={NUMBERS.max_depth.hint(policy.caps.max_depth)}
+          error={errorFor("max_depth")}
+          value={settings.max_depth}
+          min={LIMIT_MIN}
+          max={policy.caps.max_depth}
+          step={1}
+          onChange={(value) => update({ max_depth: value })}
+          inputClassName="w-36"
+        />
+      </div>
     </SettingsGroup>
   );
 }

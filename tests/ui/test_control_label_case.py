@@ -165,7 +165,6 @@ _SCAN_GROUPS = (
     "Pages to scan",
     "Checks",
     "AI checks on this computer",
-    "Limits and rule check tool",
     "Speed and browser window",
 )
 

@@ -76,6 +76,10 @@ merge.
 
 ### Changed
 
+- New scan: the page limits (**Scan every page it finds**, **Maximum
+  pages**, **Maximum link depth**) are under **Pages to scan**, and **Rule
+  check tool** is under **Checks**. The **Limits and rule check tool**
+  group is gone, so New scan has four groups.
 - Issues: **Priority** and **Issue occurrences** are the second and third
   columns, right after the issue type's name, ahead of **How sure**.
 - A row of the Issues table is now an **issue type** (it was a "kind of

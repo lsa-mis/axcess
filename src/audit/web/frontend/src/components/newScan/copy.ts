@@ -47,9 +47,6 @@ export const GROUPS = {
     description:
       "AI (artificial intelligence) runs on this computer only. Axcess uploads nothing and never downloads a model by itself.",
   },
-  limits: {
-    legend: "Limits and rule check tool",
-  },
   speed: {
     legend: "Speed and browser window",
     description:
