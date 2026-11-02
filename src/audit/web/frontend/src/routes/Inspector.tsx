@@ -453,7 +453,6 @@ export default function InspectorRoute() {
     () => targets.filter((target) => target.stateKey === activeStateKey),
     [targets, activeStateKey],
   );
-  const offStateCount = targets.length - scopedTargets.length;
   // What the status lines below are actually talking about.
   const hasScopedTarget = scopedTargets.length > 0;
 
@@ -1182,15 +1181,13 @@ export default function InspectorRoute() {
                     : `${hiddenImageCount} more occurrences are in page code that browsers do not show when scripts run (a <noscript> or <template> element), usually backup copies of images. They are not outlined.`}
                 </span>
               )}
-              {offStateCount > 0 && (
-                // Without this the issue type looks smaller in a state view
-                // than it is: the picker is the only way to the rest of it.
-                <span>
-                  {offStateCount} more {offStateCount === 1 ? "occurrence" : "occurrences"} of
-                  this issue type {offStateCount === 1 ? "is" : "are"} in another page
-                  state. Choose it in the Page state list.
-                </span>
-              )}
+              {/* No line here for occurrences in other page states: the
+                  sentence under the Page state list says it (ELSEWHERE_ID),
+                  and is that list's description. This line said the same
+                  thing a second time on one screen until 2026-11-02, when
+                  the developer removed it, keeping the one beside the
+                  control it points to (W3C COGA, "Making Content Usable":
+                  say a thing once, where it is used; paraphrased). */}
               {!showHighlights && hasScopedTarget && (
                 <span>Highlights are hidden for this page.</span>
               )}
