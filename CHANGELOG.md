@@ -76,6 +76,8 @@ merge.
 
 ### Changed
 
+- Issues: **Priority** and **Issue occurrences** are the second and third
+  columns, right after the issue type's name, ahead of **How sure**.
 - A row of the Issues table is now an **issue type** (it was a "kind of
   issue"), and the count of places is labelled **Issue occurrences**,
   everywhere you see or hear them. Every screen that shows both counts puts

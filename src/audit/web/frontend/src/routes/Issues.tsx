@@ -470,15 +470,20 @@ function parseList(raw: string | null, allowed: readonly string[]): string {
 
 const COLUMNS = [
   "Issue",
+  // Priority and Issue occurrences second and third, right after the issue
+  // type's name: the developer's order (2026-11-02), so what to look at
+  // first and how much of it there is are read before how the scan found
+  // it. They followed WCAG criterion until then (Priority, then Issue
+  // occurrences, from 2026-10-30). The tradeoff, accepted: How sure, which
+  // the recommended order groups by, is now the fourth column rather than
+  // the second, so the grouping is a column further from the name; the
+  // Not sure badge still sits in every row it applies to.
+  "Priority",
+  "Occurrences",
   "Type",
   "Finding type",
   "Check",
   "WCAG",
-  "Priority",
-  // Occurrences right after Priority, then Pages: the developer's order
-  // (2026-10-30), the problem counts before how widely they spread, as on
-  // Reports (issue types, issue occurrences, then pages).
-  "Occurrences",
   "Pages",
   "Difficulty",
   "Responsibility",
@@ -852,6 +857,19 @@ const IssueTableRow = memo(function IssueTableRow({
         </Link>
       </RowHeader>
       <Cell className={cn(cell, "whitespace-nowrap")}>
+        {isInformational ? (
+          <span className="whitespace-normal text-fg-muted">Does not apply</span>
+        ) : (
+          // The band, not the score: "11.28" means nothing to a reader,
+          // and two decimals invited comparing issues by hundredths. The
+          // score still orders the column; the word is what shows.
+          <span title={PRIORITY_HELP[priorityTier(row.priority)]}>{priorityTier(row.priority)}</span>
+        )}
+      </Cell>
+      <Cell numeric className={cell}>
+        {row.occurrence_count}
+      </Cell>
+      <Cell className={cn(cell, "whitespace-nowrap")}>
         <LaneTag lane={row.review_lane} />
       </Cell>
       <Cell className={cell}>
@@ -868,19 +886,6 @@ const IssueTableRow = memo(function IssueTableRow({
         ) : (
           <span className="text-fg-muted">Best practice</span>
         )}
-      </Cell>
-      <Cell className={cn(cell, "whitespace-nowrap")}>
-        {isInformational ? (
-          <span className="whitespace-normal text-fg-muted">Does not apply</span>
-        ) : (
-          // The band, not the score: "11.28" means nothing to a reader,
-          // and two decimals invited comparing issues by hundredths. The
-          // score still orders the column; the word is what shows.
-          <span title={PRIORITY_HELP[priorityTier(row.priority)]}>{priorityTier(row.priority)}</span>
-        )}
-      </Cell>
-      <Cell numeric className={cell}>
-        {row.occurrence_count}
       </Cell>
       <Cell numeric className={cell}>
         {/* "211 pages" says nothing about which issue type on its own, and a

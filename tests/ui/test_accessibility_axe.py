@@ -436,10 +436,10 @@ async def test_issue_card_answers_what_why_fix_and_where(
     await playwright_async.expect(issues.get_by_role("columnheader")).to_contain_text(
         [
             "Issue type",
-            "How sure",
-            "WCAG criterion",
             "Priority",
             "Issue occurrences",
+            "How sure",
+            "WCAG criterion",
             "Pages",
         ]
     )

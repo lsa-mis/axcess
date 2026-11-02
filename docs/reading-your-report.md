@@ -146,12 +146,12 @@ summary counts issue types, then occurrences. The table's columns, in order:
 | Column | What it shows |
 | --- | --- |
 | Issue type | Its name. Select it to open its page. |
+| Priority | High, Medium, or Low (see [priority](glossary.md#priority)); "Does not apply" for rows marked For information. |
+| Issue occurrences | How many [occurrences](glossary.md#occurrence) of this issue type the scan found: how many places it appears. |
 | How sure | The report group: Mostly sure, Not sure, or For information. |
 | Where it shows | Where this issue type shows up: At page load, After clicking, or In an image (see [Where it shows](glossary.md#where-it-shows)). One issue type can show both At page load and After clicking. |
 | Check | Which check found it, such as Rule check (axe), Rule check (Alfa), Keyboard check, or Image text check. |
 | WCAG criterion | The [success criterion](glossary.md#success-criterion) number with its [level](glossary.md#conformance-level) badge, or "Best practice" (see [best practice](glossary.md#best-practice)). |
-| Priority | High, Medium, or Low (see [priority](glossary.md#priority)); "Does not apply" for rows marked For information. |
-| Issue occurrences | How many [occurrences](glossary.md#occurrence) of this issue type the scan found: how many places it appears. |
 | Pages | How many pages have it, linked to the list of those pages. |
 
 Search with the **Search issues** box (the name of an issue type, or a WCAG
