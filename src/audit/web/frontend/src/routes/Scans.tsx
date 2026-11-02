@@ -125,7 +125,7 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  *   indented under the site's name, so they read as belonging to it.
  * - Thin lines between columns (Table's `ruled`), asked for in the same
  *   test, so a number can be followed up to its header across a site and
- *   its scans.
+ *   its scans. Every table has them since 2026-11-02 (Table).
  * - A scan's status shows only when it is not Complete ("Stopped",
  *   "Failed", "Scanning"), beside its report number. A Status column that
  *   read "Complete" on nearly every row was noise to testers; the

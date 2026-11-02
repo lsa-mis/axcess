@@ -1620,3 +1620,25 @@ async def test_issues_never_shows_the_recommended_order_sentence(
     await back.click()
     await playwright_async.expect(back).to_have_count(0)
     await playwright_async.expect(visible_sentence).to_have_count(0)
+
+
+async def test_every_table_has_lines_between_its_columns(
+    live_server: tuple[str, int], new_page: Any
+) -> None:
+    """Column lines on every table, as on Reports (the shared Table, 2026-11-02)."""
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    for path, name in (
+        (f"/app/scans/{scan_id}/issues", "Accessibility issue types"),
+        ("/app/scans", "Public reports by site"),
+    ):
+        await page.goto(f"{base}{path}", wait_until="networkidle")
+        table = page.get_by_role("table", name=re.compile(rf"^{name}"))
+        shadows = (
+            await table.locator("tbody tr")
+            .first.locator("th, td")
+            .evaluate_all("cells => cells.map(c => getComputedStyle(c).boxShadow)")
+        )
+        assert len(shadows) > 2, shadows
+        # Every cell but the last draws its line on its right.
+        assert all("inset" in shadow for shadow in shadows[:-1]), (path, shadows)
