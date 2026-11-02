@@ -43,7 +43,10 @@ export const GROUPS = {
     description: "What Axcess tests on each page.",
   },
   localAi: {
-    legend: "AI checks on this computer",
+    // "Local AI checks" (2026-11-02, the developer's name; it was "AI checks on
+    // this computer"). The description below keeps the privacy fact the old
+    // name carried: the AI runs on this computer only and uploads nothing.
+    legend: "Local AI checks",
     description:
       "AI (artificial intelligence) runs on this computer only. Axcess uploads nothing and never downloads a model by itself.",
   },

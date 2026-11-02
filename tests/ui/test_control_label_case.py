@@ -164,7 +164,7 @@ async def _controls(page: Any) -> list[dict[str, str]]:
 _SCAN_GROUPS = (
     "Pages to scan",
     "Checks",
-    "AI checks on this computer",
+    "Local AI checks",
     "Speed and browser window",
 )
 

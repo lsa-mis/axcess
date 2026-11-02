@@ -641,7 +641,7 @@ async def test_rail_names_every_switch_on_the_side_its_state_says(
         """Every check switch sits on the rail's side its state says."""
         on = set(await _rail_items(summary, "Checks that run"))
         off = set(await _rail_items(summary, "Not included"))
-        for group in ("Checks", "AI checks on this computer"):
+        for group in ("Checks", "Local AI checks"):
             switches = page.get_by_role("group", name=group, exact=True).get_by_role("switch")
             for index in range(await switches.count()):
                 switch = switches.nth(index)

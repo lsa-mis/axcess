@@ -80,6 +80,8 @@ merge.
   pages**, **Maximum link depth**) are under **Pages to scan**, and **Rule
   check tool** is under **Checks**. The **Limits and rule check tool**
   group is gone, so New scan has four groups.
+- New scan: **AI checks on this computer** is now called **Local AI
+  checks**. Its description still says the AI runs on this computer only.
 - Issues: **How sure**, **Priority** and **Issue occurrences** are the
   second, third and fourth columns, right after the issue type's name.
 - A row of the Issues table is now an **issue type** (it was a "kind of
