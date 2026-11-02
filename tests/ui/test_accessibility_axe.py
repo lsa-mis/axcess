@@ -693,11 +693,21 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
         conn.execute("UPDATE scans SET error_count = 3 WHERE id = ?", (scan_id,))
     await page.reload(wait_until="networkidle")
     await playwright_async.expect(failed).to_have_text("3 pages could not be loaded")
-    # Under the title, only when the evidence was captured: no site name, no
-    # disclaimer line, and no ACT rule note among the notes.
+    # Nothing under the title (2026-10-30): no "Based on the report
+    # generated" line, no site name, no disclaimer line, and no ACT rule
+    # note among the notes. Scan again is on Reports only; Export report
+    # stays at the top right, level with the heading (it was tried centred
+    # on the numbers' row and moved back).
     await playwright_async.expect(
         page.get_by_text(re.compile(r"^Based on the (report generated|scan started) "))
-    ).to_be_visible()
+    ).to_have_count(0)
+    await playwright_async.expect(
+        page.get_by_role("link", name=re.compile(r"^Scan again"))
+    ).to_have_count(0)
+    export_box = await page.get_by_role("button", name=re.compile(r"^Export report")).bounding_box()
+    numbers_box = await summary.bounding_box()
+    assert export_box and numbers_box
+    assert export_box["y"] + export_box["height"] <= numbers_box["y"], (export_box, numbers_box)
     await playwright_async.expect(
         page.get_by_text("Evidence for expert review, not a conformance verdict.", exact=True)
     ).to_have_count(0)
@@ -738,18 +748,9 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     # report, and exact text must match one element.
     await playwright_async.expect(ledger.get_by_text("Click-Through", exact=True)).to_be_visible()
 
-    # The subtitle names the report without repeating a stat card's count.
-    subtitle = page.locator("main h1 + p")
-    text = await subtitle.inner_text()
-    assert "issue groups" not in text and "issues" not in text, text
-    assert "occurrences" not in text, text
-    issues = await (await page.request.get(f"{base}/api/scans/{scan_id}/issues")).json()
-    # The date after "started"/"generated" has its own numbers ("Oct 3, 2026"),
-    # which matched a count of 3 on the 3rd of any month. Only the rest of the
-    # subtitle must not repeat a count.
-    words = re.sub(r"\b(started|generated)\b.*$", "", text)
-    for count in (issues["total_unfiltered"], issues["occurrence_counts"]["all_evidence"]):
-        assert not re.search(rf"\b{count}\b", words), (count, text)
+    # No subtitle at all under the heading (2026-10-30), so nothing there
+    # can repeat a count.
+    await playwright_async.expect(page.locator("main h1 + p")).to_have_count(0)
 
 
 async def test_running_scan_shows_factual_pipeline_progress(

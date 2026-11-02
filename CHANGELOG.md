@@ -80,6 +80,10 @@ merge.
   are gone; the first row of the table is the latest site, with **Open
   latest scan**. A scan that is running still shows its progress above the
   table.
+- Issues: the line "Based on the report generated…" and **Scan again** are
+  gone from the top of the page; **Export report** stays at the top right.
+  **Scan again** is still on Reports, in each site's row, and **Scanned**
+  there says when each scan ran.
 - The comparison table (new, still found and no longer found kinds of
   issues, and the trend) is now its own page, **What changed**, at
   `/scans/<id>/compare/changes`. Compare reports links to it with **See

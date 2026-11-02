@@ -1,5 +1,4 @@
 import { memo, useMemo, useRef, type ReactNode, type Ref } from "react";
-import { serverDate } from "../lib/serverTime";
 import { Link, useLocation, useParams, useSearchParams } from "react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
@@ -8,7 +7,6 @@ import { Card, withReturnTrail } from "../components/ui";
 import { siteLabel } from "../components/ReportCrumb";
 import ConformanceBadge from "../components/ConformanceBadge";
 import ExportMenu from "../components/ExportMenu";
-import ScanAgainLink from "../components/ScanAgainLink";
 import { TablePagination, usePagedRows } from "../components/TablePagination";
 import {
   Cell,
@@ -194,14 +192,16 @@ export default function IssuesRoute() {
   const data = issuesQuery.data;
   const isComplete = scan.status === "completed";
   const summaryRows = hasFilter ? summaryQuery.data?.rows : data.rows;
-  const basedOn = !isComplete
-    ? null
-    : scan.finished_at
-      ? `Based on the report generated ${formatCompleted(scan.finished_at)}`
-      : scan.started_at
-        ? `Based on the scan started ${formatCompleted(scan.started_at)}`
-        : null;
   const onSort = (next: SortState) => setParam("sort", serializeSort(next));
+  const exportMenu = (
+    <ExportMenu
+      scanId={scan.id}
+      site={siteLabel(scan.seed_url)}
+      pageCount={scan.page_count}
+      issueGroups={data.total_unfiltered}
+      shownIssueGroups={hasFilter ? rows.length : undefined}
+    />
+  );
   // The button that was pressed goes away with the column sort, so focus
   // moves to the table it just reordered rather than falling to the page.
   const recommend = () => {
@@ -216,26 +216,17 @@ export default function IssuesRoute() {
         scanId={scan.id}
         previousScanId={scan.previous_scan_id}
         title="Issues"
-        // When the evidence was captured, and nothing else: the site is in
-        // the topbar trail, and the counts are in the summary line below.
-        // A report that never recorded its finish time says when it started.
-        meta={basedOn ? <span className="text-fg-muted">{basedOn}</span> : undefined}
-        // Scan again sits before Export report: Export stays the header's
-        // last action, the edge its panel hangs from (see ExportMenu). A
-        // protected report has none: its settings belong to the sign-in
-        // workflow, and the server refuses to copy them into New scan.
-        actions={
-          <>
-            {!scan.protection && <ScanAgainLink scanId={scan.id} site={siteLabel(scan.seed_url)} />}
-            <ExportMenu
-              scanId={scan.id}
-              site={siteLabel(scan.seed_url)}
-              pageCount={scan.page_count}
-              issueGroups={data.total_unfiltered}
-              shownIssueGroups={hasFilter ? rows.length : undefined}
-            />
-          </>
-        }
+        // The heading and Export report only (2026-10-30, the developer's
+        // request). "Based on the report generated…" under the heading and
+        // "Scan again" beside Export were removed, to give the space to the
+        // report: the date is on Reports ("Scanned"), and "Scan again" is in
+        // the site's row there, beside "Open latest scan". Export report
+        // was tried at the end of the summary numbers' row, centred on it,
+        // and moved back here: centred against numbers of different heights
+        // it looked out of line; top right, level with the heading, it does
+        // not (the developer's call). It stays the header's last action, the
+        // edge its panel hangs from (see ExportMenu).
+        actions={exportMenu}
       />
 
       {isComplete && (
@@ -1091,17 +1082,4 @@ function priorityTier(priority: number): "High" | "Medium" | "Low" {
   if (priority >= 6) return "High";
   if (priority >= 3) return "Medium";
   return "Low";
-}
-
-/** "4 Sep 2026, 15:16", a scan's own finish time, in the reader's locale. */
-function formatCompleted(iso: string): string {
-  const at = serverDate(iso);
-  if (Number.isNaN(at.getTime())) return iso;
-  return at.toLocaleString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }
