@@ -1,5 +1,4 @@
 import { memo, useMemo, useRef, type ReactNode, type Ref } from "react";
-import { serverDate } from "../lib/serverTime";
 import { Link, useLocation, useParams, useSearchParams } from "react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
@@ -38,7 +37,7 @@ import {
 } from "../components/table/sort";
 import ReportHeader from "../components/ReportHeader";
 import ReportDangerZone from "../components/ReportDangerZone";
-import { ReportNote, ReportNotes, ReportSummary } from "../components/ReportSummary";
+import { ReportCoverageNote, ReportNote, ReportNotes, ReportSummary } from "../components/ReportSummary";
 import { cn } from "../lib/cn";
 import { liveSearchParams } from "../lib/liveSearchParams";
 import { HIDDEN_ISSUE_FIELDS } from "../lib/hiddenIssueFields";
@@ -52,7 +51,7 @@ import {
   REVIEW_LANE_HELP,
   isFindingType,
 } from "../lib/labels";
-import { REVIEW_TYPE_LABEL } from "../lib/terms";
+import { CHECK_LABEL, REVIEW_TYPE_LABEL } from "../lib/terms";
 import { useScanQuery } from "../hooks/useScanQuery";
 import type {
   ConformanceLabel,
@@ -62,19 +61,24 @@ import type {
 } from "../api/types";
 
 /**
- * The primary report: every issue group as one row of a flat table.
+ * The primary report: every issue type as one row of a flat table.
  *
- * This is where a report opens. The numbers and scan coverage that used to
- * be an Overview tab sit above the table (``ReportSummary``), and the expert
- * tools sit closed below it, so the first thing on screen is the table.
+ * This is where a report opens. The numbers that used to be an Overview tab
+ * sit above the table (``ReportSummary``); what was checked, what the labels
+ * mean and the expert tools sit closed below it, so the table follows the
+ * numbers directly.
  *
  * Each column is one of the facts the old right-hand evidence pane listed
  * for the selected issue (type, criterion, priority, spread, difficulty,
  * owner), so the whole report can be compared at a glance instead of one
  * issue at a time. What does not fit in a cell is one link away: the title
- * opens the issue's full record (what it is, why it matters, the fix), and
- * the page count opens a page of its own (``/scans/:id/issues/:key/pages``)
- * listing every affected page in columns. The topbar trail is the way back,
+ * opens the issue type's full record, which leads with every affected page
+ * in columns, then what it is, why it matters, and the fix. The page count
+ * was a second link, to a page listing the same pages
+ * (``/scans/:id/issues/:key/pages``), until 2026-11-02: one job, two
+ * links in one row, so the developer made the count a plain number (W3C
+ * COGA, "Making Content Usable": one way to do one thing; paraphrased).
+ * The topbar trail is the way back,
  * which the desktop app needs because it has no browser back button, and
  * every link out of here carries the origin it needs to draw that trail.
  *
@@ -192,15 +196,16 @@ export default function IssuesRoute() {
   const data = issuesQuery.data;
   const isComplete = scan.status === "completed";
   const summaryRows = hasFilter ? summaryQuery.data?.rows : data.rows;
-  const notes = <IssueGlossary />;
-  const basedOn = !isComplete
-    ? null
-    : scan.finished_at
-      ? `Based on the report generated ${formatCompleted(scan.finished_at)}`
-      : scan.started_at
-        ? `Based on the scan started ${formatCompleted(scan.started_at)}`
-        : null;
   const onSort = (next: SortState) => setParam("sort", serializeSort(next));
+  const exportMenu = (
+    <ExportMenu
+      scanId={scan.id}
+      site={siteLabel(scan.seed_url)}
+      pageCount={scan.page_count}
+      issueGroups={data.total_unfiltered}
+      shownIssueGroups={hasFilter ? rows.length : undefined}
+    />
+  );
   // The button that was pressed goes away with the column sort, so focus
   // moves to the table it just reordered rather than falling to the page.
   const recommend = () => {
@@ -215,31 +220,25 @@ export default function IssuesRoute() {
         scanId={scan.id}
         previousScanId={scan.previous_scan_id}
         title="Issues"
-        // When the evidence was captured, and nothing else: the site is in
-        // the topbar trail, and the counts are in the summary line below.
-        // A report that never recorded its finish time says when it started.
-        meta={basedOn ? <span className="text-fg-muted">{basedOn}</span> : undefined}
-        actions={
-          <ExportMenu
-            scanId={scan.id}
-            site={siteLabel(scan.seed_url)}
-            pageCount={scan.page_count}
-            issueGroups={data.total_unfiltered}
-            shownIssueGroups={hasFilter ? rows.length : undefined}
-          />
-        }
+        // The heading and Export report only (2026-10-30, the developer's
+        // request). "Based on the report generated…" under the heading and
+        // "Scan again" beside Export were removed, to give the space to the
+        // report: the date is on Reports ("Scanned"), and "Scan again" is in
+        // the site's row there, beside "Open latest scan". Export report
+        // was tried at the end of the summary numbers' row, centred on it,
+        // and moved back here: centred against numbers of different heights
+        // it looked out of line; top right, level with the heading, it does
+        // not (the developer's call). It stays the header's last action, the
+        // edge its panel hangs from (see ExportMenu).
+        actions={exportMenu}
       />
 
-      {isComplete ? (
+      {isComplete && (
         <ReportSummary
           scan={scan}
           issueGroups={data.total_unfiltered}
           occurrences={data.occurrence_counts.all_evidence}
-          rows={summaryRows}
-          notes={notes}
         />
-      ) : (
-        <ReportNotes>{notes}</ReportNotes>
       )}
 
       {/* Filtering changed the table silently: the visible count updated,
@@ -251,10 +250,10 @@ export default function IssuesRoute() {
       <p role="status" className="sr-only">
         {issuesQuery.isFetching
           ? "Updating issues…"
-          : `${rows.length} of ${data.total_unfiltered} issues shown` +
+          : `${rows.length} of ${data.total_unfiltered} ${data.total_unfiltered === 1 ? "issue type" : "issue types"} shown` +
             (hasFilter ? ", filtered" : "") +
-            // By type too, so a reader hears how many are barriers without
-            // walking the Type column.
+            // By "How sure" value too, so a reader hears how many are Mostly
+            // sure without walking the How sure column.
             (rows.length > 0 ? `: ${laneSummary(rows)}` : "")}
       </p>
 
@@ -272,47 +271,70 @@ export default function IssuesRoute() {
           onParam={setParam}
           onResetFilters={resetFilters}
           onClearFilters={() => setParams(new URLSearchParams(), { replace: true })}
-          pager={<TablePagination label="Issues" noun="issues" {...paged} />}
+          pager={<TablePagination label="Issues" noun="issue types" {...paged} />}
         />
         {/* Only for exactly one finding type: the link names one view. */}
         {isFindingType(findingType) && (
           <FindingTypeViewLink scanId={scan.id} findingType={findingType} imageCount={scan.finding_count} />
         )}
-        {/* WAI-ARIA sortable table: the status line says what the order is
-            now, visibly, so sighted readers get the same confirmation
-            without hunting for the chip. The filtered count and the way
-            back to the recommended order sit beside it, outside the live
-            region, so they are not read out with every sort (the count has
-            its own announcement above). The line is one target tall either
-            way, so the button coming and going never moves the table. */}
-        <TableStatus
-          actions={
-            <>
-              {hasFilter && (
-                <span className="tabular-nums">
-                  {rows.length.toLocaleString()} of {data.total_unfiltered.toLocaleString()} shown
-                </span>
-              )}
-              {sort && (
-                // eslint-disable-next-line react/forbid-elements -- Convert: a text-link styled button; needs a link variant on Button
-                <button
-                  type="button"
-                  onClick={recommend}
-                  className="min-h-target rounded-xs px-1 font-semibold text-umich-blue underline underline-offset-2 hover:text-umich-blue-600 focus-visible:outline-none focus-visible:shadow-focus"
-                >
-                  Back to recommended order
-                </button>
-              )}
-            </>
-          }
-        >
+        {/* WAI-ARIA sortable table: the line over it says what the order is,
+            with the filtered count and the way back to the recommended order
+            beside it.
+
+            Shown only when the table is sorted by a column or filtered
+            (2026-11-02), and never with the sentence "Recommended order:
+            Mostly sure, then Not sure, then For information.", which the
+            developer asked to remove: the How sure column already shows
+            that grouping, top to bottom. Removing
+            the line in every state was the request, and was set aside here
+            because the line then holds the only way back to the recommended
+            order (a sorted header only flips between its two directions),
+            and the count of what a filter left (W3C COGA, "Making Content
+            Usable": do not take away the way back).
+
+            The order is still said to a screen reader on every change, by
+            the live region under this comment, which stays on the page
+            whether or not the line shows; the line itself is not a live
+            region (`announce={false}`), so nothing is read twice (SC 4.1.3
+            Status Messages, Level AA). The table's caption says the order
+            too. */}
+        <p role="status" className="sr-only">
           {describeSort(sort)}.
-        </TableStatus>
+        </p>
+        {(sort || hasFilter) && (
+          <TableStatus
+            announce={false}
+            actions={
+              <>
+                {hasFilter && (
+                  <span className="tabular-nums">
+                    {rows.length.toLocaleString()} of {data.total_unfiltered.toLocaleString()} shown
+                  </span>
+                )}
+                {sort && (
+                  // eslint-disable-next-line react/forbid-elements -- Convert: a text-link styled button; needs a link variant on Button
+                  <button
+                    type="button"
+                    onClick={recommend}
+                    className="min-h-target rounded-xs px-1 font-semibold text-umich-blue underline underline-offset-2 hover:text-umich-blue-600 focus-visible:outline-none focus-visible:shadow-focus"
+                  >
+                    Back to recommended order
+                  </button>
+                )}
+              </>
+            }
+          >
+            {/* The sentence "Recommended order: …" is never shown, only
+                spoken (see above): with a filter on and the default order,
+                the line holds the count alone. */}
+            {sort && `${describeSort(sort)}.`}
+          </TableStatus>
+        )}
         {rows.length === 0 ? (
           <TableEmpty>
             {hasFilter
               ? "No issues match these filters. Clear a filter to see more results."
-              : "Axcess found no issues. That does not mean the site meets WCAG, because some checks may not have run. See what was checked, above this table."}
+              : "Axcess found no issues. That does not mean the site meets WCAG, because some checks may not have run. See “What was checked”, below this table."}
           </TableEmpty>
         ) : (
           <IssueTable
@@ -326,6 +348,14 @@ export default function IssuesRoute() {
           />
         )}
       </Card>
+
+      {/* Under the table since user testing (2026-10-28): the table follows
+          the numbers with nothing to step over. Why, and what keeps the
+          limit in view, is on ReportCoverageNote. */}
+      <ReportNotes className="mt-8">
+        {isComplete && <ReportCoverageNote scan={scan} rows={summaryRows} />}
+        <IssueGlossary />
+      </ReportNotes>
 
       <ReportDangerZone scan={scan} />
     </>
@@ -397,7 +427,7 @@ function IssueToolbar({
         })),
       ],
     },
-    // An issue found both at page load and after clicking is listed under
+    // An issue type found both at page load and after clicking is listed under
     // both, so these counts can add up to more than the whole table. Named
     // as its column is ("Where it shows"): "finding" is not an interface word.
     {
@@ -420,7 +450,7 @@ function IssueToolbar({
     <TableBar pager={pager} footer={<ActiveFilters items={active} onClear={onClearFilters} />}>
       <TableSearch
         label="Search issues"
-        placeholder="Issue name or WCAG number (1.4.3)"
+        placeholder="Issue type or WCAG number (1.4.3)"
         value={q}
         onChange={(value) => onParam("q", value)}
       />
@@ -444,12 +474,24 @@ function parseList(raw: string | null, allowed: readonly string[]): string {
 
 const COLUMNS = [
   "Issue",
+  // How sure, then Priority and Issue occurrences, right after the issue
+  // type's name (the developer's order, 2026-11-02). How sure comes first
+  // because it says whether to trust the Priority beside it: a High on a
+  // Not sure row is a lead to confirm, not a found problem, and the
+  // product keeps facts apart from leads (AGENTS.md). It is also the
+  // recommended order's first key, with priority ordering the rows inside
+  // each How sure group, so the columns read left to right in the order the
+  // rows are sorted. Priority and Issue occurrences followed WCAG criterion
+  // until that day, and were briefly second and third, ahead of How sure.
   "Type",
-  "Finding type",
-  "WCAG",
   "Priority",
-  "Pages",
   "Occurrences",
+  // Affected pages right after Issue occurrences (2026-11-02), as Reports
+  // orders its counts: issue occurrences, then pages. It was the last column.
+  "Pages",
+  "Finding type",
+  "Check",
+  "WCAG",
   "Difficulty",
   "Responsibility",
 ] as const;
@@ -460,18 +502,47 @@ type SortColumn = (typeof COLUMNS)[number];
  * "Finding type" reads "Where it shows", because "finding" is not an
  * interface word (docs/plain-language.md) and every value answers that
  * question (see FINDING_TYPE_LABELS in lib/labels.ts).
+ *
+ * "Issue" reads "Issue type": a row gathers every place one check found
+ * for one reason. "Occurrences" counts those places: an occurrence is one
+ * place a problem shows up, and the column's hint says so (ISSUE_COLUMN_HELP,
+ * lib/labels.ts). Until 2026-10-26 the row was "an issue"; that day the
+ * developer made the row "an issue type" and each place "an issue",
+ * because people called each place an issue and "occurrence" is an
+ * advanced word. On 2026-10-28 user testing with Siteimprove users, who
+ * know Siteimprove's "issues" and "occurrences", led the developer to bring
+ * back "Occurrences" for the places; the row stays "Issue type". The
+ * research and the reason are in docs/plain-language.md, "Why "occurrence"
+ * and "issue type"" (W3C COGA, "Making Content Usable",
+ * https://www.w3.org/TR/coga-usable/: the same word for the same thing).
  */
 const COLUMN_LABEL: Record<SortColumn, string> = {
-  Issue: "Issue",
-  // "How sure", not "Type": the column says how sure Axcess is that the
-  // issue is a real problem, and "Type" named no question (see
+  Issue: "Issue type",
+  // "How sure", not "Type": the column says how sure Axcess is that a
+  // issue type is a real problem, and "Type" named no question (see
   // REVIEW_TYPE_LABEL in lib/terms.ts).
   Type: "How sure",
   "Finding type": "Where it shows",
-  WCAG: "WCAG",
+  // Which check found the row, by its interface name (CHECK_LABEL), after
+  // where it shows: both say where the evidence came from. Testers who use
+  // Siteimprove asked whether an issue came from axe or from Siteimprove
+  // (user testing, 2026-10-28); the header's hint names who makes each
+  // rule check. Each row comes from one check (IssueRow.pipeline), so the
+  // cell is one name, never a list.
+  Check: "Check",
+  // "WCAG criterion" (2026-10-30, the developer's choice): the cell holds a
+  // success criterion's number and its level badge, and sorts by the number.
+  // "WCAG level" was proposed and set aside, since the header would then not
+  // name the number; "WCAG criterion and level" was longer than it needed to
+  // be, the badge saying its level by itself.
+  WCAG: "WCAG criterion",
   Priority: "Priority",
-  Pages: "Pages",
-  Occurrences: "Occurrences",
+  // "Affected pages" (2026-11-02), the words the trail already uses for an
+  // issue type's pages ("131 affected pages"). Not "Impacted pages": impact
+  // names the Critical/Serious/Moderate/Minor rating, so it could be read as
+  // pages with serious problems.
+  Pages: "Affected pages",
+  Occurrences: "Issue occurrences",
   Difficulty: "Difficulty",
   Responsibility: "Who fixes it",
 };
@@ -500,6 +571,7 @@ const SORT_KEYS: Record<SortColumn, string> = {
   Issue: "title",
   Type: "type",
   "Finding type": "finding_type",
+  Check: "check",
   WCAG: "wcag",
   Priority: "score",
   Pages: "pages",
@@ -516,6 +588,7 @@ const SORT_KINDS: Record<SortColumn, SortKind> = {
   Issue: "text",
   Type: "text",
   "Finding type": "text",
+  Check: "text",
   WCAG: "text",
   Priority: "number",
   Pages: "number",
@@ -583,6 +656,8 @@ function compareRows(a: IssueRow, b: IssueRow, column: SortColumn): number {
       return LANE_RANK[a.review_lane] - LANE_RANK[b.review_lane];
     case "Finding type":
       return compareLists(findingTypeRank(a), findingTypeRank(b));
+    case "Check":
+      return compareText(CHECK_LABEL[a.pipeline], CHECK_LABEL[b.pipeline]);
     case "WCAG":
       return compareLists(wcagRank(a), wcagRank(b));
     case "Priority":
@@ -669,9 +744,8 @@ function laneSummary(rows: IssueRow[]): string {
  * something with a name. The issue column is sticky, so the row keeps its
  * label while the rest scrolls under it.
  *
- * The rows arrive paged (the pager is in the bar over the table), and the
- * region keeps the tallest page's height, so paging never moves what sits
- * under the table.
+ * The rows arrive paged (the pager is in the bar over the table). A short
+ * last page leaves the table short (see usePagedRows).
  */
 function IssueTable({
   scanId,
@@ -683,7 +757,7 @@ function IssueTable({
   regionRef,
 }: {
   scanId: number;
-  paged: Pick<ReturnType<typeof usePagedRows<IssueRow>>, "pageRows" | "page" | "pageSize" | "hold">;
+  paged: Pick<ReturnType<typeof usePagedRows<IssueRow>>, "pageRows" | "page" | "pageSize">;
   /** Where links out of the table return to. */
   here: string;
   sort: SortState;
@@ -693,25 +767,35 @@ function IssueTable({
 }) {
   const offset = (paged.page - 1) * paged.pageSize;
   return (
-    <TableRegion label="Issues table" paged={paged} busy={busy} regionRef={regionRef}>
-      <Table caption={`Accessibility issues. ${describeSort(sort)}.`}>
+    <TableRegion label="Issues table" busy={busy} regionRef={regionRef}>
+      <Table caption={`Accessibility issue types, one per row. ${describeSort(sort)}.`}>
         <TableHead>
           <tr>
             {/* No ``whitespace-nowrap`` on a header: when nine columns are
                 tight, the sorted header's chip drops under its label
-                instead of widening the table past the region. */}
+                instead of widening the table past the region. The labels'
+                words wrap too (`wrap="words"`, as on Reports): "Issue
+                occurrences" (2026-10-30) on one line pushed the table 21
+                pixels past its region at 1280 with Pages sorted. Every
+                header wraps the same way, so their last lines stay level,
+                and is padded 1.5 at the sides as the body cells are (see
+                IssueTableRow): the shared 3 left the headers, not the data,
+                setting the columns' widths. */}
             {VISIBLE_COLUMNS.map((column) => (
               <SortHeader
                 key={column}
                 column={column}
+                wrap="words"
                 kind={SORT_KINDS[column]}
                 sort={sort}
                 onSort={onSort}
-                className={column === "Issue" ? "sticky left-0 z-[1] bg-surface-muted" : undefined}
+                className={cn("px-1.5", column === "Issue" && "sticky left-0 z-[1] bg-surface-muted")}
                 hint={columnHint(column)}
               >
                 {column === "WCAG" ? (
-                  <abbr title="Web Content Accessibility Guidelines">WCAG</abbr>
+                  <>
+                    <abbr title="Web Content Accessibility Guidelines">WCAG</abbr> criterion
+                  </>
                 ) : (
                   COLUMN_LABEL[column]
                 )}
@@ -735,7 +819,7 @@ function IssueTable({
 }
 
 /**
- * One issue group.
+ * One issue type.
  *
  * There used to be an "About" column whose button opened the issue's
  * description in a second row under this one. It repeated what the title
@@ -757,7 +841,6 @@ const IssueTableRow = memo(function IssueTableRow({
 }) {
   const isInformational = row.review_lane === "informational";
   const detailPath = `/scans/${scanId}/issues/${encodeURIComponent(row.issue_key)}`;
-  const pagesPath = withReturnTrail(`${detailPath}/pages`, "Issues", here);
   // Body cells are padded 1.5 rather than the shared 2, which is what keeps
   // all nine columns in view beside the expanded sidebar at 1280 px. Every
   // cell but the title is short, so it centres under its centred heading.
@@ -786,20 +869,6 @@ const IssueTableRow = memo(function IssueTableRow({
       <Cell className={cn(cell, "whitespace-nowrap")}>
         <LaneTag lane={row.review_lane} />
       </Cell>
-      <Cell className={cell}>
-        <FindingTypeCell row={row} />
-      </Cell>
-      <Cell className={cn(cell, "whitespace-nowrap")}>
-        {row.wcag_sc ? (
-          <span className="inline-flex items-center gap-1.5">
-            <span className="tabular-nums">{row.wcag_sc}</span>
-            <ConformanceBadge level={row.conformance} />
-            {row.wcag_name && <span className="sr-only">{row.wcag_name}</span>}
-          </span>
-        ) : (
-          <span className="text-fg-muted">Best practice</span>
-        )}
-      </Cell>
       <Cell className={cn(cell, "whitespace-nowrap")}>
         {isInformational ? (
           <span className="whitespace-normal text-fg-muted">Does not apply</span>
@@ -811,20 +880,25 @@ const IssueTableRow = memo(function IssueTableRow({
         )}
       </Cell>
       <Cell numeric className={cell}>
-        {/* "211 pages" says nothing about which issue on its own, and a
-            description is not a name: SC 2.4.9 wants the purpose from the
-            link text alone, so the issue rides along inside the name while
-            the cell stays a number wide. */}
-        <Link
-          to={pagesPath}
-          className="flex min-h-target items-center justify-center text-umich-blue underline underline-offset-2"
-        >
-          {row.page_count} page{row.page_count === 1 ? "" : "s"}
-          <span className="sr-only"> with {row.title}</span>
-        </Link>
+        {row.occurrence_count}
       </Cell>
       <Cell numeric className={cell}>
-        {row.occurrence_count}
+        {row.page_count}
+      </Cell>
+      <Cell className={cell}>
+        <FindingTypeCell row={row} />
+      </Cell>
+      <Cell className={cell}>{CHECK_LABEL[row.pipeline] ?? row.pipeline}</Cell>
+      <Cell className={cn(cell, "whitespace-nowrap")}>
+        {row.wcag_sc ? (
+          <span className="inline-flex items-center gap-1.5">
+            <span className="tabular-nums">{row.wcag_sc}</span>
+            <ConformanceBadge level={row.conformance} />
+            {row.wcag_name && <span className="sr-only">{row.wcag_name}</span>}
+          </span>
+        ) : (
+          <span className="text-fg-muted">Best practice</span>
+        )}
       </Cell>
       {shows("Difficulty") && (
         <Cell className={cn(cell, "whitespace-nowrap")}>
@@ -909,7 +983,14 @@ function FindingTypePill({ type, hint = true }: { type: FindingType; hint?: bool
 }
 
 /**
- * What the Type and Finding type words mean, closed until asked for.
+ * What the counts and the Type and Finding type words mean, closed until
+ * asked for.
+ *
+ * The counts lead: what an occurrence and an issue type are. The summary
+ * numbers lost the lines that said so (user testing, 2026-10-28), and
+ * "occurrence" is an advanced word, so its meaning must stay in words
+ * everyone can reach, not only in the column's hover hint (SC 3.1.3 Unusual
+ * Words, Level AAA).
  *
  * The tags in the table carry the same sentences as hover hints, but a hint
  * on a tag reaches only a mouse: this list is how keyboard and touch users,
@@ -923,7 +1004,22 @@ function IssueGlossary() {
     >
       <div className="grid max-w-5xl gap-x-10 gap-y-4 text-sm leading-relaxed text-fg-muted md:grid-cols-2 xl:grid-cols-3">
         <GlossaryList
-          heading={`${COLUMN_LABEL.Type}: how sure Axcess is that the issue is a real problem`}
+          heading="The numbers: what is counted"
+          items={[
+            {
+              key: "occurrence",
+              term: <span className="font-semibold text-fg">Occurrence</span>,
+              help: "One place a problem appears: one element on one page, or in one page state. \"Issue occurrences\" counts them all.",
+            },
+            {
+              key: "kind",
+              term: <span className="font-semibold text-fg">Issue type</span>,
+              help: "All the occurrences one check found for the same reason. Each is one row in the Issues table.",
+            },
+          ]}
+        />
+        <GlossaryList
+          heading={`${COLUMN_LABEL.Type}: how sure Axcess is that an issue type is a real problem`}
           items={REVIEW_LANES.map((key) => ({ key, term: <LaneTag lane={key} hint={false} />, help: REVIEW_LANE_HELP[key] }))}
         />
         <GlossaryList
@@ -937,7 +1033,7 @@ function IssueGlossary() {
         {/* The bands' limits, such as a critical problem on one page showing
             as Low, in words everyone can reach, not only in a hover hint. */}
         <GlossaryList
-          heading={`${COLUMN_LABEL.Priority}: which issues to look at first`}
+          heading={`${COLUMN_LABEL.Priority}: which issue types to look at first`}
           items={(["High", "Medium", "Low"] as const).map((key) => ({
             key,
             term: <span className="font-semibold text-fg">{key}</span>,
@@ -1032,17 +1128,4 @@ function priorityTier(priority: number): "High" | "Medium" | "Low" {
   if (priority >= 6) return "High";
   if (priority >= 3) return "Medium";
   return "Low";
-}
-
-/** "4 Sep 2026, 15:16", a scan's own finish time, in the reader's locale. */
-function formatCompleted(iso: string): string {
-  const at = serverDate(iso);
-  if (Number.isNaN(at.getTime())) return iso;
-  return at.toLocaleString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }

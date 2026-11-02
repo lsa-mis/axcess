@@ -1,0 +1,65 @@
+---
+/**
+ * The draft notice on the staging copy of the site.
+ *
+ * What: every page of a staging build (AXCESS_SITE_STAGING=1, see
+ * site/README.md) starts its content with a short notice that this is a
+ * draft shared for feedback, and a link to the live site. astro.config.mjs
+ * registers this override for staging builds only, so the live site never
+ * carries it. Starlight's own banner (from a page's frontmatter) still shows
+ * after it.
+ *
+ * Why: testers share links, and a draft page that looks exactly like the
+ * live site is easy to mistake for it. The notice sits in the page flow
+ * through Starlight's Banner slot, so it adds no new layout part. Rejected: a
+ * sticky bar fixed to the top of the screen. It would sit next to the sticky
+ * header, cover more of the page at 400% zoom and on phones, and could hide
+ * the focused element (SC 2.4.11 Focus Not Obscured (Minimum), Level AA).
+ *
+ * Standards:
+ * - The notice is words, not a colour or an icon alone (SC 1.4.1 Use of
+ *   Color, Level A).
+ * - Text and link use the site's --ax-fg and --ax-link on --ax-tint, which
+ *   meet 7:1 in both themes (SC 1.4.6 Contrast (Enhanced), Level AAA).
+ * - The link says where it goes on its own, "Go to the live Axcess site"
+ *   (SC 2.4.4 Link Purpose (In Context), Level A; the repo's rule that every
+ *   link names its place). It is a full URL, so it leaves the staging copy.
+ * - It is a plain paragraph inside an aside named "Draft site", so screen
+ *   reader users can find or skip it as a landmark (WAI-ARIA APG Landmark
+ *   Regions, https://www.w3.org/WAI/ARIA/apg/practices/landmark-regions/).
+ * - It comes before the page title in reading and keyboard order (SC 2.4.3
+ *   Focus Order, Level A). "Skip to content" lands on the title, after the
+ *   notice, so keyboard users who have read it once can skip past it.
+ */
+import Default from "@astrojs/starlight/components/Banner.astro";
+
+const LIVE = "https://lsa-mis.github.io/axcess/";
+---
+
+<aside class="ax-staging" aria-label="Draft site">
+  <p>
+    This is a draft of the new Axcess site, shared for feedback. It may change before it goes live.{" "}
+    <a href={LIVE}>Go to the live Axcess site</a>
+  </p>
+</aside>
+<Default {...Astro.props} />
+
+<style>
+  .ax-staging {
+    border-block-end: 1px solid var(--ax-border-strong);
+    background: var(--ax-tint);
+    color: var(--ax-fg);
+    padding: 0.75rem var(--sl-content-pad-x, 1rem);
+  }
+  .ax-staging p {
+    margin: 0;
+    max-width: 75ch;
+  }
+  .ax-staging a {
+    color: var(--ax-link);
+    text-decoration: underline;
+  }
+  .ax-staging a:hover {
+    color: var(--ax-link-hover);
+  }
+</style>

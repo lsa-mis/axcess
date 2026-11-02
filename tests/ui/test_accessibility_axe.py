@@ -95,8 +95,7 @@ async def _run_axe(page: Any, tags: list[str] | None = None) -> list[dict[str, A
 _SCAN_GROUPS = (
     "Pages to scan",
     "Checks",
-    "AI checks on this computer",
-    "Limits and rule check tool",
+    "Local AI checks",
     "Speed and browser window",
 )
 
@@ -137,19 +136,30 @@ async def _axe_clean(new_page: Any, base: str, path: str) -> None:
 async def test_root_opens_reports_with_the_last_scanned_site(
     live_server: tuple[str, int], new_page: Any
 ) -> None:
-    """The Dashboard is hidden: ``/app/`` lands on Reports, led by the last scanned site."""
+    """The Dashboard is hidden: ``/app/`` lands on Reports, the latest site first.
+
+    The "Last scanned" card above the table was removed (2026-10-30): the
+    table's first row is that site, with the same way in.
+    """
     base, scan_id = live_server
     page = await new_page()
     try:
         await page.goto(f"{base}/app/", wait_until="networkidle")
         await page.wait_for_url("**/app/scans")
-        card = page.get_by_role("region", name="Last scanned site")
-        await playwright_async.expect(card.get_by_role("heading", level=2)).to_have_text(
-            "example.com"
-        )
         await playwright_async.expect(
-            card.get_by_role("link", name="Open latest scan of example.com", exact=True)
-        ).to_have_attribute("href", f"/app/scans/{scan_id}/issues")
+            page.get_by_role("region", name="Last scanned site")
+        ).to_have_count(0)
+        first = (
+            page.get_by_role("table", name="Public reports by site", exact=False)
+            .locator(":scope > tbody > tr")
+            .first
+        )
+        await playwright_async.expect(first.get_by_role("rowheader")).to_contain_text("example.com")
+        await playwright_async.expect(
+            first.get_by_role(
+                "link", name=re.compile(r"^Open latest scan of http:\/\/example\.com")
+            )
+        ).to_have_attribute("href", f"/app/scans/{scan_id}")
         violations = await _run_axe(page)
         assert not violations, _render_violations(violations)
     finally:
@@ -420,16 +430,16 @@ async def test_issue_card_answers_what_why_fix_and_where(
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
     await choose_filter(page, "How sure", "expert_review")
     await page.wait_for_url("**type=expert_review*")
-    issues = page.get_by_role("table", name="Accessibility issues")
+    issues = page.get_by_role("table", name="Accessibility issue types")
     # Contains, not equals: the sorted header also carries its direction chip.
     await playwright_async.expect(issues.get_by_role("columnheader")).to_contain_text(
         [
-            "Issue",
+            "Issue type",
             "How sure",
-            "WCAG",
             "Priority",
-            "Pages",
-            "Occurrences",
+            "Issue occurrences",
+            "Affected pages",
+            "WCAG criterion",
         ]
     )
     # Hidden for now (HIDDEN_ISSUE_FIELDS in the SPA); the data still exports.
@@ -481,10 +491,10 @@ async def test_issue_table_fits_the_default_desktop_width(
     base, scan_id = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
-    issues = page.get_by_role("table", name="Accessibility issues")
+    issues = page.get_by_role("table", name="Accessibility issue types")
     scroller = page.get_by_role("region", name="Issues table")
     # Who fixes it is hidden for now (HIDDEN_ISSUE_FIELDS), so Pages stands in.
-    for column in (None, "Issue", "Occurrences", "Pages"):
+    for column in (None, "Issue type", "Issue occurrences", "Affected pages"):
         if column:
             await issues.get_by_role("button", name=column, exact=False).first.click()
         widths = await scroller.evaluate("el => ({scroll: el.scrollWidth, client: el.clientWidth})")
@@ -507,7 +517,7 @@ async def test_issue_list_reaches_exact_locations_without_sideways_scrolling(
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
     await choose_filter(page, "How sure", "expert_review")
     await page.wait_for_url("**type=expert_review*")
-    issues = page.get_by_role("table", name="Accessibility issues")
+    issues = page.get_by_role("table", name="Accessibility issue types")
     await playwright_async.expect(issues).to_be_visible()
 
     widths = await page.evaluate(
@@ -531,7 +541,7 @@ async def test_issue_list_reaches_exact_locations_without_sideways_scrolling(
     await page.wait_for_url("**/issues/**")
     await playwright_async.expect(
         page.get_by_role(
-            "link", name="opens the saved copy with this issue marked", exact=False
+            "link", name="opens the saved copy with this issue type marked", exact=False
         ).first
     ).to_be_attached()
     # The protected-identity context refreshes every 15 seconds even
@@ -565,7 +575,7 @@ async def test_informational_evidence_is_read_only_and_not_barrier_language(
         ),
     )
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
-    issues = page.get_by_role("table", name="Accessibility issues")
+    issues = page.get_by_role("table", name="Accessibility issue types")
     logo_title = load_report_rules()["image_findings"]["logo_adequate"]["title"]
     row_link = issues.get_by_role("rowheader").get_by_role("link", name=logo_title, exact=False)
     informational_row = row_link.locator("xpath=ancestor::tr[1]")
@@ -662,15 +672,16 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
         workspace.get_by_role("link", name="Issues", exact=True)
     ).to_have_attribute("aria-current", "page")
     await playwright_async.expect(page.get_by_role("link", name="Overview")).to_have_count(0)
-    # The summary leads with what was found: kinds of issue, the places they
-    # appear, then the pages visited. Pages that could not be loaded are said
-    # in words, never as "errors", which readers took for accessibility
-    # errors, and only when there are some.
+    # The summary leads with what was found: the issue types, then the
+    # occurrences (each place a problem appears), then the pages visited
+    # (the developer's order and words, 2026-10-30). Pages that could not
+    # be loaded are said in words, never as "errors", which readers took for
+    # accessibility errors, and only when there are some.
     summary = page.locator("dl").filter(has_text="Pages visited")
     await playwright_async.expect(summary.get_by_role("term")).to_have_text(
         [
-            re.compile(r"^Kinds? of issue found$"),
-            "Places issues appear (occurrences)",
+            re.compile(r"^Issue types?$"),
+            re.compile(r"^Issue occurrences?$"),
             "Pages visited",
         ]
     )
@@ -681,11 +692,21 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
         conn.execute("UPDATE scans SET error_count = 3 WHERE id = ?", (scan_id,))
     await page.reload(wait_until="networkidle")
     await playwright_async.expect(failed).to_have_text("3 pages could not be loaded")
-    # Under the title, only when the evidence was captured: no site name, no
-    # disclaimer line, and no ACT rule note among the notes.
+    # Nothing under the title (2026-10-30): no "Based on the report
+    # generated" line, no site name, no disclaimer line, and no ACT rule
+    # note among the notes. Scan again is on Reports only; Export report
+    # stays at the top right, level with the heading (it was tried centred
+    # on the numbers' row and moved back).
     await playwright_async.expect(
         page.get_by_text(re.compile(r"^Based on the (report generated|scan started) "))
-    ).to_be_visible()
+    ).to_have_count(0)
+    await playwright_async.expect(
+        page.get_by_role("link", name=re.compile(r"^Scan again"))
+    ).to_have_count(0)
+    export_box = await page.get_by_role("button", name=re.compile(r"^Export report")).bounding_box()
+    numbers_box = await summary.bounding_box()
+    assert export_box and numbers_box
+    assert export_box["y"] + export_box["height"] <= numbers_box["y"], (export_box, numbers_box)
     await playwright_async.expect(
         page.get_by_text("Evidence for expert review, not a conformance verdict.", exact=True)
     ).to_have_count(0)
@@ -705,6 +726,20 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     ).to_be_visible()
     ledger = page.get_by_role("region", name="What was checked")
     await playwright_async.expect(ledger).to_be_hidden()
+    # Under the table since user testing (2026-10-28), not between it and
+    # the numbers; the summary numbers carry no line under them.
+    table_box = await page.get_by_role("region", name="Issues table").bounding_box()
+    coverage_box = await coverage.bounding_box()
+    assert table_box and coverage_box and coverage_box["y"] > table_box["y"], (
+        table_box,
+        coverage_box,
+    )
+    await playwright_async.expect(
+        page.get_by_text("Each one is an element on a page")
+    ).to_have_count(0)
+    await playwright_async.expect(page.get_by_text("One per row in the table below")).to_have_count(
+        0
+    )
     await coverage.focus()
     await page.keyboard.press("Enter")
     await playwright_async.expect(ledger).to_be_visible()
@@ -712,18 +747,9 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     # report, and exact text must match one element.
     await playwright_async.expect(ledger.get_by_text("Click-Through", exact=True)).to_be_visible()
 
-    # The subtitle names the report without repeating a stat card's count.
-    subtitle = page.locator("main h1 + p")
-    text = await subtitle.inner_text()
-    assert "issue groups" not in text and "issues" not in text, text
-    assert "occurrences" not in text, text
-    issues = await (await page.request.get(f"{base}/api/scans/{scan_id}/issues")).json()
-    # The date after "started"/"generated" has its own numbers ("Oct 3, 2026"),
-    # which matched a count of 3 on the 3rd of any month. Only the rest of the
-    # subtitle must not repeat a count.
-    words = re.sub(r"\b(started|generated)\b.*$", "", text)
-    for count in (issues["total_unfiltered"], issues["occurrence_counts"]["all_evidence"]):
-        assert not re.search(rf"\b{count}\b", words), (count, text)
+    # No subtitle at all under the heading (2026-10-30), so nothing there
+    # can repeat a count.
+    await playwright_async.expect(page.locator("main h1 + p")).to_have_count(0)
 
 
 async def test_running_scan_shows_factual_pipeline_progress(
@@ -999,10 +1025,11 @@ async def test_every_spa_route_has_an_accurate_document_title(
         (f"/app/scans/{scan_id}/issues", "Accessibility issues"),
         (f"/app/scans/{scan_id}/issues/image:logo_adequate", "Issue evidence"),
         (f"/app/scans/{scan_id}/findings", "Images"),
-        (f"/app/scans/{scan_id}/findings/grouped", "Images, grouped by issue"),
+        (f"/app/scans/{scan_id}/findings/grouped", "Images, grouped by issue type"),
         (f"/app/scans/{scan_id}/a11y", "Rule check issues by WCAG criterion"),
         (f"/app/scans/{scan_id}/a11y/by-rule", "Rule check issues by rule"),
         (f"/app/scans/{scan_id}/compare", "Compare reports"),
+        (f"/app/scans/{scan_id}/compare/changes", "What changed"),
         ("/app/findings/1", "Image details"),
         ("/app/tracking", "Product roadmap"),
         ("/app/about", "About"),
@@ -1216,7 +1243,10 @@ async def test_search_changes_a_setting_from_its_results(
 
         dark = dialog.get_by_role("option", name=re.compile(r"^Theme: Dark"))
         light = dialog.get_by_role("option", name=re.compile(r"^Theme: Light"))
-        await playwright_async.expect(light).to_contain_text("Current setting")
+        device = dialog.get_by_role("option", name=re.compile(r"^Theme: Match device"))
+        # Axcess starts on Match device (DEFAULT_PREFERENCES).
+        await playwright_async.expect(device).to_contain_text("Current setting")
+        await playwright_async.expect(light).not_to_contain_text("Current setting")
         await playwright_async.expect(dark).not_to_contain_text("Current setting")
 
         # Arrow down from the first result (the Settings page) to Dark.
@@ -1241,6 +1271,7 @@ async def test_search_changes_a_setting_from_its_results(
         )
         await playwright_async.expect(page.locator("html")).to_have_attribute("data-theme", "dark")
         await playwright_async.expect(dark).to_contain_text("Current setting")
+        await playwright_async.expect(device).not_to_contain_text("Current setting")
         await playwright_async.expect(light).not_to_contain_text("Current setting")
     finally:
         await page.context.close()

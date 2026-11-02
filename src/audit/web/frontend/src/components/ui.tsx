@@ -4,23 +4,68 @@ import { createElement, forwardRef, useEffect, useId, useRef, useState } from "r
 import { Check, ChevronDown, ChevronRight, ScanEye } from "lucide-react";
 import { Link } from "react-router";
 import { cn } from "../lib/cn";
-import type { Severity, FindingStatus, ScanStatus } from "../api/types";
-import { SCAN_STATUS_LABEL, STATUS_HELP, STATUS_LABEL } from "../lib/terms";
+import type { Severity, FindingStatus, ReviewDecision, ScanStatus } from "../api/types";
+import {
+  REVIEW_DECISION_HELP,
+  REVIEW_DECISION_LABEL,
+  SCAN_STATUS_LABEL,
+  STATUS_HELP,
+  STATUS_LABEL,
+} from "../lib/terms";
 
 /** Severity chip, pairs color + text, so the signal isn't color-only. */
 export function SeverityChip({ value }: { value: Severity }) {
   return <span className={cn("sev-chip", `sev-chip--${value}`)}>{value}</span>;
 }
 
+/** The neutral chip that workflow states share: one look for every state a
+ * person sets, so none of them reads as more urgent than another. */
+const WORKFLOW_CHIP =
+  "inline-flex items-center rounded-xs border border-border bg-surface-muted px-2 py-0.5 text-2xs font-medium text-fg-muted";
+
 /** Status chip that uses neutral surfaces, we DON'T color-code status,
  * because status is intentionally user-workflow, not severity. */
 export function StatusChip({ value }: { value: FindingStatus }) {
   return (
-    <span
-      title={STATUS_HELP[value]}
-      className="inline-flex items-center rounded-xs border border-border bg-surface-muted px-2 py-0.5 text-2xs font-medium text-fg-muted"
-    >
+    <span title={STATUS_HELP[value]} className={WORKFLOW_CHIP}>
       {STATUS_LABEL[value] ?? value.replace(/_/g, " ")}
+    </span>
+  );
+}
+
+/**
+ * What a person decided about an element in the page inspector, as a chip.
+ * The same neutral chip as StatusChip, for the same reason: it is a
+ * person's workflow decision, not a severity, so its three values look
+ * alike and differ by their words alone (the words carry the meaning, never
+ * colour, SC 1.4.1 Use of Color, Level A).
+ */
+export function ReviewDecisionChip({ value }: { value: ReviewDecision | null }) {
+  const key = value ?? "none";
+  return (
+    <span title={REVIEW_DECISION_HELP[key] || undefined} className={WORKFLOW_CHIP}>
+      {REVIEW_DECISION_LABEL[key]}
+    </span>
+  );
+}
+
+/**
+ * How far a person has got checking a page's occurrences in the page
+ * inspector: "Not checked yet", "3 of 19 checked" or "All checked". The
+ * same neutral chip as StatusChip and ReviewDecisionChip: it is a person's
+ * progress, not a severity, so it is not colour-coded. "All checked" adds a
+ * check mark, so a finished page stands out by shape, not only by words,
+ * and in forced colors too (the icon is drawn in the text colour). The
+ * words say the count, so "partly checked" says how much is left.
+ */
+export function CheckedChip({ checked, total }: { checked: number; total: number }) {
+  const done = total > 0 && checked >= total;
+  return (
+    // Its words may wrap, as the Status column's chips beside it do, so the
+    // pages table still fits a 1280 px screen.
+    <span className={cn(WORKFLOW_CHIP, "gap-1")}>
+      {done && <Check className="h-3 w-3 shrink-0" aria-hidden />}
+      {checked <= 0 ? "Not checked yet" : done ? "All checked" : `${checked} of ${total} checked`}
     </span>
   );
 }
@@ -549,8 +594,19 @@ export function Disclosure({
   );
 }
 
-/** Alt-attribute pill (missing / empty / authored), Siteimprove-style tag. */
-export function AltTag({ value }: { value: string | null }) {
+/**
+ * Alt-attribute pill (missing / empty / authored), Siteimprove-style tag.
+ *
+ * Authored alt text is cut to one line by default, for a list whose rows have
+ * a fixed height (the Images page). `wrap` shows all of it instead, over as
+ * many lines as it needs. Use it wherever the row can grow: the alt text is
+ * the evidence being judged, and cut text is shown whole only in a tooltip on
+ * mouse hover, which keyboard and touch users never see (SC 1.4.13 Content on
+ * Hover or Focus, Level AA, paraphrased: hover content must also be reachable
+ * by focus). In a table, unwrapped text also widens its column to the whole
+ * sentence, squeezing the other columns and scrolling the table sideways.
+ */
+export function AltTag({ value, wrap = false }: { value: string | null; wrap?: boolean }) {
   if (value === null) {
     return (
       <span className="inline-flex items-center rounded-xs border border-sev-critical/40 bg-sev-critical-bg px-2 py-0.5 text-2xs font-semibold text-sev-critical">
@@ -566,7 +622,10 @@ export function AltTag({ value }: { value: string | null }) {
     );
   }
   return (
-    <span className="block max-w-full truncate text-xs text-fg" title={value}>
+    <span
+      className={cn("block max-w-full text-xs text-fg", wrap ? "break-words" : "truncate")}
+      title={wrap ? undefined : value}
+    >
       &ldquo;{value}&rdquo;
     </span>
   );
@@ -791,6 +850,14 @@ const TYPEAHEAD_RESET_MS = 500;
  *
  * `stacked` puts the label above rather than beside it, for a filter bar of
  * several controls where inline captions would eat the width the values need.
+ * `stacked="when-narrow"` puts it beside the box when both fit on one line,
+ * and above it when they do not (the row wraps). It follows the width the
+ * control has, not the window's: a control in a narrow column of a wide
+ * window wraps too, which a screen-width breakpoint would get wrong. The
+ * label is the same element in the same place in the reading order either
+ * way; only where it is drawn changes (SC 1.4.10 Reflow, Level AA). Used on
+ * Compare reports (routes/CompareReports.tsx), whose panels can be anything
+ * from about 300 to 1000 pixels wide.
  *
  * `hint` sits between the label and the control and is wired to
  * `aria-describedby`, so the explanation a sighted user reads before choosing
@@ -814,7 +881,7 @@ export function Select({
 }: {
   label: string;
   hideLabel?: boolean;
-  stacked?: boolean;
+  stacked?: boolean | "when-narrow";
   hint?: ReactNode;
   value: string;
   onChange: (value: string) => void;
@@ -951,7 +1018,11 @@ export function Select({
     <div
       className={cn(
         "min-w-0",
-        stacked ? "flex flex-col gap-1" : "inline-flex items-center gap-2",
+        stacked === "when-narrow"
+          ? "inline-flex flex-wrap items-center gap-x-2 gap-y-1"
+          : stacked
+            ? "flex flex-col gap-1"
+            : "inline-flex items-center gap-2",
         className,
       )}
     >
@@ -960,7 +1031,7 @@ export function Select({
         htmlFor={triggerId}
         className={cn(
           "shrink-0 font-semibold text-fg",
-          stacked ? "text-xs text-fg-subtle" : "text-sm",
+          stacked === true ? "text-xs text-fg-subtle" : "text-sm",
           hideLabel && "sr-only",
         )}
       >
@@ -1024,7 +1095,7 @@ export function Select({
           aria-labelledby={labelId}
           hidden={!open}
           onMouseDown={(event) => event.preventDefault()}
-          className="absolute left-0 z-30 mt-1.5 max-h-80 w-max min-w-full max-w-[calc(100vw-2rem)] overflow-auto rounded-xs border border-border bg-surface p-1.5 shadow-raised"
+          className="absolute left-0 z-30 mt-1.5 max-h-80 w-max min-w-full max-w-[calc(100vw-2rem)] overflow-auto rounded-xs border border-border bg-surface-raised p-1.5 shadow-raised"
         >
           {options.map((option, index) => (
             // Keyboard selection lives on the trigger, which keeps focus and
@@ -1129,6 +1200,7 @@ export function PageLink({
   context,
   contextTo,
   backTo,
+  actions = true,
 }: {
   pageId: number;
   /** Report scope required for the in-app inspector route. */
@@ -1155,6 +1227,11 @@ export function PageLink({
   contextTo?: string;
   /** In-app path the inspector's "Back" link returns to. */
   backTo?: string;
+  /**
+   * Show "Open live page · Page details" under the address. A table with an
+   * Actions column turns this off and puts PageActionLinks there instead.
+   */
+  actions?: boolean;
 }) {
   const display = pageTitle?.trim() || pageUrl;
   // Screen-reader-only context, so each link names where it goes by itself:
@@ -1167,7 +1244,8 @@ export function PageLink({
   // repeated elements with the same tag and attributes. So a view of
   // occurrences also gives the occurrence's ID, which is unique and is the
   // name the page's evidence uses for it ("Occurrence 1234"; found by
-  // review).
+  // review). The word was "issue" from 2026-10-26 to 2026-10-28
+  // (docs/plain-language.md, "Why "occurrence" and "issue type"").
   const element = elementName || selector ? shortLocator(elementName || selector || "") : null;
 
   // Build the inspector URL with whatever orientation/selector context the
@@ -1232,31 +1310,86 @@ export function PageLink({
           {pageUrl}
         </div>
       )}
-      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-2xs text-fg-muted">
-        <a
-          href={pageUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex min-h-target items-center underline underline-offset-2 hover:text-fg"
-        >
-          Open live page ↗
-          <span className="sr-only"> of {display} (opens in a new tab)</span>
-        </a>
-        {scanId != null && (
-          <>
+      {actions && (
+        <PageActionLinks
+          pageId={pageId}
+          scanId={scanId}
+          pageUrl={pageUrl}
+          display={display}
+          origin={origin}
+          backTo={backTo}
+          className="mt-1"
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * A page's two links, "Open live page ↗" and "Page details", with words for a
+ * screen reader that name the page. PageLink shows them under the address;
+ * a table with an Actions column shows them there, side by side, as `look`
+ * "actions" (Image details, routes/FindingDetail.tsx).
+ *
+ * `look` "quiet", under the address: small and muted, separated by a dot,
+ * secondary to the address above them. `look` "actions", in an Actions
+ * column: the report link style the Reports table uses for its row actions
+ * (routes/Scans.tsx, "Actions"), so the same kind of column looks and reads
+ * the same on both screens (SC 3.2.4 Consistent Identification, Level AA;
+ * W3C COGA, "Making Content Usable": the same pattern for the same kind of
+ * thing). One component for both, so the links' words and targets stay one.
+ */
+export function PageActionLinks({
+  pageId,
+  scanId,
+  pageUrl,
+  display,
+  origin,
+  backTo,
+  look = "quiet",
+  className,
+}: {
+  pageId: number;
+  scanId?: number;
+  pageUrl: string;
+  /** The page as the screen-reader-only words name it: its title, else its address. */
+  display: string;
+  origin?: string;
+  backTo?: string;
+  look?: "quiet" | "actions";
+  className?: string;
+}) {
+  const link =
+    look === "actions"
+      ? "report-link inline-flex min-h-target items-center whitespace-nowrap px-1 font-semibold"
+      : "inline-flex min-h-target items-center underline underline-offset-2 hover:text-fg";
+  return (
+    <div
+      className={cn(
+        "flex items-center",
+        // In an Actions column the two stay on one line, as Reports' do: the
+        // column takes their width rather than stacking them.
+        look === "actions" ? "gap-2 text-sm" : "flex-wrap gap-x-2 gap-y-0.5 text-2xs text-fg-muted",
+        className,
+      )}
+    >
+      <a href={pageUrl} target="_blank" rel="noopener noreferrer" className={link}>
+        Open live page ↗
+        <span className="sr-only"> of {display} (opens in a new tab)</span>
+      </a>
+      {scanId != null && (
+        <>
+          {look === "quiet" && (
             <span aria-hidden className="text-fg-subtle">
               ·
             </span>
-            <Link
-              to={pageEvidencePath({ scanId, pageId, origin, backTo })}
-              className="inline-flex min-h-target items-center underline underline-offset-2 hover:text-fg"
-            >
-              Page details
-              <span className="sr-only"> for {display}</span>
-            </Link>
-          </>
-        )}
-      </div>
+          )}
+          <Link to={pageEvidencePath({ scanId, pageId, origin, backTo })} className={link}>
+            Page details
+            <span className="sr-only"> for {display}</span>
+          </Link>
+        </>
+      )}
     </div>
   );
 }

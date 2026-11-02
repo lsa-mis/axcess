@@ -1,4 +1,4 @@
-"""Migration 0032: page_a11y_findings accepts the form error check's rows.
+"""Migration 0034: page_a11y_findings accepts the form error check's rows.
 
 Forward, rollback and forward again, keeping every other row and both
 indexes that cover the pipeline column.
@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-MIGRATION = Path(__file__).parents[2] / "src/audit/db/migrations/0032_forms_pipeline"
+MIGRATION = Path(__file__).parents[2] / "src/audit/db/migrations/0034_forms_pipeline"
 
 
 def _page(conn: sqlite3.Connection) -> tuple[int, int]:

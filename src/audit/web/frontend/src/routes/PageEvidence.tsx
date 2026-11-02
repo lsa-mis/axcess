@@ -123,7 +123,7 @@ export default function PageEvidenceRoute() {
 
       <section className="mb-6">
         <h2 className="mb-2.5 text-base font-semibold text-fg">
-          {findings.length === 0 ? "Accessibility checks" : "Occurrences"}
+          {findings.length === 0 ? "Accessibility checks" : "Issue occurrences"}
         </h2>
         {findings.length === 0 ? (
           <Card className="p-4 text-sm text-fg-muted">
@@ -321,7 +321,7 @@ function FindingCard({
           <img
             className="max-h-72 rounded-xs border border-border"
             src={blobUrl(finding.screenshot_hash)}
-            alt="Screenshot of the issue. An outline marks where it was found."
+            alt="Screenshot of the occurrence. An outline marks where it was found."
             loading="lazy"
           />
           <figcaption className="mt-1 flex items-center gap-1.5 text-xs text-fg-muted">

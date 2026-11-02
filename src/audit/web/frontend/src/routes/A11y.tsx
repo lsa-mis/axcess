@@ -147,7 +147,7 @@ export default function A11yRoute() {
           value={coverage.alfa_pages_scanned}
           hint={`of ${coverage.pages_total}`}
         />
-        <StatCard label="Occurrences (axe)" value={coverage.axe_violations_total} />
+        <StatCard label="Issue occurrences (axe)" value={coverage.axe_violations_total} />
         <StatCard label="Failed (Alfa)" value={coverage.alfa_failed_total} />
         <StatCard label={`${REVIEW_TYPE_LABEL.expert_review} (Alfa)`} value={coverage.alfa_cant_tell_total} />
         <StatCard label="Level A" value={rollup.by_level.A} tone="critical" />
@@ -411,7 +411,7 @@ function DrillDownView({
             {!status && <> for this WCAG criterion.</>}
           </TableEmpty>
         ) : (
-          <TableRegion label="Rule check occurrences table" paged={paged}>
+          <TableRegion label="Rule check occurrences table">
             <Table
               caption={`Rule check occurrences for ${wcagSc ? `WCAG ${wcagSc}` : "best practice"}, most serious impact first`}
             >

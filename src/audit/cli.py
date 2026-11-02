@@ -18,6 +18,7 @@ from audit.crawler.orchestrator import CrawlConfig, CrawlSummary, run_crawl
 from audit.db.schema import connect
 from audit.exports.collector import collect_scan
 from audit.exports.csv_export import render_csv
+from audit.exports.its_review import render_its_review
 from audit.exports.jira_export import render_jira_csv
 from audit.exports.json_export import render_json
 from audit.exports.markdown_report import render_markdown
@@ -690,13 +691,14 @@ def synthesize(
         conn.close()
 
 
-_EXPORT_FORMATS = ("csv", "json", "jira", "markdown", "xlsx")
+_EXPORT_FORMATS = ("csv", "json", "jira", "markdown", "xlsx", "its")
 _EXPORT_EXT = {
     "csv": "csv",
     "json": "json",
     "jira": "jira.csv",
     "markdown": "md",
     "xlsx": "xlsx",
+    "its": "its.xlsx",
 }
 
 
@@ -708,7 +710,7 @@ def export(
     ] = None,
     fmt: Annotated[
         str,
-        typer.Option("--format", "-f", help="csv | json | jira | markdown | xlsx"),
+        typer.Option("--format", "-f", help="csv | json | jira | markdown | xlsx | its"),
     ] = "csv",
     output: Annotated[
         Path | None,
@@ -762,6 +764,9 @@ def export(
             # xlsx builds its issue table live from the open connection;
             # the blob store lets it embed per-finding evidence screenshots.
             rendered = render_xlsx(scan, conn=conn, blob_store=BlobStore(get_settings().blob_dir))
+        elif fmt_lower == "its":
+            # The U-M ITS Accessibility Team's template, filled in.
+            rendered = render_its_review(scan, conn=conn)
         else:
             rendered = {
                 "csv": render_csv,

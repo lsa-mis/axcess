@@ -1,12 +1,20 @@
 import { parseServerTime } from "../../lib/serverTime";
 
-/** "1 issue", "7 issues". */
+/** "1 occurrence", "7 occurrences". */
 export function count(n: number, noun: string): string {
   return `${n.toLocaleString()} ${plural(n, noun)}`;
 }
 
 export function plural(n: number, noun: string): string {
   return n === 1 ? noun : `${noun}s`;
+}
+
+/**
+ * "1 issue type", "6 issue types": both words change with the count, so
+ * `count` cannot build it (docs/plain-language.md, Terms).
+ */
+export function countKinds(n: number): string {
+  return `${n.toLocaleString()} ${n === 1 ? "issue type" : "issue types"}`;
 }
 
 /** A signed change as the table prints it: "+141", "−4" (a true minus), "±0". */

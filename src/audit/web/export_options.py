@@ -1,6 +1,6 @@
 """What the report's Export panel knows before anything is downloaded.
 
-The panel offers four files, and choosing one used to be a guess. Nothing
+The panel offers five files, and choosing one used to be a guess. Nothing
 said how large a file would be: a 1,718-page scan's raw findings run to
 about 24 MB while its workbook stays under 1 MB. Nothing said that every
 file would arrive labeled DRAFT because expert review was unfinished, either:
@@ -26,12 +26,12 @@ from pydantic import BaseModel
 
 from audit.web.export_readiness import PublicExportReadiness, public_export_filename
 
-PanelFormat = Literal["xlsx", "audit", "csv", "json"]
+PanelFormat = Literal["xlsx", "its", "audit", "csv", "json"]
 
 #: The files the Export panel offers, in the panel's order. The route also
 #: serves ``markdown`` and ``jira``; the panel does not list them, so they
 #: are not rendered here.
-PANEL_FORMATS: tuple[PanelFormat, ...] = ("xlsx", "audit", "csv", "json")
+PANEL_FORMATS: tuple[PanelFormat, ...] = ("xlsx", "its", "audit", "csv", "json")
 
 
 class ExportFormatOption(BaseModel):

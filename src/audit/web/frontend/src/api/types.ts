@@ -29,9 +29,15 @@ export interface ScanSummary {
    *  content mostly does not exist until something is used. */
   dom_state_count: number;
   finding_count: number;
+  /** The rule checks that checked at least one page, in this order; null
+   *  (or absent, from an older server) when the scan did not record it. */
+  rule_checks?: RuleCheck[] | null;
   started_at: string | null;
   finished_at: string | null;
 }
+
+/** A rule check by its pipeline key (labels: RULE_CHECK_TOOL in lib/terms.ts). */
+export type RuleCheck = "axe" | "alfa";
 
 /** Every public report of one site (normalized seed scope), newest first.
  *  The headline numbers come from `most_recent_completed` only: an
@@ -44,7 +50,19 @@ export interface SiteGroup {
   most_recent_completed: ScanSummary | null;
   /** Unified issue groups in `most_recent_completed`; null when there is none. */
   most_recent_completed_issue_count: number | null;
+  /** Occurrences across those issues (the Issues page's total); null when there is none. */
+  most_recent_completed_occurrence_count: number | null;
   scans: ScanSummary[];
+}
+
+/**
+ * One completed report's counts, from `GET /api/scans/{id}/issue-counts`.
+ * Data names: `issue_count` is rows of the Issues table ("issue types"
+ * on screen); `occurrence_count` is every place they appear ("issues").
+ */
+export interface ScanIssueCounts {
+  issue_count: number;
+  occurrence_count: number;
 }
 
 export interface ScanProgress {
@@ -858,6 +876,11 @@ export interface IssuePage {
   status_summary: Record<string, number>;
   /** Marked scan-time screenshots, one for each locatable captured instance. */
   screenshot_hashes: string[];
+  /** How many of `occurrence_count` a person has checked in the page
+   *  inspector (a problem to report, or a repeat). */
+  checked_count: number;
+  /** Of those, how many are "a problem to report". */
+  reported_count: number;
 }
 
 export interface IssueDetail {
@@ -1088,6 +1111,26 @@ export interface ManualChecksResponse {
   checks: ManualCheck[];
 }
 
+/** What a person decided about an occurrence: a problem to report, or a
+ *  repeat of one already reported. Null means not checked yet. */
+export type ReviewDecision = "report" | "repeat";
+/** A person's review of one occurrence, made in the page inspector. */
+export interface OccurrenceReview {
+  decision: ReviewDecision | null;
+  /** Issue notes, as stored: trimmed, with email addresses, phone numbers
+   *  and sign-in tokens removed. */
+  notes: string;
+  updated_at: string;
+}
+/** ``PUT /api/scans/{id}/pages/{page}/review``: every occurrence on one element. */
+export interface OccurrenceReviewRequest {
+  a11y_finding_ids: number[];
+  page_image_ids: number[];
+  decision: ReviewDecision | null;
+  /** Null sets the decision only, keeping each occurrence's notes. */
+  notes: string | null;
+}
+
 export interface PageEvidence {
   page: {
     id: number;
@@ -1128,6 +1171,8 @@ export interface PageEvidence {
     /** For an AI review finding, the element it is about, named the way a
      *  browser can count it (the 3rd of 12 `a`). Null when not worked out. */
     element_place: ElementPlace | null;
+    /** A person's review of this occurrence; null until one is saved. */
+    review: OccurrenceReview | null;
   }>;
   image_occurrences: Array<{
     occurrence_id: number;
@@ -1150,6 +1195,8 @@ export interface PageEvidence {
     /** In a <noscript> or <template> element, which the saved copy on
      *  screen does not show (usually a lazy-loaded image's backup copy). */
     hidden_in_copy: boolean;
+    /** A person's review of this image on this page; null until one is saved. */
+    review: OccurrenceReview | null;
   }>;
 }
 
@@ -1372,7 +1419,7 @@ export interface SiteHistory {
 }
 
 /** A file the report's Export panel offers (``export_options.PANEL_FORMATS``). */
-export type ExportFormat = "xlsx" | "audit" | "csv" | "json";
+export type ExportFormat = "xlsx" | "its" | "audit" | "csv" | "json";
 export interface ExportFormatOption {
   format: ExportFormat;
   /** The downloaded file's name, ``_DRAFT`` marker included. */

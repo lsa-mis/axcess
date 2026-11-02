@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App";
 import { getPreferences } from "./hooks/usePreferences";
 import { applyPreferences } from "./lib/preferences";
+import { installPaneHistory } from "./lib/framed";
 import "./styles.css";
 
 // Settings (theme, text size, contrast...) go onto <html> before the first
@@ -38,6 +39,11 @@ const queryClient = new QueryClient({
 
 const root = document.getElementById("root");
 if (!root) throw new Error("Missing #root container");
+
+// As a panel of Compare reports, this document keeps its own history, so the
+// router must find it in place before it is created (lib/framed.ts says why).
+// Outside a panel this does nothing.
+installPaneHistory();
 
 // Match Vite's `base`, production bundle is served under /app/, dev is /.
 const BASENAME = import.meta.env.PROD ? "/app" : "/";

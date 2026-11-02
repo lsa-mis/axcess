@@ -387,15 +387,26 @@ async def test_settings_are_closed_accordions_and_start_is_top_right(
         page.get_by_role("heading", name="Advanced settings", exact=True)
     ).to_have_count(0)
 
-    # One click opens a group; its fieldset keeps the group's name.
-    limits = page.get_by_role("button", name="Limits and rule check tool", exact=True)
+    # One click opens a group; its fieldset keeps the group's name. The page
+    # limits are under Pages to scan and the rule check tool under Checks
+    # (2026-11-02); there is no "Limits and rule check tool" group.
+    await playwright_async.expect(
+        page.get_by_role("button", name="Limits and rule check tool", exact=True)
+    ).to_have_count(0)
+    limits = page.get_by_role("button", name="Pages to scan", exact=True)
     await limits.click()
     await playwright_async.expect(limits).to_have_attribute("aria-expanded", "true")
+    coverage = page.get_by_role("group", name="Pages to scan", exact=True)
+    await playwright_async.expect(coverage).to_be_visible()
     await playwright_async.expect(
-        page.get_by_role("group", name="Limits and rule check tool", exact=True)
+        coverage.get_by_role("spinbutton", name="Maximum pages")
     ).to_be_visible()
+    checks_button = page.get_by_role("button", name="Checks", exact=True)
+    await checks_button.click()
     await playwright_async.expect(
-        page.get_by_role("group", name="Rule check tool", exact=True)
+        page.get_by_role("group", name="Checks", exact=True).get_by_role(
+            "group", name="Rule check tool", exact=True
+        )
     ).to_be_visible()
     await playwright_async.expect(
         page.get_by_role("spinbutton", name="Maximum pages")
@@ -487,7 +498,7 @@ async def test_limits_are_validated_by_name_with_their_range(
     await playwright_async.expect(box).to_have_value(value)
     # Folded before Start: the failed submit opens the group again, so the
     # alert's link lands on a visible field.
-    limits = page.get_by_role("button", name="Limits and rule check tool", exact=True)
+    limits = page.get_by_role("button", name="Pages to scan", exact=True)
     await limits.click()
     await playwright_async.expect(box).to_be_hidden()
 
@@ -559,7 +570,7 @@ async def test_depth_dots_are_gone(live_server: tuple[str, int], new_page: Any) 
     page = await new_page(viewport={"width": 1280, "height": 900})
     await page.goto(f"{base}/app/scans/new", wait_until="networkidle")
     await _open_groups(page)
-    limits = page.get_by_role("group", name="Limits and rule check tool", exact=True)
+    limits = page.get_by_role("group", name="Pages to scan", exact=True)
     await playwright_async.expect(
         limits.get_by_role("spinbutton", name="Maximum link depth")
     ).to_be_visible()
@@ -633,7 +644,7 @@ async def test_rail_names_every_switch_on_the_side_its_state_says(
         """Every check switch sits on the rail's side its state says."""
         on = set(await _rail_items(summary, "Checks that run"))
         off = set(await _rail_items(summary, "Not included"))
-        for group in ("Checks", "AI checks on this computer"):
+        for group in ("Checks", "Local AI checks"):
             switches = page.get_by_role("group", name=group, exact=True).get_by_role("switch")
             for index in range(await switches.count()):
                 switch = switches.nth(index)

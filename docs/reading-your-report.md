@@ -25,11 +25,11 @@ it never proves [WCAG](glossary.md#wcag) conformance or legal compliance.
 
 ![Diagram of the three report groups in the How sure column. Mostly sure holds rule-engine failures from axe-core and Siteimprove Alfa, including problems found after clicking or after a configured search; confirm them on the page, fix, and rescan. Not sure holds browser checks, the keyboard trap check, motion checks, text in images whose alt text is missing or does not match, AI checks, and Alfa "cannot tell" results; a person tests and records a decision. For information holds images whose alt text already matches and older records kept for history; no action is needed.](images/diagrams/report-groups.png)
 
-Each [issue](glossary.md#issue) lands in one report group, based on the check
-that found it and its result. Only rule-engine failures are marked Mostly sure;
-anything a person has to judge is marked Not sure. The app shows the report
-group in the Issues table's **How sure** column: how sure Axcess is that the
-issue is a real problem.
+Each [issue type](glossary.md#issue-type) lands in one report group,
+based on the check that found it and its result. Only rule-engine failures are
+marked Mostly sure; anything a person has to judge is marked Not sure. The app
+shows the report group in the Issues table's **How sure** column: how sure
+Axcess is that the issue type is a real problem.
 
 | Report group | What to do |
 | --- | --- |
@@ -39,19 +39,20 @@ issue is a real problem.
 
 ## Find a problem and fix it (for developers)
 
-On the **Issues** tab, select an issue's name to open its
-[issue page](#the-full-evidence-record). From there:
+On the **Issues** tab, select the name of a
+[issue type](glossary.md#issue-type) to open
+[its page](#the-full-evidence-record). From there:
 
 | You need | Where it is |
 | --- | --- |
-| The page URL | **Pages with this issue** lists each page's title and URL. In the inspector, **Open live page** opens the page on the real site. |
+| The page URL | **Pages with this issue type** lists each page's title and URL. In the inspector, **Open live page** opens the page on the real site. |
 | The element locator and code | In the inspector, **Evidence from the scan**, under the page, lists the first three occurrences with their element locator (CSS selector) and element code (HTML). A page's **Page details**, linked from its screenshots view, lists every occurrence on that page, with **Element locator (CSS selector), for developers**. |
 | An image with text in it | For an [image of text](glossary.md#image-of-text), the page's **Page details** lists the image under **Images on this page**, with **Open the image** (the image's address), any alt text, and the text read from it. Search your code or content system for that image address. |
-| A screenshot | The **Screenshots** column in **Pages with this issue** links to a screenshot of each occurrence, when the scan took one. An outline marks where the occurrence was found. Rule check (Alfa) results have no screenshots, because Alfa runs in a separate browser. |
-| The page inspector | Select a page title in **Pages with this issue**. The inspector opens the page's **Saved copy** (or the **Live page**, if the scan saved no copy) with scripts off, and red outlines mark the flagged elements. The arrow buttons beside the count, such as "Flagged element 2 of 5", step to the previous or next flagged element; the one you are on has a thicker blue outline on yellow. The **Page code (DOM)** tab shows the page code, with the same buttons. |
+| A screenshot | The **Screenshots** column in **Pages with this issue type** links to a screenshot of each occurrence, when the scan took one. An outline marks where the occurrence was found. Rule check (Alfa) results have no screenshots, because Alfa runs in a separate browser. |
+| The page inspector | Select a page title in **Pages with this issue type**. The inspector opens the page's **Saved copy** (or the **Live page**, if the scan saved no copy) with scripts off, and red outlines mark the flagged elements. The arrow buttons beside the count, such as "Flagged element 2 of 5", step to the previous or next flagged element; the one you are on has a thicker blue outline on yellow. The **Page code (DOM)** tab shows the page code, with the same buttons. |
 
-**Issue guidance**, at the top right of the issue page, opens the issue's
-guidance in one dialog, with every section open: **What it is**, **How to fix
+**Issue guidance**, at the top right of the page for an issue type, opens
+its guidance in one dialog, with every section open: **What it is**, **How to fix
 it** with **Done when**, and **Why it matters, and how to test the fix** with
 **How to test the fix**. For Not sure, **How to confirm it** comes second,
 and the fix is under **How it should work** in **Why it matters, and how to
@@ -59,20 +60,57 @@ fix it if it is confirmed**.
 
 **About this rule** sits in **What it is**, beside the confidence, and
 appears only when the rule has its own documentation. Start there when the
-issue has no written guidance.
+issue type has no written guidance.
 
 To reproduce a problem that appears only after a click:
 
 1. Open the page's **Page details**, which groups occurrences under headings
    such as After clicking “Menu”. The heading names only the last control
    used.
-2. Select the page title in **Pages with this issue** to open the inspector.
-   It opens on the page state where the issue appears. The **Page state**
-   list offers At page load and each state where the issue appears. An entry
-   such as After clicking “Menu” → “Settings”: 2 occurrences lists every
+2. Select the page title in **Pages with this issue type** to open the
+   inspector. It opens on the page state where the occurrences appear. The
+   **Page state** list offers At page load and each state where they appear.
+   An entry such as After clicking “Menu” → “Settings”: 2 occurrences lists every
    control in order and shows the page code the scan saved.
 3. On the live page, use each control in that order, then find the element by
    its element locator (CSS selector).
+
+### Record your review of an element
+
+Beside the element facts in the inspector, **Your review:** shows what you
+decided about the element the arrow buttons are on, as a badge such as **Not
+checked yet**, and the first two lines of its **Issue notes**. It is there when the inspector was opened for one issue (from **Pages
+with this issue**), on the **Saved copy** tab.
+
+1. Step to the element with the arrow buttons.
+2. Select **Review this element**.
+3. Under **Checked by a person**, choose **Checked: a problem to report**, or
+   **Checked: a repeat of one already reported** if it is the same problem as
+   one you already reported. **Not checked yet** takes a choice back.
+4. Write **Issue notes** for the vendor: where it is, what is wrong, and what
+   to fix. If the element has no saved notes, the box starts with notes
+   suggested from the scan, in the order the ITS team writes them: the page
+   state (After clicking “Menu”), the element's text and what it is, the
+   problem, and any specifics from the check (such as a contrast ratio and
+   its colors). Read and edit them before you save. Saved notes are never
+   replaced by a suggestion.
+5. Select **Save review**. The dialog closes and the panel says **Saved.**
+
+When the rest of the elements are repeats, such as the same menu again,
+report the first one, step through the others with the arrow buttons, then
+choose **Mark 9 not checked as repeats** (the number is how many). Every
+flagged element in the page state on screen with no review yet becomes
+**Checked: a repeat of one already reported**, in one press. Elements
+already checked, and every note, are left as they are. It is offered once
+an element of the issue has been reported, since a repeat is a repeat of
+one already reported. **Undo 9 repeats** then takes exactly those back to
+**Not checked yet**.
+
+The review covers every occurrence of the issue on that element, in the page
+state on screen. **Close without saving** (or Escape) keeps your choice and
+notes while you stay on the page, and **Your review:** then says **Not saved
+yet** beside the badge. Leaving the page or reloading it discards them. Any report can
+be reviewed, finished or not, except a protected report.
 
 ### If you have a ticket or a workbook row, not the app
 
@@ -81,13 +119,15 @@ Reports stay where Axcess ran the scan, so you may get only an export.
 - **Jira ticket**: **Page** is the page address. **Target selector** and
   **Failing HTML** locate the element, **To reproduce** names any control to
   use first, and **Rule docs**, when present, links to the rule's
-  documentation. These tickets have no fix steps, so ask for the issue's
-  **Issue guidance** from the app, or use the workbook. A ticket for an image
-  of text instead lists **Image URL**, **OCR text**, any **Suggested fix**,
-  and each page under **Occurrences**.
+  documentation. These tickets have no fix steps, so ask for the
+  **Issue guidance** for that issue type from the app, or use the workbook.
+  A ticket for an image of text instead lists **Image URL**, **OCR text**, any
+  **Suggested fix**, and each page under **Occurrences** (each place the image
+  appears).
 - **The "Review locally" link** in a ticket opens only where the Axcess app
   that made the export is running, usually the analyst's computer.
-- **Workbook issue tab**: **Where** names the page, **Element** gives the
+- **Workbook issue tab** (the workbook calls an issue type an Issue, and
+  each of the first 40 has its own tab): **Where** names the page, **Element** gives the
   element locator (or the image address), and **User action** says what to
   open first. **What to fix** and **How to reproduce** are described under
   [Exports](#exports). The **Page References** sheet links every affected
@@ -99,14 +139,14 @@ the inspector's **Page state** list shows.
 
 ## The report summary
 
-A finished report opens on **Issues**. Under the title, "Based on the report
-generated" gives the date and time the scan finished, and the **Export
-report** menu sits at the top right. Three numbers above the table count:
+A finished report opens on **Issues**, with the **Export report** menu at
+the top right. **Reports** shows when each scan ran, in its **Scanned**
+column. Three numbers above the table count:
 
 | Number | What it counts |
 | --- | --- |
-| Kinds of issue found | Rows in the Issues table, across all three report groups. |
-| Places issues appear (occurrences) | [Occurrences](glossary.md#occurrence) in every issue, including Not sure and For information, so it is not a count of confirmed problems. |
+| Issue types | Rows in the Issues table, across all three report groups. |
+| Issue occurrences | Every [occurrence](glossary.md#occurrence): one place a problem appears, such as one element on one page. It counts every report group, including Not sure and For information, so it is not a count of confirmed problems. |
 | Pages visited | Every page the scan recorded, including pages that answered with an error and most pages that failed to load. |
 
 Two lines under **Pages visited** say more about it:
@@ -137,21 +177,22 @@ does not list.
 
 ## The Issues tab
 
-The summary line counts issues and occurrences. The table's columns, in
-order:
+Each row of the table is one [issue type](glossary.md#issue-type). The
+summary counts issue types, then occurrences. The table's columns, in order:
 
 | Column | What it shows |
 | --- | --- |
-| Issue | The issue's name. Select it to open the issue page. |
+| Issue type | Its name. Select it to open its page. |
 | How sure | The report group: Mostly sure, Not sure, or For information. |
-| Where it shows | Where the issue shows up: At page load, After clicking, or In an image (see [Where it shows](glossary.md#where-it-shows)). One issue can show both At page load and After clicking. |
-| WCAG | The [success criterion](glossary.md#success-criterion) number with its [level](glossary.md#conformance-level) badge, or "Best practice" (see [best practice](glossary.md#best-practice)). |
 | Priority | High, Medium, or Low (see [priority](glossary.md#priority)); "Does not apply" for rows marked For information. |
-| Pages | How many pages have it, linked to the list of those pages. |
-| Occurrences | How many places it appears. |
+| Issue occurrences | How many [occurrences](glossary.md#occurrence) of this issue type the scan found: how many places it appears. |
+| Affected pages | How many pages have it. The issue type's page lists them. |
+| Where it shows | Where this issue type shows up: At page load, After clicking, or In an image (see [Where it shows](glossary.md#where-it-shows)). One issue type can show both At page load and After clicking. |
+| Check | Which check found it, such as Rule check (axe), Rule check (Alfa), Keyboard check, or Image text check. |
+| WCAG criterion | The [success criterion](glossary.md#success-criterion) number with its [level](glossary.md#conformance-level) badge, or "Best practice" (see [best practice](glossary.md#best-practice)). |
 
-Search with the **Search issues** box (an issue name or a WCAG number, such as
-1.4.3). The **Filter** menu narrows the table by **Level** (Level A, AA, AAA,
+Search with the **Search issues** box (the name of an issue type, or a WCAG
+number such as 1.4.3). The **Filter** menu narrows the table by **Level** (Level A, AA, AAA,
 or Best practice), **How sure** (a report group), and **Where it shows**. When you choose
 one **Where it shows** value, a link to its detailed view appears above the table:
 **Rule check issues by WCAG criterion**, or **Images** for In an image.
@@ -159,27 +200,32 @@ one **Where it shows** value, a link to its detailed view appears above the tabl
 The table opens in the recommended order: Mostly sure, then Not sure, then
 For information, each by priority. Select a column header to sort by that
 column, and **Back to recommended order** to return. As the filters change, a
-screen reader hears how many issues show and how many of each type, such as
-"12 of 40 issues shown, filtered: Mostly sure 3, Not sure 7, For information 2".
+screen reader hears how many issue types show and how many of them are in
+each report group, such as "12 of 40 issue types shown, filtered: Mostly
+sure 3, Not sure 7, For information 2".
 
-Each issue's title opens its [issue page](#the-full-evidence-record).
+The name of each issue type opens [its page](#the-full-evidence-record).
 **Delete report**, at the end of the Issues page, is described under
 [Delete a report](#delete-a-report).
 
 ## The full evidence record
 
-The issue page is the full evidence record for one issue. It leads with
-**Pages with this issue**: page title (opens the inspector), Page URL,
-Occurrences, Screenshots, and Status. Its header names the WCAG criterion and
-the issue's report group, in the same words as the Issues table's **How sure** column.
+The page for an issue type is its full evidence record. It leads with
+**Pages with this issue type**: page title (opens the inspector), Page URL,
+Issue occurrences, Screenshots, Status, and **Checked by a person**: how
+many of the page's occurrences a person has checked in the inspector, as
+**Not checked yet**, **2 of 6 checked** or **All checked**. Both kinds of
+checked count (a problem to report, and a repeat). Sort by it to bring the
+pages not checked yet to the top. Its header names the WCAG criterion and
+the report group, in the same words as the Issues table's **How sure**
+column.
 
 **Issue guidance**, at the top right, opens a dialog with every section open:
 
-1. **What it is** (**What Axcess found** for an issue marked For information): the type and
+1. **What it is** (**What Axcess found** for an issue type marked For information): the type and
    what it means, the confidence (high, medium, or low), and **About this
-   rule**, then "Why it was flagged", a one-line summary such as
-   "Deterministic axe-core rule failure; verify after remediation." Then the
-   facts (WCAG level, Priority, Occurrences across its pages, and who it
+   rule**, then "Why it was flagged", a one-line summary of the evidence.
+   Then the facts (WCAG level, Priority, Occurrences across its pages, and who it
    affects) and the rule's description.
 2. **How to fix it**, with **Done when** (for Not sure, **How to confirm
    it**).
@@ -225,35 +271,41 @@ Every occurrence starts with the [status](glossary.md#status) New. Then use:
 The last four need a reason, which the app saves in the occurrence's history
 but does not show again.
 
-You cannot change status in the Issues table or on the issue page. Instead:
+You cannot change status in the Issues table or on the page for an issue
+type. Instead:
 
 1. On the report's **Issues** tab, open the **Filter** menu and choose one
    **Where it shows** value.
 2. For page results, select **Rule check issues by WCAG criterion** (use
    **Group by rule** to change a whole rule). For image results, select
-   **Images** (use **Group by issue** to change a whole issue).
+   **Images** (use **Group by issue type** to change every image of one
+   issue type at once).
 
 Fixed, Accepted risk, and Not a problem results move to the written report's
-Appendix A and leave the Jira CSV; a Not sure issue marked In progress
-becomes an issue card. Status never changes a result's report group.
+Appendix A and leave the Jira CSV. In a Not sure issue type, the
+occurrences marked In progress become an issue card. Status never changes a result's
+report group.
 
 ## Exports
 
 The **Export report** menu, at the top right of the Issues tab, offers the
-first four formats. The last two need the API (`/api/scans/{id}/export/jira`
+first five formats. The last two need the API (`/api/scans/{id}/export/jira`
 or `.../export/markdown`) or the command line (`audit export -f jira` or
 `-f markdown`).
 
 | Format | Best for | Main sheets or columns |
 | --- | --- | --- |
-| Issue list with fixes (Excel, `.xlsx`) | Assigning and tracking fixes | A summary, an issue index, a tab per issue, and supporting sheets (listed below the table) |
+| Issue types with fixes (Excel, `.xlsx`) | Assigning and tracking fixes | A summary, an index with one row per issue type, a tab for each issue type, and supporting sheets (listed below the table) |
+| ITS technical review (Excel, `.its.xlsx`) | Handing the report to the University of Michigan Information and Technology Services (ITS) Accessibility Team | The team's own Technical Review form, with only the elements checked as a problem to report (described below the table) |
 | Written report (Markdown, `.audit.md`) | A narrative report for stakeholders | Sections from an executive summary to the appendices (listed below the table) |
 | Occurrence list (CSV, `.csv`) | Filtering in a spreadsheet | One row per occurrence (per page for an image), 24 columns such as `severity`, `status`, `wcag_criterion`, `page_url`, `target_selector`, and `revealed_by` |
 | All report data (JSON, `.json`) | Scripts and other tools | `scan`, `findings` (image results), and `a11y_findings` (everything else) |
-| Jira CSV (`.jira.csv`) | Importing tickets | Summary, Description, Priority, Issue Type, Labels, Component; one row per occurrence not marked Fixed, Accepted risk, or Not a problem |
+| Jira CSV (`.jira.csv`) | Importing tickets | Summary, Description, Priority, Issue Type, Labels, Component; one row per occurrence not marked Fixed, Accepted risk, or Not a problem (one row per image for an image of text) |
 | Markdown evidence inventory (`.md`) | A raw list of every result | Every result with its status, including Not sure results |
 
-Sheets in the issue list with fixes (Excel):
+Sheets in the Excel workbook (Issue types with fixes). The workbook uses
+its own words: it calls an issue type an Issue, and each occurrence an
+Instance.
 
 - Summary
 - Issues Overview: ID, Issue, How sure, Severity, Conformance Level,
@@ -269,6 +321,38 @@ Sheets in the issue list with fixes (Excel):
 - Test Tracking
 - Manual Review Evidence
 
+The ITS technical review is the ITS Accessibility Team's own form, kept
+exactly as the team wrote it: its sheets, formulas, lists, styles and
+reference tables are not changed. It lists only what a person reported: the
+elements reviewed in the page inspector as **Checked: a problem to report**
+(see [Record your review of an element](#record-your-review-of-an-element)).
+Elements not checked yet, and repeats of a problem already reported, are left
+out. Axcess fills in:
+
+| Sheet | What Axcess fills in |
+| --- | --- |
+| Coversheet | Scan date, site name and main web address, and the checks used. If an expert review records a purpose, it goes in Background. Tester(s), Login info and the other prompts are left for a person to answer. |
+| Test Plan | Each place a reported element is, one row each: a page, or a page state reached by clicking (such as "Home, after clicking “Menu”"). URL or location gives the clicks, then the web address. The Description column is left empty for you. These rows are the choices in the Test column. |
+| Summary | A short summary of the scan, in the Narrative Summary box. The form's own counts are left as they are. |
+| Findings Issues | One row for each reported element. Issue notes are the notes you saved in Axcess, as written; an element saved without notes gets the issue's name. Test is the page or page state it is in. An issue's rows sit together. Category, Criterion, Impact and "Most affects" use the team's own wording. |
+| Reference, Reference Impact | Nothing. They stay as the team wrote them. |
+
+If nothing has been reported yet, Findings Issues is empty and the summary
+says how to report elements.
+
+The form has room for 48 rows. If more elements are reported, Axcess still
+lists them all, but the rows after row 49 have no drop-down lists or formatting, and the
+Summary counts leave them out. The summary text says when this happens.
+In Excel, the Summary's percentages show `#NAME?`, because the form uses a
+Google Sheets function (`DIVIDE`). They work in Google Sheets.
+
+Severity is a first estimate. Axcess turns each issue's automated impact into
+the form's scale: Critical becomes 4 Critical, Serious becomes 3 Major, and
+Moderate or Minor becomes 2 Minor. An issue with no WCAG criterion becomes
+1 Best practice. Nothing is marked 5 Blocker, because that depends on which
+tasks matter most on the site, and only a person can judge that. Check each
+issue and its severity before you share the form.
+
 Written report sections:
 
 - Executive summary
@@ -283,16 +367,18 @@ Written report sections:
 
 Notes on the exports:
 
-- **What to fix** exists only in the workbook. It copies the issue's fix
-  steps (**How to fix it** in the app, or **How it should work** for Needs
-  review) onto the row for every occurrence. It is general advice, not advice
-  for that one occurrence, and it is blank when the rule has none. **How to
+- **What to fix** exists only in the workbook. It copies the fix steps for
+  the issue type (**How to fix it** in the app, or **How it should work**
+  for Not sure) onto the row for every occurrence. It is general advice, not
+  advice for that one occurrence, and it is blank when the rule has none. **How to
   reproduce** holds the steps to test the fix, not steps to reproduce.
-- Written report issue cards cover open Mostly sure issues tied to a WCAG
-  criterion and Not sure issues marked In progress; other open results,
-  including other Not sure results, go to Appendix B. The workbook
-  Summary's "Issues to fix" counts follow these cards, so they can differ
-  from the Issues table.
+- Each written report issue card is one issue type: an open Mostly sure
+  issue type tied to a WCAG criterion, or the occurrences marked In
+  progress in a Not sure issue type. Other open results, including other
+  Not sure results, go to Appendix B. The written report counts each
+  occurrence as a finding. The workbook Summary's "Issues to fix" counts these
+  cards, and its "Occurrences to fix" counts the occurrences in them, so both
+  can differ from the Issues table.
 - The workbook's Issues Overview has a How sure column, like the Issues
   table. The CSV, the JSON, and the Jira CSV have no report group column.
   The Jira CSV also includes Not sure and
@@ -312,25 +398,48 @@ draft. The command-line `audit export` adds no draft label.
 ## Compare reports after a fix
 
 After you publish fixes, scan the same site again with the same checks.
-**Compare reports** compares this report with the latest earlier completed
-report for the same start address, counting issues, not occurrences.
+**Compare reports** shows two reports of the same start address side by
+side, each in its own panel. There are two ways to open it:
+
+- From a report, choose the **Compare reports** tab. The report opens in the
+  first panel. The second panel is empty and lists the site's other
+  completed reports, newest first. Choose one to show it there.
+- On **Reports**, open a site and choose **Compare with** on one of its
+  scans, then the report to compare it with. Both panels open at once.
+
+- Each panel is that report's Issues page, and works on its own. Open an
+  issue, filter, or search in one panel, and the other stays as it is.
+- **Go back**, above a panel, steps back in that panel only. The browser's
+  Back button undoes a change of report instead.
+- To show a different report in a panel, choose it in the panel's
+  **Report** list, then choose **Show this report**. A report cannot be in
+  both panels.
+- **Close**, at the top of the second panel, takes its report out and
+  empties the panel again, so you can choose another. The browser's Back
+  button brings it back.
+- Wide screens show the panels side by side. Narrow screens show them one
+  above the other.
+
+**See what changed between these reports** opens **What changed**. It marks
+each [issue type](glossary.md#issue-type), not each occurrence, as one of these:
 
 | Change | What it means |
 | --- | --- |
 | New | Found in this report but not in the earlier one. Check whether it is a new barrier. |
-| No longer found | Found in the earlier report but not found again in this one. That is not proof of a fix. Check the page yourself before you mark the issue Fixed. |
+| No longer found | Found in the earlier report but not found again in this one. That is not proof of a fix. Check the page yourself before you mark its occurrences Fixed. |
 | Still found | Found in both reports. Its number of occurrences can still go up or down. |
 
-The page opens with **Trend over time**, which plots every completed scan of
+What changed opens with **Trend over time**, which plots every completed scan of
 the site. Select a point in the trend, or use **Show as data table**, to open
 that scan's issues or compare it with this report. Below it are the three
-numbers; each is also a filter for the table of issues under them, which
-shows the occurrences before and after and the change between them. **What do
+numbers; each is also a filter for the table under them. The table has one
+row for each issue type, and shows its number of occurrences before and after
+and the change between them. **What do
 these terms mean?**, at the top right, explains each word.
 
 When the checks, settings, or pages scanned differ between the two reports,
-the page says so above the numbers: an issue can look new or no longer found
-only because of what was scanned. Read **What was checked in each report**, at
+the page says so above the numbers: an issue type can look new or no longer
+found only because of what was scanned. Read **What was checked in each report**, at
 the end of the page, before you trust a result. See
 [rescan comparison](glossary.md#rescan-comparison).
 
@@ -345,8 +454,9 @@ Progress Over Perfection: each barrier you fix helps someone use the site today.
 2. **Then Not sure.** Check each one on the page and record a decision.
 3. **Batch shared fixes.** Axcess groups by check, not by
    [root cause](glossary.md#root-cause), so look for one template or component
-   behind an issue on many pages, and route the fix to whoever owns it.
-4. **Rescan** and check your work in **Compare reports**.
+   behind an issue type on many pages, and route the fix to whoever owns
+   it.
+4. **Rescan** and check your work in **Compare reports** and **What changed**.
 
 ## Delete a report
 

@@ -251,6 +251,10 @@ class IssueLocation:
     # instance a reader can reproduce and one they cannot: "open the Account
     # menu, then look at the field" versus "load the page".
     revealed_by: str | None = None
+    # The occurrence's own record and review status, for exports that list
+    # one row per occurrence (the ITS technical review).
+    finding_id: int | None = None
+    status: str | None = None
 
 
 @dataclass(frozen=True)
@@ -1412,20 +1416,41 @@ def _card_from_row(
     )
 
 
+# Ids bound per query when every occurrence is loaded; well under SQLite's
+# bound-parameter limit.
+_LOCATION_BATCH = 500
+
+
 def _locations_for_row(
     conn: sqlite3.Connection,
     row: Any,
+    *,
+    limit: int | None = MAX_LOCATIONS_PER_CARD,
 ) -> tuple[list[IssueLocation], int]:
     """Pull element-level "exactly where" pointers for a row's findings.
 
     DOM pipelines (axe/semantic/keyboard) live in ``page_a11y_findings``;
     image findings live in ``findings`` joined out to their pages. Capped
-    at ``MAX_LOCATIONS_PER_CARD`` with the remainder reported as overflow.
+    at ``limit`` (``MAX_LOCATIONS_PER_CARD`` by default) with the remainder
+    reported as overflow; ``limit=None`` loads every occurrence.
     """
     ids = list(row.finding_ids)
     if not ids:
         return [], 0
-    sample = ids[:MAX_LOCATIONS_PER_CARD]
+    sample = ids if limit is None else ids[:limit]
+    locations: list[IssueLocation] = []
+    for start in range(0, len(sample), _LOCATION_BATCH):
+        locations.extend(_locations_for_ids(conn, row, sample[start : start + _LOCATION_BATCH]))
+    overflow = max(0, len(ids) - len(locations))
+    return locations, overflow
+
+
+def _locations_for_ids(
+    conn: sqlite3.Connection,
+    row: Any,
+    sample: list[int],
+) -> list[IssueLocation]:
+    """Load the locations of one batch of a row's finding ids."""
     placeholders = ",".join("?" for _ in sample)
     locations: list[IssueLocation] = []
 
@@ -1434,7 +1459,8 @@ def _locations_for_row(
             f"""
             SELECT p.url_normalized AS page_url, p.title AS page_title,
                    a.target_selector, a.html_snippet, a.failure_summary, a.revealed_by,
-                   a.pipeline, a.engine_outcome, a.engine_evidence_json
+                   a.pipeline, a.engine_outcome, a.engine_evidence_json,
+                   a.id AS finding_id, a.status AS status
               FROM page_a11y_findings a
               JOIN pages p ON p.id = a.page_id
              WHERE a.id IN ({placeholders})
@@ -1466,6 +1492,8 @@ def _locations_for_row(
                     )
                     or None,
                     revealed_by=str(r["revealed_by"] or "") or None,
+                    finding_id=int(r["finding_id"]),
+                    status=str(r["status"] or "new"),
                 )
             )
     else:  # image pipeline
@@ -1473,7 +1501,8 @@ def _locations_for_row(
             f"""
             SELECT p.url_normalized AS page_url, p.title AS page_title,
                    i.src_url_canonical AS image_url,
-                   pi.above_fold AS above_fold, pi.position AS position
+                   pi.above_fold AS above_fold, pi.position AS position,
+                   f.id AS finding_id, f.status AS status
               FROM findings f
               JOIN images i ON i.id = f.image_id
               JOIN page_images pi ON pi.image_id = i.id
@@ -1496,16 +1525,24 @@ def _locations_for_row(
                     selector=None,
                     image_url=str(r["image_url"] or "") or None,
                     detail=None,
+                    finding_id=int(r["finding_id"]),
+                    status=str(r["status"] or "new"),
                 )
             )
-
-    overflow = max(0, len(ids) - len(locations))
-    return locations, overflow
+    return locations
 
 
-def issue_locations(conn: sqlite3.Connection, row: Any) -> tuple[list[IssueLocation], int]:
-    """Expose retained locations for review-only rows that have no issue card."""
-    return _locations_for_row(conn, row)
+def issue_locations(
+    conn: sqlite3.Connection,
+    row: Any,
+    *,
+    limit: int | None = MAX_LOCATIONS_PER_CARD,
+) -> tuple[list[IssueLocation], int]:
+    """Expose retained locations for review-only rows that have no issue card.
+
+    ``limit=None`` returns every occurrence (the ITS review lists each one).
+    """
+    return _locations_for_row(conn, row, limit=limit)
 
 
 # ---------------------------------------------------------------------------

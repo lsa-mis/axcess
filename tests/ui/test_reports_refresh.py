@@ -40,6 +40,7 @@ def _first_scan_running() -> list[dict[str, Any]]:
             "most_recent": scan,
             "most_recent_completed": None,
             "most_recent_completed_issue_count": None,
+            "most_recent_completed_occurrence_count": None,
             "scans": [scan],
         }
     ]
@@ -88,6 +89,5 @@ async def test_a_first_scan_shows_on_reports_while_it_runs(
     site = table.get_by_role("button", name=re.compile("first.example"))
     await playwright_async.expect(site).to_be_visible(timeout=3000)
     await site.click()
-    scans = page.get_by_role("table", name=re.compile("All scans for first.example"))
-    report = scans.get_by_role("row").filter(has=page.get_by_role("link", name="Report #99"))
+    report = table.get_by_role("row").filter(has=page.get_by_role("link", name="Report #99"))
     await playwright_async.expect(report.get_by_label("Scan status: Scanning")).to_be_visible()

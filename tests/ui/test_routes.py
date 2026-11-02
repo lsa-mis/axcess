@@ -1464,7 +1464,25 @@ def test_export_xlsx_route(client: TestClient, seeded_db: tuple[object, object, 
     assert load_workbook(BytesIO(resp.content)).sheetnames[0] == "Summary"
 
 
-@pytest.mark.parametrize("fmt", ("csv", "json", "jira", "markdown", "audit", "xlsx"))
+def test_export_its_route(client: TestClient, seeded_db: tuple[object, object, int]) -> None:
+    """The ITS technical review downloads as the team's own template, filled in."""
+    db_path, _, scan_id = seeded_db
+    _complete_evaluation(client, db_path, scan_id)
+    resp = client.get(f"/api/scans/{scan_id}/export/its")
+    assert resp.status_code == 200
+    assert "spreadsheetml.sheet" in resp.headers["content-type"]
+    assert f'filename="scan_{scan_id}.its.xlsx"' in resp.headers["content-disposition"]
+    assert load_workbook(BytesIO(resp.content)).sheetnames == [
+        "Coversheet",
+        "Test Plan",
+        "Summary",
+        "Findings Issues",
+        "Reference",
+        "Reference Impact",
+    ]
+
+
+@pytest.mark.parametrize("fmt", ("csv", "json", "jira", "markdown", "audit", "xlsx", "its"))
 def test_incomplete_evaluation_export_requires_explicit_draft_acknowledgement(
     client: TestClient,
     seeded_db: tuple[object, object, int],
@@ -1479,7 +1497,7 @@ def test_incomplete_evaluation_export_requires_explicit_draft_acknowledgement(
     assert "draft=acknowledged" in response.json()["detail"]
 
 
-@pytest.mark.parametrize("fmt", ("csv", "json", "jira", "markdown", "audit", "xlsx"))
+@pytest.mark.parametrize("fmt", ("csv", "json", "jira", "markdown", "audit", "xlsx", "its"))
 def test_acknowledged_draft_export_uses_draft_filename_and_visible_label(
     client: TestClient,
     seeded_db: tuple[object, object, int],
@@ -1503,7 +1521,7 @@ def test_acknowledged_draft_export_uses_draft_filename_and_visible_label(
         assert notice["draft"] is True
         assert notice["evaluation_status"] == "draft"
         assert notice["label"] == "DRAFT, INCOMPLETE ACCESSIBILITY EVALUATION"
-    elif fmt == "xlsx":
+    elif fmt in {"xlsx", "its"}:
         workbook = load_workbook(BytesIO(response.content))
         assert workbook.sheetnames[0] == "DRAFT NOTICE"
         assert workbook["DRAFT NOTICE"]["A1"].value == (

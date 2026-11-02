@@ -50,6 +50,20 @@ _NAMES = {
     "Escape",
     "Tab",
     "Shift",
+    # Month names, in dates such as "Report #24, October 3, 2026" (the
+    # report picker on Compare reports, in the reader's locale).
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
 }
 
 # Named terms the interface capitalizes wherever they appear, as whole
@@ -63,6 +77,10 @@ _PHRASES = (
     "Rule check",  # check name: Rule check (axe), Rule check (Alfa)
     "Page inspector",  # the tool's name
     "Click-Through",  # the feature's one name, lib/labels.ts CLICK_THROUGH
+    # The organization and team the ITS technical review export is for
+    # (ExportMenu.tsx); both are proper names.
+    "University of Michigan Information and Technology Services",
+    "Accessibility Team",
 )
 
 _WORD = re.compile("[A-Za-z][A-Za-z'\u2019-]*")
@@ -150,8 +168,7 @@ async def _controls(page: Any) -> list[dict[str, str]]:
 _SCAN_GROUPS = (
     "Pages to scan",
     "Checks",
-    "AI checks on this computer",
-    "Limits and rule check tool",
+    "Local AI checks",
     "Speed and browser window",
 )
 
@@ -187,6 +204,7 @@ async def _labels_on(new_page: Any, url: str, *, open_groups: bool = False) -> l
         "/app/scans/{scan_id}",
         "/app/scans/{scan_id}/issues",
         "/app/scans/{scan_id}/compare",
+        "/app/scans/{scan_id}/compare/changes",
         "/app/tracking",
         "/app/about",
         "/app/settings",

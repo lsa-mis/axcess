@@ -20,12 +20,12 @@ import { CLICK_THROUGH_STATES, clickThroughStates } from "../lib/labels";
 function SummaryStat({
   label,
   value,
-  details,
+  details = [],
   className,
 }: {
   label: string;
   value: number;
-  details: { text: string; flag?: boolean }[];
+  details?: { text: string; flag?: boolean }[];
   className?: string;
 }) {
   return (
@@ -46,65 +46,82 @@ function SummaryStat({
 /**
  * What the old Overview tab said about a completed report, above its table.
  *
- * The report opens on Issues now, so the numbers and the coverage disclosure
- * that used to take a page of their own sit over the table instead: one row
- * of stat cards, then an accordion whose first row says how many checks ran.
- * The full ledger is behind that row, because what a scan did and did not check is something a
- * reader goes to on purpose, not something every visit should scroll past.
+ * The report opens on Issues now, so the numbers that used to take a page of
+ * their own sit over the table instead, as one row of stat cards.
  *
- * ``rows`` is the unfiltered issue list (the per-method "Found" lines count
- * it); undefined while it loads, which the ledger already handles.
- *
- * ``notes`` are the page's other closed explanations (what the table's
- * labels mean), as ``ReportNote`` rows. They join the
- * coverage row in one accordion, so the report's context reads as one short
- * list of things to open rather than loose sentences between the numbers
- * and the table.
+ * The notes that explain the report ("What was checked", what the labels
+ * mean) are not here: they sit under the table (see ReportCoverageNote).
  */
 export function ReportSummary({
   scan,
   issueGroups,
   occurrences,
-  rows,
-  notes,
 }: {
   scan: ScanDetail;
   issueGroups: number;
   occurrences: number;
-  rows: IssueRow[] | undefined;
-  notes?: ReactNode;
 }) {
-  const ran = methodsRan(scan.methods_used).length;
   return (
     <>
       {scan.blocked && <BlockedScanNotice scanId={scan.id} blocked={scan.blocked} />}
-      {/* Three numbers, main point first: how many issues, how many places
-          they appear, then how much of the site was scanned to find them.
-          The first version read left to right as the scan ran (pages, then
-          occurrences, then issues), and a coworker testing it misread it in
-          three ways: "errors" as accessibility errors, "Occurrences found"
-          as the issue count, and "Issues found" as a part of that count.
-          Leading with what the reader came for is the first rule of the U.S.
-          Federal Plain Language Guidelines, and the issue count now sits
-          next to the table whose rows it counts.
+      {/* Three numbers: how many issue types (the rows of the table below),
+          how many issue occurrences (every place a problem shows up), then
+          how much of the site was scanned to find them. The developer set
+          this order and these names on 2026-10-30 ("Issue types" first,
+          "Issue occurrences" second), the same order as the Reports table's
+          columns, so one report reads the same way on both screens (SC 3.2.4
+          Consistent Identification, Level AA). The paragraphs below are the
+          history before that. On the ITS export branch (2026-10-15) the
+          places came first, because an evaluator reviews element by element
+          and each occurrence becomes a row of the ITS technical review; the
+          2026-10-30 order replaced it on every screen. The first version
+          read left to right as the scan ran (pages, then occurrences, then
+          issues), and a coworker testing it misread it in three ways:
+          "errors" as accessibility errors, "Occurrences found" as the issue
+          count, and "Issues found" as a part of that count. Leading with
+          what the reader came for is the first rule of the U.S. Federal
+          Plain Language Guidelines.
 
-          The labels carry the difference between the two issue numbers, not
-          the lines under them, because a reader scanning the numbers reads
-          the label and skips the rest: "Kinds of issue found" for the rows,
-          "Places issues appear (occurrences)" for every place one shows up.
-          The developer chose both. "Issues found" over the first said
-          nothing about kinds, and "Places they appear" leaned on the label
-          before it. The coworker asked to call the second "Issues found",
-          and the developer suggested "Issues appear"; both were rejected:
-          the terms table in docs/plain-language.md makes an issue one kind of
-          problem (one row) and an occurrence one place it appears, so one
-          word for both numbers would put "166 issues" over a 12-row table
-          (W3C COGA, "Making Content Usable": the same word for the same thing).
-          The plain phrase comes first and the product term in parentheses
-          (Interface language rule 3), which also ties the number to the
-          table's Occurrences column. "Types of issues" was rejected too:
-          the terms table already calls Mostly sure, Not sure and For
-          information the three types of issue.
+          The labels carry the difference between the two numbers, because a
+          reader scanning the numbers reads the label and skips the rest:
+          "Issue types" for the rows of the table below, "Issue occurrences"
+          for every place a problem shows up. Each label is the same word as
+          the table's row name ("Issue type") or its matching column ("Issue
+          occurrences"), so one thing
+          keeps one name (W3C COGA, "Making Content Usable",
+          https://www.w3.org/TR/coga-usable/: the same word for the same
+          thing; SC 3.2.4 Consistent Identification, Level AA).
+
+          No line under these two. "Each one is an element on a page" and
+          "One per row in the table below" were there, and user testing
+          (2026-10-28) found them noise; the developer removed them. What
+          each number counts is still said in words everyone can reach:
+          "What the labels mean" under the table defines an issue type and an
+          occurrence, and the Issue occurrences column's hint does too (SC 3.1.3
+          Unusual Words, Level AAA). "Pages visited" keeps its lines: they
+          are facts (page states reached, pages that failed), not
+          definitions.
+
+          On 2026-10-30 the developer renamed them again, everywhere: "issue
+          type" for a row (it was "kind of issue") and "Issue occurrences" for
+          the places, with issue types first. See docs/plain-language.md.
+
+          History, short. Until 2026-10-26 the pair was "Kinds of issue
+          found" (the rows, first) and "Places issues appear (occurrences)".
+          On 2026-10-26 the developer renamed the places "issues" ("Issues
+          found", first), because the coworker read each place as an issue
+          and "occurrence" is an advanced word. On 2026-10-28 user testing
+          with Siteimprove users, who know Siteimprove's pair of "issues" (a
+          rule) and "occurrences" (each place), led the developer to bring
+          back "occurrence" for the places, and keep "kind of issue" for a
+          row, with the places count leading. The research and the reasons
+          are in docs/plain-language.md, "Why "occurrence" and "issue type"".
+          "Kinds of issues" was chosen over "Types of issues" then, because
+          the "How sure" values were once called the three types of issue
+          and "Issue Type" is a field in the Jira export. Neither holds the
+          reader back now: the How sure values have not been called types
+          since, and the Jira export's "Issue Type" is Jira's own field
+          (always "Bug"), which a reader sees only inside Jira.
 
           The page states opened by clicking are a line under the pages, not a
           fourth number: they say how much was scanned, like the pages, not
@@ -145,20 +162,17 @@ export function ReportSummary({
           the space inside it: 32px above (with the header's margin) and
           below it, 48px between columns on a wide screen (32px on a narrow
           one) and 32px between rows, against 8px from a number to its name
-          and 4px between the lines under it, which read as one unit. Three
-          across from 640px; below that the two issue numbers share a row,
-          as the pair they are, and the pages take the row under them, so
-          nothing is squeezed at 320px (SC 1.4.10 Reflow, Level AA). */}
+          and 4px between the lines under "Pages visited", which read as one
+          unit. Three
+          across from 640px; below that the two problem numbers (Issue types
+          and Issue occurrences) share a row, as the pair they are, and the
+          pages take the row under them, so nothing is squeezed at 320px (SC
+          1.4.10 Reflow, Level AA). */}
       <dl className="mt-10 mb-5 grid grid-cols-2 gap-x-8 gap-y-8 sm:grid-cols-3 lg:gap-x-12">
+        <SummaryStat label={issueGroups === 1 ? "Issue type" : "Issue types"} value={issueGroups} />
         <SummaryStat
-          label={issueGroups === 1 ? "Kind of issue found" : "Kinds of issue found"}
-          value={issueGroups}
-          details={[{ text: "One per row in the table below" }]}
-        />
-        <SummaryStat
-          label="Places issues appear (occurrences)"
+          label={occurrences === 1 ? "Issue occurrence" : "Issue occurrences"}
           value={occurrences}
-          details={[{ text: "Each one is an element on a page" }]}
         />
         <SummaryStat
           label="Pages visited"
@@ -184,37 +198,45 @@ export function ReportSummary({
           ]}
         />
       </dl>
-
-      {/* What was checked leads the notes: whether the scan checked
-          something comes before what its labels mean. The count stays on
-          the closed row, so the fact is on screen without opening anything.
-
-          The notes come after the numbers, not before them. Putting them
-          first was considered and rejected: the numbers are what the report
-          found, and leading with the main point is the first rule of the
-          U.S. Federal Plain Language Guidelines; two closed rows above them
-          would start every visit with things to open. Each note sits by
-          what it explains instead: "What was checked" (how many checks ran)
-          qualifies the numbers just above it, and what the labels mean
-          explains the table just below it. The count of checks that ran
-          stays visible on the closed row, so nobody reads the numbers
-          without the limitation beside them. Reading order for a screen
-          reader is the same: heading, numbers, notes, table. */}
-      <ReportNotes className="mt-8">
-        <ReportNote
-          id="report-coverage"
-          title="What was checked"
-          meta={
-            <span className="tabular-nums">
-              {ran} of {scan.methods_used.length} checks ran
-            </span>
-          }
-        >
-          <MethodCoverageLedger scanId={scan.id} methods={scan.methods_used} rows={rows} embedded />
-        </ReportNote>
-        {notes}
-      </ReportNotes>
     </>
+  );
+}
+
+/**
+ * "What was checked", as a closed row of ``ReportNotes``, with how many
+ * checks ran on the row itself. ``rows`` is the unfiltered issue list (the
+ * per-check "Found" lines count it); undefined while it loads, which the
+ * ledger already handles.
+ *
+ * Where it sits (Issues page): under the table, with what the labels mean,
+ * since user testing (2026-10-28). Testers wanted the table to follow the
+ * numbers with nothing to step over, and asked for both notes to move
+ * down; the developer chose to move them all the way, count included.
+ *
+ * The tradeoff, told to the developer before building it: the notes were
+ * above the table so that nobody read the numbers without the limit beside
+ * them ("6 of 7 checks ran"). Keeping that count by the numbers was offered
+ * and set aside. What still holds: the count stays visible on the closed
+ * row, without opening anything; the empty table says that some checks may
+ * not have run and points down to this row; and the order for a screen
+ * reader is heading, numbers, table, notes, the same as on screen. Never
+ * drop the count from the row to make it shorter (AGENTS.md, Interface
+ * language rule 4).
+ */
+export function ReportCoverageNote({ scan, rows }: { scan: ScanDetail; rows: IssueRow[] | undefined }) {
+  const ran = methodsRan(scan.methods_used).length;
+  return (
+    <ReportNote
+      id="report-coverage"
+      title="What was checked"
+      meta={
+        <span className="tabular-nums">
+          {ran} of {scan.methods_used.length} checks ran
+        </span>
+      }
+    >
+      <MethodCoverageLedger scanId={scan.id} methods={scan.methods_used} rows={rows} embedded />
+    </ReportNote>
   );
 }
 

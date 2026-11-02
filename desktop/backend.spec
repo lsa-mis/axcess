@@ -10,6 +10,7 @@ audit_source = source / "audit"
 datas = [
     (str(audit_source / "db" / "migrations"), "audit/db/migrations"),
     (str(audit_source / "rules"), "audit/rules"),
+    (str(audit_source / "exports" / "templates"), "audit/exports/templates"),
     (str(audit_source / "analyzer" / "vlm" / "prompts"), "audit/analyzer/vlm/prompts"),
     (str(audit_source / "web" / "frontend" / "dist"), "audit/web/frontend/dist"),
     (str(audit_source / "web" / "frontend" / "public"), "audit/web/frontend/public"),

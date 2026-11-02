@@ -12,7 +12,7 @@ import { useScanQuery } from "../hooks/useScanQuery";
 export const ISSUE_SCREENSHOTS_VIEW = "Issue screenshots";
 
 /**
- * The screenshots of each occurrence of one issue on one page
+ * The screenshots of each occurrence of one issue type on one page
  * (``/scans/:id/issues/:key/pages/:pageId/screenshots``).
  *
  * The pages table links here from its screenshots column. This is a page
@@ -54,12 +54,12 @@ export default function IssuePageScreenshotsRoute() {
       <EmptyState
         title="Screenshots not found"
         message={
-          "This page does not have this issue in this report. The issue may have been fixed, " +
+          "This page does not have this issue type in this report. It may have been fixed, " +
           "or the link may be out of date."
         }
         action={
           <LinkButton to={pagesPath} variant="primary">
-            Back to pages with this issue
+            Back to pages with this issue type
           </LinkButton>
         }
       />

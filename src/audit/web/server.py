@@ -50,7 +50,7 @@ from pydantic import (
 from starlette.background import BackgroundTask
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from audit import __version__, coverage_matrix, evaluation
+from audit import __version__, coverage_matrix, evaluation, occurrence_reviews
 from audit.analyzer.alfa import AlfaAnalyzer, AlfaResult, chromium_executable_path
 from audit.analyzer.alfa import availability as alfa_availability
 from audit.analyzer.axe import AxeAnalyzer
@@ -70,6 +70,7 @@ from audit.db.schema import connect
 from audit.exports.audit_report import render_audit_report
 from audit.exports.collector import ExportScan, collect_scan
 from audit.exports.csv_export import render_csv
+from audit.exports.its_review import render_its_review
 from audit.exports.jira_export import render_jira_csv
 from audit.exports.json_export import render_json
 from audit.exports.markdown_report import render_markdown
@@ -157,6 +158,33 @@ _SEVERITY_OPTIONS = ("critical", "major", "minor", "info")
 _DESTRUCTIVE_TRANSITIONS = {"accepted_risk", "false_positive", "remediated"}
 _PAGE_SIZE = 50
 _CONTENT_HASH_RE = re.compile(r"^[0-9a-f]{64}$")
+
+
+class OccurrenceReviewRequest(BaseModel):
+    """A person's review of the occurrences on one circled element."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    a11y_finding_ids: list[int] = Field(
+        default_factory=list, max_length=occurrence_reviews.MAX_OCCURRENCES_PER_SAVE
+    )
+    page_image_ids: list[int] = Field(
+        default_factory=list, max_length=occurrence_reviews.MAX_OCCURRENCES_PER_SAVE
+    )
+    #: None: not checked yet. "report": checked, a problem to report.
+    #: "repeat": checked, a repeat of one already reported.
+    decision: occurrence_reviews.Decision | None
+    #: Leave out (or null) to set the decision only and keep each
+    #: occurrence's notes, as "Mark … as repeats" does.
+    notes: str | None = Field(default=None, max_length=occurrence_reviews.MAX_NOTES_LENGTH)
+
+
+class OccurrenceReviewResponse(BaseModel):
+    """The review as stored: notes are trimmed and redacted."""
+
+    decision: occurrence_reviews.Decision | None
+    notes: str
+    updated_at: str
 
 
 class LocalLoginScanRequest(BaseModel):
@@ -494,13 +522,15 @@ _EXPORT_RENDERERS: dict[str, Any] = {
     "json": render_json,
     "jira": render_jira_csv,
     "markdown": render_markdown,
-    # `audit` and `xlsx` are rendered via a special-case branch in the route
-    # handler because they need the live `conn` (not just the collector
+    # `audit`, `xlsx` and `its` are rendered via a special-case branch in the
+    # route handler because they need the live `conn` (not just the collector
     # result) to build their issue tables. The entries here exist only so
     # the format-validation check (`fmt in _EXPORT_RENDERERS`) accepts them;
     # the values are unused for those formats.
     "audit": render_audit_report,
     "xlsx": render_xlsx,
+    # The U-M ITS Accessibility Team's Technical Review template, filled in.
+    "its": render_its_review,
 }
 _EXPORT_MEDIA_TYPES = {
     "csv": "text/csv; charset=utf-8",
@@ -509,6 +539,7 @@ _EXPORT_MEDIA_TYPES = {
     "markdown": "text/markdown; charset=utf-8",
     "audit": "text/markdown; charset=utf-8",
     "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "its": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 }
 _EXPORT_EXTENSIONS = {
     "csv": "csv",
@@ -517,6 +548,7 @@ _EXPORT_EXTENSIONS = {
     "markdown": "md",
     "audit": "audit.md",
     "xlsx": "xlsx",
+    "its": "its.xlsx",
 }
 
 _BASE_DIR = Path(__file__).resolve().parent
@@ -1071,6 +1103,26 @@ def create_app(
                 conn, (_scan_row_to_summary(r) for r in _public_scan_rows(conn))
             )
         return JSONResponse([group.model_dump(mode="json") for group in groups])
+
+    @app.get("/api/scans/{scan_id:int}/issue-counts")
+    def api_scan_issue_counts(scan_id: int) -> JSONResponse:
+        """One completed report's two issue counts, for the Reports list.
+
+        Fetched when a site's list of scans is opened, not with ``/api/sites``:
+        counting means building the issue list, and the site list is fetched
+        every few seconds while a scan runs.
+        """
+        from audit.web import sites
+
+        with get_conn() as conn:
+            scan = _load_scan_or_404(conn, scan_id)
+            if scan["status"] != "completed":
+                raise HTTPException(
+                    status_code=409,
+                    detail="Issues are counted only for a scan that finished.",
+                )
+            counts = sites.report_counts(conn, scan_id)
+        return JSONResponse(counts.model_dump())
 
     @app.get("/api/scans/{scan_id:int}")
     def api_scan_detail(scan_id: int) -> JSONResponse:
@@ -2054,6 +2106,51 @@ def create_app(
             raise HTTPException(status_code=404, detail="Page is not part of this report")
         return JSONResponse(jsonable_encoder(payload))
 
+    @app.put(
+        "/api/scans/{scan_id:int}/pages/{page_id:int}/review",
+        response_model=OccurrenceReviewResponse,
+    )
+    def api_save_occurrence_review(
+        scan_id: int, page_id: int, body: OccurrenceReviewRequest
+    ) -> OccurrenceReviewResponse:
+        """Save a person's review of the occurrences on one element of this page.
+
+        Any report can be reviewed, finished or not. A protected report is
+        refused: its ordinary tables keep only opaque aliases, and notes
+        about its pages would be the plaintext evidence they keep out.
+        """
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            if _get_protected_scan_compat(conn, scan_id=scan_id) is not None:
+                raise HTTPException(
+                    status_code=403, detail="Reviews are not kept for protected reports."
+                )
+            try:
+                saved = occurrence_reviews.save_review(
+                    conn,
+                    scan_id=scan_id,
+                    page_id=page_id,
+                    a11y_finding_ids=body.a11y_finding_ids,
+                    page_image_ids=body.page_image_ids,
+                    decision=body.decision,
+                    notes=body.notes,
+                )
+            except occurrence_reviews.ReviewScopeError as exc:
+                raise HTTPException(status_code=404, detail=str(exc)) from exc
+            except occurrence_reviews.ReviewError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            except sqlite3.OperationalError as exc:
+                if "occurrence_reviews" not in str(exc) and "decision" not in str(exc):
+                    raise
+                raise HTTPException(
+                    status_code=503,
+                    detail="Database migrations are incomplete. Restart Axcess, or run "
+                    "`make migrate`, and try again.",
+                ) from exc
+        return OccurrenceReviewResponse(
+            decision=saved.decision, notes=saved.notes, updated_at=saved.updated_at
+        )
+
     @app.get("/api/scans/{scan_id:int}/pages/{page_id:int}/inspect")
     async def api_page_inspect(
         request: Request,
@@ -2764,6 +2861,8 @@ def create_app(
             # Pass the blob store so the Issues Overview sheet can embed
             # each finding's marked location screenshot as evidence.
             rendered = render_xlsx(scan, conn=conn, blob_store=blob_store)
+        elif fmt == "its":
+            rendered = render_its_review(scan, conn=conn)
         else:
             rendered = _EXPORT_RENDERERS[fmt](scan)
         return label_draft_export(rendered, export_format=fmt, readiness=readiness)
@@ -2808,7 +2907,7 @@ def create_app(
             ),
         ] = None,
     ) -> Response:
-        """Download a scan export as CSV / JSON / Jira CSV / Markdown / Audit."""
+        """Download a scan export as CSV / JSON / Jira CSV / Markdown / Audit / Excel."""
         fmt_lower = fmt.lower()
         if fmt_lower not in _EXPORT_RENDERERS:
             raise HTTPException(status_code=400, detail="Unknown export format")
@@ -3179,7 +3278,8 @@ def _protected_summary(record: Any) -> dict[str, Any]:
 
 _SCANS_PUBLIC_WITH_STATES = (
     "SELECT id, seed_url, status, page_count, finding_count, "
-    "interaction_states_total, started_at, finished_at FROM scans "
+    "interaction_states_total, axe_pages_scanned, alfa_pages_scanned, "
+    "started_at, finished_at FROM scans "
     "WHERE NOT EXISTS (SELECT 1 FROM protected_scans p WHERE p.scan_id = scans.id) "
     "ORDER BY id DESC"
 )
@@ -3191,7 +3291,8 @@ _SCANS_PUBLIC_LEGACY = (
 )
 _SCANS_ALL_WITH_STATES = (
     "SELECT id, seed_url, status, page_count, finding_count, "
-    "interaction_states_total, started_at, finished_at FROM scans ORDER BY id DESC"
+    "interaction_states_total, axe_pages_scanned, alfa_pages_scanned, "
+    "started_at, finished_at FROM scans ORDER BY id DESC"
 )
 _SCANS_ALL_LEGACY = (
     "SELECT id, seed_url, status, page_count, finding_count, "
@@ -3308,9 +3409,24 @@ def _scan_row_to_summary(scan: Any) -> dict[str, Any]:
         # application whose content mostly does not exist until it is used.
         "dom_state_count": int(row.get("interaction_states_total") or 0),
         "finding_count": int(row.get("finding_count") or 0),
+        "rule_checks": _rule_checks_run(row),
         "started_at": _to_iso_string(row.get("started_at")),
         "finished_at": _to_iso_string(row.get("finished_at")),
     }
+
+
+def _rule_checks_run(row: dict[str, Any]) -> list[str] | None:
+    """The rule checks that checked at least one page of this scan, in order.
+
+    From the per-scan page counters, so it says what ran, not what was
+    chosen: a check that was on but never reached a page is left out, as
+    ``_methods_used`` counts it. ``None`` when the row does not carry the
+    counters (a legacy query), so the list can say "Not recorded" rather
+    than claim that nothing ran.
+    """
+    if "axe_pages_scanned" not in row or "alfa_pages_scanned" not in row:
+        return None
+    return [check for check in ("axe", "alfa") if int(row.get(f"{check}_pages_scanned") or 0) > 0]
 
 
 def _to_iso_string(value: Any) -> str | None:

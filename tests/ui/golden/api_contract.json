@@ -14,6 +14,7 @@
         "finished_at": "null|string",
         "id": "integer",
         "page_count": "integer",
+        "rule_checks": ["string"],
         "seed_url": "string",
         "started_at": "string",
         "status": "string"
@@ -32,6 +33,7 @@
           "finished_at": "null|string",
           "id": "integer",
           "page_count": "integer",
+          "rule_checks": [],
           "seed_url": "string",
           "started_at": "string",
           "status": "string"
@@ -45,6 +47,7 @@
               "finished_at": "string",
               "id": "integer",
               "page_count": "integer",
+              "rule_checks": [],
               "seed_url": "string",
               "started_at": "string",
               "status": "string"
@@ -52,6 +55,7 @@
           ]
         },
         "most_recent_completed_issue_count": "integer|null",
+        "most_recent_completed_occurrence_count": "integer|null",
         "scan_count": "integer",
         "scans": [
           {
@@ -60,6 +64,7 @@
             "finished_at": "null|string",
             "id": "integer",
             "page_count": "integer",
+            "rule_checks": ["string"],
             "seed_url": "string",
             "started_at": "string",
             "status": "string"
@@ -105,6 +110,7 @@
       "page_count": "integer",
       "previous_scan_id": "integer",
       "progress": "null",
+      "rule_checks": ["string"],
       "seed_url": "string",
       "started_at": "string",
       "status": "string",
@@ -179,6 +185,7 @@
         "stage": "string",
         "static_pages": "integer"
       },
+      "rule_checks": [],
       "seed_url": "string",
       "started_at": "string",
       "status": "string",
@@ -221,6 +228,7 @@
       "page_count": "integer",
       "previous_scan_id": "null",
       "progress": "null",
+      "rule_checks": [],
       "seed_url": "string",
       "started_at": "string",
       "status": "string",
@@ -263,6 +271,7 @@
       "page_count": "integer",
       "previous_scan_id": "null",
       "progress": "null",
+      "rule_checks": [],
       "seed_url": "string",
       "started_at": "string",
       "status": "string",
@@ -270,6 +279,12 @@
     }
   },
   "GET /api/scans/{scan_id} (unknown scan)": {"status": 404, "content_type": "application/json", "body": {"detail": "string"}},
+  "GET /api/scans/{scan_id}/issue-counts": {
+    "status": 200,
+    "content_type": "application/json",
+    "body": {"issue_count": "integer", "occurrence_count": "integer"}
+  },
+  "GET /api/scans/{scan_id}/issue-counts (running)": {"status": 409, "content_type": "application/json", "body": {"detail": "string"}},
   "GET /api/scans/{scan_id}/issues": {
     "status": 200,
     "content_type": "application/json",
@@ -346,10 +361,12 @@
       "help_url": "string",
       "pages": [
         {
+          "checked_count": "integer",
           "occurrence_count": "integer",
           "page_id": "integer",
           "page_title": "string",
           "page_url": "string",
+          "reported_count": "integer",
           "screenshot_hashes": ["string"],
           "status_summary": {"new": "integer"}
         }
@@ -420,10 +437,12 @@
       "help_url": "null",
       "pages": [
         {
+          "checked_count": "integer",
           "occurrence_count": "integer",
           "page_id": "integer",
           "page_title": "string",
           "page_url": "string",
+          "reported_count": "integer",
           "screenshot_hashes": [],
           "status_summary": {"new": "integer"}
         }
@@ -487,10 +506,12 @@
       "help_url": "string",
       "pages": [
         {
+          "checked_count": "integer",
           "occurrence_count": "integer",
           "page_id": "integer",
           "page_title": "string",
           "page_url": "string",
+          "reported_count": "integer",
           "screenshot_hashes": [],
           "status_summary": {"new": "integer"}
         }
@@ -850,6 +871,7 @@
           "pipeline": "string",
           "revealed_by": "null|string",
           "revealed_state_key": "null|string",
+          "review": {"decision": "string", "notes": "string", "updated_at": "string"},
           "rule_id": "string",
           "screenshot_hash": "null|string",
           "status": "string",
@@ -878,6 +900,7 @@
           "occurrence_id": "integer",
           "ocr_text": "null|string",
           "position": "integer",
+          "review": {"decision": "string", "notes": "string", "updated_at": "string"},
           "src_url_canonical": "string",
           "vlm_classification": "null|string",
           "vlm_rationale": "null|string"

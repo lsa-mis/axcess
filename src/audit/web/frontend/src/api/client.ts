@@ -18,6 +18,8 @@ import type {
   PageInspection,
   DiffReport,
   ExportFormat,
+  OccurrenceReview,
+  OccurrenceReviewRequest,
   ExportOptions,
   FindingDetail,
   FindingsFilter,
@@ -43,6 +45,7 @@ import type {
   ProtectedScanPayload,
   ProtectedScanRecord,
   ScanDetail,
+  ScanIssueCounts,
   ScanSummary,
   SiteGroup,
   ScopePreview,
@@ -201,6 +204,8 @@ export const api = {
   listScans: () => request<ScanSummary[]>("/api/scans"),
   listSites: () => request<SiteGroup[]>("/api/sites"),
   getScan: (id: number) => request<ScanDetail>(`/api/scans/${id}`),
+  /** A completed report's two issue counts (409 for any other status). */
+  getScanIssueCounts: (id: number) => request<ScanIssueCounts>(`/api/scans/${id}/issue-counts`),
   /** A previous scan's settings, to start New scan again from them. */
   getScanSettings: (id: number) => request<ScanSettingsSnapshot>(`/api/scans/${id}/settings`),
   getAlfaCapability: () => request<AlfaCapability>("/api/capabilities/alfa"),
@@ -241,6 +246,12 @@ export const api = {
     request<EvaluationRecord>(`/api/scans/${scanId}/evaluation`),
   updateEvaluation: (scanId: number, payload: Partial<EvaluationRecord>) =>
     request<EvaluationRecord>(`/api/scans/${scanId}/evaluation`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+  /** Save a person's review of the occurrences on one element of a page. */
+  saveOccurrenceReview: (scanId: number, pageId: number, payload: OccurrenceReviewRequest) =>
+    request<OccurrenceReview>(`/api/scans/${scanId}/pages/${pageId}/review`, {
       method: "PUT",
       body: JSON.stringify(payload),
     }),

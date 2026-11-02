@@ -1,0 +1,151 @@
+---
+/**
+ * A numbered list of steps to follow, each in its own panel (`Step`).
+ *
+ * One component for every list of things to do on the site: installing on a
+ * Mac, Windows or Linux, the first scan, and the sign-in scan. They used to
+ * be three looks for one kind of content: numbered panels with a heading for
+ * the first scan, a copy of the same CSS on the sign-in page, and a plain
+ * list with a drawing beside the words for installing. The same kind of
+ * content now always looks the same (SC 3.2.4 Consistent Identification,
+ * Level AA; W3C COGA, "Making Content Usable",
+ * https://www.w3.org/TR/coga-usable/, paraphrased: the same pattern for the
+ * same job), and one place holds the styles. "How Axcess works" keeps its
+ * own plain list on purpose: it explains how a scan works, it is not steps
+ * to follow.
+ *
+ * The number comes from a CSS counter on the <ol>, and the list is a real
+ * ordered list, so a screen reader hears "list, 6 items" and each item's
+ * place without the styles (SC 1.3.1 Info and Relationships, Level A).
+ * Drawings mark a control with the number of the step it belongs to, so
+ * the counter must count from 1 in every list, as it does.
+ */
+---
+
+<ol class="not-content ax-prose steps"><slot /></ol>
+
+<style>
+  .steps {
+    counter-reset: step;
+    display: grid;
+    gap: 1rem;
+    margin: 1.5rem 0;
+    padding: 0;
+    list-style: none;
+  }
+  /* A step is a layout box, not running text: it uses the column's full
+     width, and its words keep the 35em reading width (below). The site's
+     running-text rule (theme.css) holds every <li> to 35em, which put the
+     panels at the column's left edge, narrower than the column. */
+  .steps > :global(li) {
+    position: relative;
+    min-width: 0;
+    max-width: none;
+    padding: 1.25rem 1.25rem 1.25rem 4.25rem;
+    border: 1px solid var(--ax-border);
+    border-radius: 0.75rem;
+    background: var(--ax-surface-subtle);
+  }
+  .steps > :global(li)::before {
+    counter-increment: step;
+    content: counter(step);
+    position: absolute;
+    top: 1.15rem;
+    left: 1.25rem;
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+    background: var(--ax-inverse-bg);
+    color: var(--ax-inverse-fg);
+    font-weight: 700;
+  }
+  .steps :global(.step-heading) {
+    margin: 0 0 0.375rem;
+    color: var(--ax-fg);
+    font-size: 1.1875rem;
+    line-height: 1.3;
+  }
+  /* The words: about 75 characters a line at most (SC 1.4.8 Visual
+     Presentation, Level AAA, asks for 80 or fewer). Under a heading they are
+     the detail, in the muted colour; a step with no heading is the
+     instruction itself, in the text colour. Both are at least 7:1 on the
+     panel (SC 1.4.6 Contrast (Enhanced), Level AAA). */
+  .steps :global(.step-body) {
+    max-width: 35em;
+    color: var(--ax-fg);
+    line-height: 1.6;
+  }
+  .steps :global(.step-headed > .step-body) {
+    color: var(--ax-fg-muted);
+  }
+  .steps :global(.step-body p) {
+    margin: 0;
+  }
+  .steps :global(.step-body p + p) {
+    margin-top: 0.5rem;
+  }
+  .steps :global(code) {
+    overflow-wrap: anywhere;
+    padding: 0.1em 0.35em;
+    border-radius: 0.25rem;
+    background: var(--ax-surface-muted);
+    color: var(--ax-fg);
+    font-family: var(--sl-font-mono);
+    font-size: 0.875em;
+  }
+  /* The picture comes after the words, at every width: the words say all of
+     it, and the picture shows where. Up to 34rem, the width a drawing of a
+     window or dialog is made for, and never wider than the step. Beside the
+     words (as the install steps once had it) a drawing got a 20rem column,
+     where the System Settings drawing fell back to its phone layout and
+     its outline ran into the window's edge, and a screenshot shrank until
+     its words could not be read. Two drawings to compare, before and after,
+     take the step's full width, so they sit side by side. */
+  .steps :global(.step-pic) {
+    max-width: 34rem;
+    margin-top: 0.875rem;
+  }
+  .steps :global(.step-pic:has(.mock-pair)) {
+    max-width: none;
+  }
+  .steps :global(.step-pic > .mock) {
+    margin: 0;
+  }
+  /* A screenshot is never larger than its own size (a small crop blown up
+     would blur). No CSS width: the width attribute sets it, and with height:
+     auto the browser reserves the picture's space before it loads. */
+  .steps :global(.step-shot) {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    border: 1px solid var(--ax-border-strong);
+    border-radius: 0.5rem;
+  }
+  .steps :global(.step-note) {
+    margin-top: 0.875rem;
+  }
+  .steps :global(.tip) {
+    max-width: 35em;
+    padding: 0.5rem 0.75rem;
+    border-inline-start: 4px solid var(--ax-maize);
+    border-radius: 0.25rem;
+    background: var(--ax-surface-muted);
+    color: var(--ax-fg);
+  }
+  /* On a phone the picture also uses the space under the step number: every
+     pixel makes its words easier to read. The words keep their indent. */
+  @media (max-width: 37.5rem) {
+    .steps > :global(li) {
+      padding-left: 3.75rem;
+    }
+    .steps > :global(li)::before {
+      left: 0.875rem;
+    }
+    .steps :global(.step-pic) {
+      margin-left: -2.75rem;
+      max-width: calc(100% + 2.75rem);
+    }
+  }
+</style>

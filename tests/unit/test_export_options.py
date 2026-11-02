@@ -18,6 +18,7 @@ _EXTENSIONS = {
     "markdown": "md",
     "audit": "audit.md",
     "xlsx": "xlsx",
+    "its": "its.xlsx",
 }
 
 
@@ -35,6 +36,7 @@ def test_text_is_measured_in_the_utf8_bytes_the_route_sends() -> None:
 def test_each_panel_format_is_named_and_sized_as_rendered(is_draft: bool, suffix: str) -> None:
     rendered: dict[str, str | bytes] = {
         "xlsx": b"PK" + b"\x00" * 98,
+        "its": b"PK" + b"\x00" * 48,
         "audit": "# Report\n",
         "csv": "a,b\n1,é\n",
         "json": "{}",
@@ -56,6 +58,7 @@ def test_each_panel_format_is_named_and_sized_as_rendered(is_draft: bool, suffix
     assert options.evaluation_status == "in_progress"
     assert [(o.format, o.filename, o.size_bytes) for o in options.formats] == [
         ("xlsx", f"scan_12{suffix}.xlsx", 100),
+        ("its", f"scan_12{suffix}.its.xlsx", 50),
         ("audit", f"scan_12{suffix}.audit.md", 9),
         ("csv", f"scan_12{suffix}.csv", 9),
         ("json", f"scan_12{suffix}.json", 2),
