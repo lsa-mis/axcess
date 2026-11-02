@@ -495,7 +495,12 @@ const COLUMN_LABEL: Record<SortColumn, string> = {
   // rule check. Each row comes from one check (IssueRow.pipeline), so the
   // cell is one name, never a list.
   Check: "Check",
-  WCAG: "WCAG",
+  // "WCAG criterion" (2026-10-30, the developer's choice): the cell holds a
+  // success criterion's number and its level badge, and sorts by the number.
+  // "WCAG level" was proposed and set aside, since the header would then not
+  // name the number; "WCAG criterion and level" was longer than it needed to
+  // be, the badge saying its level by itself.
+  WCAG: "WCAG criterion",
   Priority: "Priority",
   Pages: "Pages",
   Occurrences: "Issue occurrences",
@@ -748,7 +753,9 @@ function IssueTable({
                 hint={columnHint(column)}
               >
                 {column === "WCAG" ? (
-                  <abbr title="Web Content Accessibility Guidelines">WCAG</abbr>
+                  <>
+                    <abbr title="Web Content Accessibility Guidelines">WCAG</abbr> criterion
+                  </>
                 ) : (
                   COLUMN_LABEL[column]
                 )}

@@ -686,7 +686,9 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
     names = [re.sub(r"\s+", " ", text).strip() for text in headers]
     # The Finding type column reads "Where it shows" ("finding" is not an interface word).
     # Check, beside it, names the check that found the row.
-    assert names[:5] == ["Kind of issue", "How sure", "Where it shows", "Check", "WCAG"], names
+    assert names[:5] == ["Issue type", "How sure", "Where it shows", "Check", "WCAG criterion"], (
+        names
+    )
 
     def row(title: str) -> Any:
         return table.locator("tbody tr").filter(

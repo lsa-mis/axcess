@@ -83,7 +83,7 @@ merge.
   occurrences, 122 Pages visited", and Reports has the columns **Issue
   types**, **Issue occurrences**, **Pages**. In the Issues table,
   **Issue occurrences** now comes right after **Priority**, before
-  **Pages**. The Jira export's "Issue Type" field is unchanged: it is
+  **Pages**, and the **WCAG** column is called **WCAG criterion**. The Jira export's "Issue Type" field is unchanged: it is
   Jira's own field.
 - Reports: the "11 sites · 27 scans" line and the **Last scanned** card
   are gone; the first row of the table is the latest site, with **Open

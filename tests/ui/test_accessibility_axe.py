@@ -437,7 +437,7 @@ async def test_issue_card_answers_what_why_fix_and_where(
         [
             "Issue type",
             "How sure",
-            "WCAG",
+            "WCAG criterion",
             "Priority",
             "Issue occurrences",
             "Pages",
