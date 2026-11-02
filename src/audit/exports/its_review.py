@@ -647,7 +647,7 @@ def _fill_summary(
             ws,
             "A4",
             scanned + "No element has been checked and reported yet, so Findings Issues "
-            "is empty. In Axcess, open an issue's pages in the inspector, and choose "
+            "is empty. In Axcess, open an issue type's pages in the inspector, and choose "
             "Checked: a problem to report for each element that is a real problem.",
         )
         return

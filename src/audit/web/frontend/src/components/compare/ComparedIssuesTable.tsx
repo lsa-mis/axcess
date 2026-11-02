@@ -27,7 +27,7 @@ export const COLUMNS = ["Change", "Issue", "WCAG", "Before", "After", "Differenc
 export type SortColumn = (typeof COLUMNS)[number];
 export type SortState = Sort<SortColumn>;
 
-/** New issues first, then what is still there, then what went away. */
+/** New issue types first, then what is still there, then what went away. */
 const CHANGE_RANK: Record<ComparisonChange, number> = { new: 0, remaining: 1, resolved: 2 };
 /**
  * Which way each column sorts first, and the words for its order. Change
@@ -134,11 +134,13 @@ function headerText(column: SortColumn, baselineId?: number, currentId?: number)
   if (column === "After") return currentId ? `After (report #${currentId})` : "After";
   if (column === "Difference") return "Change in occurrences";
   if (column === "WCAG") return "WCAG criterion";
+  // The `Issue` key stays for `?sort=issue_asc`; each row is an issue type.
+  if (column === "Issue") return "Issue type";
   return column;
 }
 
 /**
- * Every compared issue group, in the one table design: search and a Filter
+ * Every compared issue type, in the one table design: search and a Filter
  * menu (its Change group is the same `?change=` the stat cards above set)
  * with the pager beside them, a status line, and sortable columns, laid out
  * like the Issues table so the two read the same way.
@@ -212,7 +214,7 @@ export default function ComparedIssuesTable({
   return (
     <>
       <TableBar
-        pager={<TablePagination label="Compared issues" noun="issues" {...paged} />}
+        pager={<TablePagination label="Compared issues" noun="issue types" {...paged} />}
         footer={<ActiveFilters items={filtered} onClear={onClearFilters} />}
       >
         <TableSearch label="Search issues" value={q} onChange={onQuery} />
@@ -226,16 +228,16 @@ export default function ComparedIssuesTable({
         />
       </TableBar>
       <TableStatus>
-        {describeSort(sort)}. {rows.length} of {counts.all} issues shown.
+        {describeSort(sort)}. {rows.length} of {counts.all} {counts.all === 1 ? "issue type" : "issue types"} shown.
       </TableStatus>
       {rows.length === 0 ? (
         <TableEmpty>
           {counts.all === 0
             ? "Neither scan found any issues."
-            : "No issues match. Clear the filters to see them all."}
+            : "No issue types match. Clear the filters to see them all."}
         </TableEmpty>
       ) : (
-        <TableRegion label="Compared issues" paged={paged}>
+        <TableRegion label="Compared issues">
           <Table caption={`Issues in report #${baselineId} and report #${currentId}. ${describeSort(sort)}.`}>
             <TableHead>
               <tr>
@@ -310,7 +312,7 @@ const ComparedRow = memo(function ComparedRow({
       <RowHeader className="min-w-[14rem] max-w-[28rem]">
         {link ? (
           <Link
-            to={withReturnTrail(link.url.replace(/^\/app(?=\/)/, ""), "Compare reports", backTo)}
+            to={withReturnTrail(link.url.replace(/^\/app(?=\/)/, ""), "What changed", backTo)}
             className="inline-flex min-h-target items-center text-umich-blue underline underline-offset-2 hover:text-umich-blue-600"
           >
             {row.title}

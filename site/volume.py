@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Export aggregate "coverage by volume" figures from the local scan database.
 
-Reads ``data/audit.db`` and writes ``site/data/volume.json`` containing only
+Reads ``data/audit.db`` and writes ``site/src/data/volume.json`` containing only
 totals: occurrences per WCAG criterion, per check, per impact, and per
 coverage method across completed scans. No URLs, page titles, selectors, or
 snippets leave the database, so the snapshot is safe to publish.
@@ -24,7 +24,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 DB = ROOT / "data" / "audit.db"
-OUT = ROOT / "site" / "data" / "volume.json"
+OUT = ROOT / "site" / "src" / "data" / "volume.json"
 sys.path.insert(0, str(ROOT / "src"))
 
 # Plain-language names for rule ids that carry no single success criterion.

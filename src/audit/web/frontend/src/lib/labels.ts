@@ -31,11 +31,11 @@ export function clickThroughStates(count: number): string {
   return `${count.toLocaleString()} ${count === 1 ? CLICK_THROUGH_STATE : CLICK_THROUGH_STATES}`;
 }
 
-/** Which family of checks produced an issue's evidence. Table order. */
+/** Which family of checks produced an issue type's evidence. Table order. */
 export const FINDING_TYPES = ["wcag", "click_through", "alt_text"] as const satisfies readonly FindingType[];
 
 /**
- * Where an issue shows up, as the Issues table's "Where it shows" column
+ * Where an issue type shows up, as the Issues table's "Where it shows" column
  * names it: "At page load", "After clicking", "In an image". The header is a
  * plain question every value answers, like "How sure" beside it. Rejected
  * headers: "Found" (a lone verb, read as "found: yes or no" or a count),
@@ -71,15 +71,15 @@ export const FINDING_TYPE_HELP: Record<FindingType, string> = {
 export const isFindingType = (value: string): value is FindingType =>
   (FINDING_TYPES as readonly string[]).includes(value);
 
-/** How much confidence an issue's evidence carries. Table order. */
+/** How much confidence an issue type's evidence carries. Table order. */
 export const REVIEW_LANES = ["likely_barrier", "expert_review", "informational"] as const satisfies readonly ReviewLane[];
 
-/** The issue types' names: `REVIEW_TYPE_LABEL` from terms.ts, under the name this module used. */
+/** The "How sure" values' names: `REVIEW_TYPE_LABEL` from terms.ts, under the name this module used. */
 export const REVIEW_LANE_LABELS: Record<ReviewLane, string> = REVIEW_TYPE_LABEL;
 
 export const REVIEW_LANE_HELP: Record<ReviewLane, string> = {
   likely_barrier:
-    "A rule check (axe or Alfa) failed. These checks follow fixed rules, so they give the same result every time. Look at the issue on the page, fix it, test the fix, then scan again to see if it is still found.",
+    "A rule check (axe or Alfa) failed. These checks follow fixed rules, so they give the same result every time. Look at each occurrence on the page, fix it, test the fix, then scan again to see if it is still found.",
   expert_review:
     "Axcess found a possible problem, but it cannot be certain. This happens with checks such as the AI review, the browser checks, or a rule check that cannot decide. A person must decide whether it is a real problem before you report it.",
   informational:
@@ -91,30 +91,53 @@ export const REVIEW_LANE_HELP: Record<ReviewLane, string> = {
  * button, not the cells: the button takes focus, so a keyboard user reaches
  * the hint too (in the "Always" hints setting) and a screen reader reads it
  * as the button's description.
+ *
+ * Keyed by the header's visible text (``columnHint`` in routes/Issues.tsx
+ * looks hints up by it). The count column is "Issue occurrences": it read
+ * "Issues" from 2026-10-26 to 2026-10-28, "Occurrences" after user testing
+ * with Siteimprove users, and "Issue occurrences" from 2026-10-30
+ * (docs/plain-language.md, "Why "occurrence" and "issue type""). Its hint
+ * says what an occurrence is,
+ * because the column is where a reader first meets the word, and
+ * "occurrence" is an advanced word (SC 3.1.3 Unusual Words, Level AAA).
  */
 export const ISSUE_COLUMN_HELP = {
-  "How sure": "How sure Axcess is that the issue is a real problem: Mostly sure, Not sure, or For information.",
-  "Where it shows": "Where the issue shows up: at page load, after clicking, or in an image.",
+  "How sure": "How sure Axcess is that this issue type is a real problem: Mostly sure, Not sure, or For information.",
+  "Where it shows": "Where this issue type shows up: at page load, after clicking, or in an image.",
   Priority:
-    "High, Medium, or Low, from the issue's impact rating and how many pages it is on. Rule check (Alfa) issues have no rating, so they count as the lowest. A serious issue on one page can still be Low. Informational issues show Does not apply.",
+    "High, Medium, or Low, from the impact rating of this issue type and how many pages it is on. Issue types from the rule check (Alfa) have no rating, so they count as the lowest. A serious issue type on one page can still be Low. Issue types marked For information show Does not apply.",
   Pages:
-    "Pages with at least one occurrence. An element repeated on many pages, such as a shared menu, counts only on the first page it was found on. An image counts on every page it appears on.",
-  Occurrences:
-    "How many places the issue was found. An element repeated on many pages, such as a shared menu, counts once. An image counts every time it appears.",
+    "Pages with at least one occurrence of this issue type. An element repeated on many pages, such as a shared menu, counts only on the first page it was found on. An image counts on every page it appears on.",
+  "Issue occurrences":
+    "How many occurrences of this issue type were found. An occurrence is one place a problem appears: one element on one page, or in one page state. An element repeated on many pages, such as a shared menu, counts once. An image counts every time it appears.",
+  Check:
+    "Which check found this issue type. Rule check (axe) uses axe-core, made by Deque. Rule check (Alfa) uses Alfa, made by Siteimprove.",
 } as const;
+
+/**
+ * What the Reports list's "Rule check" column holds. It names who makes each
+ * tool, because testers who use Siteimprove asked whether a report came from
+ * axe or from Siteimprove (user testing, 2026-10-28), and "Alfa" alone did
+ * not tell them.
+ */
+export const RULE_CHECK_HELP =
+  "Which rule checks tested pages in this scan: axe (axe-core, made by Deque), Alfa (made by Siteimprove), or both.";
 
 /**
  * What each priority band means. Priority is the impact rating's weight
  * (critical 4 to minor 1; none, as for Rule check (Alfa), counts as 1) times
  * ln(1 + pages), pages where a shared element repeats included, with High at
- * 6 and Medium at 3 (``_priority`` in src/audit/web/issues.py). The table
- * orders by type first, so a band ranks issues of the same type.
+ * 6 and Medium at 3 (``_priority`` in src/audit/web/issues.py). The table's
+ * recommended order groups by "How sure" first, so a band ranks the kinds of
+ * issue in one "How sure" group. The hints said "issues of the same type"
+ * until 2026-10-26; "type" was the old name of "How sure", and a row is now
+ * an issue type (docs/plain-language.md, "Why "occurrence" and "issue type"").
  */
 export const PRIORITY_HELP = {
-  High: "Look at these first among issues of the same type: a high impact rating on many pages, such as a critical problem on 4 or more pages or a moderate one on 20 or more (pages a shared element repeats on count too).",
+  High: "Look at these first among issue types with the same How sure value: a high impact rating on many pages, such as a critical problem on 4 or more pages or a moderate one on 20 or more (pages a shared element repeats on count too).",
   Medium:
-    "Look at these after High issues of the same type. Priority combines the impact rating with how many pages have it.",
-  Low: "Look at these last among issues of the same type. Low can still be serious: a critical problem on 1 page is Low, so open the issue before you skip it.",
+    "Look at these after the High ones with the same How sure value. Priority combines the impact rating with how many pages have it.",
+  Low: "Look at these last among issue types with the same How sure value. Low can still be serious: a critical problem on 1 page is Low, so open it before you skip it.",
 } as const;
 
 export const isReviewLane = (value: string): value is ReviewLane =>

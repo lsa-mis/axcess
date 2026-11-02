@@ -5,7 +5,7 @@ export const CHANGES: ComparisonChange[] = ["new", "resolved", "remaining"];
 
 /**
  * The words for each change. "No longer found", not "Resolved": the later
- * scan not finding an issue does not prove it was fixed, and "Fixed" is a
+ * scan not finding an issue type does not prove it was fixed, and "Fixed" is a
  * status (docs/plain-language.md).
  */
 export const CHANGE_LABEL: Record<ComparisonChange, string> = {
@@ -16,7 +16,7 @@ export const CHANGE_LABEL: Record<ComparisonChange, string> = {
 
 /**
  * What each change means, for the hover hint. "No longer found" keeps its
- * limit: a later scan not finding an issue does not prove it was fixed, and
+ * limit: a later scan not finding an issue type does not prove it was fixed, and
  * different pages or checks can explain New and No longer found.
  */
 export const CHANGE_HELP: Record<ComparisonChange, string> = {

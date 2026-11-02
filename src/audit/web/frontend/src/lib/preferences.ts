@@ -53,7 +53,11 @@ export interface Preferences {
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
-  theme: "light",
+  // Match the device's light or dark setting until the person picks one
+  // (developer's choice, 2026-10-28): someone who set their computer to dark
+  // gets dark here too, and the public site already follows the device.
+  // main.tsx applies it before the first render, so nothing flashes.
+  theme: "system",
   textSize: "100",
   linkUnderlines: "hover",
   contrast: "standard",

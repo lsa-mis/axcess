@@ -1,0 +1,140 @@
+// @ts-check
+// The Axcess public site: product pages and the user documentation, built as
+// static HTML by Astro + Starlight and published to GitHub Pages.
+//
+// Every page can be read and navigated without JavaScript. Search and the
+// light or dark switch need it. The overrides in src/overrides/ and the rules
+// in src/styles/theme.css keep that promise; tests/public_site/ checks it with
+// scripts turned off.
+import { defineConfig } from "astro/config";
+import starlight from "@astrojs/starlight";
+
+const REPO = "https://github.com/lsa-mis/axcess";
+const SITE = "https://lsa-mis.github.io";
+// The live site is served under /axcess. The staging copy for testers is the
+// same site built under /axcess/staging (see site/README.md), so the base
+// comes from AXCESS_SITE_BASE when it is set.
+const BASE = process.env.AXCESS_SITE_BASE ?? "/axcess";
+// A staging build is marked as a draft: every page asks search engines not
+// to list it, and a banner says it is not the live site.
+const STAGING = process.env.AXCESS_SITE_STAGING === "1";
+
+export default defineConfig({
+  site: SITE,
+  base: BASE,
+  trailingSlash: "always",
+  integrations: [
+    starlight({
+      title: "Axcess",
+      description:
+        "A free accessibility scanner that runs on your computer. It tests the pages behind your sign-in, opens menus and dialogs, and keeps the evidence on your machine.",
+      favicon: "/favicon.svg",
+      // No "Built with Starlight" line: the footer already names who built
+      // Axcess, and a second credit is noise (COGA, one idea per chunk).
+      credits: false,
+      social: [{ icon: "github", label: "Axcess on GitHub", href: REPO }],
+      // The picture shown when a page is shared (Slack, Teams, email, social
+      // sites), with a description for people who cannot see it. A card made
+      // for the job, 1200 by 630 (the size those services expect): the logo,
+      // the tagline, and that it is free for Mac, Windows and Linux, in large
+      // type so it still reads as a small thumbnail. It was the report
+      // groups diagram, an image of text that the site itself hides (SC
+      // 1.4.9 Images of Text (No Exception), Level AAA) and that said nothing
+      // about what Axcess is. Made from HTML with the site's own fonts and
+      // logo; remake it if the tagline changes.
+      head: [
+        { tag: "meta", attrs: { property: "og:image", content: `${SITE}${BASE}/social-card.png` } },
+        { tag: "meta", attrs: { property: "og:image:width", content: "1200" } },
+        { tag: "meta", attrs: { property: "og:image:height", content: "630" } },
+        {
+          tag: "meta",
+          attrs: {
+            property: "og:image:alt",
+            content:
+              "The Axcess logo and the words: Accessibility testing that runs on your computer. Free and open source, for Mac, Windows and Linux.",
+          },
+        },
+        { tag: "meta", attrs: { name: "twitter:card", content: "summary_large_image" } },
+        ...(STAGING ? [{ tag: /** @type {const} */ ("meta"), attrs: { name: "robots", content: "noindex" } }] : []),
+      ],
+      editLink: { baseUrl: `${REPO}/edit/main/` },
+      customCss: ["./src/styles/fonts.css", "./src/styles/theme.css"],
+      // Code in the guides: GitHub's high-contrast themes, because the
+      // default themes' token colours fall below 7:1 (SC 1.4.6 Contrast
+      // (Enhanced), Level AAA, which the site meets everywhere else). Long
+      // lines wrap instead of scrolling, so there is no scroll area the
+      // keyboard can't reach (SC 2.1.1 Keyboard, Level A) and nothing to
+      // scroll sideways at 320 px or when zoomed in (SC 1.4.10 Reflow).
+      expressiveCode: {
+        themes: ["github-dark-high-contrast", "github-light-high-contrast"],
+        // Even those themes have a few colours (comments) under 7:1; this
+        // lightens or darkens any token colour until it reaches 7:1.
+        minSyntaxHighlightingColorContrast: 7,
+        defaultProps: { wrap: true, preserveIndent: true },
+      },
+      components: {
+        Header: "./src/overrides/Header.astro",
+        SiteTitle: "./src/overrides/SiteTitle.astro",
+        Search: "./src/overrides/Search.astro",
+        Footer: "./src/overrides/Footer.astro",
+        ThemeProvider: "./src/overrides/ThemeProvider.astro",
+        Hero: "./src/overrides/Hero.astro",
+        // A day and night switch in place of the three-way theme menu, in
+        // the header and the phone menu alike (see the file for why).
+        ThemeSelect: "./src/overrides/ThemeToggle.astro",
+        // The draft notice, in staging builds only (see the file for why).
+        ...(STAGING ? { Banner: "./src/overrides/StagingBanner.astro" } : {}),
+      },
+      // One list for every page, product and documentation alike, grouped by
+      // what the reader is trying to do (COGA "Making Content Usable":
+      // related content grouped). Labels follow docs/plain-language.md.
+      sidebar: [
+        {
+          label: "Start here",
+          items: [
+            { label: "Get started", link: "/get-started/" },
+            { label: "How Axcess works", link: "/how-it-works/" },
+            { label: "Using the desktop app", link: "/docs/desktop-app/" },
+          ],
+        },
+        {
+          label: "Use Axcess",
+          items: [
+            { label: "Reading your report", link: "/docs/reading-your-report/" },
+            { label: "Scan a site behind a sign-in", link: "/sign-in-scan/" },
+            { label: "Scanning search-driven sites", link: "/docs/spa-search-scans/" },
+            { label: "Troubleshooting", link: "/docs/troubleshooting/" },
+          ],
+        },
+        {
+          label: "Run it for a team",
+          items: [{ label: "Hosting Axcess", link: "/docs/hosting/" }],
+        },
+        {
+          label: "What it checks",
+          items: [
+            { label: "What Axcess checks", link: "/coverage/" },
+            { label: "Coverage and feature tracker", link: "/docs/coverage-tracker/" },
+          ],
+        },
+        {
+          label: "Reference",
+          items: [
+            { label: "Questions", link: "/faq/" },
+            { label: "Glossary", link: "/docs/glossary/" },
+            { label: "All documentation", link: "/docs/" },
+            { label: "All pages", link: "/all-pages/" },
+          ],
+        },
+        {
+          label: "About Axcess",
+          items: [
+            { label: "Who it's for", link: "/who-its-for/" },
+            { label: "Privacy and trust", link: "/privacy/" },
+            { label: "About", link: "/about/" },
+          ],
+        },
+      ],
+    }),
+  ],
+});

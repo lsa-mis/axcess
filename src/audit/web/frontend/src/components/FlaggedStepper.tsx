@@ -59,9 +59,10 @@ import { cn } from "../lib/cn";
  * screen-reader-only text: on screen the facts table under the toolbar
  * already shows it (SC 4.1.3 Status Messages, Level AA).
  *
- * "Element", not "issue": the steps are flagged elements (each an
- * occurrence's place on this page), and "issue" is the grouped rule
- * (docs/plain-language.md).
+ * "Element", not "occurrence": the steps are flagged elements, and one
+ * element can hold several occurrences (the inspector's "Occurrences: 3 on
+ * this element"), so a count of elements is not a count of occurrences. An
+ * occurrence is one place a problem appears and a grouped rule is a "issue type" (docs/plain-language.md, "Why "occurrence" and "issue type"").
  */
 export default function FlaggedStepper({
   count,

@@ -1,0 +1,529 @@
+---
+/**
+ * The home page hero (only the home page sets `hero` in its frontmatter).
+ *
+ * Left: what Axcess is and the two next steps. Right: a picture of a report,
+ * drawn in HTML rather than a screenshot so it stays sharp, follows the
+ * light and dark theme, and can be kept in step with the app's wording.
+ * Sizes, spacing, layering and shadows started from the v3 design artifact;
+ * the home page section in theme.css lists what differs and why.
+ *
+ * Choices and why:
+ * - One filled button ("Download Axcess"). It goes to the download section
+ *   rather than straight to a file: guessing the system can't tell an Intel
+ *   Mac from Apple silicon, and only Apple silicon is built, so a direct
+ *   file link would hand some readers a file that won't open.
+ * - The second button goes to "What Axcess checks", the honest coverage
+ *   numbers, because the next question after "what is it" is "what does it
+ *   miss" (Articulating Design Decisions: answer the objection early).
+ * - The mockup uses a made-up site (www.example.org, reserved by RFC 2606)
+ *   and only words the app really shows (the Issues and Inspector screens).
+ *   The back panel is the top of a report's Issues page, drawn as close to
+ *   the app as the panel's size allows (developer's direction, 2026-10-19):
+ *   the trail ("Reports", the site, "Report #12"), the "Issues" title, the
+ *   date line, the Export report button, and the three numbers as the app
+ *   shows them (ReportSummary.tsx): no tiles, the number in navy, its name,
+ *   and one line under it. It used to show three tinted tiles (Pages, Page
+ *   states opened by clicking, Mostly sure issues), the app's old summary.
+ *   At a narrow width the numbers go two and one, as in the app.
+ *   It is one image to assistive technology, with a text description, so a
+ *   screen reader does not read out a fake interface piece by piece
+ *   (role="img" with aria-label, WCAG technique ARIA6; SC 1.1.1 Non-text
+ *   Content, Level A).
+ * - "WCAG" links to its glossary entry, which spells it out (SC 3.1.4
+ *   Abbreviations, Level AAA, technique G55). The badge says only "Free and
+ *   open source" so it stays one line at 320 px.
+ *
+ * Calmer, by the developer's direction (2026-10-06):
+ * - The heading is semibold (650), not bold, and a little smaller, and the
+ *   paragraph is held to about 60 characters a line. At full weight the
+ *   heading, the name in the header and the button all competed.
+ * - No arrow on "Download Axcess": the words already say it, and the "↓"
+ *   character drew clumsily in this font.
+ * - The four facts are a 2 by 2 grid, each with a check mark, instead of a
+ *   wrapping line that left one fact alone on the second row. All four stay,
+ *   including the WCAG version, because it is a limit (docs/plain-language.md
+ *   rule 12). At 320 px they become one column.
+ * - The two report panels have one width, and the front one is offset 40
+ *   px to the right and down. The old front panel stuck out 28 px to the
+ *   left, toward the text, and was wider, so it read as a mistake. Tried
+ *   and rejected: an inset front panel (the back card's corner showed) and
+ *   a flush one (it read as one tall card with a seam). The offset is big
+ *   enough to look meant and points away from the text. Below 30rem the
+ *   panels go flush, so nothing needs sideways scrolling (SC 1.4.10
+ *   Reflow, Level AA).
+ */
+import { url } from "../lib/site";
+
+const { hero, title } = Astro.locals.starlightRoute.entry.data;
+---
+
+<section class="hero not-content" aria-labelledby="_top">
+  <div class="wrap">
+    <div class="copy">
+      <p class="badge">Free and open source</p>
+      <h1 id="_top">{hero?.title ?? title}</h1>
+      {hero?.tagline && <p class="tagline">{hero.tagline}</p>}
+      <div class="actions">
+        <a class="button primary" href={url("/get-started/#download")}>Download Axcess</a>
+        <a class="button secondary" href={url("/coverage/")}>See what it checks</a>
+      </div>
+      <ul class="facts">
+        <li><span>Runs on your own computer</span></li>
+        <li><span>No account needed</span></li>
+        <li><span>Mac, Windows and Linux</span></li>
+        <li><span>Checks <a href={url("/docs/glossary/#wcag")}>WCAG</a> 2.1 AA, or 2.2 if you choose</span></li>
+      </ul>
+    </div>
+
+    <div
+      class="mockup"
+      role="img"
+      aria-label="Example of the Issues page of an Axcess report for www.example.org: 12 kinds of issue found, in 386 places, on 194 pages visited plus 1,171 page states opened by clicking. In front of it, the saved copy of a page outlines the first of 19 flagged elements, a link, and lists what it is, its text, its size and its element locator."
+    >
+      <div class="panel summary" aria-hidden="true">
+        <div class="trail">
+          <span class="crumb-link">Reports</span>
+          <svg class="crumb-sep" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m9 18 6-6-6-6"/></svg>
+          <span class="crumb-site">www.example.org</span>
+          <span class="crumb-tag">Report #12</span>
+        </div>
+        <div class="report">
+          <div class="report-head">
+            <div>
+              <p class="report-title">Issues</p>
+              <p class="report-date">Based on the report generated Oct 6, 2026, 04:24 PM</p>
+            </div>
+            <span class="export"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></svg>Export report<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg></span>
+          </div>
+          <div class="stats">
+            <div><span class="n">12</span><span class="l">Kinds of issue found</span><span class="d">One per row in the table below</span></div>
+            <div><span class="n">386</span><span class="l">Places issues appear (occurrences)</span><span class="d">Each one is an element on a page</span></div>
+            <div class="pages"><span class="n">194</span><span class="l">Pages visited</span><span class="d">Plus 1,171 page states opened by clicking</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel inspector" aria-hidden="true">
+        <div class="bar">
+          <span>Flagged element 1 of 19</span>
+          <span class="chips"><span class="chip muted"><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m18 15-6-6-6 6"/></svg>Previous</span><span class="chip">Next<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg></span></span>
+        </div>
+        <dl class="facts-list">
+          <dt>What it is</dt><dd>Link</dd>
+          <dt>Text or label</dt><dd>“Copy link to this heading”</dd>
+          <dt>Size</dt><dd>30 pixels wide, 30 pixels tall</dd>
+          <dt>Element locator (CSS selector)</dt><dd class="mono">…our-post &gt; .copy-link-btn.before.auto-heading-links--iconcolor</dd>
+        </dl>
+        <div class="saved-copy">
+          <p class="page-heading">Using editors to build accessible pages</p>
+          <span class="tag">1 of 19</span>
+          <div class="row">
+            <span class="target"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></span>
+            <span class="page-sub">Give your post a clear title</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .hero {
+    background: var(--h-page);
+  }
+  .wrap {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 80px 32px 88px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr));
+    gap: 56px;
+    align-items: center;
+  }
+  .badge {
+    display: inline-block;
+    max-width: 100%;
+    margin: 0;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: var(--h-tint);
+    color: var(--h-accent);
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  h1 {
+    margin: 22px 0 20px;
+    color: var(--h-text);
+    font-size: clamp(38px, 4.6vw, 56px);
+    font-weight: 650;
+    line-height: 1.06;
+    letter-spacing: -0.024em;
+    text-wrap: balance;
+  }
+  .tagline {
+    max-width: 32rem;
+    margin: 0 0 32px;
+    color: var(--h-muted);
+    font-size: 19px;
+    line-height: 1.55;
+    text-wrap: pretty;
+  }
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  /* The artifact's two buttons. Links, because both go somewhere. */
+  .button {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: var(--ax-target);
+    border-radius: 8px;
+    font-size: 18px;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .button:hover {
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+  .primary {
+    padding: 16px 26px;
+    background: var(--h-primary-bg);
+    color: var(--h-primary-fg);
+  }
+  .primary:hover {
+    background: var(--h-primary-hover);
+  }
+  .secondary {
+    padding: 15px 24px;
+    border: 1px solid var(--h-button-line);
+    background: var(--h-band);
+    color: var(--h-accent);
+  }
+  .secondary:hover {
+    border-color: var(--h-accent);
+  }
+  .facts {
+    display: grid;
+    grid-template-columns: repeat(2, max-content);
+    gap: 10px 28px;
+    margin: 28px 0 0;
+    padding: 0;
+    list-style: none;
+    color: var(--h-muted);
+    font-size: 15px;
+    font-weight: 500;
+  }
+  .facts li {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  /* A check mark drawn in CSS, so it is decoration a screen reader skips. */
+  .facts li::before {
+    content: "";
+    flex-shrink: 0;
+    width: 10px;
+    height: 5px;
+    border-bottom: 2px solid var(--h-accent);
+    border-left: 2px solid var(--h-accent);
+    transform: translateY(-3px) rotate(-45deg);
+  }
+  .facts a {
+    color: var(--h-accent);
+    text-underline-offset: 0.2em;
+  }
+
+  /* Mockup */
+  .mockup {
+    position: relative;
+  }
+  .panel {
+    border: 1px solid var(--h-card-line);
+    border-radius: 14px;
+    background: var(--h-band);
+  }
+  /* Two panels of one width, offset 40 px right and down, so the front
+     one reads as a closer look laid on the report. */
+  .summary {
+    container-type: inline-size;
+    margin-inline-end: 40px;
+    overflow: hidden;
+    box-shadow: var(--h-shadow-soft);
+  }
+  /* The app's top bar: the trail, on the bar's white, over a line. */
+  .trail {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 22px;
+    border-bottom: 1px solid var(--h-divider);
+    color: var(--h-text);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .crumb-link {
+    color: var(--h-accent);
+    text-decoration: underline;
+    text-underline-offset: 0.25em;
+  }
+  .crumb-sep {
+    width: 13px;
+    height: 13px;
+    color: var(--h-muted);
+  }
+  .crumb-tag {
+    padding: 2px 7px;
+    border-radius: 5px;
+    background: var(--h-tint);
+  }
+  /* The page under it, on the app's page grey. */
+  /* The 52px at the foot sits behind the front panel. */
+  .report {
+    padding: 18px 22px 52px;
+    background: var(--h-page);
+  }
+  .report-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .report-title {
+    margin: 0;
+    color: var(--h-text);
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .report-date {
+    margin: 2px 0 0;
+    color: var(--h-muted);
+    font-size: 12px;
+  }
+  .export {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 10px;
+    border: 1px solid var(--h-chip-line);
+    border-radius: 7px;
+    background: var(--h-band);
+    color: var(--h-text);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .export svg {
+    width: 14px;
+    height: 14px;
+  }
+  /* The app's three numbers (ReportSummary.tsx): no panel, the number
+     first and largest in navy, its name, then one line in the muted
+     colour; the space between the columns does the grouping. */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px 20px;
+    padding: 22px 0 6px;
+  }
+  .stats > div {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .n {
+    margin-bottom: 2px;
+    color: var(--h-accent);
+    font-size: 26px;
+    font-weight: 650;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .l {
+    color: var(--h-text);
+    font-size: 12px;
+    font-weight: 650;
+    line-height: 1.3;
+  }
+  .d {
+    color: var(--h-muted);
+    font-size: 11px;
+    line-height: 1.4;
+  }
+  /* Narrow, as in the app below 640px: the two issue numbers share a row,
+     and the pages take the row under them. */
+  @container (max-width: 27rem) {
+    .stats {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .stats .pages {
+      grid-column: span 2;
+    }
+    .report-head {
+      flex-direction: column;
+    }
+  }
+  .inspector {
+    position: relative;
+    margin: -32px 0 0 40px;
+    overflow: hidden;
+    box-shadow: var(--h-shadow);
+  }
+  .bar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--h-divider);
+    color: var(--h-muted);
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .chips {
+    display: flex;
+    gap: 6px;
+  }
+  .chip {
+    padding: 5px 11px;
+    border: 1px solid var(--h-chip-line);
+    border-radius: 7px;
+    color: var(--h-text);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  /* The artifact greys out "Previous" because it is the first element. It
+     is part of a picture (role="img"), so its contrast is decoration, but
+     it still uses the muted text colour (8:1 or more), not a paler grey. */
+  .chip.muted {
+    color: var(--h-muted);
+  }
+  .facts-list {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    gap: 6px 24px;
+    margin: 0;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--h-divider);
+    font-size: 14px;
+  }
+  dt {
+    color: var(--h-muted);
+    font-weight: 600;
+  }
+  dd {
+    margin: 0;
+    color: var(--h-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mono {
+    font-family: var(--sl-font-mono);
+    font-size: 12.5px;
+  }
+  /* The saved copy of a page, with the app's maize outline and navy tag. */
+  .saved-copy {
+    padding: 22px 24px 28px;
+    background: var(--h-saved);
+  }
+  .page-heading {
+    margin: 0 0 16px;
+    color: var(--h-saved-link);
+    font-size: clamp(18px, 1.9vw, 22px);
+    font-weight: 700;
+    line-height: 1.15;
+  }
+  .tag {
+    display: inline-block;
+    padding: 3px 9px;
+    border: 3px solid #f5c400;
+    border-radius: 6px 6px 0 0;
+    background: #0a2647;
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  /* The flagged element, drawn as the app's Page inspector shows it: a maize
+     ring and a navy inner line around the element itself, here the page's
+     "Copy link to this heading" button, a 30 by 30 pixel square showing a
+     bookmark icon (the page's own icon, so drawn in a page blue, not the
+     app's navy). An empty box, and then a wide box with a link icon, were
+     tried; both differed from the real screen (developer's review with
+     screenshots, 2026-10-06). Decoration inside a picture that already has
+     a text description. */
+  .target {
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    color: #1d5fbf;
+    border: 4px solid #f5c400;
+    border-radius: 2px;
+    outline: 3px solid #0a2647;
+    outline-offset: -7px;
+    background: #ffffff;
+  }
+  .target svg {
+    width: 18px;
+    height: 18px;
+  }
+  /* The inspector's Previous and Next carry chevrons, as in the app:
+     Previous points up, and Next opens a list of the flagged elements. */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .chev {
+    width: 14px;
+    height: 14px;
+  }
+  .page-sub {
+    color: var(--h-saved-link);
+    font-size: clamp(16px, 1.7vw, 20px);
+    font-weight: 700;
+  }
+  @media (max-width: 30rem) {
+    .wrap {
+      padding: 56px 20px 64px;
+    }
+    .facts {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .summary {
+      margin-inline-end: 0;
+    }
+    .inspector {
+      margin-inline-start: 0;
+    }
+    /* Stacked buttons at one width, not two ragged widths. */
+    .actions {
+      flex-direction: column;
+    }
+    .button {
+      justify-content: center;
+    }
+
+    .facts-list {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 2px;
+    }
+    dd + dt {
+      margin-top: 8px;
+    }
+  }
+</style>

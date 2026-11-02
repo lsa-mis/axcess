@@ -1,0 +1,50 @@
+---
+/**
+ * The top of a page section: a short label, the heading, and an optional
+ * lead sentence. The label is sentence case, not spaced capitals, because
+ * all-caps text is harder to read (COGA "Making Content Usable", clear
+ * text). The heading carries the meaning; the label only says which topic
+ * this is, so it is a plain paragraph, not a second heading.
+ */
+interface Props {
+  id?: string;
+  label?: string;
+  heading: string;
+  level?: 2 | 3;
+}
+const { id, label, heading, level = 2 } = Astro.props;
+const H = `h${level}` as "h2" | "h3";
+---
+
+<header class="ax-section-header">
+  {label && <p class="label">{label}</p>}
+  <H id={id} class="heading">{heading}</H>
+  {Astro.slots.has("default") && <p class="lead"><slot /></p>}
+</header>
+
+<style>
+  .ax-section-header {
+    max-width: 46rem;
+    margin-bottom: 2.25rem;
+  }
+  .label {
+    margin: 0 0 0.5rem;
+    color: var(--ax-fg-subtle);
+    font-size: 1rem;
+    font-weight: 700;
+  }
+  .heading {
+    margin: 0;
+    color: var(--ax-fg);
+    font-size: clamp(1.75rem, 3.4vw, 2.5rem);
+    line-height: 1.15;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+  }
+  .lead {
+    margin: 1rem 0 0;
+    color: var(--ax-fg-muted);
+    font-size: 1.1875rem;
+    line-height: 1.55;
+  }
+</style>

@@ -4,10 +4,12 @@ import type { SiteHistoryPoint } from "../../api/types";
 import { Button, LinkButton, relativeTime } from "../ui";
 import { cn } from "../../lib/cn";
 import { Cell, ColumnHeader, Row, RowHeader, Table, TableHead } from "../table/Table";
-import { agoLong, count, plural } from "./format";
+import { agoLong, count, countKinds, plural } from "./format";
 
 type Measure = "occurrences" | "groups";
-const MEASURES: Record<Measure, string> = { occurrences: "Occurrences", groups: "Issues" };
+// Issue types first, as every screen that shows both counts orders them
+// (2026-10-30), and the chart opens on them.
+const MEASURES: Record<Measure, string> = { groups: "Issue types", occurrences: "Issue occurrences" };
 
 const HEIGHT = 300;
 const MARGIN = { top: 40, right: 36, bottom: 60, left: 52 };
@@ -36,7 +38,7 @@ export default function TrendChart({
   currentId: number;
   baselineId: number | null;
 }) {
-  const [measure, setMeasure] = useState<Measure>("occurrences");
+  const [measure, setMeasure] = useState<Measure>("groups");
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showTable, setShowTable] = useState(false);
   const pointRefs = useRef(new Map<number, SVGGElement>());
@@ -326,14 +328,16 @@ function CompareLink({
  * A comparison belongs to the later report and takes the earlier one as its
  * baseline. "Later" is the trend's own order (start time, as the server
  * orders a baseline); ids only decide when this report is outside the window.
+ * It stays on What changed, the page this chart is on (routes/Compare.tsx),
+ * not the side-by-side Compare reports page.
  */
 function compareHref(point: SiteHistoryPoint, currentId: number, points: SiteHistoryPoint[]): string {
   const at = points.findIndex((p) => p.id === point.id);
   const current = points.findIndex((p) => p.id === currentId);
   const earlier = current >= 0 ? at < current : point.id < currentId;
   return earlier
-    ? `/scans/${currentId}/compare?compare_to=${point.id}`
-    : `/scans/${point.id}/compare?compare_to=${currentId}`;
+    ? `/scans/${currentId}/compare/changes?compare_to=${point.id}`
+    : `/scans/${point.id}/compare/changes?compare_to=${currentId}`;
 }
 
 function HistoryTable({
@@ -352,8 +356,8 @@ function HistoryTable({
           <tr>
             <ColumnHeader>Report</ColumnHeader>
             <ColumnHeader>Scanned</ColumnHeader>
-            <ColumnHeader>Occurrences</ColumnHeader>
-            <ColumnHeader>Issues</ColumnHeader>
+            <ColumnHeader>Issue types</ColumnHeader>
+            <ColumnHeader>Issue occurrences</ColumnHeader>
             <ColumnHeader><span className="sr-only">Actions</span></ColumnHeader>
           </tr>
         </TableHead>
@@ -366,8 +370,8 @@ function HistoryTable({
                 {point.id === baselineId && <span className="font-normal text-fg-muted"> · compared with</span>}
               </RowHeader>
               <Cell>{agoLong(point.started_at)}</Cell>
-              <Cell numeric>{point.occurrences.toLocaleString()}</Cell>
               <Cell numeric>{point.groups.toLocaleString()}</Cell>
+              <Cell numeric>{point.occurrences.toLocaleString()}</Cell>
               <Cell className="py-1">
                 <span className="flex flex-wrap justify-center gap-x-4">
                   {point.id !== currentId && point.id !== baselineId && (
@@ -419,7 +423,7 @@ function Swatch({ kind }: { kind: "current" | "baseline" | "other" }) {
 }
 
 function totalsSentence(point: SiteHistoryPoint): string {
-  return `${count(point.occurrences, "occurrence")} in ${count(point.groups, "issue")}.`;
+  return `${count(point.occurrences, "occurrence")} in ${countKinds(point.groups)}.`;
 }
 
 function trendSummary(

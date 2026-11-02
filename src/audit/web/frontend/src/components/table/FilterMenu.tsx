@@ -178,7 +178,7 @@ export function FilterMenu({
       <div
         id={panelId}
         hidden={!open}
-        className="absolute left-0 top-full z-30 mt-1 max-h-[70vh] w-[min(22rem,calc(100vw-2rem))] overflow-y-auto rounded-xs border border-border-strong bg-surface p-3 text-fg shadow-lg"
+        className="absolute left-0 top-full z-30 mt-1 max-h-[70vh] w-[min(22rem,calc(100vw-2rem))] overflow-y-auto rounded-xs border border-border-strong bg-surface-raised p-3 text-fg shadow-lg"
       >
         {groups.map((group) => (
           <fieldset key={group.key} className="mb-3 border-b border-border pb-3 last-of-type:mb-0">

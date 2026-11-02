@@ -311,7 +311,7 @@ export default function ScanSummaryCard({
           more underneath. They cover nothing a keyboard can reach: the
           summary above holds no controls. */}
       {children && (
-        <div className="rounded-b-md border-t border-border bg-surface px-5 pb-5 pt-4 lg:sticky lg:bottom-0 lg:shadow-[0_-10px_16px_-12px_rgba(0,39,76,0.28)]">
+        <div className="rounded-b-md border-t border-border bg-surface px-5 pb-5 pt-4 lg:sticky lg:bottom-0 lg:shadow-sticky-footer">
           {children}
         </div>
       )}

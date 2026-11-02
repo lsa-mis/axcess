@@ -10,6 +10,24 @@ merge.
 
 ### Added
 
+- Reports: each completed scan of an opened site has **Compare with**,
+  a short list of the site's other completed reports. Choosing one opens
+  Compare reports for the two, without opening a report first.
+- **Compare reports** shows two reports side by side, each in its own
+  panel. Each panel is the report's Issues page, and works like its own
+  browser tab: open an issue, filter or search, and **Go back**, while the
+  other panel stays as it is. A **Report** list above each panel, with
+  **Show this report**, changes that panel's report. The panels sit side by
+  side on a wide screen and one above the other on a narrow one.
+- Compare reports, opened from a report's tab, starts with the second panel
+  empty: a dashed box that lists the site's other reports to choose from.
+  It no longer picks the report before for you. **Close** on the second
+  panel empties it again.
+- Reports and Issues say which check found what. On Reports, a **Rule
+  check** column shows whether each scan ran axe, Alfa or both; on the
+  Issues page, a **Check** column names the check behind each kind of
+  issue. Their hints say who makes each rule check: axe-core by Deque,
+  Alfa by Siteimprove.
 - Desktop app: the first time Axcess opens, the loading screen says
   "The first time Axcess opens, this can take a minute or two." under
   "Loading", since that first start sets up the reports database and the
@@ -57,6 +75,60 @@ merge.
   Axcess does not check it).
 
 ### Changed
+
+- A row of the Issues table is now an **issue type** (it was a "kind of
+  issue"), and the count of places is labelled **Issue occurrences**,
+  everywhere you see or hear them. Every screen that shows both counts puts
+  issue types first: the Issues summary reads "7 Issue types, 22 Issue
+  occurrences, 122 Pages visited", and Reports has the columns **Issue
+  types**, **Issue occurrences**, **Pages**. In the Issues table,
+  **Issue occurrences** now comes right after **Priority**, before
+  **Pages**, and the **WCAG** column is called **WCAG criterion**. The
+  Jira export's "Issue Type" field is unchanged: it is Jira's own field.
+- Issues: the line "Recommended order: Mostly sure, then Not sure, then
+  For information." over the table is gone; the **How sure** column shows
+  that order. A screen reader still hears the order. Sorting by a column
+  or filtering brings back a line with **Back to recommended order** or
+  the count of what the filter left.
+- Reports: the "11 sites · 27 scans" line and the **Last scanned** card
+  are gone; the first row of the table is the latest site, with **Open
+  latest scan**. A scan that is running still shows its progress above the
+  table.
+- Issues: the line "Based on the report generated…" and **Scan again** are
+  gone from the top of the page; **Export report** stays at the top right.
+  **Scan again** is still on Reports, in each site's row, and **Scanned**
+  there says when each scan ran.
+- The comparison table (new, still found and no longer found kinds of
+  issues, and the trend) is now its own page, **What changed**, at
+  `/scans/<id>/compare/changes`. Compare reports links to it with **See
+  what changed between these reports**. Old "Verify changes" (`/diff`)
+  links open What changed. The desktop app now lets Axcess show its own
+  pages in a frame, for Compare reports; other websites still cannot frame
+  it.
+- Each place a problem appears is called an **occurrence** again, not an
+  issue, everywhere you see or hear it: "Occurrences found" over the
+  Issues table, the **Occurrences** column on Reports and in the Issues
+  table, the **Occurrence list (CSV)** export, and the counts on the other
+  screens. A row of the Issues table stays a **kind of issue**, so a report
+  reads "7 kinds of issues, 22 occurrences". People who use Siteimprove
+  know these words from it. The Occurrences column's hint and the glossary
+  say what an occurrence is: one place a problem appears.
+- Reports: opening a site lists its scans as rows of the same table,
+  lined up under the site's columns, in a box indented under the site's
+  name, instead of in a second table with its own headers. Thin lines part
+  the columns. A scan shows its status only when it did not complete
+  ("Stopped", "Failed", "Scanning"). The date column is now **Scanned**,
+  and the sentence over the table is gone.
+- Issues page: the table now comes straight after the numbers. **What was
+  checked** (with how many checks ran) and what the labels mean moved
+  under the table, and the lines under "Occurrences found" and "Kinds of
+  issues" are gone; what the two numbers count is now explained in what
+  the labels mean.
+- Reports: a scan's **Report #** link is now the one way into its report;
+  the **All issues** link beside it, which opened the same page, is gone.
+- Reports remembers which sites you opened, and the order, until you
+  close the tab: going to another page and back through **Reports** in
+  the menu no longer closes them.
 
 - **The numbers over the Issues table lead with what was found.** There are
   three now: Kinds of issue found, Places issues appear (occurrences), and

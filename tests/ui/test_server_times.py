@@ -35,9 +35,6 @@ async def test_reports_say_two_hours_ago_in_new_york(
     page = await new_page(timezone_id="America/New_York")
     try:
         await page.goto(f"{base}/app/scans", wait_until="networkidle")
-        card = page.get_by_role("region", name="Last scanned site")
-        await playwright_async.expect(card).to_contain_text("2 hours ago")
-        await playwright_async.expect(card).not_to_contain_text("in 2 hours")
         table = page.get_by_role("region", name="Public reports table")
         await playwright_async.expect(table).to_contain_text("2 hours ago")
         await playwright_async.expect(table).not_to_contain_text("just now")

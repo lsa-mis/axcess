@@ -76,8 +76,14 @@ const FORMATS: {
     format: "xlsx",
     badge: "XLSX",
     tone: "bg-umich-blue/10 text-umich-blue",
-    label: "Issue list with fixes (Excel)",
-    hint: "One row per issue, with how to fix it",
+    // The workbook's index has one row per issue type (one per Issues
+    // table row); the CSV has one row per occurrence (one place). Named so
+    // the two cannot be mistaken for each other. The workbook's label
+    // changed on 2026-10-26 with the terms; the CSV was "Issue list (CSV)"
+    // from then until 2026-10-28, when "occurrence" came back. See
+    // docs/plain-language.md, "Why "occurrence" and "issue type"".
+    label: "Issue types with fixes (Excel)",
+    hint: "One row for each issue type, with how to fix it",
   },
   {
     format: "its",
@@ -98,7 +104,7 @@ const FORMATS: {
     badge: "CSV",
     tone: "bg-sev-minor-bg text-sev-minor",
     label: "Occurrence list (CSV)",
-    hint: "One row for each place an issue appears",
+    hint: "One row for each occurrence: one place on one page",
   },
   {
     format: "json",
@@ -133,12 +139,12 @@ export default function ExportMenu({
   shownIssueGroups,
 }: {
   scanId: number;
-  /** The report's site, pages and issues, under the panel's heading,
+  /** The report's site, pages and issue types, under the panel's heading,
    *  so the reader can see which report they are taking away. */
   site?: string;
   pageCount?: number;
   issueGroups?: number;
-  /** Issues the table shows now; pass it only while a filter or a
+  /** Issue types (rows) the table shows now; pass it only while a filter or a
    *  search narrows the table. */
   shownIssueGroups?: number;
 }) {
@@ -292,7 +298,7 @@ export default function ExportMenu({
   const facts = [
     site,
     pageCount === undefined ? "" : plural(pageCount, "page", "pages"),
-    issueGroups === undefined ? "" : plural(issueGroups, "issue", "issues"),
+    issueGroups === undefined ? "" : plural(issueGroups, "issue type", "issue types"),
   ]
     .filter(Boolean)
     .join(" · ");
@@ -301,9 +307,9 @@ export default function ExportMenu({
   // "every issue" for all five.
   const scopeNote =
     (shownIssueGroups !== undefined && issueGroups !== undefined && shownIssueGroups < issueGroups
-      ? `Includes all ${plural(issueGroups, "issue", "issues")} and their statuses, ` +
+      ? `Includes all ${plural(issueGroups, "issue type", "issue types")} and every status, ` +
         `not only the ${shownIssueGroups.toLocaleString()} your filters show.`
-      : "Includes every issue and status in this report, even if the table has filters on.") +
+      : "Includes every issue type and every status in this report, even if the table has filters on.") +
     " The ITS technical review lists only the elements checked as a problem to report.";
 
   return (
@@ -343,7 +349,7 @@ export default function ExportMenu({
         aria-labelledby={headingId}
         hidden={!open}
         className={cn(
-          "absolute z-30 mt-1.5 w-[23rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xs border border-border bg-surface shadow-raised",
+          "absolute z-30 mt-1.5 w-[23rem] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xs border border-border bg-surface-raised shadow-raised",
           hangLeft ? "left-0" : "right-0",
         )}
       >

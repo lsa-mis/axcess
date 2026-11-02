@@ -4,19 +4,20 @@ import type {
   FindingStatus,
   ReviewDecision,
   ReviewLane,
+  RuleCheck,
   ScanStatus,
 } from "../api/types";
 
 /**
  * The words the interface uses for shared values, in one place.
  *
- * Every screen that shows a status, an issue type, or a check reads its
+ * Every screen that shows a status, a "How sure" value, or a check reads its
  * label from here, so one thing always has one name (W3C COGA: consistent
  * terms). The stored values never change; only what people see and hear.
  * See docs/plain-language.md for the full list of terms.
  */
 
-/** An occurrence's review status, as a short label for chips and tables. */
+/** An occurrence's review status (one place on a page), as a short label for chips and tables. */
 export const STATUS_LABEL: Record<FindingStatus, string> = {
   new: "New",
   reviewing: "Reviewing",
@@ -46,8 +47,9 @@ export const STATUS_OPTION_LABEL: Record<FindingStatus, string> = {
 };
 
 /**
- * The three types of issue, as the Issues table's "How sure" column names
- * them: how sure Axcess is that the issue is a real problem.
+ * The three "How sure" values, as the Issues table's "How sure" column names
+ * them: how sure Axcess is that an issue type is a real problem. (They were
+ * once called the three types of issue; "type" is not used for them now.)
  *
  * "Mostly sure" and "Not sure" are opposites in short, common words, so the
  * two cannot be read as the same thing (SC 3.1.5 Reading Level, Level AAA).
@@ -72,7 +74,7 @@ export const REVIEW_TYPE_LABEL: Record<ReviewLane, string> = {
 };
 
 /**
- * An issue's impact rating, in the glossary's words ("Impact"), not axe's
+ * An issue type's impact rating, in the glossary's words ("Impact"), not axe's
  * raw lower-case values.
  */
 export const IMPACT_LABEL: Record<AxeImpact, string> = {
@@ -113,6 +115,21 @@ export const REVIEW_DECISION_HELP: Record<ReviewDecision | "none", string> = {
   repeat:
     "A real problem, but the same as one you already reported, such as the same menu on another page.",
 };
+
+/**
+ * A rule check by its tool's name alone, for a column already headed "Rule
+ * check" (Reports), where "Rule check (axe)" would say "rule check" twice.
+ * Elsewhere the full name in CHECK_LABEL is used.
+ */
+export const RULE_CHECK_TOOL: Record<RuleCheck, string> = {
+  axe: "axe",
+  alfa: "Alfa",
+};
+
+/** The rule checks a scan ran, in words: "axe", "axe and Alfa", "None". */
+export function ruleChecksText(checks: readonly RuleCheck[]): string {
+  return checks.length === 0 ? "None" : checks.map((check) => RULE_CHECK_TOOL[check]).join(" and ");
+}
 
 /** A scan's progress, for status badges. */
 export const SCAN_STATUS_LABEL: Record<ScanStatus, string> = {

@@ -45,6 +45,7 @@ import type {
   ProtectedScanPayload,
   ProtectedScanRecord,
   ScanDetail,
+  ScanIssueCounts,
   ScanSummary,
   SiteGroup,
   ScopePreview,
@@ -203,6 +204,8 @@ export const api = {
   listScans: () => request<ScanSummary[]>("/api/scans"),
   listSites: () => request<SiteGroup[]>("/api/sites"),
   getScan: (id: number) => request<ScanDetail>(`/api/scans/${id}`),
+  /** A completed report's two issue counts (409 for any other status). */
+  getScanIssueCounts: (id: number) => request<ScanIssueCounts>(`/api/scans/${id}/issue-counts`),
   /** A previous scan's settings, to start New scan again from them. */
   getScanSettings: (id: number) => request<ScanSettingsSnapshot>(`/api/scans/${id}/settings`),
   getAlfaCapability: () => request<AlfaCapability>("/api/capabilities/alfa"),

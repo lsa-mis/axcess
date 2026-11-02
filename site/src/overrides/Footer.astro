@@ -1,0 +1,144 @@
+---
+/**
+ * Starlight's page footer (edit link and previous/next) followed by the site
+ * footer.
+ *
+ * The site footer follows the production site's footer: the one-line
+ * description, three link groups (Learn, Use, Project), the honesty
+ * statement, and who leads Axcess, in the production site's exact words
+ * (the developer's direction, 2026-10-03). The links repeat every main
+ * destination on any screen size, scripts or not (SC 2.4.5 Multiple Ways,
+ * Level AA). Each group is a list under a heading, so a screen reader can
+ * jump between them; the whole block is one "Site" navigation landmark,
+ * named so it is not confused with the header's "Main" or the sidebar's
+ * "Pages". tests/public_site checks the honesty statement on every page.
+ */
+import Default from "@astrojs/starlight/components/Footer.astro";
+import { RELEASES, REPO, url } from "../lib/site";
+
+const WHITEPAPER = `${REPO}/blob/main/whitepaper/AXCESS-WHITE-PAPER.md`;
+const LICENSE = `${REPO}/blob/main/LICENSE`;
+
+const groups = [
+  {
+    title: "Learn",
+    links: [
+      { text: "How it works", href: url("/how-it-works/") },
+      { text: "What it checks", href: url("/coverage/") },
+      { text: "Who it's for", href: url("/who-its-for/") },
+      { text: "Questions", href: url("/faq/") },
+      { text: "Glossary", href: url("/docs/glossary/") },
+    ],
+  },
+  {
+    title: "Use",
+    links: [
+      { text: "Get started", href: url("/get-started/") },
+      { text: "Privacy and trust", href: url("/privacy/") },
+      { text: "Reading your report", href: url("/docs/reading-your-report/") },
+      { text: "Desktop releases", href: RELEASES },
+      { text: "Documentation", href: url("/docs/") },
+    ],
+  },
+  {
+    title: "Project",
+    links: [
+      { text: "About Axcess", href: url("/about/") },
+      { text: "White paper", href: WHITEPAPER },
+      { text: "Source on GitHub", href: REPO },
+      { text: "MIT license", href: LICENSE },
+      { text: "All pages", href: url("/all-pages/") },
+    ],
+  },
+];
+---
+
+<Default {...Astro.props} />
+<div class="site-footer">
+  <p class="about">
+    Local-first accessibility evidence for expert web audits. Free, open source, and built at the University of
+    Michigan.
+  </p>
+  <nav aria-label="Site" class="groups">
+    {
+      groups.map((g) => (
+        <div>
+          <h2 class="group-title">{g.title}</h2>
+          <ul>
+            {g.links.map((l) => (
+              <li>
+                <a href={l.href}>{l.text}</a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))
+    }
+  </nav>
+  <p class="fine">
+    Axcess produces evidence for expert review. It does not certify WCAG conformance or legal compliance.
+  </p>
+  <p class="fine">
+    Led by the College of Literature, Science, and the Arts Technology Services (LSA-TS) and Information and
+    Technology Services (ITS) groups at the University of Michigan
+  </p>
+</div>
+
+<script>
+  // Keyboard focus never lands under the sticky header (SC 2.4.12 Focus Not
+  // Obscured (Enhanced), Level AAA). The browser skips scrolling when part
+  // of a focused element is already on screen, so a tall table or a link
+  // just under the header could be left half covered. When focus arrives
+  // and the element's top is under the header, it is scrolled to just below
+  // the header (the page's scroll padding). Fixed parts, such as the skip
+  // link, and the header itself are left alone.
+  document.addEventListener("focusin", (event) => {
+    const el = event.target;
+    const header = document.querySelector("header.header");
+    if (!(el instanceof HTMLElement) || !header || header.contains(el)) return;
+    if (getComputedStyle(el).position === "fixed" || el.closest("mobile-starlight-toc")) return;
+    const top = el.getBoundingClientRect().top;
+    if (top < header.getBoundingClientRect().bottom) el.scrollIntoView({ block: "start" });
+  });
+</script>
+
+<style>
+  .site-footer {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--ax-border);
+    color: var(--ax-fg-muted);
+    font-size: var(--sl-text-sm);
+  }
+  .about {
+    max-width: 36rem;
+    margin: 0 0 1.25rem;
+  }
+  .groups {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+    gap: 1rem 2rem;
+    margin-bottom: 1.25rem;
+  }
+  .group-title {
+    margin: 0 0 0.25rem;
+    color: var(--ax-fg);
+    font-size: var(--sl-text-sm);
+    font-weight: 700;
+  }
+  ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  a {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--ax-target);
+    color: var(--ax-link);
+    text-underline-offset: 0.2em;
+  }
+  .fine {
+    margin: 0 0 0.5rem;
+  }
+</style>

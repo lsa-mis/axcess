@@ -599,6 +599,28 @@
         }
       }
     },
+    "/api/scans/{scan_id}/issue-counts": {
+      "get": {
+        "summary": "Api Scan Issue Counts",
+        "description": "One completed report's two issue counts, for the Reports list.\n\nFetched when a site's list of scans is opened, not with ``/api/sites``:\ncounting means building the issue list, and the site list is fetched\nevery few seconds while a scan runs.",
+        "operationId": "api_scan_issue_counts_api_scans__scan_id__issue_counts_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
     "/api/scans/{scan_id}": {
       "get": {
         "summary": "Api Scan Detail",
