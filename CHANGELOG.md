@@ -85,6 +85,11 @@ merge.
 
 ### Changed
 
+- Every table has thin lines between its columns, as the Reports table
+  does, so a value can be followed up to its column's header.
+- Page inspector: "N more occurrences appear only after clicking a
+  control…" is said once, under the **Page state** list, not a second time
+  beside the page.
 - New scan: the page limits (**Scan every page it finds**, **Maximum
   pages**, **Maximum link depth**) are under **Pages to scan**, and **Rule
   check tool** is under **Checks**. The **Limits and rule check tool**

@@ -227,7 +227,10 @@ async def test_each_state_shows_only_the_occurrences_it_contains(
     at_load = await _evidence_text(new_page, base, scan_id, page_id, "")
     assert "#at-load" in at_load
     assert "#after-click" not in at_load
-    assert "in another page state" in at_load
+    # Said once, under the Page state list (2026-11-02): the line beside the
+    # page that said it again was removed.
+    assert "only after clicking a control" in at_load
+    assert at_load.count("in the Page state list.") == 1
 
     revealed = await _evidence_text(new_page, base, scan_id, page_id, quote(state_key, safe=""))
     assert "#after-click" in revealed
@@ -235,6 +238,7 @@ async def test_each_state_shows_only_the_occurrences_it_contains(
     # is one finding: listing it again here presented one element per state.
     assert "#at-load" not in revealed
     assert "in another page state" in revealed
+    assert revealed.count("in the Page state list.") == 1
 
 
 async def test_a_load_only_issue_is_not_offered_once_per_state(
@@ -440,7 +444,10 @@ async def test_a_view_with_nothing_to_highlight_does_not_wait_forever(
     page_id, _, _ = _seed_revealed_only_issue(db_path, scan_id)
     text = await _evidence_text(new_page, live_server[0], scan_id, page_id, "")
     assert "Highlighting" not in text
-    assert "in another page state" in text
+    # Said once, under the Page state list: "2 more occurrences appear only
+    # after clicking a control, in 2 page states. Choose one in ..."
+    assert "only after clicking a control" in text
+    assert text.count("in the Page state list.") == 1
 
 
 async def test_occurrences_in_other_page_states_are_counted_under_the_one_picker(
