@@ -359,8 +359,9 @@ A check for forms that show an error without saying in words what is wrong
 form's submit button once, with nothing typed, and stops the form from being
 sent. It never presses sign-in, payment, search or delete forms, and it checks
 only a form's first step. Its results are marked [Not sure](#not-sure), with a
-picture of the form before and after the press, and in the app it runs only
-when you turn on **Check that forms describe their errors**.
+picture of the form before and after the press. In the app it is on by
+default for public websites (**Check that forms describe their errors**,
+under **Checks** on New scan) and never runs in a sign-in scan.
 
 ### Local AI model
 

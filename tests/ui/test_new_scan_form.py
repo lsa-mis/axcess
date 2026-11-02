@@ -588,6 +588,8 @@ async def test_depth_dots_are_gone(live_server: tuple[str, int], new_page: Any) 
                 "Opens menus and pop-up windows (Click-Through)",
                 "Keyboard check",
                 "Focus check",
+                # On by default for public websites (2026-11-02).
+                "Form error check",
                 "Zoom and layout check",
                 "Image text check",
             ],
@@ -595,8 +597,6 @@ async def test_depth_dots_are_gone(live_server: tuple[str, int], new_page: Any) 
                 "Pages behind a sign-in",
                 "Whole website",
                 "Subdomains",
-                # Off by default: it presses submit buttons.
-                "Form error check",
                 "Vision model review",
                 "AI review",
                 "Motion and reading-order check",
@@ -828,7 +828,42 @@ async def test_failed_scan_explains_both_retries(
         page.get_by_role("alert").filter(has_text="Axcess could not start this scan again")
     ).to_be_visible()
     # "Scan again with faster settings" is the defaults with Click-Through
-    # off, on the same address.
+    # and the form error check off, on the same address.
     assert posted[-1]["url"] == "https://retry.example.test/"
     assert posted[-1]["skip_interaction"] is True
+    assert posted[-1]["skip_forms"] is True
     assert posted[-1]["max_pages"] == 2500
+
+
+async def test_the_form_error_check_is_on_for_public_websites_and_absent_when_signed_in(
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """On by default for a public website (2026-11-02); no switch for a sign-in scan."""
+    base, _ = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    posted: list[dict[str, Any]] = []
+
+    async def capture(route: Any) -> None:
+        posted.append(route.request.post_data_json)
+        await route.fulfill(status=409, json={"error": "A crawl is already running."})
+
+    await page.route("**/api/scans", capture)
+    await page.goto(f"{base}/app/scans/new", wait_until="networkidle")
+    await _open_groups(page)
+    switch = page.get_by_role("switch", name="Check that forms describe their errors")
+    await playwright_async.expect(switch).to_be_checked()
+    summary = page.get_by_role("complementary", name="What this scan will do")
+    assert "Form error check" in await _rail_items(summary, "Checks that run")
+    await page.get_by_role("textbox", name="Website address", exact=True).fill(
+        "https://example.com/"
+    )
+    await page.get_by_role("button", name="Start scan").click()
+    await playwright_async.expect(page.get_by_role("alert").first).to_be_visible()
+    assert posted and posted[-1]["skip_forms"] is False
+
+    await page.goto(f"{base}/app/scans/new?mode=login", wait_until="networkidle")
+    await _open_groups(page)
+    await playwright_async.expect(
+        page.get_by_role("switch", name="Check that forms describe their errors")
+    ).to_have_count(0)

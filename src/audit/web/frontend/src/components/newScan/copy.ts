@@ -319,7 +319,7 @@ export const RETRY = {
   quick: "Scan again with faster settings",
   quickPending: "Starting the scan again…",
   quickHint:
-    `Scans the same address again right away, with the default settings. It does not open menus or pop-up windows (${CLICK_THROUGH}), so it finishes sooner. That shows quickly whether Axcess can scan the site. It keeps only this scan’s address and its Web Content Accessibility Guidelines (WCAG) version.`,
+    `Scans the same address again right away, with the default settings. It does not open menus or pop-up windows (${CLICK_THROUGH}) or press form buttons, so it finishes sooner. That shows quickly whether Axcess can scan the site. It keeps only this scan’s address and its Web Content Accessibility Guidelines (WCAG) version.`,
 } as const;
 
 export const SUMMARY = {

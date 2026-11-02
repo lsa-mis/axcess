@@ -11,7 +11,8 @@ merge.
 ### Added
 
 - New scan: **Check that forms describe their errors** (WCAG 3.3.1 Error
-  Identification), off by default and for public scans only. It presses
+  Identification), on by default for public websites and never in sign-in
+  scans. It presses
   each form's submit button once, with nothing typed, stops the form from
   being sent, and reports a form that marks fields in error without saying
   in words what is wrong. Results appear in the Issues table as "Form shows

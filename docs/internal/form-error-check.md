@@ -1,8 +1,11 @@
 # Form error check (WCAG 3.3.1 Error Identification)
 
 Status: built, measured on synthetic pages, and wired into scans behind the
-New scan switch "Check that forms describe their errors", **off by default**
-until it is validated on real forms. Code: `src/audit/analyzer/forms/`.
+New scan switch "Check that forms describe their errors", **on by default for
+public websites** since 2026-11-02 (the developer's decision, after the safety
+review below), never in sign-in scans, and off in "Scan again with faster
+settings". It is not yet validated on real forms, so its results are Not
+sure leads. Code: `src/audit/analyzer/forms/`.
 Measurement: `tests/integration/test_form_error_identification.py`. Crawl:
 `tests/integration/test_form_error_crawl.py`.
 
@@ -66,14 +69,18 @@ Ordered by what blocks using the check, then by expected value.
 - [ ] Validate on real forms: a sample of U-M public sites, labelled by at
       least two accessibility experts with disagreements settled, held out
       from tuning, with confidence intervals ("validation before promotion",
-      AGENTS.md). Ship off by default until then.
+      AGENTS.md). It shipped on by default for public scans before this, by
+      the developer's decision (2026-11-02); validation decides whether its
+      results can ever leave the Not sure lane.
 - [ ] Decide the four ambiguous cases with an expert (all currently reported
       as `fail`): a "Required" hint that only turns red; a message only screen
       readers get; a placeholder that changes to "Required"; a message drawn
       as an image with alt text.
-- [ ] Decide the policy for sign-in scans. The guard holds there too, but a
-      signed-in session raises the stakes; the safest start is off for
-      sign-in scans.
+- [x] Decide the policy for sign-in scans (2026-11-02): never. New scan has
+      no switch for it there, and the fetcher refuses it in a signed-in
+      browser. Pressing submit while signed in could act as the person, even
+      with every request blocked. Revisit only as an explicit opt-in for test
+      accounts, after validation.
 - [x] Safety review of what the guard cannot block (2026-11-02). Found: it
       let same-origin GET, HEAD and OPTIONS requests through, and it cannot
       see sockets, so a socket open before the press could send, and a new

@@ -96,10 +96,13 @@ export const PUBLIC_DEFAULTS: ScanSettings = {
   skip_semantic: true,
   skip_focus: false,
   skip_visual: true,
-  // Off until it is validated on real forms (docs/internal/form-error-check.md):
-  // it presses submit buttons, with nothing typed, and stops the form being
-  // sent (the guard blocks the send and leaving the page, not every request).
-  skip_forms: true,
+  // On for public websites (2026-11-02, the developer's decision, after the
+  // safety review): it presses submit buttons, with nothing typed, and
+  // nothing leaves the page meanwhile (the guard's strict mode and the socket
+  // hold, docs/internal/form-error-check.md). Its results are Not sure leads
+  // a person confirms; it is not yet validated on real forms. Never in a
+  // sign-in scan (LOGIN_POLICY below).
+  skip_forms: false,
   skip_rendered_storage: false,
   axe_level: "AA",
   // The current U-M standard. 2.2 is a deliberate choice, and marks the
@@ -422,7 +425,9 @@ export function checkCount(
  * everything else.
  */
 export function quickRetrySettings(url: string, wcagVersion: ScanSettings["wcag_version"]): ScanSettings {
-  return { ...PUBLIC_DEFAULTS, url, wcag_version: wcagVersion, skip_interaction: true };
+  // Click-Through and the form error check off: both press controls, and
+  // this retry is meant to finish fast and show whether the site scans.
+  return { ...PUBLIC_DEFAULTS, url, wcag_version: wcagVersion, skip_interaction: true, skip_forms: true };
 }
 
 /**

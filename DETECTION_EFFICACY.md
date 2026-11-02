@@ -67,8 +67,10 @@ over 48 positive and 82 negative cases. Most of these cases were written or
 tuned while the check was built; only the independent batch, scored before
 any change it led to, is an honest estimate (24 cases: precision 100%, recall
 80%). Like the bundled corpus these are regression evidence on synthetic pages,
-not a real-world accuracy estimate: the check stays off by default until it is
-validated on real forms labelled by experts (`docs/internal/form-error-check.md`).
+not a real-world accuracy estimate. The check is on by default for public
+scans (the developer's decision, 2026-11-02, after the safety review) but not
+yet validated on real forms labelled by experts, so its results stay Not sure
+leads a person confirms (`docs/internal/form-error-check.md`).
 The detection-evals workflow runs it in its own job, with a browser.
 
 The efficiency and scale gates exercise the durable local evidence path:
