@@ -100,8 +100,9 @@ Ordered by what blocks using the check, then by expected value.
 - [ ] Move 3.3.1 in `src/audit/rules/wcag_coverage.yaml` from `manual` to
       partly automated, and update `docs/coverage-tracker.md` ("Form errors
       and stateful criteria") and the public coverage page.
-- [ ] Add the layer to `DETECTION_EFFICACY.md` and the detection-evals
-      workflow (it needs a browser, so a separate job).
+- [x] Add the layer to `DETECTION_EFFICACY.md` ("Form error check") and the
+      detection-evals workflow (job `form-error-check`, with Chromium). The
+      measurement now also gates recall at 80%, as every other layer is.
 
 ### 3. Recall gaps (known misses)
 

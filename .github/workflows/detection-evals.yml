@@ -17,6 +17,8 @@ on:
       - src/audit/detection_evals.py
       - src/audit/rules/**
       - tests/quality/**
+      - tests/integration/test_form_error_identification.py
+      - tests/integration/form_error_cases*.py
   push:
     branches:
       - main
@@ -35,6 +37,8 @@ on:
       - src/audit/detection_evals.py
       - src/audit/rules/**
       - tests/quality/**
+      - tests/integration/test_form_error_identification.py
+      - tests/integration/form_error_cases*.py
   schedule:
     - cron: "17 9 * * 1"
   workflow_dispatch:
@@ -84,3 +88,26 @@ jobs:
           path: artifacts/detection-evals/**
           if-no-files-found: warn
           retention-days: 30
+
+  form-error-check:
+    # The form error check (WCAG 3.3.1) presses forms in a real browser, so
+    # it is measured apart from the corpus above, with Chromium installed.
+    # Gates: no unsafe press, false-discovery rate below 5%, recall of at
+    # least 80% (DETECTION_EFFICACY.md, "Form error check").
+    name: Form error check (WCAG 3.3.1)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          python-version: "3.13"
+      - name: Install locked dependencies
+        run: uv sync --frozen --no-install-project
+      - name: Install Chromium
+        run: uv run --no-sync playwright install --with-deps chromium
+      - name: Measure the form error check
+        env:
+          PYTHONPATH: src
+        run: uv run --no-sync pytest tests/integration/test_form_error_identification.py -p no:randomly -s

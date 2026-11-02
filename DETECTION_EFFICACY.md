@@ -47,6 +47,30 @@ efficacy claim requires a held-out, representative corpus labeled independently
 by at least two accessibility experts, with adjudication, inter-rater agreement,
 per-rule denominators, abstentions, and confidence intervals.
 
+### Form error check (WCAG 3.3.1)
+
+The form error check presses each form's submit control in a real browser, so
+it is measured on its own, not in the bundled corpus:
+`tests/integration/test_form_error_identification.py` runs the check on 130
+labelled synthetic pages served over HTTP (`form_error_cases.py`, and the
+independent batch in `form_error_cases_independent.py`). Its gates, in the
+check's own order of priority:
+
+| Gate | Rule |
+| --- | --- |
+| Safety | No form the check must skip (sign-in, payment, search, destructive, CAPTCHA) is ever pressed. Absolute. |
+| Corpus size | At least 20 positive and 5 negative scored cases. |
+| Efficacy | False-discovery rate below 5%, then recall of at least 80%. |
+
+On the current code: precision 100% (no false positives) and recall 93.8%,
+over 48 positive and 82 negative cases. Most of these cases were written or
+tuned while the check was built; only the independent batch, scored before
+any change it led to, is an honest estimate (24 cases: precision 100%, recall
+80%). Like the bundled corpus these are regression evidence on synthetic pages,
+not a real-world accuracy estimate: the check stays off by default until it is
+validated on real forms labelled by experts (`docs/internal/form-error-check.md`).
+The detection-evals workflow runs it in its own job, with a browser.
+
 The efficiency and scale gates exercise the durable local evidence path:
 SQLite writes followed by the same unified issue projection used by the report
 UI. They do not yet measure network crawling, browser rendering, OCR latency, or
@@ -67,7 +91,9 @@ efficiency, scale, or integrity gate fails.
 
 The dedicated GitHub Actions workflow runs on relevant pull requests, pushes to
 `main`, weekly schedules, and manual dispatches. It publishes both reports as a
-workflow artifact and adds the Markdown report to the job summary.
+workflow artifact and adds the Markdown report to the job summary. A second
+job installs Chromium and runs the form error check's measurement
+(`uv run pytest tests/integration/test_form_error_identification.py`).
 
 Thresholds and workload sizes live in
 `tests/quality/detection_eval_config.json`. Changes to a threshold, workload,

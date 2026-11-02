@@ -160,3 +160,6 @@ async def test_precision_and_recall(browser, tmp_path: Path) -> None:  # type: i
     # Precision before recall: the efficacy gate's false-discovery rate.
     fdr = report["false_discovery_rate"]
     assert fdr is not None and fdr < 0.05, f"false-discovery rate {fdr:.1%}"
+    # Then recall, at the same floor as every other layer (DETECTION_EFFICACY.md).
+    recall = report["recall"]
+    assert recall is not None and recall >= 0.80, f"recall {recall:.1%}"
