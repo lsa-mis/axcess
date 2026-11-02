@@ -578,7 +578,7 @@ async def test_issue_table_recommended_order_is_lane_first_and_headers_sort_flat
         await playwright_async.expect(back).to_have_count(0)
         await playwright_async.expect(group_headers).to_have_count(0)
         assert await issues.locator("tbody").count() == 1
-        # Row header, then Type.
+        # Row header, then How sure.
         lanes = [
             cell.strip()
             for cell in await issues.locator("tbody tr > td:nth-child(2)").all_inner_texts()
@@ -611,8 +611,11 @@ async def test_issue_table_recommended_order_is_lane_first_and_headers_sort_flat
     # Flat, and "Does not apply" is not a low priority: it trails in both
     # directions.
     for direction in ("desc", "asc"):
-        # Row header, How sure, Where it shows, WCAG, then Priority.
-        cells = await issues.locator("tbody tr > td:nth-child(5)").all_inner_texts()
+        # Row header, How sure, then Priority.
+        cells = await issues.locator("tbody tr > td:nth-child(3)").all_inner_texts()
+        assert {cell.strip() for cell in cells} <= {"High", "Medium", "Low", "Does not apply"}, (
+            cells
+        )
         flags = [cell.strip() == "Does not apply" for cell in cells]
         assert flags == sorted(flags), (direction, cells)
         if direction == "desc":
@@ -691,17 +694,26 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
     headers = await table.locator("thead th").all_inner_texts()
     names = [re.sub(r"\s+", " ", text).strip() for text in headers]
     # The Finding type column reads "Where it shows" ("finding" is not an interface word).
-    # Check, beside it, names the check that found the row.
-    assert names[:5] == ["Issue type", "How sure", "Where it shows", "Check", "WCAG criterion"], (
-        names
-    )
+    # Check, beside it, names the check that found the row. How sure,
+    # Priority and Issue occurrences come right after the name (the
+    # developer's order, 2026-11-02).
+    assert names[:8] == [
+        "Issue type",
+        "How sure",
+        "Priority",
+        "Issue occurrences",
+        "Affected pages",
+        "Where it shows",
+        "Check",
+        "WCAG criterion",
+    ], names
 
     def row(title: str) -> Any:
         return table.locator("tbody tr").filter(
             has=page.get_by_role("rowheader").filter(has_text=title)
         )
 
-    finding_type = "td:nth-child(3)"
+    finding_type = "td:nth-child(6)"
     assert (
         await row("Load-state rule failure").locator(finding_type).inner_text()
     ).strip() == "At page load"
@@ -727,7 +739,7 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
     assert (await row("Adequate alternative").locator(finding_type).inner_text()).strip() == (
         "In an image"
     )
-    check = "td:nth-child(4)"
+    check = "td:nth-child(7)"
     assert (await row("Load-state rule failure").locator(check).inner_text()).strip() == (
         "Rule check (axe)"
     )
@@ -1000,16 +1012,18 @@ async def test_issue_evidence_trail_names_the_issue(
 async def test_inspector_has_one_full_trail_and_no_report_tabs(
     live_server: tuple[str, int], new_page: Any
 ) -> None:
-    """Issues → an issue's pages → the inspector: one trail naming every step.
+    """Issues → an issue type → the inspector: one trail naming every step.
 
     There used to be two: the topbar stopped at "Issues" and a second trail
     under the tabs carried the rest. The topbar now shows the whole path, and
     the report tabs are gone from a page that is inside the report rather
     than one of its views.
 
-    Each crumb names the specific thing, not the kind of view: the page list
-    by its size and the inspector by the page's own title. "Pages" and "Page
-    inspector" read the same for every issue and every page.
+    Each crumb names the specific thing, not the kind of view: the issue type
+    by its title and the inspector by the page's own title. "Page inspector"
+    would read the same for every page. The way in is the issue type's name:
+    the page count in the table is a plain number since 2026-11-02, and the
+    issue type's page leads with its pages.
     """
     base, scan_id = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
@@ -1017,8 +1031,16 @@ async def test_inspector_has_one_full_trail_and_no_report_tabs(
     row = (await response.json())["rows"][0]
     await page.goto(f"{base}/app/scans/{scan_id}/issues?type={row['review_lane']}")
     table = page.get_by_role("table", name="Accessibility issue types")
-    await table.get_by_role("link", name=f"with {row['title']}", exact=False).click()
-    await page.wait_for_url("**/pages?**")
+    # The page count is a number, not a second link to the same pages.
+    await playwright_async.expect(
+        table.get_by_role("link", name=f"with {row['title']}", exact=False)
+    ).to_have_count(0)
+    await (
+        table.get_by_role("rowheader")
+        .get_by_role("link", name=row["title"], exact=False)
+        .first.click()
+    )
+    await page.wait_for_url(re.compile(r"/issues/[^/?]+(\?|$)"))
     await playwright_async.expect(
         page.get_by_role("navigation", name="Report views")
     ).to_have_count(0)
@@ -1032,7 +1054,6 @@ async def test_inspector_has_one_full_trail_and_no_report_tabs(
         await (await page.request.get(f"{base}/api/scans/{scan_id}/pages/{page_id}")).json()
     )["page"]
     page_name = inspected["title"] or inspected["url_normalized"].removeprefix("http://")
-    affected = f"{row['page_count']} affected page{'' if row['page_count'] == 1 else 's'}"
     await playwright_async.expect(
         page.get_by_role("navigation", name="Breadcrumb").filter(visible=True)
     ).to_contain_text(page_name)
@@ -1041,7 +1062,6 @@ async def test_inspector_has_one_full_trail_and_no_report_tabs(
         "Reports",
         f"example.com Report #{scan_id}",
         row["title"],
-        affected,
         page_name,
     ], items
     _assert_current_is_plain_text(items)

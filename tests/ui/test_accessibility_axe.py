@@ -95,8 +95,7 @@ async def _run_axe(page: Any, tags: list[str] | None = None) -> list[dict[str, A
 _SCAN_GROUPS = (
     "Pages to scan",
     "Checks",
-    "AI checks on this computer",
-    "Limits and rule check tool",
+    "Local AI checks",
     "Speed and browser window",
 )
 
@@ -437,10 +436,10 @@ async def test_issue_card_answers_what_why_fix_and_where(
         [
             "Issue type",
             "How sure",
-            "WCAG criterion",
             "Priority",
             "Issue occurrences",
-            "Pages",
+            "Affected pages",
+            "WCAG criterion",
         ]
     )
     # Hidden for now (HIDDEN_ISSUE_FIELDS in the SPA); the data still exports.
@@ -495,7 +494,7 @@ async def test_issue_table_fits_the_default_desktop_width(
     issues = page.get_by_role("table", name="Accessibility issue types")
     scroller = page.get_by_role("region", name="Issues table")
     # Who fixes it is hidden for now (HIDDEN_ISSUE_FIELDS), so Pages stands in.
-    for column in (None, "Issue type", "Issue occurrences", "Pages"):
+    for column in (None, "Issue type", "Issue occurrences", "Affected pages"):
         if column:
             await issues.get_by_role("button", name=column, exact=False).first.click()
         widths = await scroller.evaluate("el => ({scroll: el.scrollWidth, client: el.clientWidth})")

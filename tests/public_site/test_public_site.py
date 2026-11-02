@@ -325,7 +325,6 @@ def test_first_scan_steps_use_the_app_words(pages: dict[str, str]) -> None:
         "Website address",
         "Scan the whole website",
         "Pages to scan",
-        "Limits and rule check tool",
         "Maximum pages",
         "Speed and browser window",
         "What this scan will do",

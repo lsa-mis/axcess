@@ -106,7 +106,7 @@ export const ISSUE_COLUMN_HELP = {
   "Where it shows": "Where this issue type shows up: at page load, after clicking, or in an image.",
   Priority:
     "High, Medium, or Low, from the impact rating of this issue type and how many pages it is on. Issue types from the rule check (Alfa) have no rating, so they count as the lowest. A serious issue type on one page can still be Low. Issue types marked For information show Does not apply.",
-  Pages:
+  "Affected pages":
     "Pages with at least one occurrence of this issue type. An element repeated on many pages, such as a shared menu, counts only on the first page it was found on. An image counts on every page it appears on.",
   "Issue occurrences":
     "How many occurrences of this issue type were found. An occurrence is one place a problem appears: one element on one page, or in one page state. An element repeated on many pages, such as a shared menu, counts once. An image counts every time it appears.",

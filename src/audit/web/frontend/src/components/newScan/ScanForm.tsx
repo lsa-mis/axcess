@@ -6,7 +6,6 @@ import { GROUPS } from "./copy";
 import CoverageGroup from "./CoverageGroup";
 import FormErrorAlert from "./FormErrorAlert";
 import type { Capabilities } from "./groupProps";
-import LimitsGroup from "./LimitsGroup";
 import LocalAiGroup from "./LocalAiGroup";
 import type { FieldError, FieldKey, ScanPolicy, ScanSettings } from "./scanPolicy";
 import ScanSummaryCard from "./ScanSummaryCard";
@@ -21,13 +20,12 @@ import type { ScopePreview } from "../../api/types";
 export const SCAN_FORM_ID = "scan-form";
 
 type GroupKey = keyof typeof GROUPS;
-const GROUP_KEYS: GroupKey[] = ["coverage", "checks", "localAi", "limits", "speed"];
+const GROUP_KEYS: GroupKey[] = ["coverage", "checks", "localAi", "speed"];
 /** The fields a failed submit can name, by the group that holds them. */
 const GROUP_FIELDS: Record<GroupKey, readonly FieldKey[]> = {
-  coverage: [],
+  coverage: ["max_pages", "max_depth"],
   checks: [],
   localAi: [],
-  limits: ["max_pages", "max_depth"],
   speed: ["static_only"],
 };
 
@@ -44,8 +42,18 @@ const GROUP_FIELDS: Record<GroupKey, readonly FieldKey[]> = {
  * Every settings group is an accordion row, closed on arrival: the first
  * screen is the address, the group names, and the rail beside them saying
  * in words what will run, so nothing has to be scrolled past to start. A
- * failed submit opens the group that holds a named field (the limits, or
- * Fast scan under Speed), so the alert's link lands on a visible control.
+ * failed submit opens the group that holds a named field (the page limits
+ * under Pages to scan, or Fast scan under Speed), so the alert's link lands
+ * on a visible control.
+ *
+ * Four groups since 2026-11-02. A fifth, "Limits and rule check tool", held
+ * the page limits and the rule check tool together, two settings that only
+ * shared a group because neither had one; the developer moved the limits
+ * into Pages to scan (they say how much of the site is visited, that
+ * group's own description) and the rule check tool into Checks (it decides
+ * what each page is tested with). One fewer row to open, and each setting
+ * sits under the name a reader looks for it by (W3C COGA, "Making Content
+ * Usable": group related content; paraphrased).
  * Start (`actions`) is pinned at the foot of the rail, and
  * Reset at its top right. Why the foot of the rail: see `SubmitBar`.
  *
@@ -160,7 +168,6 @@ export default function ScanForm({
           {accordion("coverage", <CoverageGroup {...groupProps} />)}
           {accordion("checks", <ChecksGroup {...groupProps} />)}
           {accordion("localAi", <LocalAiGroup {...groupProps} />)}
-          {accordion("limits", <LimitsGroup {...groupProps} />)}
           {accordion("speed", <SpeedGroup {...groupProps} />)}
 
           {afterGroups}

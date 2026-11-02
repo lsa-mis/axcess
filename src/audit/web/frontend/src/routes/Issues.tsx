@@ -72,9 +72,13 @@ import type {
  * for the selected issue (type, criterion, priority, spread, difficulty,
  * owner), so the whole report can be compared at a glance instead of one
  * issue at a time. What does not fit in a cell is one link away: the title
- * opens the issue's full record (what it is, why it matters, the fix), and
- * the page count opens a page of its own (``/scans/:id/issues/:key/pages``)
- * listing every affected page in columns. The topbar trail is the way back,
+ * opens the issue type's full record, which leads with every affected page
+ * in columns, then what it is, why it matters, and the fix. The page count
+ * was a second link, to a page listing the same pages
+ * (``/scans/:id/issues/:key/pages``), until 2026-11-02: one job, two
+ * links in one row, so the developer made the count a plain number (W3C
+ * COGA, "Making Content Usable": one way to do one thing; paraphrased).
+ * The topbar trail is the way back,
  * which the desktop app needs because it has no browser back button, and
  * every link out of here carries the origin it needs to draw that trail.
  *
@@ -470,16 +474,24 @@ function parseList(raw: string | null, allowed: readonly string[]): string {
 
 const COLUMNS = [
   "Issue",
+  // How sure, then Priority and Issue occurrences, right after the issue
+  // type's name (the developer's order, 2026-11-02). How sure comes first
+  // because it says whether to trust the Priority beside it: a High on a
+  // Not sure row is a lead to confirm, not a found problem, and the
+  // product keeps facts apart from leads (AGENTS.md). It is also the
+  // recommended order's first key, with priority ordering the rows inside
+  // each How sure group, so the columns read left to right in the order the
+  // rows are sorted. Priority and Issue occurrences followed WCAG criterion
+  // until that day, and were briefly second and third, ahead of How sure.
   "Type",
+  "Priority",
+  "Occurrences",
+  // Affected pages right after Issue occurrences (2026-11-02), as Reports
+  // orders its counts: issue occurrences, then pages. It was the last column.
+  "Pages",
   "Finding type",
   "Check",
   "WCAG",
-  "Priority",
-  // Occurrences right after Priority, then Pages: the developer's order
-  // (2026-10-30), the problem counts before how widely they spread, as on
-  // Reports (issue types, issue occurrences, then pages).
-  "Occurrences",
-  "Pages",
   "Difficulty",
   "Responsibility",
 ] as const;
@@ -525,7 +537,11 @@ const COLUMN_LABEL: Record<SortColumn, string> = {
   // be, the badge saying its level by itself.
   WCAG: "WCAG criterion",
   Priority: "Priority",
-  Pages: "Pages",
+  // "Affected pages" (2026-11-02), the words the trail already uses for an
+  // issue type's pages ("131 affected pages"). Not "Impacted pages": impact
+  // names the Critical/Serious/Moderate/Minor rating, so it could be read as
+  // pages with serious problems.
+  Pages: "Affected pages",
   Occurrences: "Issue occurrences",
   Difficulty: "Difficulty",
   Responsibility: "Who fixes it",
@@ -825,7 +841,6 @@ const IssueTableRow = memo(function IssueTableRow({
 }) {
   const isInformational = row.review_lane === "informational";
   const detailPath = `/scans/${scanId}/issues/${encodeURIComponent(row.issue_key)}`;
-  const pagesPath = withReturnTrail(`${detailPath}/pages`, "Issues", here);
   // Body cells are padded 1.5 rather than the shared 2, which is what keeps
   // all nine columns in view beside the expanded sidebar at 1280 px. Every
   // cell but the title is short, so it centres under its centred heading.
@@ -854,21 +869,6 @@ const IssueTableRow = memo(function IssueTableRow({
       <Cell className={cn(cell, "whitespace-nowrap")}>
         <LaneTag lane={row.review_lane} />
       </Cell>
-      <Cell className={cell}>
-        <FindingTypeCell row={row} />
-      </Cell>
-      <Cell className={cell}>{CHECK_LABEL[row.pipeline] ?? row.pipeline}</Cell>
-      <Cell className={cn(cell, "whitespace-nowrap")}>
-        {row.wcag_sc ? (
-          <span className="inline-flex items-center gap-1.5">
-            <span className="tabular-nums">{row.wcag_sc}</span>
-            <ConformanceBadge level={row.conformance} />
-            {row.wcag_name && <span className="sr-only">{row.wcag_name}</span>}
-          </span>
-        ) : (
-          <span className="text-fg-muted">Best practice</span>
-        )}
-      </Cell>
       <Cell className={cn(cell, "whitespace-nowrap")}>
         {isInformational ? (
           <span className="whitespace-normal text-fg-muted">Does not apply</span>
@@ -883,17 +883,22 @@ const IssueTableRow = memo(function IssueTableRow({
         {row.occurrence_count}
       </Cell>
       <Cell numeric className={cell}>
-        {/* "211 pages" says nothing about which issue type on its own, and a
-            description is not a name: SC 2.4.9 wants the purpose from the
-            link text alone, so the issue type rides along inside the name while
-            the cell stays a number wide. */}
-        <Link
-          to={pagesPath}
-          className="flex min-h-target items-center justify-center text-umich-blue underline underline-offset-2"
-        >
-          {row.page_count} page{row.page_count === 1 ? "" : "s"}
-          <span className="sr-only"> with {row.title}</span>
-        </Link>
+        {row.page_count}
+      </Cell>
+      <Cell className={cell}>
+        <FindingTypeCell row={row} />
+      </Cell>
+      <Cell className={cell}>{CHECK_LABEL[row.pipeline] ?? row.pipeline}</Cell>
+      <Cell className={cn(cell, "whitespace-nowrap")}>
+        {row.wcag_sc ? (
+          <span className="inline-flex items-center gap-1.5">
+            <span className="tabular-nums">{row.wcag_sc}</span>
+            <ConformanceBadge level={row.conformance} />
+            {row.wcag_name && <span className="sr-only">{row.wcag_name}</span>}
+          </span>
+        ) : (
+          <span className="text-fg-muted">Best practice</span>
+        )}
       </Cell>
       {shows("Difficulty") && (
         <Cell className={cn(cell, "whitespace-nowrap")}>
