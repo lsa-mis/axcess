@@ -141,7 +141,7 @@ async def test_report_links_and_review_lanes(
         await playwright_async.expect(
             issues.get_by_role("rowheader").get_by_role("link", name=hidden, exact=False)
         ).to_have_count(0)
-    type_cells = issues.locator("tbody tr > td:nth-child(4)")
+    type_cells = issues.locator("tbody tr > td:nth-child(2)")
     assert set(await type_cells.all_inner_texts()) == {"Not sure"}
     assert "conformance" not in parse_qs(urlparse(page.url).query)
     assert await page.evaluate("document.body.scrollWidth <= innerWidth")
@@ -578,10 +578,10 @@ async def test_issue_table_recommended_order_is_lane_first_and_headers_sort_flat
         await playwright_async.expect(back).to_have_count(0)
         await playwright_async.expect(group_headers).to_have_count(0)
         assert await issues.locator("tbody").count() == 1
-        # Row header, Priority, Issue occurrences, then How sure (the fourth cell).
+        # Row header, then How sure.
         lanes = [
             cell.strip()
-            for cell in await issues.locator("tbody tr > td:nth-child(4)").all_inner_texts()
+            for cell in await issues.locator("tbody tr > td:nth-child(2)").all_inner_texts()
         ]
         assert lanes and lanes == sorted(lanes, key=lane_order.index), lanes
         await playwright_async.expect(
@@ -691,14 +691,14 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
     headers = await table.locator("thead th").all_inner_texts()
     names = [re.sub(r"\s+", " ", text).strip() for text in headers]
     # The Finding type column reads "Where it shows" ("finding" is not an interface word).
-    # Check, beside it, names the check that found the row. Priority and
-    # Issue occurrences come right after the name (the developer's order,
-    # 2026-11-02).
+    # Check, beside it, names the check that found the row. How sure,
+    # Priority and Issue occurrences come right after the name (the
+    # developer's order, 2026-11-02).
     assert names[:7] == [
         "Issue type",
+        "How sure",
         "Priority",
         "Issue occurrences",
-        "How sure",
         "Where it shows",
         "Check",
         "WCAG criterion",

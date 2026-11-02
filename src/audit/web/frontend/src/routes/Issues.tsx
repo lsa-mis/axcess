@@ -470,17 +470,18 @@ function parseList(raw: string | null, allowed: readonly string[]): string {
 
 const COLUMNS = [
   "Issue",
-  // Priority and Issue occurrences second and third, right after the issue
-  // type's name: the developer's order (2026-11-02), so what to look at
-  // first and how much of it there is are read before how the scan found
-  // it. They followed WCAG criterion until then (Priority, then Issue
-  // occurrences, from 2026-10-30). The tradeoff, accepted: How sure, which
-  // the recommended order groups by, is now the fourth column rather than
-  // the second, so the grouping is a column further from the name; the
-  // Not sure badge still sits in every row it applies to.
+  // How sure, then Priority and Issue occurrences, right after the issue
+  // type's name (the developer's order, 2026-11-02). How sure comes first
+  // because it says whether to trust the Priority beside it: a High on a
+  // Not sure row is a lead to confirm, not a found problem, and the
+  // product keeps facts apart from leads (AGENTS.md). It is also the
+  // recommended order's first key, with priority ordering the rows inside
+  // each How sure group, so the columns read left to right in the order the
+  // rows are sorted. Priority and Issue occurrences followed WCAG criterion
+  // until that day, and were briefly second and third, ahead of How sure.
+  "Type",
   "Priority",
   "Occurrences",
-  "Type",
   "Finding type",
   "Check",
   "WCAG",
@@ -857,6 +858,9 @@ const IssueTableRow = memo(function IssueTableRow({
         </Link>
       </RowHeader>
       <Cell className={cn(cell, "whitespace-nowrap")}>
+        <LaneTag lane={row.review_lane} />
+      </Cell>
+      <Cell className={cn(cell, "whitespace-nowrap")}>
         {isInformational ? (
           <span className="whitespace-normal text-fg-muted">Does not apply</span>
         ) : (
@@ -868,9 +872,6 @@ const IssueTableRow = memo(function IssueTableRow({
       </Cell>
       <Cell numeric className={cell}>
         {row.occurrence_count}
-      </Cell>
-      <Cell className={cn(cell, "whitespace-nowrap")}>
-        <LaneTag lane={row.review_lane} />
       </Cell>
       <Cell className={cell}>
         <FindingTypeCell row={row} />
