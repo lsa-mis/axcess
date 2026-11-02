@@ -284,17 +284,25 @@ export function TableRegion({
 export function Table({
   caption,
   captionClassName = "sr-only",
-  ruled = false,
+  ruled = true,
   className,
   children,
 }: {
   caption: ReactNode;
   captionClassName?: string;
   /**
-   * A thin line between columns, top to bottom, for a table whose rows are
-   * read down a column as much as across (Reports, where a site's scans are
-   * compared by their numbers). Off by default: most tables are read a row
-   * at a time, and the stripes already guide the eye across.
+   * A thin line between columns, top to bottom, so a value can be followed
+   * up to its column's header. On for every table since 2026-11-02, the
+   * developer's call: Reports had them first (user testing, 2026-10-28,
+   * where a site's scans are compared by their numbers), and the other
+   * tables without them looked like a different kind of table. One pattern
+   * for one kind of thing (W3C COGA, "Making Content Usable",
+   * https://www.w3.org/TR/coga-usable/; SC 3.2.4 Consistent Identification,
+   * Level AA, in spirit). Off only for a table that is not read down its
+   * columns at all (`ruled={false}`); none is today. Until then they were off
+   * by default, on the view that most tables are read a row at a time and
+   * the stripes guide the eye across; the lines do not get in the way of
+   * that, and they help reading down.
    *
    * The line is an inset shadow on each cell's right, not a border. The
    * sticky row header draws its own edge the same way (see RowHeader), and
