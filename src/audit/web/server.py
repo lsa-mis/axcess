@@ -4373,7 +4373,8 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
         {
             "key": "forms",
             "label": "Form error check",
-            # Off by default everywhere, and never in a sign-in scan.
+            # Off unless the scan turned it on (New scan does, by default, for
+            # public websites); never in a sign-in scan.
             "enabled": flag("form_error_checks_enabled", default=False) and rendered,
             "checked_count": forms_pages,
             "total_count": coverage["rendered_pages"],
