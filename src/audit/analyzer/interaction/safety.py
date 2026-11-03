@@ -14,6 +14,7 @@ the form check holds them in the page itself (``analyzer.forms.probe``).
 
 from __future__ import annotations
 
+import asyncio
 import re
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager, suppress
@@ -26,6 +27,9 @@ if TYPE_CHECKING:
     from playwright.async_api import Dialog, Page, Request, Route
 
 log = get_logger(__name__)
+
+# How long a cancelled guard keeps trying to remove itself.
+_LIFT_TIMEOUT_S = 10.0
 
 
 def safe_url(url: str, blocked_labels: Sequence[str]) -> bool:
@@ -149,17 +153,39 @@ async def exploration_guard(
     if page.context.service_workers:
         # Their requests bypass routing; do not pretend the write guard holds.
         raise RuntimeError("Interaction exploration requires blocked service workers")
-    page.on("dialog", dismiss)
-    page.on("popup", remember_popup)
-    await page.context.route("**/*", guard)
-    try:
-        yield
-    finally:
+
+    async def lift() -> None:
         for popup in popups:
             with suppress(Exception):
                 await popup.close()
-        await page.context.unroute("**/*", guard)
+        with suppress(Exception):
+            await page.context.unroute("**/*", guard)
         page.remove_listener("dialog", dismiss)
         page.remove_listener("popup", remember_popup)
+
+    page.on("dialog", dismiss)
+    page.on("popup", remember_popup)
+    try:
+        # Inside the try: Playwright records the route before the browser
+        # confirms it, so a caller's time limit landing here left the route
+        # in place with no cleanup, refusing every later request in the
+        # context (seen with the form error check on a real page).
+        await page.context.route("**/*", guard)
+        yield
+    finally:
+        # Finish lifting the guard even when a time limit cancels the caller
+        # during it, then let the cancellation through. Bounded either way:
+        # a time limit cancels only once, so a browser that stopped answering
+        # would otherwise hang the caller here for good.
+        task = asyncio.ensure_future(lift())
+        try:
+            await asyncio.wait_for(asyncio.shield(task), _LIFT_TIMEOUT_S)
+        except TimeoutError:
+            task.cancel()
+            log.warning("interaction.guard_not_lifted", timeout_s=_LIFT_TIMEOUT_S)
+        except asyncio.CancelledError:
+            with suppress(Exception):
+                await asyncio.wait_for(task, _LIFT_TIMEOUT_S)
+            raise
         if blocked:
             log.info("interaction.guard", blocked_requests_or_dialogs=blocked)
