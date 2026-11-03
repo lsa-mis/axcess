@@ -54,11 +54,48 @@ Outcomes: `fail`, `pass`, `native` (only the browser's own message),
 | Independent (written without seeing the detector), before any change | 24 | 100% (8/8) | 80% (8/10) | **Yes** |
 | Blind 1, before the fixes it led to | 14 | 75% | 60% | Was; now tuned against |
 | Blind 2, before the fixes it led to | 14 | 83% | 83% | Was; now tuned against |
-| All 130 scored cases, current code | 130 | 100% (0 false positives) | 93.8% | Mostly tuned against |
+| Real pages: copies of the first real-page mistakes, before the fix | 4 | 25% (1 of 4 failures right) | 100% (1/1) | No: written to the bug |
+| All 134 scored cases, current code | 134 | 100% (0 false positives) | 93.9% | Mostly tuned against |
 
 No form that must be skipped has ever been pressed. These are regression
 evidence on synthetic pages, not a real-world accuracy estimate
 (`DETECTION_EFFICACY.md`).
+
+## Real pages (2026-11-03)
+
+Run by hand in a visible browser on 32 public pages (validation-library
+demos, design-system docs, accessibility demos), one fresh browser context
+per page as in a scan. Each verdict was checked against the before/after
+screenshots by the developer's agent, not by an accessibility expert, so
+this is a sanity check, not validation. Pages behind a Cloudflare check
+were left out.
+
+| Run | Fail | Pass | Browser's own message | Wrong verdicts |
+| --- | --- | --- | --- | --- |
+| First, 14 pages, code before the fixes below | 3 | 0 | 0 | All 3 fails (Bootstrap, Parsley) |
+| Last, 32 pages, current code | 0 | 25 | 4 | None found |
+
+The first run's mistakes, and one found later on atlassian.design, each
+became a "real pages" case (`r01` to `r04` in `form_error_cases.py`) that
+fails on the old code:
+
+- Text the page revealed (Bootstrap's hidden feedback) was thrown away
+  when the same words were visible elsewhere on the page.
+- A radio group's single message (Parsley) was judged per radio button.
+- Hint text in other forms' live regions, past a 6000-element cap on the
+  record of visible text, counted as this form's error message.
+
+The same runs found three robustness bugs, each with its own test: form
+locators that matched several forms (`path` now climbs until unique), a
+change watcher that kept busy pages' main thread occupied past the 30 s
+limit (`test_form_error_busy_page.py`), and a network guard that could be
+left on, or hang, when that limit cancelled it
+(`test_exploration_guard_cleanup.py`).
+
+What the real pages show the check cannot do yet: no real page produced a
+true "fail", so recall on real forms is unmeasured. Most forms on library
+demo pages are skipped (sign-in, search, no submit control, nothing empty),
+and 7 were "not checked" because the page sent a request on submit.
 
 ## To do
 

@@ -51,7 +51,7 @@ per-rule denominators, abstentions, and confidence intervals.
 
 The form error check presses each form's submit control in a real browser, so
 it is measured on its own, not in the bundled corpus:
-`tests/integration/test_form_error_identification.py` runs the check on 130
+`tests/integration/test_form_error_identification.py` runs the check on 134
 labelled synthetic pages served over HTTP (`form_error_cases.py`, and the
 independent batch in `form_error_cases_independent.py`). Its gates, in the
 check's own order of priority:
@@ -62,8 +62,10 @@ check's own order of priority:
 | Corpus size | At least 20 positive and 5 negative scored cases. |
 | Efficacy | False-discovery rate below 5%, then recall of at least 80%. |
 
-On the current code: precision 100% (no false positives) and recall 93.8%,
-over 48 positive and 82 negative cases. Most of these cases were written or
+On the current code, on these pages we wrote ourselves: precision 100% (no
+false positives) and recall 93.9%, over 49 positive and 85 negative cases.
+Four of them (`r01` to `r04`) are cut-down copies of real pages the check
+first got wrong. Most of these cases were written or
 tuned while the check was built; only the independent batch, scored before
 any change it led to, is an honest estimate (24 cases: precision 100%, recall
 80%). Like the bundled corpus these are regression evidence on synthetic pages,
@@ -71,6 +73,9 @@ not a real-world accuracy estimate. The check is on by default for public
 scans (the developer's decision, 2026-11-02, after the safety review) but not
 yet validated on real forms labelled by experts, so its results stay Not sure
 leads a person confirms (`docs/internal/form-error-check.md`).
+On 32 real public pages, checked by hand on 2026-11-03 against screenshots
+(not by an expert), the check gave 29 verdicts, none found wrong, and no
+real page produced a failure, so recall on real forms is unmeasured.
 The detection-evals workflow runs it in its own job, with a browser.
 
 The efficiency and scale gates exercise the durable local evidence path:
