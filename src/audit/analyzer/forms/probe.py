@@ -135,15 +135,19 @@ _COLLECT_JS = r"""
     if (f.tagName === 'SELECT') return f.selectedIndex <= 0 || !f.value;
     return !f.value;
   };
+  // Climbs until the path matches this element alone (or reaches an id).
+  // A fixed five steps matched four forms on primevue.org, so the report
+  // and the screenshots pointed at the wrong form.
   const path = el => {
     const parts = [];
-    for (let n = el; n && n.nodeType === 1 && parts.length < 5; n = n.parentElement) {
+    for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
       if (n.id) { parts.unshift('#' + CSS.escape(n.id)); break; }
       let i = 1;
       for (let p = n.previousElementSibling; p; p = p.previousElementSibling) {
         if (p.tagName === n.tagName) i++;
       }
       parts.unshift(n.tagName.toLowerCase() + ':nth-of-type(' + i + ')');
+      if (n !== el && document.querySelectorAll(parts.join(' > ')).length === 1) break;
     }
     return parts.join(' > ');
   };
