@@ -67,6 +67,13 @@ const CHECKS: { name: string; text: string; how: string; on: string; link?: { hr
     link: { href: "/docs/glossary/#click-through", text: "What Click-Through is" },
   },
   {
+    name: "Form error check",
+    text: "Presses each form's submit button once, with nothing typed, and checks that the form says in words what is wrong. It stops the form from being sent, and never presses sign-in, payment, search or delete forms.",
+    how: "Seen in the browser",
+    on: "On by default for public websites; never in a sign-in scan",
+    link: { href: "/docs/glossary/#form-error-check", text: "What the form error check is" },
+  },
+  {
     name: "Image text check",
     text: "Text recognition (optical character recognition, OCR), included in the desktop app, finds text inside images. An optional local vision model checks whether the alt text says the same.",
     how: "Text recognition, plus optional AI",
