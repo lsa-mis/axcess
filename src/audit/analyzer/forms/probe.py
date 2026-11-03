@@ -413,19 +413,46 @@ _ARM_JS = (
   }
   window.__axcessHidden = hiddenNow;
   const logged = {invalid: [], texts: []};
-  const scan = node => {
-    if (!node || node.nodeType !== 1) return;
+  // Changed elements are read in batches, every 50 ms, each once per batch,
+  // and an element is logged again only when its text or colour changed.
+  // Read on every change, a page that redraws all the time (mantine.dev's
+  // live demos) kept its own main thread busy for over 20 seconds and
+  // piled up a list too long to hand back, so the check ran out of time
+  // before it reached the page's other forms. Each entry keeps the time of
+  // the change itself, not of the batch, so "shown before the first blocked
+  // request" means what it did.
+  const MAX_TEXTS = 2000;
+  const last = new WeakMap();
+  const pending = new Map();
+  let timer = 0;
+  const scan = (node, t) => {
     for (const el of [node, ...node.querySelectorAll('*')].slice(0, 400)) {
       const e = entry(el);
-      if (e) logged.texts.push({...e, t: Date.now()});
+      if (!e) continue;
+      const key = e.text + '|' + e.colour;
+      if (last.get(el) === key) continue;
+      last.set(el, key);
+      if (logged.texts.length < MAX_TEXTS) logged.texts.push({...e, t});
     }
+  };
+  const flush = () => {
+    clearTimeout(timer);
+    timer = 0;
+    const batch = [...pending];
+    pending.clear();
+    for (const [node, t] of batch) if (node.isConnected) scan(node, t);
+  };
+  const queue = node => {
+    if (!node || node.nodeType !== 1) return;
+    if (!pending.has(node)) pending.set(node, Date.now());
+    if (!timer) timer = setTimeout(flush, 50);
   };
   const observer = new MutationObserver(records => {
     for (const r of records) {
       if (r.type === 'childList') {
-        r.addedNodes.forEach(n => scan(n.nodeType === 3 ? n.parentElement : n));
+        r.addedNodes.forEach(n => queue(n.nodeType === 3 ? n.parentElement : n));
       }
-      else scan(r.type === 'characterData' ? r.target.parentElement : r.target);
+      else queue(r.type === 'characterData' ? r.target.parentElement : r.target);
     }
   });
   observer.observe(document.documentElement, {subtree: true, childList: true, characterData: true,
@@ -439,6 +466,7 @@ _ARM_JS = (
   window.__axcessFormWatch = {logged, stop: () => {
     observer.disconnect();
     document.removeEventListener('invalid', onInvalid, true);
+    flush();
   }};
 }
 """
