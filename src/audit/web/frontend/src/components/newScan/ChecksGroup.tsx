@@ -1,17 +1,29 @@
-import { CLICK_THROUGH_COPY, GROUPS, STANDARD, SWITCHES, WCAG_VERSION } from "./copy";
+import { CLICK_THROUGH_COPY, ENGINE, GROUPS, STANDARD, SWITCHES, WCAG_VERSION } from "./copy";
+import { CHECK_LABEL } from "../../lib/terms";
 import type { GroupProps } from "./groupProps";
 import PillGroup from "./PillGroup";
-import { isFixed, switchOn, switchPatch } from "./scanPolicy";
+import { isFixed, switchOn, switchPatch, type ScanSettings } from "./scanPolicy";
 import SettingsGroup, { SwitchList } from "./SettingsGroup";
 import SwitchRow from "./SwitchRow";
 
 /**
- * What each page is tested for: the standard (level and WCAG version),
- * Click-Through, and the browser checks that need a rendered page. The rule
- * engine is chosen beside the limits, in `LimitsGroup`.
+ * What each page is tested for and with what: the standard (level and WCAG
+ * version), the rule check tool, Click-Through, and the browser checks that
+ * need a rendered page.
+ *
+ * The rule check tool joined this group on 2026-11-02, from "Limits and
+ * rule check tool" (see ScanForm): which tool checks the pages is part of
+ * what Axcess tests on each page, this group's own description. It sits
+ * under the standard it checks against, before the switches that add
+ * checks of their own, and it decides whether Click-Through can run (Alfa
+ * alone cannot), so the switch it disables is right below it.
  */
-export default function ChecksGroup({ settings, update, policy }: GroupProps) {
+export default function ChecksGroup({ settings, update, policy, capabilities }: GroupProps) {
   const rendered = !settings.static_only;
+  const alfaOff = capabilities.alfa?.available === false;
+  const alfaReason = alfaOff
+    ? `${CHECK_LABEL.alfa} is not available: ${capabilities.alfa?.reason ?? "not installed"}.`
+    : undefined;
   const clickThroughBlocked = settings.static_only
     ? CLICK_THROUGH_COPY.unavailableStatic
     : settings.scan_engine === "alfa"
@@ -45,6 +57,26 @@ export default function ChecksGroup({ settings, update, policy }: GroupProps) {
           ]}
         />
       </div>
+
+      <PillGroup
+        name="scan-engine"
+        label={ENGINE.label}
+        hint={alfaReason}
+        value={settings.scan_engine}
+        onChange={(scan_engine) => {
+          const patch: Partial<ScanSettings> = { scan_engine };
+          // Alfa alone cannot re-check revealed content; axe or Both
+          // cannot run without a rendered page.
+          if (scan_engine === "alfa") patch.skip_interaction = true;
+          else if (settings.static_only) patch.static_only = false;
+          update(patch);
+        }}
+        options={[
+          { value: "axe", label: ENGINE.axe.label, hint: ENGINE.axe.hint },
+          { value: "alfa", label: ENGINE.alfa.label, hint: ENGINE.alfa.hint, disabled: alfaOff },
+          { value: "both", label: ENGINE.both.label, hint: ENGINE.both.hint, disabled: alfaOff },
+        ]}
+      />
 
       <SwitchList>
         <SwitchRow

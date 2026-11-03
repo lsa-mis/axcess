@@ -9,6 +9,7 @@ import {
   EmptyState,
   LinkButton,
   PageHeader,
+  pageEvidencePath,
   Select,
   SeverityChip,
   StatCard,
@@ -111,7 +112,7 @@ export default function GroupedFindingsRoute() {
   return (
     <>
       <PageHeader
-        title="Images, grouped by kind of issue"
+        title="Images, grouped by issue type"
         subtitle={withoutUserinfo(scan.seed_url)}
         actions={
           <LinkButton to={`/scans/${scan.id}/findings`} variant="secondary">
@@ -132,7 +133,7 @@ export default function GroupedFindingsRoute() {
           <Info className="mt-0.5 h-5 w-5 shrink-0 text-umich-blue" aria-hidden />
           <p className="text-sm text-fg">
             <strong>How this page groups images.</strong> Each group is one
-            kind of issue. Axcess groups images by two things: the kind of image
+            issue type. Axcess groups images by two things: the kind of image
             (classification), and whether its alt text is good enough. Alt
             text is the text a screen reader reads for an image. Every image
             in a group has the <em>same suggested fix</em>, so you can decide
@@ -144,11 +145,13 @@ export default function GroupedFindingsRoute() {
 
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard label="Images" value={coverage.finding_count} />
-        {/* Issues first, then kinds of issues: the order the developer set on
-            2026-10-26 for every screen that shows both counts. Why the words
-            changed: docs/plain-language.md, "Why "issue" and "kind of issue"". */}
-        <StatCard label="Issues" value={coverage.occurrence_total} />
-        <StatCard label="Kinds of issues" value={groups.length} />
+        {/* Issue types first, then issue occurrences: the order and the
+            words the developer set on 2026-10-30 for every screen that shows
+            both counts (it was occurrences first from 2026-10-26). Why the
+            words changed: docs/plain-language.md, "Why "occurrence" and
+            "issue type"". */}
+        <StatCard label="Issue types" value={groups.length} />
+        <StatCard label="Issue occurrences" value={coverage.occurrence_total} />
         <StatCard label="Pages scanned" value={coverage.page_count} />
       </div>
 
@@ -167,7 +170,7 @@ export default function GroupedFindingsRoute() {
           />
         </TableBar>
         <TableStatus className="border-b-0">
-          {groups.length.toLocaleString()} {groups.length === 1 ? "kind of issue" : "kinds of issues"}.
+          {groups.length.toLocaleString()} {groups.length === 1 ? "issue type" : "issue types"}.
         </TableStatus>
       </Card>
 
@@ -245,7 +248,7 @@ function GroupCard({
           image{group.finding_count !== 1 ? "s" : ""}
           {" · "}
           <strong className="text-fg">{group.occurrence_count}</strong>{" "}
-          issue{group.occurrence_count !== 1 ? "s" : ""}
+          occurrence{group.occurrence_count !== 1 ? "s" : ""}
         </span>
       </button>
 
@@ -290,7 +293,7 @@ function GroupCard({
             kind="image"
           />
 
-          <FindingsInGroup findings={group.findings} label={group.label} />
+          <FindingsInGroup findings={group.findings} label={group.label} scanId={scanId} />
         </div>
       )}
     </Card>
@@ -382,7 +385,15 @@ function BulkStatusBar({
   );
 }
 
-function FindingsInGroup({ findings, label }: { findings: GroupedFinding[]; label: string }) {
+function FindingsInGroup({
+  findings,
+  label,
+  scanId,
+}: {
+  findings: GroupedFinding[];
+  label: string;
+  scanId: number;
+}) {
   // One table per group, so the page is kept per group rather than in the URL.
   // A new row set (a status filter, a bulk update) starts it over.
   const resetKey = useMemo(() => findings.map((f) => f.id).join(","), [findings]);
@@ -392,7 +403,7 @@ function FindingsInGroup({ findings, label }: { findings: GroupedFinding[]; labe
       {paged.pages > 1 && (
         <TableBar pager={<TablePagination label="Images in this group" noun="images" {...paged} />} />
       )}
-      <TableRegion label={`${label} images table`} paged={paged}>
+      <TableRegion label={`${label} images table`}>
         <Table caption={`Images in ${label}`}>
           <TableHead>
             <tr>
@@ -405,7 +416,12 @@ function FindingsInGroup({ findings, label }: { findings: GroupedFinding[]; labe
           </TableHead>
           <tbody>
             {paged.pageRows.map((f, index) => (
-              <FindingRow key={f.id} finding={f} index={(paged.page - 1) * paged.pageSize + index} />
+              <FindingRow
+                key={f.id}
+                finding={f}
+                scanId={scanId}
+                index={(paged.page - 1) * paged.pageSize + index}
+              />
             ))}
           </tbody>
         </Table>
@@ -414,36 +430,68 @@ function FindingsInGroup({ findings, label }: { findings: GroupedFinding[]; labe
   );
 }
 
-function FindingRow({ finding, index }: { finding: GroupedFinding; index: number }) {
+function FindingRow({
+  finding,
+  scanId,
+  index,
+}: {
+  finding: GroupedFinding;
+  scanId: number;
+  index: number;
+}) {
   const [showPages, setShowPages] = useState(false);
   return (
     <Row index={index}>
       <Cell>
-        {finding.has_svg_text ? (
-          <span className="inline-flex h-12 w-[72px] items-center justify-center rounded-xs border border-dashed border-umich-blue/40 bg-umich-blue/5 font-mono text-2xs font-semibold text-umich-blue">
-            SVG text
-          </span>
-        ) : finding.content_hash ? (
-          // The thumbnail is the row's only link to the image's page, so its
-          // alt names where it goes ("Open image #12", the terms table's
-          // "Image #12"): with alt="" the link had no name at all (SC 2.4.4
-          // Link Purpose (In Context) and SC 4.1.2 Name, Role, Value, both
-          // Level A; technique H30). A description of the picture was
-          // rejected: it is the scanned site's image, and the link's job is
-          // to say where it leads.
-          <Link to={`/findings/${finding.id}`} className="inline-block">
-            {/* eslint-disable-next-line jsx-a11y/img-redundant-alt -- "image" names the record the link opens ("Image #12", docs/plain-language.md), not the picture */}
+        {/* The row's one way to the image's page: the picture and its name,
+            "Image #12", inside one link (WCAG technique H2, combining
+            adjacent image and text links for the same resource). The
+            picture is clickable, as the developer asked (2026-10-30), and
+            keyboard and screen reader users meet one link, not two.
+
+            Until 2026-10-30 the thumbnail was one link and "Review this
+            image →" under the Pages list was a second to the same page.
+            Researched and rejected: the whole row as one link (it would
+            cover the pages list's own button, and stop people selecting the
+            text read from the image to copy it); the thumbnail alone (rows
+            with SVG text or no saved picture would have no link, and a bare
+            picture does not look like a link, Nielsen Norman Group,
+            https://www.nngroup.com/articles/clickable-elements/); and
+            hiding one of the two links from the keyboard with ARIA (no ARIA
+            is better than bad ARIA, and voice control users could not name
+            it).
+
+            The picture's alt is empty: the words name the link, and the
+            picture repeated in words would be read twice (H2). Its border
+            darkens on hover with the underline, so it reads as part of the
+            link. "Image #12" is the terms table's name for this record and
+            the Images page's link text (SC 3.2.4 Consistent Identification,
+            Level AA), and says which image on its own (SC 2.4.9 Link Purpose
+            (Link Only), Level AAA). The link is at least 44 pixels tall
+            (SC 2.5.5 Target Size (Enhanced), Level AAA). */}
+        <Link
+          to={`/findings/${finding.id}`}
+          className="report-link group inline-flex min-h-target flex-col items-start gap-1 p-1 text-xs font-semibold"
+        >
+          {finding.has_svg_text ? (
+            <span className="inline-flex h-12 w-[72px] items-center justify-center rounded-xs border border-dashed border-umich-blue/40 bg-umich-blue/5 font-mono text-2xs font-semibold text-umich-blue no-underline group-hover:border-umich-blue">
+              SVG text
+            </span>
+          ) : finding.content_hash ? (
             <img
               src={blobUrl(finding.content_hash)}
-              alt={`Open image #${finding.id}`}
+              alt=""
               loading="lazy"
               decoding="async"
-              className="h-12 w-[72px] rounded-xs border border-border bg-white object-contain"
+              className="h-12 w-[72px] rounded-xs border border-border bg-white object-contain group-hover:border-umich-blue"
             />
-          </Link>
-        ) : (
-          <span className="text-fg-muted">No image</span>
-        )}
+          ) : (
+            <span className="inline-flex h-12 w-[72px] items-center justify-center rounded-xs border border-border text-2xs font-normal text-fg-muted no-underline group-hover:border-umich-blue">
+              No image
+            </span>
+          )}
+          <span>Image #{finding.id}</span>
+        </Link>
       </Cell>
       <Cell>
         {finding.ocr_text ? (
@@ -510,8 +558,18 @@ function FindingRow({ finding, index }: { finding: GroupedFinding; index: number
                   <span aria-hidden> ↗</span>
                   <span className="sr-only">opens in a new tab</span>
                 </a>
+                {/* The page's evidence in this report. It pointed at
+                    `/pages/:id`, an address the app never had, so it
+                    opened "Page not found" (fixed 2026-10-30). The
+                    breadcrumb leads back here, as from the other report
+                    tables (pageEvidencePath). */}
                 <Link
-                  to={`/pages/${occ.page_id}`}
+                  to={pageEvidencePath({
+                    scanId,
+                    pageId: occ.page_id,
+                    origin: "Images, grouped by issue type",
+                    backTo: `/scans/${scanId}/findings/grouped`,
+                  })}
                   className="ml-2 text-2xs text-fg-muted underline underline-offset-2"
                 >
                   Page details
@@ -533,12 +591,6 @@ function FindingRow({ finding, index }: { finding: GroupedFinding; index: number
             ))}
           </ul>
         )}
-        <Link
-          to={`/findings/${finding.id}`}
-          className="mt-1 block text-2xs text-umich-blue underline underline-offset-2"
-        >
-          Review this image →
-        </Link>
       </Cell>
     </Row>
   );

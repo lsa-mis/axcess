@@ -5,8 +5,9 @@
  * This route has three faces, chosen by scan status. Running shows the
  * progress panel and a cancel control. Failed or interrupted shows why and
  * offers a retry. Completed redirects to the Issues table, which is where a
- * report opens: it used to have an Overview tab of its own here, and its
- * numbers and coverage now sit above the table (see ``ReportSummary``). The
+ * report opens: it used to have an Overview tab of its own here; its
+ * numbers now sit above the table (``ReportSummary``) and what was checked
+ * under it (``ReportCoverageNote``). The
  * redirect keeps every existing ``/scans/:id`` link working, and a scan that
  * finishes while the reader watches lands them on its report.
  *

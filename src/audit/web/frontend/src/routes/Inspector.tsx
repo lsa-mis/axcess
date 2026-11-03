@@ -453,7 +453,6 @@ export default function InspectorRoute() {
     () => targets.filter((target) => target.stateKey === activeStateKey),
     [targets, activeStateKey],
   );
-  const offStateCount = targets.length - scopedTargets.length;
   // What the status lines below are actually talking about.
   const hasScopedTarget = scopedTargets.length > 0;
 
@@ -819,7 +818,7 @@ export default function InspectorRoute() {
     return (
       <div className="flex items-center gap-2 py-8 text-sm text-fg-muted" role="status">
         <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-        Finding the page state where these issues appear…
+        Finding the page state where these occurrences appear…
       </div>
     );
   }
@@ -974,13 +973,13 @@ export default function InspectorRoute() {
         </div>
       )}
 
-      {/* Where else the issues under review are, in one sentence, not a
-          second control.
+      {/* Where else the occurrences under review are, in one sentence, not
+          a second control.
 
-          The picker shows one page state at a time, so issues in the
+          The picker shows one page state at a time, so occurrences in the
           others were out of sight: nothing said a click had revealed more
           (eb39b33). That was first fixed with a box of pill links, one per
-          page state holding issues. But while reviewing a kind of issue the
+          page state holding occurrences. But while reviewing an issue type the
           picker lists exactly those page states, with the same counts, so
           the pills were a second control for the same choice. Two ways to
           do one thing make a reader work out whether they differ (W3C COGA,
@@ -1131,7 +1130,7 @@ export default function InspectorRoute() {
                 highlight.located + highlight.ambiguous + unreachableCount < highlight.total && (
                   <span className="text-sev-major">
                     Axcess found {highlight.located} of {highlight.total} flagged
-                    issues.{" "}
+                    occurrences.{" "}
                     {missingReason?.whenSomeFound ??
                       "The others may have changed since the scan."}
                   </span>
@@ -1141,8 +1140,8 @@ export default function InspectorRoute() {
                 // locator to tell them apart, is said, not outlined.
                 <span className="text-sev-major">
                   {highlight.ambiguous === 1
-                    ? "1 issue is not outlined: its markup appears in more than one place in this saved copy, and Axcess does not guess which."
-                    : `${highlight.ambiguous} issues are not outlined: their markup appears in more than one place in this saved copy, and Axcess does not guess which.`}
+                    ? "1 occurrence is not outlined: its markup appears in more than one place in this saved copy, and Axcess does not guess which."
+                    : `${highlight.ambiguous} occurrences are not outlined: their markup appears in more than one place in this saved copy, and Axcess does not guess which.`}
                 </span>
               )}
               {!highlightPending && showHighlights && highlight !== null && unreachableCount > 0 && (
@@ -1178,27 +1177,25 @@ export default function InspectorRoute() {
               {activeStateKey === null && hiddenImageCount > 0 && (
                 <span>
                   {hiddenImageCount === 1
-                    ? "1 more issue is in page code that browsers do not show when scripts run (a <noscript> or <template> element), usually a backup copy of an image. It is not outlined."
-                    : `${hiddenImageCount} more issues are in page code that browsers do not show when scripts run (a <noscript> or <template> element), usually backup copies of images. They are not outlined.`}
+                    ? "1 more occurrence is in page code that browsers do not show when scripts run (a <noscript> or <template> element), usually a backup copy of an image. It is not outlined."
+                    : `${hiddenImageCount} more occurrences are in page code that browsers do not show when scripts run (a <noscript> or <template> element), usually backup copies of images. They are not outlined.`}
                 </span>
               )}
-              {offStateCount > 0 && (
-                // Without this the kind of issue looks smaller in a state view
-                // than it is: the picker is the only way to the rest of it.
-                <span>
-                  {offStateCount} more {offStateCount === 1 ? "issue" : "issues"} of
-                  this kind {offStateCount === 1 ? "is" : "are"} in another page
-                  state. Choose it in the Page state list.
-                </span>
-              )}
+              {/* No line here for occurrences in other page states: the
+                  sentence under the Page state list says it (ELSEWHERE_ID),
+                  and is that list's description. This line said the same
+                  thing a second time on one screen until 2026-11-02, when
+                  the developer removed it, keeping the one beside the
+                  control it points to (W3C COGA, "Making Content Usable":
+                  say a thing once, where it is used; paraphrased). */}
               {!showHighlights && hasScopedTarget && (
                 <span>Highlights are hidden for this page.</span>
               )}
               {!hasTarget && (
                 <span>
                   {render.source === "stored"
-                    ? "This is the copy the scan saved. This kind of issue has no element to mark."
-                    : "Axcess loaded this page just now. This kind of issue has no element to mark."}
+                    ? "This is the copy the scan saved. This issue type has no element to mark."
+                    : "Axcess loaded this page just now. This issue type has no element to mark."}
                 </span>
               )}
               {!data.store_rendered_html && (
@@ -1248,7 +1245,7 @@ export default function InspectorRoute() {
                   {currentElement.where && (
                     <ElementFact term="Where the box is">{BOX_NOTES[currentElement.where]}</ElementFact>
                   )}
-                  {sharedCount > 1 && <ElementFact term="Issues">{sharedCount} on this element</ElementFact>}
+                  {sharedCount > 1 && <ElementFact term="Issue occurrences">{sharedCount} on this element</ElementFact>}
                   {currentPlace ? (
                     <>
                       <ElementFact term="Where it is in the page code" stack>
@@ -1371,7 +1368,7 @@ export default function InspectorRoute() {
               <Disclosure
                 id="inspect-evidence"
                 title="Evidence from the scan"
-                meta={`${evidenceCount} issue${evidenceCount === 1 ? "" : "s"}`}
+                meta={`${evidenceCount} occurrence${evidenceCount === 1 ? "" : "s"}`}
                 className="rounded-none border-0 border-t"
               >
                 <ul className="space-y-2">
@@ -1417,7 +1414,7 @@ export default function InspectorRoute() {
                 </ul>
                 {evidenceCount > 3 && (
                   <p className="mt-1 text-2xs text-fg-muted">
-                    + {evidenceCount - 3} more issue{evidenceCount - 3 === 1 ? "" : "s"} in this page state.
+                    + {evidenceCount - 3} more occurrence{evidenceCount - 3 === 1 ? "" : "s"} in this page state.
                   </p>
                 )}
               </Disclosure>
@@ -1840,10 +1837,15 @@ function MissingChip({ count }: { count: MissingCount | undefined }) {
 
 /**
  * The picker's neutral "Issue not here" chip, for the page as it loaded when
- * every issue under review came after a click. The option stays, as the
- * baseline the other states are read against, but none of those issues is
- * in it. "Issue" here is one place on the page (docs/plain-language.md,
- * Terms); the word stayed when the terms changed on 2026-10-26.
+ * every occurrence under review came after a click. The option stays, as
+ * the baseline the other states are read against, but none of those
+ * occurrences is in it. The chip has said "Issue not here" since before
+ * the 2026-10-26 rename, and still does: it means the issue type under
+ * review is not in this page state, not one place. "Occurrence not here"
+ * would name one place when it means all of them; "Issue type not here"
+ * is the exact term but is longer for a chip, and was left for the
+ * developer to decide when "occurrence" came back on 2026-10-28
+ * (docs/plain-language.md, "Why "occurrence" and "issue type"").
  *
  * Literal words, not "For reference": that says the option is secondary but
  * not why, and plain-language guidance asks for the fact itself. Neutral,
@@ -1855,12 +1857,12 @@ function MissingChip({ count }: { count: MissingCount | undefined }) {
 const ELSEWHERE_ID = "inspect-state-elsewhere";
 
 /**
- * "3 more issues are in 2 other page states. Choose one in the Page
+ * "3 more occurrences are in 2 other page states. Choose one in the Page
  * state list." From page load, the others all come after a click, so it
  * says so. Counts and states are both given: a state can hold several.
  */
 function elsewhereSentence(occurrences: number, states: number, inClickedState: boolean): string {
-  const many = occurrences === 1 ? "1 more issue" : `${occurrences.toLocaleString()} more issues`;
+  const many = occurrences === 1 ? "1 more occurrence" : `${occurrences.toLocaleString()} more occurrences`;
   const where = states === 1 ? "1 page state" : `${states} page states`;
   const choose = states === 1 ? "Choose it in the Page state list." : "Choose one in the Page state list.";
   if (inClickedState) {
@@ -1906,13 +1908,13 @@ const BOX_NOTES: Record<BoxNote, string> = {
 };
 
 /**
- * Why some issues are not outlined: where they are, and that the saved
+ * Why some occurrences are not outlined: where they are, and that the saved
  * copy does not keep that part. Empty for none.
  */
 function unreachableSentence(count: number, where: Unreachable): string {
   if (count === 0) return "";
   const lead =
-    count === 1 ? "1 issue is not outlined: it is" : `${count} issues are not outlined: they are`;
+    count === 1 ? "1 occurrence is not outlined: it is" : `${count} occurrences are not outlined: they are`;
   return where === "shadow"
     ? `${lead} inside a part of the page that keeps its own page code (shadow DOM). The saved copy does not keep that code.`
     : `${lead} inside another page shown within this one (an iframe). The saved copy does not keep that page.`;
@@ -2119,8 +2121,8 @@ function LocatorValue({
 }
 
 /**
- * How many of the issues under review a page state holds, in words:
- * ": 19 issues". A bare "(19)" left the reader to guess what was
+ * How many of the occurrences under review a page state holds, in words:
+ * ": 19 occurrences". A bare "(19)" left the reader to guess what was
  * counted. Nothing is added when the page state holds none.
  */
 /**
@@ -2145,7 +2147,7 @@ function shortName(name: string, max = 40): string {
 
 function occurrencesHere(count: number): string {
   if (count === 0) return "";
-  return `: ${count.toLocaleString()} issue${count === 1 ? "" : "s"}`;
+  return `: ${count.toLocaleString()} occurrence${count === 1 ? "" : "s"}`;
 }
 
 /**

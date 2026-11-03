@@ -84,7 +84,7 @@ REVIEW_LANE_LABELS: dict[ReviewLane, str] = {
 REVIEW_LANE_HELP: dict[ReviewLane, str] = {
     "likely_barrier": (
         "A rule check (axe or Alfa) failed. These checks follow fixed rules, so they give "
-        "the same result every time. Look at each issue on the page, fix it, test the fix, "
+        "the same result every time. Look at each occurrence on the page, fix it, test the fix, "
         "then scan again to see if it is still found."
     ),
     "expert_review": (

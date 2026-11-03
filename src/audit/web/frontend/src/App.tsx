@@ -40,7 +40,10 @@ const ProtectedIssueIndexRoute = lazy(() => import("./routes/ProtectedIssueIndex
 const FindingsRoute = lazy(() => import("./routes/Findings"));
 const GroupedFindingsRoute = lazy(() => import("./routes/GroupedFindings"));
 const FindingDetailRoute = lazy(() => import("./routes/FindingDetail"));
-const CompareRoute = lazy(() => import("./routes/Compare"));
+// Compare reports, two reports side by side; What changed, the comparison
+// table it links to (both say why they are two pages).
+const CompareReportsRoute = lazy(() => import("./routes/CompareReports"));
+const WhatChangedRoute = lazy(() => import("./routes/Compare"));
 const TrackingRoute = lazy(() => import("./routes/Tracking"));
 const PageEvidenceRoute = lazy(() => import("./routes/PageEvidence"));
 const InspectorRoute = lazy(() => import("./routes/Inspector"));
@@ -91,7 +94,11 @@ export default function App() {
           path="/scans/:scanId/a11y/by-rule"
           element={<ProtectedReportGate><A11yByRuleRoute /></ProtectedReportGate>}
         />
-        <Route path="/scans/:scanId/compare" element={<ProtectedReportGate><CompareRoute /></ProtectedReportGate>} />
+        <Route path="/scans/:scanId/compare" element={<ProtectedReportGate><CompareReportsRoute /></ProtectedReportGate>} />
+        <Route
+          path="/scans/:scanId/compare/changes"
+          element={<ProtectedReportGate><WhatChangedRoute /></ProtectedReportGate>}
+        />
         <Route path="/scans/:scanId/diff" element={<LegacyDiffRedirect />} />
         <Route path="/findings/:findingId" element={<FindingDetailRoute />} />
         <Route path="/tracking" element={<TrackingRoute />} />
@@ -109,12 +116,15 @@ function LegacyReportRedirect() {
   return <Navigate replace to={`/scans/${scanId}/issues`} />;
 }
 
-/** "Verify changes" became Compare reports; a saved link keeps its baseline. */
+/**
+ * "Verify changes" became Compare reports, and on 2026-10-29 its table moved
+ * to What changed; a saved link keeps its baseline and lands on that table.
+ */
 function LegacyDiffRedirect() {
   const { scanId } = useParams<{ scanId: string }>();
   const { search } = useLocation();
   const compareTo = new URLSearchParams(search).get("compare_to");
-  return <Navigate replace to={`/scans/${scanId}/compare${compareTo ? `?compare_to=${encodeURIComponent(compareTo)}` : ""}`} />;
+  return <Navigate replace to={`/scans/${scanId}/compare/changes${compareTo ? `?compare_to=${encodeURIComponent(compareTo)}` : ""}`} />;
 }
 
 function LegacyProtectedNewRedirect() {

@@ -64,13 +64,14 @@ Use the word in the first column, and never the words in the last.
 | --- | --- | --- |
 | report | The results of one scan, with a number: "Report #40". | audit, scan (for the results) |
 | scan | The act of checking a site: "Start a scan", "The scan is running". | crawl, audit |
-| issue | One place a problem appears: one element on one page, or in one page state. "476 issues". | occurrence, instance, violation, result, finding, hit, error (for an issue) |
-| kind of issue | All the issues one check found for the same reason (for images, the same kind of image with the same alt text problem). One row in the Issues table: "6 kinds of issues". | issue (for a row), issue group, issue type, type of issue, evidence group, evidence record, rule (for the row) |
+| issue type | All the occurrences one check found for the same reason (for images, the same kind of image with the same alt text problem). One row in the Issues table: "6 issue types". As a label: "Issue types". | kind of issue, issue (for a row), issue group, type of issue, evidence group, evidence record, rule (for the row) |
+| occurrence | One place a problem appears: one element on one page, or in one page state. "476 occurrences". As a label or column header: "Issue occurrences". Explain it where a screen first counts it: "An occurrence is one place a problem appears." | issue (for one place), instance, violation, result, finding, hit, error (for an occurrence); "Occurrences" alone as a label |
+| issue | A general word for a problem, and part of names: the Issues page, the Issues table, "All issues", "Issue type". | "N issues" as a count (count issue types or occurrences) |
 | image | One image the image text check looked at: "Image #12". | finding (for an image) |
-| Mostly sure / Not sure / For information | The three "How sure" values, in the Issues table's "How sure" column: how sure Axcess is that a kind of issue is a real problem. An Alfa "cannot tell" result is Not sure. | Barrier, Needs review, Informational, likely barrier, likely problem, possible problem, needs confirmation, review lead, lead, expert decision, cantTell, "Type" (for this column) |
-| At page load / After clicking / In an image | The values of the Issues table's "Where it shows" column: where a kind of issue shows up. "At page load" and "After clicking" match the page state names. | Found by, Found (as the header), WCAG (as a value), Click-Through (as a value; it stays the feature's name), Alt Text (as a value), finding type |
-| Critical / Serious / Moderate / Minor | A kind of issue's impact rating: how badly the problem affects people (glossary "Impact"). | critical, serious (lower case, as raw values), severity (for this rating) |
-| status | Where an issue stands in review. Values: New, Reviewing, In progress, Fixed, Accepted risk, Not a problem (false positive). | triage status, review status, remediated, raw values like `in_progress` |
+| Mostly sure / Not sure / For information | The three "How sure" values, in the Issues table's "How sure" column: how sure Axcess is that an issue type is a real problem. An Alfa "cannot tell" result is Not sure. | Barrier, Needs review, Informational, likely barrier, likely problem, possible problem, needs confirmation, review lead, lead, expert decision, cantTell, "Type" (for this column) |
+| At page load / After clicking / In an image | The values of the Issues table's "Where it shows" column: where an issue type shows up. "At page load" and "After clicking" match the page state names. | Found by, Found (as the header), WCAG (as a value), Click-Through (as a value; it stays the feature's name), Alt Text (as a value), finding type |
+| Critical / Serious / Moderate / Minor | An issue type's impact rating: how badly the problem affects people (glossary "Impact"). | critical, serious (lower case, as raw values), severity (for this rating) |
+| status | Where an occurrence stands in review. Values: New, Reviewing, In progress, Fixed, Accepted risk, Not a problem (false positive). | triage status, review status, remediated, raw values like `in_progress` |
 | check | One way Axcess tests pages. See the check names below. | engine, pipeline, probe, method, detector, source |
 | page state | How a page looked at one moment: "At page load" or "After clicking Menu". | DOM state, interaction state, captured state |
 | saved copy | The copy of a page the scan stored. | capture, stored capture, stored render, loaded DOM |
@@ -87,14 +88,25 @@ Use the word in the first column, and never the words in the last.
 | element code (HTML) | The code of one flagged element. | snippet, outerHTML, markup |
 | element locator (CSS selector) | The text that finds an element in the page code. | selector (alone) |
 | element locator (XPath) | The path that finds an element in the page code, as the rule check (Alfa) records it. | selector, path (alone) |
+| panel | One of the two reports on Compare reports, each in its own frame: "Go back in the report #24 panel". Never "left" or "right": on a narrow screen the panels are one above the other. | pane, side, left, right |
+| What changed | The page that lists what is new, still found and no longer found between two reports. | Compare reports (for this page), diff, verify changes |
 | Does not apply | A table cell with no value for this row. | n/a |
 
-### Why "issue" and "kind of issue"
+### Why "occurrence" and "issue type"
 
-Until October 2026 an "issue" was one row of the Issues table and each
-place it appeared was an "occurrence", so a report read "6 issues, 476
+The terms changed three times in October 2026. On screen the pair now reads
+"7 issue types, 22 issue occurrences", issue types first.
+
+| Dates | One row of the Issues table | One place a problem appears |
+| --- | --- | --- |
+| Until 2026-10-26 | issue | occurrence |
+| 2026-10-26 to 2026-10-28 | kind of issue | issue |
+| 2026-10-28 to 2026-10-30 | kind of issue | occurrence |
+| Since 2026-10-30 | issue type | occurrence ("Issue occurrences" as a label) |
+
+**2026-10-26: "issue" for a place.** A report read "6 issues, 476
 occurrences". People called the 476 "issues" and misread the 6. The
-developer changed the terms on 2026-10-26 after this research:
+developer changed the terms after this research:
 
 - Most accessibility tools call each place an issue, error or failure, and
   name the group after its rule, check or type: axe DevTools and Equalize
@@ -108,27 +120,53 @@ developer changed the terms on 2026-10-26 after this research:
   common words new meanings. Calling a group of problems "an issue" did
   that.
 
-"Kind of issue", not "issue type" or "type of issue". "Kind" and "type"
+**2026-10-28: "occurrence" again for a place.** User testing on 2026-10-28
+was with Siteimprove users. They know Siteimprove's pair: an "issue" is a
+rule, and each place it appears is an "occurrence". The developer decided
+that the count of places goes back to "occurrence" everywhere a user sees or
+hears it, and a row stays a "kind of issue". The row keeps its 2026-10-26
+name, so "issue" alone still never names one row in a count, and the two
+numbers never share a word.
+
+"Occurrence" is still an advanced word (SC 3.1.3 Unusual Words, Level AAA;
+SC 3.1.5 Reading Level, Level AAA). So where a screen or a document first
+counts occurrences, it says what one is: "An occurrence is one place a
+problem appears: one element on one page, or in one page state." The Issues
+table's Issue occurrences column hint and the glossary do this.
+
+**2026-10-30: "issue type", and "Issue occurrences" as a label.** After the
+same testing, the developer renamed a row "issue type" and labelled the
+count of places "Issue occurrences" everywhere, with issue types first on
+every screen that shows both counts (the Issues summary, Reports, the
+grouped views, What changed). Both labels now start with "Issue", so a
+reader scanning the numbers sees at once that they count the same problems
+two ways. The reasons "kind" won on 2026-10-28, below, were weighed again:
+"Scan type" is a different screen's setting, the "Type" column has been
+"How sure" since, and the Jira export's "Issue Type" is Jira's own field
+(always "Bug"), seen only inside Jira. "Kind of issue" is now in the "Do
+not use" column.
+
+Until 2026-10-30, "Kind of issue", not "issue type" or "type of issue". "Kind" and "type"
 are equally plain (both Oxford A1), and "kinds of issues" is a little more
 common than "types of issues" (Google Books Ngram, 2010-2019). But "type"
 already names other things: "Scan type" on New scan, the Jira export's
 "Issue Type" field, and the old "Type" column that became "How sure". One
 word for one thing keeps "kind" for this.
 
-"Kinds of issues", plural, since 2026-10-28. "Issue" is a countable noun,
+"Kinds of issues", plural, from 2026-10-28 to 2026-10-30. "Issue" is a countable noun,
 and "kinds of issues" is about 30 times as common as "kinds of issue" in
 the same data, so it is what readers expect. The singular stays for one
 row: "Kind of issue", "1 kind of issue".
 
-The old words stay in code and data: `occurrence_count`, `issue_key` and
-the API fields keep their names, because an export or script may read them.
-Only the words people see changed. The exports (CSV, Excel, Markdown,
+The words in code and data never changed: `occurrence_count`, `issue_key`
+and the API fields keep their names, because an export or script may read
+them. Only the words people see changed. The exports (CSV, Excel, Markdown,
 Jira) still use their own column names; see docs/glossary.md.
 
 ### Why "Mostly sure", "Not sure", and "For information"
 
 The "How sure" column answers one question: how sure is Axcess that this
-kind of issue is a real problem? Each word was chosen against these alternatives.
+issue type is a real problem? Each word was chosen against these alternatives.
 
 | Choice | Rejected | Why |
 | --- | --- | --- |

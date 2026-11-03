@@ -20,8 +20,7 @@ import { ariaSort, nextSort, sortChip, type Sort, type SortKind } from "./sort";
  *                  the pager (../TablePagination) on the right, and the
  *                  active filters written out beneath
  *   TableStatus    the polite line that says how the rows are ordered
- *   TableRegion    the keyboard-scrollable region, and the height hold that
- *                  keeps the table's foot still between pages
+ *   TableRegion    the keyboard-scrollable region
  *     Table, TableHead, SortHeader / ColumnHeader
  *     Row, RowHeader, Cell    striped rows, one target tall
  *
@@ -144,14 +143,21 @@ export function TableSearch({
  * filter is confirmed to everyone, not only to a screen reader. `actions`
  * sit beside it, outside the live region, so their names are not read out
  * with every change.
+ *
+ * `announce={false}` drops the live region, for a table that shows this
+ * line only some of the time: a live region added to the page with its words
+ * already in it is not read out, so such a table keeps its own live region
+ * mounted all the time instead (the Issues table, routes/Issues.tsx).
  */
 export function TableStatus({
   children,
   actions,
+  announce = true,
   className,
 }: {
   children: ReactNode;
   actions?: ReactNode;
+  announce?: boolean;
   className?: string;
 }) {
   return (
@@ -162,35 +168,32 @@ export function TableStatus({
         className,
       )}
     >
-      <p role="status" aria-live="polite">
-        {children}
-      </p>
+      {announce ? (
+        <p role="status" aria-live="polite">
+          {children}
+        </p>
+      ) : (
+        <p>{children}</p>
+      )}
       {actions}
     </div>
   );
 }
 
-/** What `TableRegion` needs from `usePagedRows`. */
-type Paged = {
-  hold: { ref: (node: HTMLElement | null) => void; style: { minHeight?: number } };
-};
-
 /**
  * The scroll region around a table. Keyboard users need focus on it to
- * scroll a wide table sideways, so it takes focus and carries a name. With
- * `paged`, it holds the tallest page's height, so turning to a short last
- * page does not pull everything under the table up the screen.
+ * scroll a wide table sideways, so it takes focus and carries a name. (It
+ * used to hold a paged table at its tallest page's height; see usePagedRows
+ * for why that was dropped.)
  */
 export function TableRegion({
   label,
-  paged,
   busy,
   regionRef,
   className,
   children,
 }: {
   label: string;
-  paged?: Paged;
   busy?: boolean;
   regionRef?: Ref<HTMLDivElement>;
   /**
@@ -268,7 +271,7 @@ export function TableRegion({
         className,
       )}
     >
-      {paged ? <div {...paged.hold}>{children}</div> : children}
+      {children}
     </div>
   );
 }
@@ -281,16 +284,43 @@ export function TableRegion({
 export function Table({
   caption,
   captionClassName = "sr-only",
+  ruled = true,
   className,
   children,
 }: {
   caption: ReactNode;
   captionClassName?: string;
+  /**
+   * A thin line between columns, top to bottom, so a value can be followed
+   * up to its column's header. On for every table since 2026-11-02, the
+   * developer's call: Reports had them first (user testing, 2026-10-28,
+   * where a site's scans are compared by their numbers), and the other
+   * tables without them looked like a different kind of table. One pattern
+   * for one kind of thing (W3C COGA, "Making Content Usable",
+   * https://www.w3.org/TR/coga-usable/; SC 3.2.4 Consistent Identification,
+   * Level AA, in spirit). Off only for a table that is not read down its
+   * columns at all (`ruled={false}`); none is today. Until then they were off
+   * by default, on the view that most tables are read a row at a time and
+   * the stripes guide the eye across; the lines do not get in the way of
+   * that, and they help reading down.
+   *
+   * The line is an inset shadow on each cell's right, not a border. The
+   * sticky row header draws its own edge the same way (see RowHeader), and
+   * a border beside it doubled the line; a collapsed border also stays put
+   * while a sticky cell scrolls, and a shadow moves with it.
+   */
+  ruled?: boolean;
   className?: string;
   children: ReactNode;
 }) {
   return (
-    <table className={cn("w-full text-sm", className)}>
+    <table
+      className={cn(
+        "w-full text-sm",
+        ruled && "[&_:is(th,td):not(:last-child)]:shadow-[inset_-1px_0_0_theme(colors.border.DEFAULT)]",
+        className,
+      )}
+    >
       <caption className={captionClassName}>{caption}</caption>
       {children}
     </table>

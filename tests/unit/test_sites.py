@@ -148,3 +148,29 @@ def test_report_counts_reads_only_the_report_asked_for(tmp_db: sqlite3.Connectio
     tmp_db.execute("DELETE FROM page_a11y_findings WHERE scan_id = ?", (second,))
     assert sites.report_counts(tmp_db, first) == counts
     assert sites.report_counts(tmp_db, second).occurrence_count == 0
+
+
+@pytest.mark.parametrize(
+    ("axe_pages", "alfa_pages", "expected"),
+    [(3, 0, ["axe"]), (0, 2, ["alfa"]), (3, 2, ["axe", "alfa"]), (0, 0, [])],
+)
+def test_a_scan_lists_the_rule_checks_that_checked_a_page(
+    axe_pages: int, alfa_pages: int, expected: list[str]
+) -> None:
+    from audit.web.server import _scan_row_to_summary
+
+    row = {
+        "id": 1,
+        "seed_url": "https://a.example/",
+        "status": "completed",
+        "axe_pages_scanned": axe_pages,
+        "alfa_pages_scanned": alfa_pages,
+    }
+    assert _scan_row_to_summary(row)["rule_checks"] == expected
+
+
+def test_a_scan_without_the_counters_does_not_claim_no_rule_check_ran() -> None:
+    from audit.web.server import _scan_row_to_summary
+
+    row = {"id": 1, "seed_url": "https://a.example/", "status": "completed"}
+    assert _scan_row_to_summary(row)["rule_checks"] is None

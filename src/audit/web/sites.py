@@ -17,7 +17,7 @@ from __future__ import annotations
 import sqlite3
 import threading
 from collections.abc import Iterable
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -34,6 +34,9 @@ class ScanSummaryModel(BaseModel):
     page_count: int
     dom_state_count: int
     finding_count: int
+    #: The rule checks that checked at least one page ("axe", "alfa"), or
+    #: ``None`` when the scan row did not carry the counters.
+    rule_checks: list[Literal["axe", "alfa"]] | None = None
     started_at: str | None
     finished_at: str | None
 
@@ -58,8 +61,8 @@ class ReportCounts(BaseModel):
     """The two issue counts of one completed report, as the Issues page counts them.
 
     Field names are the data's: ``issue_count`` is unified issue groups (the
-    interface's "kinds of issues") and ``occurrence_count`` is every place
-    they appear (the interface's "issues").
+    interface's "issue types") and ``occurrence_count`` is every place
+    they appear (the interface's "occurrences").
     """
 
     issue_count: int

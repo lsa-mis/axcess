@@ -179,7 +179,7 @@ async def test_an_image_issue_outlines_its_images_and_says_what_it_leaves_out(
         await playwright_async.expect(where).to_have_text("Number 3 of the 3 img elements")
         await playwright_async.expect(
             page.get_by_text(
-                "1 more issue is in page code that browsers do not show when scripts run",
+                "1 more occurrence is in page code that browsers do not show when scripts run",
                 exact=False,
             )
         ).to_be_visible()

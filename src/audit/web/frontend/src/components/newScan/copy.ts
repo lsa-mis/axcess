@@ -43,12 +43,12 @@ export const GROUPS = {
     description: "What Axcess tests on each page.",
   },
   localAi: {
-    legend: "AI checks on this computer",
+    // "Local AI checks" (2026-11-02, the developer's name; it was "AI checks on
+    // this computer"). The description below keeps the privacy fact the old
+    // name carried: the AI runs on this computer only and uploads nothing.
+    legend: "Local AI checks",
     description:
       "AI (artificial intelligence) runs on this computer only. Axcess uploads nothing and never downloads a model by itself.",
-  },
-  limits: {
-    legend: "Limits and rule check tool",
   },
   speed: {
     legend: "Speed and browser window",
@@ -97,7 +97,7 @@ export const SWITCHES = {
   skip_rendered_storage: {
     label: "Don’t keep a saved copy of each page",
     hint:
-      "Keeps the stored report smaller. The Page inspector then loads the live page when you open it, instead of the saved copy. Issues and their evidence are saved as usual.",
+      "Keeps the stored report smaller. The Page inspector then loads the live page when you open it, instead of the saved copy. Occurrences and their evidence are saved as usual.",
   },
   ocr: {
     label: "Read text inside images (OCR)",
@@ -333,7 +333,7 @@ export const SUMMARY = {
    * signed-in pages, so the one switch drops both (server.py, the
    * capture_screenshots / store_rendered_html pair).
    */
-  noScreenshots: "Screenshots of issues",
+  noScreenshots: "Screenshots of occurrences",
   /** For a public scan: it never signs in. */
   noSignIn: "Pages behind a sign-in",
   /** For a sign-in scan: it never leaves the approved website. */

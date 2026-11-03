@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams } from "react-router";
+import { useLocation, useParams } from "react-router";
 import { BookOpenText } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
@@ -20,6 +20,11 @@ export default function IssueDetailRoute() {
   const { scanId, issueKey } = useParams<{ scanId: string; issueKey: string }>();
   const id = Number(scanId);
   const key = decodeURIComponent(issueKey ?? "");
+  // This page's own address with its query: the query carries the trail it
+  // was opened with (the filtered Issues list), so evidence opened from here
+  // returns through it, as from an issue type's pages (IssuePages `here`).
+  const location = useLocation();
+  const here = `${location.pathname}${location.search}`;
 
   const { data: scan, error: scanError } = useScanQuery(id);
   const [guidanceOpen, setGuidanceOpen] = useState(false);
@@ -41,9 +46,9 @@ export default function IssueDetailRoute() {
   if (detailError) {
     return (
       <EmptyState
-        title="Kind of issue not found"
+        title="Issue type not found"
         message={
-          "This kind of issue is not part of this report. It may have been fixed, " +
+          "This issue type is not part of this report. It may have been fixed, " +
           "or the link may be out of date. Go back to the Issues table to find it."
         }
         action={
@@ -55,7 +60,7 @@ export default function IssueDetailRoute() {
     );
   }
   if (!scan) {
-    return <div className="text-fg-muted">Loading this kind of issue…</div>;
+    return <div className="text-fg-muted">Loading this issue type…</div>;
   }
 
   const row = detail?.row;
@@ -72,7 +77,7 @@ export default function IssueDetailRoute() {
             <span>{row?.title ?? key}</span>
           </span>
         }
-        // The type rides with the criterion, so a "Not sure" kind of issue reads
+        // The type rides with the criterion, so a "Not sure" issue type reads
         // as one even with the guidance closed. The word is the Issues
         // table's (REVIEW_TYPE_LABEL), the same one the guidance dialog uses.
         meta={
@@ -104,14 +109,13 @@ export default function IssueDetailRoute() {
       {detail && (
         <IssueGuidanceDialog open={guidanceOpen} onClose={() => setGuidanceOpen(false)} detail={detail} />
       )}
-      {/* The trail names the kind of issue, not the kind of page it is, so
-          evidence opened from here returns under its own title. */}
-      <IssueEvidence
-        scanId={scan.id}
-        issueKey={key}
-        origin={row?.title ?? key}
-        backTo={`/scans/${scan.id}/issues/${encodeURIComponent(key)}`}
-      />
+      {/* The trail names the issue type, not the kind of page it is, so
+          evidence opened from here returns under its own title. It returns
+          to this page as it was opened (`here`), so the report crumb still
+          leads to the Issues list the reader filtered. That was lost on this
+          path until 2026-11-02, when the Issues table's page count, the
+          other way to an issue type's pages, stopped being a link. */}
+      <IssueEvidence scanId={scan.id} issueKey={key} origin={row?.title ?? key} backTo={here} />
     </>
   );
 }

@@ -11,10 +11,10 @@ import { REVIEW_LANE_HELP } from "../lib/labels";
 import { REVIEW_TYPE_LABEL } from "../lib/terms";
 
 /**
- * Every page one kind of issue affects, with its issues (one per place) and
- * their screenshots: the body of the kind-of-issue page. What it is, the
+ * Every page one issue type affects, with its occurrences (one per place)
+ * and their screenshots: the body of the issue-type page. What it is, the
  * fix and how to verify it live in ``IssueGuidanceDialog``, opened from the
- * page header, so the page itself leads with where the issues are.
+ * page header, so the page itself leads with where the occurrences are.
  */
 export default function IssueEvidence({
   scanId,
@@ -44,7 +44,7 @@ export default function IssueEvidence({
   if (error) {
     return (
       <Card className="p-4 text-sm text-sev-critical" role="alert">
-        The details of this kind of issue could not load. Nothing in the saved report has changed.
+        The details of this issue type could not load. Nothing in the saved report has changed.
         Reload the page to try again.
       </Card>
     );
@@ -66,7 +66,7 @@ export default function IssueEvidence({
       <Card>
         <div className="flex flex-wrap items-baseline justify-between gap-3 rounded-t-[7px] border-b border-border bg-surface-muted px-4 py-3">
           <h2 className="text-base font-semibold">
-            Pages with this kind of issue
+            Pages with this issue type
             <span className="ml-2 text-sm font-normal text-fg-muted">
               {pages.length} page{pages.length !== 1 ? "s" : ""}
             </span>
@@ -86,7 +86,7 @@ export default function IssueEvidence({
 }
 
 /**
- * A kind of issue's guidance, in a dialog opened from the top right of its page:
+ * An issue type's guidance, in a dialog opened from the top right of its page:
  * what it is, the next step (the fix for a barrier, the checks for a lead),
  * and why it matters with how to verify. Every section is open, so reading it
  * takes one click, not one per section. A native modal ``<dialog>``, like
@@ -243,11 +243,14 @@ function IssueGuidance({ detail }: { detail: IssueDetail }) {
             {!isInformational && (
               <FactTile label="Priority" value={priorityTier(row.priority)} />
             )}
-            {/* "Issues", not "Occurrences": one issue is one place. Changed on
-                2026-10-26 by the developer's decision; see docs/plain-language.md,
-                "Why "issue" and "kind of issue"". */}
+            {/* "Issue occurrences": one occurrence is one place, the same
+                words as the Issues table's column. It read "Issues" from
+                2026-10-26 to 2026-10-28 and "Occurrences" to 2026-10-30; the
+                developer settled on "Issue occurrences" after user testing
+                with Siteimprove users. See
+                docs/plain-language.md, "Why "occurrence" and "issue type"". */}
             <FactTile
-              label="Issues"
+              label="Issue occurrences"
               value={row.occurrence_count.toLocaleString()}
               note={`across ${row.page_count.toLocaleString()} page${row.page_count === 1 ? "" : "s"}`}
             />
@@ -277,7 +280,7 @@ function IssueGuidance({ detail }: { detail: IssueDetail }) {
           </dl>
           {!isInformational && (
             <p className="mt-2 text-sm leading-6 text-fg-muted">
-              Priority is based on how serious this kind of issue is and how many pages have it. Fix it sooner when both are high.
+              Priority is based on how serious this issue type is and how many pages have it. Fix it sooner when both are high.
             </p>
           )}
 
@@ -289,7 +292,7 @@ function IssueGuidance({ detail }: { detail: IssueDetail }) {
               {description ? (
                 <RuleText text={description} />
               ) : (
-                "Axcess recorded this automatically. See the pages with this kind of issue for the details."
+                "Axcess recorded this automatically. See the pages with this issue type for the details."
               )}
             </p>
           )}
@@ -310,7 +313,7 @@ function IssueGuidance({ detail }: { detail: IssueDetail }) {
                   ))}
               {isLead && (
                 <li className="font-semibold">
-                  Look at each issue on the page itself before you report it as a problem.
+                  Look at each occurrence on the page itself before you report it as a problem.
                 </li>
               )}
             </ol>

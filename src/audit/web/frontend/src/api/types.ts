@@ -29,9 +29,15 @@ export interface ScanSummary {
    *  content mostly does not exist until something is used. */
   dom_state_count: number;
   finding_count: number;
+  /** The rule checks that checked at least one page, in this order; null
+   *  (or absent, from an older server) when the scan did not record it. */
+  rule_checks?: RuleCheck[] | null;
   started_at: string | null;
   finished_at: string | null;
 }
+
+/** A rule check by its pipeline key (labels: RULE_CHECK_TOOL in lib/terms.ts). */
+export type RuleCheck = "axe" | "alfa";
 
 /** Every public report of one site (normalized seed scope), newest first.
  *  The headline numbers come from `most_recent_completed` only: an
@@ -51,7 +57,7 @@ export interface SiteGroup {
 
 /**
  * One completed report's counts, from `GET /api/scans/{id}/issue-counts`.
- * Data names: `issue_count` is rows of the Issues table ("kinds of issues"
+ * Data names: `issue_count` is rows of the Issues table ("issue types"
  * on screen); `occurrence_count` is every place they appear ("issues").
  */
 export interface ScanIssueCounts {

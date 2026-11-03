@@ -14,6 +14,7 @@
         "finished_at": "null|string",
         "id": "integer",
         "page_count": "integer",
+        "rule_checks": ["string"],
         "seed_url": "string",
         "started_at": "string",
         "status": "string"
@@ -32,6 +33,7 @@
           "finished_at": "null|string",
           "id": "integer",
           "page_count": "integer",
+          "rule_checks": [],
           "seed_url": "string",
           "started_at": "string",
           "status": "string"
@@ -45,6 +47,7 @@
               "finished_at": "string",
               "id": "integer",
               "page_count": "integer",
+              "rule_checks": [],
               "seed_url": "string",
               "started_at": "string",
               "status": "string"
@@ -61,6 +64,7 @@
             "finished_at": "null|string",
             "id": "integer",
             "page_count": "integer",
+            "rule_checks": ["string"],
             "seed_url": "string",
             "started_at": "string",
             "status": "string"
@@ -106,6 +110,7 @@
       "page_count": "integer",
       "previous_scan_id": "integer",
       "progress": "null",
+      "rule_checks": ["string"],
       "seed_url": "string",
       "started_at": "string",
       "status": "string",
@@ -180,6 +185,7 @@
         "stage": "string",
         "static_pages": "integer"
       },
+      "rule_checks": [],
       "seed_url": "string",
       "started_at": "string",
       "status": "string",
@@ -222,6 +228,7 @@
       "page_count": "integer",
       "previous_scan_id": "null",
       "progress": "null",
+      "rule_checks": [],
       "seed_url": "string",
       "started_at": "string",
       "status": "string",
@@ -264,6 +271,7 @@
       "page_count": "integer",
       "previous_scan_id": "null",
       "progress": "null",
+      "rule_checks": [],
       "seed_url": "string",
       "started_at": "string",
       "status": "string",

@@ -40,6 +40,7 @@ _ROUTES = [
     "/app/scans/{scan_id}/a11y",
     "/app/scans/{scan_id}/a11y/by-rule",
     "/app/scans/{scan_id}/compare",
+    "/app/scans/{scan_id}/compare/changes",
     "/app/scans/{scan_id}/protected",
     "/app/scans/{scan_id}/protected/manual-checks",
     "/app/scans/{scan_id}/protected/issues",

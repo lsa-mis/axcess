@@ -1,4 +1,4 @@
-import type { AxeImpact, DetectionPipeline, FindingStatus, ReviewLane, ScanStatus } from "../api/types";
+import type { AxeImpact, DetectionPipeline, FindingStatus, ReviewLane, RuleCheck, ScanStatus } from "../api/types";
 
 /**
  * The words the interface uses for shared values, in one place.
@@ -9,7 +9,7 @@ import type { AxeImpact, DetectionPipeline, FindingStatus, ReviewLane, ScanStatu
  * See docs/plain-language.md for the full list of terms.
  */
 
-/** An issue's review status (one place on a page), as a short label for chips and tables. */
+/** An occurrence's review status (one place on a page), as a short label for chips and tables. */
 export const STATUS_LABEL: Record<FindingStatus, string> = {
   new: "New",
   reviewing: "Reviewing",
@@ -40,7 +40,7 @@ export const STATUS_OPTION_LABEL: Record<FindingStatus, string> = {
 
 /**
  * The three "How sure" values, as the Issues table's "How sure" column names
- * them: how sure Axcess is that a kind of issue is a real problem. (They were
+ * them: how sure Axcess is that an issue type is a real problem. (They were
  * once called the three types of issue; "type" is not used for them now.)
  *
  * "Mostly sure" and "Not sure" are opposites in short, common words, so the
@@ -66,7 +66,7 @@ export const REVIEW_TYPE_LABEL: Record<ReviewLane, string> = {
 };
 
 /**
- * A kind of issue's impact rating, in the glossary's words ("Impact"), not axe's
+ * An issue type's impact rating, in the glossary's words ("Impact"), not axe's
  * raw lower-case values.
  */
 export const IMPACT_LABEL: Record<AxeImpact, string> = {
@@ -88,6 +88,21 @@ export const CHECK_LABEL: Record<DetectionPipeline, string> = {
   image: "Image text check",
   protected_image: "Image text check",
 };
+
+/**
+ * A rule check by its tool's name alone, for a column already headed "Rule
+ * check" (Reports), where "Rule check (axe)" would say "rule check" twice.
+ * Elsewhere the full name in CHECK_LABEL is used.
+ */
+export const RULE_CHECK_TOOL: Record<RuleCheck, string> = {
+  axe: "axe",
+  alfa: "Alfa",
+};
+
+/** The rule checks a scan ran, in words: "axe", "axe and Alfa", "None". */
+export function ruleChecksText(checks: readonly RuleCheck[]): string {
+  return checks.length === 0 ? "None" : checks.map((check) => RULE_CHECK_TOOL[check]).join(" and ");
+}
 
 /** A scan's progress, for status badges. */
 export const SCAN_STATUS_LABEL: Record<ScanStatus, string> = {

@@ -1,7 +1,7 @@
 /**
- * Fields of a kind of issue left out of the Issues table and its own page for now.
+ * Fields of an issue type left out of the Issues table and its own page for now.
  *
- * Each name is both a column of the Issues table and a fact on the kind of issue
+ * Each name is both a column of the Issues table and a fact on the issue type
  * page, and hiding it here hides it in both. The API still returns the
  * field and the exports still carry it; only these two screens skip it. A
  * saved ``?sort=`` link naming a hidden column opens the recommended order.

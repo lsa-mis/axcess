@@ -135,9 +135,15 @@ _OFFLINE_OLLAMA = (
 )
 _NEW_PAIR = "A new pair has no baseline side (DiffEntry); the other buckets pin it."
 _RESOLVED_PAIR = "A resolved pair has no current side (DiffEntry); the other buckets pin it."
+_OTHER_SITE_SCAN = (
+    "A site's headline scans are later seed scans with no rule check counted; the "
+    "same ScanSummary field is pinned through body[].scans[].rule_checks."
+)
 _UNPINNED_PATHS: dict[tuple[str, str], str] = {
     ("GET /api/capabilities/local-analysis", "body.semantic.ready_models"): _OFFLINE_OLLAMA,
     ("GET /api/capabilities/local-analysis", "body.vision.installed_size_bytes"): _OFFLINE_OLLAMA,
+    ("GET /api/sites", "body[].most_recent.rule_checks"): _OTHER_SITE_SCAN,
+    ("GET /api/sites", "body[].most_recent_completed.rule_checks"): _OTHER_SITE_SCAN,
     ("GET /api/scans/{scan_id}/diff", "body.new[].previous_finding_id"): _NEW_PAIR,
     ("GET /api/scans/{scan_id}/diff", "body.new[].previous_severity"): _NEW_PAIR,
     ("GET /api/scans/{scan_id}/diff", "body.new[].previous_status"): _NEW_PAIR,
@@ -587,6 +593,13 @@ def _add_contract_evidence(db_path: Path, blob_dir: Path, scan_id: int) -> dict[
     try:
         baseline = _add_report_history(conn, blob_dir, scan_id)
         _add_a11y_evidence(conn, blob_dir, scan_id)
+        # The scan's page counters, as a crawl writes them, so a scan's
+        # ``rule_checks`` lists both checks rather than an empty list.
+        conn.execute(
+            "UPDATE scans SET axe_pages_scanned = 2, alfa_pages_scanned = 1 WHERE id = ?",
+            (scan_id,),
+        )
+        conn.commit()
         _add_saved_copy(conn, scan_id)
         _add_expert_review(conn, scan_id)
         states = _add_scan_states(conn)
