@@ -180,10 +180,25 @@ _COLLECT_JS = r"""
   }
   // Each field's own group: the largest ancestor that holds no other field,
   // so its label, hint and error text count as "beside it".
+  // Radio buttons and checkboxes that share a name are one question, and a
+  // page marks and describes them once: Parsley puts its message after the
+  // paragraph holding the whole radio group. So their group is the largest
+  // ancestor holding that set of fields and no other. Judged one by one,
+  // every radio button but the one nearest the message read as undescribed
+  // (a false failure on parsleyjs.org). Not when the set shares its nearest
+  // container with other fields: then nothing holds the question alone.
   const groupsOf = u => u.fields.map(f => {
+    const set = (f.type === 'radio' || f.type === 'checkbox') && f.name
+      ? u.fields.filter(o => o.type === f.type && o.name === f.name) : [f];
     let g = f;
+    let n = 1;
+    if (set.length > 1) {
+      let c = set[0].parentElement;
+      while (c && c !== u.root && !set.every(o => c.contains(o))) c = c.parentElement;
+      if (c && c !== u.root && fieldsIn(c).length === set.length) [g, n] = [c, set.length];
+    }
     while (g.parentElement && g.parentElement !== u.root &&
-           fieldsIn(g.parentElement).length === 1) g = g.parentElement;
+           fieldsIn(g.parentElement).length === n) g = g.parentElement;
     return g;
   });
   for (const u of units) {
@@ -268,8 +283,12 @@ _TEXT_HELPERS = r"""
   const ownText = el => squash([pseudo(el, '::before'),
     ...[...el.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent),
     pseudo(el, '::after')].join(' '));
-  const describedBy = u.fields.map(f => ((f.getAttribute('aria-describedby') || '') + ' ' +
-    (f.getAttribute('aria-errormessage') || '')).split(/\s+/).filter(Boolean)
+  // A field's links, and its group's when the group is not the field itself:
+  // Parsley links a radio group's message from the element that holds it.
+  const links = el => (el.getAttribute('aria-describedby') || '') + ' ' +
+    (el.getAttribute('aria-errormessage') || '');
+  const describedBy = u.fields.map((f, k) => (links(f) + ' ' +
+    (u.groups[k] !== f ? links(u.groups[k]) : '')).split(/\s+/).filter(Boolean)
     .map(id => document.getElementById(id)).filter(Boolean));
   // The element right after a field (or after its group) when it holds no
   // field itself: where a message goes when fields have no wrapper.
@@ -291,11 +310,23 @@ _TEXT_HELPERS = r"""
   const linkedTo = el => describedBy.some(ds => ds.some(d => d.contains(el)));
   const announced = el =>
     !!el.closest('[role=alert],[role=status],[aria-live]:not([aria-live=off])');
+  // Text in an element that was on the page but hidden just before the press
+  // (``_ARM_JS``) and is shown now: the page revealed it, so it is new even
+  // when the same words were already visible elsewhere.
+  // Read when each entry is made: ``_ARM_JS`` sets it after these helpers run.
+  // Text inside another form on the page is about that form, not this one.
+  // atlassian.design puts a live region under every field of every example;
+  // their hint text ("Must contain an @ symbol.") counted as an announced
+  // error for the form pressed (a false pass, and on another page a false
+  // failure).
+  const others = window.__axcessForms.filter((o, i) => i !== index).map(o => o.root);
+  const elsewhere = el => !u.root.contains(el) && others.some(r => r.contains(el));
   const entry = el => {
     const text = ownText(el);
-    if (!text || !seen(el)) return null;
+    if (!text || !seen(el) || elsewhere(el)) return null;
+    const hidden = window.__axcessHidden;
     return {text, fields: fieldsOf(el), linked: linkedTo(el), announced: announced(el),
-      colour: getComputedStyle(el).color};
+      colour: getComputedStyle(el).color, revealed: !!hidden && hidden.has(el)};
   };
 """
 
@@ -344,7 +375,9 @@ _SNAPSHOT_JS = (
   // Every visible text on the page, so text that only moved or re-rendered
   // is not taken for a new message.
   const all = [];
-  for (const el of [...document.body.querySelectorAll('*')].slice(0, 6000)) {
+  // The whole page, not its first 6000 elements: on a long page (19,000 on
+  // atlassian.design) text past the cap read as new after the press.
+  for (const el of [...document.body.querySelectorAll('*')].slice(0, 60000)) {
     const t = ownText(el);
     if (t && seen(el)) all.push(t);
   }
@@ -359,6 +392,22 @@ _ARM_JS = (
 """
     + _TEXT_HELPERS
     + r"""
+  // Every element in the form's scope that holds text but is hidden now, just
+  // before the press. Bootstrap writes each field's message into the page at
+  // load, hidden, and shows it with a class on submit; the same words can be
+  // visible elsewhere on the page (its documentation shows a second copy of
+  // the form, already in error), and judging by the words alone threw the
+  // revealed messages away as old (a false failure on getbootstrap.com).
+  const hiddenNow = new WeakSet();
+  const scope = new Set([u.root,
+    ...document.querySelectorAll('[role=alert],[role=status],[aria-live]'),
+    ...describedBy.flat()]);
+  for (const root of scope) {
+    for (const el of [root, ...root.querySelectorAll('*')].slice(0, 3000)) {
+      if (ownText(el) && !seen(el)) hiddenNow.add(el);
+    }
+  }
+  window.__axcessHidden = hiddenNow;
   const logged = {invalid: [], texts: []};
   const scan = node => {
     if (!node || node.nodeType !== 1) return;
@@ -703,7 +752,10 @@ def _attempt_from(
 
     def add(item: dict[str, Any], when: float | None) -> None:
         text = item["text"]
-        if not text or text in existing:
+        # Words already visible before the press are not new, so text that
+        # only moved or was redrawn is not taken for a message, unless the
+        # page revealed this very element (``revealed``, see ``_ARM_JS``).
+        if not text or (text in existing and not item.get("revealed")):
             return
         fields = tuple(sorted(item.get("fields", [])))
         key = (text, fields)

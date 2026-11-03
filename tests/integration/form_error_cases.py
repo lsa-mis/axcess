@@ -923,6 +923,78 @@ draw();</script>""",
   ? '<svg width="14" height="14" aria-hidden="true"><path d="M2 7l3 3 7-7" stroke="#2e7d32" fill="none"/></svg>'
   : '<svg width="14" height="14" aria-hidden="true"><path d="M2 2l10 10M12 2L2 12" stroke="#c62828"/></svg>')));</script>""",
     ),
+    # ---------------------------------------------------------- real pages
+    # Copies of the patterns behind the first false failures on real pages
+    # (getbootstrap.com and parsleyjs.org, checked in a visible browser),
+    # cut down to the markup that mattered.
+    Case(
+        "r01_feedback_also_shown_elsewhere",
+        "pass",
+        "Bootstrap's hidden invalid-feedback is shown on submit; a second copy of the form, already in error, shows the same words.",
+        """
+<style>.feedback { display: none; color: #dc3545; } .was-validated input:invalid { border: 2px solid #dc3545; }
+  .was-validated input:invalid ~ .feedback, .feedback.shown { display: block; }</style>
+<form id="f" novalidate><h2>Shipping</h2>
+  <div><label for="city">City</label><input id="city" required><div class="feedback">Please provide a valid city.</div></div>
+  <div><label for="zip">Zip</label><input id="zip" required><div class="feedback">Please provide a valid zip.</div></div>
+  <p><button type="submit">Continue to shipping</button></p></form>
+<h2>Server-side example</h2>
+<div><label for="city2">City</label><input id="city2" disabled><div class="feedback shown">Please provide a valid city.</div></div>
+<div><label for="zip2">Zip</label><input id="zip2" disabled><div class="feedback shown">Please provide a valid zip.</div></div>
+<script>const f = document.getElementById('f'); f.addEventListener('submit', e => { e.preventDefault();
+  f.checkValidity(); f.classList.add('was-validated'); });</script>""",
+    ),
+    Case(
+        "r02_radio_group_message_after",
+        "pass",
+        "Parsley: both radio buttons sit in one paragraph, which turns red; one message follows the paragraph, linked from it.",
+        """
+<style>.bad { color: #b94a48; background: #f2dede; border: 1px solid #eed3d7; }</style>
+<form id="f" novalidate><h2>Contact</h2>
+  <label for="fullname">Full name *</label><input id="fullname" name="fullname" required>
+  <label>Preferred contact method *</label>
+  <p id="cm">Email: <input type="radio" name="cm" value="e" required> Phone: <input type="radio" name="cm" value="p"></p>
+  <p><button type="submit">Send</button></p></form>
+<script>onSubmit(document.getElementById('f'), f => {
+  const n = document.getElementById('fullname'); n.classList.add('bad');
+  n.setAttribute('aria-describedby', 'e1'); after(n, '<ul id="e1"><li>This value is required.</li></ul>');
+  const cm = document.getElementById('cm'); cm.classList.add('bad');
+  cm.setAttribute('aria-describedby', 'e2'); after(cm, '<ul id="e2"><li>This value is required.</li></ul>');
+  f.querySelectorAll('input[type=radio]').forEach(r => r.classList.add('bad')); });</script>""",
+    ),
+    Case(
+        "r03_radio_group_left_out",
+        "fail",
+        "As r02, but only the name gets a message; the radio group turns red with no text.",
+        """
+<style>.bad { color: #b94a48; background: #f2dede; border: 1px solid #eed3d7; }</style>
+<form id="f" novalidate><h2>Contact</h2>
+  <label for="fullname">Full name *</label><input id="fullname" name="fullname" required>
+  <label>Preferred contact method *</label>
+  <p id="cm">Email: <input type="radio" name="cm" value="e" required> Phone: <input type="radio" name="cm" value="p"></p>
+  <p><button type="submit">Send</button></p></form>
+<script>onSubmit(document.getElementById('f'), f => {
+  const n = document.getElementById('fullname'); n.classList.add('bad');
+  n.setAttribute('aria-describedby', 'e1'); after(n, '<ul id="e1"><li>This value is required.</li></ul>');
+  document.getElementById('cm').classList.add('bad');
+  f.querySelectorAll('input[type=radio]').forEach(r => r.classList.add('bad')); });</script>""",
+    ),
+    Case(
+        "r04_other_form_live_hint",
+        "not_applicable",
+        "atlassian.design: the form pressed shows nothing; another example form renders hint text with error words into its own live region meanwhile.",
+        """
+<form id="f" novalidate><h2>Create a new repository</h2>
+  <label for="app">App *</label><input id="app" name="app">
+  <label for="repo">Repository name *</label><input id="repo" name="repo">
+  <p><button type="submit">Create</button></p></form>
+<form id="g" novalidate><h2>Sign up</h2>
+  <label for="em">Email</label><input id="em" name="em"><div aria-live="polite" id="hint"></div>
+  <p><button type="submit">Create account</button></p></form>
+<script>onSubmit(document.getElementById('f'), () => {});
+  document.addEventListener('click', () => setTimeout(() => {
+    document.getElementById('hint').textContent = 'Must contain an @ symbol.'; }, 100));</script>""",
+    ),
     # ------------------------------------------------------------ blind 2
     # Written after the fixes the first blind batch led to, and scored
     # without tuning: the second honest estimate.

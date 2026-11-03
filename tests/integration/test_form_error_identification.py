@@ -125,7 +125,15 @@ async def test_precision_and_recall(browser, tmp_path: Path) -> None:  # type: i
     # By when each case was written: with the detector (design), to try to
     # break it and then fixed against (decoy), or after its last change and
     # never tuned against (blind, the honest estimate).
-    batches = {"design": "fpncsa", "decoy": "d", "blind 1": "b", "blind 2": "h", "independent": "i"}
+    batches = {
+        "design": "fpncsa",
+        "decoy": "d",
+        "blind 1": "b",
+        "blind 2": "h",
+        "independent": "i",
+        # Copies of what real pages did that the check first got wrong.
+        "real pages": "r",
+    }
     report["by_batch"] = {
         name: {
             k: v
