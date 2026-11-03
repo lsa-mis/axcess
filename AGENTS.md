@@ -40,6 +40,29 @@ one axe/probe/semantic rule or one `(classification, alt_adequacy)` image
 finding group. Never mix data from different `scan_id` values in an answer
 unless the user explicitly requests a comparison.
 
+### Building a check: real pages first
+
+Build and tune a new check or probe against real websites, not only
+pages we write ourselves. Test pages written next to the detector share
+its assumptions, so they pass: the form error check scored 100% precision
+on 130 of them, then got every verdict wrong on its first real pages
+(Bootstrap's hidden feedback text, Parsley's radio-group message).
+
+1. Before writing the detector, collect real public pages that show the
+   pattern: library demos, design-system docs, and accessibility demo
+   sites (W3C BAD, WebAIM). Include ones that get it right and ones
+   that get it wrong. Get the user's approval before visiting them
+   (see Verification), and never press anything a real business acts on.
+2. Run the check on those pages in a visible browser while you build it.
+   Look at the screenshots to confirm each verdict yourself. A verdict
+   no one has looked at is not evidence.
+3. For each mistake on a real page, add a cut-down copy of that page's
+   markup to the test cases (a "real pages" batch), confirm it fails on
+   the old code, then fix the detector. Synthetic cases stay as
+   regression tests, not as proof that the check works.
+4. Report real-page results apart from synthetic scores. Never present
+   a synthetic score as real-world accuracy.
+
 ## Code map
 
 - `src/audit/crawler/` scopes, fetches, renders, and queues pages.
