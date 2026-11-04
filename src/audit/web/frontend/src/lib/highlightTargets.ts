@@ -70,6 +70,10 @@ export type Target = {
  */
 const SNIPPET_CUTS: Record<string, number> = {
   focus: 300,
+  // The form error check (``forms/probe.py``, ``_COLLECT_JS``). Missing, a
+  // form longer than this matched nothing, and the inspector said it "may
+  // not appear here", though the form is there at page load.
+  forms: 600,
   keyboard: 240,
   responsive: 240,
   visual: 240,
