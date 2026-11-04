@@ -58,6 +58,21 @@ export const GROUPS = {
 } as const;
 
 /** Switch copy, keyed by the positive setting name used in `scanPolicy.ts`. */
+/** The form error check's three answers (ChecksGroup). The group's name is
+ *  SWITCHES.forms.label, so the rail and the report keep one name for it. */
+export const FORMS_CHOICE = {
+  off: { label: "Don’t check forms" },
+  page: {
+    label: "Check forms, and stop them from being sent",
+    hint: "Nothing reaches the site. A form that only the site’s server checks is counted as could not judge.",
+  },
+  send: {
+    label: "Check forms, and send empty ones to this site",
+    hint: "Use only on a site you own or a test site. Axcess sends a form only when every field is empty, then checks the page the site sends back. The site may still act on it, for example by emailing a blank message to someone.",
+  },
+  needsBrowser: "Needs a browser. Turn off Fast scan to use it.",
+} as const;
+
 export const SWITCHES = {
   whole_host: {
     label: "Scan the whole website",
@@ -93,7 +108,7 @@ export const SWITCHES = {
   forms: {
     label: "Check that forms describe their errors",
     hint:
-      "Presses each form’s submit button once, with nothing typed, and stops the form from being sent. Finds forms that mark a field in error without saying in words what is wrong (WCAG 3.3.1). Skips sign-in, payment, delete and search forms. Adds about 1–2 seconds per form.",
+      "Presses each form’s submit button once, with nothing typed. Finds forms that mark a field in error without saying in words what is wrong (WCAG 3.3.1). Never presses sign-in, payment, delete or search forms. Adds about 1–2 seconds per form.",
   },
   responsive: {
     label: "Check narrow screens and zoom",

@@ -67,6 +67,7 @@ const SETTING_KEYS = [
   "skip_focus",
   "skip_visual",
   "skip_forms",
+  "send_empty_forms",
   "skip_rendered_storage",
   "axe_level",
   "wcag_version",
@@ -103,6 +104,10 @@ export const PUBLIC_DEFAULTS: ScanSettings = {
   // a person confirms; it is not yet validated on real forms. Never in a
   // sign-in scan (LOGIN_POLICY below).
   skip_forms: false,
+  // Sending an empty form to the site is never a default: the site may act
+  // on it (a blank message emailed to someone). Chosen per scan, on a site
+  // the person owns or a test site.
+  send_empty_forms: false,
   skip_rendered_storage: false,
   axe_level: "AA",
   // The current U-M standard. 2.2 is a deliberate choice, and marks the
@@ -176,6 +181,7 @@ export const LOGIN_POLICY: ScanPolicy = {
     // Never in a signed-in session: pressing submit there could act as the
     // person signed in, even with requests blocked.
     skip_forms: true,
+    send_empty_forms: false,
   },
   fixedNote: FIXED_NOTE_LOGIN,
   urlLabel: URL_COPY.login.label,
@@ -427,7 +433,14 @@ export function checkCount(
 export function quickRetrySettings(url: string, wcagVersion: ScanSettings["wcag_version"]): ScanSettings {
   // Click-Through and the form error check off: both press controls, and
   // this retry is meant to finish fast and show whether the site scans.
-  return { ...PUBLIC_DEFAULTS, url, wcag_version: wcagVersion, skip_interaction: true, skip_forms: true };
+  return {
+    ...PUBLIC_DEFAULTS,
+    url,
+    wcag_version: wcagVersion,
+    skip_interaction: true,
+    skip_forms: true,
+    send_empty_forms: false,
+  };
 }
 
 /**

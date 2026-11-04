@@ -358,6 +358,10 @@ export interface NewScanPayload {
   skip_visual: boolean;
   /** Skip the form error check (WCAG 3.3.1). Off unless chosen. */
   skip_forms: boolean;
+  /** Let that check send a form to the site when every field is empty, and
+   *  judge the page the site sends back. Off unless chosen; counts only
+   *  when the check is on. */
+  send_empty_forms: boolean;
   /**
    * Do not persist each page's rendered HTML snapshot. Keeps the report
    * database smaller; the Page inspector then re-renders the live page on

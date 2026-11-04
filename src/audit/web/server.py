@@ -1840,6 +1840,9 @@ def create_app(
             # Off unless asked for: an older client that sends nothing never
             # starts the form error check, which presses submit buttons.
             "skip_forms": bool(body.get("skip_forms", True)),
+            # Off unless asked for, and never on its own: sending an empty
+            # form to the site needs the check itself on.
+            "send_empty_forms": bool(body.get("send_empty_forms", False)),
             "skip_rendered_storage": bool(body.get("skip_rendered_storage")),
             "axe_level": str(body.get("axe_level", "AA")),
             "wcag_version": wcag_version,
@@ -3515,6 +3518,8 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
         focus_checks_enabled=not bool(form.get("skip_focus")),
         visual_checks_enabled=not bool(form.get("skip_visual")),
         form_error_checks_enabled=not bool(form.get("skip_forms", True)),
+        form_send_empty_forms=not bool(form.get("skip_forms", True))
+        and bool(form.get("send_empty_forms", False)),
         store_rendered_html=not bool(form.get("skip_rendered_storage")),
     )
 
@@ -4387,6 +4392,12 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
             "description": (
                 "Presses each form's submit button once, with nothing typed, and checks "
                 "that the form says in words what is wrong."
+                + (
+                    " This scan let it send a form to the site when every field was "
+                    "empty, and check the page the site sent back."
+                    if flag("form_send_empty_forms", default=False)
+                    else ""
+                )
             ),
             # One sentence, as every limit in this table. Which forms it never
             # presses is the safety rule (analyzer/forms/base.skip_reason).

@@ -1,4 +1,4 @@
-import { CLICK_THROUGH_COPY, ENGINE, GROUPS, STANDARD, SWITCHES, WCAG_VERSION } from "./copy";
+import { CLICK_THROUGH_COPY, ENGINE, FORMS_CHOICE, GROUPS, STANDARD, SWITCHES, WCAG_VERSION } from "./copy";
 import { CHECK_LABEL } from "../../lib/terms";
 import type { GroupProps } from "./groupProps";
 import PillGroup from "./PillGroup";
@@ -102,15 +102,37 @@ export default function ChecksGroup({ settings, update, policy, capabilities }: 
             hint={rendered ? SWITCHES.focus.hint : "Needs a browser. Turn off Fast scan to use it."}
           />
         )}
-        {/* Off by default and not offered for signed-in scans (fixed in the
-            login policy), so it is hidden there like the focus switch. */}
+        {/* One question with three answers, in place of the old on/off
+            switch: don't check forms, check them without sending anything
+            (the default for public websites), or check them and send empty
+            ones to the site. The developer asked for the sending choice to
+            replace the switch (2026-11-04). Rejected: the sending switch
+            alone, which either sends by default on every public site or
+            loses the safe check by default; and a second switch under this
+            one, enabled only when it is on, which splits one decision
+            across two controls whose meanings depend on each other (W3C
+            COGA "Making Content Usable": one way to do one thing,
+            https://www.w3.org/TR/coga-usable/). Native radios in a
+            fieldset whose legend names the question (SC 1.3.1 Info and
+            Relationships, Level A, technique H71), each answer's risk in
+            its own hint (SC 3.3.2 Labels or Instructions, Level A). Not
+            offered for signed-in scans (fixed in the login policy), so it
+            is hidden there like the focus switch. */}
         {!isFixed(policy, "skip_forms") && (
-          <SwitchRow
-            checked={switchOn(settings, "forms")}
-            onChange={(on) => update(switchPatch(settings, "forms", on))}
-            disabled={!rendered}
+          <PillGroup
+            name="form-check"
+            layout="list"
             label={SWITCHES.forms.label}
-            hint={rendered ? SWITCHES.forms.hint : "Needs a browser. Turn off Fast scan to use it."}
+            hint={rendered ? SWITCHES.forms.hint : FORMS_CHOICE.needsBrowser}
+            value={settings.skip_forms ? "off" : settings.send_empty_forms ? "send" : "page"}
+            onChange={(choice) =>
+              update({ skip_forms: choice === "off", send_empty_forms: choice === "send" })
+            }
+            options={[
+              { value: "off", label: FORMS_CHOICE.off.label },
+              { value: "page", label: FORMS_CHOICE.page.label, hint: FORMS_CHOICE.page.hint, disabled: !rendered },
+              { value: "send", label: FORMS_CHOICE.send.label, hint: FORMS_CHOICE.send.hint, disabled: !rendered },
+            ]}
           />
         )}
         <SwitchRow

@@ -277,6 +277,11 @@ class CrawlConfig:
     # default until it is validated on real forms
     # (docs/internal/form-error-check.md); public scans only.
     form_error_checks_enabled: bool = False
+    # Let that check send a form to the site when every field it can see is
+    # empty, and judge the page the site sends back. Off unless the person
+    # starting the scan chose it; public scans only. Without it, a form the
+    # site checks only on its server is "not checked".
+    form_send_empty_forms: bool = False
     # SC 1.3.2 Meaningful Sequence, visual (VLM) probe. Screenshots the page
     # and asks a local vision model whether the visual reading order matches
     # the DOM order. Needs Ollama + a vision model; no-ops cleanly without
@@ -547,7 +552,11 @@ async def run_crawl(
         focus_probe = FocusProbe()
     # SC 3.3.1 form error check, off by default. One per crawl, so a form
     # repeated on every page (a footer sign-up) is checked once.
-    form_error_probe = ErrorIdentificationProbe() if config.form_error_checks_enabled else None
+    form_error_probe = (
+        ErrorIdentificationProbe(send_empty=config.form_send_empty_forms)
+        if config.form_error_checks_enabled
+        else None
+    )
     # Visual pipeline probe. SC 2.2.2 (motion) is deterministic and always
     # runs; SC 1.3.2 (meaningful sequence) needs a vision model, so we attach
     # the provider only when one is reachable (else that check no-ops).
@@ -859,6 +868,7 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             "responsive_checks_enabled": config.responsive_checks_enabled,
             "focus_checks_enabled": config.focus_checks_enabled,
             "form_error_checks_enabled": config.form_error_checks_enabled,
+            "form_send_empty_forms": config.form_send_empty_forms,
             "visual_checks_enabled": config.visual_checks_enabled,
             "interaction_checks_enabled": config.interaction_checks_enabled,
             # 1: scan-level probed/states counters are persisted.
