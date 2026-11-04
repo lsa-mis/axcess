@@ -607,8 +607,8 @@ criteria:
       order on every page that has them.
 
   # Counted as manual on purpose: the form error check exists and is on by
-  # default for public scans, but it is not yet validated on real forms and
-  # no real page has produced a true failure (docs/internal/form-error-check.md).
+  # default for public scans, but it is not yet validated on real forms: two
+  # true failures on real pages so far (docs/internal/form-error-check.md).
   # Promote it to partial, with its own pipeline, after that validation.
   - sc: "3.3.1"
     name: "Error Identification"

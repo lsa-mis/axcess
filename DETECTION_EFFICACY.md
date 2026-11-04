@@ -73,9 +73,11 @@ not a real-world accuracy estimate. The check is on by default for public
 scans (the developer's decision, 2026-11-02, after the safety review) but not
 yet validated on real forms labelled by experts, so its results stay Not sure
 leads a person confirms (`docs/internal/form-error-check.md`).
-On 32 real public pages, checked by hand on 2026-11-03 against screenshots
-(not by an expert), the check gave 29 verdicts, none found wrong, and no
-real page produced a failure, so recall on real forms is unmeasured.
+On 54 real public pages, checked by hand on 2026-11-04 against screenshots
+(not by an expert), the check gave 41 verdicts and none was found wrong.
+Two were true failures, both Accessible University "before" pages (a
+general "Your form has errors" message that names no field). Two failures
+are far too few to measure recall on real forms.
 The detection-evals workflow runs it in its own job, with a browser.
 
 The efficiency and scale gates exercise the durable local evidence path:

@@ -73,7 +73,8 @@ were left out.
 | Run | Fail | Pass | Browser's own message | Wrong verdicts |
 | --- | --- | --- | --- | --- |
 | First, 14 pages, code before the fixes below | 3 | 0 | 0 | All 3 fails (Bootstrap, Parsley) |
-| Last, 32 pages, current code | 0 | 25 | 4 | None found |
+| 32 pages, after the fixes below | 0 | 25 | 4 | None found |
+| Last, 54 pages (the 32, broken-on-purpose practice sites, Accessible University), current code | 2 | 28 | 5 | None found |
 
 The first run's mistakes, and one found later on atlassian.design, each
 became a "real pages" case (`r01` to `r04` in `form_error_cases.py`) that
@@ -92,10 +93,21 @@ limit (`test_form_error_busy_page.py`), and a network guard that could be
 left on, or hang, when that limit cancelled it
 (`test_exploration_guard_cleanup.py`).
 
-What the real pages show the check cannot do yet: no real page produced a
-true "fail", so recall on real forms is unmeasured. Most forms on library
-demo pages are skipped (sign-in, search, no submit control, nothing empty),
-and 7 were "not checked" because the page sent a request on submit.
+The two true failures are both Accessible University "before" pages
+(washington.edu and its updated copy on openassessittoolkit.github.io):
+a box inside the form says "Your form has errors. Please correct them and
+resubmit." It names no field, and no field is marked. The check counts error
+words alone only for text inside the form itself, and only strong ones
+(error, invalid, incorrect, failed, problem, could not be sent), since hint
+and thank-you text use the weak ones; `r05` copies the page and `r06` is
+the decoy. Its fixed "after" page comes out as the browser's own message.
+
+What the real pages show the check cannot do yet: two failures are far too
+few to measure recall on real forms. Most forms on library demo pages are
+skipped (sign-in, search, no submit control, nothing empty), and 12 were
+"not checked" because the page sent the form to its server when pressed.
+W3C's BAD "before" survey is one of those: it is checked only on the
+server, so the check cannot see its red labels without sending the form.
 
 ## To do
 
