@@ -169,6 +169,11 @@ class FormResult:
     # Sent to the site, empty, because the scan allowed it: the answer is the
     # page the site sent back, and "After" is a picture of that page.
     sent: bool = False
+    # When sent: the HTTP status and title of the page the site sent back,
+    # for the scan's log. A reply that is not the form again (a Cloudflare
+    # check, an error page) is otherwise indistinguishable from "accepted".
+    reply_status: int | None = None
+    reply_title: str = ""
 
 
 # The one rule this check reports, keyed in page_a11y_findings like the other

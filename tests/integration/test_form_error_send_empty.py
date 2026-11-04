@@ -205,3 +205,5 @@ async def test_the_bad_survey_reply_fails(browser) -> None:  # type: ignore[no-u
         posts = list(_Site.posts)
     assert len(posts) == 1, posts
     assert [r.outcome for r in results] == ["fail"], results
+    # The scan's log says what the site sent back.
+    assert (results[0].reply_status, results[0].reply_title) == (200, "Survey")

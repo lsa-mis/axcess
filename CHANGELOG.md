@@ -287,11 +287,15 @@ merge.
 - Inspector: a form the form error check flagged is now outlined in the
   page copy. For a form with long code, it said the form "may not appear
   here", though the form is on the page from the start.
-- Form error check: it now presses each form as the page loaded it.
-  Click-Through runs first on the same page, and it can leave radio buttons
-  and checkboxes ticked. On W3C's BAD survey, a ticked answer meant the
-  form was no longer empty, so it was not sent and could not be judged. If
-  any field has changed, the check now reloads the page first.
+- Form error check: it now presses each form as the page loaded it, by
+  reloading the page before its first press. The other checks run first on
+  the same page. The keyboard and focus checks move focus through every
+  field, and a page that checks a field when it loses focus marked it in
+  error before the press, so the press changed nothing (Section 508's test
+  pages). Click-Through left radio buttons ticked (W3C's BAD survey).
+- Form error check: the scan's log now has one line per form with its
+  result, its reason, and, for a form sent empty, the reply's status and
+  title.
 - About: the desktop app now shows the version you are running, such as
   "Desktop preview 0.2.3". It always said 0.2.0, because the page took the
   number from the web part of the app, which each release does not change.

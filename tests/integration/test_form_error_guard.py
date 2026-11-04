@@ -37,6 +37,7 @@ _PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Gua
   window.ws = new WebSocket('ws://127.0.0.1:{ws_port}/open');
   document.getElementById('contact').addEventListener('submit', e => {
     e.preventDefault();
+    window.openAtPress = window.ws.readyState === 1;
     fetch('/hit-get?name=');
     navigator.sendBeacon('/hit-beacon', 'name=');
     try { window.ws.send('submitted'); } catch (_) {}
@@ -93,14 +94,18 @@ async def test_nothing_leaves_the_page_while_a_form_is_pressed(browser: Any) -> 
                 await page.wait_for_function("window.ws.readyState === 1")
                 results = await ErrorIdentificationProbe().run(page)
                 await asyncio.sleep(0.5)
+                open_at_press = await page.evaluate("window.openAtPress === true")
             finally:
                 await context.close()
 
     # Only the page itself was fetched; nothing the submit handler tried.
     assert [hit for hit in hits if "hit-" in hit] == [], hits
-    # The socket opened at load stayed open, carried nothing, and no new one
-    # was opened during the press.
-    assert connections == ["/open"], connections
+    # The socket opened at load was open when the form was pressed, carried
+    # nothing, and no new one was opened during the press. The check reloads
+    # the page before its first press, so the page opened it twice, once per
+    # load, both before the press.
+    assert open_at_press, "the press came before the socket opened; this proves nothing"
+    assert connections == ["/open", "/open"], connections
     assert messages == [], messages
     # The form tried to send itself, so it is not judged.
     assert [r.outcome for r in results] == ["not_checked"], results

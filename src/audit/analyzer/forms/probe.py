@@ -54,7 +54,7 @@ from audit.analyzer.interaction.safety import Submission, exploration_guard
 from audit.logging import get_logger
 
 if TYPE_CHECKING:
-    from playwright.async_api import Dialog, Frame, Page, Request
+    from playwright.async_api import Dialog, Frame, Page, Request, Response
 
 log = get_logger(__name__)
 
@@ -557,13 +557,19 @@ class ErrorIdentificationProbe:
         pinned = page.url
         attempted = 0
         plan = await self._plan(page)
-        if any(info.get("changed") for _, _, info in plan):
-            # Earlier checks on this page left a field changed: Click-Through
-            # ticks radio buttons and checkboxes without leaving the page, so
-            # nothing put it back. The check presses forms as the page loaded
-            # them, with nothing typed, ticked or chosen, and sends only an
-            # empty form; on report #39 a ticked answer kept W3C's BAD survey
-            # from being judged. Reload once, as between forms, and plan again.
+        if any(info.get("changed") or self._skip(info) is None for _, _, info in plan):
+            # The check runs last, on the page the other checks already used,
+            # and it judges a press against the page as it loaded. Before its
+            # first press, reload once, as between forms, and plan again.
+            # Earlier checks leave the page changed in ways a field's value
+            # does not show: the keyboard and focus checks move focus through
+            # every field, and a page that checks a field when it loses focus
+            # marks it then, so the press changed nothing (Section 508's
+            # TF10/10.D-2-fail-2, reports #48 and #49). Click-Through ticks
+            # radio buttons and checkboxes (W3C's BAD survey, report #39), and
+            # a form on a timer may have locked itself. Only when a form will
+            # be pressed, or a field was changed, which can turn a form that
+            # looked filled in back into one to press.
             try:
                 await page.goto(pinned, wait_until="load", timeout=15000)
             except Exception as exc:
@@ -606,6 +612,18 @@ class ErrorIdentificationProbe:
                 continue
             if outcome is not None:
                 results.append(outcome)
+                # Only counts reach the report for a form that does not fail;
+                # this line is how a scan's answer for each form is found.
+                log.info(
+                    "forms.result",
+                    outcome=outcome.outcome,
+                    reason=outcome.reason,
+                    form=outcome.form[:60],
+                    page=pinned,
+                    sent=outcome.sent,
+                    reply_status=outcome.reply_status,
+                    reply_title=outcome.reply_title[:80],
+                )
 
     async def _plan(
         self, page: Page, *, again: Set[str] = frozenset()
@@ -723,7 +741,22 @@ class ErrorIdentificationProbe:
         def on_dialog(dialog: Dialog) -> None:
             dialogs.append((dialog.message, time.time() * 1000))
 
+        reply_status: list[int] = []
+        reply_title = ""
+
+        def on_response(response: Response) -> None:
+            with contextlib.suppress(Exception):
+                if (
+                    submission is not None
+                    and submission.sent_at is not None
+                    and not reply_status
+                    and response.request.is_navigation_request()
+                    and response.frame == page.main_frame
+                ):
+                    reply_status.append(response.status)
+
         page.on("request", on_request)
+        page.on("response", on_response)
         page.on("dialog", on_dialog)
         await self._hold_sends(page)
         try:
@@ -754,6 +787,8 @@ class ErrorIdentificationProbe:
                 if submission is not None and submission.sent_at is not None:
                     # A new page: the site's reply. Find the form on it again
                     # by its fields and submit control, and record that copy.
+                    with contextlib.suppress(Exception):
+                        reply_title = await page.title()
                     replies = await frame.evaluate(_COLLECT_JS)
                     reply = next(
                         (i for i, r in enumerate(replies) if self._key(r) == self._key(info)),
@@ -769,6 +804,8 @@ class ErrorIdentificationProbe:
                             0,
                         )
                         result.sent = True
+                        result.reply_status = reply_status[0] if reply_status else None
+                        result.reply_title = reply_title
                         result.before_png = before_png
                         return result
                     after = await frame.evaluate(_SNAPSHOT_JS, reply)
@@ -781,6 +818,7 @@ class ErrorIdentificationProbe:
                 after_png = await self._shot(shoot, page, after_selector)
         finally:
             page.remove_listener("request", on_request)
+            page.remove_listener("response", on_response)
             page.remove_listener("dialog", on_dialog)
             # A held send is the form trying to send itself, as a write is.
             requests.extend(await self._release_sends(page))
@@ -797,6 +835,8 @@ class ErrorIdentificationProbe:
         )
         result.messages = [m.text for m in attempt.messages][:10]
         result.sent = submission is not None and submission.sent_at is not None
+        result.reply_status = reply_status[0] if reply_status else None
+        result.reply_title = reply_title
         result.before_png = before_png
         result.after_png = after_png
         return result

@@ -196,6 +196,21 @@ put it past the 16th. It now reads 200.
 `test_the_bad_survey_reply_fails` holds a cut-down copy and fails on the
 old code; the survey's own code, rendered offline, fails now.
 
+Third round of real scans (reports #44 to #52, 2026-11-04): the two
+Section 508 pages that fail alone passed through a scan with "no sign of
+an error". The keyboard and focus checks run first and move focus through
+every field; those pages check a field when it loses focus, so it was
+already red before the press. A field's value does not show that, so the
+check now reloads the page before its first press whenever it will press
+a form (`test_form_error_after_other_checks.py`, which runs the real
+keyboard check first). A full scan with the reports' own settings then
+gave the right answer on 15 real pages, the seven failures included.
+The survey (report #46) was sent but nothing was stored, and its own code
+run offline fails with the same settings, so the live reply must differ
+(a Cloudflare check on the POST is likely; not seen). Each form's result
+is now logged (`forms.result`, with the reply's status and title) so the
+next scan says which.
+
 Why it is opt-in: an empty form is not harmless. It still sends hidden and
 preset values, and many sites act on any submission, emailing a blank
 contact message to a person or creating a record. It is for sites the
