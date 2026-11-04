@@ -80,6 +80,24 @@ def test_success_wording_without_corroboration_is_not_an_error() -> None:
     assert classify(_attempt(messages=(thanks,)))[0] == "not_applicable"
 
 
+def test_a_general_error_inside_the_form_fails() -> None:
+    # Accessible University's "before" page: black on yellow, nothing marked.
+    general = Message("Your form has errors. Please correct them and resubmit.", in_form=True)
+    outcome, reason, _ = classify(_attempt(messages=(general,)))
+    assert outcome == "fail" and "which field" in reason
+
+
+def test_strong_words_count_only_inside_the_form() -> None:
+    toast = Message("There was an error loading the chat.")
+    assert classify(_attempt(messages=(toast,)))[0] == "not_applicable"
+
+
+def test_weak_words_inside_the_form_still_need_corroboration() -> None:
+    for text in ("Request received. No further action is required.", "All fields are required."):
+        note = Message(text, in_form=True)
+        assert classify(_attempt(messages=(note,)))[0] == "not_applicable", text
+
+
 def test_a_summary_names_a_field_by_a_distinctive_word() -> None:
     summary = Message("2 errors: Name - required; Email - required", announced=True)
     assert classify(_attempt(marked=(0, 1), messages=(summary,)))[0] == "pass"

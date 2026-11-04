@@ -87,6 +87,16 @@ _ERROR_WORDS = re.compile(
 )
 
 
+# Words that only an error message uses. Narrower than _ERROR_WORDS on
+# purpose: hints and thank-you text say "required", "please check" and
+# "enter", but not "your form has errors" or "could not be sent".
+_STRONG_ERROR_WORDS = re.compile(
+    r"\b(errors?|invalid|incorrect|failed|problems?)\b|"
+    r"\bcould ?n[o']?t be (sent|submitted|processed)\b",
+    re.IGNORECASE,
+)
+
+
 def looks_like_error(text: str) -> bool:
     return bool(_ERROR_WORDS.search(text))
 
@@ -122,6 +132,8 @@ class Message:
     # Linked to a field by aria-describedby or aria-errormessage, rather than
     # only placed beside it.
     linked: bool = False
+    # Inside the form itself, not elsewhere on the page.
+    in_form: bool = False
 
 
 @dataclass(frozen=True)
@@ -303,12 +315,21 @@ def _is_error_message(message: Message, attempt: Attempt) -> bool:
     too ("Please check your inbox", "No further action is required", "Enter
     your street address"), and the decoy cases written after the first
     version turned exactly those into false failures.
+
+    The one exception is text inside the form itself with a word only an
+    error uses ("Your form has errors. Please correct them and resubmit.").
+    Accessible University's "before" page shows exactly that, in black on
+    yellow, with no field marked: the classic failure of SC 3.3.1, missed
+    while words alone never counted. Text elsewhere on the page (a toast
+    that says "error loading chat") still needs corroboration.
     """
     # A description is words: a lone "!" or "*" beside a field describes
     # nothing (SC 3.3.1 asks for the error to be described in text).
     if not _WORD.search(message.text):
         return False
     if message.linked:
+        return True
+    if message.in_form and _STRONG_ERROR_WORDS.search(message.text):
         return True
     # Beside a field: its words, or the field itself being marked, say it is an
     # error, not "Looks good" or "Available".

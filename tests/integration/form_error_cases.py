@@ -995,6 +995,27 @@ draw();</script>""",
   document.addEventListener('click', () => setTimeout(() => {
     document.getElementById('hint').textContent = 'Must contain an @ symbol.'; }, 100));</script>""",
     ),
+    Case(
+        "r05_general_error_in_form",
+        "fail",
+        "Accessible University's before page: a box inside the form shows 'ERROR / Your form has errors. Please correct them and resubmit.' in black on yellow; no field is marked.",
+        """
+<form id="f" novalidate>
+  <div id="error" style="display: none; background: #ffffcc; color: #000; padding: 8px">
+    <div>ERROR</div><p>Your form has errors. Please correct them and resubmit.</p></div>
+  <label for="name">Name</label><input id="name" name="name">
+  <label for="email">Email</label><input id="email" name="email">
+  <p><button type="submit">Submit</button></p></form>
+<script>onSubmit(document.getElementById('f'), f => { document.getElementById('error').style.display = 'block'; });</script>""",
+    ),
+    Case(
+        "r06_required_note_in_form",
+        "not_applicable",
+        "A note inside the form appears on submit: 'All fields are required.' Weak words, nothing marked: not evidence of a detected error.",
+        _contact(
+            """onSubmit(f, f => f.insertAdjacentHTML('afterbegin', '<p>All fields are required.</p>'));"""
+        ),
+    ),
     # ------------------------------------------------------------ blind 2
     # Written after the fixes the first blind batch led to, and scored
     # without tuning: the second honest estimate.

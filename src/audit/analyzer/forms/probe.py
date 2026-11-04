@@ -330,7 +330,8 @@ _TEXT_HELPERS = r"""
     if (!text || !seen(el) || elsewhere(el)) return null;
     const hidden = window.__axcessHidden;
     return {text, fields: fieldsOf(el), linked: linkedTo(el), announced: announced(el),
-      colour: getComputedStyle(el).color, revealed: !!hidden && hidden.has(el)};
+      colour: getComputedStyle(el).color, revealed: !!hidden && hidden.has(el),
+      inForm: u.root.contains(el)};
   };
 """
 
@@ -796,7 +797,13 @@ def _attempt_from(
         if old is None or (early and not old.before_request):
             colour = _is_error_colour(item.get("colour", ""))
             messages[key] = Message(
-                text, fields, item.get("announced", False), early, colour, item.get("linked", False)
+                text,
+                fields,
+                item.get("announced", False),
+                early,
+                colour,
+                item.get("linked", False),
+                item.get("inForm", False),
             )
 
     for item in watched["texts"]:
