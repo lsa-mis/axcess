@@ -53,14 +53,29 @@ on 130 of them, then got every verdict wrong on its first real pages
    sites (W3C BAD, WebAIM). Include ones that get it right and ones
    that get it wrong. Get the user's approval before visiting them
    (see Verification), and never press anything a real business acts on.
-2. Run the check on those pages in a visible browser while you build it.
+2. Find failing pages as hard as passing ones. Most real pages pass or
+   are skipped, and passes alone cannot show that the check catches
+   anything: the form error check had 2 failures in 54 real pages.
+   Search until you have several proved failures for the exact
+   criterion the check tests.
+3. Prove a failure before you rely on it. A page counts as failing only
+   when a source outside this repo says it fails that exact criterion
+   (the demo's own evaluation report or annotations, or a published
+   audit), and you have seen the failure yourself in the browser. A
+   site built to be inaccessible is not proof. W3C's own report on its
+   BAD "before" survey fails it on 1.4.1 (F81, required or error fields
+   shown by colour only) but passes it on 3.3.1, so the form error
+   check was right not to fail it. Read that report first. Never give the
+   user a page as one that should fail, or score against it, on a
+   guess; say what you have not confirmed.
+4. Run the check on those pages in a visible browser while you build it.
    Look at the screenshots to confirm each verdict yourself. A verdict
    no one has looked at is not evidence.
-3. For each mistake on a real page, add a cut-down copy of that page's
+5. For each mistake on a real page, add a cut-down copy of that page's
    markup to the test cases (a "real pages" batch), confirm it fails on
    the old code, then fix the detector. Synthetic cases stay as
    regression tests, not as proof that the check works.
-4. Report real-page results apart from synthetic scores. Never present
+6. Report real-page results apart from synthetic scores. Never present
    a synthetic score as real-world accuracy.
 
 ## Code map
