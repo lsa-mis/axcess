@@ -39,6 +39,7 @@ from collections import Counter
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlsplit
 
 from audit.analyzer.forms.base import (
     Attempt,
@@ -49,7 +50,7 @@ from audit.analyzer.forms.base import (
     skip_reason,
 )
 from audit.analyzer.interaction.probe import DEFAULT_BLOCKED_LABELS
-from audit.analyzer.interaction.safety import exploration_guard
+from audit.analyzer.interaction.safety import Submission, exploration_guard
 from audit.logging import get_logger
 
 if TYPE_CHECKING:
@@ -66,6 +67,10 @@ DEFAULT_MAX_FORMS = 5
 # a short async check); a page that takes longer is a known limit.
 DEFAULT_SETTLE_MS = 1200
 DEFAULT_TIMEOUT_S = 30.0
+# Empty forms sent to the site, at most, in one scan when sending is allowed.
+DEFAULT_MAX_SENDS = 25
+# How long the page the site sends back may take to load.
+_REPLY_TIMEOUT_MS = 15000
 
 # Held for the press, in every frame: WebSocket and RTCDataChannel sends
 # are dropped, and new WebSockets cannot open, recording when each was tried.
@@ -261,6 +266,18 @@ _COLLECT_JS = r"""
       isSearch: r.matches('[role=search]') || !!r.closest('[role=search]') ||
         (u.fields.length === 1 && (u.fields[0].type === 'search' ||
           /^(q|query|search|s)$/i.test(u.fields[0].name || ''))),
+      // What sending it would do, for the opt-in "send empty forms": a real
+      // <form>, where it goes and how, whether it opens another window, and
+      // whether every field a person can see is empty (nothing typed,
+      // ticked or chosen).
+      isForm: r.tagName === 'FORM',
+      action: r.tagName !== 'FORM' ? '' :
+        (u.submit && u.submit.hasAttribute('formaction') ? u.submit.formAction : r.action),
+      method: r.tagName !== 'FORM' ? '' : ((u.submit && u.submit.getAttribute('formmethod')) ||
+        r.getAttribute('method') || 'get').toUpperCase(),
+      newWindow: r.tagName === 'FORM' && !!((u.submit && u.submit.getAttribute('formtarget')) ||
+        r.getAttribute('target')),
+      allEmpty: u.fields.every(isEmpty),
     };
   });
 }
@@ -494,7 +511,13 @@ class ErrorIdentificationProbe:
     max_forms: int = DEFAULT_MAX_FORMS
     settle_ms: int = DEFAULT_SETTLE_MS
     timeout_s: float = DEFAULT_TIMEOUT_S
+    # Let a form the site checks only on its server be sent, empty, and judge
+    # the page the site sends back (``_may_send``). Off unless the person
+    # starting the scan chose it.
+    send_empty: bool = False
+    max_sends: int = DEFAULT_MAX_SENDS
     _seen: set[str] = field(default_factory=set)
+    _sent: int = 0
 
     async def run(self, page: Page, *, capture: Capture | None = None) -> list[FormResult]:
         """Check the page's forms. ``capture``, when given, photographs each
@@ -630,10 +653,22 @@ class ErrorIdentificationProbe:
         await frame.evaluate(_ARM_JS, form_index)
         requests: list[float] = []
         dialogs: list[tuple[str, float]] = []
+        submission = (
+            Submission(info["action"], info["method"])
+            if self._may_send(page, frame, info)
+            else None
+        )
 
         def on_request(request: Request) -> None:
             with contextlib.suppress(Exception):
                 if request.frame.page != page:
+                    return
+                if submission is not None and (
+                    submission.sent_at is not None or submission.matches(request)
+                ):
+                    # The submission let through, and the reply page's own
+                    # requests (still guarded), are not the form trying to
+                    # send itself some other way.
                     return
                 if (
                     request.method not in {"GET", "HEAD", "OPTIONS"}
@@ -648,7 +683,9 @@ class ErrorIdentificationProbe:
         page.on("dialog", on_dialog)
         await self._hold_sends(page)
         try:
-            async with exploration_guard(page, set(), DEFAULT_BLOCKED_LABELS, strict=True):
+            async with exploration_guard(
+                page, set(), DEFAULT_BLOCKED_LABELS, strict=True, submission=submission
+            ):
                 submit = await frame.evaluate_handle(
                     "i => window.__axcessForms[i].submit", form_index
                 )
@@ -656,6 +693,10 @@ class ErrorIdentificationProbe:
                 if element is None:
                     return None
                 await element.click(timeout=3000)
+                if submission is not None and submission.sent_at is not None:
+                    self._sent += 1
+                    with contextlib.suppress(Exception):
+                        await page.wait_for_load_state("load", timeout=_REPLY_TIMEOUT_MS)
                 await page.wait_for_timeout(self.settle_ms)
                 # Hover and focus styles are not error marks.
                 with contextlib.suppress(Exception):
@@ -665,11 +706,35 @@ class ErrorIdentificationProbe:
                     )
                     await page.wait_for_timeout(100)
                 watched = await frame.evaluate(_DISARM_JS)
-                await frame.evaluate("i => window.__axcessRebind(i)", form_index)
-                after = await frame.evaluate(_SNAPSHOT_JS, form_index)
+                after_selector = info["selector"]
+                if submission is not None and submission.sent_at is not None:
+                    # A new page: the site's reply. Find the form on it again
+                    # by its fields and submit control, and record that copy.
+                    replies = await frame.evaluate(_COLLECT_JS)
+                    reply = next(
+                        (i for i, r in enumerate(replies) if self._key(r) == self._key(info)),
+                        None,
+                    )
+                    if reply is None:
+                        result = self._result(
+                            "not_applicable",
+                            "Axcess sent the empty form, and the page the site sent back "
+                            "does not show the form again",
+                            info,
+                            page,
+                            0,
+                        )
+                        result.sent = True
+                        result.before_png = before_png
+                        return result
+                    after = await frame.evaluate(_SNAPSHOT_JS, reply)
+                    after_selector = replies[reply]["selector"]
+                else:
+                    await frame.evaluate("i => window.__axcessRebind(i)", form_index)
+                    after = await frame.evaluate(_SNAPSHOT_JS, form_index)
                 # Still inside the guard: nothing the page does meanwhile can
                 # send or navigate.
-                after_png = await self._shot(shoot, page, info["selector"])
+                after_png = await self._shot(shoot, page, after_selector)
         finally:
             page.remove_listener("request", on_request)
             page.remove_listener("dialog", on_dialog)
@@ -684,9 +749,34 @@ class ErrorIdentificationProbe:
         )
         result.fields_in_error = [labels[k] for k in (undescribed or attempt.marked)]
         result.messages = [m.text for m in attempt.messages][:10]
+        result.sent = submission is not None and submission.sent_at is not None
         result.before_png = before_png
         result.after_png = after_png
         return result
+
+    def _may_send(self, page: Page, frame: Frame, info: dict[str, Any]) -> bool:
+        """Whether this form may be sent to the site, empty.
+
+        Only when the person starting the scan allowed it, for a real form in
+        the page itself (not a frame) whose every visible field is empty, that
+        goes to this same site, by GET or POST, in this window, and within the
+        scan's limit. The skip rules (sign-in, payment, CAPTCHA, search,
+        delete) were already applied before any press.
+        """
+        if not self.send_empty or self._sent >= self.max_sends or frame is not page.main_frame:
+            return False
+        if not info.get("isForm") or not info.get("allEmpty") or info.get("newWindow"):
+            return False
+        if info.get("method") not in {"GET", "POST"}:
+            return False
+        try:
+            action, here = urlsplit(info.get("action") or ""), urlsplit(page.url)
+        except ValueError:
+            return False
+        return action.scheme in {"http", "https"} and (action.scheme, action.netloc) == (
+            here.scheme,
+            here.netloc,
+        )
 
     @staticmethod
     async def _hold_sends(page: Page) -> None:

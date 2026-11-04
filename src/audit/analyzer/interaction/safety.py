@@ -10,14 +10,24 @@ while the guard is held, GET included, not only writes and navigation. The
 form check needs nothing from the network to see a form react, so it gives
 the server nothing at all. Sockets are not requests and are not seen here;
 the form check holds them in the page itself (``analyzer.forms.probe``).
+
+``submission`` (the form check, only when the person starting the scan let
+it send empty forms) lets exactly one request through: that form's own
+submission, a top-level navigation from the page to the form's action on
+the same site. From then on the page the site sends back may read from the
+site (GET and HEAD on the same origin, its styles and scripts), so it can
+be judged as the site shows it; every write, every other navigation, and
+every other site stay blocked.
 """
 
 from __future__ import annotations
 
 import asyncio
 import re
+import time
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager, suppress
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from urllib.parse import unquote, urlsplit
 
@@ -30,6 +40,29 @@ log = get_logger(__name__)
 
 # How long a cancelled guard keeps trying to remove itself.
 _LIFT_TIMEOUT_S = 10.0
+
+
+@dataclass
+class Submission:
+    """The one form submission a guard may let through (see the module docstring)."""
+
+    action: str  # the form's action, as an absolute URL
+    method: str  # "GET" or "POST"
+    # When it was let through, in milliseconds since the epoch; None until then.
+    sent_at: float | None = None
+
+    def matches(self, request: Request) -> bool:
+        """Whether ``request`` is this submission: same method, same address
+        up to the query (a GET form adds its fields there)."""
+        try:
+            got, want = urlsplit(request.url), urlsplit(self.action)
+        except ValueError:
+            return False
+        return (
+            request.method == self.method
+            and request.is_navigation_request()
+            and (got.scheme, got.netloc, got.path) == (want.scheme, want.netloc, want.path)
+        )
 
 
 def safe_url(url: str, blocked_labels: Sequence[str]) -> bool:
@@ -56,7 +89,12 @@ def safe_url(url: str, blocked_labels: Sequence[str]) -> bool:
 
 @asynccontextmanager
 async def exploration_guard(
-    page: Page, urls: set[str], blocked_labels: Sequence[str], *, strict: bool = False
+    page: Page,
+    urls: set[str],
+    blocked_labels: Sequence[str],
+    *,
+    strict: bool = False,
+    submission: Submission | None = None,
 ) -> AsyncIterator[None]:
     """Block writes, new windows and document navigation before dispatch.
 
@@ -65,7 +103,8 @@ async def exploration_guard(
     Allowed requests fall through to existing scope/egress policy.
 
     ``strict`` blocks every request of the page and its popups, reads too
-    (see the module docstring).
+    (see the module docstring). ``submission`` lets one form submission
+    through, then the reads of the page the site sends back.
     """
     blocked = 0
     popups: set[Page] = set()
@@ -120,7 +159,19 @@ async def exploration_guard(
         destination = urlsplit(request.url)
         same_origin = (destination.scheme, destination.netloc) == (pinned.scheme, pinned.netloc)
         if (
-            strict
+            submission is not None
+            and submission.sent_at is None
+            and not popup
+            and same_origin
+            and request.frame == page.main_frame
+            and submission.matches(request)
+        ):
+            submission.sent_at = time.time() * 1000
+            await route.fallback()
+            return
+        sent = submission is not None and submission.sent_at is not None
+        if (
+            (strict and not sent)
             or popup
             or is_navigation
             or request.method not in {"GET", "HEAD", "OPTIONS"}

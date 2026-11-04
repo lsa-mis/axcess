@@ -166,6 +166,9 @@ class FormResult:
     # or its printed form: they are evidence, not the answer.
     before_png: bytes | None = field(default=None, repr=False, compare=False)
     after_png: bytes | None = field(default=None, repr=False, compare=False)
+    # Sent to the site, empty, because the scan allowed it: the answer is the
+    # page the site sent back, and "After" is a picture of that page.
+    sent: bool = False
 
 
 # The one rule this check reports, keyed in page_a11y_findings like the other
@@ -224,6 +227,11 @@ class FormFinding:
     def from_result(cls, result: FormResult) -> FormFinding:
         """The occurrence for a ``fail`` result: what was seen, in words."""
         parts = [result.reason[:1].upper() + result.reason[1:] + "."]
+        if result.sent:
+            parts.append(
+                "Axcess sent the form to the site with nothing filled in, "
+                "as this scan allowed; this is the page the site sent back."
+            )
         if result.fields_in_error:
             parts.append("Fields marked in error: " + ", ".join(result.fields_in_error[:10]) + ".")
         if result.messages:
