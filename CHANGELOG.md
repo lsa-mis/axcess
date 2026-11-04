@@ -280,6 +280,11 @@ merge.
 
 ### Fixed
 
+- Form error check: it now presses each form as the page loaded it.
+  Click-Through runs first on the same page, and it can leave radio buttons
+  and checkboxes ticked. On W3C's BAD survey, a ticked answer meant the
+  form was no longer empty, so it was not sent and could not be judged. If
+  any field has changed, the check now reloads the page first.
 - About: the desktop app now shows the version you are running, such as
   "Desktop preview 0.2.3". It always said 0.2.0, because the page took the
   number from the web part of the app, which each release does not change.

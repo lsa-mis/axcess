@@ -21,7 +21,9 @@ from typing import Any, ClassVar
 
 import pytest
 
+from audit.analyzer.axe import AxeAnalyzer
 from audit.analyzer.forms import ErrorIdentificationProbe
+from audit.analyzer.interaction import InteractionProbe
 
 pytestmark = [pytest.mark.integration, pytest.mark.asyncio(loop_scope="module")]
 pytest.importorskip("playwright.async_api")
@@ -29,9 +31,15 @@ pytest.importorskip("playwright.async_api")
 _STYLE = "<style>label.bad { color: #c00000; } label { display: block; }</style>"
 
 
-def _form(bad: bool, *, value: str = "", action: str = "/survey") -> str:
+def _form(bad: bool, *, value: str = "", action: str = "/survey", radios: bool = False) -> str:
     cls = ' class="bad"' if bad else ""
-    return f"""<form action="{action}" method="post"><h2>Survey</h2>
+    # As on the BAD survey: answer buttons with no label of their own.
+    answers = (
+        "".join(f'<input type="radio" name="res" value="{n}">{n}' for n in (1, 2, 3))
+        if radios
+        else ""
+    )
+    return f"""<form action="{action}" method="post"><h2>Survey</h2>{answers}
   <label for="name"{cls}>Name</label><input id="name" name="name" value="{value}">
   <label for="email"{cls}>Email</label><input id="email" name="email">
   <input type="hidden" name="token" value="abc">
@@ -63,18 +71,21 @@ class _Site(http.server.BaseHTTPRequestHandler):
             "/": _form(False),
             "/filled": _form(False, value="Ada"),
             "/elsewhere": _form(False, action="http://other.invalid/survey"),
+            "/radios": _form(False, action="/survey-radios", radios=True),
         }
         self._send(_page(pages.get(self.path, "")))
 
     def do_POST(self) -> None:
         length = int(self.headers.get("Content-Length") or 0)
         body = self.rfile.read(length).decode()
-        if self.path == "/survey":
+        if self.path in {"/survey", "/survey-radios"}:
             type(self).posts.append(body)
             # As the BAD survey does: the form again, labels red, no words.
             # Its own script tries to post somewhere; that must be refused.
             beacon = "<script>fetch('/beacon', {method: 'POST', body: 'x'});</script>"
-            self._send(_page(_form(True), beacon))
+            radios = self.path == "/survey-radios"
+            reply = _form(True, action=self.path, radios=radios)
+            self._send(_page(reply, beacon))
         else:
             type(self).other_posts.append(self.path)
             self._send(b"")
@@ -128,3 +139,26 @@ async def test_a_form_with_a_value_or_another_site_is_never_sent(browser, path: 
         posts = list(_Site.posts)
     assert posts == [], posts
     assert all(not r.sent for r in results)
+
+
+async def test_buttons_ticked_by_click_through_are_cleared_before_sending(browser) -> None:  # type: ignore[no-untyped-def]
+    """Report #39, on W3C's BAD survey: Click-Through runs first on the same
+    page and ticks every radio button it finds, without leaving the page, so
+    nothing put the page back. The form check then found a form with answers
+    in it, rightly refused to send it, and could not judge it. It must start
+    from the page as it loaded."""
+    with _serve() as base:
+        context = await browser.new_context(service_workers="block")
+        page = await context.new_page()
+        try:
+            await page.goto(f"{base}/radios")
+            await InteractionProbe(axe=AxeAnalyzer.from_bundled()).run(page)
+            assert await page.evaluate(
+                "() => [...document.querySelectorAll('input[type=radio]')].some(r => r.checked)"
+            ), "Click-Through no longer ticks the buttons; this test proves nothing"
+            results = await ErrorIdentificationProbe(send_empty=True).run(page)
+        finally:
+            await context.close()
+        posts = list(_Site.posts)
+    assert [r.outcome for r in results] == ["fail"], results
+    assert len(posts) == 1 and "res=" not in posts[0], posts

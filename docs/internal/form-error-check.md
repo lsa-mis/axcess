@@ -139,6 +139,17 @@ control, and compares it with the record from before the press. A reply
 page without the form is "no sign of an error" (the site accepted it, or
 went elsewhere).
 
+First real scan (report #39, the BAD survey, 2026-11-04): "could not
+judge". Click-Through runs first on the same page. It ticked all eight of
+the survey's radio buttons, and it puts a page back only when a click
+leaves it. So the form check found answers ticked, rightly refused to send
+the form, and the guard blocked its submission. The same leftover state
+also changed what the check pressed in scans that do not send. The fix:
+before its first press, the check reloads the page when any field differs
+from what the page's markup set (`changed` in `_COLLECT_JS`), and plans
+again. `test_buttons_ticked_by_click_through_are_cleared_before_sending`
+runs the real Click-Through first and fails without the fix.
+
 Why it is opt-in: an empty form is not harmless. It still sends hidden and
 preset values, and many sites act on any submission, emailing a blank
 contact message to a person or creating a record. It is for sites the

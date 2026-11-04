@@ -36,7 +36,7 @@ import asyncio
 import contextlib
 import time
 from collections import Counter
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Set
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit
@@ -139,6 +139,24 @@ _COLLECT_JS = r"""
     if (f.type === 'checkbox' || f.type === 'radio') return !f.checked;
     if (f.tagName === 'SELECT') return f.selectedIndex <= 0 || !f.value;
     return !f.value;
+  };
+  // Whether a field differs from how the page's markup set it: something
+  // ticked, typed or chosen since. Click-Through runs first on the same
+  // page and ticks radio buttons and checkboxes without leaving the page.
+  const changed = f => {
+    if (f.type === 'checkbox' || f.type === 'radio') return f.checked !== f.defaultChecked;
+    if (f.tagName === 'SELECT') {
+      const opts = [...f.options];
+      if (f.multiple) return opts.some(o => o.selected !== o.defaultSelected);
+      let first = -1;
+      opts.forEach((o, i) => { if (o.defaultSelected) first = i; });
+      if (first < 0 && f.size <= 1) first = opts.findIndex(o => !o.disabled);
+      return f.selectedIndex !== first;
+    }
+    // A slider or colour field has a value even when the markup sets none,
+    // so it would always look changed; neither is ever empty anyway.
+    if (f.type === 'range' || f.type === 'color') return false;
+    return f.value !== f.defaultValue;
   };
   // Climbs until the path matches this element alone (or reaches an id).
   // A fixed five steps matched four forms on primevue.org, so the report
@@ -278,6 +296,7 @@ _COLLECT_JS = r"""
       newWindow: r.tagName === 'FORM' && !!((u.submit && u.submit.getAttribute('formtarget')) ||
         r.getAttribute('target')),
       allEmpty: u.fields.every(isEmpty),
+      changed: u.fields.some(changed),
     };
   });
 }
@@ -533,6 +552,20 @@ class ErrorIdentificationProbe:
         pinned = page.url
         attempted = 0
         plan = await self._plan(page)
+        if any(info.get("changed") for _, _, info in plan):
+            # Earlier checks on this page left a field changed: Click-Through
+            # ticks radio buttons and checkboxes without leaving the page, so
+            # nothing put it back. The check presses forms as the page loaded
+            # them, with nothing typed, ticked or chosen, and sends only an
+            # empty form; on report #39 a ticked answer kept W3C's BAD survey
+            # from being judged. Reload once, as between forms, and plan again.
+            try:
+                await page.goto(pinned, wait_until="load", timeout=15000)
+            except Exception as exc:
+                log.debug("forms.reload_failed", error_type=type(exc).__name__)
+                return
+            # The forms just planned are this page's own: plan them again.
+            plan = await self._plan(page, again={self._key(info) for _, _, info in plan})
         for frame_index, form_index, info in plan:
             reason = self._skip(info)
             if reason:
@@ -569,8 +602,13 @@ class ErrorIdentificationProbe:
             if outcome is not None:
                 results.append(outcome)
 
-    async def _plan(self, page: Page) -> list[tuple[int, int, dict[str, Any]]]:
+    async def _plan(
+        self, page: Page, *, again: Set[str] = frozenset()
+    ) -> list[tuple[int, int, dict[str, Any]]]:
+        """The forms on the page not yet checked in this scan, marked as
+        checked. ``again``: forms this page already marked, planned anew."""
         plan: list[tuple[int, int, dict[str, Any]]] = []
+        planned: set[str] = set()
         for frame_index, frame in enumerate(page.frames):
             if frame is not page.main_frame:
                 try:
@@ -586,8 +624,9 @@ class ErrorIdentificationProbe:
                 continue
             for form_index, info in enumerate(forms):
                 key = self._key(info)
-                if key in self._seen:
+                if key in planned or (key in self._seen and key not in again):
                     continue
+                planned.add(key)
                 self._seen.add(key)
                 plan.append((frame_index, form_index, info))
         return plan
