@@ -626,8 +626,8 @@ criteria:
       Submit each form with missing and wrong values, and confirm every error
       names the field and says in words what is wrong. The check types
       nothing, never presses sign-in, payment, search or delete forms, checks
-      only a form's first step, and cannot judge a form that sends itself to
-      the server.
+      only a form's first step, and cannot judge a form that only the site's
+      server checks, unless the scan lets it send empty forms to the site.
 
   - sc: "3.3.2"
     name: "Labels or Instructions"

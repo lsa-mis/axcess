@@ -15,7 +15,11 @@ merge.
   scans. It presses
   each form's submit button once, with nothing typed, stops the form from
   being sent, and reports a form that marks fields in error without saying
-  in words what is wrong. Results appear in the Issues table as "Form shows
+  in words what is wrong, or shows a general error that names no field.
+  A third answer, **Check forms, and send empty ones to this site**, lets
+  it send a form whose every field is empty and check the page the site
+  sends back, for forms that only the site's server checks. It is never a
+  default and is meant for sites you own or test sites. Results appear in the Issues table as "Form shows
   an error without describing it in text", under Not sure. It never
   presses sign-in, payment, delete or search forms. Each result keeps a
   picture of the form before and after the press, and **What was checked**

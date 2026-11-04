@@ -156,7 +156,7 @@ export const QUESTIONS: Question[] = [
       "It blocks form submissions and other requests that could change data on the site.",
       "It does not leave the page or open new windows while it clicks.",
       "It stops after 100 clicks, 5 levels of menus, or 2 minutes on each page.",
-      "The form error check types nothing and stops the form from being sent. It never presses sign-in, payment, search or delete forms, and never runs in a sign-in scan.",
+      "The form error check types nothing, and by default stops the form from being sent. Only if you choose it on New scan does it send forms whose every field is empty; the site may still act on those, so choose it only for a site you own or a test site. It never presses sign-in, payment, search or delete forms, and never runs in a sign-in scan.",
     ],
     after: "Scans of public sites follow the site's instructions for automated visitors (robots.txt) by default.",
     links: [{ href: "/docs/glossary/#click-through", text: "Click-Through, in the glossary" }],

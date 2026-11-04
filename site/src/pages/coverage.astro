@@ -162,7 +162,7 @@ const CHECK_CARDS: [string, string, string, string][] = [
   [
     "forms",
     "Form error check",
-    "Presses each form's submit button once, with nothing typed, and checks that the form says in words what is wrong. It stops the form from being sent. On by default for public websites; never in a sign-in scan.",
+    "Presses each form's submit button once, with nothing typed, and checks that the form says in words what is wrong. By default it stops the form from being sent; you can let it send empty forms to a site you own or a test site. On by default for public websites; never in a sign-in scan.",
     "It never presses sign-in, payment, search or delete forms, checks only the first step of a form, and a person confirms each result. It is not yet tested on enough real forms to count toward coverage.",
   ],
 ];

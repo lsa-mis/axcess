@@ -109,6 +109,42 @@ skipped (sign-in, search, no submit control, nothing empty), and 12 were
 W3C's BAD "before" survey is one of those: it is checked only on the
 server, so the check cannot see its red labels without sending the form.
 
+## Sending empty forms (opt-in, 2026-11-04)
+
+The developer's decision, after W3C's BAD "before" survey came out "not
+checked": it is checked only on its server, so its red labels appear only
+in the page the server sends back. New scan's form question has a third
+answer, **Check forms, and send empty ones to this site**
+(`send_empty_forms`, stored as `form_send_empty_forms`). It is never a
+default, never offered in sign-in scans (the browser never runs the check
+in a signed-in session), and off in "Scan again with faster settings".
+
+A form is sent only when all of these hold (`ErrorIdentificationProbe._may_send`):
+the skip rules already passed (sign-in, payment, CAPTCHA, search, delete);
+it is a real `<form>` in the page itself, not in a frame; every field a
+person can see is empty, nothing ticked or chosen (hidden values such as
+tokens still go with it); it goes to the same site, by GET or POST, in the
+same window; and fewer than 25 forms were sent in this scan.
+
+The network guard (`interaction.safety.Submission`) then lets exactly one
+request through: that form's own submission, a top-level navigation to its
+action. A script that sends the form some other way is still blocked, which
+still means "not checked". Once the submission is through, the reply page
+may read from the same site (GET and HEAD: its styles and scripts), so it
+is judged as the site shows it; every write, every other navigation and
+every other site stay blocked. The socket hold covers the page before the
+press, not the reply page, which loads like any page the crawler opens.
+The check finds the form again on the reply page by its fields and submit
+control, and compares it with the record from before the press. A reply
+page without the form is "no sign of an error" (the site accepted it, or
+went elsewhere).
+
+Why it is opt-in: an empty form is not harmless. It still sends hidden and
+preset values, and many sites act on any submission, emailing a blank
+contact message to a person or creating a record. It is for sites the
+person owns or test sites. Tests:
+`tests/integration/test_form_error_send_empty.py`.
+
 ## To do
 
 Ordered by what blocks using the check, then by expected value.

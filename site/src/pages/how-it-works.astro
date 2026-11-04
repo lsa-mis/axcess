@@ -68,7 +68,7 @@ const CHECKS: { name: string; text: string; how: string; on: string; link?: { hr
   },
   {
     name: "Form error check",
-    text: "Presses each form's submit button once, with nothing typed, and checks that the form says in words what is wrong. It stops the form from being sent, and never presses sign-in, payment, search or delete forms.",
+    text: "Presses each form's submit button once, with nothing typed, and checks that the form says in words what is wrong. By default it stops the form from being sent; on a site you own or a test site you can let it send empty forms. It never presses sign-in, payment, search or delete forms.",
     how: "Seen in the browser",
     on: "On by default for public websites; never in a sign-in scan",
     link: { href: "/docs/glossary/#form-error-check", text: "What the form error check is" },

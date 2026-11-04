@@ -167,7 +167,7 @@ No Axcess pipeline detects these, they require a human. Treat this as your manua
 | 3.2.3 | Consistent Navigation | AA | Confirm navigation repeated across pages stays in the same relative order. A cross-page embedding analyzer is on the roadmap. |
 | 3.2.4 | Consistent Identification | AA | Confirm components with the same function are labelled consistently across pages. A cross-page analyzer is on the roadmap. |
 | 3.2.6 | Consistent Help | A | Confirm help mechanisms (contact, self-help) appear in the same relative order on every page that has them. |
-| 3.3.1 | Error Identification | A | Submit each form with missing and wrong values, and confirm every error names the field and says in words what is wrong. The check types nothing, never presses sign-in, payment, search or delete forms, checks only a form's first step, and cannot judge a form that sends itself to the server. |
+| 3.3.1 | Error Identification | A | Submit each form with missing and wrong values, and confirm every error names the field and says in words what is wrong. The check types nothing, never presses sign-in, payment, search or delete forms, checks only a form's first step, and cannot judge a form that only the site's server checks, unless the scan lets it send empty forms to the site. |
 | 3.3.3 | Error Suggestion | AA | Trigger validation errors and confirm the page suggests how to fix them. |
 | 3.3.4 | Error Prevention (Legal, Financial, Data) | AA | For legal/financial/data submissions, confirm reversal, checking, or confirmation is available. |
 | 3.3.7 | Redundant Entry | A | In multi-step flows, confirm previously-entered info is auto-populated or selectable rather than re-typed. |

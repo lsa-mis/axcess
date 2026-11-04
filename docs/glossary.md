@@ -356,9 +356,14 @@ when you turn on **Check motion and animation**.
 
 A check for forms that show an error without saying in words what is wrong
 ([error identification](#error-identification), WCAG 3.3.1). It presses each
-form's submit button once, with nothing typed, and stops the form from being
-sent. It never presses sign-in, payment, search or delete forms, and it checks
-only a form's first step. Its results are marked [Not sure](#not-sure), with a
+form's submit button once, with nothing typed. By default it stops the form
+from being sent, so a form that only the site's server checks is counted as
+could not judge. On New scan you can choose instead to let it send a form to
+the site when every field is empty, and check the page the site sends back:
+use that only on a site you own or a test site, because the site may still
+act on an empty form, for example by emailing a blank message to someone. It
+never presses sign-in, payment, search or delete forms, and it checks only a
+form's first step. Its results are marked [Not sure](#not-sure), with a
 picture of the form before and after the press. In the app it is on by
 default for public websites (**Check that forms describe their errors**,
 under **Checks** on New scan) and never runs in a sign-in scan.
