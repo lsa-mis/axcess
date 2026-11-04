@@ -390,11 +390,16 @@ _SNAPSHOT_JS = (
     const label = f.labels && f.labels[0];
     const wrap = f.parentElement && f.parentElement !== u.root ? f.parentElement : null;
     // A radio or checkbox group is often marked on its fieldset and legend,
-    // and a required mark (an asterisk) inside the field's own group.
+    // and a required mark (an asterisk) inside the field's own group. The
+    // group holds this field (or this set of radio buttons) and no other, so
+    // a colour that turns red anywhere in it is about this field. Its first
+    // 200 elements: W3C's BAD survey turns its question red in a row above
+    // the answers, past the 16th element of nested layout tables, and the
+    // first 12 missed it (report #41).
     const set = f.closest('fieldset');
     const next = nextTo(key);
     const extra = [set, set && set.querySelector('legend'),
-      ...[...u.groups[key].querySelectorAll('*')].slice(0, 12),
+      ...[...u.groups[key].querySelectorAll('*')].slice(0, 200),
       next, ...(next ? [...next.querySelectorAll('*')].slice(0, 6) : [])];
     return {
       key,
@@ -786,7 +791,10 @@ class ErrorIdentificationProbe:
         result = self._result(
             outcome, reason, info, page, page.frames.index(frame) if frame in page.frames else 0
         )
-        result.fields_in_error = [labels[k] for k in (undescribed or attempt.marked)]
+        # Once each: a set of radio buttons is one question with one name.
+        result.fields_in_error = list(
+            dict.fromkeys(labels[k] for k in (undescribed or attempt.marked))
+        )
         result.messages = [m.text for m in attempt.messages][:10]
         result.sent = submission is not None and submission.sent_at is not None
         result.before_png = before_png

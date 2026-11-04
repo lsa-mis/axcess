@@ -75,9 +75,13 @@ yet validated on real forms labelled by experts, so its results stay Not sure
 leads a person confirms (`docs/internal/form-error-check.md`).
 On 54 real public pages, checked by hand on 2026-11-04 against screenshots
 (not by an expert), the check gave 41 verdicts and none was found wrong.
-Two were true failures, both Accessible University "before" pages (a
-general "Your form has errors" message that names no field). Two failures
-are far too few to measure recall on real forms.
+Three were true failures: both Accessible University "before" pages (a
+general "Your form has errors" message that names no field) and one
+Foundation Abide example (labels turn red, no text). On 12 more pages that
+an outside source says fail 3.3.1, it failed all 4 it could press, passed
+the fixed version, and skipped the rest by its safety rules (payment and
+password forms) or because nothing could be pressed. Seven failures are
+still too few to measure recall on real forms.
 The detection-evals workflow runs it in its own job, with a browser.
 
 The efficiency and scale gates exercise the durable local evidence path:

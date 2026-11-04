@@ -1,9 +1,10 @@
 """The form error check's opt-in "send empty forms", against a real server.
 
-W3C's BAD "before" survey is checked only on its server: pressing Submit
-posts the form, and the page that comes back marks the missing answers with
-red labels and no words. Without sending, the check can only say "not
-checked". With the scan's permission it may send a form whose every visible
+W3C's BAD "before" survey is checked only on its server. Sent empty, the
+page that comes back turns two questions red and explains nothing (its PHP,
+in W3C's bad.zip; W3C's Easy Checks: "errors are only indicated by the label
+being red, and there is no explanation of the errors"). Without sending, the
+check can only say "not checked". With the scan's permission it may send a form whose every visible
 field is empty, and judge the page the site sends back. Everything else is
 still refused: a form with any value in it, a form that goes to another
 site, and every request the reply page makes on its own except reads.
@@ -46,6 +47,32 @@ def _form(bad: bool, *, value: str = "", action: str = "/survey", radios: bool =
   <input type="submit" value="submit"></form>"""
 
 
+def _bad_survey(reply: bool) -> str:
+    """A cut-down copy of the BAD survey's markup: each question in its own
+    nest of layout tables, its heading in a row above the answers. In the
+    reply the server wraps the heading in ``<font color="red">``."""
+
+    def question(text: str, answers: str) -> str:
+        heading = f'<font color="red">{text}</font>' if reply else text
+        return (
+            '<table class="bordotabella"><tr><td><table><tr><td><img alt="" width="11" '
+            'height="25"></td><td><table><tr><td colspan="2"><img alt="" width="10" '
+            f'height="10"></td></tr><tr><th align="left" colspan="2">{heading}</th></tr>'
+            f"<tr><td>{answers}</td></tr></table></td></tr></table></td></tr></table>"
+        )
+
+    park = "".join(f'<input type="radio" name="res" value="{n}">{n} ' for n in (1, 2, 3))
+    city = (
+        '<select name="cc"><option value="0">select a city</option><option>Kabul</option></select>'
+    )
+    return (
+        '<form action="/bad-survey" method="post">'
+        + question("Which is your favorite city park?", park)
+        + question("Which city do you find is the greenest?", city)
+        + '<input type="submit" id="submit" value="submit" name="submit"></form>'
+    )
+
+
 def _page(body: str, script: str = "") -> bytes:
     return (
         f'<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Survey</title>'
@@ -72,15 +99,19 @@ class _Site(http.server.BaseHTTPRequestHandler):
             "/filled": _form(False, value="Ada"),
             "/elsewhere": _form(False, action="http://other.invalid/survey"),
             "/radios": _form(False, action="/survey-radios", radios=True),
+            "/bad": _bad_survey(reply=False),
         }
         self._send(_page(pages.get(self.path, "")))
 
     def do_POST(self) -> None:
         length = int(self.headers.get("Content-Length") or 0)
         body = self.rfile.read(length).decode()
-        if self.path in {"/survey", "/survey-radios"}:
+        if self.path == "/bad-survey":
             type(self).posts.append(body)
-            # As the BAD survey does: the form again, labels red, no words.
+            self._send(_page(_bad_survey(reply=True)))
+        elif self.path in {"/survey", "/survey-radios"}:
+            type(self).posts.append(body)
+            # The form again, its labels red, no words.
             # Its own script tries to post somewhere; that must be refused.
             beacon = "<script>fetch('/beacon', {method: 'POST', body: 'x'});</script>"
             radios = self.path == "/survey-radios"
@@ -162,3 +193,15 @@ async def test_buttons_ticked_by_click_through_are_cleared_before_sending(browse
         posts = list(_Site.posts)
     assert [r.outcome for r in results] == ["fail"], results
     assert len(posts) == 1 and "res=" not in posts[0], posts
+
+
+async def test_the_bad_survey_reply_fails(browser) -> None:  # type: ignore[no-untyped-def]
+    """Report #41: the survey was sent and its reply judged "no sign of an
+    error". The red questions sit in a row above the answers, deep in layout
+    tables, past the first 12 elements of the field's group that were all the
+    check looked at."""
+    with _serve() as base:
+        results = await _check(browser, f"{base}/bad", send=True)
+        posts = list(_Site.posts)
+    assert len(posts) == 1, posts
+    assert [r.outcome for r in results] == ["fail"], results

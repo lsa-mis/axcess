@@ -62,12 +62,16 @@ on 130 of them, then got every verdict wrong on its first real pages
    when a source outside this repo says it fails that exact criterion
    (the demo's own evaluation report or annotations, or a published
    audit), and you have seen the failure yourself in the browser. A
-   site built to be inaccessible is not proof. W3C's own report on its
-   BAD "before" survey fails it on 1.4.1 (F81, required or error fields
-   shown by colour only) but passes it on 3.3.1, so the form error
-   check was right not to fail it. Read that report first. Never give the
-   user a page as one that should fail, or score against it, on a
-   guess; say what you have not confirmed.
+   site built to be inaccessible is not proof, and one source may not
+   be either: read every source the demo has, and when they disagree,
+   what the page does decides. W3C's evaluation report on its BAD
+   "before" survey passes 3.3.1 ("no corresponding content"), but its
+   Easy Checks page says that, sent empty, "errors are only indicated by
+   the label being red, and there is no explanation of the errors", and
+   the survey's own code (in W3C's bad.zip) does exactly that: a 3.3.1
+   failure the form error check missed. Never give the user a page as
+   one that should fail, or as one that should pass, or score against
+   it, on a guess; say what you have not confirmed.
 4. Run the check on those pages in a visible browser while you build it.
    Look at the screenshots to confirm each verdict yourself. A verdict
    no one has looked at is not evidence.

@@ -280,6 +280,10 @@ merge.
 
 ### Fixed
 
+- Form error check: a question that turns red with no words now fails,
+  even when the page is built from tables nested several levels deep. On
+  W3C's BAD survey, sent empty, the red questions sat too deep in their
+  layout tables, so the check saw no error at all.
 - Inspector: a form the form error check flagged is now outlined in the
   page copy. For a form with long code, it said the form "may not appear
   here", though the form is on the page from the start.

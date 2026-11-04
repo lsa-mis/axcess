@@ -74,7 +74,9 @@ were left out.
 | --- | --- | --- | --- | --- |
 | First, 14 pages, code before the fixes below | 3 | 0 | 0 | All 3 fails (Bootstrap, Parsley) |
 | 32 pages, after the fixes below | 0 | 25 | 4 | None found |
-| Last, 54 pages (the 32, broken-on-purpose practice sites, Accessible University), current code | 2 | 28 | 5 | None found |
+| 54 pages (the 32, broken-on-purpose practice sites, Accessible University) | 2 | 28 | 5 | None found |
+| The same 54, after the group fix below (report #41) | 3 | 28 | 5 | None found |
+| 12 pages that an outside source says fail 3.3.1, and 2 of their fixed versions | 4 | 2 | 0 | None found |
 
 The first run's mistakes, and one found later on atlassian.design, each
 became a "real pages" case (`r01` to `r04` in `form_error_cases.py`) that
@@ -102,18 +104,48 @@ words alone only for text inside the form itself, and only strong ones
 and thank-you text use the weak ones; `r05` copies the page and `r06` is
 the decoy. Its fixed "after" page comes out as the browser's own message.
 
-What the real pages show the check cannot do yet: two failures are far too
-few to measure recall on real forms. Most forms on library demo pages are
+The rerun's new failure is Foundation's Abide radio and checkbox example
+(get.foundation/sites/docs/abide.html): pressed, its labels turn red with
+no text (seen in the screenshots; no outside source, as it is a library's
+documentation). It is unstable: on the earlier run the page tried to send
+the form, which made it "not checked".
+
+### Pages an outside source says fail (2026-11-04)
+
+Found by searching for demos whose own documentation, answer key or test
+case says the form fails 3.3.1; each returned HTTP 200 with no Cloudflare
+or CAPTCHA check. Run in a visible browser, each failure checked against
+its screenshots.
+
+| Page | Source says | Check | Right? |
+| --- | --- | --- | --- |
+| Section 508 Baseline `TF10/10.D-2-fail-2.html` | colour only, fail | fail | Yes |
+| Section 508 Baseline `TF10/10.D-2-fail-3.html` | generic "Error.", fail | fail | Yes |
+| Audit training lab, Fernhill `?defects=V14` | red borders only | fail | Yes |
+| Fernhill `?defects=none` (fixed) | passes | pass | Yes |
+| mackjudd.com `contact.html` (a scanner's test fixture) | red borders only | fail | Yes |
+| Section 508 Baseline `TF10/10.D-2-fail-1.html` | fails: message not announced | pass | Yes for this check: the visible text describes the error; announcing it is not judged |
+| W3C conformance-model museum, checkout payment | border colour only | skipped | By design: a payment form |
+| Audit training lab, Cedar Valley `?defects=F05` and `none` | legend turns red only | skipped | By design: a password field |
+| Accessible Web Project test suite, understandable | "Something went wrong" | its failing form skipped | By design: a password field |
+| GOV.UK tool audit, two "errors" test pages | colour only / not identified | skipped | Nothing to press: the error state is fixed in the page |
+
+W3C's BAD "before" survey also fails now, but only in a scan that sends
+empty forms, and was confirmed only on the survey's own code run offline
+(the section below), not on w3.org.
+
+What the real pages show the check cannot do yet: seven failures are
+still too few to measure recall on real forms. Most forms on library demo pages are
 skipped (sign-in, search, no submit control, nothing empty), and 12 were
 "not checked" because the page sent the form to its server when pressed.
 W3C's BAD "before" survey is one of those: it is checked only on the
-server, so the check cannot see its red labels without sending the form.
+server, so the check cannot see its red questions without sending the form.
 
 ## Sending empty forms (opt-in, 2026-11-04)
 
 The developer's decision, after W3C's BAD "before" survey came out "not
-checked": it is checked only on its server, so its red labels appear only
-in the page the server sends back. New scan's form question has a third
+checked": it is checked only on its server, so its red questions appear
+only in the page the server sends back. New scan's form question has a third
 answer, **Check forms, and send empty ones to this site**
 (`send_empty_forms`, stored as `form_send_empty_forms`). It is never a
 default, never offered in sign-in scans (the browser never runs the check
@@ -149,6 +181,20 @@ before its first press, the check reloads the page when any field differs
 from what the page's markup set (`changed` in `_COLLECT_JS`), and plans
 again. `test_buttons_ticked_by_click_through_are_cleared_before_sending`
 runs the real Click-Through first and fails without the fix.
+
+Second real scan (report #41): sent, and judged "no sign of an error",
+a miss. What the reply shows, from the survey's PHP in W3C's `bad.zip`:
+for an unanswered question the server wraps its heading in `<font
+color="red">`, in a row above the answers, and explains nothing; the
+newsletter messages appear only when something was typed there. W3C's
+Easy Checks page says the same ("errors are only indicated by the label
+being red, and there is no explanation of the errors"); its evaluation
+report passes 3.3.1 as "no corresponding content", which does not match
+the page's behaviour. The heading is inside the question's group, but the
+check read only the group's first 12 elements, and nested layout tables
+put it past the 16th. It now reads 200.
+`test_the_bad_survey_reply_fails` holds a cut-down copy and fails on the
+old code; the survey's own code, rendered offline, fails now.
 
 Why it is opt-in: an empty form is not harmless. It still sends hidden and
 preset values, and many sites act on any submission, emailing a blank
