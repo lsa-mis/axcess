@@ -276,7 +276,8 @@ Ordered by what blocks using the check, then by expected value.
       least two accessibility experts with disagreements settled, held out
       from tuning, with confidence intervals. Its clear failures became
       Mostly sure before this, by the developer's decision (2026-11-05);
-      validation says whether that holds.
+      validation says whether that holds. Who: the developer's team will
+      label the forms (decided 2026-11-05).
 - [ ] Decide the four ambiguous cases with an expert (all reported as
       `fail`, Not sure, "Form may show an error without describing it in
       text", since 2026-11-05): a "Required" hint that only turns red; a
@@ -355,6 +356,12 @@ Ordered by what blocks using the check, then by expected value.
       reported, for precision. Revisit only with real-world evidence.
 - [ ] Forms submitted only with Enter: the check never presses Enter, a
       safety rule. Changing it is the developer's decision.
+- [x] The 2 disputed real pages (Section 508 TF10 10.D-2 fail-1, Discover
+      Saturn): their visible text describes the error, so the check
+      passes them for 3.3.1. What they do lack (the message is not
+      announced, SC 4.1.3; it is not linked to its field, SC 1.3.1) is
+      out of this check's scope. The developer's decision (2026-11-05):
+      leave them disputed and unscored, with no separate check for now.
 - [x] Multi-step forms: only the first step is checked, and the report says
       so ("What was checked", the coverage page, the glossary).
 - [x] A form whose press fails (a dialog covers the page, the click times
