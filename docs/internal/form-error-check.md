@@ -332,4 +332,8 @@ Ordered by what blocks using the check, then by expected value.
 
 - [ ] Wait until the page goes quiet instead of a fixed 1.2 s, with a ceiling,
       and measure on real pages.
-- [ ] Measure the cost of reloading the page between forms on heavy pages.
+- [x] Measure the cost of reloading the page (2026-11-05). The check now
+      reloads before its first press too. A reload of six real pages with
+      forms (Atlassian, Mantine, shadcn, PrimeVue, Bootstrap, RSD) took
+      0.0 to 1.9 s, warm: once per page with a form to press, against the
+      check's 30 s budget per page.
