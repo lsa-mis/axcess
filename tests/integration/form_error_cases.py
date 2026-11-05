@@ -46,7 +46,7 @@ _HEAD = """<!doctype html><html lang="en"><head><meta charset="utf-8"><title>{ti
 <script>
   window.__clicked = false;
   document.addEventListener('click', e => {
-    if (e.target.closest('button, input[type=submit], [role=button]')) window.__clicked = true;
+    if (e.target.closest('button, input[type=submit], [role=button], [onclick]')) window.__clicked = true;
   }, true);
   const RED = '#c62828';
   const red = el => { el.style.border = '2px solid ' + RED; };
@@ -794,6 +794,21 @@ draw();</script>""",
     # anything in response: the honest estimate. Patterns from common form
     # libraries (Bootstrap, Angular, React Hook Form) and real-world markup.
     Case(
+        "d13_this_field_after_last",
+        "pass",
+        "Decoy for i07: only the last of three fields is required, and 'This field is required.' appears right after it, in red, announced. Its place names the field.",
+        """
+<form id="f" novalidate><h2>Book a table</h2>
+  <label for="who">Name (optional)</label><input id="who">
+  <label for="note">Note (optional)</label><input id="note">
+  <label for="day">Date</label><input id="day" type="date" required>
+  <p id="msg"></p>
+  <p><button type="submit">Book table</button></p></form>
+<script>onSubmit(document.getElementById('f'), f => {
+  const m = document.getElementById('msg'); m.className = 'err'; m.setAttribute('role', 'alert');
+  m.textContent = 'This field is required.'; });</script>""",
+    ),
+    Case(
         "b01_bootstrap_no_feedback",
         "fail",
         "Bootstrap was-validated: :invalid fields turn red, no feedback text.",
@@ -1015,6 +1030,72 @@ draw();</script>""",
         _contact(
             """onSubmit(f, f => f.insertAdjacentHTML('afterbegin', '<p>All fields are required.</p>'));"""
         ),
+    ),
+    # RSD Ingeniería's "before" contact form (luviuche.github.io, a course
+    # project's error map, items C3, C5, C6): its only submit control is a
+    # <div onclick>, and an empty press only reddens the fields' borders.
+    Case(
+        "r07_div_submit_control",
+        "fail",
+        "A form whose only submit control is a clickable div after the fields ('Enviar mensaje'); the press reddens the empty fields, no text.",
+        """
+<style>.error { border: 2px solid #c8102e !important; background: #fff5f5; }
+  .boton { display: inline-block; background: #c8102e; color: #fff; padding: 12px 25px; cursor: pointer; }</style>
+<form class="formulario" id="f" onsubmit="return enviar(event)"><h2>Contáctanos</h2>
+  <input type="text" id="nombre" placeholder="Nombre completo">
+  <input type="email" id="correo" placeholder="Correo electrónico">
+  <textarea id="mensaje" placeholder="Describe tu proyecto"></textarea>
+  <div class="boton" onclick="enviar(event)">Enviar mensaje</div></form>
+<script>function enviar(e) { if (e && e.preventDefault) e.preventDefault();
+  ['nombre', 'correo', 'mensaje'].forEach(id => { const el = document.getElementById(id);
+    if (!el.value.trim()) el.classList.add('error'); }); return false; }</script>""",
+    ),
+    Case(
+        "r08_two_clickable_divs",
+        "skipped",
+        "Decoy for r07: two clickable divs after the fields ('Limpiar', 'Enviar'). Which one sends is a guess, so neither is pressed.",
+        """
+<style>.error { border: 2px solid #c8102e !important; } .boton { display: inline-block; cursor: pointer; padding: 8px; }</style>
+<form id="f"><h2>Contáctanos</h2>
+  <input type="text" id="nombre" placeholder="Nombre completo">
+  <div class="boton" onclick="document.getElementById('nombre').value = ''">Limpiar</div>
+  <div class="boton" onclick="document.getElementById('nombre').classList.add('error')">Enviar</div></form>""",
+    ),
+    Case(
+        "r09_clickable_div_before_fields",
+        "skipped",
+        "Decoy for r07: the form's only clickable div is a help toggle above the fields. It is not a submit control.",
+        """
+<style>.boton { display: inline-block; cursor: pointer; } .error { border: 2px solid #c8102e !important; }</style>
+<form id="f"><h2>Contact</h2>
+  <div class="boton" onclick="document.getElementById('name').classList.add('error')">Help</div>
+  <label for="name">Name</label><input id="name"></form>""",
+    ),
+    # Section 508's baseline test pages (TF10): no <form>, a field and a
+    # button named "Validate Number". The pass page shows its error in text.
+    Case(
+        "r10_formless_validate_passes",
+        "pass",
+        "Section 508's 10.D-all-pass-2: no form; 'Validate Number' writes 'Error: not a number.' into a live region.",
+        """
+<div id="tc"><strong id="errors" aria-live="assertive" aria-atomic="true"></strong><br><br>
+  <label for="number">Enter A Number:</label><input type="text" id="number">
+  <button id="submit-btn">Validate Number</button></div>
+<script>document.getElementById('submit-btn').addEventListener('click', () => {
+  if (!/^[0-9]+$/.test(document.getElementById('number').value))
+    document.getElementById('errors').textContent = 'Error: not a number.'; });</script>""",
+    ),
+    Case(
+        "r11_formless_validate_colour_only",
+        "fail",
+        "As r10, but 'Validate Number' only turns the field pink with a red border (as 10.D-2-fail-2 does with 'Submit').",
+        """
+<style>input.error { background-color: #fdd; border-color: red; }</style>
+<div id="tc"><label for="number">Enter A Number:</label><input type="text" id="number">
+  <button id="submit-btn">Validate Number</button></div>
+<script>document.getElementById('submit-btn').addEventListener('click', () => {
+  const n = document.getElementById('number');
+  if (!/^[0-9]+$/.test(n.value)) n.classList.add('error'); });</script>""",
     ),
     # ------------------------------------------------------------ blind 2
     # Written after the fixes the first blind batch led to, and scored

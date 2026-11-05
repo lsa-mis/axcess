@@ -174,9 +174,11 @@ _COLLECT_JS = r"""
     }
     return parts.join(' > ');
   };
+  // "validate": Section 508's baseline pages check a field with a button
+  // named "Validate Number" and no <form>; without it they were never judged.
   const SUBMITISH = new RegExp('\\b(submit|send|continue|next|sign up|register|apply|' +
     'request|join|subscribe|contact|book|create|add|update|save|go|done|finish|' +
-    'get started|confirm)\\b', 'i');
+    'get started|confirm|validate)\\b', 'i');
   const units = [];
   const taken = [];
   for (const form of document.querySelectorAll('form')) {
@@ -189,6 +191,23 @@ _COLLECT_JS = r"""
     if (!submit && form.id) {
       submit = [...document.querySelectorAll('[form="' + CSS.escape(form.id) + '"]')]
         .find(b => shown(b) && (b.type === 'submit' || b.tagName === 'BUTTON')) || null;
+    }
+    // A form whose only submit control is not a button: RSD Ingenieria's
+    // "before" contact form (a course project's deliberate error) submits
+    // from a <div onclick>. Taken only when it is the one clickable element
+    // with text after the last field, holding no field or control. Two (a
+    // "Clear" and a "Send") would be a guess, and one above the fields is a
+    // help toggle, not a submit control.
+    if (!submit) {
+      const last = fields[fields.length - 1];
+      const control = 'input, select, textarea, button, a[href], label';
+      const clickable = [...form.querySelectorAll('[onclick], [role=button], [tabindex]')]
+        .filter(el => shown(el) && !el.matches(control) && !el.querySelector(control) &&
+          squash(el.textContent) && getComputedStyle(el).cursor === 'pointer' &&
+          (last.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING));
+      // A clickable element inside another counts once, as the outer one.
+      const outer = clickable.filter(el => !clickable.some(o => o !== el && o.contains(el)));
+      if (outer.length === 1) submit = outer[0];
     }
     units.push({root: form, submit, fields});
     taken.push(form);
@@ -275,7 +294,10 @@ _COLLECT_JS = r"""
       // The browser shows its own message only for a real submit of a form
       // without novalidate. checkValidity() (Bootstrap's pattern) fires the
       // same invalid events and shows nothing.
-      noValidate: r.tagName !== 'FORM' || r.noValidate || !!(u.submit && u.submit.formNoValidate),
+      // Nor for a control that does not submit the form itself (a clickable
+      // div, a type=button button): the page's own script decides.
+      noValidate: r.tagName !== 'FORM' || r.noValidate || !u.submit ||
+        !['submit', 'image'].includes(u.submit.type) || !!u.submit.formNoValidate,
       hasPassword: u.fields.some(f => f.type === 'password') ||
         !!r.querySelector('input[type=password]'),
       hasCard: ac.some(a => /\bcc-|card|cvv|cvc/i.test(a)),
@@ -339,11 +361,20 @@ _TEXT_HELPERS = r"""
     const control = 'input, select, textarea, button, a[href], [role=button]';
     return n && !n.matches(control) && !n.querySelector(control) ? n : null;
   };
-  const fieldsOf = el => {
+  // Text tied to a field only by coming right after it, in a form with
+  // several fields, that speaks of fields in general ("A required field is
+  // missing.") is about the form, not the field before it: independent case
+  // i07 put that banner after its last field and passed. "This field is
+  // required." there is still about that field.
+  const GENERAL = new RegExp('\\b(?:a|an|one|some|all|any|several|these|the following)' +
+    '\\s+(?:\\w+\\s+)?fields?\\b|\\bfields\\b', 'i');
+  const fieldsOf = (el, text) => {
+    const general = u.fields.length > 1 && GENERAL.test(text || '');
     const keys = [];
     u.fields.forEach((f, k) => {
       if (u.groups[k].contains(el) || describedBy[k].some(d => d.contains(el)) ||
-          [...(f.labels || [])].some(l => l.contains(el)) || nextTo(k)?.contains(el)) keys.push(k);
+          [...(f.labels || [])].some(l => l.contains(el)) ||
+          (!general && nextTo(k)?.contains(el))) keys.push(k);
     });
     return keys;
   };
@@ -365,7 +396,7 @@ _TEXT_HELPERS = r"""
     const text = ownText(el);
     if (!text || !seen(el) || elsewhere(el)) return null;
     const hidden = window.__axcessHidden;
-    return {text, fields: fieldsOf(el), linked: linkedTo(el), announced: announced(el),
+    return {text, fields: fieldsOf(el, text), linked: linkedTo(el), announced: announced(el),
       colour: getComputedStyle(el).color, revealed: !!hidden && hidden.has(el),
       inForm: u.root.contains(el)};
   };
