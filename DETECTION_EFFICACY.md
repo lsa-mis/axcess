@@ -50,8 +50,23 @@ per-rule denominators, abstentions, and confidence intervals.
 ### Form error check (WCAG 3.3.1)
 
 The form error check presses each form's submit control in a real browser, so
-it is measured on its own, not in the bundled corpus:
-`tests/integration/test_form_error_identification.py` runs the check on 134
+it is measured on its own, not in the bundled corpus.
+
+**Its metric is the labelled real-page set** (`tests/real_pages/`, run on
+request with `make real-pages`, since it visits outside sites; AGENTS.md,
+"real pages first"). Each form judged in a full scan with the
+public-website defaults, labelled from an outside source or from a person's
+look at the screenshots. On 2026-11-05: 37 scored forms on 22 pages, 9 that
+fail SC 3.3.1 and 28 that do not; all 9 failed and none of the 28 did
+(precision 100%, recall 100%), with 2 more listed as disputed. Small and not
+independent: most of these pages were used to find and fix the check's
+gaps, labelled by the developer's agent, not by experts, and with 9
+failures the false-discovery rate could still be as high as 28% (95%
+upper bound). It measures what the check does on real forms; it is not a
+validation.
+
+Second, as regression tests only, on pages we wrote:
+`tests/integration/test_form_error_identification.py` runs the check on 146
 labelled synthetic pages served over HTTP (`form_error_cases.py`, and the
 independent batch in `form_error_cases_independent.py`). Its gates, in the
 check's own order of priority:
@@ -63,7 +78,8 @@ check's own order of priority:
 | Efficacy | False-discovery rate below 5%, then recall of at least 80%. |
 
 On the current code, on these pages we wrote ourselves: precision 100% (no
-false positives) and recall 93.9%, over 49 positive and 85 negative cases.
+false positives) and recall 96.2%, over 52 positive and 90 negative scored
+cases.
 Four of them (`r01` to `r04`) are cut-down copies of real pages the check
 first got wrong. Most of these cases were written or
 tuned while the check was built; only the independent batch, scored before

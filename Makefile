@@ -1,4 +1,4 @@
-.PHONY: help site site-install site-dev site-check site-test setup run run-stable serve protected-maintenance test test-unit test-integration test-ui quality-gate detection-evals lint lint-fix typecheck migrate migrate-rollback fetch-models fixture-site a11y-check clean frontend-install frontend-lint frontend-build frontend-dev alfa-install desktop-install desktop-setup desktop-run desktop-test desktop-backend desktop-browsers desktop-ocr desktop-package
+.PHONY: real-pages help site site-install site-dev site-check site-test setup run run-stable serve protected-maintenance test test-unit test-integration test-ui quality-gate detection-evals lint lint-fix typecheck migrate migrate-rollback fetch-models fixture-site a11y-check clean frontend-install frontend-lint frontend-build frontend-dev alfa-install desktop-install desktop-setup desktop-run desktop-test desktop-backend desktop-browsers desktop-ocr desktop-package
 
 PY := uv run
 DB := data/audit.db
@@ -156,6 +156,9 @@ test-unit: ## Run unit tests only
 
 test-integration: ## Run integration tests only
 	$(PY) pytest tests/integration -m integration
+
+real-pages: ## Score the form error check on its labelled real pages (visits outside sites)
+	AXCESS_REAL_PAGES=1 $(PY) pytest tests/real_pages -s -p no:randomly
 
 test-ui: ## Run UI tests (Playwright + axe-core)
 	$(PY) pytest tests/ui -m ui

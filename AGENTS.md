@@ -79,8 +79,21 @@ on 130 of them, then got every verdict wrong on its first real pages
    markup to the test cases (a "real pages" batch), confirm it fails on
    the old code, then fix the detector. Synthetic cases stay as
    regression tests, not as proof that the check works.
-6. Report real-page results apart from synthetic scores. Never present
-   a synthetic score as real-world accuracy.
+6. Measure on real pages. A check's precision and recall are the numbers
+   from its labelled set of real pages, kept in the repo: each page's
+   address, the form or element judged, the verdict it should get, and
+   the basis (an outside source, or a person who looked at the
+   screenshot). Rerun the set after every change to the detector, before
+   you report the change. A page whose source and visible behaviour
+   disagree is listed as disputed, not scored. The set visits outside
+   sites, so it runs only on request, never in CI.
+7. Pages we wrote are regression tests, not the metric. They gate CI and
+   catch one fix undoing another, but their score is always reported
+   second and named for what it is ("on pages we wrote"). Never lead
+   with it or present it as real-world accuracy: the form error check
+   scored 100% precision and 96.2% recall on 142 of them, while its real
+   set, the number that counts, had only 9 failing forms, most of them
+   used to tune it. Say how small and how independent the real set is.
 
 ## Code map
 

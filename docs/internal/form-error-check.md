@@ -47,7 +47,17 @@ Its priorities, in order: safety, precision, speed, recall.
 Outcomes: `fail`, `pass`, `native` (only the browser's own message),
 `not_applicable`, `not_checked`, `skipped`.
 
-## Measured results (synthetic pages)
+## Measured results
+
+The metric is the labelled real-page set (`tests/real_pages/`, `make
+real-pages`; DETECTION_EFFICACY.md). 2026-11-05, full scans with the
+public-website defaults: 37 scored forms on 22 pages, all 9 failing forms
+failed and none of the 28 others did; 2 more are disputed. Most of these
+pages were used to tune the check, so it is not independent, and with 9
+failures the false-discovery rate could be as high as 28% (95% upper
+bound).
+
+### Pages we wrote (regression tests, not the metric)
 
 | Batch | Scored | Precision | Recall | Honest? |
 | --- | --- | --- | --- | --- |
@@ -55,7 +65,7 @@ Outcomes: `fail`, `pass`, `native` (only the browser's own message),
 | Blind 1, before the fixes it led to | 14 | 75% | 60% | Was; now tuned against |
 | Blind 2, before the fixes it led to | 14 | 83% | 83% | Was; now tuned against |
 | Real pages: copies of the first real-page mistakes, before the fix | 4 | 25% (1 of 4 failures right) | 100% (1/1) | No: written to the bug |
-| All 134 scored cases, current code | 134 | 100% (0 false positives) | 93.9% | Mostly tuned against |
+| All 142 scored cases, current code (2026-11-05) | 142 | 100% (0 false positives) | 96.2% | Mostly tuned against |
 
 No form that must be skipped has ever been pressed. These are regression
 evidence on synthetic pages, not a real-world accuracy estimate
@@ -292,26 +302,31 @@ Ordered by what blocks using the check, then by expected value.
 
 ### 3. Recall gaps (known misses)
 
-- [ ] A generic banner placed right after the last field ("A required field
-      is missing.", independent case i07) is tied to that field by position
-      and counts as identifying it. Do not tie generic text by position when
-      the form has several fields.
+- [x] A generic banner placed right after the last field ("A required field
+      is missing.", independent case i07) was tied to that field by position
+      and counted as identifying it (2026-11-05). Text tied only by position,
+      in a form with several fields, that speaks of fields in general ("a
+      required field", "all fields") is no longer tied; "This field is
+      required." still is (decoy d13).
 - [ ] Fields inside web components' shadow DOM are not found. Search open
       shadow roots.
 - [ ] Only the submit button reacts (turns red, shakes): deliberately not
       reported, for precision. Revisit only with real-world evidence.
 - [ ] Forms submitted only with Enter, and multi-step forms (only the first
       step is checked; say so in the report).
-- [ ] A submit control that is not a button: RSD Ingeniería's "before"
-      contact form submits from a `<div onclick>`, so the form is skipped
-      as having no submit control.
-- [ ] A group of fields with no `<form>` is pressed only when its button's
+- [x] A submit control that is not a button (2026-11-05): RSD Ingeniería's
+      "before" contact form submits from a `<div onclick>`. A form with no
+      button now takes the one clickable element with text after its last
+      field (`r07`); two such elements, or one above the fields, are not
+      pressed (decoys `r08`, `r09`).
+- [x] A group of fields with no `<form>` is pressed only when its button's
       name is submit-like (`SUBMITISH`); "Validate Number" (Section 508's
-      pass pages) is not, so those pages are never judged. Adding words
-      needs a decoy for each.
-- [ ] Server-side validation, where the error appears only after the request:
+      pass pages) was not, so those pages were never judged. "validate" is
+      now one (2026-11-05; `r10` passes, `r11` fails).
+- [x] Server-side validation, where the error appears only after the request:
       possible only by letting an empty request through, so an explicit
-      per-scan opt-in for staging sites, never by default.
+      per-scan opt-in, never by default. Done as "Check forms, and send
+      empty ones to this site" (2026-11-04; "Sending empty forms" above).
 
 ### 4. Speed
 
