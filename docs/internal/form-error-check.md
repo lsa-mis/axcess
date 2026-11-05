@@ -130,6 +130,18 @@ its screenshots.
 | Accessible Web Project test suite, understandable | "Something went wrong" | its failing form skipped | By design: a password field |
 | GOV.UK tool audit, two "errors" test pages | colour only / not identified | skipped | Nothing to press: the error state is fixed in the page |
 
+Second search, 2026-11-05, run as full scans with a real scan's settings
+(the other checks first), each verdict checked against its screenshots:
+
+| Page | Source says | Check | Right? |
+| --- | --- | --- | --- |
+| a11y-fails (karstenlenz.github.io) `wcag-exercises/3_3_input_assistance.html` | "intentionally bad accessibility" (weak: no text names this failure) | fail: the Name field turns red, no text | Yes, by the screenshot |
+| RSD Ingeniería `entrega-1/contacto.html` (a course project's error map: C3, C6) | colour only, 3.3.1 | skipped: no submit control | Missed: its "submit" is a `<div onclick>` |
+| RSD Ingeniería `entrega-2/contacto.html` (fixed) | passes | pass | Yes |
+| Discover Saturn `property-detail.html` and `index.html` (a scanner's practice site) | colour only and not linked to the field, 1.4.1 / 3.3.1 | pass | Disagrees: red text ("Required", "Enter a valid email") shows under each field; not linking it is a screen-reader problem this check does not judge |
+| Discover Venus `forms/demo-4-errors.html` | fails | skipped | Nothing to press: a static mock |
+| Section 508 Baseline `TF10/10.D-all-pass-1/2/3.html` | passes | no form found | Not judged: no `<form>`, and "Validate Number" is not a submit-like name |
+
 W3C's BAD "before" survey also fails now, but only in a scan that sends
 empty forms, and was confirmed only on the survey's own code run offline
 (the section below), not on w3.org.
@@ -290,6 +302,13 @@ Ordered by what blocks using the check, then by expected value.
       reported, for precision. Revisit only with real-world evidence.
 - [ ] Forms submitted only with Enter, and multi-step forms (only the first
       step is checked; say so in the report).
+- [ ] A submit control that is not a button: RSD Ingeniería's "before"
+      contact form submits from a `<div onclick>`, so the form is skipped
+      as having no submit control.
+- [ ] A group of fields with no `<form>` is pressed only when its button's
+      name is submit-like (`SUBMITISH`); "Validate Number" (Section 508's
+      pass pages) is not, so those pages are never judged. Adding words
+      needs a decoy for each.
 - [ ] Server-side validation, where the error appears only after the request:
       possible only by letting an empty request through, so an explicit
       per-scan opt-in for staging sites, never by default.
