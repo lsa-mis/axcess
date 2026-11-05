@@ -280,6 +280,12 @@ merge.
 
 ### Fixed
 
+- Form error check: it now judges forms built from web components, whose
+  fields and messages sit inside the component (shadow DOM). Before, such
+  forms were not found at all. It also hears the browser's own message for
+  those fields, waits for a form a script builds after the page loads, and
+  counts a form it could not press (a dialog covering the page) instead of
+  leaving it out.
 - Form error check: a question that turns red with no words now fails,
   even when the page is built from tables nested several levels deep. On
   W3C's BAD survey, sent empty, the red questions sat too deep in their

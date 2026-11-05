@@ -69,6 +69,8 @@ DEFAULT_SETTLE_MS = 1200
 DEFAULT_TIMEOUT_S = 30.0
 # Empty forms sent to the site, at most, in one scan when sending is allowed.
 DEFAULT_MAX_SENDS = 25
+# How long, after a reload, to wait for a form a script builds after "load".
+RELOAD_WAIT_S = 3.0
 # How long the page the site sends back may take to load.
 _REPLY_TIMEOUT_MS = 15000
 
@@ -119,6 +121,44 @@ _RELEASE_JS = r"""
 
 _COLLECT_JS = r"""
 () => {
+  // Open shadow roots. A web component keeps its fields and messages in its
+  // own part of the page, which querySelectorAll, contains and closest do
+  // not enter, so its forms were never judged (case f21; Shoelace, Lion,
+  // Spectrum and Material Web pages had no form at all). A page with no
+  // shadow root keeps the native lookups.
+  const SHADOW = [...document.querySelectorAll('*')].some(e => e.shadowRoot);
+  const deepAll = (root, cap = 1e9) => {
+    if (!SHADOW) return [...root.querySelectorAll('*')].slice(0, cap);
+    const out = [];
+    const walk = r => {
+      for (const el of r.querySelectorAll('*')) {
+        if (out.length >= cap) return;
+        out.push(el);
+        if (el.shadowRoot) walk(el.shadowRoot);
+      }
+    };
+    if (root.shadowRoot) walk(root.shadowRoot);
+    walk(root);
+    return out;
+  };
+  const deepQuery = (root, sel) =>
+    SHADOW ? deepAll(root).filter(el => el.matches(sel)) : [...root.querySelectorAll(sel)];
+  const up = n => n.parentElement || (n.parentNode && n.parentNode.host) || null;
+  const deepContains = (a, b) => {
+    if (!SHADOW) return a.contains(b);
+    for (let n = b; n; n = up(n)) if (n === a) return true;
+    return false;
+  };
+  const deepClosest = (el, sel) => {
+    if (!SHADOW) return el.closest(sel);
+    for (let n = el; n; n = up(n)) if (n.matches && n.matches(sel)) return n;
+    return null;
+  };
+  // An id is looked up in the element's own part of the page first.
+  const byId = (from, id) => {
+    const r = from.getRootNode && from.getRootNode();
+    return (r && r.getElementById && r.getElementById(id)) || document.getElementById(id);
+  };
   const FIELD = 'input:not([type=hidden]):not([type=submit]):not([type=button])' +
     ':not([type=reset]):not([type=image]), textarea, select';
   const shown = el => !!el && el.getClientRects().length > 0 &&
@@ -127,11 +167,11 @@ _COLLECT_JS = r"""
   const squash = s => (s || '').replace(/\s+/g, ' ').trim();
   const nameOf = el => squash(el.getAttribute('aria-label') || el.innerText || el.value ||
     el.getAttribute('title') || '');
-  const fieldsIn = root => [...root.querySelectorAll(FIELD)]
+  const fieldsIn = root => deepQuery(root, FIELD)
     .filter(f => shown(f) && !f.disabled && !f.readOnly);
   const labelOf = f => {
     const by = (f.getAttribute('aria-labelledby') || '').split(/\s+/)
-      .map(id => document.getElementById(id)?.textContent || '').join(' ');
+      .map(id => byId(f, id)?.textContent || '').join(' ');
     return squash(by || [...(f.labels || [])].map(l => l.textContent).join(' ') ||
       f.getAttribute('aria-label') || f.placeholder || f.name || '');
   };
@@ -185,8 +225,9 @@ _COLLECT_JS = r"""
     if (!shown(form)) continue;
     const fields = fieldsIn(form);
     if (!fields.length) continue;
+    // [type=submit]: a web component's button (<sl-button type="submit">).
     const SUBMITS = 'button[type=submit], button:not([type]), ' +
-      'input[type=submit], input[type=image]';
+      'input[type=submit], input[type=image], [type=submit]';
     let submit = [...form.querySelectorAll(SUBMITS)].find(shown) || null;
     if (!submit && form.id) {
       submit = [...document.querySelectorAll('[form="' + CSS.escape(form.id) + '"]')]
@@ -199,7 +240,12 @@ _COLLECT_JS = r"""
     // "Clear" and a "Send") would be a guess, and one above the fields is a
     // help toggle, not a submit control.
     if (!submit) {
-      const last = fields[fields.length - 1];
+      // Compared in the page itself: a field inside a component stands for
+      // the component.
+      let last = fields[fields.length - 1];
+      while (last.getRootNode() !== document && last.getRootNode().host) {
+        last = last.getRootNode().host;
+      }
       const control = 'input, select, textarea, button, a[href], label';
       const clickable = [...form.querySelectorAll('[onclick], [role=button], [tabindex]')]
         .filter(el => shown(el) && !el.matches(control) && !el.querySelector(control) &&
@@ -216,11 +262,11 @@ _COLLECT_JS = r"""
   // single-page apps build them: the nearest container of the button that
   // holds fields.
   for (const b of document.querySelectorAll('button, [role=button], input[type=button]')) {
-    if (b.closest('form') || !shown(b) || !SUBMITISH.test(nameOf(b))) continue;
-    let c = b.parentElement;
-    for (let depth = 0; c && depth < 6 && !fieldsIn(c).length; depth++) c = c.parentElement;
+    if (deepClosest(b, 'form') || !shown(b) || !SUBMITISH.test(nameOf(b))) continue;
+    let c = up(b);
+    for (let depth = 0; c && depth < 6 && !fieldsIn(c).length; depth++) c = up(c);
     if (!c || c === document.body || c === document.documentElement) continue;
-    if (taken.some(t => t.contains(c) || c.contains(t))) continue;
+    if (taken.some(t => deepContains(t, c) || deepContains(c, t))) continue;
     taken.push(c);
     units.push({root: c, submit: b, fields: fieldsIn(c)});
   }
@@ -239,12 +285,11 @@ _COLLECT_JS = r"""
     let g = f;
     let n = 1;
     if (set.length > 1) {
-      let c = set[0].parentElement;
-      while (c && c !== u.root && !set.every(o => c.contains(o))) c = c.parentElement;
+      let c = up(set[0]);
+      while (c && c !== u.root && !set.every(o => deepContains(c, o))) c = up(c);
       if (c && c !== u.root && fieldsIn(c).length === set.length) [g, n] = [c, set.length];
     }
-    while (g.parentElement && g.parentElement !== u.root &&
-           fieldsIn(g.parentElement).length === n) g = g.parentElement;
+    while (up(g) && up(g) !== u.root && fieldsIn(up(g)).length === n) g = up(g);
     return g;
   });
   for (const u of units) {
@@ -327,6 +372,44 @@ _COLLECT_JS = r"""
 # Shared by the snapshot and the watcher: each visible piece of text in scope,
 # with the fields it belongs to and whether it sits in an announced region.
 _TEXT_HELPERS = r"""
+  // Open shadow roots. A web component keeps its fields and messages in its
+  // own part of the page, which querySelectorAll, contains and closest do
+  // not enter, so its forms were never judged (case f21; Shoelace, Lion,
+  // Spectrum and Material Web pages had no form at all). A page with no
+  // shadow root keeps the native lookups.
+  const SHADOW = [...document.querySelectorAll('*')].some(e => e.shadowRoot);
+  const deepAll = (root, cap = 1e9) => {
+    if (!SHADOW) return [...root.querySelectorAll('*')].slice(0, cap);
+    const out = [];
+    const walk = r => {
+      for (const el of r.querySelectorAll('*')) {
+        if (out.length >= cap) return;
+        out.push(el);
+        if (el.shadowRoot) walk(el.shadowRoot);
+      }
+    };
+    if (root.shadowRoot) walk(root.shadowRoot);
+    walk(root);
+    return out;
+  };
+  const deepQuery = (root, sel) =>
+    SHADOW ? deepAll(root).filter(el => el.matches(sel)) : [...root.querySelectorAll(sel)];
+  const up = n => n.parentElement || (n.parentNode && n.parentNode.host) || null;
+  const deepContains = (a, b) => {
+    if (!SHADOW) return a.contains(b);
+    for (let n = b; n; n = up(n)) if (n === a) return true;
+    return false;
+  };
+  const deepClosest = (el, sel) => {
+    if (!SHADOW) return el.closest(sel);
+    for (let n = el; n; n = up(n)) if (n.matches && n.matches(sel)) return n;
+    return null;
+  };
+  // An id is looked up in the element's own part of the page first.
+  const byId = (from, id) => {
+    const r = from.getRootNode && from.getRootNode();
+    return (r && r.getElementById && r.getElementById(id)) || document.getElementById(id);
+  };
   const u = window.__axcessForms[index];
   const squash = s => (s || '').replace(/\s+/g, ' ').trim();
   const seen = el => {
@@ -351,7 +434,7 @@ _TEXT_HELPERS = r"""
     (el.getAttribute('aria-errormessage') || '');
   const describedBy = u.fields.map((f, k) => (links(f) + ' ' +
     (u.groups[k] !== f ? links(u.groups[k]) : '')).split(/\s+/).filter(Boolean)
-    .map(id => document.getElementById(id)).filter(Boolean));
+    .map(id => byId(f, id)).filter(Boolean));
   // The element right after a field (or after its group) when it holds no
   // field itself: where a message goes when fields have no wrapper.
   // Not when it holds a control: then it is the next part of the form (the
@@ -372,15 +455,16 @@ _TEXT_HELPERS = r"""
     const general = u.fields.length > 1 && GENERAL.test(text || '');
     const keys = [];
     u.fields.forEach((f, k) => {
-      if (u.groups[k].contains(el) || describedBy[k].some(d => d.contains(el)) ||
-          [...(f.labels || [])].some(l => l.contains(el)) ||
-          (!general && nextTo(k)?.contains(el))) keys.push(k);
+      const next = !general && nextTo(k);
+      if (deepContains(u.groups[k], el) || describedBy[k].some(d => deepContains(d, el)) ||
+          [...(f.labels || [])].some(l => deepContains(l, el)) ||
+          (next && deepContains(next, el))) keys.push(k);
     });
     return keys;
   };
-  const linkedTo = el => describedBy.some(ds => ds.some(d => d.contains(el)));
+  const linkedTo = el => describedBy.some(ds => ds.some(d => deepContains(d, el)));
   const announced = el =>
-    !!el.closest('[role=alert],[role=status],[aria-live]:not([aria-live=off])');
+    !!deepClosest(el, '[role=alert],[role=status],[aria-live]:not([aria-live=off])');
   // Text in an element that was on the page but hidden just before the press
   // (``_ARM_JS``) and is shown now: the page revealed it, so it is new even
   // when the same words were already visible elsewhere.
@@ -391,14 +475,14 @@ _TEXT_HELPERS = r"""
   // error for the form pressed (a false pass, and on another page a false
   // failure).
   const others = window.__axcessForms.filter((o, i) => i !== index).map(o => o.root);
-  const elsewhere = el => !u.root.contains(el) && others.some(r => r.contains(el));
+  const elsewhere = el => !deepContains(u.root, el) && others.some(r => deepContains(r, el));
   const entry = el => {
     const text = ownText(el);
     if (!text || !seen(el) || elsewhere(el)) return null;
     const hidden = window.__axcessHidden;
     return {text, fields: fieldsOf(el, text), linked: linkedTo(el), announced: announced(el),
       colour: getComputedStyle(el).color, revealed: !!hidden && hidden.has(el),
-      inForm: u.root.contains(el)};
+      inForm: deepContains(u.root, el)};
   };
 """
 
@@ -419,7 +503,7 @@ _SNAPSHOT_JS = (
   };
   const fields = u.fields.map((f, key) => {
     const label = f.labels && f.labels[0];
-    const wrap = f.parentElement && f.parentElement !== u.root ? f.parentElement : null;
+    const wrap = up(f) && up(f) !== u.root ? up(f) : null;
     // A radio or checkbox group is often marked on its fieldset and legend,
     // and a required mark (an asterisk) inside the field's own group. The
     // group holds this field (or this set of radio buttons) and no other, so
@@ -427,11 +511,11 @@ _SNAPSHOT_JS = (
     // 200 elements: W3C's BAD survey turns its question red in a row above
     // the answers, past the 16th element of nested layout tables, and the
     // first 12 missed it (report #41).
-    const set = f.closest('fieldset');
+    const set = deepClosest(f, 'fieldset');
     const next = nextTo(key);
     const extra = [set, set && set.querySelector('legend'),
-      ...[...u.groups[key].querySelectorAll('*')].slice(0, 200),
-      next, ...(next ? [...next.querySelectorAll('*')].slice(0, 6) : [])];
+      ...deepAll(u.groups[key], 200),
+      next, ...(next ? deepAll(next, 6) : [])];
     return {
       key,
       ariaInvalid: f.getAttribute('aria-invalid') === 'true',
@@ -441,10 +525,10 @@ _SNAPSHOT_JS = (
   });
   const texts = [];
   const scope = new Set([u.root,
-    ...document.querySelectorAll('[role=alert],[role=status],[aria-live]'),
+    ...deepQuery(document, '[role=alert],[role=status],[aria-live]'),
     ...describedBy.flat()]);
   for (const root of scope) {
-    for (const el of [root, ...root.querySelectorAll('*')].slice(0, 3000)) {
+    for (const el of [root, ...deepAll(root, 2999)]) {
       const e = entry(el);
       if (e) texts.push(e);
     }
@@ -454,7 +538,7 @@ _SNAPSHOT_JS = (
   const all = [];
   // The whole page, not its first 6000 elements: on a long page (19,000 on
   // atlassian.design) text past the cap read as new after the press.
-  for (const el of [...document.body.querySelectorAll('*')].slice(0, 60000)) {
+  for (const el of deepAll(document.body, 60000)) {
     const t = ownText(el);
     if (t && seen(el)) all.push(t);
   }
@@ -477,10 +561,10 @@ _ARM_JS = (
   // revealed messages away as old (a false failure on getbootstrap.com).
   const hiddenNow = new WeakSet();
   const scope = new Set([u.root,
-    ...document.querySelectorAll('[role=alert],[role=status],[aria-live]'),
+    ...deepQuery(document, '[role=alert],[role=status],[aria-live]'),
     ...describedBy.flat()]);
   for (const root of scope) {
-    for (const el of [root, ...root.querySelectorAll('*')].slice(0, 3000)) {
+    for (const el of [root, ...deepAll(root, 2999)]) {
       if (ownText(el) && !seen(el)) hiddenNow.add(el);
     }
   }
@@ -499,7 +583,7 @@ _ARM_JS = (
   const pending = new Map();
   let timer = 0;
   const scan = (node, t) => {
-    for (const el of [node, ...node.querySelectorAll('*')].slice(0, 400)) {
+    for (const el of [node, ...deepAll(node, 399)]) {
       const e = entry(el);
       if (!e) continue;
       const key = e.text + '|' + e.colour;
@@ -528,17 +612,30 @@ _ARM_JS = (
       else queue(r.type === 'characterData' ? r.target.parentElement : r.target);
     }
   });
-  observer.observe(document.documentElement, {subtree: true, childList: true, characterData: true,
-    attributes: true,
-    attributeFilter: ['class', 'style', 'hidden', 'aria-hidden', 'aria-invalid']});
-  const onInvalid = e => {
-    const k = u.fields.indexOf(e.target);
-    if (k >= 0) logged.invalid.push(k);
-  };
-  document.addEventListener('invalid', onInvalid, true);
+  const watch = {subtree: true, childList: true, characterData: true, attributes: true,
+    attributeFilter: ['class', 'style', 'hidden', 'aria-hidden', 'aria-invalid']};
+  observer.observe(document.documentElement, watch);
+  // Changes inside a component are not seen from the page: watch each one.
+  if (SHADOW) {
+    for (const el of deepAll(document)) if (el.shadowRoot) observer.observe(el.shadowRoot, watch);
+  }
+  // The browser's own message: an "invalid" event on a field. It does not
+  // leave a web component's shadow root, so a listener on the page missed
+  // it for Shoelace's fields (a false failure: the browser's message was the
+  // description). Listen on each field, and on each component it sits in,
+  // which receives the event for a form-associated custom element.
+  const listened = [];
+  u.fields.forEach((f, k) => {
+    const on = () => logged.invalid.push(k);
+    for (let n = f; n; n = n.getRootNode().host) {
+      n.addEventListener('invalid', on);
+      listened.push([n, on]);
+      if (n.getRootNode() === document) break;
+    }
+  });
   window.__axcessFormWatch = {logged, stop: () => {
     observer.disconnect();
-    document.removeEventListener('invalid', onInvalid, true);
+    for (const [n, on] of listened) n.removeEventListener('invalid', on);
     flush();
   }};
 }
@@ -606,8 +703,11 @@ class ErrorIdentificationProbe:
             except Exception as exc:
                 log.debug("forms.reload_failed", error_type=type(exc).__name__)
                 return
-            # The forms just planned are this page's own: plan them again.
-            plan = await self._plan(page, again={self._key(info) for _, _, info in plan})
+            # The forms just planned are this page's own: plan them again,
+            # once the page has built them again.
+            planned = {self._key(info) for _, _, info in plan}
+            await self._wait_for_forms(page, planned)
+            plan = await self._plan(page, again=planned)
         for frame_index, form_index, info in plan:
             reason = self._skip(info)
             if reason:
@@ -632,6 +732,7 @@ class ErrorIdentificationProbe:
                 except Exception as exc:
                     log.debug("forms.reload_failed", error_type=type(exc).__name__)
                     return
+                await self._wait_for_forms(page, {self._key(info)})
             attempted += 1
             frame = self._frame(page, frame_index)
             if frame is None:
@@ -640,6 +741,19 @@ class ErrorIdentificationProbe:
                 outcome = await self._attempt(page, frame, form_index, info, capture)
             except Exception as exc:
                 log.debug("forms.attempt_failed", error_type=type(exc).__name__)
+                # Counted, not dropped: shoelace.style covers its forms with
+                # an announcement dialog, the press timed out, and the form
+                # vanished from the scan's counts.
+                results.append(
+                    self._result(
+                        "skipped",
+                        "the submit control could not be pressed (something covers it, "
+                        "or the page did not respond)",
+                        info,
+                        page,
+                        frame_index,
+                    )
+                )
                 continue
             if outcome is not None:
                 results.append(outcome)
@@ -655,6 +769,25 @@ class ErrorIdentificationProbe:
                     reply_status=outcome.reply_status,
                     reply_title=outcome.reply_title[:80],
                 )
+
+    async def _wait_for_forms(self, page: Page, keys: Set[str]) -> None:
+        """After a reload, wait until the page has built ``keys`` again.
+
+        A script can build a form after the load event: web components (
+        Shoelace's controls appear 0.27 s after "load") and many single-page
+        apps. Planned at once, such a page had no form, and the check said
+        nothing about it. Up to ``RELOAD_WAIT_S``; then the plan sees what
+        is there.
+        """
+        deadline = time.monotonic() + RELOAD_WAIT_S
+        while True:
+            found: set[str] = set()
+            for frame in page.frames:
+                with contextlib.suppress(Exception):
+                    found.update(self._key(info) for info in await frame.evaluate(_COLLECT_JS))
+            if keys <= found or time.monotonic() >= deadline:
+                return
+            await page.wait_for_timeout(200)
 
     async def _plan(
         self, page: Page, *, again: Set[str] = frozenset()

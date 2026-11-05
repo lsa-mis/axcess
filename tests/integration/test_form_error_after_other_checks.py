@@ -54,3 +54,29 @@ async def test_a_field_marked_on_blur_by_the_keyboard_check_still_fails(browser:
     finally:
         await context.close()
     assert [r.outcome for r in results] == ["fail"], results
+
+
+# A form a script builds after the page's load event, as web components and
+# many single-page apps do: Shoelace's form controls appear 0.27 s after
+# "load". The check reloads before its first press, and used to plan again at
+# once, find no form, and say nothing about the page.
+_LATE = """<!doctype html><html lang="en"><head><title>Late</title></head><body><main></main>
+<script>setTimeout(() => {
+  document.querySelector('main').innerHTML = '<form id="f" novalidate><label for="n">Name</label>' +
+    '<input id="n"><button type="submit">Send</button></form>';
+  document.getElementById('f').addEventListener('submit', e => { e.preventDefault();
+    document.getElementById('n').style.border = '2px solid #c62828'; });
+}, 300);</script></body></html>"""
+
+
+async def test_a_form_built_after_load_is_still_judged_after_the_reload(browser: Any) -> None:
+    context = await browser.new_context(service_workers="block")
+    await context.route(_URL, lambda r: r.fulfill(body=_LATE, content_type="text/html"))
+    page = await context.new_page()
+    try:
+        await page.goto(_URL)
+        await page.wait_for_selector("#f")
+        results = await ErrorIdentificationProbe().run(page)
+    finally:
+        await context.close()
+    assert [r.outcome for r in results] == ["fail"], results

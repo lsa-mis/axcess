@@ -809,6 +809,33 @@ draw();</script>""",
   m.textContent = 'This field is required.'; });</script>""",
     ),
     Case(
+        "d14_shadow_message_inside",
+        "pass",
+        "Decoy for f21: each web component writes its own error text inside its shadow DOM, under its input, and reddens it.",
+        """
+<form id="f" novalidate><h2>Contact</h2><x-msg label="Name"></x-msg><x-msg label="Email"></x-msg>
+  <p><button type="submit">Send</button></p></form>
+<script>customElements.define('x-msg', class extends HTMLElement { connectedCallback() {
+  const r = this.attachShadow({mode: 'open'});
+  r.innerHTML = '<label>' + this.getAttribute('label') + ' <input style="border:1px solid #767676"></label>' +
+    '<p class="m" style="color:#b00020"></p>'; } });
+onSubmit(document.getElementById('f'), () => document.querySelectorAll('x-msg').forEach(x => {
+  x.shadowRoot.querySelector('input').style.border = '2px solid #c62828';
+  x.shadowRoot.querySelector('.m').textContent = 'Enter your ' + x.getAttribute('label').toLowerCase() + '.'; }));</script>""",
+    ),
+    Case(
+        "d15_shadow_static_asterisk",
+        "not_applicable",
+        "Decoy for f21: a web component with a red required asterisk that never changes; the press does nothing visible.",
+        """
+<form id="f" novalidate><h2>Contact</h2><x-req label="Name"></x-req>
+  <p><button type="submit">Send</button></p></form>
+<script>customElements.define('x-req', class extends HTMLElement { connectedCallback() {
+  const r = this.attachShadow({mode: 'open'});
+  r.innerHTML = '<label>' + this.getAttribute('label') + ' <span style="color:#c62828">*</span> <input></label>'; } });
+onSubmit(document.getElementById('f'), () => {});</script>""",
+    ),
+    Case(
         "b01_bootstrap_no_feedback",
         "fail",
         "Bootstrap was-validated: :invalid fields turn red, no feedback text.",

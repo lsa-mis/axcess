@@ -111,8 +111,12 @@ async def _scan(conn: sqlite3.Connection, url: str, send: bool, out: Path) -> li
 
 
 def _match(form: RealForm, results: list[Any]) -> Any | None:
+    if form.selector:
+        hits = [r for r in results if r.selector == form.selector and r.form == form.form]
+        return hits[0] if hits else None
+    # Without a locator the name is unique on the page.
     hits = [r for r in results if r.form == form.form]
-    return hits[form.nth] if len(hits) > form.nth else None
+    return hits[0] if len(hits) == 1 else None
 
 
 def test_real_pages(tmp_db: sqlite3.Connection, tmp_path: Path, monkeypatch: Any) -> None:

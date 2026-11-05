@@ -308,12 +308,35 @@ Ordered by what blocks using the check, then by expected value.
       in a form with several fields, that speaks of fields in general ("a
       required field", "all fields") is no longer tied; "This field is
       required." still is (decoy d13).
-- [ ] Fields inside web components' shadow DOM are not found. Search open
-      shadow roots.
+- [x] Fields inside web components' shadow DOM (2026-11-05). The check
+      now looks inside open shadow roots for fields, their groups, their
+      messages and the changes the press makes, and hears the browser's own
+      message on each field, since the "invalid" event does not leave a
+      shadow root. A page with no shadow root keeps the native lookups.
+      Case `f21` now fails; decoys `d14` (the component writes its own
+      error text, passes) and `d15` (an unchanging red asterisk) hold. On
+      shoelace.style's form-controls page, with its announcement dialog
+      closed, 5 forms are now judged where none was: 3 "browser's own
+      message", 1 no sign of an error, and 1 fail, the custom-validation-
+      styles example, whose hint text only turns red for Name (the first
+      ambiguous case above: disputed until an expert decides). Lion,
+      Spectrum Web Components and Material Web's pages still have no form
+      to judge (no `<form>` or no submit control). In a real scan Shoelace's
+      dialog covers the page, so its forms are counted "could not be
+      pressed" (below).
 - [ ] Only the submit button reacts (turns red, shakes): deliberately not
       reported, for precision. Revisit only with real-world evidence.
-- [ ] Forms submitted only with Enter, and multi-step forms (only the first
-      step is checked; say so in the report).
+- [ ] Forms submitted only with Enter: the check never presses Enter, a
+      safety rule. Changing it is the developer's decision.
+- [x] Multi-step forms: only the first step is checked, and the report says
+      so ("What was checked", the coverage page, the glossary).
+- [x] A form whose press fails (a dialog covers the page, the click times
+      out) was dropped from the scan's counts. It is now counted as
+      skipped, "the submit control could not be pressed" (2026-11-05).
+- [x] After a reload the check planned at once, so a form a script builds
+      after "load" (Shoelace's appear 0.27 s later) was not found and the
+      page was not judged. It now waits up to 3 s for the forms it planned
+      to come back (2026-11-05; `test_form_error_after_other_checks.py`).
 - [x] A submit control that is not a button (2026-11-05): RSD Ingeniería's
       "before" contact form submits from a `<div onclick>`. A form with no
       button now takes the one clickable element with text after its last
@@ -330,8 +353,17 @@ Ordered by what blocks using the check, then by expected value.
 
 ### 4. Speed
 
-- [ ] Wait until the page goes quiet instead of a fixed 1.2 s, with a ceiling,
-      and measure on real pages.
+- [x] Wait until the page goes quiet instead of a fixed 1.2 s: measured on
+      the real-page set (2026-11-05) and not built. On most forms the last
+      change came 50 to 350 ms after the press, so a quiet rule could save
+      about 0.5 to 0.7 s a form. But PrimeVue's forms changed text at 530 ms
+      and again at 1,201 ms, and mackjudd.com at 972 ms (its countdown). A
+      rule that stops at the first quiet moment can stop before a late
+      message, and then the marks without their text read as a failure: a
+      false failure, and precision comes before speed. Click-Through tried
+      both faster designs and kept a fixed wait for the same reason
+      (`InteractionProbe.settle_ms`). Revisit only with a way to tell a
+      finished page from a pending timer.
 - [x] Measure the cost of reloading the page (2026-11-05). The check now
       reloads before its first press too. A reload of six real pages with
       forms (Atlassian, Mantine, shadcn, PrimeVue, Bootstrap, RSD) took

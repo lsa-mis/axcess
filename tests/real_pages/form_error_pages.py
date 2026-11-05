@@ -1,8 +1,8 @@
 """The form error check's labelled real pages (AGENTS.md, "real pages first").
 
 One entry per judged form: the page, the form's name as the check reports
-it (``FormResult.form``) and which one when a page has several with that
-name, the verdict it should get, and why we believe it.
+it (``FormResult.form``) and which one by its element locator (CSS selector) when a page has
+several with that name, the verdict it should get, and why we believe it.
 
 ``expected``:
 - ``fail``: the form fails SC 3.3.1 when sent empty.
@@ -36,7 +36,10 @@ class RealForm:
     expected: str
     basis: str
     note: str
-    nth: int = 0
+    # The form's element locator (CSS selector), for a page with several
+    # forms of the same name. By position, a form the check could not press
+    # (now counted, before dropped) shifted every label after it.
+    selector: str = ""
     send: bool = False
 
 
@@ -47,6 +50,31 @@ _AU = (
 _508 = "https://baselinealignment.section508.gov/testcases/"
 _FERN = "github.com/Daymond-Blair/accessibility-audit-training-lab data/answer-keys/fernhill.json"
 _SEEN = "seen: the before and after screenshots, 2026-11-04/05"
+
+
+# Element locators of same-named forms, as the check reports them (2026-11-05):
+# the top element, then ``depth`` first-child divs, then the form.
+def _path(top: str, depth: int) -> str:
+    return " > ".join([top, *["div:nth-of-type(1)"] * depth, "form:nth-of-type(1)"])
+
+
+def _div(n: int, depth: int) -> str:
+    return _path(f"div:nth-of-type({n})", depth)
+
+
+_SEL: dict[str, list[str]] = {
+    "bootstrap": [_div(2, 1), _div(7, 1)],
+    "primevue": [
+        _div(3, 3),
+        "section:nth-of-type(6) > div:nth-of-type(2) > " + _path("div:nth-of-type(1)", 2),
+    ],
+    "shadcn-save": ["#form-rhf-input", "#form-rhf-textarea", "#form-rhf-select"],
+    "mantine": [_div(2, 2), _div(6, 2), _div(7, 2), _div(11, 3), _div(16, 2)],
+    "react-aria": [_div(1, 1), _div(2, 1)],
+    "abide-submit": [_div(6, 0), _div(8, 0)],
+    "atlassian-schema": [_div(7, 4), _div(12, 4)],
+}
+
 
 PAGES: list[RealForm] = [
     # ------------------------------------------------------------- fail
@@ -179,9 +207,9 @@ PAGES: list[RealForm] = [
             "not fail",
             "seen",
             _SEEN + ": invalid-feedback text.",
-            nth=n,
+            selector=sel,
         )
-        for n in (0, 1)
+        for n, sel in enumerate(_SEL["bootstrap"])
     ),
     *(
         RealForm(
@@ -191,9 +219,9 @@ PAGES: list[RealForm] = [
             "not fail",
             "seen",
             _SEEN + ": message text under each field.",
-            nth=n,
+            selector=sel,
         )
-        for n in (0, 1)
+        for n, sel in enumerate(_SEL["primevue"])
     ),
     RealForm(
         "shadcn-submit",
@@ -211,9 +239,9 @@ PAGES: list[RealForm] = [
             "not fail",
             "seen",
             _SEEN + ": FormMessage text.",
-            nth=n,
+            selector=sel,
         )
-        for n in (0, 1, 2)
+        for n, sel in enumerate(_SEL["shadcn-save"])
     ),
     RealForm(
         "shadcn-plan",
@@ -231,9 +259,9 @@ PAGES: list[RealForm] = [
             "not fail",
             "seen",
             _SEEN + ": error text under each field.",
-            nth=n,
+            selector=sel,
         )
-        for n in range(5)
+        for n, sel in enumerate(_SEL["mantine"])
     ),
     *(
         RealForm(
@@ -243,9 +271,9 @@ PAGES: list[RealForm] = [
             "not fail",
             "seen",
             _SEEN + ".",
-            nth=n,
+            selector=sel,
         )
-        for n in (0, 1)
+        for n, sel in enumerate(_SEL["react-aria"])
     ),
     *(
         RealForm(
@@ -255,9 +283,9 @@ PAGES: list[RealForm] = [
             "not fail",
             "seen",
             _SEEN + ": form-error text.",
-            nth=n,
+            selector=sel,
         )
-        for n in (0, 1)
+        for n, sel in enumerate(_SEL["abide-submit"])
     ),
     *(
         RealForm(
@@ -267,9 +295,9 @@ PAGES: list[RealForm] = [
             "not fail",
             "seen",
             _SEEN + ": error message text.",
-            nth=n,
+            selector=sel,
         )
-        for n in (0, 1)
+        for n, sel in enumerate(_SEL["atlassian-schema"])
     ),
     RealForm(
         "atlassian-archive",
