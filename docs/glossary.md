@@ -11,18 +11,25 @@ in one of these three groups: how sure Axcess is that it is a real problem.
 
 ### Mostly sure
 
-A result where a [rule engine](#rule-engine) ([axe-core](#axe-core) or
-[Siteimprove Alfa](#siteimprove-alfa)) failed a fixed, machine-testable rule,
-such as an image with no [alt text](#alt-text). These rules give the same result
-every time, so these are the most certain results. Start here: check that the
-rule applies to that part of the page, fix it, test the fix, then
-[rescan](#rescan-comparison) to see if it is still found.
+A result Axcess is close to certain about. It comes from one of two places:
+
+- a [rule engine](#rule-engine) ([axe-core](#axe-core) or
+  [Siteimprove Alfa](#siteimprove-alfa)) failed a fixed, machine-testable
+  rule, such as an image with no [alt text](#alt-text). These rules give the
+  same result every time.
+- the [form error check](#form-error-check) saw a clear failure: after the
+  press, a field was marked in error, or a general error message appeared,
+  and no text named the field and said what was wrong.
+
+Start here: check that the result applies to that part of the page, fix it,
+test the fix, then [rescan](#rescan-comparison) to see if it is still found.
 
 - Good to know: some Mostly sure issues are [best practices](#best-practice),
   not WCAG failures. The Issues table's WCAG column shows Best practice for
   these.
-- Why "mostly": a fixed rule can still be wrong about a page, so check each one
-  (see [Zero false positive goal](#zero-false-positive-goal)).
+- Why "mostly": a fixed rule or a clear-looking form error can still be wrong
+  about a page, so check each one (see
+  [Zero false positive goal](#zero-false-positive-goal)).
 - Called "Barrier" in earlier versions of Axcess.
 
 ### Not sure
@@ -32,7 +39,8 @@ confirm before you report it. Open the page and check the item
 yourself. If it is a real problem, record that in its [status](#status) and fix
 it; if not, mark it as a [false positive](#false-positive) with a short note.
 
-- Found by: a [browser check](#browser-check) (such as focus, zoom, or reflow),
+- Found by: a [browser check](#browser-check) (such as focus, zoom, or reflow,
+  and the [form error check](#form-error-check) when its result is unclear),
   the [keyboard trap](#keyboard-trap) check, a [motion check](#motion-check),
   image text whose [alt text](#alt-text) is missing or does not match, a
   [local AI model](#local-ai-model) (such as for link text, headings, or form
@@ -343,7 +351,8 @@ tools can run it the same way.
 
 A check that measures how a page behaves in a real browser, such as resizing it
 to phone width or pressing Tab through it. Its results are marked
-[Not sure](#not-sure).
+[Not sure](#not-sure), except the [form error check](#form-error-check)'s
+clear failures, which are [Mostly sure](#mostly-sure).
 
 ### Motion check
 
@@ -363,8 +372,13 @@ the site when every field is empty, and check the page the site sends back:
 use that only on a site you own or a test site, because the site may still
 act on an empty form, for example by emailing a blank message to someone. It
 never presses sign-in, payment, search or delete forms, and it checks only a
-form's first step. Its results are marked [Not sure](#not-sure), with a
-picture of the form before and after the press. In the app it is on by
+form's first step. Each result comes with a picture of the form before and
+after the press. A clear failure is marked [Mostly sure](#mostly-sure): a
+field marked in error, or a general error message, and no text that names the
+field and says what is wrong. An unclear one is marked [Not sure](#not-sure),
+as "Form may show an error without describing it in text": for example a
+"Required" hint that only turns red, or a message only screen readers get.
+Reports made before 5 November 2026 mark every result Not sure. In the app it is on by
 default for public websites (**Check that forms describe their errors**,
 under **Checks** on New scan) and never runs in a sign-in scan.
 

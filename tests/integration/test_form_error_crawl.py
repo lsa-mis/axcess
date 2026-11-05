@@ -55,7 +55,7 @@ def test_a_failing_form_is_stored_as_an_occurrence(
     assert len(rows) == 1, [dict(r) for r in rows]
     row = rows[0]
     assert (row["rule_id"], row["wcag_sc"], row["wcag_level"]) == (
-        "form-error-not-described",
+        "form-error-identification",
         "3.3.1",
         "A",
     )

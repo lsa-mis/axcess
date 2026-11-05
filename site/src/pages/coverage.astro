@@ -358,14 +358,15 @@ const headings = [
     <Card heading="Mostly sure: confirm it, then fix it" level={3}>
       <p>
         Comes from failures in the Rule check (axe), including problems found by Click-Through or after a search you
-        set up, and failures in the Rule check (Alfa). Confirm it on the page, fix it, then scan again.
+        set up, failures in the Rule check (Alfa), and clear failures found by the Form error check. Confirm it on the
+        page, fix it, then scan again.
       </p>
     </Card>
     <Card heading="Not sure: a person decides" level={3}>
       <p>
-        Comes from the Zoom and layout, Focus, Keyboard, Form error, and Motion and reading-order checks, from the
-        Image text check when alt text is missing or does not match, from the AI review, and from Rule check (Alfa)
-        "cannot tell" results. Test it on the page and record your decision.
+        Comes from the Zoom and layout, Focus, Keyboard, and Motion and reading-order checks, from the Form error check
+        when its result is unclear, from the Image text check when alt text is missing or does not match, from the AI
+        review, and from Rule check (Alfa) "cannot tell" results. Test it on the page and record your decision.
       </p>
     </Card>
     <Card heading="For information: nothing to fix" level={3}>

@@ -145,6 +145,10 @@ class Attempt:
     messages: tuple[Message, ...]
     native_invalid: tuple[int, ...]  # fields the browser's own validation stopped
     blocked_request: bool
+    # Signs of the four kinds of page an expert has yet to decide (a hint
+    # already shown turned red; text only screen readers get; a changed
+    # placeholder; a picture with alt text). A failure with any is Not sure.
+    unclear: tuple[str, ...] = ()
 
 
 @dataclass
@@ -174,11 +178,22 @@ class FormResult:
     # check, an error page) is otherwise indistinguishable from "accepted".
     reply_status: int | None = None
     reply_title: str = ""
+    # For a fail: the undecided signs it showed (``Attempt.unclear``). Any
+    # makes the occurrence ``RULE_UNCLEAR``, reported Not sure.
+    unclear: list[str] = field(default_factory=list)
 
 
 # The one rule this check reports, keyed in page_a11y_findings like the other
 # browser checks' rules (``pipeline='forms'``).
-RULE_ERROR_NOT_DESCRIBED = "form-error-not-described"
+# How sure (the developer's decision, 2026-11-05): a clear failure is Mostly
+# sure; one that shows any of the four undecided signs (``Attempt.unclear``)
+# is Not sure until an expert decides those kinds. Reports from before keep
+# ``RULE_LEGACY``, which stays Not sure, so an old report reads as it did.
+RULE_CLEAR = "form-error-identification"
+RULE_UNCLEAR = "form-error-identification-unclear"
+RULE_LEGACY = "form-error-not-described"
+TITLE_NOT_DESCRIBED = "Form shows an error without describing it in text"
+TITLE_UNCLEAR = "Form may show an error without describing it in text"
 HELP_URL = "https://www.w3.org/WAI/WCAG22/Understanding/error-identification.html"
 
 
@@ -196,12 +211,19 @@ class FormFinding:
     failure_summary: str
     submit: str
     frame_url: str = ""
+    unclear: bool = False
+
+    @property
+    def rule_id(self) -> str:
+        return RULE_UNCLEAR if self.unclear else RULE_CLEAR
 
     @property
     def target_hash(self) -> str:
         h = hashlib.sha256()
+        # A clear failure hashes under the old rule's name, so its history and
+        # a reviewer's decision carry over from reports made before the split.
         for part in (
-            RULE_ERROR_NOT_DESCRIBED,
+            RULE_UNCLEAR if self.unclear else RULE_LEGACY,
             self.frame_url,
             self.target_selector,
             self.html_snippet[:200],
@@ -212,12 +234,12 @@ class FormFinding:
 
     def to_repo_kwargs(self) -> dict[str, Any]:
         return {
-            "rule_id": RULE_ERROR_NOT_DESCRIBED,
+            "rule_id": self.rule_id,
             "wcag_sc": "3.3.1",
             "wcag_scs": "3.3.1",
             "wcag_level": "A",
             "impact": "serious",
-            "help": "Form shows an error without describing it in text",
+            "help": TITLE_UNCLEAR if self.unclear else TITLE_NOT_DESCRIBED,
             "help_url": HELP_URL,
             "target_selector": self.target_selector,
             "failure_summary": self.failure_summary,
@@ -243,12 +265,18 @@ class FormFinding:
             parts.append(
                 "Text that appeared: " + " | ".join(m[:120] for m in result.messages[:5]) + "."
             )
+        if result.unclear:
+            parts.append(
+                "Not sure: " + "; ".join(result.unclear) + ". An expert has yet to decide "
+                "whether this describes the error, so a person checks it."
+            )
         return cls(
             target_selector=result.selector,
             html_snippet=result.snippet,
             failure_summary=" ".join(parts)[:1000],
             submit=result.submit,
             frame_url=result.frame_url,
+            unclear=bool(result.unclear),
         )
 
 

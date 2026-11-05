@@ -44,6 +44,7 @@ from typing import Any, Literal
 import yaml
 
 from audit.analyzer.alfa_evidence import humanize_target
+from audit.analyzer.forms import base as forms_base
 from audit.labels import FINDING_TYPES, FindingType
 from audit.logging import get_logger
 from audit.wcag_version import WcagVersion, stored_wcag_version
@@ -946,6 +947,9 @@ def _axe_issue_rows(
         review_lane: ReviewLane = "expert_review"
         evidence_confidence: EvidenceConfidence = "medium"
         evidence_summary = "A check found this, but a person must confirm it on the page."
+        # A title that wins over the guidance card's, which is chosen by WCAG
+        # criterion and so cannot tell two rules of one criterion apart.
+        own_title: str | None = None
         high_confidence_occurrences = 0
         if pipeline == "semantic":
             sc = raw_rule_id.removeprefix("semantic:")
@@ -1029,12 +1033,33 @@ def _axe_issue_rows(
             )
         elif pipeline == "forms":
             issue_key = f"{pipeline}:{raw_rule_id}"
-            default_title = "Form shows an error without describing it in text"
+            default_title = forms_base.TITLE_NOT_DESCRIBED
             evidence_summary = (
                 "Found by pressing the form's submit button once, with nothing typed, while "
                 "Axcess stopped the form from being sent. Check by hand that each error "
                 "names its field in text."
             )
+            # How sure (the developer's decision, 2026-11-05;
+            # docs/internal/form-error-check.md): a clear failure is Mostly sure,
+            # one with an undecided sign Not sure. The old rule, from reports made
+            # before the split, keeps Not sure, so an old report reads as it did.
+            if raw_rule_id == forms_base.RULE_CLEAR:
+                review_lane = "likely_barrier"
+                evidence_confidence = "high"
+                high_confidence_occurrences = len(reported)
+                evidence_summary = (
+                    "Found by pressing the form's submit button once, with nothing typed. The "
+                    "form marked a field in error, or showed a general error message, and no "
+                    "text names the field and says what is wrong. Check it on the page."
+                )
+            elif raw_rule_id == forms_base.RULE_UNCLEAR:
+                own_title = forms_base.TITLE_UNCLEAR
+                evidence_summary = (
+                    "Found by pressing the form's submit button once, with nothing typed. The "
+                    "page did something an expert has yet to decide counts as describing the "
+                    "error, such as a 'Required' hint turning red or text only screen readers "
+                    "get. A person checks it."
+                )
         elif pipeline == "visual":
             issue_key = f"{pipeline}:{raw_rule_id}"
             if legacy_visual_motion_observation:
@@ -1163,7 +1188,8 @@ def _axe_issue_rows(
             IssueRow(
                 pipeline=pipeline,
                 issue_key=issue_key,
-                title=meta.get("title")
+                title=own_title
+                or meta.get("title")
                 or (
                     default_title
                     if pipeline in {"alfa", "protected_image", "visual"}

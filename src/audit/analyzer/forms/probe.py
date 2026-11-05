@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import re
 import time
 from collections import Counter
 from collections.abc import Awaitable, Callable, Set
@@ -542,7 +543,28 @@ _SNAPSHOT_JS = (
     const t = ownText(el);
     if (t && seen(el)) all.push(t);
   }
-  return {fields, texts, all};
+  // What tells the four kinds of page an expert has yet to decide apart from
+  // a clear failure (docs/internal/form-error-check.md): text a screen reader
+  // reads but the eye cannot see, each field's placeholder, and pictures
+  // with alt text. A failure with any of them new is reported Not sure.
+  const heard = el => {
+    if (seen(el) || !el.getClientRects().length) return false;
+    const st = getComputedStyle(el);
+    return st.display !== 'none' && st.visibility !== 'hidden' &&
+      !deepClosest(el, '[aria-hidden=true], [hidden]');
+  };
+  const unseen = [];
+  const alts = [];
+  for (const root of scope) {
+    for (const el of [root, ...deepAll(root, 2999)]) {
+      if (elsewhere(el)) continue;
+      const text = ownText(el);
+      if (text && heard(el)) unseen.push(text);
+      if (el.tagName === 'IMG' && seen(el) && squash(el.alt)) alts.push(squash(el.alt));
+    }
+  }
+  const placeholders = u.fields.map(f => squash(f.placeholder));
+  return {fields, texts, all, unseen, alts, placeholders};
 }
 """
 )
@@ -998,6 +1020,7 @@ class ErrorIdentificationProbe:
             dict.fromkeys(labels[k] for k in (undescribed or attempt.marked))
         )
         result.messages = [m.text for m in attempt.messages][:10]
+        result.unclear = list(attempt.unclear)
         result.sent = submission is not None and submission.sent_at is not None
         result.reply_status = reply_status[0] if reply_status else None
         result.reply_title = reply_title
@@ -1089,6 +1112,42 @@ def _is_error_colour(colour: str) -> bool:
 _ERROR_CLASS = ("error", "invalid", "danger", "has-error", "is-error", "is-invalid")
 
 
+# A requirement hint ("Required", "* mandatory"), the first undecided kind.
+# Not every error word: a radio group's question ("Choose a plan") turning
+# red is the group marked in error, a clear failure (case f10).
+_REQUIREMENT = re.compile(r"\b(required|mandatory|obligatory)\b", re.IGNORECASE)
+
+
+def _unclear_signs(before: dict[str, Any], after: dict[str, Any]) -> tuple[str, ...]:
+    """Which of the four undecided kinds of page this press showed.
+
+    Each is a failure by the check's rule that an expert may judge
+    otherwise (docs/internal/form-error-check.md, "Decide the four
+    ambiguous cases"), so a failure with any of them is reported Not sure.
+    """
+    signs: list[str] = []
+    old = {(t["text"], tuple(t.get("fields", []))): t.get("colour", "") for t in before["texts"]}
+    for t in after["texts"]:
+        was = old.get((t["text"], tuple(t.get("fields", []))))
+        if (
+            was is not None
+            and not _is_error_colour(was)
+            and _is_error_colour(t.get("colour", ""))
+            and _REQUIREMENT.search(t["text"])
+        ):
+            signs.append(f'text that was already shown ("{t["text"][:60]}") turned an error colour')
+            break
+    if set(after.get("unseen", [])) - set(before.get("unseen", [])):
+        signs.append("text only screen readers get appeared")
+    # The reply page after a send can hold another number of fields.
+    placeholders = zip(before.get("placeholders", []), after.get("placeholders", []), strict=False)
+    if any(a != b for a, b in placeholders):
+        signs.append("a field's placeholder text changed")
+    if set(after.get("alts", [])) - set(before.get("alts", [])):
+        signs.append("a picture with alt text appeared")
+    return tuple(signs)
+
+
 def _attempt_from(
     info: dict[str, Any],
     before: dict[str, Any],
@@ -1157,6 +1216,7 @@ def _attempt_from(
         add({"text": text, "announced": True}, when)
 
     return Attempt(
+        unclear=_unclear_signs(before, after),
         fields=tuple(states),
         marked=tuple(marked),
         messages=tuple(messages.values()),

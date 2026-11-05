@@ -144,10 +144,14 @@ def test_real_pages(tmp_db: sqlite3.Connection, tmp_path: Path, monkeypatch: Any
                     "expected": form.expected,
                     "predicted": predicted,
                     "reason": result.reason if result else "",
+                    # A fail with any is reported Not sure, not Mostly sure.
+                    "unclear": list(result.unclear) if result else [],
                     "basis": form.basis,
                 }
             )
-            print(f"{form.id:<34} expected {form.expected:<9} got {predicted}", flush=True)
+            how_sure = " (unclear: Not sure)" if result is not None and result.unclear else ""
+            line = f"{form.id:<34} expected {form.expected:<9} got {predicted}{how_sure}"
+            print(line, flush=True)
     report = score(rows)
     report["rows"] = rows
     (_OUT / "form_error_real_pages.json").write_text(json.dumps(report, indent=2))

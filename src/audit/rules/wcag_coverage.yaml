@@ -621,9 +621,9 @@ criteria:
     automated_check: >-
       The form error check presses each form's submit button once, with
       nothing typed, and reports a form that marks fields in error without
-      saying in words what is wrong. It is not yet tested on enough real
-      forms to count toward coverage, so its results are Not sure and this
-      criterion still counts as tested by hand.
+      saying in words what is wrong. A clear failure is Mostly sure and an
+      unclear one Not sure, but it is not yet tested on enough real forms to
+      count toward coverage, so this criterion still counts as tested by hand.
     manual_check: >-
       Submit each form with missing and wrong values, and confirm every error
       names the field and says in words what is wrong. The check types

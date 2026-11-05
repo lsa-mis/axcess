@@ -87,8 +87,9 @@ any change it led to, is an honest estimate (24 cases: precision 100%, recall
 80%). Like the bundled corpus these are regression evidence on synthetic pages,
 not a real-world accuracy estimate. The check is on by default for public
 scans (the developer's decision, 2026-11-02, after the safety review) but not
-yet validated on real forms labelled by experts, so its results stay Not sure
-leads a person confirms (`docs/internal/form-error-check.md`).
+yet validated on real forms labelled by experts. By the developer's
+decision (2026-11-05), a clear failure is Mostly sure and one with an
+undecided sign Not sure (`docs/internal/form-error-check.md`).
 On 54 real public pages, checked by hand on 2026-11-04 against screenshots
 (not by an expert), the check gave 41 verdicts and none was found wrong.
 Three were true failures: both Accessible University "before" pages (a

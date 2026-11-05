@@ -16,6 +16,7 @@ from typing import Any, Literal, cast
 from pydantic import BaseModel, Field
 
 from audit.analyzer.alfa_evidence import parse_evidence
+from audit.analyzer.forms import base as forms_base
 from audit.crawler import url_policy
 from audit.labels import CLICK_THROUGH_STATES
 from audit.wcag_version import stored_wcag_version
@@ -280,12 +281,22 @@ class _Group:
         )
 
 
+# The form error check's rule before the Mostly sure / Not sure split
+# (2026-11-05) and its clear rule after it are one issue across reports.
+_FORMS_LEGACY_KEY = f"forms:{forms_base.RULE_LEGACY}"
+_FORMS_CLEAR_KEY = f"forms:{forms_base.RULE_CLEAR}"
+
+
 def _group_key(row: issues.IssueRow) -> str:
     """One Alfa rule is one group whichever outcome it had, so a finding that
-    moves between failed and cannot-tell is a change, not a new issue."""
+    moves between failed and cannot-tell is a change, not a new issue. The
+    form error check's old rule and its clear rule are one group, so an old
+    report and a new one compare as the same issue."""
     key = row.issue_key
     if row.pipeline == "alfa" and key.rsplit(":", 1)[-1] in {"failed", "cant_tell"}:
         key = key.rsplit(":", 1)[0]
+    if key == _FORMS_LEGACY_KEY:
+        key = _FORMS_CLEAR_KEY
     return key
 
 

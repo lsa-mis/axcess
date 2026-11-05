@@ -100,9 +100,10 @@ export const PUBLIC_DEFAULTS: ScanSettings = {
   // On for public websites (2026-11-02, the developer's decision, after the
   // safety review): it presses submit buttons, with nothing typed, and
   // nothing leaves the page meanwhile (the guard's strict mode and the socket
-  // hold, docs/internal/form-error-check.md). Its results are Not sure leads
-  // a person confirms; it is not yet validated on real forms. Never in a
-  // sign-in scan (LOGIN_POLICY below).
+  // hold, docs/internal/form-error-check.md). A clear failure is Mostly
+  // sure and an unclear one Not sure (2026-11-05, the developer's decision);
+  // it is not yet validated on real forms. Never in a sign-in scan
+  // (LOGIN_POLICY below).
   skip_forms: false,
   // Sending an empty form to the site is never a default: the site may act
   // on it (a blank message emailed to someone). Chosen per scan, on a site

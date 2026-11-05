@@ -23,11 +23,12 @@ it never proves [WCAG](glossary.md#wcag) conformance or legal compliance.
 
 ## The three report groups at a glance
 
-![Diagram of the three report groups in the How sure column. Mostly sure holds rule-engine failures from axe-core and Siteimprove Alfa, including problems found after clicking or after a configured search; confirm them on the page, fix, and rescan. Not sure holds browser checks, the keyboard trap check, motion checks, text in images whose alt text is missing or does not match, AI checks, and Alfa "cannot tell" results; a person tests and records a decision. For information holds images whose alt text already matches and older records kept for history; no action is needed.](images/diagrams/report-groups.png)
+![Diagram of the three report groups in the How sure column. Mostly sure holds rule-engine failures from axe-core and Siteimprove Alfa, including problems found after clicking or after a configured search, and clear form errors, where a field is marked in error with no text that says what is wrong; confirm them on the page, fix, and rescan. Not sure holds browser checks, the keyboard trap check, form errors that are unclear, motion checks, text in images whose alt text is missing or does not match, AI checks, and Alfa "cannot tell" results; a person tests and records a decision. For information holds images whose alt text already matches and older records kept for history; no action is needed.](images/diagrams/report-groups.png)
 
 Each [issue type](glossary.md#issue-type) lands in one report group,
-based on the check that found it and its result. Only rule-engine failures are
-marked Mostly sure; anything a person has to judge is marked Not sure. The app
+based on the check that found it and its result. Only rule-engine failures and
+the form error check's clear failures are marked Mostly sure; anything a person
+has to judge is marked Not sure. The app
 shows the report group in the Issues table's **How sure** column: how sure
 Axcess is that the issue type is a real problem.
 
@@ -168,7 +169,8 @@ ran. **Result** says what the check ran on and what it found. **About this
 check** says in one line each what the check does and its limit, and **More
 about this check** opens its card on the Axcess website. The **Form error
 check** row also counts the forms it pressed, the forms it did not press
-(such as sign-in, payment or search forms), and the forms it could not judge
+(such as sign-in, payment or search forms, or a form a dialog covered), and
+the forms it could not judge
 because they tried to send themselves. The focus and visual checks have no
 row here. The second row, **What "Mostly sure", "Not sure"
 and the other labels mean**, explains the words in the **How sure** and **Where it shows**

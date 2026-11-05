@@ -20,7 +20,12 @@ merge.
   it send a form whose every field is empty and check the page the site
   sends back, for forms that only the site's server checks. It is never a
   default and is meant for sites you own or test sites. Results appear in the Issues table as "Form shows
-  an error without describing it in text", under Not sure. It never
+  an error without describing it in text", under Mostly sure, or as "Form
+  may show an error without describing it in text", under Not sure, when
+  the page did something an expert has yet to decide counts (a "Required"
+  hint that only turns red, text only screen readers get, a changed
+  placeholder, a picture with alt text). Reports made before this change
+  keep every result under Not sure. It never
   presses sign-in, payment, delete or search forms. Each result keeps a
   picture of the form before and after the press, and **What was checked**
   says how many forms it pressed, did not press, and could not judge.

@@ -4,16 +4,43 @@ Status: built, measured on synthetic pages, and wired into scans behind the
 New scan switch "Check that forms describe their errors", **on by default for
 public websites** since 2026-11-02 (the developer's decision, after the safety
 review below), never in sign-in scans, and off in "Scan again with faster
-settings". It is not yet validated on real forms, so its results are Not
-sure leads. Code: `src/audit/analyzer/forms/`.
-Measurement: `tests/integration/test_form_error_identification.py`. Crawl:
-`tests/integration/test_form_error_crawl.py`.
+settings". It is not yet validated on real forms by experts. Code:
+`src/audit/analyzer/forms/`. Metric: the real-page set, `tests/real_pages/`.
+Regression tests: `tests/integration/test_form_error_identification.py`.
+Crawl: `tests/integration/test_form_error_crawl.py`.
 
-In a report each failing form is one occurrence of the issue "Form shows an
-error without describing it in text" (WCAG 3.3.1, Level A), in the Not sure
-lane, with the submit control as the control that revealed it ("After
-clicking"). Stored in `page_a11y_findings` with `pipeline = 'forms'`
-(migration 0034).
+In a report each failing form is one occurrence, with the submit control as
+the control that revealed it ("After clicking"), stored in
+`page_a11y_findings` with `pipeline = 'forms'` (migration 0034), WCAG 3.3.1,
+Level A, as one of two issues ("How sure" below):
+
+- "Form shows an error without describing it in text"
+  (`form-error-identification`), Mostly sure;
+- "Form may show an error without describing it in text"
+  (`form-error-identification-unclear`), Not sure.
+
+### How sure (the developer's decision, 2026-11-05)
+
+The developer asked for Mostly sure, given no false failure on the real-page
+set, with the unclear kinds of page kept Not sure. A failure is unclear when
+the press showed any of the four kinds an expert has yet to decide (below,
+"Decide the four ambiguous cases"): text already shown with a requirement
+word ("Required") that turned an error colour; text a screen reader reads
+but the eye cannot see; a field's placeholder that changed; a picture with
+alt text (`probe._unclear_signs`, `test_form_error_unclear.py`). Every other
+failure is clear: a field marked in error, or a general error message, and no
+text that names the field and says what is wrong.
+
+Said to the developer before building it: the real set has 9 failures, so a
+false-failure rate of up to 28% (95% upper bound) is not ruled out, and
+Mostly sure tells people they can trust a result. The glossary, the report
+guide, its diagram and the website now say that Mostly sure covers the form
+error check's clear failures as well as rule-engine failures.
+
+Reports made before the split keep their rule (`form-error-not-described`)
+and read as they did, all Not sure; a clear occurrence keeps the same
+`target_hash`, so its history and reviews carry over, and the comparison of
+an old report with a new one treats the two rules as one issue.
 
 ## What it does
 
@@ -247,14 +274,14 @@ Ordered by what blocks using the check, then by expected value.
 
 - [ ] Validate on real forms: a sample of U-M public sites, labelled by at
       least two accessibility experts with disagreements settled, held out
-      from tuning, with confidence intervals ("validation before promotion",
-      AGENTS.md). It shipped on by default for public scans before this, by
-      the developer's decision (2026-11-02); validation decides whether its
-      results can ever leave the Not sure lane.
-- [ ] Decide the four ambiguous cases with an expert (all currently reported
-      as `fail`): a "Required" hint that only turns red; a message only screen
-      readers get; a placeholder that changes to "Required"; a message drawn
-      as an image with alt text.
+      from tuning, with confidence intervals. Its clear failures became
+      Mostly sure before this, by the developer's decision (2026-11-05);
+      validation says whether that holds.
+- [ ] Decide the four ambiguous cases with an expert (all reported as
+      `fail`, Not sure, "Form may show an error without describing it in
+      text", since 2026-11-05): a "Required" hint that only turns red; a
+      message only screen readers get; a placeholder that changes to
+      "Required"; a message drawn as an image with alt text.
 - [x] Decide the policy for sign-in scans (2026-11-02): never. New scan has
       no switch for it there, and the fetcher refuses it in a signed-in
       browser. Pressing submit while signed in could act as the person, even
@@ -280,8 +307,8 @@ Ordered by what blocks using the check, then by expected value.
 - [x] Store results in `page_a11y_findings` with its own pipeline and rule
       id, the fields in error and the messages seen.
 - [x] Report it: the check name "Form error check" in `lib/terms.ts`, an
-      ordinary Issues row in the Not sure lane, a guidance card for 3.3.1 in
-      `audit_report.yaml`.
+      ordinary Issues row (Mostly sure when clear, Not sure when unclear,
+      since 2026-11-05), a guidance card for 3.3.1 in `audit_report.yaml`.
 - [x] Screenshots before and after the press, for the occurrence: the form,
       outlined, in the page itself (not in a frame), when the scan keeps
       screenshots. The after picture is the finding's `screenshot_hash`, the
