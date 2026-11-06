@@ -66,3 +66,72 @@ The agent named the planted instruction as untrusted data inside an
 - **Limit:** one small site that I wrote, and one agent run. Real sites with
   templates and build steps make the search longer; the brief cannot know the
   source layout.
+
+## Rework round 1: checking a fix with axe-core and Playwright
+
+Regan added a sixth done-when line while checking the work: "lets add a
+layer for verification of those issues in the agentic guide/ brief - to
+validate using axe core/ playwright - deterministic way".
+
+**What the brief now does.** For every issue type the rule check (axe)
+found, the brief gives one command per place, such as
+`python axcess_check.py fix-brief.md 1.1`, and one for every place of the
+issue type (`... fix-brief.md 1`). The script, `axcess_check.py`, is copied
+into the brief word for word from `src/audit/exports/axcess_check.py`. It
+opens the page in Chromium with Playwright, adds axe-core at the version the
+scan used (it refuses to judge with another version), runs only that one
+rule, and answers with an exit code: `0` passed, `1` failed (and it lists the
+locators that still fail), `2` not checked (the element is gone, the place
+appears only after a click, the page address was redacted, or the page did
+not load). The command holds only numbers Axcess chose; the page address and
+element locator are in one `untrusted-data` block of JSON at the end of the
+brief, redacted and cut like every other scanned value, so scanned text never
+reaches a shell. Issue types that axe did not find (keyboard, focus and other
+probes, image text, Alfa) say there is no script check.
+
+**How it was checked, end to end, offline.** On 2026-11-06, on this computer:
+
+1. Copied `tests/fixtures/fix_brief_site/` to a scratch folder and served it
+   with `python3 -m http.server 8799 --bind 127.0.0.1`.
+2. Ran a real scan of it into an empty scratch database, with the same
+   command as above. Completed: 3 pages, 4 axe failures.
+3. Downloaded the brief through the real route
+   (`GET /api/scans/1/export/brief?draft=acknowledged`, FastAPI's test
+   client): response 200. It is saved here as
+   [`sample-brief-with-checks.md`](sample-brief-with-checks.md).
+4. Did what the brief says, as an agent would: saved the brief as
+   `fix-brief.md`, cut the script out of the brief's `python` block (it was
+   byte-for-byte the same as `src/audit/exports/axcess_check.py`), and put
+   the scan's `axe.min.js` (4.10.2) beside them.
+5. Ran the checks before any change, changed the site copy in two steps, and
+   ran them again. Every command and its output is in
+   [`check-run.txt`](check-run.txt); the changes are in
+   [`check-fix.diff`](check-fix.diff).
+6. Stopped the server.
+
+| Check | Before the fix | After fixing `.fine-print` only | After fixing all |
+| --- | --- | --- | --- |
+| `1.1` contrast, `.fine-print` on about.html | 1 failed | 0 passed (twice, same result) | 0 passed |
+| `1.2` contrast, `p` on index.html | 1 failed | 1 failed, `still failing: p` | 0 passed |
+| `1` both contrast places | 1 failed | 1 failed | 0 passed |
+| `2.1` button with no name | 1 failed | not run | 0 passed |
+| `3.1` image with no alt text | 1 failed | not run | 0 passed |
+
+The same before-and-after run is a test, so it stays true:
+`tests/integration/test_fix_brief_check_script.py` serves a temporary copy of
+the site, fails before the fix, passes after, keeps the unfixed places
+failing, and checks the "not checked" answers (after a click, element gone,
+another axe-core version).
+
+**What this shows, and what it does not.**
+
+- **Shows:** a fix can be checked with the same rule, the same axe-core
+  version and the same browser size as the scan, with a pass or fail that
+  does not depend on anyone's judgment, and only the fixed place passes.
+- **Does not show:** that the page meets WCAG. One rule passing at one
+  element is all a `0` means; the brief says so. Places that appear only
+  after a click are reported as not checked rather than replayed, because the
+  click is scanned text the script will not act on.
+- **Limit:** the agent's machine needs Python, Playwright with Chromium, and
+  axe-core 4.10.2; the brief says how to get them. This run used the copies
+  already on this computer, with no network install.

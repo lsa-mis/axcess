@@ -1,0 +1,61 @@
+$ python axcess_check.py fix-brief.md 1
+FAILED check 1.1 (color-contrast): the element on http://127.0.0.1:8799/about.html
+  still failing: .fine-print
+FAILED check 1.2 (color-contrast): the element on http://127.0.0.1:8799/index.html
+  still failing: p
+exit code 1
+
+$ python axcess_check.py fix-brief.md 2
+FAILED check 2.1 (button-name): the element on http://127.0.0.1:8799/index.html
+  still failing: button
+exit code 1
+
+$ python axcess_check.py fix-brief.md 3
+FAILED check 3.1 (image-alt): the element on http://127.0.0.1:8799/index.html
+  still failing: img
+exit code 1
+
+$ python axcess_check.py fix-brief.md 1.1
+FAILED check 1.1 (color-contrast): the element on http://127.0.0.1:8799/about.html
+  still failing: .fine-print
+exit code 1
+
+$ python axcess_check.py fix-brief.md 1.1
+FAILED check 1.1 (color-contrast): the element on http://127.0.0.1:8799/about.html
+  still failing: .fine-print
+exit code 1
+
+--- after the fixes ---
+[changed assets/site.css: .fine-print color #c4c4c4 -> #595959]
+$ python axcess_check.py fix-brief.md 1.1
+PASSED check 1.1 (color-contrast): the element on http://127.0.0.1:8799/about.html
+exit code 0
+
+$ python axcess_check.py fix-brief.md 1.1
+PASSED check 1.1 (color-contrast): the element on http://127.0.0.1:8799/about.html
+exit code 0
+
+$ python axcess_check.py fix-brief.md 1
+PASSED check 1.1 (color-contrast): the element on http://127.0.0.1:8799/about.html
+FAILED check 1.2 (color-contrast): the element on http://127.0.0.1:8799/index.html
+  still failing: p
+exit code 1
+
+$ python axcess_check.py fix-brief.md 1.1 --whole-page
+PASSED check 1.1 (color-contrast): 0 element(s) on http://127.0.0.1:8799/about.html
+exit code 0
+
+[changed: .promo-note color -> #595959; cart button aria-label; img alt]
+$ python axcess_check.py fix-brief.md 1
+PASSED check 1.1 (color-contrast): the element on http://127.0.0.1:8799/about.html
+PASSED check 1.2 (color-contrast): the element on http://127.0.0.1:8799/index.html
+exit code 0
+
+$ python axcess_check.py fix-brief.md 2
+PASSED check 2.1 (button-name): the element on http://127.0.0.1:8799/index.html
+exit code 0
+
+$ python axcess_check.py fix-brief.md 3
+PASSED check 3.1 (image-alt): the element on http://127.0.0.1:8799/index.html
+exit code 0
+
