@@ -419,7 +419,12 @@ def test_browser_only_crawl_never_uses_anonymous_http(tmp_db: sqlite3.Connection
 
     browser = _AuthenticatedBrowser()
 
+    attempted: list[str] = []
+
     def reject_anonymous_request(request: httpx.Request) -> httpx.Response:
+        # Recorded as well as raised: a caller that catches the error (the
+        # sitemap reader logs and carries on) must still fail this test.
+        attempted.append(str(request.url))
         raise AssertionError(f"anonymous HTTP request attempted: {request.method}")
 
     async def run() -> CrawlSummary:
@@ -449,6 +454,7 @@ def test_browser_only_crawl_never_uses_anonymous_http(tmp_db: sqlite3.Connection
 
     assert summary.pages_fetched == 1
     assert browser.calls == [seed]
+    assert attempted == []
     # Protected/login scans disable image extraction by default. Browser
     # analyzer coverage must not disappear with that unrelated option.
     assert summary.axe_pages_scanned == 1

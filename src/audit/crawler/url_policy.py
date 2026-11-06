@@ -81,6 +81,11 @@ def normalize(url: str) -> str:
     Rules:
       * lowercase scheme and host
       * strip default ports (``:80`` for http, ``:443`` for https)
+      * drop campaign-tracking parameters (``utm_*``, ``gclid``, ``fbclid``
+        and the like): they label how a visitor arrived, never which page
+        they get, so ``/about?utm_source=mail`` is the same page as
+        ``/about``. Fetching each variant would cost the site a request and
+        file one page twice in the report.
       * sort query parameters alphabetically, preserving blank values
       * drop ordinary in-page fragments
       * preserve hash-router paths (``#/route`` and ``#!/route``), because
@@ -102,12 +107,28 @@ def normalize(url: str) -> str:
 
     path = parts.path or "/"
 
-    query_pairs = parse_qsl(parts.query, keep_blank_values=True)
+    query_pairs = [
+        (key, value)
+        for key, value in parse_qsl(parts.query, keep_blank_values=True)
+        if not _is_tracking_param(key)
+    ]
     query = urlencode(sorted(query_pairs))
 
     fragment = _spa_route_fragment(parts.fragment)
 
     return urlunsplit((scheme, netloc, path, query, fragment))
+
+
+# Click and campaign identifiers added by mail, ad and analytics tools. Exact
+# names only (plus the ``utm_`` family), so a site's own parameters are kept.
+_TRACKING_PARAMS = frozenset(
+    {"gclid", "dclid", "fbclid", "msclkid", "mc_cid", "mc_eid", "_ga", "_gl", "yclid"}
+)
+
+
+def _is_tracking_param(key: str) -> bool:
+    lowered = key.lower()
+    return lowered.startswith("utm_") or lowered in _TRACKING_PARAMS
 
 
 def _spa_route_fragment(fragment: str) -> str:

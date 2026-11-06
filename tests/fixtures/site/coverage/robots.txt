@@ -1,0 +1,3 @@
+User-agent: *
+Disallow: /docs/private/
+Sitemap: {{ORIGIN}}/sitemaps/index.xml
