@@ -166,8 +166,11 @@ def _redact_token(match: re.Match[str]) -> str:
 def _redact_patterns(text: str) -> str:
     """Redact identifiers and secrets in plain text (no URL handling)."""
 
-    result = _HEADER.sub(lambda m: f"{m.group(1)}{REDACTED}", text)
-    result = _BEARER.sub(lambda m: f"{m.group(1)} {REDACTED}", result)
+    # The scheme's credential first: "Authorization: Bearer <token>" would
+    # otherwise have only the word "Bearer" taken as the header's value,
+    # leaving a token that is not a JWT behind.
+    result = _BEARER.sub(lambda m: f"{m.group(1)} {REDACTED}", text)
+    result = _HEADER.sub(lambda m: f"{m.group(1)}{REDACTED}", result)
     result = _JWT.sub(REDACTED, result)
     result = _EMAIL.sub(REDACTED_EMAIL, result)
     result = _UUID.sub(REDACTED_ID, result)

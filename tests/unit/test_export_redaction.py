@@ -109,6 +109,8 @@ def test_bearer_token_and_header_values_are_redacted() -> None:
         "dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U"
     )
     assert jwt not in redact_text(f"Authorization: Bearer {jwt}")
+    # A token that is not a JWT goes too, not only the word "Bearer".
+    assert "abcdefghijklmnop" not in redact_text("Authorization: Bearer abcdefghijklmnop")
     assert redact_text(f"token {jwt}") == f"token {REDACTED}"
     assert redact_text("password=hunter2") == f"password={REDACTED}"
 

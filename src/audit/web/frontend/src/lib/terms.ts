@@ -1,4 +1,12 @@
-import type { AxeImpact, DetectionPipeline, FindingStatus, ReviewLane, RuleCheck, ScanStatus } from "../api/types";
+import type {
+  AxeImpact,
+  DetectionPipeline,
+  ExportFormat,
+  FindingStatus,
+  ReviewLane,
+  RuleCheck,
+  ScanStatus,
+} from "../api/types";
 
 /**
  * The words the interface uses for shared values, in one place.
@@ -103,6 +111,33 @@ export const RULE_CHECK_TOOL: Record<RuleCheck, string> = {
 export function ruleChecksText(checks: readonly RuleCheck[]): string {
   return checks.length === 0 ? "None" : checks.map((check) => RULE_CHECK_TOOL[check]).join(" and ");
 }
+
+/**
+ * The Export panel's files, by name. Each name says what the file holds and,
+ * in parentheses, its format, so two Markdown files cannot be mistaken for
+ * each other. The workbook's index has one row per issue type (one per Issues
+ * table row); the CSV has one row per occurrence (one place). The workbook's
+ * label changed on 2026-10-26 with the terms; the CSV was "Issue list (CSV)"
+ * from then until 2026-10-28, when "occurrence" came back. See
+ * docs/plain-language.md, "Why "occurrence" and "issue type"".
+ */
+export const EXPORT_FORMAT_LABEL: Record<ExportFormat, string> = {
+  xlsx: "Issue types with fixes (Excel)",
+  audit: "Written report (Markdown)",
+  brief: "Fix brief for a coding agent (Markdown)",
+  csv: "Occurrence list (CSV)",
+  json: "All report data (JSON)",
+};
+
+/** One line under each Export panel file: what it is for. */
+export const EXPORT_FORMAT_HINT: Record<ExportFormat, string> = {
+  xlsx: "One row for each issue type, with how to fix it",
+  audit: "The whole report as readable text",
+  brief:
+    "Open issue types with where and how to fix them, for Claude Code or another coding agent. Private details are always removed.",
+  csv: "One row for each occurrence: one place on one page",
+  json: "Every detail the scan saved, for developers",
+};
 
 /** A scan's progress, for status badges. */
 export const SCAN_STATUS_LABEL: Record<ScanStatus, string> = {

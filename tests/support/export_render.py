@@ -34,6 +34,7 @@ from audit.blob_store import BlobStore
 from audit.exports.audit_report import render_audit_report
 from audit.exports.collector import collect_scan
 from audit.exports.csv_export import render_csv
+from audit.exports.fix_brief import render_fix_brief
 from audit.exports.jira_export import render_jira_csv
 from audit.exports.json_export import render_json
 from audit.exports.markdown_report import render_markdown
@@ -60,6 +61,7 @@ EXPORT_EXTENSIONS: dict[str, str] = {
     "markdown": "md",
     "audit": "audit.md",
     "xlsx": "xlsx",
+    "brief": "fix-brief.md",
 }
 EXPORT_FORMATS = tuple(EXPORT_EXTENSIONS)
 
@@ -95,6 +97,8 @@ def render_unlabeled(
         return render_json(scan)
     if export_format == "jira":
         return render_jira_csv(scan)
+    if export_format == "brief":
+        return render_fix_brief(scan, conn=conn, ui_base_url=UI_BASE, generated_at=GENERATED_AT)
     raise ValueError(f"Unknown export format: {export_format}")
 
 

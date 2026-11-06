@@ -68,8 +68,9 @@ from audit.crawler.search import SearchConfig, search_url_allowed
 from audit.db import repo
 from audit.db.schema import connect
 from audit.exports.audit_report import render_audit_report
-from audit.exports.collector import ExportScan, collect_scan
+from audit.exports.collector import DEFAULT_UI_BASE, ExportScan, collect_scan
 from audit.exports.csv_export import render_csv
+from audit.exports.fix_brief import render_fix_brief
 from audit.exports.jira_export import render_jira_csv
 from audit.exports.json_export import render_json
 from audit.exports.markdown_report import render_markdown
@@ -502,6 +503,9 @@ _EXPORT_RENDERERS: dict[str, Any] = {
     # the values are unused for those formats.
     "audit": render_audit_report,
     "xlsx": render_xlsx,
+    # The coding-agent fix brief also needs the live `conn` (it reads the
+    # issue list), so it has its own branch in `render_public_export`.
+    "brief": render_fix_brief,
 }
 _EXPORT_MEDIA_TYPES = {
     "csv": "text/csv; charset=utf-8",
@@ -510,6 +514,7 @@ _EXPORT_MEDIA_TYPES = {
     "markdown": "text/markdown; charset=utf-8",
     "audit": "text/markdown; charset=utf-8",
     "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "brief": "text/markdown; charset=utf-8",
 }
 _EXPORT_EXTENSIONS = {
     "csv": "csv",
@@ -518,7 +523,15 @@ _EXPORT_EXTENSIONS = {
     "markdown": "md",
     "audit": "audit.md",
     "xlsx": "xlsx",
+    "brief": "fix-brief.md",
 }
+#: Formats that are always redacted, whatever the ``redact`` query asks: the
+#: fix brief is made to be handed to a coding agent, so it never carries the
+#: unredacted evidence.
+_ALWAYS_REDACTED_FORMATS = frozenset({"brief"})
+#: Formats only a completed report can be exported as. A brief of a running,
+#: failed or stopped scan would send an agent to fix a partial list.
+_COMPLETED_ONLY_FORMATS = frozenset({"brief"})
 
 _BASE_DIR = Path(__file__).resolve().parent
 _FRONTEND_DIST = _BASE_DIR / "frontend" / "dist"
@@ -2772,6 +2785,7 @@ def create_app(
         readiness: PublicExportReadiness,
         *,
         redact: bool = False,
+        ui_base_url: str = DEFAULT_UI_BASE,
     ) -> str | bytes:
         """Render one export format, redact it if asked, then label drafts."""
         # The audit-report renderer needs the live connection so it
@@ -2786,9 +2800,13 @@ def create_app(
             # redacted workbook gets none: text in a screenshot cannot be
             # redacted, so the pictures are never put in.
             rendered = render_xlsx(scan, conn=conn, blob_store=None if redact else blob_store)
+        elif fmt == "brief":
+            # Redacted while it is built (scanned values only), so it skips
+            # the whole-file pass below.
+            rendered = render_fix_brief(scan, conn=conn, ui_base_url=ui_base_url)
         else:
             rendered = _EXPORT_RENDERERS[fmt](scan)
-        if redact:
+        if redact and fmt not in _ALWAYS_REDACTED_FORMATS:
             # Redaction runs on the finished file, never on stored evidence:
             # the report in the app keeps everything (export-only scope).
             rendered = redact_export(rendered, export_format=fmt)
@@ -2822,8 +2840,12 @@ def create_app(
             scan = collect_public_export_scan(conn, scan_id, request)
             readiness = assess_public_export_readiness(conn, scan_id, draft_acknowledged=True)
 
+            base_url = str(request.base_url).rstrip("/")
+
             def render(fmt: PanelFormat) -> str | bytes:
-                return render_public_export(conn, scan, fmt, readiness, redact=redact)
+                return render_public_export(
+                    conn, scan, fmt, readiness, redact=redact, ui_base_url=base_url
+                )
 
             return build_export_options(
                 scan_id,
@@ -2831,6 +2853,12 @@ def create_app(
                 extensions=_EXPORT_EXTENSIONS,
                 render=render,
                 redacted=redact,
+                always_redacted=_ALWAYS_REDACTED_FORMATS,
+                # A report that is not complete has no brief to measure; the
+                # panel shows the file without a size, and choosing it says why.
+                unavailable=(
+                    _COMPLETED_ONLY_FORMATS if scan.status != "completed" else frozenset()
+                ),
             )
 
     # The SPA's Export panel downloads from this ``/api/*`` route with
@@ -2861,12 +2889,23 @@ def create_app(
             ),
         ] = False,
     ) -> Response:
-        """Download a scan export as CSV / JSON / Jira CSV / Markdown / Audit."""
+        """Download a scan export as CSV / JSON / Jira CSV / Markdown / Audit / fix brief."""
         fmt_lower = fmt.lower()
         if fmt_lower not in _EXPORT_RENDERERS:
             raise HTTPException(status_code=400, detail="Unknown export format")
         with get_conn() as conn:
             scan = collect_public_export_scan(conn, scan_id, request)
+            if fmt_lower in _COMPLETED_ONLY_FORMATS and scan.status != "completed":
+                # Refused before the readiness check, as a deleted scan is
+                # refused before it: there is no complete report to export.
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        f"Report #{scan_id} is not complete (the scan is {scan.status}). "
+                        "A fix brief can only be made from a completed scan. Wait for "
+                        "the scan to finish, or start a new scan."
+                    ),
+                )
             try:
                 readiness = assess_public_export_readiness(
                     conn,
@@ -2875,14 +2914,22 @@ def create_app(
                 )
             except IncompleteEvaluationExportError as exc:
                 raise HTTPException(status_code=409, detail=str(exc)) from exc
-            rendered = render_public_export(conn, scan, fmt_lower, readiness, redact=redact)
+            rendered = render_public_export(
+                conn,
+                scan,
+                fmt_lower,
+                readiness,
+                redact=redact,
+                ui_base_url=str(request.base_url).rstrip("/"),
+            )
+        redacted = redact or fmt_lower in _ALWAYS_REDACTED_FORMATS
         media = _EXPORT_MEDIA_TYPES[fmt_lower]
         ext = _EXPORT_EXTENSIONS[fmt_lower]
-        filename = public_export_filename(scan_id, ext, readiness, redacted=redact)
+        filename = public_export_filename(scan_id, ext, readiness, redacted=redacted)
         headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
         if readiness.is_draft:
             headers["X-Axcess-Export-State"] = "draft"
-        if redact:
+        if redacted:
             headers["X-Axcess-Export-Redaction"] = "best-effort"
         return Response(
             content=rendered,

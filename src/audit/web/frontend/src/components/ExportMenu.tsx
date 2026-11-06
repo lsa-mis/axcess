@@ -12,6 +12,7 @@ import { AlertCircle, Check, ChevronDown, Download, Loader2 } from "lucide-react
 import { ApiError, api, exportUrl } from "../api/client";
 import type { ExportFormat } from "../api/types";
 import { cn } from "../lib/cn";
+import { EXPORT_FORMAT_HINT, EXPORT_FORMAT_LABEL } from "../lib/terms";
 import { Button, Checkbox } from "./ui";
 
 /**
@@ -40,14 +41,16 @@ import { Button, Checkbox } from "./ui";
  *
  * **Remove private details (redact).** A report of a site behind a sign-in
  * can hold a person's own data (a filled-in field, an email address in a
- * greeting). One checkbox, above the four files, asks for redacted copies:
+ * greeting). One checkbox, above the files, asks for redacted copies:
  * the server replaces likely private details with "[redacted]" in the file
- * and names it `_REDACTED`. It changes the downloads only; the report in
- * Axcess keeps everything, as decided for this feature (export only).
+ * and names it `_REDACTED`. The fix brief for a coding agent is redacted
+ * either way, because it is made to be handed over. It changes the
+ * downloads only; the report in Axcess keeps everything, as decided for
+ * this feature (export only).
  * - A checkbox, the native `<input type="checkbox">` in the shared
  *   `Checkbox`, because this is an on/off setting for the files below it
  *   (W3C "Using ARIA" rule 1, https://www.w3.org/TR/using-aria/#rule1).
- *   Rejected: a second "redacted" link for each file. Eight links for four
+ *   Rejected: a second "redacted" link for each file. Ten links for five
  *   files is two ways to do one thing (W3C COGA "Making Content Usable",
  *   https://www.w3.org/TR/coga-usable/, paraphrased: keep one way to do a
  *   task), and the list would no longer fit at 320 px.
@@ -65,50 +68,31 @@ import { Button, Checkbox } from "./ui";
  *   (AGENTS.md, Interface language rule 4). Each file carries the same
  *   notice inside it.
  */
-const FORMATS: {
+const FORMAT_BADGES: {
   format: ExportFormat;
   badge: string;
   /** The badge's tint. The badge is decorative (the label names the format),
    *  but its text still clears 7:1 on its tint in every theme. */
   tone: string;
-  label: string;
-  hint: string;
 }[] = [
-  {
-    format: "xlsx",
-    badge: "XLSX",
-    tone: "bg-umich-blue/10 text-umich-blue",
-    // The workbook's index has one row per issue type (one per Issues
-    // table row); the CSV has one row per occurrence (one place). Named so
-    // the two cannot be mistaken for each other. The workbook's label
-    // changed on 2026-10-26 with the terms; the CSV was "Issue list (CSV)"
-    // from then until 2026-10-28, when "occurrence" came back. See
-    // docs/plain-language.md, "Why "occurrence" and "issue type"".
-    label: "Issue types with fixes (Excel)",
-    hint: "One row for each issue type, with how to fix it",
-  },
-  {
-    format: "audit",
-    badge: "MD",
-    tone: "bg-sev-info-bg text-sev-info",
-    label: "Written report (Markdown)",
-    hint: "The whole report as readable text",
-  },
-  {
-    format: "csv",
-    badge: "CSV",
-    tone: "bg-sev-minor-bg text-sev-minor",
-    label: "Occurrence list (CSV)",
-    hint: "One row for each occurrence: one place on one page",
-  },
-  {
-    format: "json",
-    badge: "JSON",
-    tone: "bg-sev-major-bg text-sev-major",
-    label: "All report data (JSON)",
-    hint: "Every detail the scan saved, for developers",
-  },
+  { format: "xlsx", badge: "XLSX", tone: "bg-umich-blue/10 text-umich-blue" },
+  { format: "audit", badge: "MD", tone: "bg-sev-info-bg text-sev-info" },
+  // The fix brief sits beside the written report, the other Markdown file,
+  // so the two are compared where they are chosen. Its badge says what it is
+  // for ("FIX"), not "MD" again, so the two rows do not look alike. It is
+  // always redacted, whatever the checkbox says: the server builds it for
+  // hand-off to a coding agent, and its hint says so in words.
+  { format: "brief", badge: "FIX", tone: "bg-sev-critical-bg text-sev-critical" },
+  { format: "csv", badge: "CSV", tone: "bg-sev-minor-bg text-sev-minor" },
+  { format: "json", badge: "JSON", tone: "bg-sev-major-bg text-sev-major" },
 ];
+// Names and hints live in lib/terms.ts, so every surface that names an
+// export uses the same words (AGENTS.md, Interface language rule 2).
+const FORMATS = FORMAT_BADGES.map((entry) => ({
+  ...entry,
+  label: EXPORT_FORMAT_LABEL[entry.format],
+  hint: EXPORT_FORMAT_HINT[entry.format],
+}));
 
 type DownloadState =
   | { kind: "preparing" }
@@ -227,7 +211,7 @@ export default function ExportMenu({
   }, [open]);
 
   /** The panel's arrow-key stops, in order: the redaction choice, then the
-   *  four downloads. */
+   *  five downloads. */
   function panelStops(): HTMLElement[] {
     return Array.from(panelRef.current?.querySelectorAll<HTMLElement>("input, a") ?? []);
   }

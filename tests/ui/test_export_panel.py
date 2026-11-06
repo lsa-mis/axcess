@@ -9,6 +9,7 @@ its progress and its outcome in words, in the row and in a live region.
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -23,6 +24,7 @@ expect = playwright_async.expect
 _FORMATS = (
     "Issue types with fixes (Excel)",
     "Written report (Markdown)",
+    "Fix brief for a coding agent (Markdown)",
     "Occurrence list (CSV)",
     "All report data (JSON)",
 )
@@ -86,6 +88,8 @@ async def test_arrow_keys_move_between_downloads(
     await expect(link("Issue types with fixes (Excel)")).to_be_focused()
     await page.keyboard.press("ArrowDown")
     await expect(link("Written report (Markdown)")).to_be_focused()
+    await page.keyboard.press("ArrowDown")
+    await expect(link("Fix brief for a coding agent (Markdown)")).to_be_focused()
     await page.keyboard.press("End")
     await expect(link("All report data (JSON)")).to_be_focused()
     await page.keyboard.press("ArrowUp")
@@ -168,6 +172,45 @@ async def test_redacted_copy_by_keyboard_says_its_limits_and_names_the_file(
         _AXE_TAGS,
     )
     assert not violations, _render_violations(violations)
+
+
+async def test_fix_brief_downloads_redacted_for_a_coding_agent(
+    live_server: tuple[str, int], new_page: Any
+) -> None:
+    """The coding-agent fix brief (Asana 1220313732698508), chosen by keyboard."""
+    base, scan_id = live_server
+    page = await new_page(accept_downloads=True)
+    await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+    await _open_by_keyboard(page)
+    panel = page.get_by_role("group", name=f"Export Report #{scan_id}")
+    brief = panel.get_by_role("link", name="Fix brief for a coding agent (Markdown)", exact=True)
+    # Its hint says what it is for, and that it is always redacted, before
+    # anyone chooses it; the redaction checkbox stays off.
+    await expect(brief).to_have_accessible_description(
+        re.compile(r"coding agent\. Private details are always removed\.")
+    )
+    await expect(brief).to_have_accessible_description(re.compile(r" about \d+(\.\d)? (B|KB|MB)$"))
+    await expect(brief).to_have_attribute("href", re.compile(r"/export/brief\?draft=acknowledged$"))
+
+    for _ in range(3):
+        await page.keyboard.press("ArrowDown")
+    await expect(brief).to_be_focused()
+    async with page.expect_download() as download_info:
+        await page.keyboard.press("Enter")
+    download = await download_info.value
+
+    assert download.suggested_filename == f"scan_{scan_id}_DRAFT_REDACTED.fix-brief.md"
+    text = Path(await download.path()).read_text(encoding="utf-8")
+    assert f"# Fix brief for a coding agent: Report #{scan_id}" in text
+    assert "```untrusted-data" in text
+    await expect(brief).to_contain_text(f"Downloaded scan_{scan_id}_DRAFT_REDACTED.fix-brief.md")
+    await expect(page.get_by_role("status").filter(has_text="Downloading")).to_have_text(
+        re.compile(
+            rf"^Downloading scan_{scan_id}_DRAFT_REDACTED\.fix-brief\.md, a redacted copy, "
+            r"\d+(\.\d)? (B|KB)\.$"
+        )
+    )
+    await expect(brief).to_be_focused()
 
 
 async def test_a_failed_download_is_reported_in_words(

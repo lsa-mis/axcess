@@ -1387,7 +1387,8 @@ export interface SiteHistory {
 }
 
 /** A file the report's Export panel offers (``export_options.PANEL_FORMATS``). */
-export type ExportFormat = "xlsx" | "audit" | "csv" | "json";
+/** The Export panel's files. ``brief`` is the fix brief for a coding agent. */
+export type ExportFormat = "xlsx" | "audit" | "brief" | "csv" | "json";
 export interface ExportFormatOption {
   format: ExportFormat;
   /** The downloaded file's name, ``_DRAFT`` and ``_REDACTED`` markers included. */
