@@ -17,7 +17,7 @@
  * copy said "DOM states", "interaction states", "Click-Through states" and
  * "views opened by clicking"; those should not reach a reader.
  */
-import type { FindingType, ReviewLane } from "../api/types";
+import type { FindingType, ReviewLane, WcagRef } from "../api/types";
 import { REVIEW_TYPE_LABEL } from "./terms";
 
 export const CLICK_THROUGH = "Click-Through";
@@ -152,6 +152,22 @@ export const PRIORITY_HELP = {
     "Look at these after the High ones with the same How sure value. For example: a serious problem on 1 page, or a moderate one on 2 or more pages. More pages and more occurrences raise the priority, and pages a shared element repeats on count too.",
   Low: "Look at these last among issue types with the same How sure value. For example: a minor problem, or a moderate one on 1 page. Low can still matter, so open it before you skip it.",
 } as const;
+
+/**
+ * The other criteria an issue type maps to, as "also 4.1.2 Name, Role,
+ * Value": one axe rule can fail more than one criterion (link-name fails
+ * 2.4.4 and 4.1.2), and naming only the first under-reports what a fix must
+ * meet. The first criterion keeps its place and its level badge, so sorting
+ * and the badge mean what they did; "also" says the rest are extra, not a
+ * replacement. Rejected: one badge per criterion (a row of badges reads as a
+ * list of separate issue types) and a joined "2.4.4, 4.1.2" (it hides which
+ * one the level badge belongs to). Names show when Axcess knows them.
+ */
+export function alsoWcagText(refs: readonly WcagRef[], withNames: boolean): string {
+  if (refs.length === 0) return "";
+  const parts = refs.map((ref) => (withNames && ref.name ? `${ref.sc} ${ref.name}` : ref.sc));
+  return `also ${parts.join(", ")}`;
+}
 
 export const isReviewLane = (value: string): value is ReviewLane =>
   (REVIEW_LANES as readonly string[]).includes(value);

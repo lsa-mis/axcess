@@ -801,6 +801,11 @@ export type EvidenceConfidence = "high" | "medium" | "low";
 /** Which family of checks produced an issue's evidence (labels: lib/labels.ts). */
 export type FindingType = "wcag" | "click_through" | "alt_text";
 
+export interface WcagRef {
+  sc: string;
+  name: string | null;
+}
+
 export interface IssueRow {
   pipeline: DetectionPipeline;
   issue_key: string;
@@ -844,6 +849,9 @@ export interface IssueRow {
   finding_types: FindingType[];
   /** How many of occurrence_count only appeared after a control was used. */
   click_through_occurrence_count: number;
+  /** Every other WCAG criterion the rule maps to, after wcag_sc (link-name:
+   *  2.4.4, also 4.1.2). name is null where Axcess does not know the title. */
+  also_wcag: WcagRef[];
 }
 
 export interface IssueLocation {

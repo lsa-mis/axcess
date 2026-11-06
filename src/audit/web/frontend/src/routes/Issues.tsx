@@ -1,4 +1,4 @@
-import { memo, useMemo, useRef, type ReactNode, type Ref } from "react";
+import { Fragment, memo, useMemo, useRef, type ReactNode, type Ref } from "react";
 import { Link, useLocation, useParams, useSearchParams } from "react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
@@ -891,11 +891,28 @@ const IssueTableRow = memo(function IssueTableRow({
       <Cell className={cell}>{CHECK_LABEL[row.pipeline] ?? row.pipeline}</Cell>
       <Cell className={cn(cell, "whitespace-nowrap")}>
         {row.wcag_sc ? (
-          <span className="inline-flex items-center gap-1.5">
-            <span className="tabular-nums">{row.wcag_sc}</span>
-            <ConformanceBadge level={row.conformance} />
-            {row.wcag_name && <span className="sr-only">{row.wcag_name}</span>}
-          </span>
+          <>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="tabular-nums">{row.wcag_sc}</span>
+              <ConformanceBadge level={row.conformance} />
+              {row.wcag_name && <span className="sr-only">{row.wcag_name}</span>}
+            </span>
+            {/* The rule's other criteria under the first, numbers on screen
+                and names for a screen reader, as the first criterion's
+                name is. Why "also": alsoWcagText in lib/labels.ts. */}
+            {row.also_wcag.length > 0 && (
+              <span className="mt-0.5 block text-xs tabular-nums text-fg-muted">
+                also{" "}
+                {row.also_wcag.map((ref, index) => (
+                  <Fragment key={ref.sc}>
+                    {index > 0 && ", "}
+                    {ref.sc}
+                    {ref.name && <span className="sr-only"> {ref.name}</span>}
+                  </Fragment>
+                ))}
+              </span>
+            )}
+          </>
         ) : (
           <span className="text-fg-muted">Best practice</span>
         )}

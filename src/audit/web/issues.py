@@ -156,6 +156,40 @@ class IssueDetail:
 
 
 @dataclass(frozen=True)
+class WcagRef:
+    """One more WCAG success criterion an issue type maps to.
+
+    ``name`` is the criterion's title where Axcess knows it (the Level A and
+    AA criteria in ``wcag_coverage.yaml``), else None.
+    """
+
+    sc: str
+    name: str | None
+
+
+def _also_wcag(wcag_scs: Any, primary: str | None) -> tuple[WcagRef, ...]:
+    """The criteria after the primary one, from the stored CSV of all of them.
+
+    One axe rule can fail more than one criterion: ``link-name`` maps to
+    2.4.4 Link Purpose and 4.1.2 Name, Role, Value. The table and the issue
+    page name every one; ``wcag_sc`` stays the primary for sorting, filters
+    and exports.
+    """
+    if not primary or not wcag_scs:
+        return ()
+    from audit import coverage_matrix
+
+    out: list[WcagRef] = []
+    for sc in str(wcag_scs).split(","):
+        sc = sc.strip()
+        if not sc or sc == primary or any(ref.sc == sc for ref in out):
+            continue
+        criterion = coverage_matrix.by_sc(sc)
+        out.append(WcagRef(sc=sc, name=criterion.name if criterion else None))
+    return tuple(out)
+
+
+@dataclass(frozen=True)
 class IssueLocation:
     """One bounded, scan-scoped location sample for the unified table."""
 
@@ -248,6 +282,8 @@ class IssueRow:
     # how many of ``occurrence_count`` are the second kind.
     finding_types: tuple[FindingType, ...] = ("wcag",)
     click_through_occurrence_count: int = 0
+    # Every other criterion the rule maps to, after ``wcag_sc``.
+    also_wcag: tuple[WcagRef, ...] = ()
 
 
 def list_issues(
@@ -1080,6 +1116,11 @@ def _axe_issue_rows(
                 wcag_sc=wcag_sc,
                 wcag_name=meta.get("wcag_name")
                 or (_alfa_criterion_name(g.get("help")) if pipeline == "alfa" else None),
+                also_wcag=(
+                    _also_wcag(g.get("wcag_scs"), wcag_sc)
+                    if wcag_sc and wcag_sc == g.get("wcag_sc")
+                    else ()
+                ),
                 responsibility=(meta.get("owner") or "dev"),
                 abilities_affected=tuple(meta.get("abilities_affected") or []),
                 difficulty=_EFFORT_TO_DIFFICULTY.get(meta.get("effort", ""), "Unknown"),
@@ -1516,6 +1557,7 @@ __all__ = [
     "IssueDetail",
     "IssuePage",
     "IssueRow",
+    "WcagRef",
     "abilities_breakdown",
     "conformance_breakdown",
     "detail_for_row",

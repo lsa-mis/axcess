@@ -939,3 +939,30 @@ def test_protected_image_leads_are_alt_text() -> None:
     assert issues_mod._dom_finding_types("axe", 3, 0) == ("wcag",)
     assert issues_mod._dom_finding_types("axe", 3, 3) == ("click_through",)
     assert issues_mod._dom_finding_types("alfa", 3, 1) == ("wcag", "click_through")
+
+
+def test_issue_names_every_criterion_the_rule_maps_to(tmp_db: sqlite3.Connection) -> None:
+    """link-name fails 2.4.4 and 4.1.2; the row names both, primary first."""
+    scan_id = _seed_two_pipelines(tmp_db)
+    page_id = tmp_db.execute(
+        "SELECT id FROM pages WHERE scan_id = ? LIMIT 1", (scan_id,)
+    ).fetchone()[0]
+    tmp_db.execute(
+        """
+        INSERT INTO page_a11y_findings
+            (page_id, scan_id, rule_id, wcag_sc, wcag_scs, wcag_level,
+             impact, help, help_url, target_selector, failure_summary,
+             html_snippet, target_hash, status)
+        VALUES (?, ?, 'link-name', '2.4.4', '2.4.4,4.1.2', 'A',
+            'serious', 'Links must have discernible text', '', 'nav > a',
+            'no name', '<a href=x></a>', 'hash-ln', 'new')
+        """,
+        (page_id, scan_id),
+    )
+    rows = issues_mod.list_issues(tmp_db, scan_id)
+    row = next(r for r in rows if r.issue_key == "axe:link-name")
+    assert row.wcag_sc == "2.4.4"
+    assert row.also_wcag == (issues_mod.WcagRef(sc="4.1.2", name="Name, Role, Value"),)
+    # A rule that maps to one criterion lists no others.
+    cc = next(r for r in rows if r.issue_key == "axe:color-contrast")
+    assert cc.also_wcag == ()
