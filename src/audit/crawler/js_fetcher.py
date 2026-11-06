@@ -50,6 +50,58 @@ log = get_logger(__name__)
 _DEFAULT_VIEWPORT: ViewportSize = {"width": 1440, "height": 900}
 _NAV_TIMEOUT_MS = 30_000
 _IDLE_TIMEOUT_MS = 10_000
+# After ``networkidle``, wait until no page code (DOM) has been added,
+# removed or rewritten for ``_SETTLE_QUIET_MS`` and no framework "cloak"
+# attribute is left, for at most ``_SETTLE_MAX_MS``. Network quiet is not
+# render quiet: Alpine fills ``x-text``/``x-model`` and removes ``x-cloak``
+# when it starts, and Vue and AngularJS do the same with ``v-cloak`` and
+# ``ng-cloak``; a timer or a framework's next tick can still be changing the
+# page when the network has gone quiet. axe and the saved copy both read the
+# page after this, so they see the same settled page. Attribute changes do
+# not count: carousels and animations rewrite ``style`` and ``class``
+# forever, and waiting for them would cost the cap on every page.
+_SETTLE_QUIET_MS = 200
+_SETTLE_MAX_MS = 2_000
+_SETTLE_JS = """
+async ({ quietMs, maxMs }) => {
+  const root = document.documentElement;
+  if (!root) return "no-document";
+  const cloaked = () =>
+    document.querySelector("[x-cloak], [v-cloak], [ng-cloak], .ng-cloak") !== null;
+  const start = performance.now();
+  let last = start;
+  const observer = new MutationObserver(() => { last = performance.now(); });
+  observer.observe(root, { childList: true, subtree: true, characterData: true });
+  try {
+    for (;;) {
+      const now = performance.now();
+      if (now - start >= maxMs) return "timeout";
+      if (now - last >= quietMs && !cloaked()) return "settled";
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  } finally {
+    observer.disconnect();
+  }
+}
+"""
+
+
+async def settle_dom(
+    page: Page, *, quiet_ms: int = _SETTLE_QUIET_MS, max_ms: int = _SETTLE_MAX_MS
+) -> str:
+    """Wait, bounded, for the page code to stop changing. Never raises.
+
+    Returns ``"settled"``, ``"timeout"`` (still changing at ``max_ms``; the
+    scan goes on with the page as it is) or ``"error"`` (the page navigated
+    or closed while waiting).
+    """
+    try:
+        result = await page.evaluate(_SETTLE_JS, {"quietMs": quiet_ms, "maxMs": max_ms})
+    except Exception:
+        return "error"
+    return str(result)
+
+
 # Per-page cap on outlined element screenshots. Each capture costs a
 # scroll + a screenshot (~50-150 ms); capping the count bounds the
 # crawl-time and storage cost on pathological findings-dense pages. One
@@ -324,6 +376,8 @@ class JsFetcher:
             # we still want the rendered HTML in that case.
             with contextlib.suppress(Exception):
                 await page.wait_for_load_state("networkidle", timeout=self._idle_timeout_ms)
+            # Then for the frameworks to finish filling the page in.
+            await settle_dom(page)
             if self._max_rendered_html_chars is not None:
                 # Transfer only a scalar bound check to Python before asking
                 # Playwright to serialize the full DOM. This prevents an

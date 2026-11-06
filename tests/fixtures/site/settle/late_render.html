@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Late render fixture</title>
+  <style>[x-cloak] { display: none !important; }</style>
+</head>
+<body>
+  <main>
+    <h1>Filled in after the network goes quiet</h1>
+    <!-- Like Alpine: hidden with x-cloak until the framework starts, then
+         filled in (x-text) and uncloaked. Here that happens 900 ms after
+         load, after networkidle's 500 ms quiet window has passed. -->
+    <div id="menu" x-cloak><span id="filled"></span></div>
+  </main>
+  <script>
+    window.addEventListener("load", () => {
+      setTimeout(() => {
+        document.getElementById("filled").textContent = "Menu ready";
+        const button = document.createElement("button");
+        button.id = "late-button";            // no name: an axe violation
+        document.getElementById("menu").appendChild(button);
+        document.getElementById("menu").removeAttribute("x-cloak");
+      }, 900);
+    });
+  </script>
+</body>
+</html>
