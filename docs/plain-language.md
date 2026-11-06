@@ -80,6 +80,8 @@ Use the word in the first column, and never the words in the last.
 | Level A, AA, AAA, Best practice | How strict a requirement is. | BP, Lvl, criterion level |
 | fix | To correct a problem, or the correction itself. | remediate, remediation |
 | start page | The address a scan starts from. The form field is "Website address". | seed URL, entry page, starting page |
+| page limit, link depth | The two settings that bound a scan, as New scan names them: "Maximum pages" and "Maximum link depth" (how many clicks from the start page). In a sentence: "9 over the page limit", "1 beyond the link depth". | max_pages, max depth, depth limit, crawl depth |
+| found but not visited | A page in the scan's scope that the scan learned about but did not test, counted by reason under "Pages visited": "12 more pages found but not visited". | unvisited, not crawled, missed, skipped (alone) |
 | sign-in scan | A scan of pages behind a sign-in, with the report it makes. | login scan, protected scan, secure browser flow |
 | helper app | The Axcess companion app that runs a sign-in scan on your computer. | companion (alone), agent |
 | two-step sign-in (2FA) | A sign-in that needs a second step, such as a code or a phone approval. | MFA, 1FA, OTP without explanation |

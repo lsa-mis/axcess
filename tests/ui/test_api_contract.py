@@ -595,8 +595,12 @@ def _add_contract_evidence(db_path: Path, blob_dir: Path, scan_id: int) -> dict[
         _add_a11y_evidence(conn, blob_dir, scan_id)
         # The scan's page counters, as a crawl writes them, so a scan's
         # ``rule_checks`` lists both checks rather than an empty list.
+        # And the pages it found but did not visit, as a crawl stores them
+        # when it ends, so ``unvisited`` is an object rather than null.
         conn.execute(
-            "UPDATE scans SET axe_pages_scanned = 2, alfa_pages_scanned = 1 WHERE id = ?",
+            "UPDATE scans SET axe_pages_scanned = 2, alfa_pages_scanned = 1, "
+            "unvisited_page_limit = 3, unvisited_depth_limit = 1, unvisited_blocked = 2 "
+            "WHERE id = ?",
             (scan_id,),
         )
         conn.commit()

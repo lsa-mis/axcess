@@ -55,6 +55,7 @@ from audit.config import get_settings
 from audit.crawler import live_progress, url_policy
 from audit.crawler.fetcher import FetchError, FetchResult, StaticFetcher
 from audit.crawler.js_fetcher import JsFetcher
+from audit.crawler.links import discover_links
 from audit.crawler.rate_limit import HostLimiter
 from audit.crawler.render_detect import (
     is_challenge_response,
@@ -63,9 +64,10 @@ from audit.crawler.render_detect import (
 )
 from audit.crawler.robots import RobotsChecker
 from audit.crawler.search import SearchConfig, SearchExplorer, search_url_allowed
+from audit.crawler.sitemap import read_site_sitemaps
 from audit.crawler.style_snapshot import SheetRef, StoredStyles, StyleSnapshot
 from audit.crawler.url_policy import HostScope
-from audit.db import queue, repo
+from audit.db import crawl_coverage, queue, repo
 from audit.db.schema import write_batch
 from audit.extractor.downloader import ImageDownloader, ImageDownloaderProtocol
 from audit.extractor.pipeline import OcrConfig, VlmConfig, process_page
@@ -112,6 +114,13 @@ class CrawlConfig:
     # pages within ``max_depth`` (New scan's "Scan every page it finds").
     max_pages: int | None = 500
     max_depth: int = 10
+    # Read sitemap.xml, and the sitemaps robots.txt names, before following
+    # links. A page that nothing links to is otherwise invisible to the
+    # crawl. Sitemap pages are queued right after the starting address, in
+    # the order the sitemap lists them, and count toward ``max_pages`` like
+    # any other page (Regan's decision on the coverage ticket). Ignored by a
+    # browser-only (signed-in) scan, which makes no anonymous HTTP requests.
+    read_sitemaps: bool = True
     allow_subdomains: bool = False
     rps: float = 2.0
     ignore_robots: bool = False
@@ -353,6 +362,17 @@ class CrawlSummary:
     # refusals, not distinct URLs: a sign-out control in a shared header is
     # refused once per page that carries it.
     pages_skipped_blocked: int = 0
+    # Addresses first learned of from a sitemap.
+    pages_from_sitemap: int = 0
+    # Fetches that turned out to be a page already recorded under another
+    # address (a redirect to it, or the same page by a different letter case
+    # or trailing slash). Not stored as a second page.
+    pages_duplicate: int = 0
+    # Known pages this scan did not visit, by reason. Set when the crawl ends
+    # (see ``audit.db.crawl_coverage``).
+    unvisited_page_limit: int = 0
+    unvisited_depth_limit: int = 0
+    unvisited_blocked: int = 0
     ocr_analyzed: int = 0
     ocr_text_candidates: int = 0
     vlm_classified: int = 0
@@ -620,6 +640,11 @@ async def run_crawl(
     interrupted = False
     try:
         try:
+            # Not for a signed-in (browser-only) scan: the sitemap would be
+            # fetched over anonymous HTTP, outside the signed-in session, and
+            # such a scan must get every document from its browser.
+            if config.read_sitemaps and not config.browser_only:
+                await _queue_sitemap_pages(ctx, client, normalized_seed)
             async with asyncio.TaskGroup() as tg:
                 for _ in range(config.workers):
                     tg.create_task(_worker(ctx))
@@ -651,6 +676,7 @@ async def run_crawl(
                 summary.resolved = synth.resolved
             except Exception as exc:
                 log.warning("synthesize.failed", scan_id=scan_id, error=str(exc))
+        _count_unvisited(ctx)
         _finalize_scan(conn, scan_id, summary)
         live_progress.forget(scan_id)
         if ocr_pool is not None:
@@ -811,6 +837,7 @@ def config_json_for_scan(config: CrawlConfig) -> str:
         {
             "max_pages": config.max_pages,
             "max_depth": config.max_depth,
+            "read_sitemaps": config.read_sitemaps,
             "allow_subdomains": config.allow_subdomains,
             # Scope as chosen, so "Edit settings and retry" can put it back.
             # Older rows omit it and read as False, the form's default.
@@ -918,6 +945,7 @@ def _purge_out_of_scope_jobs(
 
 
 def _seed_queue(conn: sqlite3.Connection, scan_id: int, seed_url: str) -> None:
+    crawl_coverage.note_known(conn, scan_id=scan_id, url=seed_url, depth=0, via="link")
     queue.enqueue(
         conn,
         JOB_KIND,
@@ -1179,6 +1207,12 @@ async def _worker(ctx: _WorkerContext) -> None:
     while True:
         if _page_limit_reached(ctx):
             return
+        limit = ctx.config.max_pages
+        if limit is not None and ctx.summary.pages_fetched + ctx.in_flight >= limit:
+            # Pages in flight may fill the last places. Wait for them rather
+            # than lease another, so a scan never visits more than its limit.
+            await asyncio.sleep(0.05)
+            continue
         job = queue.lease(ctx.conn, JOB_KIND, lease_secs=120, scan_id=ctx.scan_id)
         if job is None:
             if (
@@ -1197,6 +1231,16 @@ async def _worker(ctx: _WorkerContext) -> None:
             log.warning("crawl.job_failed", id=job.id, error=str(exc))
             queue.fail(ctx.conn, job.id, str(exc))
             ctx.summary.errors += 1
+            # Attempted, so not a page the report left out; it is in the
+            # error count instead.
+            with contextlib.suppress(sqlite3.Error):
+                crawl_coverage.set_outcome(
+                    ctx.conn,
+                    scan_id=ctx.scan_id,
+                    url=str(job.payload["url"]),
+                    outcome="failed",
+                    depth=int(job.payload.get("depth") or 0),
+                )
         finally:
             ctx.in_flight -= 1
 
@@ -1253,11 +1297,22 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
     ):
         ctx.summary.pages_skipped_blocked += 1
         log.info("crawl.skipped", url=url, reason="blocklist")
+        crawl_coverage.set_outcome(
+            ctx.conn, scan_id=ctx.scan_id, url=url, outcome="blocked", depth=depth
+        )
         return
 
     if not ctx.config.ignore_robots and not await ctx.robots.allowed(url):
         ctx.summary.pages_skipped_robots += 1
         log.info("crawl.skipped", url=url, reason="robots_txt")
+        crawl_coverage.set_outcome(
+            ctx.conn, scan_id=ctx.scan_id, url=url, outcome="blocked", depth=depth
+        )
+        return
+
+    duplicate_of = _known_duplicate(ctx, url)
+    if duplicate_of is not None:
+        _skip_duplicate(ctx, url, duplicate_of, depth=depth, fetched=False)
         return
 
     # Logged before the fetch, not after, so the order pages are *visited* is
@@ -1337,6 +1392,11 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
         except FetchError as exc:
             log.warning("crawl.js_fetch_failed", url=url, error=str(exc))
 
+    duplicate_of = _fetched_duplicate(ctx, url, result)
+    if duplicate_of is not None:
+        _skip_duplicate(ctx, url, duplicate_of, depth=depth, fetched=True)
+        return
+
     page_id = _record_page(
         ctx, url, status_code=result.status_code, result=result, render_mode=render_mode
     )
@@ -1356,6 +1416,7 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
     redirected = bool(result.url and result.url != url)
     if redirected:
         ctx.summary.pages_redirected += 1
+        _mark_landing_visited(ctx, result.url, depth=depth)
     auth_wall = bool(
         result.is_html and looks_like_authentication_page(result.url or url, result.body)
     )
@@ -1553,11 +1614,10 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
 
     if not result.is_html or not result.is_ok:
         return
-    if depth >= ctx.config.max_depth:
-        return
-    if _page_limit_reached(ctx):
-        return
-    _enqueue_children(
+    # Links are read even past the depth or page limit. They are not queued
+    # then, but they are recorded, so the report can count the pages it knew
+    # of and did not visit instead of silently stopping at the limit.
+    await _enqueue_children(
         ctx,
         base_url=result.url,
         body=result.body,
@@ -1625,6 +1685,7 @@ def _record_page(
         html_hash=html_hash,
         rendered_html=rendered_html,
     )
+    crawl_coverage.set_outcome(ctx.conn, scan_id=ctx.scan_id, url=url, outcome="visited")
     if ctx.config.store_rendered_html:
         # The saved copy's CSS goes with the saved copy: none when the copy
         # was not kept (too large, not HTML), and a re-fetch replaces it.
@@ -1681,7 +1742,7 @@ def _extract_title(body: bytes) -> str | None:
     return text or None
 
 
-def _enqueue_children(
+async def _enqueue_children(
     ctx: _WorkerContext,
     *,
     base_url: str,
@@ -1689,51 +1750,248 @@ def _enqueue_children(
     depth: int,
     extra_urls: tuple[str, ...] = (),
 ) -> None:
-    try:
-        tree = HTMLParser(body)
-    except Exception:
-        return
+    """Record every address the page leads to, and queue the ones to visit.
+
+    Reads links, image-map areas and button-only navigation from the page
+    (see ``audit.crawler.links``), plus the addresses Click-Through or search
+    revealed in the browser.
+    """
     seen: set[str] = set()
-    hrefs = [anchor.attributes.get("href") for anchor in tree.css("a[href]")]
-    for href in [*hrefs, *extra_urls[:1000]]:
+    for href in [*discover_links(base_url, body), *extra_urls[:1000]]:
         if not href:
             continue
         try:
-            absolute = urljoin(base_url, href)
-            normalized = url_policy.normalize(absolute)
+            normalized = url_policy.normalize(urljoin(base_url, href))
         except ValueError:
             continue
         if normalized in seen:
             continue
         seen.add(normalized)
-        if not url_policy.is_in_scope(
-            normalized, ctx.scope, allow_subdomains=ctx.config.allow_subdomains
-        ):
-            log.debug("crawl.link_refused", url=normalized, source=base_url, reason="out_of_scope")
-            continue
-        # a11y-crawler filters at link discovery and again at enqueue; those
-        # are one step here, so the check sits at the single point where a
-        # discovered link becomes a queued job.
-        if url_policy.is_blocked(
-            normalized, ctx.config.blocked_url_patterns
-        ) or url_policy.is_excluded(normalized, ctx.config.excluded_scopes):
-            # Counted here, not only at lease time: a link refused before it
-            # is ever queued is the common case (a sign-out control sits in
-            # the header of every page), and a summary that reported zero
-            # would tell the operator the blocklist had done nothing.
-            ctx.summary.pages_skipped_blocked += 1
-            log.info("crawl.link_refused", url=normalized, source=base_url, reason="blocklist")
-            continue
-        queue.enqueue(
-            ctx.conn,
-            JOB_KIND,
-            {"url": normalized, "depth": depth, "scan_id": ctx.scan_id},
-            dedupe_key=_dedupe_key(ctx.scan_id, normalized),
+        await _consider_url(ctx, normalized, depth=depth, via="link", source=base_url)
+
+
+async def _consider_url(
+    ctx: _WorkerContext,
+    normalized: str,
+    *,
+    depth: int,
+    via: crawl_coverage.Via,
+    source: str,
+) -> bool:
+    """Record one discovered address; queue it if it should be visited.
+
+    Returns True when the address was not known before. Every in-scope
+    address is recorded, refused or not, so the report can count it: one
+    blocked by robots.txt or the blocklist as blocked, one beyond the depth
+    limit or found after the page limit as not visited.
+    """
+    if not url_policy.is_in_scope(
+        normalized, ctx.scope, allow_subdomains=ctx.config.allow_subdomains
+    ):
+        log.debug("crawl.link_refused", url=normalized, source=source, reason="out_of_scope")
+        return False
+    # a11y-crawler filters at link discovery and again at enqueue; those
+    # are one step here, so the check sits at the single point where a
+    # discovered link becomes a queued job.
+    if url_policy.is_blocked(normalized, ctx.config.blocked_url_patterns) or url_policy.is_excluded(
+        normalized, ctx.config.excluded_scopes
+    ):
+        # Counted here, not only at lease time: a link refused before it
+        # is ever queued is the common case (a sign-out control sits in
+        # the header of every page), and a summary that reported zero
+        # would tell the operator the blocklist had done nothing.
+        ctx.summary.pages_skipped_blocked += 1
+        log.info("crawl.link_refused", url=normalized, source=source, reason="blocklist")
+        known = crawl_coverage.note_known(
+            ctx.conn, scan_id=ctx.scan_id, url=normalized, depth=depth, via=via
         )
-        # Which page produced this link. A crawl that visits somewhere
-        # unexpected is only explainable if the page that offered the link
-        # is recorded alongside it.
-        log.info("crawl.enqueued", url=normalized, source=base_url, depth=depth)
+        crawl_coverage.set_outcome(
+            ctx.conn, scan_id=ctx.scan_id, url=normalized, outcome="blocked", depth=depth
+        )
+        return known.new
+    known = crawl_coverage.note_known(
+        ctx.conn, scan_id=ctx.scan_id, url=normalized, depth=depth, via=via
+    )
+    if known.outcome is not None:
+        return known.new
+    # Checked once, when first known, rather than queued and refused at lease
+    # time: the refusal costs no queue slot and is counted once per page.
+    if not ctx.config.ignore_robots and not await ctx.robots.allowed(normalized):
+        ctx.summary.pages_skipped_robots += 1
+        log.info("crawl.link_refused", url=normalized, source=source, reason="robots_txt")
+        crawl_coverage.set_outcome(
+            ctx.conn, scan_id=ctx.scan_id, url=normalized, outcome="blocked", depth=depth
+        )
+        return known.new
+    if depth > ctx.config.max_depth or _page_limit_reached(ctx):
+        return known.new
+    queue.enqueue(
+        ctx.conn,
+        JOB_KIND,
+        {"url": normalized, "depth": depth, "scan_id": ctx.scan_id},
+        dedupe_key=_dedupe_key(ctx.scan_id, normalized),
+    )
+    # Which page produced this link. A crawl that visits somewhere
+    # unexpected is only explainable if the page that offered the link
+    # is recorded alongside it.
+    log.info("crawl.enqueued", url=normalized, source=source, depth=depth)
+    return known.new
+
+
+async def _queue_sitemap_pages(
+    ctx: _WorkerContext, client: httpx.AsyncClient, seed_url: str
+) -> None:
+    """Queue the in-scope pages the site's sitemaps list, before any link.
+
+    A sitemap entry is one step from the start (depth 1): it is reached
+    without a click, but its own links are followed like any page's. A
+    failure here only loses the sitemap; the crawl goes on from links.
+    """
+    try:
+        info = await ctx.robots.get_info(seed_url)
+        async with ctx.limiter.throttle(seed_url):
+            urls = await read_site_sitemaps(
+                client, seed_url, info.sitemaps, path_prefix=ctx.scope.path_prefix
+            )
+    except Exception as exc:
+        log.warning("crawl.sitemap_failed", error_type=type(exc).__name__)
+        return
+    new = 0
+    for raw in urls:
+        try:
+            normalized = url_policy.normalize(raw)
+        except ValueError:
+            continue
+        if await _consider_url(ctx, normalized, depth=1, via="sitemap", source="sitemap"):
+            new += 1
+    ctx.summary.pages_from_sitemap += new
+    log.info("crawl.sitemaps_read", listed=len(urls), new=new)
+
+
+def _known_duplicate(ctx: _WorkerContext, url: str) -> str | None:
+    """The page this address duplicates, decided before fetching it, or None.
+
+    Two cases cost no request:
+
+    * an earlier fetch was redirected here, so this page is already recorded
+      under the address that led to it;
+    * this is the slash-less spelling of a folder the crawl has visited or
+      will visit (its twin is queued within the depth limit).
+    """
+    known = crawl_coverage.get_known(ctx.conn, scan_id=ctx.scan_id, url=url)
+    if (
+        known is not None
+        and known.outcome == "visited"
+        and not crawl_coverage.page_exists(ctx.conn, scan_id=ctx.scan_id, url=url)
+    ):
+        return crawl_coverage.page_landing_on(ctx.conn, scan_id=ctx.scan_id, url=url) or url
+    twin = crawl_coverage.directory_twin(url)
+    if twin is None:
+        return None
+    twin_state = crawl_coverage.get_known(ctx.conn, scan_id=ctx.scan_id, url=twin)
+    if twin_state is None:
+        return None
+    if twin_state.outcome == "visited":
+        return twin
+    if twin_state.outcome is None and twin_state.min_depth <= ctx.config.max_depth:
+        return twin
+    return None
+
+
+def _loose_key(url: str) -> str:
+    """An address with letter case and a final slash ignored."""
+    parts = urlsplit(url)
+    path = (parts.path or "/").rstrip("/") or "/"
+    return urlunsplit(parts._replace(path=path)).casefold()
+
+
+def _fetched_duplicate(ctx: _WorkerContext, url: str, result: FetchResult) -> str | None:
+    """The recorded page this fetch duplicates, or None.
+
+    * A redirect to a page already recorded. A redirect to a sign-in page is
+      kept as its own row, as before: that row is the evidence that the
+      address sent the scan to a sign-in wall.
+    * The same document (same content hash) as a recorded page whose address
+      differs only in letter case or a final slash, as on servers that ignore
+      case. Different content under such an address stays its own page.
+    """
+    landed = result.url or url
+    try:
+        landed_normalized = url_policy.normalize(landed)
+    except ValueError:
+        landed_normalized = landed
+    if landed_normalized != url:
+        if result.is_html and looks_like_authentication_page(landed, result.body):
+            return None
+        existing = crawl_coverage.page_for_address(
+            ctx.conn, scan_id=ctx.scan_id, url=landed_normalized, raw=landed
+        )
+        if existing is not None:
+            return existing
+    else:
+        # Fetched directly while a redirect to it was in flight, and the
+        # redirect was recorded first.
+        landed_on = crawl_coverage.page_landing_on(ctx.conn, scan_id=ctx.scan_id, url=url)
+        if landed_on is not None and not crawl_coverage.page_exists(
+            ctx.conn, scan_id=ctx.scan_id, url=url
+        ):
+            return landed_on
+    if not (result.is_ok and result.is_html and result.body):
+        return None
+    digest = hashlib.sha256(result.body).hexdigest()
+    key = _loose_key(url)
+    for other in crawl_coverage.pages_with_hash(ctx.conn, scan_id=ctx.scan_id, html_hash=digest):
+        if other != url and _loose_key(other) == key:
+            return other
+    return None
+
+
+def _skip_duplicate(
+    ctx: _WorkerContext, url: str, duplicate_of: str, *, depth: int, fetched: bool
+) -> None:
+    ctx.summary.pages_duplicate += 1
+    log.info("crawl.skipped", url=url, reason="duplicate", same_as=duplicate_of, fetched=fetched)
+    crawl_coverage.set_outcome(
+        ctx.conn, scan_id=ctx.scan_id, url=url, outcome="duplicate", depth=depth
+    )
+
+
+def _mark_landing_visited(ctx: _WorkerContext, landed: str, *, depth: int) -> None:
+    """Record where a redirect landed as visited, so it is not fetched again."""
+    try:
+        normalized = url_policy.normalize(landed)
+    except ValueError:
+        return
+    if not url_policy.is_in_scope(
+        normalized, ctx.scope, allow_subdomains=ctx.config.allow_subdomains
+    ):
+        return
+    crawl_coverage.set_outcome(
+        ctx.conn, scan_id=ctx.scan_id, url=normalized, outcome="visited", depth=depth
+    )
+
+
+def _count_unvisited(ctx: _WorkerContext) -> None:
+    """Store, on the scan, the known pages it did not visit, by reason."""
+    try:
+        counts = crawl_coverage.finalize(
+            ctx.conn,
+            scan_id=ctx.scan_id,
+            max_depth=ctx.config.max_depth,
+            page_limit_reached=_page_limit_reached(ctx),
+        )
+    except sqlite3.Error as exc:
+        log.warning("crawl.coverage_count_failed", error_type=type(exc).__name__)
+        return
+    ctx.summary.unvisited_page_limit = counts.page_limit
+    ctx.summary.unvisited_depth_limit = counts.depth_limit
+    ctx.summary.unvisited_blocked = counts.blocked
+    log.info(
+        "crawl.unvisited",
+        page_limit=counts.page_limit,
+        depth_limit=counts.depth_limit,
+        blocked=counts.blocked,
+    )
 
 
 # File extensions a browser will download or hand to a viewer rather than

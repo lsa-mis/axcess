@@ -209,17 +209,31 @@ was checked**, above the Issues table.
 
 ### Crawl
 
-How a scan moves through a site: Axcess starts at the address you give,
-follows links to find more pages, and tests each page in the [scope](#scope).
+How a scan moves through a site: Axcess starts at the address you give, reads
+the site's sitemap (the list of pages a site publishes for search engines),
+follows links and buttons to find more pages, and tests each page in the
+[scope](#scope). A page found only through the sitemap is marked that way in
+the scan's data.
+
+### Pages found but not visited
+
+Pages in the [scope](#scope) that a scan learned about but did not test. The
+report summary counts them under the number of pages visited, by reason:
+over the page limit, beyond the link depth (more clicks from the start page
+than the scan was set to follow), or blocked (the site's robots.txt asked
+scanners to stay out, or it is a link a scan never follows, such as Sign out).
+It gives counts only, not a list. Reports from before these pages were counted
+say "not counted".
 
 ### Pages not reached
 
 Pages the scan tried but could not load, which the report summary counts
 under the number of pages visited ("3 pages could not be loaded"); a page
 that answered with an error, such as "Sign-in required", is listed with that
-status instead. The
-report does not list pages skipped because the site asked scanners to stay out
-(its robots.txt file) or because they were outside the [scope](#scope).
+status instead. Pages the scan skipped because the site asked scanners to stay
+out (its robots.txt file) are counted under
+[pages found but not visited](#pages-found-but-not-visited); pages outside the
+[scope](#scope) are not counted at all.
 
 ### Scope
 

@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Tools</title></head>
+<body>
+<h1>Tools</h1>
+<p><button type="button" onclick="location.href='calculator.html'">Open the cost calculator</button></p>
+<form action="results.html" method="get">
+  <input type="hidden" name="view" value="all">
+  <button type="submit">See all results</button>
+</form>
+<form action="search.html" method="get">
+  <label for="q">Search the help pages</label>
+  <input id="q" name="q" type="search">
+  <button type="submit">Search</button>
+</form>
+<form action="account/delete-history.html" method="post">
+  <button type="submit">Clear my history</button>
+</form>
+<p><a href="/docs/">Back to the help pages</a></p>
+</body>
+</html>

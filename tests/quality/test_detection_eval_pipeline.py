@@ -23,7 +23,7 @@ CONFIG_PATH = PROJECT_ROOT / "tests" / "quality" / "detection_eval_config.json"
 def test_committed_eval_config_covers_three_increasing_workloads() -> None:
     config = load_eval_config(CONFIG_PATH, project_root=PROJECT_ROOT)
 
-    assert config.config_version == "1.0.0"
+    assert config.config_version == "1.1.0"
     assert config.corpus_path.is_file()
     assert config.performance.page_counts == (100, 500, 1000)
     assert config.performance.efficiency_reference_pages in config.performance.page_counts

@@ -5,7 +5,7 @@ import type { IssueRow, ScanDetail } from "../api/types";
 import MethodCoverageLedger, { methodsRan } from "./MethodCoverageLedger";
 import { Card, Disclosure } from "./ui";
 import { cn } from "../lib/cn";
-import { CLICK_THROUGH_STATES, clickThroughStates } from "../lib/labels";
+import { CLICK_THROUGH_STATES, clickThroughStates, unvisitedPagesText } from "../lib/labels";
 
 /**
  * One number in the summary strip: the value large, what it counts under it,
@@ -192,6 +192,17 @@ export function ReportSummary({
                   },
                 ]
               : []),
+            // Pages the scan knew of and left out, by reason (page limit,
+            // link depth, blocked). A line under the pages, not a number of
+            // its own, for the same reason as the page states line: it says
+            // how much was scanned, not what was found. Not flagged in colour:
+            // a limit the reader set is not a failure. Counts only, no list
+            // (the developer's decision on the coverage ticket); the wording
+            // and when it shows are in unvisitedPagesText (lib/labels.ts).
+            ...(() => {
+              const text = unvisitedPagesText(scan.unvisited);
+              return text === null ? [] : [{ text }];
+            })(),
           ]}
         />
       </dl>

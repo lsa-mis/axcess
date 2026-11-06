@@ -692,6 +692,31 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
         conn.execute("UPDATE scans SET error_count = 3 WHERE id = ?", (scan_id,))
     await page.reload(wait_until="networkidle")
     await playwright_async.expect(failed).to_have_text("3 pages could not be loaded")
+    # Pages the scan found but did not visit: one line under the pages, by
+    # reason, counts only. A report from before they were counted says so.
+    unvisited = summary.get_by_text(re.compile(r"found but not visited"))
+    await playwright_async.expect(unvisited).to_have_text(
+        "Pages found but not visited were not counted in this report"
+    )
+    with sqlite3.connect(seeded_db[0]) as conn:
+        conn.execute(
+            "UPDATE scans SET unvisited_page_limit = 9, unvisited_depth_limit = 1, "
+            "unvisited_blocked = 2 WHERE id = ?",
+            (scan_id,),
+        )
+    await page.reload(wait_until="networkidle")
+    await playwright_async.expect(unvisited).to_have_text(
+        "12 more pages found but not visited: 9 over the page limit, 1 beyond the "
+        "link depth, 2 blocked by robots.txt or by links a scan never follows, such as Sign out"
+    )
+    with sqlite3.connect(seeded_db[0]) as conn:
+        conn.execute(
+            "UPDATE scans SET unvisited_page_limit = 0, unvisited_depth_limit = 0, "
+            "unvisited_blocked = 0 WHERE id = ?",
+            (scan_id,),
+        )
+    await page.reload(wait_until="networkidle")
+    await playwright_async.expect(unvisited).to_have_count(0)
     # Nothing under the title (2026-10-30): no "Based on the report
     # generated" line, no site name, no disclaimer line, and no ACT rule
     # note among the notes. Scan again is on Reports only; Export report
