@@ -122,6 +122,15 @@ Two lines under **Pages visited** say more about it:
   [pages not reached](glossary.md#pages-not-reached), and most of them are
   already counted in **Pages visited**.
 
+Under those lines, **List the pages visited** opens a table of every page the
+scan recorded. Pages that could not be loaded come first, then pages that
+answered with an error, such as "Page not found (HTTP 404)". Each row shows
+how the page loaded and how many occurrences, images and page states the
+checks stored for it, the same counts as that page's **Page details**. A page
+that could not be loaded reads "Not checked" in those columns, because no
+check ran on it. An element that repeats on many pages, such as a menu,
+counts on each page in this table, but only once in the Issues table.
+
 Below the numbers, two closed rows open more detail. **What was checked**
 shows how many checks ran, such as "7 of 9 checks ran". It opens a table with
 one row per check, such as Rule check (axe) and Click-Through, and the checks
@@ -134,7 +143,9 @@ checks have no row here. The second row, **What "Mostly sure", "Not sure"
 and the other labels mean**, explains the words in the **How sure** and **Where it shows**
 columns.
 
-The "could not be loaded" line says how many pages failed, not which ones. See
+The "could not be loaded" line says how many pages failed. **List the pages
+visited** shows which ones. The line also counts other failures while Axcess
+scanned a page, so its number can differ from the table's. See
 [pages not reached](glossary.md#pages-not-reached) for what the report does and
 does not list.
 

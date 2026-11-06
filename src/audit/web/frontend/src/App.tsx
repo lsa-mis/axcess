@@ -46,6 +46,8 @@ const CompareReportsRoute = lazy(() => import("./routes/CompareReports"));
 const WhatChangedRoute = lazy(() => import("./routes/Compare"));
 const TrackingRoute = lazy(() => import("./routes/Tracking"));
 const PageEvidenceRoute = lazy(() => import("./routes/PageEvidence"));
+// Every page a report visited; the summary's "Pages visited" links here.
+const PagesVisitedRoute = lazy(() => import("./routes/PagesVisited"));
 const InspectorRoute = lazy(() => import("./routes/Inspector"));
 const AboutRoute = lazy(() => import("./routes/About"));
 const SettingsRoute = lazy(() => import("./routes/Settings"));
@@ -69,6 +71,7 @@ export default function App() {
         <Route path="/scans/:scanId/review" element={<ProtectedReportGate><LegacyReportRedirect /></ProtectedReportGate>} />
         <Route path="/scans/:scanId/manual-checks" element={<ProtectedReportGate><LegacyReportRedirect /></ProtectedReportGate>} />
         <Route path="/scans/:scanId/handoff" element={<ProtectedReportGate><LegacyReportRedirect /></ProtectedReportGate>} />
+        <Route path="/scans/:scanId/pages" element={<ProtectedReportGate><PagesVisitedRoute /></ProtectedReportGate>} />
         <Route path="/scans/:scanId/pages/:pageId" element={<ProtectedReportGate><PageEvidenceRoute /></ProtectedReportGate>} />
         <Route path="/scans/:scanId/pages/:pageId/inspect" element={<ProtectedReportGate><InspectorRoute /></ProtectedReportGate>} />
         <Route path="/scans/:scanId/issues" element={<ProtectedReportGate><IssuesRoute /></ProtectedReportGate>} />

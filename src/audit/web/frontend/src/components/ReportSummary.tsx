@@ -16,16 +16,29 @@ import { CLICK_THROUGH_STATES, clickThroughStates } from "../lib/labels";
  * because it needs attention (pages that could not be loaded); its words say
  * so too, so the colour is never the only signal (SC 1.4.1 Use of Color,
  * Level A).
+ *
+ * ``link`` adds one link as the last ``dd``, after the lines, to the list
+ * the number counts ("List the pages visited"). It is a text link, not a
+ * button or a tile: the stat itself stays plain text and only the words
+ * that go somewhere look like a link (W3C COGA: make controls look like
+ * controls). Its target is 44px tall (SC 2.5.5 Target Size (Enhanced),
+ * Level AAA; a link alone on its line is not inside a sentence, so the
+ * inline exception does not cover it), and a negative margin as tall as
+ * the extra height takes it back out of the layout, so the line keeps the
+ * 4px spacing of the lines above it and the group stays one unit (see the
+ * spacing rule in ReportSummary).
  */
 function SummaryStat({
   label,
   value,
   details = [],
+  link,
   className,
 }: {
   label: string;
   value: number;
   details?: { text: string; flag?: boolean }[];
+  link?: { to: string; text: string };
   className?: string;
 }) {
   return (
@@ -39,6 +52,18 @@ function SummaryStat({
           {text}
         </dd>
       ))}
+      {link && (
+        <dd className="order-4 text-xs">
+          <Link
+            to={link.to}
+            // The margin is half of (target height - line height), whatever
+            // Settings > Target size makes the target.
+            className="-my-[calc((var(--target,44px)_-_1.3125rem)/2)] inline-flex min-h-target items-center font-semibold text-umich-blue underline underline-offset-2"
+          >
+            {link.text}
+          </Link>
+        </dd>
+      )}
     </div>
   );
 }
@@ -142,6 +167,20 @@ export function ReportSummary({
           coworker read as accessibility errors (glossary: "Pages not
           reached").
 
+          "List the pages visited" is the last line under "Pages visited"
+          (2026-11-06, backlog: readers could not tell a clean result from
+          missing coverage, because the number did not say which pages it
+          counted or which of them failed). It opens the list of every page
+          (routes/PagesVisited.tsx), with the ones that could not be loaded
+          first. A link under the number rather than the number itself as a
+          link: a big link in a row of plain numbers would look like the one
+          number that can be clicked, and it would be read as "46, link"
+          with no verb (docs/plain-language.md rule 8: a verb and an object;
+          SC 2.4.4 Link Purpose (In Context), Level A). It shows only when
+          there is at least one page to list, by the same rule as the lines
+          above it. Keyboard order is the reading order: the link comes
+          after the facts it is about (SC 2.4.3 Focus Order, Level A).
+
           No panel, border, fill or dividers, the same rule as StatCard
           (ui.tsx): a frame around a number competes with the number, and a
           tinted, rounded tile, suggested again with the reorder, looks like a
@@ -193,6 +232,11 @@ export function ReportSummary({
                 ]
               : []),
           ]}
+          link={
+            scan.page_count > 0
+              ? { to: `/scans/${scan.id}/pages`, text: "List the pages visited" }
+              : undefined
+          }
         />
       </dl>
     </>

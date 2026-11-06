@@ -100,7 +100,7 @@ from audit.wcag_version import (
     is_wcag_version,
     stored_wcag_version,
 )
-from audit.web import local_sign_in
+from audit.web import local_sign_in, pages_queries
 from audit.web.comparison import (
     MAX_PAGE_SIZE,
     Category,
@@ -128,6 +128,7 @@ from audit.web.local_sign_in import (
     SignInInProgressError,
     SignInRegistry,
 )
+from audit.web.pages_queries import ScanPagesResponse
 from audit.web.protected_api import build_protected_router
 from audit.web.protected_auth import (
     require_protected_identity,
@@ -2060,6 +2061,20 @@ def create_app(
             except ValueError as exc:
                 raise HTTPException(status_code=400, detail=str(exc)) from exc
         return JSONResponse(jsonable_encoder(payload), status_code=201)
+
+    @app.get("/api/scans/{scan_id:int}/pages", response_model=ScanPagesResponse)
+    def api_scan_pages(
+        scan_id: int,
+        limit: int = Query(default=pages_queries.DEFAULT_LIMIT, ge=1, le=pages_queries.MAX_LIMIT),
+        offset: int = Query(default=0, ge=0),
+        sort: pages_queries.PageSort = pages_queries.DEFAULT_SORT,
+    ) -> ScanPagesResponse:
+        """Every page this report visited, one bounded page of rows at a time."""
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            return pages_queries.list_scan_pages(
+                conn, scan_id, limit=limit, offset=offset, sort=sort
+            )
 
     @app.get("/api/scans/{scan_id:int}/pages/{page_id:int}")
     def api_page_evidence(scan_id: int, page_id: int) -> JSONResponse:

@@ -1022,6 +1022,7 @@ async def test_every_spa_route_has_an_accurate_document_title(
         (f"/app/scans/{scan_id}/manual-checks", "Accessibility issues"),
         (f"/app/scans/{scan_id}/handoff", "Accessibility issues"),
         (f"/app/scans/{scan_id}/pages/1", "Page details"),
+        (f"/app/scans/{scan_id}/pages", "Pages visited"),
         (f"/app/scans/{scan_id}/issues", "Accessibility issues"),
         (f"/app/scans/{scan_id}/issues/image:logo_adequate", "Issue evidence"),
         (f"/app/scans/{scan_id}/findings", "Images"),
@@ -1584,5 +1585,99 @@ async def test_instance_screenshots_describe_the_outline_and_pass_axe(
         ).to_be_visible()
         violations = await _run_axe(page)
         assert not violations, _render_violations(violations)
+    finally:
+        await page.context.close()
+
+
+async def test_pages_visited_list_says_which_pages_failed_and_passes_axe(
+    live_server: tuple[str, int],
+    seeded_db: tuple[Path, Path, int],
+    new_page: Any,
+) -> None:
+    """The summary's "Pages visited" leads, by keyboard, to every page and how it loaded.
+
+    A page that could not be loaded says so in words and reads "Not checked",
+    never "0", so a gap in coverage is not mistaken for a clean page.
+    """
+    base, scan_id = live_server
+    db_path, blob_dir, _ = seeded_db
+    add_screenshot_finding(db_path, blob_dir, scan_id)
+    with sqlite3.connect(db_path) as conn:
+        conn.executemany(
+            "INSERT INTO pages (scan_id, url_normalized, status_code, title, render_mode) "
+            "VALUES (?, ?, ?, NULL, 'static')",
+            [
+                (scan_id, "http://example.com/down", None),
+                (scan_id, "http://example.com/gone", 404),
+            ],
+        )
+        conn.execute("UPDATE scans SET page_count = 4, error_count = 1 WHERE id = ?", (scan_id,))
+    page = await new_page()
+    try:
+        await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+        link = page.get_by_role("link", name="List the pages visited", exact=True)
+        await link.focus()
+        await page.keyboard.press("Enter")
+        await page.wait_for_url(f"**/app/scans/{scan_id}/pages")
+        await playwright_async.expect(
+            page.get_by_role("heading", name="Pages visited", level=1)
+        ).to_be_visible()
+        await playwright_async.expect(
+            page.get_by_text("4 pages · 1 could not be loaded · 1 answered with an error")
+        ).to_be_visible()
+
+        table = page.get_by_role("table", name=re.compile(r"^Pages visited by report"))
+        rows = table.locator("tbody tr")
+        await playwright_async.expect(rows).to_have_count(4)
+        # Problems first: the page that could not be loaded, then the 404.
+        down = rows.nth(0)
+        await playwright_async.expect(down.get_by_role("rowheader")).to_contain_text(
+            "http://example.com/down"
+        )
+        await playwright_async.expect(down).to_contain_text("Could not be loaded")
+        await playwright_async.expect(down.get_by_text("Not checked")).to_have_count(3)
+        await playwright_async.expect(rows.nth(1)).to_contain_text("Page not found (HTTP 404)")
+        await playwright_async.expect(
+            page.get_by_text("Sorted by Page load result, problems first.")
+        ).to_be_visible()
+        await playwright_async.expect(
+            down.get_by_role("link", name="Page details for http://example.com/down")
+        ).to_have_attribute("href", re.compile(rf"/app/scans/{scan_id}/pages/\d+\?origin="))
+
+        violations = await _run_axe(page)
+        assert not violations, _render_violations(violations)
+
+        # Sorting works by keyboard, and the line under the bar says so.
+        # Found by its column, not its name: the name gains the sort chip.
+        header = table.get_by_role("columnheader", name=re.compile(r"^Issue occurrences"))
+        sort = header.get_by_role("button")
+        await sort.focus()
+        await page.keyboard.press("Enter")
+        await playwright_async.expect(
+            page.get_by_text("Sorted by Issue occurrences, highest first.")
+        ).to_be_visible()
+        await playwright_async.expect(sort).to_be_focused()
+        await playwright_async.expect(rows.nth(0).get_by_role("rowheader")).to_contain_text("Home")
+    finally:
+        await page.context.close()
+
+
+async def test_pages_visited_list_fits_a_phone_screen(
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """At 320 px only the table's own region scrolls sideways (SC 1.4.10 Reflow)."""
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 320, "height": 800})
+    try:
+        await page.goto(f"{base}/app/scans/{scan_id}/pages", wait_until="networkidle")
+        await page.wait_for_selector("main#main h1", timeout=5000)
+        widths = await page.evaluate(
+            """() => ({
+                client: document.documentElement.clientWidth,
+                body: document.body.scrollWidth,
+            })"""
+        )
+        assert widths["body"] <= widths["client"], widths
     finally:
         await page.context.close()

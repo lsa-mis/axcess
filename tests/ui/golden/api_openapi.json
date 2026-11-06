@@ -1020,6 +1020,65 @@
         }
       }
     },
+    "/api/scans/{scan_id}/pages": {
+      "get": {
+        "summary": "Api Scan Pages",
+        "description": "Every page this report visited, one bounded page of rows at a time.",
+        "operationId": "api_scan_pages_api_scans__scan_id__pages_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "integer", "maximum": 200, "minimum": 1, "default": 50, "title": "Limit"}
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "integer", "minimum": 0, "default": 0, "title": "Offset"}
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "load_desc",
+                "load_asc",
+                "url_asc",
+                "url_desc",
+                "occurrences_desc",
+                "occurrences_asc",
+                "images_desc",
+                "images_asc",
+                "states_desc",
+                "states_asc"
+              ],
+              "type": "string",
+              "default": "load_desc",
+              "title": "Sort"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ScanPagesResponse"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
     "/api/scans/{scan_id}/pages/{page_id}": {
       "get": {
         "summary": "Api Page Evidence",
@@ -2403,6 +2462,75 @@
         ],
         "title": "ScanFormSettings",
         "description": "The New scan form's fields (``NewScanPayload`` in the SPA)."
+      },
+      "ScanPageRow": {
+        "properties": {
+          "page_id": {"type": "integer", "title": "Page Id"},
+          "url": {"type": "string", "title": "Url"},
+          "title": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Title"},
+          "status_code": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "Status Code"},
+          "load_result": {
+            "type": "string",
+            "enum": ["loaded", "error_status", "not_loaded"],
+            "title": "Load Result"
+          },
+          "occurrence_count": {"type": "integer", "title": "Occurrence Count"},
+          "image_count": {"type": "integer", "title": "Image Count"},
+          "page_state_count": {"type": "integer", "title": "Page State Count"}
+        },
+        "type": "object",
+        "required": [
+          "page_id",
+          "url",
+          "title",
+          "status_code",
+          "load_result",
+          "occurrence_count",
+          "image_count",
+          "page_state_count"
+        ],
+        "title": "ScanPageRow",
+        "description": "One page the scan visited."
+      },
+      "ScanPagesResponse": {
+        "properties": {
+          "scan_id": {"type": "integer", "title": "Scan Id"},
+          "total": {"type": "integer", "title": "Total"},
+          "not_loaded_count": {"type": "integer", "title": "Not Loaded Count"},
+          "error_status_count": {"type": "integer", "title": "Error Status Count"},
+          "limit": {"type": "integer", "title": "Limit"},
+          "offset": {"type": "integer", "title": "Offset"},
+          "sort": {
+            "type": "string",
+            "enum": [
+              "load_desc",
+              "load_asc",
+              "url_asc",
+              "url_desc",
+              "occurrences_desc",
+              "occurrences_asc",
+              "images_desc",
+              "images_asc",
+              "states_desc",
+              "states_asc"
+            ],
+            "title": "Sort"
+          },
+          "pages": {"items": {"$ref": "#/components/schemas/ScanPageRow"}, "type": "array", "title": "Pages"}
+        },
+        "type": "object",
+        "required": [
+          "scan_id",
+          "total",
+          "not_loaded_count",
+          "error_status_count",
+          "limit",
+          "offset",
+          "sort",
+          "pages"
+        ],
+        "title": "ScanPagesResponse",
+        "description": "One page of a report's visited pages, with the report-wide totals."
       },
       "SearchConfig": {
         "properties": {

@@ -199,6 +199,7 @@ async def _labels_on(new_page: Any, url: str, *, open_groups: bool = False) -> l
         "/app/scans/new",
         "/app/scans/{scan_id}",
         "/app/scans/{scan_id}/issues",
+        "/app/scans/{scan_id}/pages",
         "/app/scans/{scan_id}/compare",
         "/app/scans/{scan_id}/compare/changes",
         "/app/tracking",

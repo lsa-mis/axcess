@@ -15,6 +15,8 @@ import type {
   ManualChecksResponse,
   ManualOutcome,
   PageEvidence,
+  ScanPagesResponse,
+  ScanPagesSort,
   PageInspection,
   DiffReport,
   ExportFormat,
@@ -267,6 +269,18 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  /** One page of the pages a report visited; `limit` is at most 200. */
+  listScanPages: (
+    scanId: number,
+    { limit, offset, sort }: { limit: number; offset: number; sort: ScanPagesSort },
+  ) => {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      offset: String(offset),
+      sort,
+    });
+    return request<ScanPagesResponse>(`/api/scans/${scanId}/pages?${params}`);
+  },
   getPageEvidence: (scanId: number, pageId: number) =>
     request<PageEvidence>(`/api/scans/${scanId}/pages/${pageId}`),
   /**

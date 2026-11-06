@@ -237,6 +237,7 @@ STATIC_PATHS = (
     "/app/scans/new",
     "/app/scans/new?mode=login",
     "/app/scans/{scan_id}/issues",
+    "/app/scans/{scan_id}/pages",
     "/app/scans/{scan_id}/compare",
     "/app/scans/{scan_id}/compare/changes",
     "/app/scans/{scan_id}/a11y/by-rule",

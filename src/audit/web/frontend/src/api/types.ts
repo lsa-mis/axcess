@@ -1111,6 +1111,53 @@ export interface ManualChecksResponse {
   checks: ManualCheck[];
 }
 
+/** How one visited page loaded (`pages_queries.load_result`). */
+export type PageLoadResult = "loaded" | "error_status" | "not_loaded";
+
+/** Sort keys `GET /api/scans/{id}/pages` accepts (`pages_queries.PageSort`). */
+export type ScanPagesSort =
+  | "load_desc"
+  | "load_asc"
+  | "url_asc"
+  | "url_desc"
+  | "occurrences_desc"
+  | "occurrences_asc"
+  | "images_desc"
+  | "images_asc"
+  | "states_desc"
+  | "states_asc";
+
+/** One page a report visited (`pages_queries.ScanPageRow`). */
+export interface ScanPageRow {
+  page_id: number;
+  url: string;
+  title: string | null;
+  /** The HTTP status the server answered with; null when the fetch failed. */
+  status_code: number | null;
+  load_result: PageLoadResult;
+  /** Every occurrence stored on this page, as its Page details lists them. */
+  occurrence_count: number;
+  /** Images found on this page, as its Page details lists them. */
+  image_count: number;
+  /** Page states opened by clicking on this page. */
+  page_state_count: number;
+}
+
+/** `GET /api/scans/{id}/pages` (`pages_queries.ScanPagesResponse`). */
+export interface ScanPagesResponse {
+  scan_id: number;
+  /** Every page the scan recorded, whatever the limit and offset. */
+  total: number;
+  /** Pages whose fetch failed, across the whole report. */
+  not_loaded_count: number;
+  /** Pages that answered with an error status (400 or above), across the report. */
+  error_status_count: number;
+  limit: number;
+  offset: number;
+  sort: ScanPagesSort;
+  pages: ScanPageRow[];
+}
+
 export interface PageEvidence {
   page: {
     id: number;
