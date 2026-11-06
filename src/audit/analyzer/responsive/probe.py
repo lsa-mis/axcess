@@ -87,6 +87,22 @@ p {
 # Shared JS: find leaf elements whose text is clipped by overflow:hidden.
 # Returns up to `max` {selector, html, detail} records. Ellipsis elements
 # are skipped (designed truncation, human judgment, not an auto-fail).
+#
+# Visually hidden text is skipped too. The "screen reader only" pattern
+# (WebAIM, "Invisible Content Just for Screen Reader Users",
+# https://webaim.org/techniques/css/invisiblecontent/; W3C technique C7)
+# hides text on purpose with a 1px box, overflow:hidden and clip or
+# clip-path. That text is clipped by design, so it is not a 1.4.4 or 1.4.12
+# failure: every occurrence of both checks in a user's scan was such an
+# element (a skip link, hidden spans, a hidden label). An element counts as
+# visually hidden when it or an ancestor has a clip or clip-path that leaves
+# no visible area, or a box at most 1px wide or high with overflow hidden.
+#
+# A focusable hidden element, such as a skip link, is shown when it gets
+# focus, so it is measured only while focused: it is focused, re-checked,
+# measured if it is now visible, and focus is put back. A skip link that is
+# still clipped while focused is a real failure, because a sighted keyboard
+# user sees it then.
 _CLIPPED_TEXT_JS = """
 (maxOffenders) => {
   const out = [];
@@ -101,27 +117,77 @@ _CLIPPED_TEXT_JS = """
     }
     return tag;
   };
+  // No visible area left by a computed clip: rect(top, right, bottom, left).
+  const clipLeavesNothing = (s) => {
+    if (s.position !== 'absolute' && s.position !== 'fixed') return false;
+    const m = /^rect\\(([^)]*)\\)$/.exec(s.clip || '');
+    if (!m) return false;
+    const v = m[1].split(/[ ,]+/).map((x) => parseFloat(x));
+    if (v.length !== 4 || v.some((x) => Number.isNaN(x))) return false;
+    return v[1] - v[3] <= 1 || v[2] - v[0] <= 1;
+  };
+  const clipPathLeavesNothing = (s) =>
+    /^inset\\(\\s*(50|100)%%/.test(s.clipPath || '');
+  const visuallyHidden = (el) => {
+    for (let n = el; n && n !== document.body; n = n.parentElement) {
+      const s = getComputedStyle(n);
+      if (clipLeavesNothing(s) || clipPathLeavesNothing(s)) return true;
+      const hides = s.overflow === 'hidden' || s.overflowX === 'hidden'
+        || s.overflowY === 'hidden';
+      const r = n.getBoundingClientRect();
+      if (hides && (r.width <= 1 || r.height <= 1)) return true;
+    }
+    return false;
+  };
+  const focusTarget = (el) =>
+    el.closest('a[href], button, input, select, textarea, summary, [tabindex]');
+  const measure = (el) => {
+    const cs = getComputedStyle(el);
+    const hidesX = cs.overflowX === 'hidden' || cs.overflow === 'hidden';
+    const hidesY = cs.overflowY === 'hidden' || cs.overflow === 'hidden';
+    if (!hidesX && !hidesY) return null;
+    if (cs.textOverflow === 'ellipsis') return null;  // designed truncation
+    const clipX = hidesX && el.scrollWidth > el.clientWidth + 4;
+    const clipY = hidesY && el.scrollHeight > el.clientHeight + 4;
+    if (!clipX && !clipY) return null;
+    return {
+      clipX,
+      content: clipX ? el.scrollWidth : el.scrollHeight,
+      box: clipX ? el.clientWidth : el.clientHeight,
+    };
+  };
+  const previous = document.activeElement;
   for (let i = 0; i < limit && out.length < maxOffenders; i++) {
     const el = els[i];
     if (el.children.length > 0) continue;            // leaf nodes only
     const text = (el.innerText || '').trim();
     if (!text) continue;
-    const cs = getComputedStyle(el);
-    const hidesX = cs.overflowX === 'hidden' || cs.overflow === 'hidden';
-    const hidesY = cs.overflowY === 'hidden' || cs.overflow === 'hidden';
-    if (!hidesX && !hidesY) continue;
-    if (cs.textOverflow === 'ellipsis') continue;    // designed truncation
-    const clipX = hidesX && el.scrollWidth > el.clientWidth + 4;
-    const clipY = hidesY && el.scrollHeight > el.clientHeight + 4;
-    if (!clipX && !clipY) continue;
+    let m = measure(el);
+    const target = focusTarget(el);
+    if (!m && !target) continue;                     // cheap common case
+    let focused = false;
+    if (visuallyHidden(el)) {
+      // Hidden on purpose; only a control that shows itself on focus is
+      // measured, and only while it has focus.
+      if (!target || target.matches('[tabindex="-1"]')) continue;
+      target.focus({ preventScroll: true });
+      if (document.activeElement !== target) continue;
+      m = visuallyHidden(el) ? null : measure(el);
+      target.blur();
+      focused = true;
+    }
+    if (!m) continue;
     out.push({
       selector: sel(el),
       html: (el.outerHTML || '').slice(0, 240),
-      detail: (clipX ? 'clipped horizontally' : 'clipped vertically')
-        + ': content ' + (clipX ? el.scrollWidth : el.scrollHeight) + 'px'
-        + ' in a ' + (clipX ? el.clientWidth : el.clientHeight) + 'px box'
+      detail: (m.clipX ? 'clipped horizontally' : 'clipped vertically')
+        + (focused ? ' while it has keyboard focus' : '')
+        + ': content ' + m.content + 'px in a ' + m.box + 'px box'
         + '; text starts "' + text.slice(0, 40) + '"',
     });
+  }
+  if (previous && previous !== document.activeElement && previous.focus) {
+    previous.focus({ preventScroll: true });
   }
   return out;
 }

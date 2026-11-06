@@ -9,6 +9,7 @@ Real Playwright against hand-built fixtures in
     - ``reflow_overflow.html``  → ``responsive-reflow-overflow``  (SC 1.4.10)
     - ``zoom_clipped.html``     → ``responsive-text-clipped``      (SC 1.4.4)
     - ``spacing_clipped.html``  → ``responsive-text-spacing-clipped`` (SC 1.4.12)
+    - ``skip_link_clipped.html`` → a skip link still clipped while focused
 
 Isolation matters as much as detection: each positive fixture is built
 so the OTHER two checks stay quiet on it (see the geometry notes in the
@@ -133,6 +134,32 @@ async def test_detects_clipping_under_text_spacing_override(page) -> None:  # ty
     assert RULE_REFLOW not in rules
     assert RULE_TEXT_CLIPPED not in rules
     assert all(f.criterion_sc == "1.4.12" for f in clipped)
+
+
+async def test_visually_hidden_text_is_not_clipping(page) -> None:  # type: ignore[no-untyped-def]
+    """Screen-reader-only text (sr-only, clip-path) is clipped on purpose.
+
+    A skip link that shows itself on focus, a hidden span inside a link, a
+    hidden label and hidden text in a hidden container must all stay quiet.
+    """
+    await page.goto(_file_url("sr_only.html"))
+    findings = await ResponsiveProbe().run(page)
+    assert findings == [], "Visually hidden text was reported: " + ", ".join(
+        f"{f.rule_id} on {f.target_selector}" for f in findings
+    )
+
+
+async def test_skip_link_clipped_while_focused_is_reported(page) -> None:  # type: ignore[no-untyped-def]
+    """A skip link still cut off while it has focus is a real failure."""
+    await page.goto(_file_url("skip_link_clipped.html"))
+    findings = await ResponsiveProbe().run(page)
+    clipped = [f for f in findings if f.rule_id == RULE_TEXT_CLIPPED]
+    assert any("skip" in f.target_selector for f in clipped), (
+        "Expected a#skip to be named; got " + str([f.target_selector for f in findings])
+    )
+    assert all("while it has keyboard focus" in f.failure_summary for f in clipped)
+    # The probe hands focus back: nothing is left focused by the check.
+    assert await page.evaluate("document.activeElement === document.body")
 
 
 # --------------------------------------------------------------------
