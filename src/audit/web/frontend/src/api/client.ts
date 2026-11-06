@@ -196,6 +196,29 @@ async function downloadExport(
   };
 }
 
+/**
+ * One report export's text, for the clipboard rather than a file.
+ *
+ * Same URL and refusals as ``downloadExport`` (a running, failed or deleted
+ * scan is refused with the server's own message), so copying a file and
+ * downloading it can never disagree about what the file holds.
+ */
+async function fetchExportText(
+  scanId: number,
+  format: ExportFormat,
+  redact = false,
+): Promise<string> {
+  const res = await fetch(exportUrl(scanId, format, true, redact), {
+    credentials: "same-origin",
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new ApiError(res.status, apiErrorMessage(res.status, body));
+  }
+  return res.text();
+}
+
 /** The comparison API's row cap (``comparison.MAX_PAGE_SIZE``). Issue groups
  *  are bounded by the rule catalogue, so every group of two reports fits. */
 export const COMPARISON_MAX_ROWS = 500;
@@ -378,6 +401,7 @@ export const api = {
   getExportOptions: (scanId: number, redact = false) =>
     request<ExportOptions>(`/api/scans/${scanId}/exports${redact ? "?redact=true" : ""}`),
   downloadExport,
+  fetchExportText,
   cancelScan: (id: number) =>
     request<{ ok: boolean }>(`/api/scans/${id}/cancel`, { method: "POST" }),
   /**

@@ -213,6 +213,82 @@ async def test_fix_brief_downloads_redacted_for_a_coding_agent(
     await expect(brief).to_be_focused()
 
 
+_STAMP = re.compile(r"Made by Axcess on \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC")
+
+
+async def test_copy_fix_brief_puts_its_markdown_on_the_clipboard(
+    live_server: tuple[str, int], new_page: Any
+) -> None:
+    """One click copies the fix brief's Markdown (Asana 1220313732698508, rework 1).
+
+    Then the keyboard: the arrow keys reach the button right after the brief's
+    download, and Enter copies again, with the result said in words.
+    """
+    base, scan_id = live_server
+    page = await new_page(permissions=["clipboard-read", "clipboard-write"])
+    await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+    await page.get_by_role("button", name="Export").click()
+    panel = page.get_by_role("group", name=f"Export Report #{scan_id}")
+    copy = panel.get_by_role("button", name="Copy fix brief", exact=True)
+    await expect(copy).to_have_accessible_description(
+        re.compile(r"^Puts the same Markdown on your clipboard")
+    )
+
+    await copy.click()
+    done = "Copied the fix brief. Paste it into your coding agent."
+    await expect(page.get_by_role("status").filter(has_text="Copied")).to_have_text(done)
+    await expect(panel).to_contain_text(done)
+    await expect(copy).to_have_accessible_description(re.compile(re.escape(done) + "$"))
+
+    copied = await page.evaluate("navigator.clipboard.readText()")
+    served = await (
+        await page.request.get(f"{base}/api/scans/{scan_id}/export/brief?draft=acknowledged")
+    ).text()
+    assert f"# Fix brief for a coding agent: Report #{scan_id}" in copied
+    assert "```untrusted-data" in copied
+    # The same file the download serves, minute stamp aside.
+    assert _STAMP.sub("", copied) == _STAMP.sub("", served)
+
+    # By keyboard: the button is the arrow-key stop after the brief's download.
+    await page.evaluate("navigator.clipboard.writeText('')")
+    brief = panel.get_by_role("link", name="Fix brief for a coding agent (Markdown)", exact=True)
+    await brief.focus()
+    await page.keyboard.press("ArrowDown")
+    await expect(copy).to_be_focused()
+    await page.keyboard.press("Enter")
+    await expect(page.get_by_role("status").filter(has_text="Copied")).to_have_text(done)
+    assert "# Fix brief for a coding agent" in await page.evaluate("navigator.clipboard.readText()")
+    await page.keyboard.press("ArrowDown")
+    csv = panel.get_by_role("link", name="Occurrence list (CSV)", exact=True)
+    await expect(csv).to_be_focused()
+
+
+async def test_a_refused_copy_is_reported_in_words(
+    live_server: tuple[str, int], new_page: Any
+) -> None:
+    base, scan_id = live_server
+    page = await new_page(permissions=["clipboard-read", "clipboard-write"])
+    await page.route(
+        re.compile(r"/api/scans/\d+/export/brief"),
+        lambda route: route.fulfill(
+            status=409,
+            content_type="application/json",
+            body='{"detail": "This report is still scanning."}',
+        ),
+    )
+    await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+    await page.evaluate("navigator.clipboard.writeText('before')")
+    await page.get_by_role("button", name="Export").click()
+    await page.get_by_role("button", name="Copy fix brief", exact=True).click()
+
+    message = "Axcess could not copy the fix brief. This report is still scanning."
+    await expect(page.get_by_role("status").filter(has_text="could not copy")).to_have_text(message)
+    await expect(page.get_by_role("group", name=f"Export Report #{scan_id}")).to_contain_text(
+        message
+    )
+    assert await page.evaluate("navigator.clipboard.readText()") == "before"
+
+
 async def test_a_failed_download_is_reported_in_words(
     live_server: tuple[str, int], new_page: Any
 ) -> None:

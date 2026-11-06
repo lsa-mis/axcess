@@ -8,11 +8,17 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, Check, ChevronDown, Download, Loader2 } from "lucide-react";
+import { AlertCircle, Check, ChevronDown, Copy, Download, Loader2 } from "lucide-react";
 import { ApiError, api, exportUrl } from "../api/client";
 import type { ExportFormat } from "../api/types";
 import { cn } from "../lib/cn";
-import { EXPORT_FORMAT_HINT, EXPORT_FORMAT_LABEL } from "../lib/terms";
+import {
+  COPY_FIX_BRIEF_DONE,
+  COPY_FIX_BRIEF_HINT,
+  COPY_FIX_BRIEF_LABEL,
+  EXPORT_FORMAT_HINT,
+  EXPORT_FORMAT_LABEL,
+} from "../lib/terms";
 import { Button, Checkbox } from "./ui";
 
 /**
@@ -67,6 +73,22 @@ import { Button, Checkbox } from "./ui";
  *   is best effort, what it can miss, and to check the file before sharing
  *   (AGENTS.md, Interface language rule 4). Each file carries the same
  *   notice inside it.
+ *
+ * **Copy fix brief.** The fix brief is made to be pasted into Claude Code or
+ * another coding agent, so it has a one-click copy beside its download
+ * (asked for on Asana 1220313732698508): a native `<button>` under the
+ * brief's row, because it acts rather than goes somewhere, with a verb and
+ * an object as its words ("Copy fix brief"). It fetches the same URL as the
+ * download, so a refused or failed export says why in words, and its result
+ * ("Copied", or why not) is said in the row and in the live region. The
+ * button's words never change to "Copied": a voice-control user says the
+ * words they see, and they must still work a second time.
+ * - It writes a `ClipboardItem` whose text is still being fetched, so the
+ *   copy counts as part of the click; Safari refuses a clipboard write that
+ *   starts after a network wait. Browsers without `ClipboardItem` fall back
+ *   to `writeText` once the text has arrived.
+ * - The download stays: the button is a second way to the same file for
+ *   people who paste rather than attach.
  */
 const FORMAT_BADGES: {
   format: ExportFormat;
@@ -93,6 +115,11 @@ const FORMATS = FORMAT_BADGES.map((entry) => ({
   label: EXPORT_FORMAT_LABEL[entry.format],
   hint: EXPORT_FORMAT_HINT[entry.format],
 }));
+
+type CopyState =
+  | { kind: "copying" }
+  | { kind: "done" }
+  | { kind: "failed"; message: string };
 
 type DownloadState =
   | { kind: "preparing" }
@@ -131,6 +158,7 @@ export default function ExportMenu({
   const [downloads, setDownloads] = useState<Partial<Record<ExportFormat, DownloadState>>>({});
   const [announcement, setAnnouncement] = useState("");
   const [redact, setRedact] = useState(false);
+  const [copyState, setCopyState] = useState<CopyState | null>(null);
   const idBase = useId();
   const panelId = `${idBase}-panel`;
   const headingId = `${idBase}-heading`;
@@ -211,9 +239,11 @@ export default function ExportMenu({
   }, [open]);
 
   /** The panel's arrow-key stops, in order: the redaction choice, then the
-   *  five downloads. */
+   *  five downloads, with "Copy fix brief" right after the fix brief. */
   function panelStops(): HTMLElement[] {
-    return Array.from(panelRef.current?.querySelectorAll<HTMLElement>("input, a") ?? []);
+    return Array.from(
+      panelRef.current?.querySelectorAll<HTMLElement>("input, a, button") ?? [],
+    );
   }
 
   function onTriggerKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>) {
@@ -268,6 +298,39 @@ export default function ExportMenu({
     }
   }
 
+  async function copyBrief() {
+    if (copyState?.kind === "copying") return;
+    setCopyState({ kind: "copying" });
+    setAnnouncement("Copying the fix brief…");
+    // Started at once, inside the click, so the clipboard write below still
+    // counts as the click's own action (see the component's comment).
+    const text = api.fetchExportText(scanId, "brief", redact);
+    const fetchFailure = text.then(
+      () => null,
+      (error: unknown) => error,
+    );
+    try {
+      if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
+        const blob = text.then((markdown) => new Blob([markdown], { type: "text/plain" }));
+        await navigator.clipboard.write([new ClipboardItem({ "text/plain": blob })]);
+      } else {
+        await navigator.clipboard.writeText(await text);
+      }
+      setCopyState({ kind: "done" });
+      setAnnouncement(COPY_FIX_BRIEF_DONE);
+    } catch {
+      const failure = await fetchFailure;
+      const message =
+        failure instanceof ApiError
+          ? failure.message
+          : failure
+            ? "The Axcess server did not respond. Check that it is still running."
+            : "Your browser did not let Axcess use the clipboard. Download the file instead.";
+      setCopyState({ kind: "failed", message });
+      setAnnouncement(`Axcess could not copy the fix brief. ${message}`);
+    }
+  }
+
   function onChoose(event: ReactMouseEvent<HTMLAnchorElement>, entry: (typeof FORMATS)[number]) {
     // A modified click asks the browser for something else (a new tab, a
     // saved link); the href is the real export URL, so let it do that.
@@ -279,7 +342,9 @@ export default function ExportMenu({
     void download(entry);
   }
 
-  const preparing = Object.values(downloads).some((state) => state?.kind === "preparing");
+  const preparing =
+    Object.values(downloads).some((state) => state?.kind === "preparing") ||
+    copyState?.kind === "copying";
   const facts = [
     site,
     pageCount === undefined ? "" : plural(pageCount, "page", "pages"),
@@ -425,6 +490,14 @@ export default function ExportMenu({
                     ) : null}
                   </span>
                 </a>
+                {entry.format === "brief" && (
+                  <CopyBriefRow
+                    idBase={idBase}
+                    state={copyState}
+                    onCopy={() => void copyBrief()}
+                    onKeyDown={onStopKeyDown}
+                  />
+                )}
               </li>
             );
           })}
@@ -460,6 +533,66 @@ export default function ExportMenu({
           </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * "Copy fix brief", under the fix brief's row and lined up with its words,
+ * so it reads as part of that file and not as a sixth one.
+ */
+function CopyBriefRow({
+  idBase,
+  state,
+  onCopy,
+  onKeyDown,
+}: {
+  idBase: string;
+  state: CopyState | null;
+  onCopy: () => void;
+  onKeyDown: (event: ReactKeyboardEvent<HTMLElement>) => void;
+}) {
+  const hintId = `${idBase}-copy-brief-hint`;
+  const stateId = `${idBase}-copy-brief-state`;
+  return (
+    <div className="pb-2 pl-[4.125rem] pr-2.5">
+      <Button
+        type="button"
+        size="sm"
+        className="min-h-target"
+        aria-describedby={[hintId, state && stateId].filter(Boolean).join(" ")}
+        aria-disabled={state?.kind === "copying" || undefined}
+        onClick={onCopy}
+        onKeyDown={onKeyDown}
+      >
+        {state?.kind === "copying" ? (
+          <Loader2 className="h-3.5 w-3.5 motion-safe:animate-spin" aria-hidden />
+        ) : (
+          <Copy className="h-3.5 w-3.5" aria-hidden />
+        )}
+        {COPY_FIX_BRIEF_LABEL}
+      </Button>
+      <span id={hintId} className="mt-1 block text-xs text-fg-muted">
+        {COPY_FIX_BRIEF_HINT}
+      </span>
+      {state?.kind === "copying" && (
+        <span id={stateId} className="mt-0.5 flex items-center gap-1 text-xs text-fg-muted">
+          <Loader2 className="h-3.5 w-3.5 shrink-0 motion-safe:animate-spin" aria-hidden />
+          Copying…
+        </span>
+      )}
+      {state?.kind === "done" && (
+        <span id={stateId} className="mt-0.5 flex items-start gap-1 text-xs text-fg-muted">
+          <Check className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+          <span>{COPY_FIX_BRIEF_DONE}</span>
+        </span>
+      )}
+      {state?.kind === "failed" && (
+        <span id={stateId} className="mt-0.5 flex items-start gap-1 text-xs text-sev-critical">
+          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+          <span>Axcess could not copy the fix brief. {state.message}</span>
+        </span>
+      )}
     </div>
   );
 }

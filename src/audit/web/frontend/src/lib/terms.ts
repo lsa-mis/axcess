@@ -139,6 +139,16 @@ export const EXPORT_FORMAT_HINT: Record<ExportFormat, string> = {
   json: "Every detail the scan saved, for developers",
 };
 
+/**
+ * The Export panel's one-click copy of the fix brief: the button, and what
+ * it says once the brief is on the clipboard. A verb and an object, so the
+ * button says what it copies (docs/plain-language.md rule 8).
+ */
+export const COPY_FIX_BRIEF_LABEL = "Copy fix brief";
+export const COPY_FIX_BRIEF_HINT =
+  "Puts the same Markdown on your clipboard, to paste into Claude Code or another coding agent.";
+export const COPY_FIX_BRIEF_DONE = "Copied the fix brief. Paste it into your coding agent.";
+
 /** A scan's progress, for status badges. */
 export const SCAN_STATUS_LABEL: Record<ScanStatus, string> = {
   running: "Scanning",
