@@ -501,7 +501,17 @@ class JsFetcher:
                 and "text/html" in headers.get("content-type", "text/html")
             ):
                 with live_progress.check("responsive"):
-                    responsive_findings = await self._responsive_probe.run(page)
+                    # Photographed inside the probe, while each failure holds:
+                    # the pass below runs after the page is restored, when
+                    # the element shows whole.
+                    responsive_findings = await self._responsive_probe.run(
+                        page,
+                        shot=(
+                            (lambda p, sel: self._capture_element(p, sel, center=True))
+                            if self._capture_screenshots
+                            else None
+                        ),
+                    )
 
             # Per-finding element screenshots, captured LAST, after every
             # probe has produced its findings but before the context closes
@@ -512,6 +522,9 @@ class JsFetcher:
             # revealed them. The loop below cannot retake these and must not
             # overwrite them.
             screenshots: dict[str, bytes] = dict(interaction.screenshots)
+            for finding in responsive_findings:
+                if finding.screenshot:
+                    screenshots[finding.target_hash] = finding.screenshot
             if self._capture_screenshots:
                 try:
                     all_findings: list[Any] = [

@@ -41,7 +41,9 @@ pathological page can't stall the crawl.
 from __future__ import annotations
 
 import contextlib
+import dataclasses
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -56,6 +58,9 @@ if TYPE_CHECKING:
     from playwright.async_api import Page
 
 log = logging.getLogger(__name__)
+
+#: Photographs one element on the page as it is now; None when it cannot.
+ShotFn = Callable[["Page", str], Awaitable[bytes | None]]
 
 # Viewports. 320 is WCAG 1.4.10's literal number; 640x450 is the
 # accepted 200%-zoom-at-1280 proxy used by most automated checkers.
@@ -245,23 +250,29 @@ class ResponsiveProbe:
     # Keep logs terse when the companion asks for a private diagnostic mode.
     suppress_diagnostics: bool = False
 
-    async def run(self, page: Page) -> list[ResponsiveFinding]:
+    async def run(self, page: Page, *, shot: ShotFn | None = None) -> list[ResponsiveFinding]:
         """Probe ``page``; returns findings, never raises.
 
         Restores the original viewport on exit regardless of failures —
         the page object may still be inspected by a caller afterwards.
+
+        With ``shot``, each finding is photographed while its failure holds
+        (the narrow viewport, or the spacing stylesheet), so the picture
+        shows the overflow or the cut-off text rather than the restored page.
         """
         findings: list[ResponsiveFinding] = []
         try:
-            findings.extend(await self._check_reflow(page))
+            findings.extend(await self._photograph(page, await self._check_reflow(page), shot))
         except Exception as exc:
             self._log_failure("reflow", exc)
         try:
-            findings.extend(await self._check_zoom_clipping(page))
+            findings.extend(
+                await self._photograph(page, await self._check_zoom_clipping(page), shot)
+            )
         except Exception as exc:
             self._log_failure("zoom_clipping", exc)
         try:
-            findings.extend(await self._check_text_spacing(page))
+            findings.extend(await self._check_text_spacing(page, shot))
         except Exception as exc:
             self._log_failure("text_spacing", exc)
         # Always restore the crawl's standard viewport.
@@ -270,6 +281,23 @@ class ResponsiveProbe:
                 {"width": self.base_viewport_width, "height": self.base_viewport_height}
             )
         return findings
+
+    async def _photograph(
+        self, page: Page, findings: list[ResponsiveFinding], shot: ShotFn | None
+    ) -> list[ResponsiveFinding]:
+        """Attach a picture of each finding's element, taken now. Never raises."""
+        if shot is None:
+            return findings
+        out: list[ResponsiveFinding] = []
+        for finding in findings:
+            png: bytes | None = None
+            if finding.target_selector not in ("", "html", "body", "(unknown)"):
+                try:
+                    png = await shot(page, finding.target_selector)
+                except Exception:
+                    png = None
+            out.append(dataclasses.replace(finding, screenshot=png) if png else finding)
+        return out
 
     def _log_failure(self, check: str, exc: Exception) -> None:
         if self.suppress_diagnostics:
@@ -351,7 +379,9 @@ class ResponsiveProbe:
     # Check 3, WCAG text-spacing override (SC 1.4.12).
     # -----------------------------------------------------------------
 
-    async def _check_text_spacing(self, page: Page) -> list[ResponsiveFinding]:
+    async def _check_text_spacing(
+        self, page: Page, shot: ShotFn | None = None
+    ) -> list[ResponsiveFinding]:
         # Run at the crawl's standard viewport, spacing failures are
         # about hard-coded boxes, not narrow screens, and running at
         # 320px would double-report what the reflow check already saw.
@@ -364,25 +394,28 @@ class ResponsiveProbe:
             clipped: list[dict[str, str]] = await page.evaluate(
                 _CLIPPED_TEXT_JS, _MAX_OFFENDERS_PER_CHECK
             )
+            findings = [
+                ResponsiveFinding(
+                    rule_id=RULE_SPACING_CLIPPED,
+                    criterion_sc="1.4.12",
+                    impact="serious",
+                    target_selector=str(c.get("selector", "(unknown)")),
+                    failure_summary=(
+                        "With WCAG's text-spacing override applied (line-height "
+                        "1.5, letter-spacing 0.12em, word-spacing 0.16em, paragraph "
+                        "spacing 2em) text is "
+                        f"{c.get('detail', 'clipped')}. Users who apply their own "
+                        "readability stylesheets lose this content."
+                    ),
+                    html_snippet=str(c.get("html", "")),
+                    help="Content must not clip when users override text spacing.",
+                )
+                for c in clipped
+            ]
+            # While the spacing still applies, so the picture shows the clip.
+            return await self._photograph(page, findings, shot)
         finally:
             # Remove the injected sheet so the page is clean if anything
             # inspects it later in the fetch lifecycle.
             with contextlib.suppress(Exception):
                 await handle.evaluate("el => el.remove()")
-        return [
-            ResponsiveFinding(
-                rule_id=RULE_SPACING_CLIPPED,
-                criterion_sc="1.4.12",
-                impact="serious",
-                target_selector=str(c.get("selector", "(unknown)")),
-                failure_summary=(
-                    "With WCAG's text-spacing override applied (line-height "
-                    "1.5, letter-spacing 0.12em, word-spacing 0.16em) text is "
-                    f"{c.get('detail', 'clipped')}. Users who apply their own "
-                    "readability stylesheets lose this content."
-                ),
-                html_snippet=str(c.get("html", "")),
-                help="Content must not clip when users override text spacing.",
-            )
-            for c in clipped
-        ]
