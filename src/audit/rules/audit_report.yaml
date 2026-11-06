@@ -412,9 +412,6 @@ axe_rules:
 
   tabindex:
     title: "A tabindex above 0 changes the Tab order"
-    wcag_sc: "2.4.3"
-    wcag_name: "Focus Order"
-    wcag_level: "A"
     abilities_affected: [vision, motor, cognition]
     what_happening: >-
       The rule check (axe) flags every element with a <code>tabindex</code>
@@ -834,9 +831,6 @@ axe_rules:
 
   heading-order:
     title: "Heading levels skip a step"
-    wcag_sc: "1.3.1"
-    wcag_name: "Info and Relationships"
-    wcag_level: "A"
     abilities_affected: [vision, cognition, motor]
     what_happening: >-
       The rule check (axe) reads the page's headings in order, including those
