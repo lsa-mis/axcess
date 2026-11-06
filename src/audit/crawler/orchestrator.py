@@ -34,7 +34,7 @@ from audit.analyzer.alfa import (
     chromium_executable_path,
 )
 from audit.analyzer.alfa import availability as alfa_availability
-from audit.analyzer.axe import AxeAnalyzer, AxeViolation
+from audit.analyzer.axe import AxeAnalyzer, AxeViolation, bundled_axe_version
 from audit.analyzer.axe import Level as AxeLevel
 from audit.analyzer.focus import FocusFinding, FocusProbe
 from audit.analyzer.interaction import (
@@ -837,6 +837,8 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             "vlm_enabled": config.vlm_enabled,
             "axe_enabled": config.axe_enabled,
             "axe_level": config.axe_level,
+            # Which axe-core rule set the scan ran. Absent from older reports.
+            "axe_core_version": bundled_axe_version() if config.axe_enabled else None,
             # Stored as given; readers go through ``stored_wcag_version``.
             "wcag_version": config.wcag_version,
             "alfa_enabled": config.alfa_enabled,

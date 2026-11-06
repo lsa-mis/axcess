@@ -255,8 +255,8 @@ or `.../export/markdown`) or the command line (`audit export -f jira` or
 | --- | --- | --- |
 | Issue types with fixes (Excel, `.xlsx`) | Assigning and tracking fixes | A summary, an index with one row per issue type, a tab for each issue type, and supporting sheets (listed below the table) |
 | Written report (Markdown, `.audit.md`) | A narrative report for stakeholders | Sections from an executive summary to the appendices (listed below the table) |
-| Occurrence list (CSV, `.csv`) | Filtering in a spreadsheet | One row per occurrence (per page for an image), 24 columns such as `severity`, `status`, `wcag_criterion`, `page_url`, `target_selector`, and `revealed_by` |
-| All report data (JSON, `.json`) | Scripts and other tools | `scan`, `findings` (image results), and `a11y_findings` (everything else) |
+| Occurrence list (CSV, `.csv`) | Filtering in a spreadsheet | One row per occurrence (per page for an image), 25 columns such as `severity`, `status`, `wcag_criterion`, `page_url`, `rule_id`, `target_selector`, `revealed_by`, and `axe_core_version` (the axe-core release behind an axe row, so you can compare it with another tool's report) |
+| All report data (JSON, `.json`) | Scripts and other tools | `scan` (with `axe_core_version`), `findings` (image results), and `a11y_findings` (everything else, each with its `rule_id`) |
 | Jira CSV (`.jira.csv`) | Importing tickets | Summary, Description, Priority, Issue Type, Labels, Component; one row per occurrence not marked Fixed, Accepted risk, or Not a problem (one row per image for an image of text) |
 | Markdown evidence inventory (`.md`) | A raw list of every result | Every result with its status, including Not sure results |
 

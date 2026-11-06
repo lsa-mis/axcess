@@ -148,6 +148,11 @@ _GUIDANCE_TEMPLATE = (
 )
 
 
+def _axe_version_text(version: str | None) -> str:
+    """Which axe-core rules the scan ran, for the summaries."""
+    return f"axe-core {version}" if version else "Not recorded for this report"
+
+
 def _guidance(wcag_version: str) -> str:
     """The prioritization guidance, naming the standard the scan used."""
     return _GUIDANCE_TEMPLATE.replace("{wcag_version}", wcag_version)
@@ -962,6 +967,7 @@ def _build_summary_sheet(
         seed_url_cell.hyperlink = scan.seed_url
         seed_url_cell.style = "Hyperlink"
     metric("Audited against", f"WCAG {scan.wcag_version} Level {scan.axe_level}")
+    metric("Rule check (axe) version", _axe_version_text(scan.axe_core_version))
     metric("Pages crawled", scan.page_count)
     metric("Audit date", audit_date)
     r += 1

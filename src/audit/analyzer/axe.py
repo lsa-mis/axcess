@@ -41,8 +41,10 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 from collections.abc import Iterator
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -195,6 +197,27 @@ def _sc_sort_key(sc: str) -> tuple[int, int, int]:
         return (int(parts[0]), int(parts[1]), int(parts[2]))
     except ValueError:
         return (99, 99, 99)
+
+
+_VERSION_BANNER = re.compile(r"axe v(\d+\.\d+\.\d+)")
+
+
+@lru_cache(maxsize=4)
+def bundled_axe_version(path: Path = DEFAULT_AXE_BUNDLE) -> str | None:
+    """The axe-core version of the bundle a scan runs, from its banner.
+
+    ``axe.min.js`` opens with ``/*! axe v4.10.2 ...``. Recorded with each
+    scan, so a report says which rule set produced it and two reports can
+    be compared across tools and over time. None when the file is missing
+    or has no banner; a scan never fails over it.
+    """
+    try:
+        with path.open(encoding="utf-8") as handle:
+            head = handle.read(200)
+    except OSError:
+        return None
+    match = _VERSION_BANNER.search(head)
+    return match.group(1) if match else None
 
 
 @dataclass(slots=True, frozen=True)
