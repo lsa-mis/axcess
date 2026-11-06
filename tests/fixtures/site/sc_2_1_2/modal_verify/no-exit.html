@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Modal check: Modal with no clear way out</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 2rem; }
+    #veil { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 5; }
+    #dialog { position: fixed; inset: 20% 25%; background: #fff; color: #000;
+      border: 2px solid #000; padding: 1rem; z-index: 10; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body data-variant="no-exit">
+  <main id="behind">
+    <h1>Modal with no clear way out</h1>
+    <p>Escape does nothing, and the only button says Got it.</p>
+    <p><a href="#before">Link before the button</a></p>
+    <button type="button" id="trigger">Open settings</button>
+    <p><a href="#after">Link after the button</a></p>
+  </main>
+  <div id="veil" hidden></div>
+  <div id="dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title" hidden>
+    <h2 id="dialog-title">Settings</h2>
+    <p>Type your name.</p>
+    <label>Your name <input type="text" id="name"></label>
+      <button type="button" id="close">Got it</button>
+  </div>
+  <script src="modal.js"></script>
+</body>
+</html>
