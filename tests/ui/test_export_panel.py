@@ -107,6 +107,9 @@ async def test_download_reports_its_outcome_and_keeps_focus(
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
     await _open_by_keyboard(page)
     workbook = page.get_by_role("link", name="Issue types with fixes (Excel)", exact=True)
+    # The redaction choice is the first stop; the first file is the next.
+    await page.keyboard.press("ArrowDown")
+    await expect(workbook).to_be_focused()
 
     async with page.expect_download() as download_info:
         await page.keyboard.press("Enter")
