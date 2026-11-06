@@ -135,7 +135,7 @@ async def test_issue_tags_headers_and_bands_explain_themselves(
             )
         ).to_be_visible()
         await playwright_async.expect(
-            page.get_by_role("definition").filter(has_text="a critical problem on 1 page is Low")
+            page.get_by_role("definition").filter(has_text="a critical problem, even on 1 page")
         ).to_be_visible()
     finally:
         await page.context.close()

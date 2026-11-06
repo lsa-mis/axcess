@@ -262,20 +262,39 @@ def test_list_issues_deep_link_to_dedicated_detail(
     assert img_row.detail_url.startswith(f"/scans/{scan_id}/issues/image:")
 
 
-def test_priority_rewards_spread(tmp_db: sqlite3.Connection) -> None:
-    """A serious issue on 2 pages outranks a serious issue on 1.
+def test_priority_starts_from_impact(tmp_db: sqlite3.Connection) -> None:
+    """A critical issue on 1 page outranks a serious one on 2 pages.
 
-    The formula is severity_weight * log(1 + page_count). This is the
-    test that pins it: same severity, more pages -> higher priority.
+    Priority must agree with the impact rating: spread adjusts it but does
+    not let a serious problem on two pages outrank a critical one on one.
     """
     scan_id = _seed_two_pipelines(tmp_db)
     rows = issues_mod.list_issues(tmp_db, scan_id)
     cc = next(r for r in rows if r.issue_key == "axe:color-contrast")
     ia = next(r for r in rows if r.issue_key == "axe:image-alt")
-    # color-contrast affects 2 pages and is serious (weight 3.0);
-    # image-alt affects 1 page and is critical (weight 4.0).
-    # 3.0 * log(3) ~= 3.30 vs 4.0 * log(2) ~= 2.77 -> cc wins on spread.
-    assert cc.priority > ia.priority
+    # image-alt: critical, 1 page -> 6.0 (High on its own).
+    # color-contrast: serious, 2 pages -> 4 + ln 2 + 0.25 ln 2 ~= 4.87.
+    assert ia.priority > cc.priority
+
+
+def test_priority_bands() -> None:
+    """Pin the bands the hover hints promise (High >= 6, Medium >= 3)."""
+    p = issues_mod._priority
+    # Mostly sure: critical is High on one page; serious is Medium there.
+    assert p("critical", 1) == 6.0
+    assert 3 <= p("serious", 1) < 6
+    assert p("serious", 8) >= 6
+    assert 3 <= p("moderate", 2) < 6
+    assert p("minor", 1) < 3
+    # More pages and more occurrences each raise the score.
+    assert p("serious", 5) > p("serious", 2)
+    assert p("serious", 2, occurrence_count=20) > p("serious", 2)
+    # Not sure is never High, however wide; For information is always Low.
+    assert p("critical", 10_000, 10_000, "medium") < 6
+    assert p("critical", 1, 1, "medium") >= 3
+    assert p("critical", 10_000, 10_000, "low") < 3
+    # The unconfirmed zoom or spacing lead on 10 pages that used to be High.
+    assert p("serious", 10, 10, "medium") < 6
 
 
 def test_get_issue_detail_axe_pipeline(tmp_db: sqlite3.Connection) -> None:
@@ -731,7 +750,7 @@ def test_element_repeated_across_pages_is_reported_once(
     assert row.repeat_page_count == 2
     assert [loc.page_url for loc in row.locations] == ["http://example.com/"]
     # Priority still reflects the three pages the component actually reaches.
-    assert row.priority == issues_mod._priority("serious", 3)
+    assert row.priority == issues_mod._priority("serious", 3, 1, "high")
 
     detail = issues_mod.get_issue_detail(tmp_db, scan_id, row.issue_key)
     assert detail is not None

@@ -1030,8 +1030,8 @@ function IssueGlossary() {
             help: FINDING_TYPE_HELP[key],
           }))}
         />
-        {/* The bands' limits, such as a critical problem on one page showing
-            as Low, in words everyone can reach, not only in a hover hint. */}
+        {/* The bands' meaning, such as Not sure never being High, in words
+            everyone can reach, not only in a hover hint. */}
         <GlossaryList
           heading={`${COLUMN_LABEL.Priority}: which issue types to look at first`}
           items={(["High", "Medium", "Low"] as const).map((key) => ({
@@ -1123,7 +1123,7 @@ function columnHint(column: SortColumn): string | undefined {
   return label in ISSUE_COLUMN_HELP ? ISSUE_COLUMN_HELP[label as keyof typeof ISSUE_COLUMN_HELP] : undefined;
 }
 
-/** A plain-English band for the priority score (severity × log1p(pages)). */
+/** A plain-English band for the priority score (``_priority`` in src/audit/web/issues.py). */
 function priorityTier(priority: number): "High" | "Medium" | "Low" {
   if (priority >= 6) return "High";
   if (priority >= 3) return "Medium";

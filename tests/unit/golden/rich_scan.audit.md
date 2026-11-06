@@ -246,13 +246,13 @@ The same findings, re-sliced by who fixes them. Hand each team their pack.
 - [ ] **Fixture rule 09 synthetic check**, Serious, Effort: see fix steps, 2 pages.
 - [ ] **Fixture rule 21 synthetic check**, Serious, Effort: see fix steps, 2 pages.
 - [ ] **Fixture rule 33 synthetic check**, Serious, Effort: see fix steps, 2 pages.
+- [ ] **Links have no name for screen readers**, Serious, Under 15 minutes, 1 page.
 - [ ] **Fixture: buttons [primary/secondary] need names?**, Serious, Effort: see fix steps, 1 page.
 - [ ] **Fixture rule 05 synthetic check**, Serious, Effort: see fix steps, 1 page.
 - [ ] **Fixture rule 13 synthetic check**, Serious, Effort: see fix steps, 1 page.
 - [ ] **Fixture rule 17 synthetic check**, Serious, Effort: see fix steps, 1 page.
 - [ ] **Fixture rule 25 synthetic check**, Serious, Effort: see fix steps, 1 page.
 - [ ] **Fixture rule 29 synthetic check**, Serious, Effort: see fix steps, 1 page.
-- [ ] **Links have no name for screen readers**, Serious, Under 15 minutes, 1 page.
 - [ ] **Fixture rule without a documentation link**, Moderate, Effort: see fix steps, 2 pages.
 - [ ] **Fixture rule 06 synthetic check**, Moderate, Effort: see fix steps, 2 pages.
 - [ ] **Fixture rule 18 synthetic check**, Moderate, Effort: see fix steps, 2 pages.
@@ -803,261 +803,7 @@ Users relying on assistive technology hit a barrier here.
 
 _Rule docs: https://dequeuniversity.com/rules/axe/4.10/fixture-rule-33_
 
-### 15. Text misses the stricter Level AAA contrast ratio
-
-**WCAG:** SC 1.4.6 Contrast (Enhanced), Level AAA
-
-**Detected by:** axe-core (deterministic DOM rules).
-
-**Where:** 1 finding(s) on **1** page(s).
-
-Specific locations:
-- **Page:** [About us](<https://example.org/about>). **Location on page:** Affected element identified by the recorded page selector. **Technical target:** `p.subtle`. **Observed evidence:** Fix any of the following: the rule's check failed.
-
-**What is happening:**
-
-The rule check (axe) found text that meets the Level AA contrast minimum but not the stricter Level AAA level. The contrast ratio measures how much lighter one color is than the other, from 1:1 (same color) to 21:1 (black on white). This text is at least 4.5:1 but under 7:1, or, for large text, at least 3:1 but under 4.5:1. Text below the AA minimum shows up in the `color-contrast` issue instead.
-
-**Why it matters:**
-
-Text that blends into its background is hard to read for people with low vision, and color blindness can lower the contrast even more. The 7:1 level makes up for the contrast loss of about 20/80 vision (seeing at 20 feet what most people see at 80 feet).
-
-**Affects:** Vision.
-
-**Severity:** Serious, A real barrier for affected users, even if a workaround sometimes exists.
-
-**Effort:** Under 2 hours
-
-**Owner:** Designer
-
-**Fix (do this):**
-
-1. Check whether your policy asks for Level AAA. If it asks only for Level AA, you do not have to fix this, but a fix still helps people with low vision. The World Wide Web Consortium (W3C), which writes WCAG, does not advise requiring Level AAA for a whole site. Some content cannot meet every Level AAA criterion.
-2. Open each occurrence and read the check's message. It gives the contrast ratio, the text color (foreground color), the background color, the font size and the font weight. For example: "contrast of 6.54 ... Expected contrast ratio of 7:1".
-3. Pick a darker text color, or a lighter background, that reaches 7:1 for normal text, or 4.5:1 for large text. Large text is 24px (18pt) or bigger, or 14pt (about 18.7px) or bigger in bold. Do not round up: 6.99:1 does not meet 7:1. For example, on white, `#767676` gives 4.54:1 and `#595959` just reaches 7:1.
-4. Change the color in the shared style (the design token or CSS custom property, such as `--text-muted: #595959;`), not on each element. One shared color often causes many occurrences, so one change can fix them all.
-
-**Verify it is fixed:**
-
-- **Manual:** Inspect the text in your browser's developer tools; in Chrome, the color picker shows the contrast ratio with AA and AAA lines. Check hover and focus states too. Use a contrast checker for text on images or gradients, text under other elements, and images of text, because the rule check (axe) skips them.
-- **Automated:** Scan again at Level AAA and see if this text is still found, because a Level AA scan does not run this rule.
-- **Acceptance:** Every text element on the affected pages reaches 7:1 contrast with its background, or 4.5:1 if large, except logos and disabled controls.
-
-**My confidence:** High.
-
-_Rule docs: https://dequeuniversity.com/rules/axe/4.10/color-contrast-enhanced_
-
-### 16. Fixture: buttons [primary/secondary] need names?
-
-> ⚠ **Human review needed**, this finding doesn't have a templated fix in our rule book yet. The data is real; the prescriptive guidance below is light.
-
-**WCAG:** SC 2.4.7, Level AA
-
-**Detected by:** axe-core (deterministic DOM rules).
-
-**Where:** 1 finding(s) on **1** page(s).
-
-Specific locations:
-- **Page:** [About us](<https://example.org/about>). **Location on page:** Affected element identified by the recorded page selector. **Technical target:** `#fixture-01`. **Observed evidence:** Fix any of the following: the rule's check failed.
-
-**What is happening:**
-
-1 finding(s) for Fixture: buttons [primary/secondary] need names? across 1 page(s).
-
-**Why it matters:**
-
-Users relying on assistive technology hit a barrier here.
-
-**Severity:** Serious, A real barrier for affected users, even if a workaround sometimes exists.
-
-**Effort:** Effort: see fix steps
-
-**Owner:** Dev
-
-**Fix (do this):**
-
-1. Human review needed, no templated fix for `axe:fixture-rule-01` in `rules/audit_report.yaml` yet. See the rule docs: https://dequeuniversity.com/rules/axe/4.10/fixture-rule-01
-
-**My confidence:** Medium.
-
-_Rule docs: https://dequeuniversity.com/rules/axe/4.10/fixture-rule-01_
-
-### 17. Fixture rule 05 synthetic check
-
-> ⚠ **Human review needed**, this finding doesn't have a templated fix in our rule book yet. The data is real; the prescriptive guidance below is light.
-
-**WCAG:** SC 2.4.7, Level AA
-
-**Detected by:** axe-core (deterministic DOM rules).
-
-**Where:** 1 finding(s) on **1** page(s).
-
-Specific locations:
-- **Page:** [Home](<https://example.org/>). **Location on page:** Affected element identified by the recorded page selector. **Technical target:** `#fixture-05`. **Observed evidence:** Fix any of the following: the rule's check failed.
-
-**What is happening:**
-
-1 finding(s) for Fixture rule 05 synthetic check across 1 page(s).
-
-**Why it matters:**
-
-Users relying on assistive technology hit a barrier here.
-
-**Severity:** Serious, A real barrier for affected users, even if a workaround sometimes exists.
-
-**Effort:** Effort: see fix steps
-
-**Owner:** Dev
-
-**Fix (do this):**
-
-1. Human review needed, no templated fix for `axe:fixture-rule-05` in `rules/audit_report.yaml` yet. See the rule docs: https://dequeuniversity.com/rules/axe/4.10/fixture-rule-05
-
-**My confidence:** Medium.
-
-_Rule docs: https://dequeuniversity.com/rules/axe/4.10/fixture-rule-05_
-
-### 18. Fixture rule 13 synthetic check
-
-> ⚠ **Human review needed**, this finding doesn't have a templated fix in our rule book yet. The data is real; the prescriptive guidance below is light.
-
-**WCAG:** SC 2.4.7, Level AA
-
-**Detected by:** axe-core (deterministic DOM rules).
-
-**Where:** 1 finding(s) on **1** page(s).
-
-Specific locations:
-- **Page:** [https://example.org/products](<https://example.org/products>). **Location on page:** Affected element identified by the recorded page selector. **Technical target:** `#fixture-13`. **Observed evidence:** Fix any of the following: the rule's check failed.
-
-**What is happening:**
-
-1 finding(s) for Fixture rule 13 synthetic check across 1 page(s).
-
-**Why it matters:**
-
-Users relying on assistive technology hit a barrier here.
-
-**Severity:** Serious, A real barrier for affected users, even if a workaround sometimes exists.
-
-**Effort:** Effort: see fix steps
-
-**Owner:** Dev
-
-**Fix (do this):**
-
-1. Human review needed, no templated fix for `axe:fixture-rule-13` in `rules/audit_report.yaml` yet. See the rule docs: https://dequeuniversity.com/rules/axe/4.10/fixture-rule-13
-
-**My confidence:** Medium.
-
-_Rule docs: https://dequeuniversity.com/rules/axe/4.10/fixture-rule-13_
-
-### 19. Fixture rule 17 synthetic check
-
-> ⚠ **Human review needed**, this finding doesn't have a templated fix in our rule book yet. The data is real; the prescriptive guidance below is light.
-
-**WCAG:** SC 2.4.7, Level AA
-
-**Detected by:** axe-core (deterministic DOM rules).
-
-**Where:** 1 finding(s) on **1** page(s).
-
-Specific locations:
-- **Page:** [Contact](<https://example.org/contact>). **Location on page:** Affected element identified by the recorded page selector. **Technical target:** `#fixture-17`. **Observed evidence:** Fix any of the following: the rule's check failed.
-
-**What is happening:**
-
-1 finding(s) for Fixture rule 17 synthetic check across 1 page(s).
-
-**Why it matters:**
-
-Users relying on assistive technology hit a barrier here.
-
-**Severity:** Serious, A real barrier for affected users, even if a workaround sometimes exists.
-
-**Effort:** Effort: see fix steps
-
-**Owner:** Dev
-
-**Fix (do this):**
-
-1. Human review needed, no templated fix for `axe:fixture-rule-17` in `rules/audit_report.yaml` yet. See the rule docs: https://dequeuniversity.com/rules/axe/4.10/fixture-rule-17
-
-**My confidence:** Medium.
-
-_Rule docs: https://dequeuniversity.com/rules/axe/4.10/fixture-rule-17_
-
-### 20. Fixture rule 25 synthetic check
-
-> ⚠ **Human review needed**, this finding doesn't have a templated fix in our rule book yet. The data is real; the prescriptive guidance below is light.
-
-**WCAG:** SC 2.4.7, Level AA
-
-**Detected by:** axe-core (deterministic DOM rules).
-
-**Where:** 1 finding(s) on **1** page(s).
-
-Specific locations:
-- **Page:** [Home](<https://example.org/>). **Location on page:** Affected element identified by the recorded page selector. **Technical target:** `#fixture-25`. **Observed evidence:** Fix any of the following: the rule's check failed.
-
-**What is happening:**
-
-1 finding(s) for Fixture rule 25 synthetic check across 1 page(s).
-
-**Why it matters:**
-
-Users relying on assistive technology hit a barrier here.
-
-**Severity:** Serious, A real barrier for affected users, even if a workaround sometimes exists.
-
-**Effort:** Effort: see fix steps
-
-**Owner:** Dev
-
-**Fix (do this):**
-
-1. Human review needed, no templated fix for `axe:fixture-rule-25` in `rules/audit_report.yaml` yet. See the rule docs: https://dequeuniversity.com/rules/axe/4.10/fixture-rule-25
-
-**My confidence:** Medium.
-
-_Rule docs: https://dequeuniversity.com/rules/axe/4.10/fixture-rule-25_
-
-### 21. Fixture rule 29 synthetic check
-
-> ⚠ **Human review needed**, this finding doesn't have a templated fix in our rule book yet. The data is real; the prescriptive guidance below is light.
-
-**WCAG:** SC 2.4.7, Level AA
-
-**Detected by:** axe-core (deterministic DOM rules).
-
-**Where:** 1 finding(s) on **1** page(s).
-
-Specific locations:
-- **Page:** [Blog](<https://example.org/blog>). **Location on page:** Affected element identified by the recorded page selector. **Technical target:** `#fixture-29`. **Observed evidence:** Fix any of the following: the rule's check failed.
-
-**What is happening:**
-
-1 finding(s) for Fixture rule 29 synthetic check across 1 page(s).
-
-**Why it matters:**
-
-Users relying on assistive technology hit a barrier here.
-
-**Severity:** Serious, A real barrier for affected users, even if a workaround sometimes exists.
-
-**Effort:** Effort: see fix steps
-
-**Owner:** Dev
-
-**Fix (do this):**
-
-1. Human review needed, no templated fix for `axe:fixture-rule-29` in `rules/audit_report.yaml` yet. See the rule docs: https://dequeuniversity.com/rules/axe/4.10/fixture-rule-29
-
-**My confidence:** Medium.
-
-_Rule docs: https://dequeuniversity.com/rules/axe/4.10/fixture-rule-29_
-
-### 22. Links have no name for screen readers
+### 15. Links have no name for screen readers
 
 **WCAG:** SC 2.4.4 Link Purpose (In Context), Level A
 
@@ -1110,6 +856,260 @@ Screen reader users do not know where the link goes, on the page or in their lis
 **My confidence:** High.
 
 _Rule docs: https://dequeuniversity.com/rules/axe/4.10/link-name_
+
+### 16. Text misses the stricter Level AAA contrast ratio
+
+**WCAG:** SC 1.4.6 Contrast (Enhanced), Level AAA
+
+**Detected by:** axe-core (deterministic DOM rules).
+
+**Where:** 1 finding(s) on **1** page(s).
+
+Specific locations:
+- **Page:** [About us](<https://example.org/about>). **Location on page:** Affected element identified by the recorded page selector. **Technical target:** `p.subtle`. **Observed evidence:** Fix any of the following: the rule's check failed.
+
+**What is happening:**
+
+The rule check (axe) found text that meets the Level AA contrast minimum but not the stricter Level AAA level. The contrast ratio measures how much lighter one color is than the other, from 1:1 (same color) to 21:1 (black on white). This text is at least 4.5:1 but under 7:1, or, for large text, at least 3:1 but under 4.5:1. Text below the AA minimum shows up in the `color-contrast` issue instead.
+
+**Why it matters:**
+
+Text that blends into its background is hard to read for people with low vision, and color blindness can lower the contrast even more. The 7:1 level makes up for the contrast loss of about 20/80 vision (seeing at 20 feet what most people see at 80 feet).
+
+**Affects:** Vision.
+
+**Severity:** Serious, A real barrier for affected users, even if a workaround sometimes exists.
+
+**Effort:** Under 2 hours
+
+**Owner:** Designer
+
+**Fix (do this):**
+
+1. Check whether your policy asks for Level AAA. If it asks only for Level AA, you do not have to fix this, but a fix still helps people with low vision. The World Wide Web Consortium (W3C), which writes WCAG, does not advise requiring Level AAA for a whole site. Some content cannot meet every Level AAA criterion.
+2. Open each occurrence and read the check's message. It gives the contrast ratio, the text color (foreground color), the background color, the font size and the font weight. For example: "contrast of 6.54 ... Expected contrast ratio of 7:1".
+3. Pick a darker text color, or a lighter background, that reaches 7:1 for normal text, or 4.5:1 for large text. Large text is 24px (18pt) or bigger, or 14pt (about 18.7px) or bigger in bold. Do not round up: 6.99:1 does not meet 7:1. For example, on white, `#767676` gives 4.54:1 and `#595959` just reaches 7:1.
+4. Change the color in the shared style (the design token or CSS custom property, such as `--text-muted: #595959;`), not on each element. One shared color often causes many occurrences, so one change can fix them all.
+
+**Verify it is fixed:**
+
+- **Manual:** Inspect the text in your browser's developer tools; in Chrome, the color picker shows the contrast ratio with AA and AAA lines. Check hover and focus states too. Use a contrast checker for text on images or gradients, text under other elements, and images of text, because the rule check (axe) skips them.
+- **Automated:** Scan again at Level AAA and see if this text is still found, because a Level AA scan does not run this rule.
+- **Acceptance:** Every text element on the affected pages reaches 7:1 contrast with its background, or 4.5:1 if large, except logos and disabled controls.
+
+**My confidence:** High.
+
+_Rule docs: https://dequeuniversity.com/rules/axe/4.10/color-contrast-enhanced_
+
+### 17. Fixture: buttons [primary/secondary] need names?
+
+> ⚠ **Human review needed**, this finding doesn't have a templated fix in our rule book yet. The data is real; the prescriptive guidance below is light.
+
+**WCAG:** SC 2.4.7, Level AA
+
+**Detected by:** axe-core (deterministic DOM rules).
+
+**Where:** 1 finding(s) on **1** page(s).
+
+Specific locations:
+- **Page:** [About us](<https://example.org/about>). **Location on page:** Affected element identified by the recorded page selector. **Technical target:** `#fixture-01`. **Observed evidence:** Fix any of the following: the rule's check failed.
+
+**What is happening:**
+
+1 finding(s) for Fixture: buttons [primary/secondary] need names? across 1 page(s).
+
+**Why it matters:**
+
+Users relying on assistive technology hit a barrier here.
+
+**Severity:** Serious, A real barrier for affected users, even if a workaround sometimes exists.
+
+**Effort:** Effort: see fix steps
+
+**Owner:** Dev
+
+**Fix (do this):**
+
+1. Human review needed, no templated fix for `axe:fixture-rule-01` in `rules/audit_report.yaml` yet. See the rule docs: https://dequeuniversity.com/rules/axe/4.10/fixture-rule-01
+
+**My confidence:** Medium.
+
+_Rule docs: https://dequeuniversity.com/rules/axe/4.10/fixture-rule-01_
+
+### 18. Fixture rule 05 synthetic check
+
+> ⚠ **Human review needed**, this finding doesn't have a templated fix in our rule book yet. The data is real; the prescriptive guidance below is light.
+
+**WCAG:** SC 2.4.7, Level AA
+
+**Detected by:** axe-core (deterministic DOM rules).
+
+**Where:** 1 finding(s) on **1** page(s).
+
+Specific locations:
+- **Page:** [Home](<https://example.org/>). **Location on page:** Affected element identified by the recorded page selector. **Technical target:** `#fixture-05`. **Observed evidence:** Fix any of the following: the rule's check failed.
+
+**What is happening:**
+
+1 finding(s) for Fixture rule 05 synthetic check across 1 page(s).
+
+**Why it matters:**
+
+Users relying on assistive technology hit a barrier here.
+
+**Severity:** Serious, A real barrier for affected users, even if a workaround sometimes exists.
+
+**Effort:** Effort: see fix steps
+
+**Owner:** Dev
+
+**Fix (do this):**
+
+1. Human review needed, no templated fix for `axe:fixture-rule-05` in `rules/audit_report.yaml` yet. See the rule docs: https://dequeuniversity.com/rules/axe/4.10/fixture-rule-05
+
+**My confidence:** Medium.
+
+_Rule docs: https://dequeuniversity.com/rules/axe/4.10/fixture-rule-05_
+
+### 19. Fixture rule 13 synthetic check
+
+> ⚠ **Human review needed**, this finding doesn't have a templated fix in our rule book yet. The data is real; the prescriptive guidance below is light.
+
+**WCAG:** SC 2.4.7, Level AA
+
+**Detected by:** axe-core (deterministic DOM rules).
+
+**Where:** 1 finding(s) on **1** page(s).
+
+Specific locations:
+- **Page:** [https://example.org/products](<https://example.org/products>). **Location on page:** Affected element identified by the recorded page selector. **Technical target:** `#fixture-13`. **Observed evidence:** Fix any of the following: the rule's check failed.
+
+**What is happening:**
+
+1 finding(s) for Fixture rule 13 synthetic check across 1 page(s).
+
+**Why it matters:**
+
+Users relying on assistive technology hit a barrier here.
+
+**Severity:** Serious, A real barrier for affected users, even if a workaround sometimes exists.
+
+**Effort:** Effort: see fix steps
+
+**Owner:** Dev
+
+**Fix (do this):**
+
+1. Human review needed, no templated fix for `axe:fixture-rule-13` in `rules/audit_report.yaml` yet. See the rule docs: https://dequeuniversity.com/rules/axe/4.10/fixture-rule-13
+
+**My confidence:** Medium.
+
+_Rule docs: https://dequeuniversity.com/rules/axe/4.10/fixture-rule-13_
+
+### 20. Fixture rule 17 synthetic check
+
+> ⚠ **Human review needed**, this finding doesn't have a templated fix in our rule book yet. The data is real; the prescriptive guidance below is light.
+
+**WCAG:** SC 2.4.7, Level AA
+
+**Detected by:** axe-core (deterministic DOM rules).
+
+**Where:** 1 finding(s) on **1** page(s).
+
+Specific locations:
+- **Page:** [Contact](<https://example.org/contact>). **Location on page:** Affected element identified by the recorded page selector. **Technical target:** `#fixture-17`. **Observed evidence:** Fix any of the following: the rule's check failed.
+
+**What is happening:**
+
+1 finding(s) for Fixture rule 17 synthetic check across 1 page(s).
+
+**Why it matters:**
+
+Users relying on assistive technology hit a barrier here.
+
+**Severity:** Serious, A real barrier for affected users, even if a workaround sometimes exists.
+
+**Effort:** Effort: see fix steps
+
+**Owner:** Dev
+
+**Fix (do this):**
+
+1. Human review needed, no templated fix for `axe:fixture-rule-17` in `rules/audit_report.yaml` yet. See the rule docs: https://dequeuniversity.com/rules/axe/4.10/fixture-rule-17
+
+**My confidence:** Medium.
+
+_Rule docs: https://dequeuniversity.com/rules/axe/4.10/fixture-rule-17_
+
+### 21. Fixture rule 25 synthetic check
+
+> ⚠ **Human review needed**, this finding doesn't have a templated fix in our rule book yet. The data is real; the prescriptive guidance below is light.
+
+**WCAG:** SC 2.4.7, Level AA
+
+**Detected by:** axe-core (deterministic DOM rules).
+
+**Where:** 1 finding(s) on **1** page(s).
+
+Specific locations:
+- **Page:** [Home](<https://example.org/>). **Location on page:** Affected element identified by the recorded page selector. **Technical target:** `#fixture-25`. **Observed evidence:** Fix any of the following: the rule's check failed.
+
+**What is happening:**
+
+1 finding(s) for Fixture rule 25 synthetic check across 1 page(s).
+
+**Why it matters:**
+
+Users relying on assistive technology hit a barrier here.
+
+**Severity:** Serious, A real barrier for affected users, even if a workaround sometimes exists.
+
+**Effort:** Effort: see fix steps
+
+**Owner:** Dev
+
+**Fix (do this):**
+
+1. Human review needed, no templated fix for `axe:fixture-rule-25` in `rules/audit_report.yaml` yet. See the rule docs: https://dequeuniversity.com/rules/axe/4.10/fixture-rule-25
+
+**My confidence:** Medium.
+
+_Rule docs: https://dequeuniversity.com/rules/axe/4.10/fixture-rule-25_
+
+### 22. Fixture rule 29 synthetic check
+
+> ⚠ **Human review needed**, this finding doesn't have a templated fix in our rule book yet. The data is real; the prescriptive guidance below is light.
+
+**WCAG:** SC 2.4.7, Level AA
+
+**Detected by:** axe-core (deterministic DOM rules).
+
+**Where:** 1 finding(s) on **1** page(s).
+
+Specific locations:
+- **Page:** [Blog](<https://example.org/blog>). **Location on page:** Affected element identified by the recorded page selector. **Technical target:** `#fixture-29`. **Observed evidence:** Fix any of the following: the rule's check failed.
+
+**What is happening:**
+
+1 finding(s) for Fixture rule 29 synthetic check across 1 page(s).
+
+**Why it matters:**
+
+Users relying on assistive technology hit a barrier here.
+
+**Severity:** Serious, A real barrier for affected users, even if a workaround sometimes exists.
+
+**Effort:** Effort: see fix steps
+
+**Owner:** Dev
+
+**Fix (do this):**
+
+1. Human review needed, no templated fix for `axe:fixture-rule-29` in `rules/audit_report.yaml` yet. See the rule docs: https://dequeuniversity.com/rules/axe/4.10/fixture-rule-29
+
+**My confidence:** Medium.
+
+_Rule docs: https://dequeuniversity.com/rules/axe/4.10/fixture-rule-29_
 
 ### 23. Fixture rule without a documentation link
 
@@ -1877,8 +1877,8 @@ These detected findings or finding subsets were set aside after triage (remediat
 
 | Method | Issue | WCAG | Reason set aside |
 |---|---|---|---|
-| axe | Text does not stand out enough from its background | 1.4.3 | Triaged subset: false_positive (1) |
 | axe | Form fields have no name for screen readers | 4.1.2 | Already triaged: accepted_risk (1) |
+| axe | Text does not stand out enough from its background | 1.4.3 | Triaged subset: false_positive (1) |
 
 ## Appendix B, Review leads and informational evidence
 
@@ -1891,8 +1891,8 @@ These results are preserved for transparency but are not included in the remedia
 - **Images with important text have no alt text** (`essential_missing`), 2 finding(s) on 2 pages; **Not sure / medium confidence**. Text recognition (OCR) and a vision model found text in this image. Check what the image is for and whether its alt text says the same.
 - **Keyboard focus may be stuck on one element** (`keyboard-trap-stuck`), 1 finding(s) on 1 page; **Not sure / medium confidence**. Pressing Tab and pressing Shift+Tab both left focus on the same element. Check by hand whether another key, such as Escape, moves focus out.
 - **Link text may not say where the link goes** (`2.4.4`), 2 finding(s) on 2 pages; **Not sure / medium confidence**. The AI review (a language model on this computer) judged this. Check it on the page before you report it.
-- **Image with words has empty or different alt text** (`unclassified_inadequate`), 2 finding(s) on 2 pages; **Not sure / low confidence**. Axcess could not tell what this image is for: the vision model did not sort it. Decide that by hand before you report a barrier.
 - **Rule check (Alfa), a person must decide (Alfa sia-r111)** (`sia-r111:cant_tell`), 1 finding(s) on 1 page; **Not sure / medium confidence**. The rule check (Alfa) could not decide on 1 occurrence. That is not a failure. Alfa could not decide whether the target spacing is sufficient. [Stored evidence is unavailable.]
+- **Image with words has empty or different alt text** (`unclassified_inadequate`), 2 finding(s) on 2 pages; **Not sure / low confidence**. Axcess could not tell what this image is for: the vision model did not sort it. Decide that by hand before you report a barrier.
 - **Image with words has no alt text** (`unclassified_missing`), 1 finding(s) on 1 page; **Not sure / low confidence**. Axcess could not tell what this image is for: the vision model did not sort it. Decide that by hand before you report a barrier.
 - **Logo alt text uses words from the logo** (`logo_adequate`), 1 finding(s) on 1 page; **For information / medium confidence**. The alt text says the same as the text in the image. It is kept as a record, not a problem to fix.
 

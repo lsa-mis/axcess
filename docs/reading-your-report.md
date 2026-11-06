@@ -374,8 +374,8 @@ A long list is normal for a first scan, and nobody clears it in one sitting.
 Progress Over Perfection: each barrier you fix helps someone use the site today.
 
 1. **Mostly sure first.** They top the Issues table; confirm each one, then fix
-   it. [Priority](glossary.md#priority) favors spread, so also check the
-   workbook's Severity column for a severe problem on a single page.
+   it, starting with High [priority](glossary.md#priority). Priority starts
+   from the impact rating, so a critical problem on a single page is High.
 2. **Then Not sure.** Check each one on the page and record a decision.
 3. **Batch shared fixes.** Axcess groups by check, not by
    [root cause](glossary.md#root-cause), so look for one template or component

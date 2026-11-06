@@ -150,9 +150,10 @@ Moderate.
 
 ### Priority
 
-A High, Medium, or Low label in the Issues table that combines
-[impact](#impact) with how many pages an issue type touches. Because it rewards
-spread, a severe problem on a single page shows as Low, so check its impact too.
+A High, Medium, or Low label in the Issues table. It starts from the
+[impact](#impact) rating, so a critical problem is High even on one page. More
+pages and more occurrences raise it. Not sure lowers it, so a Not sure issue
+type is never High: a person must confirm it first.
 
 ### Status
 

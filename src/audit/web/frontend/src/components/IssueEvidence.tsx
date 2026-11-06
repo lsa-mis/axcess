@@ -441,7 +441,7 @@ function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-/** A plain-English band for the priority score (severity × log1p(pages)). */
+/** A plain-English band for the priority score (``_priority`` in src/audit/web/issues.py). */
 function priorityTier(priority: number): "High" | "Medium" | "Low" {
   if (priority >= 6) return "High";
   if (priority >= 3) return "Medium";

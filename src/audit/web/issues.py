@@ -96,21 +96,6 @@ def _alfa_diagnostics(findings: list[dict[str, Any]], *, limit: int = 2) -> list
     return diagnostics
 
 
-# Severity to priority weight. Used for sorting and for the "Priority"
-# column. Multiplied by log(1 + page_count) to give multi-page issues
-# more weight, one fix on 800 pages beats one fix on 1 page even if
-# the per-page severity is identical.
-_SEVERITY_WEIGHT = {
-    "critical": 4.0,
-    "serious": 3.0,
-    "moderate": 2.0,
-    "minor": 1.0,
-    # Image-finding severities get the same scale (mapped through their
-    # framework labels: critical/major/minor/info → critical/serious/moderate/minor).
-    "major": 3.0,
-    "info": 1.0,
-}
-
 # Effort tier → Difficulty label, in the Siteimprove vocabulary.
 # Beginner is "any editor can do this in <15 min"; Expert is structural.
 _EFFORT_TO_DIFFICULTY = {
@@ -1102,7 +1087,12 @@ def _axe_issue_rows(
                 page_count=len(reported_pages),
                 # Priority measures reach: a shared component that fails on
                 # every page is more urgent, not less, for being one element.
-                priority=_priority(impact, len(reported_pages | repeat_pages)),
+                priority=_priority(
+                    impact,
+                    len(reported_pages | repeat_pages),
+                    len(reported),
+                    evidence_confidence,
+                ),
                 impact=impact,
                 status_summary=reported_statuses,
                 # Deep-link to the dedicated Issue Detail view (the
@@ -1285,7 +1275,12 @@ def _image_issue_rows(
                 difficulty=_EFFORT_TO_DIFFICULTY.get(meta.get("effort", ""), "Unknown"),
                 occurrence_count=g.get("occurrence_count", g["finding_count"]),
                 page_count=len(page_ids),
-                priority=_priority(worst_severity, len(page_ids)),
+                priority=_priority(
+                    worst_severity,
+                    len(page_ids),
+                    int(g.get("occurrence_count", g["finding_count"])),
+                    evidence_confidence,
+                ),
                 impact=worst_severity,
                 status_summary=status_summary,
                 # Deep-link to the dedicated Issue Detail view, same
@@ -1403,18 +1398,53 @@ def _conformance_label(wcag_level: str | None) -> ConformanceLabel:
 _CONFORMANCE_RANK = {"A": 0, "AA": 1, "AAA": 2, "BP": 3}
 
 
-def _priority(impact: str | None, page_count: int) -> float:
-    """Severity weight x log(1 + pages_affected). Cheap and honest.
+# Priority starts from the impact rating, so the Priority column agrees with
+# the Impact column; reach and occurrence count only adjust it, and how sure
+# Axcess is scales it last. The old formula (weight x ln(1 + pages)) rated a
+# critical problem on one page Low (2.77) and an unconfirmed serious lead on
+# ten pages High (7.19): spread outweighed both the impact rating and the
+# evidence. Bands stay High >= 6 and Medium >= 3 (priorityTier in the UI).
+_PRIORITY_BASE = {
+    "critical": 6.0,  # High on its own, on a single page
+    "serious": 4.0,  # Medium; High from about 8 pages
+    "moderate": 2.5,  # Low on one page; Medium from 2 pages
+    "minor": 1.0,
+    # Image-finding severities on the same scale.
+    "major": 4.0,
+    "info": 1.0,
+}
+_PRIORITY_REACH_CAP = 3.0  # ln(pages); reached at about 20 pages
+_PRIORITY_OCCURRENCE_WEIGHT = 0.25
+_PRIORITY_OCCURRENCE_CAP = 1.0
+# "Not sure" (medium) can reach Medium but never High: the maximum raw score
+# is 6 + 3 + 1 = 10, and 10 x 0.55 = 5.5. "For information" (low) stays Low:
+# 10 x 0.25 = 2.5. A lead a person has not confirmed must not outrank a
+# confirmed barrier of the same impact.
+_PRIORITY_CONFIDENCE_FACTOR = {"high": 1.0, "medium": 0.55, "low": 0.25}
 
-    The weight is the same scale we use everywhere else
-    (4 critical → 1 minor). Multiplying by ``log(1 + page_count)`` gives
-    spread credit without letting one rule with thousands of pages
-    drown out a critical-but-narrow issue.
+
+def _priority(
+    impact: str | None,
+    page_count: int,
+    occurrence_count: int = 1,
+    confidence: str = "high",
+) -> float:
+    """Impact first, adjusted by reach and occurrences, scaled by confidence.
+
+    ``base(impact) + min(3, ln(pages)) + min(1, 0.25 x ln(occurrences))``,
+    times 1.0 / 0.55 / 0.25 for high / medium / low evidence confidence.
+    A rating Axcess does not know (Alfa has none) counts as minor.
     """
     import math
 
-    weight = _SEVERITY_WEIGHT.get(impact or "", 1.0)
-    return round(weight * math.log1p(page_count), 3)
+    base = _PRIORITY_BASE.get(impact or "", 1.0)
+    reach = min(_PRIORITY_REACH_CAP, math.log(max(1, page_count)))
+    occurrences = min(
+        _PRIORITY_OCCURRENCE_CAP,
+        _PRIORITY_OCCURRENCE_WEIGHT * math.log(max(1, occurrence_count)),
+    )
+    factor = _PRIORITY_CONFIDENCE_FACTOR.get(confidence, 1.0)
+    return round((base + reach + occurrences) * factor, 3)
 
 
 def _humanize_image_title(classification: str, adequacy: str) -> str:
