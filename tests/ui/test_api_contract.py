@@ -140,6 +140,10 @@ _OTHER_SITE_SCAN = (
     "same ScanSummary field is pinned through body[].scans[].rule_checks."
 )
 _UNPINNED_PATHS: dict[tuple[str, str], str] = {
+    ("GET /api/scans/{scan_id}/issues/{issue_key}", "body.row.also_wcag"): (
+        "The detail is read for the first axe issue type, which maps to one criterion; "
+        "the issues list pins the same IssueRow field from the seeded link-name row."
+    ),
     ("GET /api/capabilities/local-analysis", "body.semantic.ready_models"): _OFFLINE_OLLAMA,
     ("GET /api/capabilities/local-analysis", "body.vision.installed_size_bytes"): _OFFLINE_OLLAMA,
     ("GET /api/sites", "body[].most_recent.rule_checks"): _OTHER_SITE_SCAN,
@@ -593,6 +597,30 @@ def _add_contract_evidence(db_path: Path, blob_dir: Path, scan_id: int) -> dict[
     try:
         baseline = _add_report_history(conn, blob_dir, scan_id)
         _add_a11y_evidence(conn, blob_dir, scan_id)
+        # A rule that maps to two criteria, as axe tags link-name (2.4.4 and
+        # 4.1.2), so an issue row's ``also_wcag`` carries a value.
+        repo.upsert_axe_violation(
+            conn,
+            page_id=_page_ids(conn, scan_id)[0],
+            scan_id=scan_id,
+            rule_id="link-name",
+            wcag_sc="2.4.4",
+            wcag_scs="2.4.4,4.1.2",
+            wcag_level="A",
+            impact="minor",
+            help="Links must have discernible text",
+            help_url="https://dequeuniversity.com/rules/axe/4.10/link-name",
+            target_selector="#contract-icon-link",
+            failure_summary="Fix the missing link name.",
+            html_snippet='<a id="contract-icon-link" href="/x"></a>',
+            target_hash="api-contract-link-name",
+        )
+        # Not "new", so the comparison's status shapes keep both keys.
+        conn.execute(
+            "UPDATE page_a11y_findings SET status = 'reviewing' "
+            "WHERE target_hash = 'api-contract-link-name'"
+        )
+        conn.commit()
         # The scan's page counters, as a crawl writes them, so a scan's
         # ``rule_checks`` lists both checks rather than an empty list.
         conn.execute(

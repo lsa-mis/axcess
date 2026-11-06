@@ -299,6 +299,7 @@
         {
           "abilities_affected": ["string"],
           "acceptance": "string",
+          "also_wcag": [{"name": "string", "sc": "string"}],
           "click_through_occurrence_count": "integer",
           "conformance": "string",
           "description": "string",
@@ -338,7 +339,7 @@
             "accepted_risk": "absent|integer",
             "false_positive": "absent|integer",
             "in_progress": "absent|integer",
-            "new": "absent|integer",
+            "new": "integer",
             "remediated": "absent|integer",
             "reviewing": "absent|integer"
           },
@@ -372,6 +373,7 @@
       "row": {
         "abilities_affected": ["string"],
         "acceptance": "string",
+        "also_wcag": [],
         "click_through_occurrence_count": "integer",
         "conformance": "string",
         "description": "string",
@@ -446,6 +448,7 @@
       "row": {
         "abilities_affected": ["string"],
         "acceptance": "string",
+        "also_wcag": [],
         "click_through_occurrence_count": "integer",
         "conformance": "string",
         "description": "string",
@@ -513,6 +516,7 @@
       "row": {
         "abilities_affected": ["string"],
         "acceptance": "string",
+        "also_wcag": [],
         "click_through_occurrence_count": "integer",
         "conformance": "string",
         "description": "string",
