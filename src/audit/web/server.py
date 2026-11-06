@@ -73,6 +73,7 @@ from audit.exports.csv_export import render_csv
 from audit.exports.jira_export import render_jira_csv
 from audit.exports.json_export import render_json
 from audit.exports.markdown_report import render_markdown
+from audit.exports.redaction import redact_export
 from audit.exports.xlsx_export import render_xlsx
 from audit.labels import (
     CLICK_THROUGH,
@@ -2769,8 +2770,10 @@ def create_app(
         scan: ExportScan,
         fmt: str,
         readiness: PublicExportReadiness,
+        *,
+        redact: bool = False,
     ) -> str | bytes:
-        """Render one export format and apply its draft labeling."""
+        """Render one export format, redact it if asked, then label drafts."""
         # The audit-report renderer needs the live connection so it
         # can call the grouping helpers. The other renderers operate
         # on the pre-collected `scan` only.
@@ -2779,16 +2782,35 @@ def create_app(
             rendered = render_audit_report(scan, conn=conn)
         elif fmt == "xlsx":
             # Pass the blob store so the Issues Overview sheet can embed
-            # each finding's marked location screenshot as evidence.
-            rendered = render_xlsx(scan, conn=conn, blob_store=blob_store)
+            # each finding's marked location screenshot as evidence. A
+            # redacted workbook gets none: text in a screenshot cannot be
+            # redacted, so the pictures are never put in.
+            rendered = render_xlsx(scan, conn=conn, blob_store=None if redact else blob_store)
         else:
             rendered = _EXPORT_RENDERERS[fmt](scan)
+        if redact:
+            # Redaction runs on the finished file, never on stored evidence:
+            # the report in the app keeps everything (export-only scope).
+            rendered = redact_export(rendered, export_format=fmt)
         return label_draft_export(rendered, export_format=fmt, readiness=readiness)
 
     # The Export panel asks this before offering its downloads, so each
     # choice can say how big the file is and whether it will be a draft.
     @app.get("/api/scans/{scan_id:int}/exports", response_model=ExportOptions)
-    def export_options(request: Request, scan_id: int) -> ExportOptions:
+    def export_options(
+        request: Request,
+        scan_id: int,
+        redact: Annotated[
+            bool,
+            Query(
+                description=(
+                    "Set to true for a redacted copy: likely private details "
+                    "(form values, email addresses, phone numbers, card and ID "
+                    "numbers, tokens) are replaced with [redacted]. Best effort."
+                )
+            ),
+        ] = False,
+    ) -> ExportOptions:
         """Name, size and draft state of each file the Export panel offers.
 
         Each file is rendered exactly as the download route renders it, with
@@ -2801,10 +2823,14 @@ def create_app(
             readiness = assess_public_export_readiness(conn, scan_id, draft_acknowledged=True)
 
             def render(fmt: PanelFormat) -> str | bytes:
-                return render_public_export(conn, scan, fmt, readiness)
+                return render_public_export(conn, scan, fmt, readiness, redact=redact)
 
             return build_export_options(
-                scan_id, readiness, extensions=_EXPORT_EXTENSIONS, render=render
+                scan_id,
+                readiness,
+                extensions=_EXPORT_EXTENSIONS,
+                render=render,
+                redacted=redact,
             )
 
     # The SPA's Export panel downloads from this ``/api/*`` route with
@@ -2824,6 +2850,16 @@ def create_app(
                 )
             ),
         ] = None,
+        redact: Annotated[
+            bool,
+            Query(
+                description=(
+                    "Set to true for a redacted copy: likely private details "
+                    "(form values, email addresses, phone numbers, card and ID "
+                    "numbers, tokens) are replaced with [redacted]. Best effort."
+                )
+            ),
+        ] = False,
     ) -> Response:
         """Download a scan export as CSV / JSON / Jira CSV / Markdown / Audit."""
         fmt_lower = fmt.lower()
@@ -2839,13 +2875,15 @@ def create_app(
                 )
             except IncompleteEvaluationExportError as exc:
                 raise HTTPException(status_code=409, detail=str(exc)) from exc
-            rendered = render_public_export(conn, scan, fmt_lower, readiness)
+            rendered = render_public_export(conn, scan, fmt_lower, readiness, redact=redact)
         media = _EXPORT_MEDIA_TYPES[fmt_lower]
         ext = _EXPORT_EXTENSIONS[fmt_lower]
-        filename = public_export_filename(scan_id, ext, readiness)
+        filename = public_export_filename(scan_id, ext, readiness, redacted=redact)
         headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
         if readiness.is_draft:
             headers["X-Axcess-Export-State"] = "draft"
+        if redact:
+            headers["X-Axcess-Export-Redaction"] = "best-effort"
         return Response(
             content=rendered,
             media_type=media,

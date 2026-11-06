@@ -54,6 +54,9 @@ class ExportOptions(BaseModel):
     #: review of this report is not complete.
     draft: bool
     evaluation_status: str
+    #: True when the files described are the redacted copies (likely private
+    #: details replaced with "[redacted]"). Sizes and names are for those.
+    redacted: bool = False
     formats: list[ExportFormatOption]
 
 
@@ -69,22 +72,27 @@ def build_export_options(
     *,
     extensions: Mapping[str, str],
     render: Callable[[PanelFormat], str | bytes],
+    redacted: bool = False,
 ) -> ExportOptions:
     """Describe each panel format by rendering it the way the route would.
 
     ``readiness`` must be the draft-acknowledged disposition the panel's
     downloads request, and ``render`` must return the labeled export for
-    that disposition, so the filename and the size describe the same file.
+    that disposition (redacted when ``redacted`` is set), so the filename
+    and the size describe the same file.
     """
 
     return ExportOptions(
         scan_id=scan_id,
         draft=readiness.is_draft,
         evaluation_status=readiness.evaluation_status,
+        redacted=redacted,
         formats=[
             ExportFormatOption(
                 format=export_format,
-                filename=public_export_filename(scan_id, extensions[export_format], readiness),
+                filename=public_export_filename(
+                    scan_id, extensions[export_format], readiness, redacted=redacted
+                ),
                 size_bytes=encoded_size(render(export_format)),
             )
             for export_format in PANEL_FORMATS

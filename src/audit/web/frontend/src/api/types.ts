@@ -1390,7 +1390,7 @@ export interface SiteHistory {
 export type ExportFormat = "xlsx" | "audit" | "csv" | "json";
 export interface ExportFormatOption {
   format: ExportFormat;
-  /** The downloaded file's name, ``_DRAFT`` marker included. */
+  /** The downloaded file's name, ``_DRAFT`` and ``_REDACTED`` markers included. */
   filename: string;
   /** Bytes of the file as the download route renders it now. */
   size_bytes: number;
@@ -1401,5 +1401,8 @@ export interface ExportOptions {
   /** Every file downloads as a labeled draft: expert review is unfinished. */
   draft: boolean;
   evaluation_status: string;
+  /** The files described are redacted copies: likely private details are
+   *  replaced with "[redacted]". Names and sizes are for those copies. */
+  redacted: boolean;
   formats: ExportFormatOption[];
 }

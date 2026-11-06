@@ -12,7 +12,7 @@ import { AlertCircle, Check, ChevronDown, Download, Loader2 } from "lucide-react
 import { ApiError, api, exportUrl } from "../api/client";
 import type { ExportFormat } from "../api/types";
 import { cn } from "../lib/cn";
-import { Button } from "./ui";
+import { Button, Checkbox } from "./ui";
 
 /**
  * The report's downloads, behind one control.
@@ -37,6 +37,33 @@ import { Button } from "./ui";
  * a refused or failed export saved the error as the file, or nothing, with
  * no word on the page. The link's `href` stays the real export URL, so a
  * modified click (a new tab, copying the link) still does what it asks.
+ *
+ * **Remove private details (redact).** A report of a site behind a sign-in
+ * can hold a person's own data (a filled-in field, an email address in a
+ * greeting). One checkbox, above the four files, asks for redacted copies:
+ * the server replaces likely private details with "[redacted]" in the file
+ * and names it `_REDACTED`. It changes the downloads only; the report in
+ * Axcess keeps everything, as decided for this feature (export only).
+ * - A checkbox, the native `<input type="checkbox">` in the shared
+ *   `Checkbox`, because this is an on/off setting for the files below it
+ *   (W3C "Using ARIA" rule 1, https://www.w3.org/TR/using-aria/#rule1).
+ *   Rejected: a second "redacted" link for each file. Eight links for four
+ *   files is two ways to do one thing (W3C COGA "Making Content Usable",
+ *   https://www.w3.org/TR/coga-usable/, paraphrased: keep one way to do a
+ *   task), and the list would no longer fit at 320 px.
+ * - Above the files, not below: the choice comes before the action, in
+ *   reading and focus order (SC 2.4.3 Focus Order, Level A). It is also the
+ *   first stop for the arrow keys, so opening the panel with Down arrow
+ *   lands on it rather than skipping past it to the first file.
+ * - Off by default. Turning it on by default would change what every
+ *   existing download contains (AGENTS.md, Implementation rule 5), and the
+ *   reviewer's own copy should keep the full evidence. The label says what
+ *   it does in plain words first, with "redact" in parentheses for people
+ *   who know the term (docs/plain-language.md).
+ * - Its limits are never shortened away: when it is on, the footer says it
+ *   is best effort, what it can miss, and to check the file before sharing
+ *   (AGENTS.md, Interface language rule 4). Each file carries the same
+ *   notice inside it.
  */
 const FORMATS: {
   format: ExportFormat;
@@ -119,6 +146,7 @@ export default function ExportMenu({
   const [open, setOpen] = useState(false);
   const [downloads, setDownloads] = useState<Partial<Record<ExportFormat, DownloadState>>>({});
   const [announcement, setAnnouncement] = useState("");
+  const [redact, setRedact] = useState(false);
   const idBase = useId();
   const panelId = `${idBase}-panel`;
   const headingId = `${idBase}-heading`;
@@ -136,8 +164,8 @@ export default function ExportMenu({
   // scan, so it waits until someone opens the panel. The downloads never
   // wait for it: a link works before, and without, its size.
   const options = useQuery({
-    queryKey: ["export-options", scanId],
-    queryFn: () => api.getExportOptions(scanId),
+    queryKey: ["export-options", scanId, redact],
+    queryFn: () => api.getExportOptions(scanId, redact),
     enabled: open,
     staleTime: 60_000,
     // One retry, not the default three: a server that lacks the endpoint
@@ -166,7 +194,7 @@ export default function ExportMenu({
     if (!open) return;
     if (focusFirstOnOpen.current) {
       focusFirstOnOpen.current = false;
-      panelRef.current?.querySelector("a")?.focus();
+      panelStops()[0]?.focus();
     }
     const closeOnOutsidePointer = (event: MouseEvent) => {
       if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
@@ -198,24 +226,26 @@ export default function ExportMenu({
     };
   }, [open]);
 
-  function panelLinks(): HTMLAnchorElement[] {
-    return Array.from(panelRef.current?.querySelectorAll("a") ?? []);
+  /** The panel's arrow-key stops, in order: the redaction choice, then the
+   *  four downloads. */
+  function panelStops(): HTMLElement[] {
+    return Array.from(panelRef.current?.querySelectorAll<HTMLElement>("input, a") ?? []);
   }
 
   function onTriggerKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>) {
     if (event.key !== "ArrowDown") return;
     event.preventDefault();
     if (open) {
-      panelLinks()[0]?.focus();
+      panelStops()[0]?.focus();
     } else {
       focusFirstOnOpen.current = true;
       setOpen(true);
     }
   }
 
-  function onLinkKeyDown(event: ReactKeyboardEvent<HTMLAnchorElement>) {
-    const links = panelLinks();
-    const current = links.indexOf(event.currentTarget);
+  function onStopKeyDown(event: ReactKeyboardEvent<HTMLElement>) {
+    const links = panelStops();
+    const current = links.indexOf(event.target as HTMLElement);
     const target =
       event.key === "ArrowDown"
         ? Math.min(current + 1, links.length - 1)
@@ -235,12 +265,15 @@ export default function ExportMenu({
     setDownloads((previous) => ({ ...previous, [entry.format]: { kind: "preparing" } }));
     setAnnouncement(`Preparing “${entry.label}”…`);
     try {
-      const result = await api.downloadExport(scanId, entry.format);
+      const result = await api.downloadExport(scanId, entry.format, redact);
       setDownloads((previous) => ({
         ...previous,
         [entry.format]: { kind: "done", filename: result.filename },
       }));
-      setAnnouncement(`Downloading ${result.filename}, ${formatFileSize(result.sizeBytes)}.`);
+      setAnnouncement(
+        `Downloading ${result.filename}${result.redacted ? ", a redacted copy" : ""}, ` +
+          `${formatFileSize(result.sizeBytes)}.`,
+      );
     } catch (error) {
       const message =
         error instanceof ApiError
@@ -326,6 +359,18 @@ export default function ExportMenu({
           )}
         </div>
 
+        {/* The wrapper takes the arrow keys for the checkbox inside it; the
+            shared Checkbox has no key handler of its own to pass one to. */}
+        {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- Keep: forwards the panel's arrow keys from the native checkbox inside; it is not itself a control. */}
+        <div className="border-b border-border px-2 py-1.5" onKeyDown={onStopKeyDown}>
+          <Checkbox
+            checked={redact}
+            onChange={setRedact}
+            label="Remove private details (redact)"
+            hint="Replaces form field values, email addresses, phone numbers, card and ID numbers, and secret codes with [redacted] in the files. The report in Axcess keeps everything."
+          />
+        </div>
+
         <ul className="p-1.5">
           {FORMATS.map((entry) => {
             const option = optionFor(entry.format);
@@ -347,13 +392,13 @@ export default function ExportMenu({
                     downloadable as a visibly labeled draft, which is the
                     server's contract; the footer says when that applies. */}
                 <a
-                  href={exportUrl(scanId, entry.format, true)}
+                  href={exportUrl(scanId, entry.format, true, redact)}
                   download={option?.filename ?? ""}
                   aria-labelledby={ids.label}
                   aria-describedby={describedBy}
                   aria-disabled={state?.kind === "preparing" || undefined}
                   onClick={(event) => onChoose(event, entry)}
-                  onKeyDown={onLinkKeyDown}
+                  onKeyDown={onStopKeyDown}
                   // Drawn as a row, not a run of text: the global link hover
                   // underline (and the "always underline links" setting)
                   // would otherwise strike through every line inside it.
@@ -411,6 +456,13 @@ export default function ExportMenu({
                 Axcess could not check the file sizes, or whether the files are drafts. The
                 downloads still work.
               </span>
+            </p>
+          )}
+          {redact && (
+            <p className="font-semibold text-fg">
+              Removing private details is best effort. It can miss names and other private text,
+              and it does not change text inside images, so screenshots are left out. Check each
+              file before you share it.
             </p>
           )}
           {options.data?.draft && (

@@ -174,8 +174,9 @@ function dispositionFilename(header: string | null): string | null {
 async function downloadExport(
   scanId: number,
   format: ExportFormat,
-): Promise<{ filename: string; sizeBytes: number; draft: boolean }> {
-  const res = await fetch(exportUrl(scanId, format, true), {
+  redact = false,
+): Promise<{ filename: string; sizeBytes: number; draft: boolean; redacted: boolean }> {
+  const res = await fetch(exportUrl(scanId, format, true, redact), {
     credentials: "same-origin",
     cache: "no-store",
   });
@@ -191,6 +192,7 @@ async function downloadExport(
     filename,
     sizeBytes: blob.size,
     draft: res.headers.get("X-Axcess-Export-State") === "draft",
+    redacted: res.headers.get("X-Axcess-Export-Redaction") !== null,
   };
 }
 
@@ -373,7 +375,8 @@ export const api = {
   /** Explicit, identity-protected download of the minimal redacted summary. */
   downloadProtectedRedactedExport,
   /** Name, size and draft state of each file the Export panel offers. */
-  getExportOptions: (scanId: number) => request<ExportOptions>(`/api/scans/${scanId}/exports`),
+  getExportOptions: (scanId: number, redact = false) =>
+    request<ExportOptions>(`/api/scans/${scanId}/exports${redact ? "?redact=true" : ""}`),
   downloadExport,
   cancelScan: (id: number) =>
     request<{ ok: boolean }>(`/api/scans/${id}/cancel`, { method: "POST" }),
@@ -578,6 +581,20 @@ export const api = {
 export const blobUrl = (contentHash: string): string =>
   `/blobs/${contentHash}`;
 
-/** Download URL for a scan export; incomplete reports require explicit draft acknowledgement. */
-export const exportUrl = (scanId: number, format: string, acknowledgedDraft = false): string =>
-  `/api/scans/${scanId}/export/${format}${acknowledgedDraft ? "?draft=acknowledged" : ""}`;
+/**
+ * Download URL for a scan export; incomplete reports require explicit draft
+ * acknowledgement. ``redact`` asks for the redacted copy, with likely private
+ * details replaced by "[redacted]" (best effort, export only).
+ */
+export const exportUrl = (
+  scanId: number,
+  format: string,
+  acknowledgedDraft = false,
+  redact = false,
+): string => {
+  const params = new URLSearchParams();
+  if (acknowledgedDraft) params.set("draft", "acknowledged");
+  if (redact) params.set("redact", "true");
+  const query = params.toString();
+  return `/api/scans/${scanId}/export/${format}${query ? `?${query}` : ""}`;
+};

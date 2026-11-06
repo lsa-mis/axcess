@@ -79,6 +79,10 @@ async def test_arrow_keys_move_between_downloads(
     trigger = await _open_by_keyboard(page)
 
     link = lambda name: page.get_by_role("link", name=name, exact=True)  # noqa: E731
+    # The redaction choice comes first, before the files it applies to.
+    redact = page.get_by_role("checkbox", name="Remove private details (redact)")
+    await expect(redact).to_be_focused()
+    await page.keyboard.press("ArrowDown")
     await expect(link("Issue types with fixes (Excel)")).to_be_focused()
     await page.keyboard.press("ArrowDown")
     await expect(link("Written report (Markdown)")).to_be_focused()
@@ -87,6 +91,8 @@ async def test_arrow_keys_move_between_downloads(
     await page.keyboard.press("ArrowUp")
     await expect(link("Occurrence list (CSV)")).to_be_focused()
     await page.keyboard.press("Home")
+    await expect(redact).to_be_focused()
+    await page.keyboard.press("ArrowDown")
     await expect(link("Issue types with fixes (Excel)")).to_be_focused()
     await page.keyboard.press("Escape")
     await expect(trigger).to_be_focused()
@@ -113,6 +119,52 @@ async def test_download_reports_its_outcome_and_keeps_focus(
     )
     # The panel stays open with focus where it was, ready for a second file.
     await expect(workbook).to_be_focused()
+
+
+async def test_redacted_copy_by_keyboard_says_its_limits_and_names_the_file(
+    live_server: tuple[str, int], new_page: Any
+) -> None:
+    base, scan_id = live_server
+    page = await new_page(accept_downloads=True)
+    await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+    await _open_by_keyboard(page)
+    panel = page.get_by_role("group", name=f"Export Report #{scan_id}")
+    redact = panel.get_by_role("checkbox", name="Remove private details (redact)")
+    await expect(redact).to_have_accessible_description(re.compile(r"with \[redacted\]"))
+    await expect(panel).not_to_contain_text("best effort")
+
+    await page.keyboard.press("Space")
+    await expect(redact).to_be_checked()
+    # Never shortened away: what it can miss, and to check before sharing.
+    await expect(panel).to_contain_text("Removing private details is best effort.")
+    await expect(panel).to_contain_text("names and other private text")
+    await expect(panel).to_contain_text("text inside images")
+    await expect(panel).to_contain_text("Check each file before you share it.")
+
+    await page.keyboard.press("ArrowDown")
+    workbook = panel.get_by_role("link", name="Issue types with fixes (Excel)", exact=True)
+    await expect(workbook).to_be_focused()
+    await expect(workbook).to_have_attribute("href", re.compile(r"redact=true"))
+    async with page.expect_download() as download_info:
+        await page.keyboard.press("Enter")
+    download = await download_info.value
+
+    assert download.suggested_filename == f"scan_{scan_id}_DRAFT_REDACTED.xlsx"
+    await expect(page.get_by_role("status").filter(has_text="Downloading")).to_have_text(
+        re.compile(rf"^Downloading scan_{scan_id}_DRAFT_REDACTED\.xlsx, a redacted copy, \d+ KB\.$")
+    )
+    await expect(workbook).to_be_focused()
+
+    # Scoped to the panel, now showing the checked choice and its notice.
+    await page.add_script_tag(content=_AXE_TEXT)
+    violations = await page.evaluate(
+        """async (tags) => (await window.axe.run(
+            document.querySelector('[role=group][aria-labelledby]'),
+            { runOnly: { type: 'tag', values: tags } },
+        )).violations""",
+        _AXE_TAGS,
+    )
+    assert not violations, _render_violations(violations)
 
 
 async def test_a_failed_download_is_reported_in_words(

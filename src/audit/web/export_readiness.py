@@ -137,11 +137,18 @@ def public_export_filename(
     scan_id: int,
     extension: str,
     readiness: PublicExportReadiness,
+    *,
+    redacted: bool = False,
 ) -> str:
-    """Return a stable final filename or an unmistakable draft filename."""
+    """Return a stable final filename, marked when it is a draft or redacted.
+
+    ``_REDACTED`` in the name tells a recipient, before opening the file,
+    that it is the hand-off copy and not the full evidence.
+    """
 
     draft_marker = "_DRAFT" if readiness.is_draft else ""
-    return f"scan_{scan_id}{draft_marker}.{extension}"
+    redaction_marker = "_REDACTED" if redacted else ""
+    return f"scan_{scan_id}{draft_marker}{redaction_marker}.{extension}"
 
 
 def label_draft_export(
