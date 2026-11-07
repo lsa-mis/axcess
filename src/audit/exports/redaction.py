@@ -119,7 +119,11 @@ _ATTRIBUTE = re.compile(
 # An opening tag. Element code in a report is often cut short, so a tag
 # may end at the end of the text instead of at ">".
 _TAG = re.compile(r"<[A-Za-z][^<>]*(?:>|$)")
-_TEXTAREA = re.compile(r"(?is)(<textarea\b[^>]*>)(.*?)(</textarea\s*>)")
+# A text box's typed text. Element code is often cut short, so a text box
+# whose closing tag was cut off runs to the end of the text, and all of it is
+# replaced: without the closing tag there is no telling where the typed text
+# stops, and keeping it would leak it.
+_TEXTAREA = re.compile(r"(?is)(<textarea\b[^>]*>)(.*?)(</textarea\s*>|\Z)")
 # Attributes whose value is a link: keep the link, redact its secrets.
 _URL_ATTRIBUTES = frozenset({"href", "src", "action", "formaction", "poster", "cite", "data"})
 # Attributes that are filled-in or secret by nature.
@@ -166,8 +170,11 @@ def _redact_token(match: re.Match[str]) -> str:
 def _redact_patterns(text: str) -> str:
     """Redact identifiers and secrets in plain text (no URL handling)."""
 
-    result = _HEADER.sub(lambda m: f"{m.group(1)}{REDACTED}", text)
-    result = _BEARER.sub(lambda m: f"{m.group(1)} {REDACTED}", result)
+    # The scheme's credential first: "Authorization: Bearer <token>" would
+    # otherwise have only the word "Bearer" taken as the header's value,
+    # leaving a token that is not a JWT behind.
+    result = _BEARER.sub(lambda m: f"{m.group(1)} {REDACTED}", text)
+    result = _HEADER.sub(lambda m: f"{m.group(1)}{REDACTED}", result)
     result = _JWT.sub(REDACTED, result)
     result = _EMAIL.sub(REDACTED_EMAIL, result)
     result = _UUID.sub(REDACTED_ID, result)

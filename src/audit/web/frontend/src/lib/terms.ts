@@ -1,4 +1,12 @@
-import type { AxeImpact, DetectionPipeline, FindingStatus, ReviewLane, RuleCheck, ScanStatus } from "../api/types";
+import type {
+  AxeImpact,
+  DetectionPipeline,
+  ExportFormat,
+  FindingStatus,
+  ReviewLane,
+  RuleCheck,
+  ScanStatus,
+} from "../api/types";
 
 /**
  * The words the interface uses for shared values, in one place.
@@ -103,6 +111,56 @@ export const RULE_CHECK_TOOL: Record<RuleCheck, string> = {
 export function ruleChecksText(checks: readonly RuleCheck[]): string {
   return checks.length === 0 ? "None" : checks.map((check) => RULE_CHECK_TOOL[check]).join(" and ");
 }
+
+/**
+ * The Export panel's files, by name. Each name says what the file holds and,
+ * in parentheses, its format, so two Markdown files cannot be mistaken for
+ * each other. The workbook's index has one row per issue type (one per Issues
+ * table row); the CSV has one row per occurrence (one place). The workbook's
+ * label changed on 2026-10-26 with the terms; the CSV was "Issue list (CSV)"
+ * from then until 2026-10-28, when "occurrence" came back. See
+ * docs/plain-language.md, "Why "occurrence" and "issue type"".
+ */
+export const EXPORT_FORMAT_LABEL: Record<ExportFormat, string> = {
+  xlsx: "Issue types with fixes (Excel)",
+  audit: "Written report (Markdown)",
+  brief: "Fix brief for a coding agent (Markdown)",
+  csv: "Occurrence list (CSV)",
+  json: "All report data (JSON)",
+};
+
+/** One line under each Export panel file: what it is for. */
+export const EXPORT_FORMAT_HINT: Record<ExportFormat, string> = {
+  xlsx: "One row for each issue type, with how to fix it",
+  audit: "The whole report as readable text",
+  brief:
+    "Open issue types with where and how to fix them, for Claude Code or another coding agent. Always removes likely private details, as best effort.",
+  csv: "One row for each occurrence: one place on one page",
+  json: "Every detail the scan saved, for developers",
+};
+
+/**
+ * The Export panel's one-click copy of the fix brief: the button, and what
+ * it says once the brief is on the clipboard. A verb and an object, so the
+ * button says what it copies (docs/plain-language.md rule 8).
+ */
+export const COPY_FIX_BRIEF_LABEL = "Copy fix brief";
+export const COPY_FIX_BRIEF_HINT =
+  "Puts the same Markdown on your clipboard, to paste into Claude Code or another coding agent.";
+export const COPY_FIX_BRIEF_DONE = "Copied the fix brief. Paste it into your coding agent.";
+
+/**
+ * The fix brief's redaction limits, shown in the Export panel whether or not
+ * "Remove private details" is ticked, because the brief is always redacted
+ * and is made to leave Axcess. It says "best effort" and keeps every limit
+ * that applies to the brief (AGENTS.md, Interface language rule 4): what
+ * redaction can miss, and that its links open the full report. The brief has
+ * no screenshots, so the image limit of the other files does not apply.
+ * Never "always removed": the redactor matches patterns and cannot know a
+ * name (PR #60 review).
+ */
+export const FIX_BRIEF_REDACTION_LIMITS =
+  "The fix brief is always a redacted copy. Removing private details is best effort: it can miss names and other private text, and the brief's links back to Axcess open the full report. Check the brief before you share it or paste it into a coding agent.";
 
 /** A scan's progress, for status badges. */
 export const SCAN_STATUS_LABEL: Record<ScanStatus, string> = {

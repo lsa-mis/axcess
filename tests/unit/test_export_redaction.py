@@ -56,6 +56,14 @@ def test_textarea_content_is_redacted() -> None:
     )
 
 
+def test_textarea_cut_short_before_its_closing_tag_is_redacted() -> None:
+    # Element code is saved cut short, so the closing tag can be missing; the
+    # typed text still must not survive.
+    assert redact_text('<div><textarea id="n">My note to the bank, about my loan') == (
+        '<div><textarea id="n">[redacted]'
+    )
+
+
 def test_secret_named_attributes_are_redacted_but_aria_values_kept() -> None:
     html = '<div data-session-id="s-991" data-value="x" nonce="r4nd" aria-valuenow="5">'
     assert redact_text(html) == (
@@ -109,6 +117,8 @@ def test_bearer_token_and_header_values_are_redacted() -> None:
         "dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U"
     )
     assert jwt not in redact_text(f"Authorization: Bearer {jwt}")
+    # A token that is not a JWT goes too, not only the word "Bearer".
+    assert "abcdefghijklmnop" not in redact_text("Authorization: Bearer abcdefghijklmnop")
     assert redact_text(f"token {jwt}") == f"token {REDACTED}"
     assert redact_text("password=hunter2") == f"password={REDACTED}"
 

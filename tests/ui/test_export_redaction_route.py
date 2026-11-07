@@ -176,9 +176,13 @@ def test_export_options_describe_the_redacted_files(
     assert redacted["redacted"] is True
     for option in redacted["formats"]:
         assert option["filename"].endswith(
-            {"xlsx": ".xlsx", "audit": ".audit.md", "csv": ".csv", "json": ".json"}[
-                option["format"]
-            ]
+            {
+                "xlsx": ".xlsx",
+                "audit": ".audit.md",
+                "brief": ".fix-brief.md",
+                "csv": ".csv",
+                "json": ".json",
+            }[option["format"]]
         )
         assert "_REDACTED." in option["filename"]
         response = client.get(

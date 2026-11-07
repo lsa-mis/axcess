@@ -18,6 +18,7 @@ _EXTENSIONS = {
     "markdown": "md",
     "audit": "audit.md",
     "xlsx": "xlsx",
+    "brief": "fix-brief.md",
 }
 
 
@@ -36,6 +37,7 @@ def test_each_panel_format_is_named_and_sized_as_rendered(is_draft: bool, suffix
     rendered: dict[str, str | bytes] = {
         "xlsx": b"PK" + b"\x00" * 98,
         "audit": "# Report\n",
+        "brief": "# Brief\n",
         "csv": "a,b\n1,é\n",
         "json": "{}",
     }
@@ -46,7 +48,9 @@ def test_each_panel_format_is_named_and_sized_as_rendered(is_draft: bool, suffix
         return rendered[export_format]
 
     readiness = PublicExportReadiness(evaluation_status="in_progress", is_draft=is_draft)
-    options = build_export_options(12, readiness, extensions=_EXTENSIONS, render=render)
+    options = build_export_options(
+        12, readiness, extensions=_EXTENSIONS, render=render, always_redacted={"brief"}
+    )
 
     # Only what the panel offers is rendered: Jira CSV and plain Markdown
     # would cost a render each for a size nobody sees.
@@ -57,6 +61,23 @@ def test_each_panel_format_is_named_and_sized_as_rendered(is_draft: bool, suffix
     assert [(o.format, o.filename, o.size_bytes) for o in options.formats] == [
         ("xlsx", f"scan_12{suffix}.xlsx", 100),
         ("audit", f"scan_12{suffix}.audit.md", 9),
+        # The fix brief is always the redacted copy, and named so.
+        ("brief", f"scan_12{suffix}_REDACTED.fix-brief.md", 8),
         ("csv", f"scan_12{suffix}.csv", 9),
         ("json", f"scan_12{suffix}.json", 2),
     ]
+
+
+def test_a_format_the_route_would_refuse_is_left_out() -> None:
+    """A fix brief of a report that is not complete has no size to show."""
+    readiness = PublicExportReadiness(evaluation_status="draft", is_draft=True)
+
+    options = build_export_options(
+        3,
+        readiness,
+        extensions=_EXTENSIONS,
+        render=lambda export_format: "x",
+        unavailable={"brief"},
+    )
+
+    assert [option.format for option in options.formats] == ["xlsx", "audit", "csv", "json"]

@@ -1882,6 +1882,11 @@ def fix_options_for(row: Any, rules: dict[str, Any]) -> tuple[FixOption, ...]:
     return _fix_options(_meta_for_row(row, rules))
 
 
+def card_markdown(text: str) -> str:
+    """Card prose as Markdown, for callers outside this module (the fix brief)."""
+    return _strip_html(text)
+
+
 def load_report_rules() -> dict[str, Any]:
     """Read the authored rule copy once, for callers outside this module."""
     return _load_rules()
@@ -1906,6 +1911,7 @@ __all__ = [
     "DroppedFinding",
     "FixOption",
     "IssueLocation",
+    "card_markdown",
     "fix_options_for",
     "load_report_rules",
     "plain_text",

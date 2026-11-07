@@ -168,7 +168,7 @@ def label_draft_export(
     if not readiness.is_draft:
         return rendered
     status_label = readiness.evaluation_status.replace("_", " ")
-    if export_format in {"markdown", "audit"}:
+    if export_format in {"markdown", "audit", "brief"}:
         if not isinstance(rendered, str):
             raise TypeError("Markdown exports must be text")
         notice = (
