@@ -863,6 +863,9 @@ export interface IssueLocation {
   /** Captured outerHTML of the flagged element, shown as escaped source in
    *  the inline inspector, never executed. Null when none was recorded. */
   html_snippet: string | null;
+  /** For an image issue type, the image file's address as the crawler saved
+   *  it; `target` is then a description, not a locator. Null for DOM rules. */
+  image_url: string | null;
 }
 
 export interface IssuePage {

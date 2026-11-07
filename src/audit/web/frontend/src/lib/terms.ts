@@ -134,7 +134,7 @@ export const EXPORT_FORMAT_HINT: Record<ExportFormat, string> = {
   xlsx: "One row for each issue type, with how to fix it",
   audit: "The whole report as readable text",
   brief:
-    "Open issue types with where and how to fix them, for Claude Code or another coding agent. Private details are always removed.",
+    "Open issue types with where and how to fix them, for Claude Code or another coding agent. Always removes likely private details, as best effort.",
   csv: "One row for each occurrence: one place on one page",
   json: "Every detail the scan saved, for developers",
 };
@@ -148,6 +148,19 @@ export const COPY_FIX_BRIEF_LABEL = "Copy fix brief";
 export const COPY_FIX_BRIEF_HINT =
   "Puts the same Markdown on your clipboard, to paste into Claude Code or another coding agent.";
 export const COPY_FIX_BRIEF_DONE = "Copied the fix brief. Paste it into your coding agent.";
+
+/**
+ * The fix brief's redaction limits, shown in the Export panel whether or not
+ * "Remove private details" is ticked, because the brief is always redacted
+ * and is made to leave Axcess. It says "best effort" and keeps every limit
+ * that applies to the brief (AGENTS.md, Interface language rule 4): what
+ * redaction can miss, and that its links open the full report. The brief has
+ * no screenshots, so the image limit of the other files does not apply.
+ * Never "always removed": the redactor matches patterns and cannot know a
+ * name (PR #60 review).
+ */
+export const FIX_BRIEF_REDACTION_LIMITS =
+  "The fix brief is always a redacted copy. Removing private details is best effort: it can miss names and other private text, and the brief's links back to Axcess open the full report. Check the brief before you share it or paste it into a coding agent.";
 
 /** A scan's progress, for status badges. */
 export const SCAN_STATUS_LABEL: Record<ScanStatus, string> = {

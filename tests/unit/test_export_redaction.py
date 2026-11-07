@@ -56,6 +56,14 @@ def test_textarea_content_is_redacted() -> None:
     )
 
 
+def test_textarea_cut_short_before_its_closing_tag_is_redacted() -> None:
+    # Element code is saved cut short, so the closing tag can be missing; the
+    # typed text still must not survive.
+    assert redact_text('<div><textarea id="n">My note to the bank, about my loan') == (
+        '<div><textarea id="n">[redacted]'
+    )
+
+
 def test_secret_named_attributes_are_redacted_but_aria_values_kept() -> None:
     html = '<div data-session-id="s-991" data-value="x" nonce="r4nd" aria-valuenow="5">'
     assert redact_text(html) == (

@@ -81,9 +81,13 @@ into the brief word for word from `src/audit/exports/axcess_check.py`. It
 opens the page in Chromium with Playwright, adds axe-core at the version the
 scan used (it refuses to judge with another version), runs only that one
 rule, and answers with an exit code: `0` passed, `1` failed (and it lists the
-locators that still fail), `2` not checked (the element is gone, the place
-appears only after a click, the page address was redacted, or the page did
-not load). The command holds only numbers Axcess chose; the page address and
+locators that still fail), `2` not checked (the element is gone or its
+locator now matches more than one element, the place appears only after a
+click, the page address was redacted, the page did not load or answered with
+an HTTP error such as 404, or axe-core could not decide, an "incomplete"
+result). It compares the element axe-core reports with the saved element
+itself, not their locator text, so a locator that changes after a fix (an
+added `id`) cannot turn a failure into a pass. The command holds only numbers Axcess chose; the page address and
 element locator are in one `untrusted-data` block of JSON at the end of the
 brief, redacted and cut like every other scanned value, so scanned text never
 reaches a shell. Issue types that axe did not find (keyboard, focus and other
@@ -121,7 +125,12 @@ The same before-and-after run is a test, so it stays true:
 `tests/integration/test_fix_brief_check_script.py` serves a temporary copy of
 the site, fails before the fix, passes after, keeps the unfixed places
 failing, and checks the "not checked" answers (after a click, element gone,
-another axe-core version).
+another axe-core version, a 404 page, a locator that matches two elements, an
+"incomplete" result) and that a changed locator still fails.
+
+The sample brief and the run log here were recorded before the PR #60 review
+changes (2026-11-06), so the script copied into the sample is the earlier
+version; the tests above cover the current one.
 
 **What this shows, and what it does not.**
 

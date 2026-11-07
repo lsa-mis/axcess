@@ -18,6 +18,7 @@ import {
   COPY_FIX_BRIEF_LABEL,
   EXPORT_FORMAT_HINT,
   EXPORT_FORMAT_LABEL,
+  FIX_BRIEF_REDACTION_LIMITS,
 } from "../lib/terms";
 import { Button, Checkbox } from "./ui";
 
@@ -73,6 +74,17 @@ import { Button, Checkbox } from "./ui";
  *   is best effort, what it can miss, and to check the file before sharing
  *   (AGENTS.md, Interface language rule 4). Each file carries the same
  *   notice inside it.
+ * - The fix brief is redacted whether or not the box is ticked, so its
+ *   limits are shown whether or not it is ticked too: with the box off, the
+ *   footer says the brief is a redacted copy, that this is best effort, what
+ *   it can miss, and to check the brief before sharing or pasting it. The
+ *   brief's download link and "Copy fix brief" both point to that text with
+ *   `aria-describedby`, so a screen reader user hears the limits before
+ *   acting, as a sighted user sees them in the open panel. The brief's own
+ *   hint says "best effort" too. Rejected: the earlier "Private details are
+ *   always removed", which promised more than a pattern-matching redactor
+ *   can do (it cannot recognize a name), and hiding the limits until the box
+ *   was ticked, when the brief is redacted either way (PR #60 review).
  *
  * **Copy fix brief.** The fix brief is made to be pasted into Claude Code or
  * another coding agent, so it has a one-click copy beside its download
@@ -161,6 +173,7 @@ export default function ExportMenu({
   const [copyState, setCopyState] = useState<CopyState | null>(null);
   const idBase = useId();
   const panelId = `${idBase}-panel`;
+  const limitsId = `${idBase}-redaction-limits`;
   const headingId = `${idBase}-heading`;
   const containerRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -430,7 +443,12 @@ export default function ExportMenu({
               size: `${idBase}-${entry.format}-size`,
               state: `${idBase}-${entry.format}-state`,
             };
-            const describedBy = [ids.hint, option && ids.size, state && ids.state]
+            const describedBy = [
+              ids.hint,
+              entry.format === "brief" && limitsId,
+              option && ids.size,
+              state && ids.state,
+            ]
               .filter(Boolean)
               .join(" ");
             return (
@@ -493,6 +511,7 @@ export default function ExportMenu({
                 {entry.format === "brief" && (
                   <CopyBriefRow
                     idBase={idBase}
+                    limitsId={limitsId}
                     state={copyState}
                     onCopy={() => void copyBrief()}
                     onKeyDown={onStopKeyDown}
@@ -515,13 +534,13 @@ export default function ExportMenu({
               </span>
             </p>
           )}
-          {redact && (
-            <p className="font-semibold text-fg">
-              Removing private details is best effort. It can miss names and other private text,
-              and it does not change text inside images, so screenshots are left out. Check each
-              file before you share it.
-            </p>
-          )}
+          {/* One limits note, always shown: for every file when the box is
+              ticked, for the always-redacted fix brief when it is not. */}
+          <p id={limitsId} className="font-semibold text-fg">
+            {redact
+              ? "Removing private details is best effort. It can miss names and other private text, and it does not change text inside images, so screenshots are left out. The links back to Axcess open the full report. Check each file before you share it."
+              : FIX_BRIEF_REDACTION_LIMITS}
+          </p>
           {options.data?.draft && (
             <p className="font-semibold text-fg">
               An expert has not finished reviewing this report, so each file is marked DRAFT.
@@ -543,11 +562,14 @@ export default function ExportMenu({
  */
 function CopyBriefRow({
   idBase,
+  limitsId,
   state,
   onCopy,
   onKeyDown,
 }: {
   idBase: string;
+  /** The panel's redaction limits note, which also covers this copy. */
+  limitsId: string;
   state: CopyState | null;
   onCopy: () => void;
   onKeyDown: (event: ReactKeyboardEvent<HTMLElement>) => void;
@@ -560,7 +582,7 @@ function CopyBriefRow({
         type="button"
         size="sm"
         className="min-h-target"
-        aria-describedby={[hintId, state && stateId].filter(Boolean).join(" ")}
+        aria-describedby={[hintId, limitsId, state && stateId].filter(Boolean).join(" ")}
         aria-disabled={state?.kind === "copying" || undefined}
         onClick={onCopy}
         onKeyDown={onKeyDown}

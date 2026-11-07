@@ -138,7 +138,12 @@ async def test_redacted_copy_by_keyboard_says_its_limits_and_names_the_file(
     panel = page.get_by_role("group", name=f"Export Report #{scan_id}")
     redact = panel.get_by_role("checkbox", name="Remove private details (redact)")
     await expect(redact).to_have_accessible_description(re.compile(r"with \[redacted\]"))
-    await expect(panel).not_to_contain_text("best effort")
+    # Unticked, only the always-redacted fix brief's limits show, not the
+    # note for every file (PR #60 review: the brief's limits always show).
+    await expect(panel).to_contain_text(
+        "The fix brief is always a redacted copy. Removing private details is best effort"
+    )
+    await expect(panel).not_to_contain_text("Check each file before you share it.")
 
     await page.keyboard.press("Space")
     await expect(redact).to_be_checked()
@@ -146,6 +151,7 @@ async def test_redacted_copy_by_keyboard_says_its_limits_and_names_the_file(
     await expect(panel).to_contain_text("Removing private details is best effort.")
     await expect(panel).to_contain_text("names and other private text")
     await expect(panel).to_contain_text("text inside images")
+    await expect(panel).to_contain_text("The links back to Axcess open the full report.")
     await expect(panel).to_contain_text("Check each file before you share it.")
 
     await page.keyboard.press("ArrowDown")
@@ -184,11 +190,18 @@ async def test_fix_brief_downloads_redacted_for_a_coding_agent(
     await _open_by_keyboard(page)
     panel = page.get_by_role("group", name=f"Export Report #{scan_id}")
     brief = panel.get_by_role("link", name="Fix brief for a coding agent (Markdown)", exact=True)
-    # Its hint says what it is for, and that it is always redacted, before
-    # anyone chooses it; the redaction checkbox stays off.
+    # Its hint says what it is for, and that it is always redacted as best
+    # effort, before anyone chooses it; the redaction checkbox stays off. The
+    # limits are on screen and in its description without ticking the box
+    # (PR #60 review: never "always removed").
     await expect(brief).to_have_accessible_description(
-        re.compile(r"coding agent\. Private details are always removed\.")
+        re.compile(r"coding agent\. Always removes likely private details, as best effort\.")
     )
+    await expect(brief).to_have_accessible_description(
+        re.compile(r"best effort: it can miss names and other private text")
+    )
+    await expect(panel).to_contain_text("Check the brief before you share it")
+    await expect(panel).not_to_contain_text("always removed")
     await expect(brief).to_have_accessible_description(re.compile(r" about \d+(\.\d)? (B|KB|MB)$"))
     await expect(brief).to_have_attribute("href", re.compile(r"/export/brief\?draft=acknowledged$"))
 
@@ -232,6 +245,10 @@ async def test_copy_fix_brief_puts_its_markdown_on_the_clipboard(
     copy = panel.get_by_role("button", name="Copy fix brief", exact=True)
     await expect(copy).to_have_accessible_description(
         re.compile(r"^Puts the same Markdown on your clipboard")
+    )
+    # The redaction limits reach the copy button too, before it is pressed.
+    await expect(copy).to_have_accessible_description(
+        re.compile(r"Removing private details is best effort: it can miss names")
     )
 
     await copy.click()

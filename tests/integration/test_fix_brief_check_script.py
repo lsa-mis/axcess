@@ -211,3 +211,110 @@ def test_a_different_axe_core_version_is_not_checked(
 
     assert done.returncode == axcess_check.NOT_CHECKED, done.stdout
     assert "axe-core 0.0.1, the scan used" in done.stdout
+
+
+def _agent(tmp_path: Path, brief: str) -> Path:
+    """The folder an agent saves the brief, the script and axe-core in."""
+
+    work = tmp_path / "agent"
+    work.mkdir()
+    (work / "fix-brief.md").write_text(brief, encoding="utf-8")
+    (work / "axcess_check.py").write_text(CHECK_SCRIPT, encoding="utf-8")
+    shutil.copyfile(DEFAULT_AXE_BUNDLE, work / "axe.min.js")
+    return work
+
+
+def _run(work: Path, origin: str, *args: str) -> tuple[int, str]:
+    done = subprocess.run(  # noqa: S603 - this interpreter, the script Axcess wrote
+        [sys.executable, "axcess_check.py", "fix-brief.md", *args, "--origin", origin],
+        cwd=work,
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
+    return done.returncode, done.stdout
+
+
+def test_a_new_locator_for_the_same_failing_element_is_not_a_pass(
+    tmp_db: sqlite3.Connection, tmp_path: Path, site: tuple[Path, str]
+) -> None:
+    """PR #60 review: axe's locator changes, the element still fails."""
+    root, origin = site
+    brief = _brief(tmp_db)
+    work = _agent(tmp_path, brief)
+    image = _place(axcess_check.load_checks(brief), "image-alt", "index.html")
+    # An id, but still no alt text: axe now names the element "#hero", while
+    # the saved locator "img" still finds the same element.
+    index = root / "index.html"
+    index.write_text(
+        index.read_text().replace(
+            '<img src="assets/cover.png"', '<img id="hero" src="assets/cover.png"'
+        ),
+        encoding="utf-8",
+    )
+
+    code, out = _run(work, origin, image)
+
+    assert code == axcess_check.FAILED, out
+    assert "still failing: #hero" in out
+
+
+def test_a_locator_that_matches_two_elements_is_not_checked(
+    tmp_db: sqlite3.Connection, tmp_path: Path, site: tuple[Path, str]
+) -> None:
+    root, origin = site
+    brief = _brief(tmp_db)
+    work = _agent(tmp_path, brief)
+    promo = _place(axcess_check.load_checks(brief), "color-contrast", "index.html")
+    # A second paragraph: the saved locator "p" no longer names one element.
+    index = root / "index.html"
+    index.write_text(
+        index.read_text().replace("</main>", "<p>Open every day.</p></main>"),
+        encoding="utf-8",
+    )
+
+    code, out = _run(work, origin, promo)
+
+    assert code == axcess_check.NOT_CHECKED, out
+    assert "now matches 2 elements" in out
+
+
+def test_an_undecided_axe_result_is_not_checked(
+    tmp_db: sqlite3.Connection, tmp_path: Path, site: tuple[Path, str]
+) -> None:
+    """PR #60 review: axe-core "incomplete" is never reported as a pass."""
+    root, origin = site
+    brief = _brief(tmp_db)
+    work = _agent(tmp_path, brief)
+    fine_print = _place(axcess_check.load_checks(brief), "color-contrast", "about.html")
+    # A background image: axe-core cannot measure the contrast, so it reports
+    # the element as incomplete instead of as a violation.
+    css = root / "assets" / "site.css"
+    css.write_text(
+        css.read_text() + "\n.fine-print { background-image: url(cover.png); }\n",
+        encoding="utf-8",
+    )
+
+    code, out = _run(work, origin, fine_print)
+    assert code == axcess_check.NOT_CHECKED, out
+    assert "could not decide" in out
+    # The same in whole-page mode.
+    code, out = _run(work, origin, fine_print, "--whole-page")
+    assert code == axcess_check.NOT_CHECKED, out
+
+
+def test_an_error_page_is_not_checked(
+    tmp_db: sqlite3.Connection, tmp_path: Path, site: tuple[Path, str]
+) -> None:
+    """PR #60 review: a 404 page is never checked in place of the page."""
+    root, origin = site
+    brief = _brief(tmp_db)
+    work = _agent(tmp_path, brief)
+    fine_print = _place(axcess_check.load_checks(brief), "color-contrast", "about.html")
+    (root / "about.html").unlink()
+
+    code, out = _run(work, origin, fine_print)
+
+    assert code == axcess_check.NOT_CHECKED, out
+    assert "HTTP status 404" in out

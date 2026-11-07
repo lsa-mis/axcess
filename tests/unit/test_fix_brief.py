@@ -24,6 +24,7 @@ from audit.exports import axcess_check, fix_brief
 from audit.exports.collector import collect_scan
 from audit.exports.fix_brief import DATA_FENCE_LABEL, render_fix_brief
 from audit.exports.redaction import REDACTION_NOTICE
+from audit.web import issues
 
 WHEN = datetime(2026, 11, 6, 12, 0, tzinfo=UTC)
 
@@ -156,9 +157,10 @@ def test_issue_type_cap_adds_a_cut_short_notice(
 def test_total_size_cap_stops_adding_issue_types(
     tmp_db: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # The fixed part (header and the check script) is about 11,000 characters;
-    # the cap leaves room for a few issue types on top of it.
-    cap = 15_000
+    # The fixed part (header and the check script) is about 15,000 characters
+    # since the script checks element identity, HTTP status and axe-core's
+    # incomplete results; the cap leaves room for a few issue types on top.
+    cap = 19_000
     monkeypatch.setattr(fix_brief, "MAX_BRIEF_CHARS", cap)
     scan_id = _scan(tmp_db)
     page = _page(tmp_db, scan_id, "https://shop.example/")
@@ -232,6 +234,40 @@ def test_secrets_and_form_values_are_redacted(tmp_db: sqlite3.Connection) -> Non
     assert REDACTION_NOTICE in brief
 
 
+def test_a_long_text_box_is_redacted_before_it_is_cut(tmp_db: sqlite3.Connection) -> None:
+    # Fits the issue list's 2,000-character sample, closing tag included, but
+    # is longer than four times the brief's 400-character cut (PR #60 review).
+    private = "Dear bank, my late husband's account and my loan worries: "
+    snippet = '<textarea id="note">' + private + "z" * 1700 + "</textarea>"
+    assert len(snippet) < 2000
+    scan_id = _scan(tmp_db)
+    page = _page(tmp_db, scan_id, "https://shop.example/")
+    _finding(tmp_db, scan_id, page, "label", target="#note", html_snippet=snippet)
+
+    brief = _brief(tmp_db, scan_id)
+
+    assert "late husband" not in brief
+    assert '<textarea id="note">[redacted]' in brief
+
+
+def test_scanned_values_are_redacted_whole_then_cut(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: list[str] = []
+
+    def spy(text: str) -> str:
+        seen.append(text)
+        return text
+
+    monkeypatch.setattr(fix_brief, "redact_text", spy)
+    value = "<p>" + "w" * 5000 + "</p>"
+
+    shown = fix_brief._scanned(value, fix_brief.MAX_SNIPPET_CHARS)
+
+    # The redactor saw the whole value, closing tag and all; only the output
+    # is cut.
+    assert seen == [value]
+    assert len(shown) <= fix_brief.MAX_SNIPPET_CHARS
+
+
 # --- Injection ---------------------------------------------------------------
 
 
@@ -278,6 +314,140 @@ def test_injection_text_stays_inside_fenced_data_blocks(tmp_db: sqlite3.Connecti
         if token.type == "inline" and token.content.startswith("How to")
     ]
     assert headings == ["How to fix it", "How to check the fix"]
+
+
+# --- Places and counts (PR #60 review) -----------------------------------------
+
+
+def _image(
+    conn: sqlite3.Connection,
+    scan_id: int,
+    pages: list[int],
+    src: str,
+    *,
+    content: str,
+    status: str = "new",
+) -> None:
+    """One image of text with no alt text, shown once on each of ``pages``."""
+
+    image_id = repo.upsert_image(
+        conn,
+        content_hash=content * 64,
+        src_url=src,
+        mime="image/png",
+        bytes_len=512,
+        width=600,
+        height=100,
+        blob_path=f"{content * 2}/{content * 64}.png",
+        has_svg_text=False,
+        scan_id=scan_id,
+    )
+    for page_id in pages:
+        repo.upsert_page_image(
+            conn,
+            page_id=page_id,
+            image_id=image_id,
+            alt_text=None,
+            role=None,
+            context_snippet=None,
+            position=0,
+        )
+    repo.upsert_analysis(
+        conn,
+        image_id=image_id,
+        ocr_text="BUY NOW",
+        ocr_confidence=90.0,
+        vlm_classification="essential",
+        vlm_rationale="Banner.",
+        has_text=True,
+        model_versions={"ocr": "t", "vlm": "v"},
+    )
+    finding_id = repo.upsert_finding(
+        conn,
+        image_id=image_id,
+        scan_id=scan_id,
+        severity="major",
+        priority_score=1.0,
+        remediation_hint=None,
+    )
+    conn.execute("UPDATE findings SET status = ? WHERE id = ?", (status, finding_id))
+
+
+def _image_section(brief: str) -> str:
+    start = brief.index("\n### ", brief.index("## Issue types to fix"))
+    return brief[start:]
+
+
+def test_image_counts_use_one_unit(tmp_db: sqlite3.Connection) -> None:
+    scan_id = _scan(tmp_db)
+    pages = [_page(tmp_db, scan_id, f"https://shop.example/p{n}") for n in range(5)]
+    # One open image reused on five pages: all five places still need a fix.
+    _image(tmp_db, scan_id, pages, "https://shop.example/banner.png", content="b")
+
+    brief = _brief(tmp_db, scan_id)
+
+    assert "- Open images: 1 of 1 (1 New), shown in 5 places on 5 pages" in brief
+    assert "Open occurrences: 1 of 5" not in brief
+
+
+def test_open_places_are_shown_before_closed_ones(tmp_db: sqlite3.Connection) -> None:
+    scan_id = _scan(tmp_db)
+    page = _page(tmp_db, scan_id, "https://shop.example/")
+    for target, status in (
+        ("#fixed-1", "remediated"),
+        ("#not-a-problem", "false_positive"),
+        ("#fixed-2", "remediated"),
+        ("#still-broken", "new"),
+    ):
+        _finding(tmp_db, scan_id, page, "label", target=target, status=status)
+    other = _page(tmp_db, scan_id, "https://shop.example/gallery")
+    for n, status in enumerate(("remediated", "remediated", "false_positive", "new")):
+        _image(
+            tmp_db,
+            scan_id,
+            [other],
+            f"https://shop.example/img{n}.png",
+            content="cdef"[n],
+            status=status,
+        )
+
+    brief = _brief(tmp_db, scan_id)
+
+    # The open element and the open image are in the brief's three places.
+    assert "element locator (CSS selector): #still-broken" in brief
+    assert "image file address: https://shop.example/img3.png" in brief
+    # The Issues view's own sample is unchanged: the first three found.
+    dom_row = next(r for r in issues.list_issues(tmp_db, scan_id) if r.pipeline != "image")
+    assert [loc.target for loc in dom_row.locations] == ["#fixed-1", "#not-a-problem", "#fixed-2"]
+
+
+def test_image_places_are_described_with_a_redacted_image_address(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    scan_id = _scan(tmp_db)
+    page = _page(tmp_db, scan_id, "https://shop.example/")
+    _image(
+        tmp_db,
+        scan_id,
+        [page],
+        "https://cdn.shop.example/promo/sale-banner.png?token=s3cretT0kenValue",
+        content="b",
+    )
+
+    section = _image_section(_brief(tmp_db, scan_id))
+
+    # A description is not called an element locator ...
+    assert "element locator" not in section
+    assert "image place (a description, not a CSS selector): Image occurrence 1" in section
+    # ... and the image's file address, redacted, is there to search for.
+    assert (
+        "image file address: https://cdn.shop.example/promo/sale-banner.png?token=[redacted]"
+        in section
+    )
+    assert "s3cretT0kenValue" not in section
+    # Only inside the fenced data, and never offered to the axe check script.
+    assert "sale-banner.png" not in _outside_fences(section)
+    assert "No script check: an axe rule did not find this issue type" in section
 
 
 # --- Scan isolation ----------------------------------------------------------
@@ -444,7 +614,8 @@ def test_checks_data_is_redacted_and_cut_like_other_scanned_values(
 def test_the_checks_data_counts_toward_the_size_cap(
     tmp_db: sqlite3.Connection, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    cap = 15_000
+    # Room for the fixed part (about 15,000 characters) and a few issue types.
+    cap = 19_000
     monkeypatch.setattr(fix_brief, "MAX_BRIEF_CHARS", cap)
     scan_id = _scan(tmp_db)
     for number in range(30):
@@ -508,3 +679,63 @@ def test_the_script_helpers_match_how_axcess_saved_locators() -> None:
     assert axcess_check.with_origin("https://shop.example/a", None) == "https://shop.example/a"
     with pytest.raises(KeyError):
         axcess_check.pick({"places": {"1.1": {}}}, "2")
+
+
+# --- The check script's verdicts (PR #60 review) ------------------------------
+
+_PLACE = {"locator": "img", "locator_exact": True}
+_URL = "http://127.0.0.1:8000/"
+
+
+def _node(target: str, *, saved: bool) -> dict[str, object]:
+    return {"target": [target], "saved": saved}
+
+
+def _verdict(outcome: dict[str, object], *, whole_page: bool = False) -> int:
+    return axcess_check.verdict(_PLACE, outcome, whole_page=whole_page, url=_URL)[0]
+
+
+def test_a_changed_locator_for_the_same_failing_element_still_fails() -> None:
+    # Adding id="hero" without alt text: axe now says "#hero", the saved
+    # locator says "img", and both are the same element.
+    outcome = {"count": 1, "failing": [_node("#hero", saved=True)], "unsure": []}
+
+    assert _verdict(outcome) == axcess_check.FAILED
+
+
+def test_a_failure_at_another_element_does_not_fail_this_place() -> None:
+    outcome = {"count": 1, "failing": [_node("img", saved=False)], "unsure": []}
+
+    assert _verdict(outcome) == axcess_check.PASSED
+
+
+def test_an_ambiguous_or_missing_locator_is_not_checked() -> None:
+    for count in (0, 2, -1, None):
+        outcome = {"count": count, "failing": [], "unsure": []}
+        assert _verdict(outcome) == axcess_check.NOT_CHECKED, count
+
+
+def test_axe_incomplete_results_are_not_checked_never_passed() -> None:
+    at_element = {"count": 1, "failing": [], "unsure": [_node("p", saved=True)]}
+    elsewhere = {"count": 1, "failing": [], "unsure": [_node("p", saved=False)]}
+    on_page = {"count": None, "failing": [], "unsure": [_node("p", saved=False)]}
+
+    assert _verdict(at_element) == axcess_check.NOT_CHECKED
+    assert _verdict(elsewhere) == axcess_check.PASSED
+    assert _verdict(on_page, whole_page=True) == axcess_check.NOT_CHECKED
+    # A failure still wins over an undecided element.
+    on_page["failing"] = [_node("p", saved=False)]
+    assert _verdict(on_page, whole_page=True) == axcess_check.FAILED
+
+
+def test_an_error_response_is_not_checked() -> None:
+    class Response:
+        def __init__(self, status: int) -> None:
+            self.status = status
+
+    assert axcess_check.response_problem(Response(200)) is None
+    assert axcess_check.response_problem(Response(204)) is None
+    for status in (404, 500, 301, 403):
+        problem = axcess_check.response_problem(Response(status))
+        assert problem is not None and str(status) in problem
+    assert axcess_check.response_problem(None) is not None
