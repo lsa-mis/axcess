@@ -19,19 +19,19 @@ and of the database, so it can be tested with a stub.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Collection, Mapping
 from typing import Literal
 
 from pydantic import BaseModel
 
 from audit.web.export_readiness import PublicExportReadiness, public_export_filename
 
-PanelFormat = Literal["xlsx", "audit", "csv", "json"]
+PanelFormat = Literal["xlsx", "audit", "brief", "csv", "json"]
 
 #: The files the Export panel offers, in the panel's order. The route also
 #: serves ``markdown`` and ``jira``; the panel does not list them, so they
-#: are not rendered here.
-PANEL_FORMATS: tuple[PanelFormat, ...] = ("xlsx", "audit", "csv", "json")
+#: are not rendered here. ``brief`` is the coding-agent fix brief.
+PANEL_FORMATS: tuple[PanelFormat, ...] = ("xlsx", "audit", "brief", "csv", "json")
 
 
 class ExportFormatOption(BaseModel):
@@ -54,6 +54,9 @@ class ExportOptions(BaseModel):
     #: review of this report is not complete.
     draft: bool
     evaluation_status: str
+    #: True when the files described are the redacted copies (likely private
+    #: details replaced with "[redacted]"). Sizes and names are for those.
+    redacted: bool = False
     formats: list[ExportFormatOption]
 
 
@@ -69,24 +72,38 @@ def build_export_options(
     *,
     extensions: Mapping[str, str],
     render: Callable[[PanelFormat], str | bytes],
+    redacted: bool = False,
+    always_redacted: Collection[str] = (),
+    unavailable: Collection[str] = (),
 ) -> ExportOptions:
     """Describe each panel format by rendering it the way the route would.
 
     ``readiness`` must be the draft-acknowledged disposition the panel's
     downloads request, and ``render`` must return the labeled export for
-    that disposition, so the filename and the size describe the same file.
+    that disposition (redacted when ``redacted`` is set), so the filename
+    and the size describe the same file. A format in ``always_redacted`` is
+    named as redacted whatever ``redacted`` says (the fix brief), and a
+    format in ``unavailable`` is left out, because the route would refuse it
+    (a fix brief of a report that is not complete).
     """
 
     return ExportOptions(
         scan_id=scan_id,
         draft=readiness.is_draft,
         evaluation_status=readiness.evaluation_status,
+        redacted=redacted,
         formats=[
             ExportFormatOption(
                 format=export_format,
-                filename=public_export_filename(scan_id, extensions[export_format], readiness),
+                filename=public_export_filename(
+                    scan_id,
+                    extensions[export_format],
+                    readiness,
+                    redacted=redacted or export_format in always_redacted,
+                ),
                 size_bytes=encoded_size(render(export_format)),
             )
             for export_format in PANEL_FORMATS
+            if export_format not in unavailable
         ],
     )

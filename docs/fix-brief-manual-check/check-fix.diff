@@ -1,0 +1,28 @@
+diff -ru site-before/assets/site.css site-after/assets/site.css
+--- site-before/assets/site.css
++++ site-after/assets/site.css
+@@ -1,4 +1,4 @@
+ body { font-family: sans-serif; color: #222; background: #fff; }
+-.promo-note { color: #b0b0b0; }
+-.fine-print { color: #c4c4c4; font-size: 12px; }
++.promo-note { color: #595959; }
++.fine-print { color: #595959; font-size: 12px; }
+ .icon-btn { border: 0; background: none; }
+diff -ru site-before/index.html site-after/index.html
+--- site-before/index.html
++++ site-after/index.html
+@@ -9,12 +9,12 @@
+   <header class="site-header">
+     <a href="index.html" class="brand">Harbor Books</a>
+     <nav><a href="about.html">About us</a> <a href="contact.html">Contact</a></nav>
+-    <button class="icon-btn cart-toggle" type="button"><svg width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="6"></circle></svg></button>
++    <button class="icon-btn cart-toggle" type="button" aria-label="Open the cart"><svg width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="6"></circle></svg></button>
+   </header>
+   <main>
+     <h1>New this week</h1>
+     <p class="promo-note">Members save 10% on every order this month.</p>
+-    <img src="assets/cover.png" class="cover-art" width="120" height="160">
++    <img src="assets/cover.png" class="cover-art" alt="Cover of this week's new book" width="120" height="160">
+   </main>
+ </body>
+ </html>
