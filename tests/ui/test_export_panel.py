@@ -57,7 +57,17 @@ async def test_panel_says_what_each_download_delivers(
         )
     # The seeded scan's expert review is unfinished.
     await expect(panel).to_contain_text("each file is marked DRAFT")
-    await expect(panel).to_contain_text("even if the table has filters on")
+    await expect(panel).to_contain_text(
+        "Every file except the fix brief includes every issue type and every status "
+        "in this report, even if the table has filters on."
+    )
+    # The fix brief is a sample of the report, and the panel says so beside
+    # the note about the other files (PR #58 review).
+    await expect(panel).to_contain_text(
+        "The fix brief is not the whole report. It lists open issue types only, most "
+        "important first, stops at a limit, and shows a few places for each. It says "
+        "what it left out."
+    )
     await expect(panel).to_contain_text("never prove")
 
     # Scoped to the panel: the rest of the page has its own axe coverage.
@@ -151,6 +161,11 @@ async def test_redacted_copy_by_keyboard_says_its_limits_and_names_the_file(
     await expect(panel).to_contain_text("Removing private details is best effort.")
     await expect(panel).to_contain_text("names and other private text")
     await expect(panel).to_contain_text("text inside images")
+    # A kept locator can quote a value from the page (PR #58 review).
+    await expect(panel).to_contain_text(
+        "Every file except the fix brief keeps element locators (CSS selectors) whole, "
+        "so they still find the element, even when one quotes a value from the page."
+    )
     await expect(panel).to_contain_text("The links back to Axcess open the full report.")
     await expect(panel).to_contain_text("Check each file before you share it.")
 

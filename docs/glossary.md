@@ -432,6 +432,13 @@ does not change text inside images, so screenshots are left out. It changes
 only the download: the report in Axcess keeps everything. Check the file
 before you share it.
 
+Element locators (CSS selectors) are kept whole, so that each still finds its
+element. A locator that quotes a value from the page, such as
+`input[data-owner="jane@example.com"]`, therefore still shows that value. The
+same value is replaced everywhere else in the file. The fix brief for a coding
+agent is the exception: it redacts inside locators too, and tells the agent
+when a locator is no longer exact.
+
 ### Configured search
 
 An optional scan setting, **Use a search box to find more pages**, that types

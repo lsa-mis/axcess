@@ -79,7 +79,7 @@ found, the brief gives one command per place, such as
 issue type (`... fix-brief.md 1`). The script, `axcess_check.py`, is copied
 into the brief word for word from `src/audit/exports/axcess_check.py`. It
 opens the page in Chromium with Playwright, adds axe-core at the version the
-scan used (it refuses to judge with another version), runs only that one
+brief names (it refuses to judge with another version), runs only that one
 rule, and answers with an exit code: `0` passed, `1` failed (and it lists the
 locators that still fail), `2` not checked (the element is gone or its
 locator now matches more than one element, the place appears only after a
@@ -92,6 +92,14 @@ element locator are in one `untrusted-data` block of JSON at the end of the
 brief, redacted and cut like every other scanned value, so scanned text never
 reaches a shell. Issue types that axe did not find (keyboard, focus and other
 probes, image text, Alfa) say there is no script check.
+
+The version the brief names is the axe-core version Axcess runs when the
+brief is made. Axcess does not save which version a scan ran, so the brief
+does not call it the scan's version, and it says a result can differ if
+Axcess was updated after the scan (changed in the PR #58 review). The saved
+samples in this folder were recorded before that change and still say "the
+version this scan used"; in this check the scan and the brief were made with
+the same copy of Axcess, so it was true here.
 
 **How it was checked, end to end, offline.** On 2026-11-06, on this computer:
 

@@ -162,6 +162,28 @@ export const COPY_FIX_BRIEF_DONE = "Copied the fix brief. Paste it into your cod
 export const FIX_BRIEF_REDACTION_LIMITS =
   "The fix brief is always a redacted copy. Removing private details is best effort: it can miss names and other private text, and the brief's links back to Axcess open the full report. Check the brief before you share it or paste it into a coding agent.";
 
+/**
+ * The limits when "Remove private details" is ticked, for every file. It
+ * keeps each fact of the notice written into the files (AGENTS.md, Interface
+ * language rule 4), including one added in PR #58 review: the files keep
+ * element locators whole, so a locator that quotes a value from the page
+ * still shows it. The fix brief is the exception, and the sentence says so:
+ * it redacts inside locators and tells the coding agent when one is no
+ * longer exact.
+ */
+export const REDACTION_LIMITS =
+  "Removing private details is best effort. It can miss names and other private text, and it does not change text inside images, so screenshots are left out. Every file except the fix brief keeps element locators (CSS selectors) whole, so they still find the element, even when one quotes a value from the page. The links back to Axcess open the full report. Check each file before you share it.";
+
+/**
+ * What the fix brief leaves out, shown beside the note that the files cover
+ * the whole report. The brief does not: it lists open issue types only,
+ * stops at a limit, and shows a few places for each. No numbers here, so
+ * the text cannot drift from the limits in `exports/fix_brief.py`; the
+ * brief itself gives the exact counts ("What this brief covers").
+ */
+export const FIX_BRIEF_SCOPE_NOTE =
+  "The fix brief is not the whole report. It lists open issue types only, most important first, stops at a limit, and shows a few places for each. It says what it left out.";
+
 /** A scan's progress, for status badges. */
 export const SCAN_STATUS_LABEL: Record<ScanStatus, string> = {
   running: "Scanning",

@@ -30,11 +30,13 @@ site: https://example.org/
 
 ## Check fixes the way the scan found them
 
-For an issue type that the rule check (axe) found, a script can check your fix instead of you checking by eye. It opens the page in Chromium with Playwright, adds axe-core 4.10.2 (the version this scan used), and runs only that issue type's rule. The exit code is the result, and it is the same every time for the same page code:
+For an issue type that the rule check (axe) found, a script can check your fix instead of you checking by eye. It opens the page in Chromium with Playwright, adds axe-core 4.10.2, and runs only that issue type's rule. The exit code is the result, and it is the same every time for the same page code:
 
 - `0`, passed: the rule no longer fails at that element. The script compares the element itself, not its locator text, so a changed locator cannot hide a failure.
 - `1`, failed: the rule still fails there. The script lists the element locators that still fail.
-- `2`, not checked: for example the element is gone, its element locator now matches more than one element, the place appears only after a click, the page did not load or answered with an error (such as 404 Not Found), axe-core could not decide (an incomplete result), or the axe-core version is not the scan's. Check it by hand, or scan again in Axcess.
+- `2`, not checked: for example the element is gone, its element locator now matches more than one element, the place appears only after a click, the page did not load or answered with an error (such as 404 Not Found), axe-core could not decide (an incomplete result), or the axe-core version is not 4.10.2. Check it by hand, or scan again in Axcess.
+
+About the version: axe-core 4.10.2 is what this copy of Axcess runs now. Axcess does not save which axe-core version a scan ran. If Axcess was updated after this scan, the scan may have run an older version, and a check here can give a different result than the scan did. Scan again in Axcess to be sure.
 
 Set it up once:
 
@@ -54,8 +56,8 @@ A passed check shows that one rule no longer fails at that element. It does not 
 Axcess copies this file, word for word, into every fix brief
 (:mod:`audit.exports.fix_brief`). A coding agent saves it as
 ``axcess_check.py`` and runs it to check a fix the same way the scan found
-the problem: it opens the page in Chromium with Playwright, adds the same
-axe-core version the scan used, and runs only the one axe rule of the issue
+the problem: it opens the page in Chromium with Playwright, adds the
+axe-core version the brief names, and runs only the one axe rule of the issue
 type. The result is the exit code, so it is the same every time for the same
 page code:
 
@@ -64,7 +66,7 @@ page code:
 * 1: failed. The rule still fails there.
 * 2: could not check. For example the element is gone, its locator now
   matches more than one element, the place appears only after a click, the
-  axe-core version is not the scan's, the page did not load or answered with
+  axe-core version is not the one the brief names, the page did not load or answered with
   an error (such as 404 Not Found), or axe-core could not decide (an
   "incomplete" result). A person or a new scan in Axcess has to decide.
 
@@ -266,7 +268,7 @@ def run(args: argparse.Namespace) -> int:
                 continue
             if version != checks["axe_version"]:
                 print(
-                    f"NOT CHECKED {label}: axe-core {version}, the scan used "
+                    f"NOT CHECKED {label}: axe-core {version}, the brief names "
                     f"{checks['axe_version']}."
                 )
                 worst = max(worst, NOT_CHECKED)

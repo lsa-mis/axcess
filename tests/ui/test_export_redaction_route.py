@@ -201,3 +201,103 @@ def test_an_unknown_report_is_still_refused_when_redacting(client: TestClient) -
     """``redact=true`` does not bypass the route's existing refusals."""
     response = client.get("/api/scans/99999/export/csv", params={"redact": "true"})
     assert response.status_code == 404
+
+
+# --- PR #58 review -------------------------------------------------------------
+
+_TYPED = "My loan was declined"
+_OWNER = "owner@example.org"
+_QUOTING_LOCATOR = f'input[data-owner="{_OWNER}"]'
+
+
+def _seed_finding(
+    db_path: Path, scan_id: int, *, rule_id: str, selector: str, html_snippet: str
+) -> None:
+    with sqlite3.connect(db_path) as conn:
+        (page_id,) = conn.execute(
+            "SELECT id FROM pages WHERE scan_id = ? ORDER BY id LIMIT 1", (scan_id,)
+        ).fetchone()
+        conn.execute(
+            """
+            INSERT INTO page_a11y_findings (
+                page_id, scan_id, rule_id, help, target_selector, target_hash,
+                html_snippet, failure_summary, status, created_at, updated_at,
+                engine_outcome, pipeline, wcag_sc, wcag_level, impact
+            ) VALUES (?, ?, ?, 'Form elements must have labels', ?, ?, ?,
+                      'Fix any of the following: the element has no label', 'new',
+                      CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 'failed', 'axe', '4.1.2',
+                      'A', 'critical')
+            """,
+            (page_id, scan_id, rule_id, selector, f"seeded-{rule_id}", html_snippet),
+        )
+
+
+@pytest.mark.parametrize("fmt", _FORMATS)
+def test_text_typed_into_a_text_box_does_not_reach_a_written_description(
+    client: TestClient, seeded_db: tuple[Path, Path, int], fmt: str
+) -> None:
+    # The written report and the workbook describe an element in a sentence
+    # ("text area containing ..."). The sentence must be made from redacted
+    # evidence: once written, nothing marks its words as a form value.
+    db_path, _, scan_id = seeded_db
+    _seed_finding(
+        db_path,
+        scan_id,
+        rule_id="label",
+        selector="#notes",
+        html_snippet=f'<textarea id="notes">{_TYPED}</textarea>',
+    )
+
+    full = client.get(f"/api/scans/{scan_id}/export/{fmt}", params={"draft": "acknowledged"})
+    redacted = client.get(
+        f"/api/scans/{scan_id}/export/{fmt}",
+        params={"draft": "acknowledged", "redact": "true"},
+    )
+
+    assert redacted.status_code == 200, redacted.text
+    full_text = _text_of(fmt, full.content)
+    assert _TYPED not in _text_of(fmt, redacted.content)
+    if fmt in {"audit", "xlsx"}:
+        # The seed reaches the sentence, so the check above means something.
+        assert f"containing “{_TYPED}”" in full_text
+        assert "containing “[redacted]”" in _text_of(fmt, redacted.content)
+
+
+@pytest.mark.parametrize("fmt", _FORMATS)
+def test_a_recorded_locator_is_kept_whole_and_its_value_redacted_elsewhere(
+    client: TestClient, seeded_db: tuple[Path, Path, int], fmt: str
+) -> None:
+    db_path, _, scan_id = seeded_db
+    _seed_finding(
+        db_path,
+        scan_id,
+        rule_id="label",
+        selector=_QUOTING_LOCATOR,
+        html_snippet=f'<input data-owner="{_OWNER}" value="{_OWNER}">',
+    )
+
+    full = client.get(f"/api/scans/{scan_id}/export/{fmt}", params={"draft": "acknowledged"})
+    redacted = client.get(
+        f"/api/scans/{scan_id}/export/{fmt}",
+        params={"draft": "acknowledged", "redact": "true"},
+    )
+
+    assert redacted.status_code == 200, redacted.text
+    full_text = _text_of(fmt, full.content)
+    text = _text_of(fmt, redacted.content)
+    if fmt == "json":
+        full_text = json.dumps(json.loads(full_text), ensure_ascii=False)
+        text = json.dumps(json.loads(text), ensure_ascii=False)
+        locator = json.dumps(_QUOTING_LOCATOR)[1:-1]
+    else:
+        locator = (
+            _QUOTING_LOCATOR.replace('"', '""') if fmt in {"csv", "jira"} else _QUOTING_LOCATOR
+        )
+    # Every whole locator the full file shows is still there, unchanged ...
+    assert full_text.count(locator) > 0 or fmt == "markdown"
+    assert text.count(locator) == full_text.count(locator)
+    # ... and the address appears nowhere else: not in the element code.
+    assert text.count(_OWNER) == text.count(locator)
+    if fmt in {"json", "jira"}:
+        # These two print the element code, so the check above means something.
+        assert full_text.count(_OWNER) > full_text.count(locator)

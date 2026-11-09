@@ -74,7 +74,7 @@ from audit.exports.fix_brief import render_fix_brief
 from audit.exports.jira_export import render_jira_csv
 from audit.exports.json_export import render_json
 from audit.exports.markdown_report import render_markdown
-from audit.exports.redaction import redact_export
+from audit.exports.redaction import redact_export, scan_locators
 from audit.exports.xlsx_export import render_xlsx
 from audit.labels import (
     CLICK_THROUGH,
@@ -2793,13 +2793,19 @@ def create_app(
         # on the pre-collected `scan` only.
         rendered: str | bytes
         if fmt == "audit":
-            rendered = render_audit_report(scan, conn=conn)
+            # ``redact`` here and for the workbook: these two write sentences
+            # from element code ("text area containing ..."), so they read a
+            # redacted copy of the evidence. The pass below cannot find a
+            # form value once it is part of a sentence.
+            rendered = render_audit_report(scan, conn=conn, redact=redact)
         elif fmt == "xlsx":
             # Pass the blob store so the Issues Overview sheet can embed
             # each finding's marked location screenshot as evidence. A
             # redacted workbook gets none: text in a screenshot cannot be
             # redacted, so the pictures are never put in.
-            rendered = render_xlsx(scan, conn=conn, blob_store=None if redact else blob_store)
+            rendered = render_xlsx(
+                scan, conn=conn, blob_store=None if redact else blob_store, redact=redact
+            )
         elif fmt == "brief":
             # Redacted while it is built (scanned values only), so it skips
             # the whole-file pass below.
@@ -2809,7 +2815,11 @@ def create_app(
         if redact and fmt not in _ALWAYS_REDACTED_FORMATS:
             # Redaction runs on the finished file, never on stored evidence:
             # the report in the app keeps everything (export-only scope).
-            rendered = redact_export(rendered, export_format=fmt)
+            # The scan's element locators are kept whole, so each still
+            # finds its element; the notice in the file says so.
+            rendered = redact_export(
+                rendered, export_format=fmt, locators=scan_locators(scan.a11y_findings)
+            )
         return label_draft_export(rendered, export_format=fmt, readiness=readiness)
 
     # The Export panel asks this before offering its downloads, so each

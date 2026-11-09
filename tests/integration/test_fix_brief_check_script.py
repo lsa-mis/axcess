@@ -210,7 +210,7 @@ def test_a_different_axe_core_version_is_not_checked(
     )
 
     assert done.returncode == axcess_check.NOT_CHECKED, done.stdout
-    assert "axe-core 0.0.1, the scan used" in done.stdout
+    assert "axe-core 0.0.1, the brief names" in done.stdout
 
 
 def _agent(tmp_path: Path, brief: str) -> Path:

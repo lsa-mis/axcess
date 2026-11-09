@@ -23,7 +23,7 @@ from audit.db import repo
 from audit.exports import axcess_check, fix_brief
 from audit.exports.collector import collect_scan
 from audit.exports.fix_brief import DATA_FENCE_LABEL, render_fix_brief
-from audit.exports.redaction import REDACTION_NOTICE
+from audit.exports.redaction import REDACTION_NOTICE, REDACTION_NOTICE_LOCATORS_REDACTED
 from audit.web import issues
 
 WHEN = datetime(2026, 11, 6, 12, 0, tzinfo=UTC)
@@ -231,7 +231,19 @@ def test_secrets_and_form_values_are_redacted(tmp_db: sqlite3.Connection) -> Non
     assert 'value="[redacted]"' in brief
     assert "https://shop.example/account?token=[redacted]&tab=orders" in brief
     # The redaction notice, limits included, is never dropped.
-    assert REDACTION_NOTICE in brief
+    # The brief's own notice: every limit of the other files' notice except
+    # "locators are kept whole", which is not true of the brief.
+    assert REDACTION_NOTICE_LOCATORS_REDACTED in brief
+    assert REDACTION_NOTICE not in brief
+    assert "kept whole" not in brief
+    for fact in (
+        "best effort",
+        "names and other private text",
+        "text inside images",
+        "not redacted",
+        "Check the file before you share it",
+    ):
+        assert fact in REDACTION_NOTICE_LOCATORS_REDACTED
 
 
 def test_a_long_text_box_is_redacted_before_it_is_cut(tmp_db: sqlite3.Connection) -> None:
@@ -314,6 +326,63 @@ def test_injection_text_stays_inside_fenced_data_blocks(tmp_db: sqlite3.Connecti
         if token.type == "inline" and token.content.startswith("How to")
     ]
     assert headings == ["How to fix it", "How to check the fix"]
+
+
+def test_what_an_alfa_check_reported_is_fenced_data_not_a_heading(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    # PR #58 review. With no written card, an Alfa issue type's title and
+    # description in the app quote what the check reported about the page.
+    scan_id = _scan(tmp_db)
+    page = _page(tmp_db, scan_id, "https://shop.example/")
+    _finding(
+        tmp_db,
+        scan_id,
+        page,
+        "sia-r999",
+        pipeline="alfa",
+        help_text="WCAG 4.1.2: Name, Role, Value",
+        wcag_sc="4.1.2",
+        target="#owner",
+        failure_summary=f"The field for jane.doe@example.com has no name. {_INJECTION}",
+    )
+
+    brief = _brief(tmp_db, scan_id)
+
+    # The heading is the rule's own name and id, nothing the page could write.
+    assert _heading_titles(brief) == ["Name, Role, Value (Alfa sia-r999)"]
+    assert _INJECTION not in _outside_fences(brief)
+    assert "has no name" not in _outside_fences(brief)
+    assert "jane.doe@example.com" not in brief
+    # What the check reported is still there, as redacted data with a label.
+    reports = [
+        content
+        for info, content in _fences(brief)
+        if info == DATA_FENCE_LABEL and content.startswith("check report: ")
+    ]
+    assert len(reports) == 1
+    assert _INJECTION in reports[0] and "[redacted email]" in reports[0]
+    assert len(reports[0]) <= len("check report: \n") + fix_brief.MAX_REPORTED_CHARS
+    assert "Axcess has no written description for this rule." in _outside_fences(brief)
+
+
+def test_an_alfa_heading_says_when_a_person_must_decide(tmp_db: sqlite3.Connection) -> None:
+    scan_id = _scan(tmp_db)
+    page = _page(tmp_db, scan_id, "https://shop.example/")
+    _finding(
+        tmp_db,
+        scan_id,
+        page,
+        "sia-r999",
+        pipeline="alfa",
+        engine_outcome="cant_tell",
+        help_text="WCAG 1.4.3: Contrast (Minimum)",
+        wcag_sc="1.4.3",
+    )
+
+    assert _heading_titles(_brief(tmp_db, scan_id)) == [
+        "Contrast (Minimum), a person must decide (Alfa sia-r999)"
+    ]
 
 
 # --- Places and counts (PR #60 review) -----------------------------------------
@@ -511,6 +580,14 @@ def test_each_axe_place_gets_a_deterministic_check_command(tmp_db: sqlite3.Conne
     checks = axcess_check.load_checks(brief)
     assert checks["format"] == axcess_check.FORMAT
     assert checks["axe_version"] == fix_brief.axe_version() != "unknown"
+    # Axcess saves no engine version with a scan, so the brief must not call
+    # this the scan's version (PR #58 review).
+    assert "the version this scan used" not in brief
+    assert "is not the scan's" not in brief
+    assert (
+        f"axe-core {fix_brief.axe_version()} is what this copy of Axcess runs now. "
+        "Axcess does not save which axe-core version a scan ran."
+    ) in brief
     assert checks["viewport"] == {"width": 1440, "height": 900}
     assert sorted(checks["places"]) == ["1.1", "1.2", "2.1"]
     pages = {checks["places"][k]["page"] for k in ("1.1", "1.2")}
@@ -602,7 +679,9 @@ def test_checks_data_is_redacted_and_cut_like_other_scanned_values(
     label, region = places["1.1"], places["2.1"]
     assert label["rule"] == "label"
     assert "[redacted" in label["page"] and label["page_exact"] is False
-    assert "[redacted email]" in label["locator"] and label["locator_exact"] is False
+    # A form value quoted in a locator goes whole, not only the email in it.
+    assert label["locator"] == "input[value='[redacted]']"
+    assert label["locator_exact"] is False
     # The issue list already shortened this locator, so it is not exact.
     assert len(region["locator"]) <= fix_brief.MAX_LOCATOR_CHARS
     assert region["locator_exact"] is False

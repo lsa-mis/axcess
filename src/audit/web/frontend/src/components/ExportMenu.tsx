@@ -19,6 +19,8 @@ import {
   EXPORT_FORMAT_HINT,
   EXPORT_FORMAT_LABEL,
   FIX_BRIEF_REDACTION_LIMITS,
+  FIX_BRIEF_SCOPE_NOTE,
+  REDACTION_LIMITS,
 } from "../lib/terms";
 import { Button, Checkbox } from "./ui";
 
@@ -41,6 +43,20 @@ import { Button, Checkbox } from "./ui";
  * The panel says what it is about to hand over before anyone chooses: which
  * report, how large each file is, that the files cover the whole report
  * rather than the table's filters, and whether they will be marked DRAFT.
+ * The fix brief is the one file that does not cover the whole report: it
+ * lists open issue types only, up to a limit, with a few places for each.
+ * So the footer's note says "every file except the fix brief", and a second
+ * sentence says what the brief is. Before, "includes every issue type and
+ * every status" read as true of all five files, and someone could take the
+ * brief for the complete report (PR #58 review; AGENTS.md, Interface
+ * language rule 5: text accurate to the code). Rejected: a separate note
+ * under the brief's own row, which would put two scope notes in one panel
+ * for people to reconcile (W3C COGA "Making Content Usable",
+ * https://www.w3.org/TR/coga-usable/, paraphrased: keep related information
+ * together). The footer's three facts (what the files cover, what the brief
+ * covers, what automated results cannot prove) are three short paragraphs,
+ * one idea each, rather than one block (same COGA document, paraphrased: use
+ * short blocks of text, one topic each).
  * Each download then says what happened. A plain `<a download>` could not:
  * a refused or failed export saved the error as the file, or nothing, with
  * no word on the page. The link's `href` stays the real export URL, so a
@@ -73,7 +89,10 @@ import { Button, Checkbox } from "./ui";
  * - Its limits are never shortened away: when it is on, the footer says it
  *   is best effort, what it can miss, and to check the file before sharing
  *   (AGENTS.md, Interface language rule 4). Each file carries the same
- *   notice inside it.
+ *   notice inside it. One limit is a choice, not a miss: the files keep
+ *   element locators (CSS selectors) whole, because a changed locator no
+ *   longer finds its element, so a locator that quotes a value from the
+ *   page still shows it. The footer says that too (PR #58 review).
  * - The fix brief is redacted whether or not the box is ticked, so its
  *   limits are shown whether or not it is ticked too: with the box off, the
  *   footer says the brief is a redacted copy, that this is best effort, what
@@ -367,9 +386,9 @@ export default function ExportMenu({
     .join(" · ");
   const scopeNote =
     shownIssueGroups !== undefined && issueGroups !== undefined && shownIssueGroups < issueGroups
-    ? `Includes all ${plural(issueGroups, "issue type", "issue types")} and every status, ` +
-      `not only the ${shownIssueGroups.toLocaleString()} your filters show.`
-    : "Includes every issue type and every status in this report, even if the table has filters on.";
+    ? `Every file except the fix brief includes all ${plural(issueGroups, "issue type", "issue types")} ` +
+      `and every status, not only the ${shownIssueGroups.toLocaleString()} your filters show.`
+    : "Every file except the fix brief includes every issue type and every status in this report, even if the table has filters on.";
 
   return (
     <div ref={containerRef} className="relative">
@@ -537,18 +556,18 @@ export default function ExportMenu({
           {/* One limits note, always shown: for every file when the box is
               ticked, for the always-redacted fix brief when it is not. */}
           <p id={limitsId} className="font-semibold text-fg">
-            {redact
-              ? "Removing private details is best effort. It can miss names and other private text, and it does not change text inside images, so screenshots are left out. The links back to Axcess open the full report. Check each file before you share it."
-              : FIX_BRIEF_REDACTION_LIMITS}
+            {redact ? REDACTION_LIMITS : FIX_BRIEF_REDACTION_LIMITS}
           </p>
           {options.data?.draft && (
             <p className="font-semibold text-fg">
               An expert has not finished reviewing this report, so each file is marked DRAFT.
             </p>
           )}
+          <p>{scopeNote}</p>
+          <p>{FIX_BRIEF_SCOPE_NOTE}</p>
           <p>
-            {scopeNote} Automated results are for an expert to review. They never prove that a
-            site meets accessibility rules.
+            Automated results are for an expert to review. They never prove that a site meets
+            accessibility rules.
           </p>
         </div>
       </div>

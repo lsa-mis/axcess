@@ -3,8 +3,8 @@
 Axcess copies this file, word for word, into every fix brief
 (:mod:`audit.exports.fix_brief`). A coding agent saves it as
 ``axcess_check.py`` and runs it to check a fix the same way the scan found
-the problem: it opens the page in Chromium with Playwright, adds the same
-axe-core version the scan used, and runs only the one axe rule of the issue
+the problem: it opens the page in Chromium with Playwright, adds the
+axe-core version the brief names, and runs only the one axe rule of the issue
 type. The result is the exit code, so it is the same every time for the same
 page code:
 
@@ -13,7 +13,7 @@ page code:
 * 1: failed. The rule still fails there.
 * 2: could not check. For example the element is gone, its locator now
   matches more than one element, the place appears only after a click, the
-  axe-core version is not the scan's, the page did not load or answered with
+  axe-core version is not the one the brief names, the page did not load or answered with
   an error (such as 404 Not Found), or axe-core could not decide (an
   "incomplete" result). A person or a new scan in Axcess has to decide.
 
@@ -215,7 +215,7 @@ def run(args: argparse.Namespace) -> int:
                 continue
             if version != checks["axe_version"]:
                 print(
-                    f"NOT CHECKED {label}: axe-core {version}, the scan used "
+                    f"NOT CHECKED {label}: axe-core {version}, the brief names "
                     f"{checks['axe_version']}."
                 )
                 worst = max(worst, NOT_CHECKED)
