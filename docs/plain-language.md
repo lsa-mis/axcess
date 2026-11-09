@@ -43,8 +43,8 @@ readers; this page tells contributors which words to use.
     opens when you click it".
 11. **Sentence case** for everything. No "please", no double negatives.
     Buttons and controls too: "Start a scan", not "Start A Scan". Names
-    keep their capitals ("Axcess", "Excel"), and so do the named terms in
-    the table below ("Mostly sure", "Not sure", "Best practice",
+    keep their capitals ("Axcess", "Excel", "Claude Code"), and so do the
+    named terms in the table below ("Mostly sure", "Not sure", "Best practice",
     "Click-Through"). One exception: the logo beside the brand mark,
     top left, spells it "axcess", in lowercase, as a logo; text everywhere
     else writes "Axcess".
@@ -199,4 +199,5 @@ Name the tool only when it matters to the reader, and in parentheses.
 
 "Axcess", "WCAG" after it is spelled out, "screen reader", "keyboard",
 "alt text" (explain once as "the text a screen reader reads for an image"),
-"screenshot", "export", "Excel", "Markdown", "CSV", "JSON".
+"screenshot", "export", "Excel", "Markdown", "CSV", "JSON", "Claude Code"
+(a product name, in the hints for the fix brief export).
