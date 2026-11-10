@@ -1,4 +1,4 @@
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { serverDate } from "../lib/serverTime";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { keepPreviousData, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -724,19 +724,6 @@ export default function InspectorRoute() {
   // frame's document changes.
   const [pageMark, setPageMark] = useState(0);
   useEffect(() => setPageMark(0), [srcDoc]);
-  const currentTarget = scopedTargets[highlight?.steps[pageMark]?.targets[0] ?? -1];
-  // An image or an AI review finding is found by its place among elements of
-  // its kind; its selector (``a[ord=6]``) is not one a browser can use.
-  const currentPlace = currentTarget?.image?.locator
-    ? {
-        selector: currentTarget.image.locator.kind === "source" ? "picture > source" : currentTarget.image.locator.kind,
-        index: currentTarget.image.locator.index,
-        total: currentTarget.image.locator.total,
-      }
-    : (currentTarget?.place ?? null);
-  const currentAddress = currentTarget?.image?.locator?.candidate ?? null;
-  // How many occurrences share the element the reader is on.
-  const sharedCount = highlight?.steps[pageMark]?.targets.length ?? 0;
 
   // A person's review of the element the reader is on: every occurrence of
   // the issue outlined there, in this page state, gets the same review.
@@ -1393,79 +1380,33 @@ export default function InspectorRoute() {
                 screenshot is captured or stored. `onLoad` is a document-load
                 lifecycle signal, not an interaction, so the a11y rule below is
                 a false positive for an iframe. */}
-            {/* What the numbered box is on, as a short table with the same
-                labels in the same places for every flagged element, so
-                Previous / Next change only the values. The toolbar above
-                already says which one you are on, so this does not repeat it.
-                The person's review of the element (its decision, notes and
-                the "Review this element" button) sits to the right of the
-                table on a wide screen, in a column of fixed width so it does
-                not shift as the words change from element to element, and
-                under the table on a narrow one, after it in reading order;
-                see ElementReview for why. It is short, so the saved page
-                below stays where it was. Side by side only from xl:
-                narrower, the table's values would lose their width. */}
-            {showHighlights && highlightedCount > 0 && currentElement && (
+            {/* The person's review of the flagged element (its decision,
+                notes and the "Review this element" button), under the
+                toolbar; see ElementReview for why.
+
+                There was a table of facts here too: What it is, Text or
+                label, Size, Where the box is, and an element's place in the
+                page code. The developer removed it (2026-11-10), against the
+                recommendation to keep it, as part of taking locators and
+                other page-code details off the screens. What it said is
+                still said elsewhere: the toolbar status names the element
+                ("Link, “Read the big story”"), and when no box is drawn the
+                line under the saved copy says why (BOX_NOTES), so a hidden
+                element is never left unexplained (SC 1.3.3 Sensory
+                Characteristics, Level A: the box's absence alone cannot say
+                why). Lost with it: the size in pixels, the image address,
+                and the count of occurrences on one element. */}
+            {showHighlights && highlightedCount > 0 && currentElement && canReview && (
               <div
                 role="group"
                 aria-label="The flagged element you are on"
                 className="border-b border-border bg-surface px-3 py-2 text-sm text-fg"
               >
-                <div className={cn(canReview && "xl:grid xl:grid-cols-[minmax(0,1fr)_21rem] xl:gap-6")}>
-                  <dl className="grid grid-cols-[auto_minmax(0,1fr)] content-start gap-x-3 gap-y-1 sm:gap-x-4">
-                    <ElementFact term="What it is">{currentElement.kind}</ElementFact>
-                    <ElementFact term="Text or label">
-                      {currentElement.text ? (
-                        `“${currentElement.text}”`
-                      ) : (
-                        <span className="text-fg-muted">None found</span>
-                      )}
-                    </ElementFact>
-                    <ElementFact term="Size">
-                      <span className="tabular-nums">
-                        {pixels(currentElement.width)} wide, {pixels(currentElement.height)} tall
-                      </span>
-                      {/* The row below says where the box is when it is not on the element. */}
-                      {currentElement.where === null &&
-                        (currentElement.width === 0 || currentElement.height === 0) && (
-                        <span className="block text-xs text-fg-muted">
-                          It has no visible size in this saved copy, so the box marks where it sits.
-                        </span>
-                      )}
-                    </ElementFact>
-                    {currentElement.where && (
-                      <ElementFact term="Where the box is">{BOX_NOTES[currentElement.where]}</ElementFact>
-                    )}
-                    {sharedCount > 1 && <ElementFact term="Issue occurrences">{sharedCount} on this element</ElementFact>}
-                    {/* No "Element locator" row: the developer removed locators
-                        from every screen (2026-11-10; see ElementCode in
-                        components/ui.tsx). The rows above say what the element
-                        is, and the Page code (DOM) tab shows its code. Removed
-                        with it: "Copy element locator" and "Show all". A
-                        place in the page code still shows for an image or an
-                        AI review finding, which have no usable locator. */}
-                    {currentPlace && (
-                      <>
-                        <ElementFact term="Where it is in the page code" stack>
-                          Number {currentPlace.index + 1} of the {currentPlace.total}{" "}
-                          <code translate="no" className="font-mono text-xs">
-                            {currentPlace.selector}
-                          </code>{" "}
-                          {currentPlace.total === 1 ? "element" : "elements"}
-                        </ElementFact>
-                        {currentAddress && (
-                          <ElementFact term="Image address">
-                            <code translate="no" className="font-mono text-xs">
-                              {currentAddress}
-                            </code>
-                          </ElementFact>
-                        )}
-                      </>
-                    )}
-                  </dl>
-                  {canReview && (
-                    <div className="mt-3 max-w-md border-t border-border pt-3 xl:mt-0 xl:max-w-none xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
-                      <ElementReview
+                {/* The width of the column it had beside the facts table, so
+                    its buttons keep the rows ElementReview's layout is built
+                    for ("Mark ... as repeats" under "Review this element"). */}
+                <div className="max-w-[21rem]">
+                  <ElementReview
                         key={`${scan}:${page}`}
                         scanId={scan}
                         pageId={page}
@@ -1492,8 +1433,6 @@ export default function InspectorRoute() {
                         onDraftChange={setReviewDraft}
                         onSaved={reviewSaved}
                       />
-                    </div>
-                  )}
                 </div>
               </div>
             )}
@@ -1553,12 +1492,20 @@ export default function InspectorRoute() {
             {!highlightPending && showHighlights && highlightedCount > 0 && (
               <p className="border-t border-border px-3 py-2 text-xs text-fg-muted">
                 <span className="block max-w-measure">
+                  {/* Where the box is, in words, follows the key whenever it is
+                      not simply around the element: a box that is not drawn,
+                      or one drawn on a list box or around what an element
+                      holds. The facts table used to say it; it was removed
+                      (see the comment above the review panel), and the box's
+                      place alone cannot say why (SC 1.3.3 Sensory
+                      Characteristics, Level A). */}
                   {highlightedCount > 1
                     ? `Dashed red outlines mark the ${highlightedCount} flagged elements on this page. The one you are on has a numbered blue box with a yellow ring, and the rest of the page is dimmed.`
                     : // Never describe a box that is not drawn (see ``drawsNoBox``).
                       drawsNoBox(currentElement?.where ?? null)
-                      ? "No box marks the flagged element. The table above the saved copy says why."
+                      ? "No box marks the flagged element."
                       : "A blue box with a yellow ring marks the flagged element."}
+                  {currentElement?.where && ` Where the box is: ${BOX_NOTES[currentElement.where]}`}
                 </span>
               </p>
             )}
@@ -2133,31 +2080,6 @@ function unreachableSentence(count: number, where: Unreachable): string {
   return where === "shadow"
     ? `${lead} inside a part of the page that keeps its own page code (shadow DOM). The saved copy does not keep that code.`
     : `${lead} inside another page shown within this one (an iframe). The saved copy does not keep that page.`;
-}
-
-/** "1 pixel", "924 pixels". */
-function pixels(n: number): string {
-  return `${n} ${n === 1 ? "pixel" : "pixels"}`;
-}
-
-/**
- * One labelled fact about the flagged element: the label, then its value,
- * lined up with the rows above and below. A long label (`stack`) sits above
- * its value until the screen is wide, so the value keeps its room on a
- * narrow screen.
- */
-function ElementFact({ term, stack = false, children }: { term: string; stack?: boolean; children: ReactNode }) {
-  return (
-    <div
-      className={cn(
-        "col-span-2",
-        stack ? "lg:grid lg:grid-cols-subgrid lg:items-baseline" : "grid grid-cols-subgrid items-baseline",
-      )}
-    >
-      <dt className="text-xs font-semibold text-fg-muted">{term}</dt>
-      <dd className="min-w-0 [overflow-wrap:anywhere]">{children}</dd>
-    </div>
-  );
 }
 
 /**

@@ -21,7 +21,7 @@ from typing import Any
 
 import pytest
 
-from ._inspector_case import BOX_RECT, fact, open_inspector, rect_of, seed, settled
+from ._inspector_case import BOX_RECT, box_note, open_inspector, rect_of, seed, settled
 
 pytestmark = [pytest.mark.ui, pytest.mark.asyncio(loop_scope="module")]
 
@@ -124,7 +124,8 @@ async def test_a_page_drawn_on_a_canvas_is_said(
         ).to_be_visible()
         box = page.frame_locator("iframe[title^='Saved copy']").locator("#axcess-spotlight")
         await playwright_async.expect(box).to_have_text("1 of 2")
-        await playwright_async.expect(fact(page, "Where the box is")).to_have_text(
+        await playwright_async.expect(box_note(page)).to_contain_text(
+            "Where the box is: "
             "Around a drawing area (canvas). The saved copy runs no scripts, so it shows the "
             "area's backup content, not the drawing."
         )
@@ -142,6 +143,6 @@ async def test_a_page_drawn_on_a_canvas_is_said(
         assert drawn is not None
         assert drawn["left"] <= button[0] and button[2] <= drawn["right"], (drawn, button)
         assert drawn["top"] <= button[1] and button[3] <= drawn["bottom"], (drawn, button)
-        await playwright_async.expect(fact(page, "Where the box is")).to_have_count(0)
+        await playwright_async.expect(box_note(page)).not_to_contain_text("Where the box is")
     finally:
         await page.context.close()

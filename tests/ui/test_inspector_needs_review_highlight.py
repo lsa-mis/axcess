@@ -24,7 +24,6 @@ from audit.db.schema import connect
 from audit.extractor.html_images import extract_image_refs
 
 from .test_accessibility_axe import _render_violations, _run_axe
-from .test_inspector_highlight_strict import _fact
 
 pytestmark = [pytest.mark.ui, pytest.mark.asyncio(loop_scope="module")]
 
@@ -171,12 +170,12 @@ async def test_an_image_issue_outlines_its_images_and_says_what_it_leaves_out(
             "/sale.png",
             "/sale.png",
         ]
-        where = _fact(page, "Where it is in the page code")
-        await playwright_async.expect(where).to_have_text("Number 1 of the 3 img elements")
-        await playwright_async.expect(_fact(page, "Image address")).to_have_text("/sale.png")
+        # The table of facts (place in the page code, image address) was
+        # removed (2026-11-10); the outlines above pin which images these are.
+        await playwright_async.expect(page.get_by_text("Image address")).to_have_count(0)
         group = page.get_by_role("group", name="Flagged elements", exact=True)
         await group.get_by_role("button", name="Next element").click()
-        await playwright_async.expect(where).to_have_text("Number 3 of the 3 img elements")
+        await playwright_async.expect(page.get_by_text("Flagged element 2 of 2")).to_be_visible()
         await playwright_async.expect(
             page.get_by_text(
                 "1 more occurrence is in page code that browsers do not show when scripts run",
@@ -207,9 +206,11 @@ async def test_an_ai_review_issue_outlines_the_exact_link(
         # Both links' kept code is the same; the second is the one reviewed.
         href = await marked.get_attribute("href")
         assert href is not None and href.startswith("/two?")
-        await playwright_async.expect(_fact(page, "Where it is in the page code")).to_have_text(
-            "Number 2 of the 2 a elements"
-        )
+        # Its place in the page code is no longer shown (the facts table was
+        # removed, 2026-11-10); the href above pins the exact link.
+        await playwright_async.expect(
+            page.get_by_text("Where it is in the page code")
+        ).to_have_count(0)
     finally:
         await page.context.close()
 

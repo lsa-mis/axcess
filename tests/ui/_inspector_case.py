@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import gzip
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -69,14 +70,21 @@ async def open_inspector(
     return page
 
 
-def fact(page: Any, term: str) -> Any:
-    """The value (dd) beside one label (dt) in the table under the inspector toolbar."""
-    return (
-        page.get_by_role("group", name="The flagged element you are on", exact=True)
-        .locator("dl > div")
-        .filter(has=page.locator("dt").get_by_text(term, exact=True))
-        .locator("dd")
+def box_note(page: Any) -> Any:
+    """The key under the saved copy, which says where the box is when it is
+    not simply around the element ("Where the box is: ...").
+
+    The table of facts under the toolbar used to say it; the developer
+    removed that table (2026-11-10), and its "Where the box is" moved here.
+    """
+    return page.locator("p").filter(
+        has_text=re.compile(r"marks the flagged element|flagged elements on this page")
     )
+
+
+def element_status(page: Any) -> Any:
+    """The toolbar status that names the flagged element you are on."""
+    return page.get_by_role("group", name="Flagged elements", exact=True).get_by_role("status")
 
 
 def rect_of(selector: str) -> str:

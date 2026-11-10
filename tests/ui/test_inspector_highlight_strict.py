@@ -70,16 +70,6 @@ def _seed(db_path: Path, scan_id: int, findings: list[tuple[str, str, str, str]]
         conn.close()
 
 
-def _fact(page: Any, term: str) -> Any:
-    """The value (dd) beside one label (dt) in the table under the inspector toolbar."""
-    return (
-        page.get_by_role("group", name="The flagged element you are on", exact=True)
-        .locator("dl > div")
-        .filter(has=page.locator("dt").get_by_text(term, exact=True))
-        .locator("dd")
-    )
-
-
 async def _open(new_page: Any, base: str, scan_id: int, page_id: int, issue: str) -> Any:
     page = await new_page(viewport={"width": 1280, "height": 900})
     await page.goto(
@@ -149,39 +139,29 @@ async def test_the_current_element_gets_a_numbered_box_and_a_description(
         frame = page.frame_locator("iframe[title^='Saved copy']")
         box = frame.locator("#axcess-spotlight")
         await playwright_async.expect(box).to_have_text("1 of 3")
-        # The same labels in the same places for every element; the toolbar
-        # status above says which one it is, so the table does not repeat it.
-        facts = page.get_by_role("group", name="The flagged element you are on", exact=True)
-        # No element locator row and no Copy button: locators left every
-        # screen (2026-11-10, see ElementCode in components/ui.tsx).
-        labels = ["What it is", "Text or label", "Size"]
-        await playwright_async.expect(facts.locator("dt")).to_have_text(labels)
-        await playwright_async.expect(page.get_by_text("Flagged element 1:")).to_have_count(0)
-        await playwright_async.expect(_fact(page, "What it is")).to_have_text("Link")
-        await playwright_async.expect(_fact(page, "Text or label")).to_have_text(
-            "“Read the big story”"
-        )
+        # No table of facts under the toolbar (What it is, Text or label,
+        # Size, the element locator and its Copy button): the developer
+        # removed it (2026-11-10). The toolbar status names the element.
+        for term in ("What it is", "Text or label", "Size"):
+            await playwright_async.expect(page.locator("dt", has_text=term)).to_have_count(0)
         await playwright_async.expect(
             page.get_by_role("button", name="Copy element locator", exact=True)
         ).to_have_count(0)
-        await playwright_async.expect(facts.get_by_text("#big")).to_have_count(0)
 
         # A tiny link: the box is still big enough to see, and labelled.
         await group.get_by_role("button", name="Next element").click()
         await playwright_async.expect(box).to_have_text("2 of 3")
         size = await box.evaluate("el => [el.offsetWidth, el.offsetHeight]")
         assert size[0] >= 26 and size[1] >= 26, size
-        await playwright_async.expect(_fact(page, "Text or label")).to_have_text("“x”")
-        await playwright_async.expect(facts.locator("dt")).to_have_text(labels)
+        await playwright_async.expect(group.get_by_role("status")).to_have_text(
+            "Flagged element 2 of 3: Link, “x”"
+        )
 
-        # An empty element: said to have no visible size.
+        # An empty element: named by its tag, and still boxed where it sits.
         await group.get_by_role("button", name="Next element").click()
         await playwright_async.expect(box).to_have_text("3 of 3")
-        await playwright_async.expect(_fact(page, "What it is")).to_have_text("<span> element")
-        await playwright_async.expect(_fact(page, "Text or label")).to_have_text("None found")
-        await playwright_async.expect(_fact(page, "Size")).to_contain_text("0 pixels wide")
-        await playwright_async.expect(_fact(page, "Size")).to_contain_text(
-            "It has no visible size in this saved copy, so the box marks where it sits."
+        await playwright_async.expect(group.get_by_role("status")).to_have_text(
+            "Flagged element 3 of 3: <span> element"
         )
         violations = await _run_axe(page)
         assert not violations, _render_violations(violations)
@@ -226,10 +206,8 @@ async def test_alfa_records_are_matched_by_tag_attributes_and_text(
         await playwright_async.expect(
             frame.locator("footer span.axcess-inspect-highlight")
         ).to_have_count(1)
-        # An Alfa record's XPath is not shown either, only what the element is.
-        facts = page.get_by_role("group", name="The flagged element you are on", exact=True)
-        await playwright_async.expect(facts.locator("dt")).to_have_text(
-            ["What it is", "Text or label", "Size"]
-        )
+        # An Alfa record's XPath is not shown: locators and the facts table
+        # left the screen (2026-11-10).
+        await playwright_async.expect(page.get_by_text("Element locator")).to_have_count(0)
     finally:
         await page.context.close()
