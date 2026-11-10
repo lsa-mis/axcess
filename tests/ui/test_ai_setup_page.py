@@ -223,7 +223,7 @@ async def test_retry_scan_respects_ai_off_but_keeps_regular_checks(
 
         await page.route(f"**/api/scans/{scan_id}/settings", old_settings)
         await page.goto(f"{server}/app/scans/new?from={scan_id}", wait_until="networkidle")
-        await page.get_by_role("button", name="AI checks on this computer", exact=True).click()
+        await page.get_by_role("button", name="Local AI checks", exact=True).click()
         vision = page.get_by_role("switch", name="Compare image text with alt text (vision model)")
         wording = page.get_by_role("switch", name="AI review of wording")
         await expect(vision).not_to_be_checked()

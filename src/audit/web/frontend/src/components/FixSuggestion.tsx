@@ -698,12 +698,16 @@ export function SuggestionsBlockedNote({
       </LinkButton>
     </p>
   ) : null;
+  // Each sentence keeps to the reading width every paragraph uses
+  // (max-w-measure, 32em: under 80 characters a line; SC 1.4.8 Visual
+  // Presentation, Level AAA). The note is a box as wide as the page, so
+  // without it a line ran to 108 characters.
   // Turning AI off never hides saved answers; only request actions disappear.
   // The note links to the one settings page (WCAG 2.2 SC 3.2.4 Consistent
   // Identification, Level AA), not a second local toggle.
   if (status.reason === "turned_off") {
     return <Card className={`${className} p-4 text-sm text-fg-muted`}>
-      <p>{aiSetup
+      <p className="max-w-measure">{aiSetup
         ? "AI features are off. Saved suggestions are still available. Turn AI on in Settings → AI features to ask for a new suggestion."
         : "AI suggestions are off. Saved suggestions are still available. An administrator can turn new suggestions on."}</p>
       {setupLink}
@@ -712,7 +716,7 @@ export function SuggestionsBlockedNote({
   if (status.reason === "model_missing") {
     return (
       <Card className={`${className} p-4 text-sm text-fg-muted`}>
-        <p>AI fix suggestions are turned on, but the AI model they use is not installed.</p>
+        <p className="max-w-measure">AI fix suggestions are turned on, but the AI model they use is not installed.</p>
         <p className="mt-2">
           To install it, run this in a terminal, then reload this page. It downloads several
           gigabytes.
