@@ -68,7 +68,9 @@ _NAMES = {
 
 # Named terms the interface capitalizes wherever they appear, as whole
 # phrases, so "Delete Page" still fails while "the Page inspector" passes.
-# Each is one name from docs/plain-language.md's terms table or lib/.
+# Each is one name from docs/plain-language.md's terms table or lib/, or a
+# product name of more than one word, which has to be matched whole: "Code"
+# alone in ``_NAMES`` would let "Copy Code" pass.
 _PHRASES = (
     "Mostly sure",  # issue type, lib/terms.ts
     "Not sure",  # issue type, lib/terms.ts
@@ -81,6 +83,7 @@ _PHRASES = (
     # (ExportMenu.tsx); both are proper names.
     "University of Michigan Information and Technology Services",
     "Accessibility Team",
+    "Claude Code",  # product name, in the fix brief's export hints, lib/terms.ts
 )
 
 _WORD = re.compile("[A-Za-z][A-Za-z'\u2019-]*")
@@ -127,6 +130,8 @@ def test_the_check_catches_title_case() -> None:
     assert title_case_words("Export to Excel. Open the PDF") == []
     assert title_case_words("Open example.com") == []
     assert title_case_words("Open the Page inspector") == []
+    assert title_case_words("Paste into Claude Code or another agent") == []
+    assert title_case_words("Copy Code") == ["Code"]
     assert title_case_words("Delete Page") == ["Page"]
     assert title_case_words("Search everything (Cmd+K)") == []
 

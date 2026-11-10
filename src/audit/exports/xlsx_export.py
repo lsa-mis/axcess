@@ -440,7 +440,9 @@ def _scan_environment(scan: ExportScan, conn: sqlite3.Connection) -> str:
     return ". ".join(parts) + ".\n" + _ENVIRONMENT_TO_SUPPLY
 
 
-def _build_tickets(conn: sqlite3.Connection, scan: ExportScan) -> list[_Ticket]:
+def _build_tickets(
+    conn: sqlite3.Connection, scan: ExportScan, *, redact: bool = False
+) -> list[_Ticket]:
     # Read the authored rule copy once for the whole workbook, not once per
     # issue: a scan with 200 issue types would otherwise re-parse the YAML
     # 200 times to answer the same question.
@@ -453,7 +455,7 @@ def _build_tickets(conn: sqlite3.Connection, scan: ExportScan) -> list[_Ticket]:
     rows = issues.list_issues(conn, scan.id)
     tickets: list[_Ticket] = []
     for index, row in enumerate(rows):
-        locations, overflow = issue_locations(conn, row)
+        locations, overflow = issue_locations(conn, row, redact=redact)
         tickets.append(
             _Ticket(
                 index=index,
@@ -1160,6 +1162,8 @@ def _build_page_references_sheet(
     scan: ExportScan,
     conn: sqlite3.Connection,
     cards: list[AuditCard],
+    *,
+    redact: bool = False,
 ) -> None:
     """List every issue/page pairing with plain-language element locations."""
     rows: list[tuple[Any, ...]] = []
@@ -1179,7 +1183,7 @@ def _build_page_references_sheet(
                 if card is not None
                 else [
                     location
-                    for location in issue_locations(conn, issue)[0]
+                    for location in issue_locations(conn, issue, redact=redact)[0]
                     if location.page_url == page.page_url
                 ]
             )
@@ -1402,8 +1406,14 @@ def render_xlsx(
     auditor: str = "Axcess",
     audit_date: str | None = None,
     blob_store: BlobStore | None = None,
+    redact: bool = False,
 ) -> bytes:
     """Render the full Excel audit workbook and return the .xlsx bytes.
+
+    ``redact`` is for a redacted download: the plain-language element
+    locations are then written from a redacted copy of the evidence (see
+    ``audit_report._locations_for_row``). The caller still runs
+    ``redaction.redact_export`` over the finished workbook.
 
     The sheet count varies with the number of issues:
 
@@ -1432,7 +1442,7 @@ def render_xlsx(
     location screenshot beside its instance table.
     """
     date_str = audit_date or _fmt_date(scan.finished_at or scan.started_at)
-    cards, dropped, best_practice = build_audit_cards(conn, scan)
+    cards, dropped, best_practice = build_audit_cards(conn, scan, redact=redact)
 
     wb = Workbook()
     summary = wb.active
@@ -1450,7 +1460,7 @@ def render_xlsx(
 
     # Names are reserved before any sheet is written: the index links to
     # them, so the link and the tab have to agree on the truncated name.
-    tickets = _build_tickets(conn, scan)
+    tickets = _build_tickets(conn, scan, redact=redact)
     environment = _scan_environment(scan, conn)
     # Names are reserved before any sheet is written: the index links to
     # them, so the link and the tab have to agree on the truncated name.
@@ -1481,7 +1491,9 @@ def render_xlsx(
     if pooled:
         _build_pooled_instances_sheet(wb.create_sheet(_POOLED_SHEET), pooled)
     _build_hotspots_sheet(wb.create_sheet("Page Hotspots"), cards)
-    _build_page_references_sheet(wb.create_sheet("Page References"), scan, conn, cards)
+    _build_page_references_sheet(
+        wb.create_sheet("Page References"), scan, conn, cards, redact=redact
+    )
     _build_dom_states_sheet(wb.create_sheet(CLICK_THROUGH), conn, scan)
     _build_affected_sheet(wb.create_sheet("Who's Affected"), cards)
     _build_coverage_sheet(wb.create_sheet("Coverage & Method"))

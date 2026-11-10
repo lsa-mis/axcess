@@ -230,6 +230,12 @@ class IssueLocation:
     # location" an inspector shows. Rendered as escaped source, never
     # executed, so it is evidence of what the markup was at scan time.
     html_snippet: str | None = None
+    # For an image issue type: the image file's address as the crawler saved
+    # it (canonical, so it can differ from the page's own ``src`` text). An
+    # image location's ``target`` is a description ("Image occurrence 2"),
+    # not an element locator, so this is what lets someone search the
+    # site's code for the image. None for DOM rule locations.
+    image_url: str | None = None
 
 
 @dataclass(frozen=True)
@@ -316,6 +322,7 @@ def list_issues(
     review_lane: str | Sequence[str] | None = None,
     finding_type: str | Sequence[str] | None = None,
     sort: str = "priority_desc",
+    open_locations_first: bool = False,
 ) -> list[IssueRow]:
     """Build the unified issues list with optional filters.
 
@@ -345,14 +352,26 @@ def list_issues(
     Filters applied AFTER the query (the underlying grouping queries
     are scan-wide already; filtering in Python keeps the row-building
     logic in one place).
+
+    ``open_locations_first`` changes only which three places each row's
+    ``locations`` sample shows: places whose occurrence is still open (New,
+    Reviewing, In progress) come before closed ones. The fix brief asks for
+    it, so a coding agent is never shown only places that are already fixed.
+    The Issues view keeps the default, the first places found.
     """
     rules = _load_rules()
 
     rows: list[IssueRow] = []
     rows.extend(
-        _axe_issue_rows(conn, scan_id, rules, wcag_version=_scan_wcag_version(conn, scan_id))
+        _axe_issue_rows(
+            conn,
+            scan_id,
+            rules,
+            wcag_version=_scan_wcag_version(conn, scan_id),
+            open_locations_first=open_locations_first,
+        )
     )
-    rows.extend(_image_issue_rows(conn, scan_id, rules))
+    rows.extend(_image_issue_rows(conn, scan_id, rules, open_locations_first=open_locations_first))
 
     return filter_and_sort(
         rows,
@@ -926,6 +945,7 @@ def _axe_issue_rows(
     rules: dict[str, Any],
     *,
     wcag_version: WcagVersion,
+    open_locations_first: bool = False,
 ) -> list[IssueRow]:
     """One row per ``rule_id`` group from the page_a11y_findings table.
 
@@ -1332,7 +1352,10 @@ def _axe_issue_rows(
                 fix_steps=tuple(meta.get("fix_steps") or alfa_fix_steps),
                 acceptance=meta.get("acceptance"),
                 help_url=meta.get("help_url") or g.get("help_url") or None,
-                locations=_a11y_location_samples(reported, scan_id=scan_id),
+                locations=_a11y_location_samples(
+                    _open_first(reported) if open_locations_first else reported,
+                    scan_id=scan_id,
+                ),
                 repeat_finding_ids=tuple(int(f["id"]) for f in repeats),
                 repeat_page_count=len(repeat_pages),
                 finding_types=_dom_finding_types(pipeline, len(reported), click_through),
@@ -1421,6 +1444,8 @@ def _image_issue_rows(
     conn: sqlite3.Connection,
     scan_id: int,
     rules: dict[str, Any],
+    *,
+    open_locations_first: bool = False,
 ) -> list[IssueRow]:
     """One row per ``(classification, alt_adequacy)`` group."""
     groups = image_findings_queries.grouped_by_remediation(conn, scan_id)
@@ -1503,7 +1528,10 @@ def _image_issue_rows(
                 fix_steps=tuple(meta.get("fix_steps") or ()),
                 acceptance=meta.get("acceptance"),
                 help_url=meta.get("help_url"),
-                locations=_image_location_samples(findings, scan_id=scan_id),
+                locations=_image_location_samples(
+                    _open_first(findings) if open_locations_first else findings,
+                    scan_id=scan_id,
+                ),
                 finding_types=("alt_text",),
             )
         )
@@ -1513,6 +1541,16 @@ def _image_issue_rows(
 # --------------------------------------------------------------------------
 # Helpers.
 # --------------------------------------------------------------------------
+
+
+#: Occurrence statuses that still need work.
+_OPEN_STATUSES = frozenset({"new", "reviewing", "in_progress"})
+
+
+def _open_first(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The same findings, open ones first, each half in its original order."""
+
+    return sorted(findings, key=lambda finding: str(finding.get("status")) not in _OPEN_STATUSES)
 
 
 def _a11y_location_samples(
@@ -1589,6 +1627,7 @@ def _image_location_samples(
                     target=f"Image occurrence {position + 1} ({placement})",
                     context=" · ".join(context_parts)[:300] or None,
                     evidence_url=f"/scans/{scan_id}/pages/{page_id}",
+                    image_url=str(finding["image_url"]) if finding.get("image_url") else None,
                 )
             )
             if len(samples) >= limit:

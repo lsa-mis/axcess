@@ -50,6 +50,7 @@ from audit.analyzer.alfa_evidence import (
 from audit.exports import interaction_coverage
 from audit.exports.collector import ExportA11yFinding, ExportFinding, ExportScan
 from audit.exports.interaction_coverage import InteractionCoverage
+from audit.exports.redaction import redact_evidence
 from audit.labels import CLICK_THROUGH, CLICK_THROUGH_STATES_LABEL, REVIEW_LANE_LABELS
 from audit.web import issues as issues_mod
 
@@ -319,6 +320,8 @@ class DroppedFinding:
 def _bucket_rows_into_cards(
     conn: sqlite3.Connection,
     rows: list[Any],
+    *,
+    redact: bool = False,
 ) -> tuple[list[AuditCard], list[DroppedFinding], list[Any]]:
     """Split unified issue rows into the framework's three buckets.
 
@@ -390,7 +393,7 @@ def _bucket_rows_into_cards(
             continue
         open_rows.append(open_row)
 
-    cards = [_card_from_row(conn, row, rules) for row in open_rows]
+    cards = [_card_from_row(conn, row, rules, redact=redact) for row in open_rows]
     cards.sort(key=lambda c: (_severity_rank(c.severity), -c.affected_page_count))
     return cards, dropped, best_practice
 
@@ -481,15 +484,18 @@ def _projected_scope_counts(
 def build_audit_cards(
     conn: sqlite3.Connection,
     scan: ExportScan,
+    *,
+    redact: bool = False,
 ) -> tuple[list[AuditCard], list[DroppedFinding], list[Any]]:
     """Public entry point: the audit model for ``scan`` as structured data.
 
     Wraps :func:`audit.web.issues.list_issues` + :func:`_bucket_rows_into_cards`
     so other renderers (the Excel workbook) can build their own tables from
-    exactly the cards the Markdown report uses.
+    exactly the cards the Markdown report uses. ``redact`` is for a redacted
+    download; see :func:`_locations_for_row`.
     """
     rows = issues_mod.list_issues(conn, scan.id)
-    return _bucket_rows_into_cards(conn, rows)
+    return _bucket_rows_into_cards(conn, rows, redact=redact)
 
 
 def render_audit_report(
@@ -497,6 +503,7 @@ def render_audit_report(
     *,
     conn: sqlite3.Connection,
     generated_at: datetime | None = None,
+    redact: bool = False,
 ) -> str:
     """Build the holistic Markdown audit report for ``scan``.
 
@@ -504,11 +511,16 @@ def render_audit_report(
     :func:`audit.web.issues.list_issues` (which fans out to every
     detection pipeline) and then pulls element-level locations on
     demand.
+
+    ``redact`` is for a redacted download: the sentences that describe where
+    an element is are then written from a redacted copy of the evidence. The
+    caller still runs :func:`audit.exports.redaction.redact_export` over the
+    finished report; this flag alone does not make the report redacted.
     """
     when = generated_at or datetime.now(UTC)
 
     rows = issues_mod.list_issues(conn, scan.id)
-    cards, dropped, best_practice = _bucket_rows_into_cards(conn, rows)
+    cards, dropped, best_practice = _bucket_rows_into_cards(conn, rows, redact=redact)
     blocked_seed = _blocked_seed_details(conn, scan)
 
     lines: list[str] = []
@@ -1371,6 +1383,8 @@ def _card_from_row(
     conn: sqlite3.Connection,
     row: Any,
     rules: dict[str, Any],
+    *,
+    redact: bool = False,
 ) -> AuditCard:
     """Turn one unified IssueRow into a fully-rendered AuditCard.
 
@@ -1382,7 +1396,7 @@ def _card_from_row(
     """
     meta = _meta_for_row(row, rules)
     severity = _IMPACT_SEVERITY.get(row.impact or "", "Moderate")
-    locations, overflow = _locations_for_row(conn, row)
+    locations, overflow = _locations_for_row(conn, row, redact=redact)
     triaged = sum(v for k, v in row.status_summary.items() if k in _TRIAGED_STATUSES)
     fix_steps = list(row.fix_steps) or [
         f"Human review needed, no templated fix for `{row.issue_key}` in "
@@ -1432,6 +1446,7 @@ def _locations_for_row(
     row: Any,
     *,
     limit: int | None = MAX_LOCATIONS_PER_CARD,
+    redact: bool = False,
 ) -> tuple[list[IssueLocation], int]:
     """Pull element-level "exactly where" pointers for a row's findings.
 
@@ -1439,6 +1454,14 @@ def _locations_for_row(
     image findings live in ``findings`` joined out to their pages. Capped
     at ``limit`` (``MAX_LOCATIONS_PER_CARD`` by default) with the remainder
     reported as overflow; ``limit=None`` loads every occurrence.
+
+    With ``redact``, each description is written from a redacted copy of the
+    occurrence's evidence (:func:`audit.exports.redaction.redact_evidence`).
+    A description is a sentence made from element code, such as "text area
+    containing ...". Once it is a sentence, the redaction pass over the
+    finished file can no longer tell that the quoted words were typed into a
+    form, so they must be replaced before the sentence is written. The
+    stored evidence is only read, never changed.
     """
     ids = list(row.finding_ids)
     if not ids:
@@ -1446,7 +1469,9 @@ def _locations_for_row(
     sample = ids if limit is None else ids[:limit]
     locations: list[IssueLocation] = []
     for start in range(0, len(sample), _LOCATION_BATCH):
-        locations.extend(_locations_for_ids(conn, row, sample[start : start + _LOCATION_BATCH]))
+        locations.extend(
+            _locations_for_ids(conn, row, sample[start : start + _LOCATION_BATCH], redact=redact)
+        )
     overflow = max(0, len(ids) - len(locations))
     return locations, overflow
 
@@ -1455,8 +1480,11 @@ def _locations_for_ids(
     conn: sqlite3.Connection,
     row: Any,
     sample: list[int],
+    *,
+    redact: bool = False,
 ) -> list[IssueLocation]:
-    """Load the locations of one batch of a row's finding ids."""
+    """Load the locations of one batch of a row's finding ids (redacted when
+    asked; see ``_locations_for_row``)."""
     placeholders = ",".join("?" for _ in sample)
     locations: list[IssueLocation] = []
 
@@ -1474,7 +1502,7 @@ def _locations_for_ids(
             tuple(sample),
         ).fetchall()
         for raw in db_rows:
-            r = normalize_finding(dict(raw))
+            r = normalize_finding(redact_evidence(dict(raw)) if redact else dict(raw))
             detail = r["failure_summary"] or ""
             target = str(r.get("target_display") or r["target_selector"] or "")
             locations.append(
@@ -1543,12 +1571,13 @@ def issue_locations(
     row: Any,
     *,
     limit: int | None = MAX_LOCATIONS_PER_CARD,
+    redact: bool = False,
 ) -> tuple[list[IssueLocation], int]:
     """Expose retained locations for review-only rows that have no issue card.
 
     ``limit=None`` returns every occurrence (the ITS review lists each one).
     """
-    return _locations_for_row(conn, row, limit=limit)
+    return _locations_for_row(conn, row, limit=limit, redact=redact)
 
 
 # ---------------------------------------------------------------------------
@@ -1925,6 +1954,11 @@ def fix_options_for(row: Any, rules: dict[str, Any]) -> tuple[FixOption, ...]:
     return _fix_options(_meta_for_row(row, rules))
 
 
+def card_markdown(text: str) -> str:
+    """Card prose as Markdown, for callers outside this module (the fix brief)."""
+    return _strip_html(text)
+
+
 def load_report_rules() -> dict[str, Any]:
     """Read the authored rule copy once, for callers outside this module."""
     return _load_rules()
@@ -1949,6 +1983,7 @@ __all__ = [
     "DroppedFinding",
     "FixOption",
     "IssueLocation",
+    "card_markdown",
     "fix_options_for",
     "load_report_rules",
     "plain_text",

@@ -34,13 +34,15 @@ def test_sizes_and_names_match_the_draft_downloads(
         "xlsx",
         "its",
         "audit",
+        "brief",
         "csv",
         "json",
     ]
     for option in body["formats"]:
         filename, size = _downloaded(client, scan_id, option["format"])
         assert option["filename"] == filename
-        assert "_DRAFT." in filename
+        # The fix brief is always the redacted copy.
+        assert ("_DRAFT_REDACTED." if option["format"] == "brief" else "_DRAFT.") in filename
         if option["format"] in {"xlsx", "its"}:
             # A workbook is a zip whose entries carry their write time, so two
             # renders can differ by a few bytes; the size is shown as "about".
@@ -63,6 +65,7 @@ def test_a_completed_evaluation_offers_final_files(
         f"scan_{scan_id}.xlsx",
         f"scan_{scan_id}.its.xlsx",
         f"scan_{scan_id}.audit.md",
+        f"scan_{scan_id}_REDACTED.fix-brief.md",
         f"scan_{scan_id}.csv",
         f"scan_{scan_id}.json",
     }

@@ -16,6 +16,12 @@ datas = [
     (str(audit_source / "web" / "frontend" / "public"), "audit/web/frontend/public"),
     (str(audit_source / "web" / "static"), "audit/web/static"),
     (str(audit_source / "alfa_runner"), "audit/alfa_runner"),
+    # The fix brief copies the check script into every brief word for word,
+    # so audit/exports/fix_brief.py reads the script's source file when it is
+    # imported. PyInstaller keeps a module as compiled code only and leaves no
+    # .py file on disk. Without this line, importing the FastAPI application
+    # fails with FileNotFoundError and the packaged app cannot start.
+    (str(audit_source / "exports" / "axcess_check.py"), "audit/exports"),
 ]
 datas += copy_metadata("yoyo-migrations")
 # tldextract loads its bundled public-suffix snapshot through importlib

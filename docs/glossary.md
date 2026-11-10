@@ -483,6 +483,28 @@ An export downloaded from the app before expert review is finished. The app
 marks it DRAFT in the file name and inside the file; command-line exports are
 not marked.
 
+### Redacted copy
+
+An export downloaded with **Remove private details (redact)** turned on in
+the **Export report** menu. Axcess replaces likely private details in the file
+with "[redacted]": form field values, email addresses, phone numbers, card and
+ID numbers, and secret codes (tokens) in web addresses and page code. Element
+locators, check names, WCAG criteria and page addresses stay, so a developer
+can still find and fix each problem. The file name ends in `_REDACTED`, and a
+notice inside the file says the same.
+
+Redaction is best effort. It can miss names and other private text, and it
+does not change text inside images, so screenshots are left out. It changes
+only the download: the report in Axcess keeps everything. Check the file
+before you share it.
+
+Element locators (CSS selectors) are kept whole, so that each still finds its
+element. A locator that quotes a value from the page, such as
+`input[data-owner="jane@example.com"]`, therefore still shows that value. The
+same value is replaced everywhere else in the file. The fix brief for a coding
+agent is the exception: it redacts inside locators too, and tells the agent
+when a locator is no longer exact.
+
 ### Configured search
 
 An optional scan setting, **Use a search box to find more pages**, that types

@@ -1801,6 +1801,18 @@
             "in": "path",
             "required": true,
             "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "redact",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Set to true for a redacted copy: likely private details (form values, email addresses, phone numbers, card and ID numbers, tokens) are replaced with [redacted]. Best effort.",
+              "default": false,
+              "title": "Redact"
+            },
+            "description": "Set to true for a redacted copy: likely private details (form values, email addresses, phone numbers, card and ID numbers, tokens) are replaced with [redacted]. Best effort."
           }
         ],
         "responses": {
@@ -1818,7 +1830,7 @@
     "/api/scans/{scan_id}/export/{fmt}": {
       "get": {
         "summary": "Export Scan",
-        "description": "Download a scan export as CSV / JSON / Jira CSV / Markdown / Audit / Excel.",
+        "description": "Download a scan export: CSV, JSON, Jira CSV, Markdown, Audit, Excel or fix brief.",
         "operationId": "export_scan_api_scans__scan_id__export__fmt__get",
         "parameters": [
           {
@@ -1843,6 +1855,18 @@
               "title": "Draft"
             },
             "description": "Set exactly to 'acknowledged' to download an incomplete expert evaluation as a visibly labeled draft."
+          },
+          {
+            "name": "redact",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Set to true for a redacted copy: likely private details (form values, email addresses, phone numbers, card and ID numbers, tokens) are replaced with [redacted]. Best effort.",
+              "default": false,
+              "title": "Redact"
+            },
+            "description": "Set to true for a redacted copy: likely private details (form values, email addresses, phone numbers, card and ID numbers, tokens) are replaced with [redacted]. Best effort."
           }
         ],
         "responses": {
@@ -2134,7 +2158,11 @@
       },
       "ExportFormatOption": {
         "properties": {
-          "format": {"type": "string", "enum": ["xlsx", "its", "audit", "csv", "json"], "title": "Format"},
+          "format": {
+            "type": "string",
+            "enum": ["xlsx", "its", "audit", "brief", "csv", "json"],
+            "title": "Format"
+          },
           "filename": {"type": "string", "title": "Filename"},
           "size_bytes": {"type": "integer", "title": "Size Bytes"}
         },
@@ -2148,6 +2176,7 @@
           "scan_id": {"type": "integer", "title": "Scan Id"},
           "draft": {"type": "boolean", "title": "Draft"},
           "evaluation_status": {"type": "string", "title": "Evaluation Status"},
+          "redacted": {"type": "boolean", "title": "Redacted", "default": false},
           "formats": {
             "items": {"$ref": "#/components/schemas/ExportFormatOption"},
             "type": "array",

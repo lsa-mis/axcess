@@ -175,6 +175,9 @@ async def verify_runtime() -> dict[str, str]:
         "rules": package_dir / "rules",
         "alfa_runner": package_dir / "alfa_runner" / "runner.mjs",
         "alfa_modules": package_dir / "alfa_runner" / "node_modules" / "@siteimprove" / "alfa-act",
+        # Read as text by audit.exports.fix_brief when the application is
+        # imported; named here so a build that leaves it out says which file.
+        "fix_brief_check_script": package_dir / "exports" / "axcess_check.py",
     }
     missing = [name for name, path in required_assets.items() if not path.exists()]
     if missing:

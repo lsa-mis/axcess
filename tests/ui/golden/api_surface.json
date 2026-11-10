@@ -731,7 +731,7 @@
         "methods": ["GET"],
         "name": "export_options",
         "async": false,
-        "params": {"path": ["scan_id"]},
+        "params": {"path": ["scan_id"], "query": ["redact"]},
         "request_param": "request",
         "background_tasks_param": null
       },
@@ -741,7 +741,7 @@
         "methods": ["GET"],
         "name": "export_scan",
         "async": false,
-        "params": {"path": ["scan_id", "fmt"], "query": ["draft"]},
+        "params": {"path": ["scan_id", "fmt"], "query": ["draft", "redact"]},
         "request_param": "request",
         "background_tasks_param": null
       },
@@ -1517,7 +1517,7 @@
         "methods": ["GET"],
         "name": "export_options",
         "async": false,
-        "params": {"path": ["scan_id"]},
+        "params": {"path": ["scan_id"], "query": ["redact"]},
         "request_param": "request",
         "background_tasks_param": null
       },
@@ -1527,7 +1527,7 @@
         "methods": ["GET"],
         "name": "export_scan",
         "async": false,
-        "params": {"path": ["scan_id", "fmt"], "query": ["draft"]},
+        "params": {"path": ["scan_id", "fmt"], "query": ["draft", "redact"]},
         "request_param": "request",
         "background_tasks_param": null
       },
@@ -2289,7 +2289,7 @@
         "methods": ["GET"],
         "name": "export_options",
         "async": false,
-        "params": {"path": ["scan_id"]},
+        "params": {"path": ["scan_id"], "query": ["redact"]},
         "request_param": "request",
         "background_tasks_param": null
       },
@@ -2299,7 +2299,7 @@
         "methods": ["GET"],
         "name": "export_scan",
         "async": false,
-        "params": {"path": ["scan_id", "fmt"], "query": ["draft"]},
+        "params": {"path": ["scan_id", "fmt"], "query": ["draft", "redact"]},
         "request_param": "request",
         "background_tasks_param": null
       },
@@ -3074,7 +3074,7 @@
         "methods": ["GET"],
         "name": "export_options",
         "async": false,
-        "params": {"path": ["scan_id"]},
+        "params": {"path": ["scan_id"], "query": ["redact"]},
         "request_param": "request",
         "background_tasks_param": null
       },
@@ -3084,7 +3084,7 @@
         "methods": ["GET"],
         "name": "export_scan",
         "async": false,
-        "params": {"path": ["scan_id", "fmt"], "query": ["draft"]},
+        "params": {"path": ["scan_id", "fmt"], "query": ["draft", "redact"]},
         "request_param": "request",
         "background_tasks_param": null
       },
