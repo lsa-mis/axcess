@@ -121,8 +121,22 @@ export interface ScanPageChecks {
   checks: Partial<Record<string, PageCheckState>>;
 }
 
+/**
+ * Pages a scan found but did not visit, by reason. Counted when the crawl
+ * ends; null for a scan from before they were counted, or one still running.
+ */
+export interface UnvisitedCounts {
+  /** Found within the link depth after the scan reached its page limit. */
+  page_limit: number;
+  /** Found only more clicks from the start page than the link depth allows. */
+  depth_limit: number;
+  /** Refused by the site's robots.txt or by the blocked addresses (sign-out links). */
+  blocked: number;
+}
+
 export interface ScanDetail extends ScanSummary {
   error_count: number;
+  unvisited: UnvisitedCounts | null;
   failure_reason: string | null;
   by_severity: Record<Severity, number>;
   previous_scan_id: number | null;

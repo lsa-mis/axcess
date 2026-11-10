@@ -177,6 +177,25 @@ def test_api_scan_detail(client: TestClient, seeded_db: tuple[object, object, in
     assert methods["semantic"]["result"] == "Coverage not recorded for this older scan"
 
 
+def test_api_scan_detail_counts_pages_found_but_not_visited(
+    client: TestClient, seeded_db: tuple[Path, Path, int]
+) -> None:
+    db_path, _, scan_id = seeded_db
+    # A scan from before the counts existed says "not counted", never zero.
+    assert client.get(f"/api/scans/{scan_id}").json()["unvisited"] is None
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            "UPDATE scans SET unvisited_page_limit = 9, unvisited_depth_limit = 1, "
+            "unvisited_blocked = 2 WHERE id = ?",
+            (scan_id,),
+        )
+    assert client.get(f"/api/scans/{scan_id}").json()["unvisited"] == {
+        "page_limit": 9,
+        "depth_limit": 1,
+        "blocked": 2,
+    }
+
+
 def test_api_scan_detail_reports_actual_method_coverage(
     client: TestClient, seeded_db: tuple[object, object, int]
 ) -> None:

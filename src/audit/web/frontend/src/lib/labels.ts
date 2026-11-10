@@ -17,7 +17,7 @@
  * copy said "DOM states", "interaction states", "Click-Through states" and
  * "views opened by clicking"; those should not reach a reader.
  */
-import type { FindingType, ReviewLane } from "../api/types";
+import type { FindingType, ReviewLane, UnvisitedCounts } from "../api/types";
 import { REVIEW_TYPE_LABEL } from "./terms";
 
 export const CLICK_THROUGH = "Click-Through";
@@ -29,6 +29,37 @@ export const CLICK_THROUGH_STATES_LABEL = "Page states opened by clicking";
 
 export function clickThroughStates(count: number): string {
   return `${count.toLocaleString()} ${count === 1 ? CLICK_THROUGH_STATE : CLICK_THROUGH_STATES}`;
+}
+
+/**
+ * Pages a scan found but did not visit, as one line under "Pages visited".
+ * Only the reasons that apply are named, largest first in the order a reader
+ * can act on them (raise the page limit, raise the link depth, then the pages
+ * kept out on purpose). "Link depth" and "page limit" are the New scan
+ * form's own words for the two settings ("Maximum link depth", "Maximum
+ * pages"), so the reader can find the setting to change (SC 3.2.4 Consistent
+ * Identification, Level AA). Blocked pages name both causes, because a reader
+ * who sees only "blocked" may think the site refused the scan.
+ *
+ * Returns null when every page the scan found was visited: the developer's
+ * rule for this card is to hide a line that tells the reader nothing (the
+ * "Every page loaded" line was dropped for the same reason). A report from
+ * before these pages were counted says so, because a missing count is a
+ * limitation, never zero (AGENTS.md, Interface language rule 4).
+ */
+export function unvisitedPagesText(counts: UnvisitedCounts | null): string | null {
+  if (counts === null) return "Pages found but not visited were not counted in this report";
+  const total = counts.page_limit + counts.depth_limit + counts.blocked;
+  if (total === 0) return null;
+  const n = (count: number) => count.toLocaleString();
+  const reasons = [
+    counts.page_limit > 0 ? `${n(counts.page_limit)} over the page limit` : null,
+    counts.depth_limit > 0 ? `${n(counts.depth_limit)} beyond the link depth` : null,
+    counts.blocked > 0
+      ? `${n(counts.blocked)} blocked by robots.txt or by links a scan never follows, such as Sign out`
+      : null,
+  ].filter((reason): reason is string => reason !== null);
+  return `${n(total)} more ${total === 1 ? "page" : "pages"} found but not visited: ${reasons.join(", ")}`;
 }
 
 /** Which family of checks produced an issue type's evidence. Table order. */

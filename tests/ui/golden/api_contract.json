@@ -114,6 +114,7 @@
       "seed_url": "string",
       "started_at": "string",
       "status": "string",
+      "unvisited": {"blocked": "integer", "depth_limit": "integer", "page_limit": "integer"},
       "wcag_version": "string"
     }
   },
@@ -189,6 +190,7 @@
       "seed_url": "string",
       "started_at": "string",
       "status": "string",
+      "unvisited": "null",
       "wcag_version": "string"
     }
   },
@@ -232,6 +234,7 @@
       "seed_url": "string",
       "started_at": "string",
       "status": "string",
+      "unvisited": "null",
       "wcag_version": "string"
     }
   },
@@ -275,6 +278,7 @@
       "seed_url": "string",
       "started_at": "string",
       "status": "string",
+      "unvisited": "null",
       "wcag_version": "string"
     }
   },

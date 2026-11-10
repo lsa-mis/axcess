@@ -1147,6 +1147,11 @@ def create_app(
             # The WCAG version this scan was audited against. A scan stored
             # before the setting existed ran 2.2 and reads as 2.2.
             "wcag_version": stored_wcag_version(scan.get("config_json")),
+            # Known pages the crawl did not visit, by reason, written when it
+            # ended (audit.db.crawl_coverage). None for a scan from before
+            # they were counted, or one that has not ended, so the report can
+            # say "not counted" instead of showing zero.
+            "unvisited": _unvisited_counts(scan),
         }
         if protection is not None:
             # The middleware has already required a verified proxy identity
@@ -3407,6 +3412,20 @@ def _deny_legacy_protected_review(conn: sqlite3.Connection, scan_id: int) -> Non
                 "manual-evidence workflow."
             ),
         )
+
+
+def _unvisited_counts(scan: dict[str, Any]) -> dict[str, int] | None:
+    values = {
+        "page_limit": scan.get("unvisited_page_limit"),
+        "depth_limit": scan.get("unvisited_depth_limit"),
+        "blocked": scan.get("unvisited_blocked"),
+    }
+    counts: dict[str, int] = {}
+    for key, value in values.items():
+        if value is None:
+            return None
+        counts[key] = int(value)
+    return counts
 
 
 def _scan_row_to_summary(scan: Any) -> dict[str, Any]:

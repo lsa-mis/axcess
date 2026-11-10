@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "about": "Every page a scan of /docs/ on this site should visit, and the 9 hard cases from the crawl-coverage ticket. Served by audit.crawl_coverage_eval, which fills in {{ORIGIN}} in .txt and .xml files, answers redirects below with 301, and matches paths without regard to letter case (as many servers do).",
+  "start_path": "/docs/",
+  "redirects": {
+    "/docs/old-news.html": "/docs/news.html"
+  },
+  "expected_pages": [
+    "/docs/",
+    "/docs/about.html",
+    "/docs/contact.html",
+    "/docs/guides/",
+    "/docs/guides/getting-started.html",
+    "/docs/guides/accounts.html",
+    "/docs/guides/email.html",
+    "/docs/guides/printing.html",
+    "/docs/guides/wifi.html",
+    "/docs/guides/software.html",
+    "/docs/guides/storage.html",
+    "/docs/guides/security.html",
+    "/docs/chain/1.html",
+    "/docs/chain/2.html",
+    "/docs/chain/3.html",
+    "/docs/chain/4.html",
+    "/docs/chain/5.html",
+    "/docs/chain/6.html",
+    "/docs/chain/7.html",
+    "/docs/chain/8.html",
+    "/docs/chain/9.html",
+    "/docs/chain/10.html",
+    "/docs/chain/11.html",
+    "/docs/tools.html",
+    "/docs/calculator.html",
+    "/docs/results.html?view=all",
+    "/docs/map.html",
+    "/docs/campus/north.html",
+    "/docs/campus/south.html",
+    "/docs/news.html",
+    "/docs/hidden/archive.html",
+    "/docs/hidden/annual-report.html"
+  ],
+  "hard_cases": [
+    {
+      "id": "sitemap_only",
+      "label": "A page only in the sitemap",
+      "must_visit": ["/docs/hidden/archive.html", "/docs/hidden/annual-report.html"],
+      "must_be_sitemap_only": ["/docs/hidden/archive.html", "/docs/hidden/annual-report.html"],
+      "note": "archive.html is in the sitemap robots.txt names (through a sitemap index); annual-report.html is in /sitemap.xml. No link leads to either."
+    },
+    {
+      "id": "deep_page",
+      "label": "A page 11 clicks deep",
+      "must_visit": ["/docs/chain/11.html"],
+      "depth": 11,
+      "note": "Visited when the depth limit allows 11 steps; with the default limit of 10 it is counted as not visited because of the depth limit."
+    },
+    {
+      "id": "button_only",
+      "label": "A page reached only by a button",
+      "must_visit": ["/docs/calculator.html", "/docs/results.html?view=all"],
+      "must_not_request": ["/docs/search.html", "/docs/account/delete-history.html"],
+      "note": "calculator.html is behind an onclick button; results.html behind a form that is only a button. The search form and the POST form must not be followed."
+    },
+    {
+      "id": "image_map",
+      "label": "An `<area>` link",
+      "must_visit": ["/docs/campus/north.html", "/docs/campus/south.html"]
+    },
+    {
+      "id": "url_variants",
+      "label": "URL variants (slash, letter case, extra query text)",
+      "must_visit": ["/docs/about.html", "/docs/guides/"],
+      "single_page_rows": ["/docs/about.html", "/docs/guides/"],
+      "must_not_request_query": ["utm_"],
+      "note": "/docs/About.html, /docs/about.html?utm_source=newsletter and /docs/guides (no slash) must not become extra pages."
+    },
+    {
+      "id": "redirect",
+      "label": "A redirect",
+      "must_visit": ["/docs/news.html"],
+      "single_page_rows": ["/docs/news.html"],
+      "note": "/docs/old-news.html answers 301 to /docs/news.html, which about.html also links to."
+    },
+    {
+      "id": "out_of_scope",
+      "label": "An out-of-scope page",
+      "must_not_request": ["/blog/post.html"]
+    },
+    {
+      "id": "sign_out",
+      "label": "A sign-out link",
+      "must_not_request": ["/docs/account/logout.html"],
+      "counts_as_blocked": ["/docs/account/logout.html"]
+    },
+    {
+      "id": "robots_disallowed",
+      "label": "A page robots.txt disallows",
+      "must_not_request": ["/docs/private/report.html"],
+      "counts_as_blocked": ["/docs/private/report.html"]
+    }
+  ]
+}

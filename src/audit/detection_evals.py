@@ -18,6 +18,13 @@ from pathlib import Path
 from time import perf_counter
 from typing import Any
 
+from audit.crawl_coverage_eval import (
+    CoverageEvalConfig,
+    CoverageEvalError,
+    format_coverage_markdown,
+    parse_coverage_config,
+    run_coverage_eval,
+)
 from audit.db import repo
 from audit.db.schema import connect, transaction
 from audit.quality_benchmark import evaluate, gate_failures, load_corpus
@@ -56,6 +63,8 @@ class DetectionEvalConfig:
     config_version: str
     corpus_path: Path
     performance: PerformanceConfig
+    # Optional so an older config without the lane still loads.
+    crawl_coverage: CoverageEvalConfig | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,6 +105,15 @@ def load_eval_config(path: Path, *, project_root: Path | None = None) -> Detecti
     if reference_pages not in page_counts:
         raise DetectionEvalError("efficiency_reference_pages must be one of page_counts")
     root = project_root or path.resolve().parents[2]
+    coverage_raw = raw.get("crawl_coverage")
+    crawl_coverage: CoverageEvalConfig | None = None
+    if coverage_raw is not None:
+        if not isinstance(coverage_raw, dict):
+            raise DetectionEvalError("crawl_coverage must be an object")
+        try:
+            crawl_coverage = parse_coverage_config(coverage_raw, root)
+        except CoverageEvalError as exc:
+            raise DetectionEvalError(str(exc)) from exc
     corpus_path = Path(corpus_value)
     if not corpus_path.is_absolute():
         corpus_path = root / corpus_path
@@ -122,6 +140,7 @@ def load_eval_config(path: Path, *, project_root: Path | None = None) -> Detecti
                 "max_per_finding_slowdown",
             ),
         ),
+        crawl_coverage=crawl_coverage,
     )
 
 
@@ -136,10 +155,17 @@ def run_detection_evals(config: DetectionEvalConfig) -> dict[str, Any]:
         for pages in config.performance.page_counts
     ]
     efficiency_failures, scale_failures = performance_failures(config.performance, points)
+    coverage_report = (
+        run_coverage_eval(config.crawl_coverage) if config.crawl_coverage is not None else None
+    )
     failures = [
         *(f"efficacy: {failure}" for failure in efficacy_failures),
         *(f"efficiency: {failure}" for failure in efficiency_failures),
         *(f"scale: {failure}" for failure in scale_failures),
+        *(
+            f"crawl coverage: {failure}"
+            for failure in (coverage_report["failures"] if coverage_report else [])
+        ),
     ]
     reference = next(
         point for point in points if point.pages == config.performance.efficiency_reference_pages
@@ -190,9 +216,13 @@ def run_detection_evals(config: DetectionEvalConfig) -> dict[str, Any]:
             "thresholds": {"max_per_finding_slowdown": config.performance.max_per_finding_slowdown},
             "failures": scale_failures,
         },
+        "crawl_coverage": coverage_report,
         "limitations": [
             "Performance points cover local evidence writes and unified issue projection.",
             "They exclude crawling, browser rendering, OCR, and model inference latency.",
+            "The crawl-coverage lane crawls one small local test site over plain HTTP; "
+            "it does not measure browser rendering, which requests each page again "
+            "unless skip_static_when_rendering is on.",
             "Shared-runner timings are coarse regression guards, not hardware-neutral claims.",
         ],
         "failures": failures,
@@ -284,6 +314,16 @@ def format_markdown(report: dict[str, Any]) -> str:
             "| **Scale** | Repeats the evidence path at increasing page and finding "
             "counts, verifies every row and issue group, and compares time per "
             "finding. | Detects lost evidence and non-linear degradation as reports grow. |"
+        ),
+        *(
+            [
+                "| **Crawl coverage** | Runs the real crawler against a local test "
+                "site with 9 hard cases and checks which pages it visited, skipped "
+                "and counted. | Detects pages a scan misses, visits wrongly, fetches "
+                "twice, or leaves out of its report without saying so. |"
+            ]
+            if report.get("crawl_coverage")
+            else []
         ),
         "",
         "## Efficacy",
@@ -441,6 +481,8 @@ def format_markdown(report: dict[str, Any]) -> str:
             "",
         ]
     )
+    if report.get("crawl_coverage"):
+        lines.extend(format_coverage_markdown(report["crawl_coverage"]))
     if report["failures"]:
         lines.extend(["## Failed gates", "", *(f"- {item}" for item in report["failures"]), ""])
     else:
