@@ -5,7 +5,7 @@ import { useLocation, useParams } from "react-router";
 import { ApiError, api, blobUrl } from "../api/client";
 import AlfaEvidenceNote from "../components/AlfaEvidenceNote";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
-import { Card, StatusChip } from "../components/ui";
+import { Card, ElementCode, StatusChip } from "../components/ui";
 import { httpStatusLabel, renderModeLabel } from "../lib/pageLabels";
 import { findingLocation } from "../lib/findingLocation";
 import type { DetectionPipeline, PageEvidence } from "../api/types";
@@ -257,7 +257,7 @@ function FindingCard({
   finding: PageEvidenceFinding;
   pageUrl: string;
 }) {
-  const location = findingLocation(pageUrl, finding.target_selector, finding.target_display);
+  const location = findingLocation(pageUrl, finding.target_selector);
   const cantTell = finding.engine_outcome === "cant_tell";
 
   return (
@@ -288,16 +288,23 @@ function FindingCard({
       )}
       <AlfaEvidenceNote evidence={finding} />
 
+      {/* The element's code where its locator was: why, ElementCode in
+          components/ui.tsx. A rule check (Alfa) result about a piece of
+          text, which has no element code, quotes the text instead. */}
       <p className="mt-3 text-2xs font-semibold text-fg-subtle">
-        Where on the page
+        {location.text && !finding.html_snippet ? "Text on the page" : "Element code (HTML)"}
       </p>
-      <p className="mt-1 break-words text-sm text-fg">{location.label}</p>
+      {location.text && !finding.html_snippet ? (
+        <p className="mt-1 break-words text-sm text-fg">“{location.text}”</p>
+      ) : (
+        <ElementCode snippet={finding.html_snippet} className="mt-1" />
+      )}
 
-      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
-        {/* A text fragment scrolls the live page to this exact wording and
-            highlights it, the only "show me" available for findings that
-            have no screenshot, which is every Alfa result. */}
-        {location.deepLink && (
+      {/* A text fragment scrolls the live page to this exact wording and
+          highlights it, the only "show me" available for findings that
+          have no screenshot, which is every Alfa result. */}
+      {location.deepLink && (
+        <p className="mt-2">
           <a
             href={location.deepLink}
             target="_blank"
@@ -308,16 +315,8 @@ function FindingCard({
             Show me on the live page
             <span className="sr-only">, opens in a new tab and scrolls to this text</span>
           </a>
-        )}
-        <details className="text-xs">
-          <summary className="min-h-target cursor-pointer content-center text-fg-muted">
-            Element locator (CSS selector), for developers
-          </summary>
-          <code className="mt-1 block max-w-full overflow-x-auto rounded-2xs border border-border bg-surface-muted px-2 py-1 text-xs text-fg">
-            {location.raw}
-          </code>
-        </details>
-      </div>
+        </p>
+      )}
 
       {finding.screenshot_hash ? (
         <figure className="mt-3">

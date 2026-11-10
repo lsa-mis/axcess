@@ -1,8 +1,8 @@
-import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { serverDate } from "../lib/serverTime";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { keepPreviousData, useQueries, useQuery } from "@tanstack/react-query";
-import { Check, ChevronDown, ChevronUp, Copy, ExternalLink, FileCode2, Layers, Loader2 } from "lucide-react";
+import { ExternalLink, FileCode2, Layers, Loader2 } from "lucide-react";
 import DomSource from "../components/DomSource";
 import FlaggedStepper from "../components/FlaggedStepper";
 import { api } from "../api/client";
@@ -10,7 +10,6 @@ import type { PageEvidence, PageInspection, SavedFrame, SavedStyles } from "../a
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import Tabs from "../components/Tabs";
 import {
-  Button,
   Card,
   Disclosure,
   EmptyState,
@@ -35,7 +34,6 @@ import {
   markCurrent,
   noteCurrent,
   normalizeWhitespace,
-  readableLocator,
   scrollPanels,
   snippetCutFor,
   spotlight,
@@ -711,7 +709,6 @@ export default function InspectorRoute() {
   const [pageMark, setPageMark] = useState(0);
   useEffect(() => setPageMark(0), [srcDoc]);
   const currentTarget = scopedTargets[highlight?.steps[pageMark]?.targets[0] ?? -1];
-  const currentLocator = readableLocator(currentTarget?.selector ?? null);
   // An image or an AI review finding is found by its place among elements of
   // its kind; its selector (``a[ord=6]``) is not one a browser can use.
   const currentPlace = currentTarget?.image?.locator
@@ -724,17 +721,6 @@ export default function InspectorRoute() {
   const currentAddress = currentTarget?.image?.locator?.candidate ?? null;
   // How many occurrences share the element the reader is on.
   const sharedCount = highlight?.steps[pageMark]?.targets.length ?? 0;
-  // readableLocator returns a selector unchanged and turns a Rule check
-  // (Alfa) record into its XPath, so a changed string is an XPath. An AI
-  // review selector such as ``a[ord=6]`` counts the analyzer's own list of
-  // links, which no browser can use: it is not shown as a locator at all
-  // (the table still says what the element is).
-  const locatorIsXPath = currentLocator !== null && currentLocator !== currentTarget?.selector;
-  const shownLocator = currentLocator && !/\[ord=\d+\]/.test(currentLocator) ? currentLocator : null;
-  const locatorTerm = locatorIsXPath ? "Element locator (XPath)" : "Element locator (CSS selector)";
-  // Whether the locator is shown in full. It stays as the reader set it while
-  // they step, so every element's row keeps the same shape.
-  const [locatorOpen, setLocatorOpen] = useState(false);
   // "Go to element" (in FlaggedStepper): the button, to come back to with
   // Escape, and what it says when the element cannot take focus.
   const goToRef = useRef<HTMLButtonElement>(null);
@@ -1246,7 +1232,14 @@ export default function InspectorRoute() {
                     <ElementFact term="Where the box is">{BOX_NOTES[currentElement.where]}</ElementFact>
                   )}
                   {sharedCount > 1 && <ElementFact term="Issue occurrences">{sharedCount} on this element</ElementFact>}
-                  {currentPlace ? (
+                  {/* No "Element locator" row: the developer removed locators
+                      from every screen (2026-11-10; see ElementCode in
+                      components/ui.tsx). The rows above say what the element
+                      is, and the Page code (DOM) tab shows its code. Removed
+                      with it: "Copy element locator" and "Show all". A
+                      place in the page code still shows for an image or an
+                      AI review finding, which have no usable locator. */}
+                  {currentPlace && (
                     <>
                       <ElementFact term="Where it is in the page code" stack>
                         Number {currentPlace.index + 1} of the {currentPlace.total}{" "}
@@ -1263,18 +1256,6 @@ export default function InspectorRoute() {
                         </ElementFact>
                       )}
                     </>
-                  ) : (
-                    shownLocator && (
-                      <ElementFact term={locatorTerm} stack>
-                        <LocatorValue
-                          key={shownLocator}
-                          id="inspect-locator"
-                          value={shownLocator}
-                          open={locatorOpen}
-                          onOpenChange={setLocatorOpen}
-                        />
-                      </ElementFact>
-                    )
                   )}
                 </dl>
               </div>
@@ -1378,11 +1359,8 @@ export default function InspectorRoute() {
                         {f.help}
                         <span className="ml-1 font-normal text-fg-muted">({f.rule_id})</span>
                       </p>
-                      {f.target_selector && (
-                        <code className="mt-0.5 block overflow-x-auto whitespace-nowrap rounded-2xs border border-border bg-surface px-2 py-1 text-2xs text-fg">
-                          {f.target_selector}
-                        </code>
-                      )}
+                      {/* The code without the locator above it: why, ElementCode
+                          in components/ui.tsx. */}
                       {f.html_snippet && (
                         <pre className="mt-1 max-h-24 overflow-auto whitespace-pre-wrap break-all rounded-2xs border border-border bg-surface px-2 py-1 text-2xs leading-relaxed text-fg-muted">
                           {f.html_snippet}
@@ -1941,181 +1919,6 @@ function ElementFact({ term, stack = false, children }: { term: string; stack?: 
     >
       <dt className="text-xs font-semibold text-fg-muted">{term}</dt>
       <dd className="min-w-0 [overflow-wrap:anywhere]">{children}</dd>
-    </div>
-  );
-}
-
-/**
- * An element locator, and under it the two controls for it: "Copy element
- * locator" and, when the locator is cut, "Show all".
- *
- * The locator is on one line, cut at its start, so its end, the part that
- * names the element, stays in view; "Show all" puts each step on its own
- * line. The cut is visual only: the text in the page is the whole locator,
- * character for character, and a screen reader reads all of it.
- *
- * The controls are on their own line under the locator, in the value
- * column. Rejected, in turn: (1) the controls at the end of the locator's
- * line, which made that row a 44 px button tall, taller than the rows above
- * it, so the facts table lost its even rhythm where the eye reads values;
- * and a "Show all" that came and went there changed the locator's width,
- * which changed whether it was cut, every frame, so it had to stay in place
- * invisibly, keeping the gap. (2) "Copy element locator" in a row of its
- * own under the whole table, behind a divider, far from the value it copies.
- * Under the locator, Copy sits next to what it acts on (W3C COGA, "Making
- * Content Usable", https://www.w3.org/TR/coga-usable/: keep related things
- * together), the locator's line is plain text like the others, and "Show
- * all" can be left out entirely when the locator fits, since it no longer
- * shares the locator's line. Copy comes first, so it stays in one place
- * whether or not Show all is there. Both are full 44 px targets (SC 2.5.5
- * Target Size (Enhanced), Level AAA).
- *
- * The copy button's words never change; the result is said in words in a
- * status under the controls, at a reading width (SC 4.1.3 Status Messages,
- * Level AA; SC 1.4.8 Visual Presentation, Level AAA). Each copy gets a new
- * key, so a second "Copied" is announced like the first. When the browser
- * blocks copying (plain http on a network address), the whole locator is
- * shown and selected, so Ctrl+C or Command+C copies it.
- */
-function LocatorValue({
-  id,
-  value,
-  open,
-  onOpenChange,
-}: {
-  id: string;
-  value: string;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const codeRef = useRef<HTMLElement>(null);
-  const probeRef = useRef<HTMLSpanElement>(null);
-  const toggleRef = useRef<HTMLButtonElement>(null);
-  const copyRef = useRef<HTMLButtonElement>(null);
-  const [cut, setCut] = useState(false);
-  // Whether the locator is wider than its line, measured on a hidden copy of
-  // it on one line (the probe), so the answer holds while it is shown in
-  // full too. A font that arrives late resizes the probe, which measures
-  // again.
-  useLayoutEffect(() => {
-    const code = codeRef.current;
-    const probe = probeRef.current;
-    if (!code || !probe) return;
-    const measure = () => {
-      const isCut = probe.getBoundingClientRect().width > code.clientWidth + 0.5;
-      // The toggle is about to go: move its focus on rather than lose it.
-      if (!isCut && !open && document.activeElement === toggleRef.current) copyRef.current?.focus();
-      setCut(isCut);
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(code);
-    observer.observe(probe);
-    return () => observer.disconnect();
-  }, [open]);
-
-  const attempts = useRef(0);
-  const [copied, setCopied] = useState<{ attempt: number; ok: boolean } | null>(null);
-  const selectLocator = () => {
-    const code = codeRef.current;
-    if (code) window.getSelection()?.selectAllChildren(code);
-  };
-  // Selected once the whole locator is on screen, not on a guess at when that is.
-  const selectWhenOpen = useRef(false);
-  useLayoutEffect(() => {
-    if (!open || !selectWhenOpen.current) return;
-    selectWhenOpen.current = false;
-    selectLocator();
-  });
-  const copy = async () => {
-    attempts.current += 1;
-    const attempt = attempts.current;
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied({ attempt, ok: true });
-    } catch {
-      setCopied({ attempt, ok: false });
-      if (open) selectLocator();
-      else {
-        selectWhenOpen.current = true;
-        onOpenChange(true);
-      }
-    }
-  };
-
-  // Split before each " > ", so the steps join back into the exact locator.
-  // The split is for display only: textContent, copy and tests stay exact.
-  const steps = value.split(/(?= > )/);
-  const last = steps.length - 1;
-  const stepSpans = (block: boolean) =>
-    steps.map((step, index) => (
-      <span
-        key={index}
-        className={cn(block && "block pl-4 -indent-4", index === last && steps.length > 1 && "font-semibold")}
-      >
-        {step}
-      </span>
-    ));
-  return (
-    <div className="relative">
-      {/* Out of the flow and clipped to nothing, so it never widens the page. */}
-      <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-0 overflow-hidden">
-        <span ref={probeRef} className="invisible inline-block whitespace-nowrap font-mono text-xs">
-          {stepSpans(false)}
-        </span>
-      </span>
-      <code
-        id={id}
-        ref={codeRef}
-        translate="no"
-        className={cn(
-          "block min-w-0 font-mono text-xs text-fg",
-          !open && "overflow-hidden text-ellipsis whitespace-nowrap text-left [direction:rtl]",
-        )}
-      >
-        <span dir="ltr" className={open ? "block" : undefined}>
-          {stepSpans(open)}
-        </span>
-      </code>
-      <div className="mt-1 flex flex-wrap items-center gap-2">
-        <Button ref={copyRef} type="button" variant="secondary" size="sm" className="min-h-target" onClick={copy}>
-          <Copy className="h-3.5 w-3.5" aria-hidden />
-          Copy element locator
-        </Button>
-        {(cut || open) && (
-          <Button
-            ref={toggleRef}
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="min-h-target"
-            aria-expanded={open}
-            aria-controls={id}
-            onClick={() => {
-              // Closing a locator that fits removes this button: focus Copy first.
-              if (open && !cut) copyRef.current?.focus();
-              onOpenChange(!open);
-            }}
-          >
-            {open ? <ChevronUp className="h-3.5 w-3.5" aria-hidden /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden />}
-            {open ? "Show less" : "Show all"}
-          </Button>
-        )}
-      </div>
-      <p role="status" className="mt-1 max-w-measure text-xs text-fg empty:sr-only">
-        {copied &&
-          (copied.ok ? (
-            <span key={copied.attempt} className="inline-flex items-center gap-1">
-              <Check className="h-3.5 w-3.5" aria-hidden />
-              Copied
-            </span>
-          ) : (
-            <span key={copied.attempt}>
-              Not copied. Your browser did not allow it. The element locator is now shown in full and selected.
-              Press Ctrl+C, or Command+C on a Mac, to copy it.
-            </span>
-          ))}
-      </p>
     </div>
   );
 }

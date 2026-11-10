@@ -17,10 +17,8 @@
  * crawler never has its element on screen to photograph.
  */
 export interface FindingLocation {
-  /** Human-readable description of the element. */
-  label: string;
-  /** The raw stored target, for developers. */
-  raw: string;
+  /** The literal text Alfa judged, or null when the target is an element. */
+  text: string | null;
   /** A URL that scrolls the live page to this exact text, when we can build one. */
   deepLink: string | null;
 }
@@ -29,16 +27,16 @@ export interface FindingLocation {
  *  whitespace difference breaks the match) so we anchor on a generous prefix. */
 const FRAGMENT_MAX = 100;
 
-export function findingLocation(
-  pageUrl: string,
-  targetSelector: string,
-  targetDisplay?: string,
-): FindingLocation {
-  const raw = targetSelector;
+/**
+ * The text a finding judged, and a link to it on the live page. It no longer
+ * returns a label or the raw locator: locators left every screen
+ * (2026-11-10; see ElementCode in components/ui.tsx), and an element is
+ * shown by its code instead.
+ */
+export function findingLocation(pageUrl: string, targetSelector: string): FindingLocation {
   const text = textTargetOf(targetSelector);
   return {
-    label: targetDisplay || (text ? `Text “${text}”` : targetSelector),
-    raw,
+    text,
     deepLink: text ? textFragmentUrl(pageUrl, text) : null,
   };
 }

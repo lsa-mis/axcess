@@ -136,8 +136,9 @@ field.
 The text that finds one [element](#element) in the page code. The rule check
 (axe) and the browser checks record it as a CSS selector, such as
 `main > h2`. The rule check (Alfa) records it as an XPath, a path from the top
-of the page, such as `/html[1]/body[1]/main[1]/h2[1]`. The page inspector names
-which one it shows and can copy it.
+of the page, such as `/html[1]/body[1]/main[1]/h2[1]`. The app does not show
+it: each occurrence shows its element code (HTML) instead. The CSV, JSON and
+Excel exports keep it, for developers.
 
 ## Severity and priority
 

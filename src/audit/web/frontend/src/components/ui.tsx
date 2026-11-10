@@ -1147,7 +1147,6 @@ export function PageLink({
   pageTitle,
   showUrlBelow = true,
   selector = null,
-  elementName = null,
   occurrenceId = null,
   snippet = null,
   issue = null,
@@ -1166,8 +1165,6 @@ export function PageLink({
   showUrlBelow?: boolean;
   /** Target selector to outline on the inspected page (when known directly). */
   selector?: string | null;
-  /** A short readable name for the element (target_display), when known. */
-  elementName?: string | null;
   /** The occurrence's ID, where a view lists occurrences (see below). */
   occurrenceId?: number | null;
   /** Exact element markup (html_snippet), the most reliable locator. */
@@ -1192,16 +1189,17 @@ export function PageLink({
   // Screen-reader-only context, so each link names where it goes by itself:
   // one view lists many occurrences, and the same words ("Open live page",
   // a page title) led to different pages or elements (SC 2.4.9 Link Purpose
-  // (Link Only), Level AAA; WCAG technique C7; October 2026 AAA audit). The
-  // element is its short display name where the view has one, else the last
-  // two steps of its locator, kept short (see shortLocator). Short names can
-  // still match: two elements whose locators end in the same two steps, or
-  // repeated elements with the same tag and attributes. So a view of
-  // occurrences also gives the occurrence's ID, which is unique and is the
-  // name the page's evidence uses for it ("Occurrence 1234"; found by
-  // review). The word was "issue" from 2026-10-26 to 2026-10-28
-  // (docs/plain-language.md, "Why "occurrence" and "issue type"").
-  const element = elementName || selector ? shortLocator(elementName || selector || "") : null;
+  // (Link Only), Level AAA; WCAG technique C7; October 2026 AAA audit). A
+  // view of occurrences gives the occurrence's ID, which is unique and is
+  // the name the page's evidence uses for it ("Occurrence 1234"). The word
+  // was "issue" from 2026-10-26 to 2026-10-28 (docs/plain-language.md, "Why
+  // "occurrence" and "issue type"").
+  //
+  // It named the element by the last two steps of its element locator (CSS
+  // selector) too, until the developer removed locators from every screen
+  // (2026-11-10): the element's code says what it is, and a locator such as
+  // "div:nth-of-type(4) > div > header" told a reader nothing. The ID alone
+  // keeps each link unique.
 
   // Build the inspector URL with whatever orientation/selector context the
   // caller can offer. The params are kept sparse so the route stays legible.
@@ -1240,7 +1238,7 @@ export function PageLink({
           <ScanEye className="mt-0.5 h-5 w-5 shrink-0 text-fg-subtle" aria-hidden />
           <span className="break-words">{display}</span>
           <span className="sr-only">
-            , opens in the page inspector{element ? ` at ${element}` : ""}
+            , opens in the page inspector
             {occurrenceId != null ? `, occurrence ${occurrenceId}` : ""}
           </span>
         </Link>
@@ -1381,17 +1379,37 @@ export function relativeTime(iso: string | null): string {
 }
 
 /**
- * The last two steps of an element locator, each kept short, to name an
- * element. Two, not one: the same button repeated under different headings
- * (a "copy link" icon on every heading) shares its last step, and the step
- * above it is what tells them apart.
+ * One occurrence's element code (HTML), shown where the element locator
+ * (CSS selector) used to be.
+ *
+ * The developer removed locators from every screen (2026-11-10): a locator
+ * such as "div:nth-of-type(4) > div > header" says nothing to a reader, and
+ * the code beside it already said what the element is. The locator is still
+ * stored, because the page inspector uses it to find and outline the
+ * element, and still exported (CSV, JSON, Excel) for developers. Considered:
+ * a readable label beside the locator ("Button 'Menu' in the site header");
+ * set aside for removing the locator outright.
+ *
+ * The code is shown, not behind a "Show element code" disclosure as it was:
+ * with the locator gone, it is the only thing in the cell that says which
+ * element this is. It wraps rather than scrolls, so no part of it needs a
+ * scroll area that a keyboard cannot reach (SC 2.1.1 Keyboard, Level A) or
+ * sideways scrolling at 320 px (SC 1.4.10 Reflow, Level AA). A check that
+ * saved no code says so in words, so an empty cell is never read as missing
+ * data (SC 1.3.1 Info and Relationships, Level A, in spirit).
  */
-export function shortLocator(selector: string): string {
-  const steps = selector
-    .split(">")
-    .map((step) => step.trim())
-    .filter(Boolean)
-    .slice(-2)
-    .map((step) => (step.length > 32 ? `${step.slice(0, 31)}…` : step));
-  return steps.join(" > ") || selector;
+export function ElementCode({ snippet, className }: { snippet: string | null | undefined; className?: string }) {
+  if (!snippet?.trim()) {
+    return <p className={cn("text-xs text-fg-muted", className)}>No element code was saved for this occurrence.</p>;
+  }
+  return (
+    <pre
+      className={cn(
+        "whitespace-pre-wrap break-all rounded-xs border border-border bg-surface-muted p-2 font-mono text-2xs leading-relaxed text-fg",
+        className,
+      )}
+    >
+      {snippet}
+    </pre>
+  );
 }

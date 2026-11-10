@@ -503,15 +503,19 @@ async def test_finding_anchor_waits_for_scan_metadata(
     )
     await page.goto(f"{base}/app/scans/{scan_id}/pages/1#finding-77", wait_until="networkidle")
     await playwright_async.expect(page.locator("#finding-77")).to_be_focused()
-    # The finding's evidence says what is missing and where the element is.
-    # (These checks rode on the old Verify changes link to this page; Compare
-    # scans links to the issue instead, so they live here now.)
+    # The finding's evidence says what is missing, and shows the element's
+    # code where its locator used to be. This Alfa record saved no code, so
+    # it says so, and its locator-based description ("Text in the first
+    # paragraph") is gone with the locators (2026-11-10, ElementCode in
+    # components/ui.tsx). (These checks rode on the old Verify changes link
+    # to this page; Compare scans links to the issue instead.)
     await playwright_async.expect(
         page.get_by_text("Some details are missing.", exact=True)
     ).to_be_visible()
     await playwright_async.expect(
-        page.get_by_text("Text in the first paragraph", exact=False)
+        page.get_by_text("No element code was saved for this occurrence.", exact=True)
     ).to_be_visible()
+    await playwright_async.expect(page.get_by_text("Text in the first paragraph")).to_have_count(0)
     violations = await _run_axe(page)
     assert not violations, _render_violations(violations)
 

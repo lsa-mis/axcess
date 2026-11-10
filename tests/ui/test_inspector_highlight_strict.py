@@ -6,8 +6,10 @@ could have the wrong one outlined. It also drew the current element's outline
 on the element itself, which vanished on a tiny or empty element. Now an
 occurrence is outlined only when its locator (checked against its markup) or
 its markup alone names one element; the current one gets a numbered box over
-it; and a short table under the toolbar says what the box is on, with its
-element locator, which can be shown in full and copied.
+it; and a short table under the toolbar says what the box is on. The table
+had an element locator (CSS selector) row with a Copy button until the
+developer removed locators from every screen (2026-11-10); a test below pins
+that it stays out.
 """
 
 from __future__ import annotations
@@ -150,25 +152,25 @@ async def test_the_current_element_gets_a_numbered_box_and_a_description(
         # The same labels in the same places for every element; the toolbar
         # status above says which one it is, so the table does not repeat it.
         facts = page.get_by_role("group", name="The flagged element you are on", exact=True)
-        labels = ["What it is", "Text or label", "Size", "Element locator (CSS selector)"]
+        # No element locator row and no Copy button: locators left every
+        # screen (2026-11-10, see ElementCode in components/ui.tsx).
+        labels = ["What it is", "Text or label", "Size"]
         await playwright_async.expect(facts.locator("dt")).to_have_text(labels)
         await playwright_async.expect(page.get_by_text("Flagged element 1:")).to_have_count(0)
         await playwright_async.expect(_fact(page, "What it is")).to_have_text("Link")
         await playwright_async.expect(_fact(page, "Text or label")).to_have_text(
             "“Read the big story”"
         )
-        locator = _fact(page, "Element locator (CSS selector)").locator("code")
-        await playwright_async.expect(locator).to_have_text("#big")
         await playwright_async.expect(
             page.get_by_role("button", name="Copy element locator", exact=True)
-        ).to_be_visible()
+        ).to_have_count(0)
+        await playwright_async.expect(facts.get_by_text("#big")).to_have_count(0)
 
         # A tiny link: the box is still big enough to see, and labelled.
         await group.get_by_role("button", name="Next element").click()
         await playwright_async.expect(box).to_have_text("2 of 3")
         size = await box.evaluate("el => [el.offsetWidth, el.offsetHeight]")
         assert size[0] >= 26 and size[1] >= 26, size
-        await playwright_async.expect(locator).to_have_text("#tiny")
         await playwright_async.expect(_fact(page, "Text or label")).to_have_text("“x”")
         await playwright_async.expect(facts.locator("dt")).to_have_text(labels)
 
@@ -224,131 +226,10 @@ async def test_alfa_records_are_matched_by_tag_attributes_and_text(
         await playwright_async.expect(
             frame.locator("footer span.axcess-inspect-highlight")
         ).to_have_count(1)
-        # An Alfa record's locator is an XPath, and is named as one.
-        await playwright_async.expect(
-            _fact(page, "Element locator (XPath)").locator("code")
-        ).to_have_text("/html[1]/body[1]/main[1]/nav[1]/button[1]")
-    finally:
-        await page.context.close()
-
-
-_LONG_SELECTOR = 'html > body > main > div:nth-child(1) > a#big[href="/big"]'
-_FAKE_CLIPBOARD = """
-Object.defineProperty(navigator, "clipboard", {
-  configurable: true,
-  value: { writeText: async (text) => { window.__copied = text; } },
-});
-"""
-
-
-async def test_a_long_locator_shows_its_end_and_copies_whole(
-    seeded_db: tuple[Path, Path, int], live_server: tuple[str, int], new_page: Any
-) -> None:
-    db_path, _, _ = seeded_db
-    base, scan_id = live_server
-    page_id = _seed(
-        db_path,
-        scan_id,
-        [("axe", "link-name", _LONG_SELECTOR, '<a id="big" href="/big">Read the big story</a>')],
-    )
-    page = await new_page(viewport={"width": 320, "height": 900})
-    await page.add_init_script(_FAKE_CLIPBOARD)
-    await page.goto(
-        f"{base}/app/scans/{scan_id}/pages/{page_id}/inspect?issue=axe:link-name",
-        wait_until="networkidle",
-    )
-    try:
-        code = _fact(page, "Element locator (CSS selector)").locator("code")
-        # The whole locator is the text, whatever is cut on screen.
-        await playwright_async.expect(code).to_have_text(_LONG_SELECTOR)
-        assert await page.evaluate("document.documentElement.scrollWidth") <= 320
-
-        show = page.get_by_role("button", name="Show all", exact=True)
-        await playwright_async.expect(show).to_have_attribute("aria-expanded", "false")
-        await show.click()
-        less = page.get_by_role("button", name="Show less", exact=True)
-        await playwright_async.expect(less).to_have_attribute("aria-expanded", "true")
-        await playwright_async.expect(code).to_have_text(_LONG_SELECTOR)
-        await less.click()
-        assert await page.evaluate("document.activeElement.tagName") == "BUTTON"
-
-        copy = page.get_by_role("button", name="Copy element locator", exact=True)
-        await copy.click()
-        await playwright_async.expect(
-            page.get_by_role("status").filter(has_text="Copied")
-        ).to_be_visible()
-        assert await page.evaluate("window.__copied") == _LONG_SELECTOR
-        await playwright_async.expect(copy).to_have_accessible_name("Copy element locator")
-
-        # No clipboard (plain http on a network address): shown and selected.
-        await page.evaluate(
-            "() => { navigator.clipboard.writeText = () => Promise.reject(new Error('blocked')); }"
+        # An Alfa record's XPath is not shown either, only what the element is.
+        facts = page.get_by_role("group", name="The flagged element you are on", exact=True)
+        await playwright_async.expect(facts.locator("dt")).to_have_text(
+            ["What it is", "Text or label", "Size"]
         )
-        await copy.click()
-        await playwright_async.expect(
-            page.get_by_text("Not copied. Your browser did not allow it.", exact=False)
-        ).to_be_visible()
-        await playwright_async.expect(less).to_have_attribute("aria-expanded", "true")
-        selected = await page.evaluate("String(getSelection())")
-        assert " ".join(selected.split()) == _LONG_SELECTOR
-        violations = await _run_axe(page)
-        assert not violations, _render_violations(violations)
-    finally:
-        await page.context.close()
-
-
-@pytest.mark.parametrize("width", [430, 460, 480, 520, 800])
-async def test_the_locator_toggle_holds_still_at_every_width(
-    seeded_db: tuple[Path, Path, int], live_server: tuple[str, int], new_page: Any, width: int
-) -> None:
-    """The Show all button holds still, whatever the width, and is there
-    exactly when the locator is cut.
-
-    It once shared the locator's line, so appearing narrowed the locator's
-    box, which changed whether it was cut: at widths where one state wrapped
-    and the other did not, the button came and went every frame. It now sits
-    on the line under the locator, so it is left out when the locator fits,
-    and its coming or going cannot change the locator's width.
-    """
-    db_path, _, _ = seeded_db
-    base, scan_id = live_server
-    page_id = _seed(
-        db_path,
-        scan_id,
-        [
-            (
-                "axe",
-                "link-name",
-                "html > body > main > div:nth-child(1) > a#big",
-                '<a id="big" href="/big">Read the big story</a>',
-            )
-        ],
-    )
-    page = await new_page(viewport={"width": width, "height": 900})
-    await page.goto(
-        f"{base}/app/scans/{scan_id}/pages/{page_id}/inspect?issue=axe:link-name",
-        wait_until="networkidle",
-    )
-    try:
-        await page.locator("#inspect-locator").wait_for()
-        seen = await page.evaluate(
-            """async () => {
-                const states = new Set();
-                for (let i = 0; i < 30; i++) {
-                    await new Promise((resolve) => requestAnimationFrame(resolve));
-                    const code = document.getElementById('inspect-locator');
-                    const toggle = document.querySelector(
-                        "button[aria-controls='inspect-locator']"
-                    );
-                    const cut = code.scrollWidth > code.clientWidth + 0.5;
-                    states.add(`${cut}:${toggle !== null}:${code.clientWidth}`);
-                }
-                return [...states];
-            }"""
-        )
-        assert len(seen) == 1, seen
-        cut, shown, _ = seen[0].split(":")
-        assert cut == shown, seen
-        assert await page.evaluate("document.documentElement.scrollWidth") <= width
     finally:
         await page.context.close()

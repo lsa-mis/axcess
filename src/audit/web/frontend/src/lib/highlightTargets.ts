@@ -1247,19 +1247,6 @@ function nameOrText(el: Element): string {
   );
 }
 
-/** A locator as a reader can use it: the CSS selector, or an Alfa record's XPath. */
-export function readableLocator(selector: string | null): string | null {
-  if (!selector) return null;
-  if (!isAlfaJsonSelector(selector)) return selector;
-  try {
-    const parsed = JSON.parse(selector) as unknown;
-    const first = (Array.isArray(parsed) ? parsed[0] : parsed) as { path?: unknown } | undefined;
-    return typeof first?.path === "string" ? first.path : null;
-  } catch {
-    return null;
-  }
-}
-
 function forceVisible(el: HTMLElement | SVGElement): void {
   el.style.setProperty("opacity", "1", "important");
   el.style.setProperty("visibility", "visible", "important");
