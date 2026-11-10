@@ -61,6 +61,7 @@ from audit.analyzer.axe import AxeAnalyzer
 from audit.analyzer.focus import FocusProbe
 from audit.analyzer.interaction import DEFAULT_BLOCKED_LABELS, InteractionProbe
 from audit.analyzer.keyboard import KeyboardProbe
+from audit.analyzer.markup import MarkupProbe
 from audit.analyzer.model_registry import get_pick
 from audit.analyzer.responsive import ResponsiveProbe
 from audit.analyzer.semantic.registry import supported_criteria
@@ -1732,6 +1733,9 @@ def create_app(
             keyboard_probe_enabled=not body.skip_keyboard,
             responsive_checks_enabled=not body.skip_responsive,
             focus_checks_enabled=True,
+            # Reads the page code and changes nothing, so it is as safe
+            # behind a sign-in as the rule check (axe).
+            markup_checks_enabled=True,
             visual_checks_enabled=False,
             # A marked element screenshot is what makes a finding reviewable
             # without re-running the sign-in, so an authenticated scan needs
@@ -2070,6 +2074,8 @@ def create_app(
             "skip_responsive": bool(body.get("skip_responsive")),
             "skip_semantic": bool(body.get("skip_semantic", desktop_ai_off)),
             "skip_focus": bool(body.get("skip_focus")),
+            # On unless asked off, like the other checks that only read.
+            "skip_markup": bool(body.get("skip_markup")),
             "skip_visual": bool(body.get("skip_visual")),
             # Off unless asked for: an older client that sends nothing never
             # starts the form error check, which presses submit buttons.
@@ -3941,6 +3947,7 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
         keyboard_probe_enabled=not bool(form.get("skip_keyboard")),
         responsive_checks_enabled=not bool(form.get("skip_responsive")),
         focus_checks_enabled=not bool(form.get("skip_focus")),
+        markup_checks_enabled=not bool(form.get("skip_markup")),
         visual_checks_enabled=not bool(form.get("skip_visual")),
         form_error_checks_enabled=not bool(form.get("skip_forms", True)),
         form_send_empty_forms=not bool(form.get("skip_forms", True))
@@ -4147,6 +4154,9 @@ async def _run_local_login_background(
                 else None
             ),
             focus_probe=FocusProbe(suppress_diagnostics=True),
+            markup_probe=(
+                MarkupProbe(suppress_diagnostics=True) if config.markup_checks_enabled else None
+            ),
             interaction_probe=login_interaction,
             # Follow the scan's own setting rather than hardcoding it off.
             # This fetcher is built here instead of by the orchestrator, so
@@ -4655,6 +4665,7 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
     interaction_pages = int(scan.get("interaction_pages_probed") or 0)
     interaction_states = int(scan.get("interaction_states_total") or 0)
     forms_pages = int(scan.get("forms_pages_checked") or 0)
+    markup_pages = int(scan.get("markup_pages_checked") or 0)
     coverage_version = int(cfg.get("method_coverage_version") or 0)
     scan_status = str(scan.get("status") or "")
     page_count = int(scan.get("page_count") or 0)
@@ -4720,6 +4731,20 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
                 "A failed rule is not proof the page fails WCAG, and a person "
                 'reviews each "cannot tell".'
             ),
+        },
+        {
+            "key": "markup",
+            "label": "Page code check",
+            # Scans before migration 0037 never ran it and stored no setting.
+            "enabled": (flag("markup_checks_enabled", default=False) and rendered)
+            or markup_pages > 0,
+            "checked_count": markup_pages,
+            "total_count": coverage["rendered_pages"],
+            "unit": "page",
+            "verb": "checked",
+            "description": "Reads each page's code for problems the rule check (axe) misses.",
+            # One sentence, as every limit in this table.
+            "caveat": "It reads each page only as it loads, not after clicking.",
         },
         {
             "key": "image",

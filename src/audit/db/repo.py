@@ -830,7 +830,7 @@ def upsert_keyboard_finding(
     failure_summary: str,
     html_snippet: str,
     target_hash: str,
-    criterion_sc: str,
+    criterion_sc: str | None,
     pipeline: str = "keyboard",
     screenshot_hash: str | None = None,
     revealed_by: str | None = None,
@@ -1054,6 +1054,53 @@ def upsert_visual_finding(
     )
 
 
+def upsert_markup_finding(
+    conn: sqlite3.Connection,
+    *,
+    page_id: int,
+    scan_id: int,
+    rule_id: str,
+    wcag_sc: str | None,
+    wcag_scs: str | None,
+    wcag_level: str | None,
+    impact: str | None,
+    help: str,
+    help_url: str,
+    target_selector: str,
+    failure_summary: str,
+    html_snippet: str,
+    target_hash: str,
+    criterion_sc: str | None,
+    pipeline: str = "markup",
+    screenshot_hash: str | None = None,
+) -> int:
+    """Idempotent upsert for a page code check finding (``pipeline='markup'``).
+
+    Same row format as the other browser checks, delegates to the
+    pipeline-parameterized :func:`upsert_keyboard_finding`. ``wcag_sc`` and
+    ``criterion_sc`` are None for a best-practice rule.
+    """
+    return upsert_keyboard_finding(
+        conn,
+        page_id=page_id,
+        scan_id=scan_id,
+        rule_id=rule_id,
+        wcag_sc=wcag_sc,
+        wcag_scs=wcag_scs,
+        wcag_level=wcag_level,
+        impact=impact,
+        help=help,
+        help_url=help_url,
+        target_selector=target_selector,
+        failure_summary=failure_summary,
+        html_snippet=html_snippet,
+        target_hash=target_hash,
+        criterion_sc=criterion_sc,
+        pipeline=pipeline,
+        screenshot_hash=screenshot_hash,
+    )
+
+
 def upsert_semantic_finding(
     conn: sqlite3.Connection,
     *,
@@ -1217,7 +1264,7 @@ def increment_scan_method_coverage(
     conn: sqlite3.Connection,
     *,
     scan_id: int,
-    method: Literal["semantic", "keyboard", "responsive"],
+    method: Literal["semantic", "keyboard", "responsive", "markup"],
     pages_delta: int = 1,
 ) -> None:
     """Record pages actually evaluated by a non-engine scan method.
@@ -1234,6 +1281,8 @@ def increment_scan_method_coverage(
         "semantic": "semantic_pages_analyzed",
         "keyboard": "keyboard_pages_probed",
         "responsive": "responsive_pages_probed",
+        # Migration 0037: pages the page code check ran on.
+        "markup": "markup_pages_checked",
     }
     column = columns[method]
     conn.execute(

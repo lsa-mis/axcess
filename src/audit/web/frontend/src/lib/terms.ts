@@ -102,6 +102,7 @@ export const CHECK_LABEL: Record<DetectionPipeline, string> = {
   focus: "Focus check",
   visual: "Motion and reading-order check",
   forms: "Form error check",
+  markup: "Page code check",
   semantic: "AI review",
   image: "Image text check",
   protected_image: "Image text check",

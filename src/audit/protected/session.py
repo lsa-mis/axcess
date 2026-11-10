@@ -39,6 +39,7 @@ from audit.analyzer.axe import Level as AxeLevel
 from audit.analyzer.focus import FocusProbe
 from audit.analyzer.interaction import InteractionProbe
 from audit.analyzer.keyboard import KeyboardProbe
+from audit.analyzer.markup import MarkupProbe
 from audit.analyzer.responsive import ResponsiveProbe
 from audit.analyzer.visual import VisualProbe
 from audit.blob_store import BlobStore
@@ -881,6 +882,7 @@ class ManualAuthenticationSession:
         keyboard_probe: KeyboardProbe | None = None,
         responsive_probe: ResponsiveProbe | None = None,
         focus_probe: FocusProbe | None = None,
+        markup_probe: MarkupProbe | None = None,
         visual_probe: VisualProbe | None = None,
         # Operates the page's controls and re-runs axe on each state a click
         # reveals. Omitting it was silent: a login scan ran with interaction
@@ -910,6 +912,7 @@ class ManualAuthenticationSession:
             keyboard_probe=keyboard_probe,
             responsive_probe=responsive_probe,
             focus_probe=focus_probe,
+            markup_probe=markup_probe,
             visual_probe=visual_probe,
             interaction_probe=interaction_probe,
             capture_screenshots=capture_screenshots,

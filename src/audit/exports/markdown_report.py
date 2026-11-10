@@ -32,6 +32,7 @@ _SOURCE_LABELS = {
     "visual": "Visual analysis",
     "protected_image": "Protected image analysis",
     "forms": "Form error check",
+    "markup": "Page code check",
 }
 
 

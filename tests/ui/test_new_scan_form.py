@@ -49,6 +49,7 @@ _RAIL_NAME = {
     ),
     "Check for keyboard traps": "Keyboard check",
     "Check that keyboard focus is never hidden": "Focus check",
+    "Check the page code for problems the rule check misses": "Page code check",
     "Check that forms describe their errors": "Form error check",
     "Check narrow screens and zoom": "Zoom and layout check",
     "Read text inside images (OCR)": "Image text check",
@@ -588,6 +589,8 @@ async def test_depth_dots_are_gone(live_server: tuple[str, int], new_page: Any) 
                 "Opens menus and pop-up windows (Click-Through)",
                 "Keyboard check",
                 "Focus check",
+                # On by default: it only reads the page code.
+                "Page code check",
                 # On by default for public websites (2026-11-02).
                 "Form error check",
                 "Zoom and layout check",

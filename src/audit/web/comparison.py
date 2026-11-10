@@ -28,7 +28,16 @@ Category = Literal["new", "still_detected", "changed", "no_longer_detected", "ca
 # keeps the stricter reading of the same row (whether coverage supports it).
 Change = Literal["new", "resolved", "remaining"]
 Pipeline = Literal[
-    "axe", "alfa", "keyboard", "responsive", "focus", "visual", "forms", "semantic", "image"
+    "axe",
+    "alfa",
+    "keyboard",
+    "responsive",
+    "focus",
+    "visual",
+    "forms",
+    "markup",
+    "semantic",
+    "image",
 ]
 CATEGORIES: tuple[Category, ...] = (
     "new",
@@ -45,6 +54,7 @@ PIPELINES: tuple[Pipeline, ...] = (
     "focus",
     "visual",
     "forms",
+    "markup",
     "semantic",
     "image",
 )
@@ -407,6 +417,7 @@ _COUNTERS = {
     "keyboard": "keyboard_pages_probed",
     "responsive": "responsive_pages_probed",
     "forms": "forms_pages_checked",
+    "markup": "markup_pages_checked",
 }
 _FLAGS = {
     "axe": "axe_enabled",
@@ -416,6 +427,7 @@ _FLAGS = {
     "responsive": "responsive_checks_enabled",
     "focus": "focus_checks_enabled",
     "forms": "form_error_checks_enabled",
+    "markup": "markup_checks_enabled",
     "visual": "visual_checks_enabled",
 }
 
@@ -475,6 +487,9 @@ def _coverage(
         flag = _FLAGS.get(pipeline)
         if flag and cfg.get(flag) is False:
             limitations.append(note(f"{pipeline} was disabled.", in_table=True))
+        elif pipeline == "markup" and flag and cfg.get(flag) is None:
+            # Reports made before the page code check existed never ran it.
+            limitations.append(note("markup was not run in this report.", in_table=True))
         elif pipeline in {"focus", "visual", "forms"}:
             limitations.append(
                 note(f"completed {pipeline} coverage was not recorded.", in_table=True)
@@ -577,7 +592,8 @@ def _method_coverage(
 ) -> MethodCoverage:
     cfg = _config(scan)
     flag = _FLAGS.get(pipeline)
-    if flag and cfg.get(flag) is False:
+    # A report from before the page code check existed did not run it.
+    if flag and (cfg.get(flag) is False or (pipeline == "markup" and cfg.get(flag) is None)):
         state: Literal["complete", "incomplete", "unknown", "disabled"] = "disabled"
     elif (
         pipeline not in _COUNTERS

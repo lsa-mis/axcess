@@ -47,6 +47,7 @@ const METHOD_PIPELINE: Partial<Record<ScanMethodCoverage["key"], IssueRow["pipel
   image: ["image", "protected_image"],
   semantic: ["semantic"],
   forms: ["forms"],
+  markup: ["markup"],
 };
 
 /** The methods that actually ran, fully or in part. The report's one-line

@@ -45,6 +45,7 @@ import yaml
 
 from audit.analyzer.alfa_evidence import humanize_target
 from audit.analyzer.forms import base as forms_base
+from audit.analyzer.markup import base as markup_base
 from audit.labels import FINDING_TYPES, FindingType
 from audit.logging import get_logger
 from audit.wcag_version import WcagVersion, stored_wcag_version
@@ -620,6 +621,11 @@ def rule_meta_for(row: IssueRow, rules: dict[str, Any]) -> dict[str, Any]:
         sc = row.issue_key.removeprefix("semantic:")
         meta = rules.get("semantic_criteria", {}).get(sc, {})
         return dict(meta) if isinstance(meta, dict) else {}
+    if row.pipeline == "markup":
+        # One card per page code rule: two of its rules share WCAG 1.3.1 and
+        # one has no criterion, so a card keyed by criterion cannot tell them
+        # apart.
+        return _markup_card(rules, row.issue_key.removeprefix("markup:"))
     if row.pipeline in ("keyboard", "responsive", "focus", "visual", "forms"):
         # Dynamic-probe rows are carded by SC (one YAML card covers
         # several rule_ids, e.g. all three keyboard-trap shapes).
@@ -637,6 +643,12 @@ def rule_meta_for(row: IssueRow, rules: dict[str, Any]) -> dict[str, Any]:
     image_key = row.issue_key.removeprefix("image:")
     meta = rules.get("image_findings", {}).get(image_key, {})
     return dict(meta) if isinstance(meta, dict) else {}
+
+
+def _markup_card(rules: dict[str, Any], rule_id: str) -> dict[str, Any]:
+    """A page code rule's card from ``markup_rules``, or {} for an unknown rule."""
+    card = rules.get("markup_rules", {}).get(rule_id, {})
+    return dict(card) if isinstance(card, dict) else {}
 
 
 # Card fields an Alfa issue does not take: it keeps its own title and the
@@ -684,6 +696,7 @@ def _pages_for_issue(
         "focus",
         "visual",
         "forms",
+        "markup",
         "protected_image",
     ):
         # Every DOM pipeline lives in page_a11y_findings. The row's
@@ -994,6 +1007,8 @@ def _axe_issue_rows(
             # merely because a third-party rule id happens to collide; an
             # Alfa rule has its own card, for guidance only.
             meta = _alfa_guidance(rules, raw_rule_id)
+        elif pipeline == "markup":
+            meta = _markup_card(rules, raw_rule_id)
         else:
             meta = axe_rules_meta.get(raw_rule_id, {})
             # A browser check's card is keyed by its criterion. An axe rule
@@ -1147,6 +1162,24 @@ def _axe_issue_rows(
                     "error, such as a 'Required' hint turning red or text only screen readers "
                     "get. A person checks it."
                 )
+        elif pipeline == "markup":
+            issue_key = f"{pipeline}:{raw_rule_id}"
+            # How sure, and what the evidence is, come from the rule itself
+            # (``audit.analyzer.markup.base.RULES``), so each rule decides its
+            # own lane in one place. A rule this version does not know keeps
+            # the cautious default: Not sure.
+            markup_rule = markup_base.rule_for(raw_rule_id)
+            default_title = markup_rule.title if markup_rule else f"Page code: {raw_rule_id}"
+            evidence_summary = (
+                "The page code check found this by reading the page code (DOM). "
+                "Check it on the page."
+            )
+            if markup_rule is not None:
+                review_lane = markup_rule.review_lane
+                evidence_confidence = markup_rule.evidence_confidence
+                evidence_summary = markup_rule.evidence_summary
+                if review_lane == "likely_barrier":
+                    high_confidence_occurrences = len(reported)
         elif pipeline == "visual":
             issue_key = f"{pipeline}:{raw_rule_id}"
             if legacy_visual_motion_observation:

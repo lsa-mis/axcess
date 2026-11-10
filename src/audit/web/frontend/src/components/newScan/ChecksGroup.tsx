@@ -102,6 +102,24 @@ export default function ChecksGroup({ settings, update, policy, capabilities }: 
             hint={rendered ? SWITCHES.focus.hint : "Needs a browser. Turn off Fast scan to use it."}
           />
         )}
+        {/* The page code check, after focus: like the switches above it, one
+            switch per check that needs a browser, worded as what it checks
+            (repo plain-language rules: a verb and an object). Its hint says
+            it only reads the page, because the switches around it change
+            or press the page and a reader deciding whether to turn one off
+            needs to know which do (W3C COGA "Making Content Usable",
+            https://www.w3.org/TR/coga-usable/, paraphrased: say what will
+            happen). Hidden in a sign-in scan, which always runs it (fixed
+            in the login policy), like the focus switch. */}
+        {!isFixed(policy, "skip_markup") && (
+          <SwitchRow
+            checked={switchOn(settings, "markup")}
+            onChange={(on) => update(switchPatch(settings, "markup", on))}
+            disabled={!rendered}
+            label={SWITCHES.markup.label}
+            hint={rendered ? SWITCHES.markup.hint : "Needs a browser. Turn off Fast scan to use it."}
+          />
+        )}
         {/* One question with three answers, in place of the old on/off
             switch: don't check forms, check them without sending anything
             (the default for public websites), or check them and send empty

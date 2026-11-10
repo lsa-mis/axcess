@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from audit.analyzer.forms import FormFinding
     from audit.analyzer.interaction import RevealedViolation, StateCapture
     from audit.analyzer.keyboard import KeyboardTrap
+    from audit.analyzer.markup import MarkupFinding
     from audit.analyzer.responsive import ResponsiveFinding
     from audit.analyzer.visual import VisualFinding
     from audit.crawler.frame_snapshot import SavedFrame
@@ -61,6 +62,11 @@ class FetchResult:
     # SC 2.4.11 Focus Not Obscured, live-page focus probe results. Same
     # population rules: JsFetcher only, default on, ``--skip-focus`` disables.
     focus_findings: tuple[FocusFinding, ...] = field(default=())
+    # Page code check results (``pipeline='markup'``). JsFetcher only, run
+    # right after axe; default on, ``--skip-markup`` disables. ``ran`` says
+    # the check ran on this page, so a page with nothing found still counts.
+    markup_findings: tuple[MarkupFinding, ...] = field(default=())
+    markup_check_ran: bool = False
     # SC 1.3.2 Meaningful Sequence, visual (VLM) probe. JsFetcher only;
     # no-op without a vision model. ``--skip-visual`` disables.
     visual_findings: tuple[VisualFinding, ...] = field(default=())

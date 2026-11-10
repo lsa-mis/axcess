@@ -415,6 +415,17 @@ def crawl(
             ),
         ),
     ] = False,
+    skip_markup: Annotated[
+        bool,
+        typer.Option(
+            "--skip-markup",
+            help=(
+                "Skip the page code check (fields named only by a placeholder, "
+                "labels tied to no field, titles that repeat the text, text "
+                "styled as a heading)."
+            ),
+        ),
+    ] = False,
     skip_visual: Annotated[
         bool,
         typer.Option(
@@ -546,6 +557,7 @@ def crawl(
             keyboard_probe_max_focusable=keyboard_max_focusable,
             responsive_checks_enabled=not skip_responsive,
             focus_checks_enabled=not skip_focus,
+            markup_checks_enabled=not skip_markup,
             visual_checks_enabled=not skip_visual,
             interaction_checks_enabled=not skip_interaction,
             capture_screenshots=not skip_screenshots,
@@ -623,6 +635,9 @@ def _render_summary(conn, summary: CrawlSummary) -> None:  # type: ignore[no-unt
     if summary.focus_pages_probed:
         table.add_row("Pages focus-probed (SC 2.4.11)", str(summary.focus_pages_probed))
         table.add_row("Focus-obscured findings total", str(summary.focus_findings_total))
+    if summary.markup_pages_checked:
+        table.add_row("Pages checked by the page code check", str(summary.markup_pages_checked))
+        table.add_row("Page code check findings total", str(summary.markup_findings_total))
     if summary.visual_pages_probed:
         table.add_row("Pages visually probed (SC 1.3.2)", str(summary.visual_pages_probed))
         table.add_row("Visual-sequence findings total", str(summary.visual_findings_total))

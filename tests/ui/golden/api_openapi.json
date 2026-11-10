@@ -1860,6 +1860,7 @@
                     "focus",
                     "visual",
                     "forms",
+                    "markup",
                     "semantic",
                     "image"
                   ],
@@ -2239,6 +2240,7 @@
               "focus",
               "visual",
               "forms",
+              "markup",
               "semantic",
               "image"
             ],
@@ -2297,6 +2299,7 @@
               "focus",
               "visual",
               "forms",
+              "markup",
               "semantic",
               "image"
             ],
@@ -2828,6 +2831,7 @@
           "skip_responsive": {"type": "boolean", "title": "Skip Responsive"},
           "skip_semantic": {"type": "boolean", "title": "Skip Semantic"},
           "skip_focus": {"type": "boolean", "title": "Skip Focus"},
+          "skip_markup": {"type": "boolean", "title": "Skip Markup", "default": false},
           "skip_visual": {"type": "boolean", "title": "Skip Visual"},
           "skip_forms": {"type": "boolean", "title": "Skip Forms", "default": true},
           "send_empty_forms": {"type": "boolean", "title": "Send Empty Forms", "default": false},

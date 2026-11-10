@@ -184,6 +184,7 @@ export interface ScanMethodCoverage {
     | "responsive"
     | "interaction"
     | "forms"
+    | "markup"
     | "search";
   label: string;
   /** Kept for compatibility: means selected/configured, not completed. */
@@ -356,6 +357,9 @@ export interface NewScanPayload {
   skip_semantic: boolean;
   /** Skip the deterministic focus-obscured browser probe. */
   skip_focus: boolean;
+  /** Skip the page code check, which reads the rendered page code after axe.
+   *  On unless chosen off; the server treats a missing value as on. */
+  skip_markup: boolean;
   /** Skip motion and vision-assisted visual probes. */
   skip_visual: boolean;
   /** Skip the form error check (WCAG 3.3.1). Off unless chosen. */
@@ -705,7 +709,8 @@ export type DetectionPipeline =
   | "responsive"
   | "focus"
   | "visual"
-  | "forms";
+  | "forms"
+  | "markup";
 
 export interface A11yRuleSummary {
   rule_id: string;

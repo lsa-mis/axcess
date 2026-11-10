@@ -1065,6 +1065,9 @@ def _protected_crawl_config(
         keyboard_probe_enabled=True,
         responsive_checks_enabled=True,
         focus_checks_enabled=True,
+        # The helper app does not run the page code check yet, so the stored
+        # settings must not say it ran.
+        markup_checks_enabled=False,
         # A full-page/element screenshot is not eligible for automatic
         # protected persistence, and v1 has no reviewer attachment upload.
         visual_checks_enabled=False,

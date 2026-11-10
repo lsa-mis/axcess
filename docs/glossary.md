@@ -388,6 +388,16 @@ Reports made before 5 November 2026 mark every result Not sure. In the app it is
 default for public websites (**Check that forms describe their errors**,
 under **Checks** on New scan) and never runs in a sign-in scan.
 
+### Page code check
+
+A check that reads each page's code (the [rendered page](#rendered-page)'s
+DOM) for problems the [axe-core](#axe-core) rule check does not look for. It
+runs right after axe-core, reads the page only as it loaded (not after
+clicking), and changes nothing on the page. Each problem it finds is its own
+[issue type](#issue-type), and each one says how sure Axcess is. It is on by
+default (**Check the page code for problems the rule check misses**, under
+**Checks** on New scan), and it also runs in a sign-in scan made in the app.
+
 ### Local AI model
 
 An optional AI model that reads text (a language model) or looks at images (a

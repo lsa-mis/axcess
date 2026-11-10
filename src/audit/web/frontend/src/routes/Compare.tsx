@@ -30,6 +30,7 @@ const PIPELINE_KEYS: DetectionPipeline[] = [
   "focus",
   "visual",
   "forms",
+  "markup",
   "semantic",
   "image",
 ];
@@ -575,6 +576,7 @@ const SETTING_NAMES: Record<string, string> = {
   keyboard_probe_enabled: CHECK_LABEL.keyboard,
   responsive_checks_enabled: CHECK_LABEL.responsive,
   focus_checks_enabled: CHECK_LABEL.focus,
+  markup_checks_enabled: CHECK_LABEL.markup,
   form_error_checks_enabled: CHECK_LABEL.forms,
   visual_checks_enabled: CHECK_LABEL.visual,
   semantic_enabled: CHECK_LABEL.semantic,

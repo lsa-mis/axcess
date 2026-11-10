@@ -200,6 +200,7 @@ _CHECK_LABEL = {
     "image": "Image text check",
     # The form error check (WCAG 3.3.1), as the app names it (lib/terms.ts).
     "forms": "Form error check",
+    "markup": "Page code check",
 }
 
 # The template writes each criterion as "<number> <en dash> <name>".

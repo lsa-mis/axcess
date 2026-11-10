@@ -120,6 +120,7 @@ _PIPELINE_LABEL = {
     "responsive": "responsive & zoom probe",
     "focus": "live-page focus probe",
     "visual": "visual order and media playback probe",
+    "markup": "page code check (deterministic DOM questions axe-core does not ask)",
 }
 
 # Static description of each detection pipeline for the coverage section.
@@ -200,6 +201,16 @@ _PIPELINE_COVERAGE = [
         "checks": "SC 2.4.11, focus hidden behind sticky headers / cookie banners / overlays.",
         "confidence": "Medium, catches elements whose centre is covered; "
         "partial-overlap and post-click overlays still need a human.",
+    },
+    {
+        "key": "markup",
+        "name": "Page code check",
+        "method": "Reads the rendered page code (DOM) right after axe-core, without "
+        "changing the page, and asks questions axe-core does not.",
+        "checks": "Each rule is its own issue type; its card names the WCAG criterion, "
+        "or says it is a best practice.",
+        "confidence": "Depends on the rule: each issue type says how sure it is. "
+        "It reads the page only as it loaded, not after clicking.",
     },
     {
         "key": "interaction",
@@ -1488,7 +1499,16 @@ def _locations_for_ids(
     placeholders = ",".join("?" for _ in sample)
     locations: list[IssueLocation] = []
 
-    if row.pipeline in ("axe", "alfa", "semantic", "keyboard", "responsive", "focus", "visual"):
+    if row.pipeline in (
+        "axe",
+        "alfa",
+        "semantic",
+        "keyboard",
+        "responsive",
+        "focus",
+        "visual",
+        "markup",
+    ):
         db_rows = conn.execute(
             f"""
             SELECT p.url_normalized AS page_url, p.title AS page_title,
@@ -1606,7 +1626,17 @@ def _methods_line(rows: list[Any]) -> str:
     present = {r.pipeline for r in rows}
     labels = [
         _PIPELINE_LABEL[p]
-        for p in ("axe", "alfa", "image", "semantic", "keyboard", "responsive", "focus", "visual")
+        for p in (
+            "axe",
+            "alfa",
+            "markup",
+            "image",
+            "semantic",
+            "keyboard",
+            "responsive",
+            "focus",
+            "visual",
+        )
         if p in present
     ]
     return ", ".join(labels) if labels else "none (no findings produced)"

@@ -32,6 +32,7 @@ from audit.analyzer.interaction import (
     InteractionResult,
 )
 from audit.analyzer.keyboard import KeyboardProbe, KeyboardTrap
+from audit.analyzer.markup import MarkupFinding, MarkupProbe
 from audit.analyzer.responsive import ResponsiveFinding, ResponsiveProbe
 from audit.analyzer.visual import VisualFinding, VisualProbe
 from audit.crawler import live_progress
@@ -224,6 +225,7 @@ class JsFetcher:
         keyboard_probe: KeyboardProbe | None = None,
         responsive_probe: ResponsiveProbe | None = None,
         focus_probe: FocusProbe | None = None,
+        markup_probe: MarkupProbe | None = None,
         visual_probe: VisualProbe | None = None,
         interaction_probe: InteractionProbe | None = None,
         form_error_probe: ErrorIdentificationProbe | None = None,
@@ -257,6 +259,10 @@ class JsFetcher:
         # geometry at the normal viewport) but after axe/keyboard. It only
         # focuses elements + reads layout, no lasting DOM mutation.
         self._focus_probe = focus_probe
+        # Page code check. Runs right after axe and before anything that
+        # presses keys or clicks, so it reads the page code as it loaded.
+        # Read-only: it changes nothing on the page.
+        self._markup_probe = markup_probe
         # SC 1.3.2 visual probe. Screenshots the page, must run before the
         # responsive probe resizes the viewport. No-op without a vision model.
         self._visual_probe = visual_probe
@@ -444,6 +450,18 @@ class JsFetcher:
                         version=self._wcag_version,
                         include_incomplete=True,
                     )
+            # Page code check, right after axe and on the same quiet page.
+            # It only reads, and never raises (each rule is isolated).
+            markup_findings: list[MarkupFinding] = []
+            markup_check_ran = False
+            if (
+                self._markup_probe is not None
+                and 200 <= status < 300
+                and "text/html" in headers.get("content-type", "text/html")
+            ):
+                with live_progress.check("markup"):
+                    markup_findings = await self._markup_probe.run(page)
+                markup_check_ran = True
             # Keyboard probe (SC 2.1.2) runs *after* axe because it
             # presses keys and alters focus, axe needs a quiet DOM.
             # Same gating as axe (success page, HTML content). Probe
@@ -545,6 +563,7 @@ class JsFetcher:
                         *axe_violations,
                         *keyboard_traps,
                         *focus_findings,
+                        *markup_findings,
                         *visual_findings,
                         *responsive_findings,
                         # Revealed findings whose element outlived the sweep --
@@ -628,6 +647,8 @@ class JsFetcher:
                 keyboard_traps=tuple(keyboard_traps),
                 responsive_findings=tuple(responsive_findings),
                 focus_findings=tuple(focus_findings),
+                markup_findings=tuple(markup_findings),
+                markup_check_ran=markup_check_ran,
                 visual_findings=tuple(visual_findings),
                 interaction_findings=interaction.findings,
                 interaction_states=interaction.states,

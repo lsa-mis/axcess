@@ -45,6 +45,7 @@ from audit.analyzer.interaction import (
     StateCapture,
 )
 from audit.analyzer.keyboard import KeyboardProbe, KeyboardTrap
+from audit.analyzer.markup import MarkupFinding, MarkupProbe
 from audit.analyzer.ocr.pool import OcrPool
 from audit.analyzer.responsive import ResponsiveFinding, ResponsiveProbe
 from audit.analyzer.visual import VisualFinding, VisualProbe
@@ -275,6 +276,12 @@ class CrawlConfig:
     # (focuses each element, checks for a sticky/fixed overlay over its
     # centre); no model. Default on; disable with ``--skip-focus``.
     focus_checks_enabled: bool = True
+    # Page code check: deterministic questions about the rendered page code
+    # that axe-core does not ask (a field named only by its placeholder, a
+    # label tied to no field, a title that repeats the text, text styled as
+    # a heading). Reads the page right after axe and changes nothing; no
+    # model. Default on; disable with ``--skip-markup``.
+    markup_checks_enabled: bool = True
     # SC 3.3.1 Error Identification, form error check. Presses each form's
     # submit control once, empty, inside the network guard, and reports a
     # form that detects an error without describing it in text. Off by
@@ -386,6 +393,8 @@ class CrawlSummary:
     responsive_findings_total: int = 0
     focus_pages_probed: int = 0
     focus_findings_total: int = 0
+    markup_pages_checked: int = 0
+    markup_findings_total: int = 0
     form_error_findings_total: int = 0
     visual_pages_probed: int = 0
     visual_findings_total: int = 0
@@ -554,6 +563,10 @@ async def run_crawl(
     focus_probe: FocusProbe | None = None
     if config.focus_checks_enabled:
         focus_probe = FocusProbe()
+    # Page code check, default on. Read-only and stateless.
+    markup_probe: MarkupProbe | None = None
+    if config.markup_checks_enabled:
+        markup_probe = MarkupProbe()
     # SC 3.3.1 form error check, off by default. One per crawl, so a form
     # repeated on every page (a footer sign-up) is checked once.
     form_error_probe = (
@@ -605,6 +618,7 @@ async def run_crawl(
             keyboard_probe=keyboard_probe,
             responsive_probe=responsive_probe,
             focus_probe=focus_probe,
+            markup_probe=markup_probe,
             visual_probe=visual_probe,
             interaction_probe=interaction_probe,
             form_error_probe=form_error_probe,
@@ -873,6 +887,7 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             "keyboard_probe_enabled": config.keyboard_probe_enabled,
             "responsive_checks_enabled": config.responsive_checks_enabled,
             "focus_checks_enabled": config.focus_checks_enabled,
+            "markup_checks_enabled": config.markup_checks_enabled,
             "form_error_checks_enabled": config.form_error_checks_enabled,
             "form_send_empty_forms": config.form_send_empty_forms,
             "visual_checks_enabled": config.visual_checks_enabled,
@@ -982,6 +997,7 @@ class _LazyJs:
         keyboard_probe: KeyboardProbe | None = None,
         responsive_probe: ResponsiveProbe | None = None,
         focus_probe: FocusProbe | None = None,
+        markup_probe: MarkupProbe | None = None,
         visual_probe: VisualProbe | None = None,
         interaction_probe: InteractionProbe | None = None,
         form_error_probe: ErrorIdentificationProbe | None = None,
@@ -999,6 +1015,7 @@ class _LazyJs:
         self._keyboard_probe = keyboard_probe
         self._responsive_probe = responsive_probe
         self._focus_probe = focus_probe
+        self._markup_probe = markup_probe
         self._visual_probe = visual_probe
         self._interaction_probe = interaction_probe
         self._form_error_probe = form_error_probe
@@ -1017,6 +1034,7 @@ class _LazyJs:
                 keyboard_probe=self._keyboard_probe,
                 responsive_probe=self._responsive_probe,
                 focus_probe=self._focus_probe,
+                markup_probe=self._markup_probe,
                 visual_probe=self._visual_probe,
                 interaction_probe=self._interaction_probe,
                 form_error_probe=self._form_error_probe,
@@ -1250,6 +1268,8 @@ def _tracked_checks(ctx: _WorkerContext) -> list[str]:
     if ctx.js is not None:
         if config.axe_enabled:
             checks.append("axe")
+        if config.markup_checks_enabled:
+            checks.append("markup")
         if config.keyboard_probe_enabled:
             checks.append("keyboard")
         if config.responsive_checks_enabled:
@@ -1520,6 +1540,16 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
                 ctx,
                 page_id=page_id,
                 findings=result.focus_findings,
+                screenshots=result.screenshots,
+            )
+
+        # Page code check. Rows tagged ``pipeline='markup'``; the page is
+        # counted only when the check ran on it.
+        if render_mode == "js" and ctx.config.markup_checks_enabled and result.markup_check_ran:
+            _persist_markup(
+                ctx,
+                page_id=page_id,
+                findings=result.markup_findings,
                 screenshots=result.screenshots,
             )
 
@@ -2289,6 +2319,40 @@ def _persist_focus(
             )
     ctx.summary.focus_pages_probed += 1
     ctx.summary.focus_findings_total += len(findings)
+
+
+@_batched_writes
+def _persist_markup(
+    ctx: _WorkerContext,
+    *,
+    page_id: int,
+    findings: tuple[MarkupFinding, ...],
+    screenshots: Mapping[str, bytes],
+) -> None:
+    """Write page code check findings and count the page (migration 0037).
+
+    Counted even when nothing was found, so the report can say how many
+    pages the check ran on.
+    """
+    for f in findings:
+        try:
+            repo.upsert_markup_finding(
+                ctx.conn,
+                page_id=page_id,
+                scan_id=ctx.scan_id,
+                screenshot_hash=_store_screenshot(ctx, f.target_hash, screenshots),
+                **f.to_repo_kwargs(),
+            )
+        except sqlite3.Error as exc:
+            log.warning(
+                "markup.persist_failed",
+                rule_id=f.rule_id,
+                page_id=page_id,
+                error=str(exc),
+            )
+    repo.increment_scan_method_coverage(ctx.conn, scan_id=ctx.scan_id, method="markup")
+    ctx.summary.markup_pages_checked += 1
+    ctx.summary.markup_findings_total += len(findings)
 
 
 @_batched_writes

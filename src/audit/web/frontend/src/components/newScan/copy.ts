@@ -105,6 +105,10 @@ export const SWITCHES = {
     hint:
       "Finds the focus outline (the box that shows where the keyboard is) hidden behind sticky headers or footers. WCAG 2.4.11 is new in WCAG 2.2. A WCAG 2.1 scan reports it as Best practice.",
   },
+  markup: {
+    label: "Check the page code for problems the rule check misses",
+    hint: "Reads each page’s code (HTML) for problems the rule check (axe) does not look for. It only reads the page and changes nothing.",
+  },
   forms: {
     label: "Check that forms describe their errors",
     hint:
@@ -382,6 +386,7 @@ export const RAIL_LABELS = {
   click_through: `Opens menus and pop-up windows (${CLICK_THROUGH})`,
   keyboard: CHECK_LABEL.keyboard,
   focus: CHECK_LABEL.focus,
+  markup: CHECK_LABEL.markup,
   forms: CHECK_LABEL.forms,
   responsive: CHECK_LABEL.responsive,
   ocr: CHECK_LABEL.image,
