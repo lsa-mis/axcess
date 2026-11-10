@@ -26,6 +26,7 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from audit import evaluation
+from audit.ai.state import ai_enabled
 from audit.config import Settings
 from audit.crawler import url_policy
 from audit.crawler.orchestrator import CrawlConfig, config_json_for_scan
@@ -253,6 +254,8 @@ def build_protected_router(
         _companion_public_origin(settings)
         require_same_origin(request, settings)
         active_vault = _require_vault(vault)
+        if body.allow_local_ai and not ai_enabled(settings):
+            raise HTTPException(409, "AI features are off. Turn them on in Settings > AI features.")
         # Retention is a protected-data invariant in staging as well as
         # production. A non-revocable development KEK cannot make a prior
         # SQLite/WAL/backup snapshot unreadable, so it is not eligible for
@@ -813,6 +816,10 @@ def build_protected_router(
             record = get_protected_scan(conn, scan_id=enrollment["scan_id"])
             if record is None:
                 raise HTTPException(status_code=404, detail="Protected scan work is unavailable")
+            if record.allow_local_ai and not ai_enabled(settings):
+                raise HTTPException(
+                    409, "AI features are off. Turn them on in Settings > AI features."
+                )
             if record.protection_status not in {
                 ProtectedScanStatus.AWAITING_AUTHENTICATION,
                 ProtectedScanStatus.AUTHENTICATION_REQUIRED,
@@ -1042,7 +1049,7 @@ def _protected_crawl_config(
         # Protected assets stay in memory; the companion performs its own
         # authenticated image pass rather than the public blob pipeline.
         ocr_enabled=True,
-        vlm_enabled=bool(request.allow_local_ai),
+        vlm_enabled=bool(request.allow_local_ai) and ai_enabled(settings),
         vlm_model=settings.vlm_model,
         vlm_base_url=settings.ollama_base_url,
         js_enabled=True,

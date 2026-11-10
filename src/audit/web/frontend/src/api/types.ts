@@ -276,6 +276,8 @@ export interface ScopePreview {
 }
 
 export interface LocalAnalysisCapability {
+  /** Desktop's saved AI choice; absent on shared-server installs. */
+  ai_enabled?: boolean;
   ocr: {
     available: boolean;
     engine: string;
@@ -1506,4 +1508,174 @@ export interface ExportOptions {
    *  replaced with "[redacted]". Names and sizes are for those copies. */
   redacted: boolean;
   formats: ExportFormatOption[];
+}
+
+/* ---------------------------------------------------------------------------
+ * AI fix suggestions (src/audit/suggest/models.py). Mirrors the Pydantic
+ * models; keep the two in step.
+ * ------------------------------------------------------------------------- */
+
+export type SuggestionOccurrenceKind = "a11y" | "image";
+export type SuggestionStatus = "queued" | "running" | "ready" | "failed" | "cancelled";
+export type SuggestionAudience = "developer" | "editor";
+export type SuggestionCheckOutcome = "passed" | "still_fails" | "not_checked";
+export type SuggestionConfidence = "likely" | "guess";
+export type SuggestionFeedback = "helpful" | "not_helpful";
+export type SuggestionErrorCode =
+  | "model_unavailable"
+  | "model_missing"
+  | "timeout"
+  | "bad_answer"
+  | "no_change"
+  | "restarted"
+  | "occurrence_gone"
+  | "internal";
+export type SuggestionAvailabilityReason =
+  | "ready"
+  | "turned_off"
+  | "database_update_needed"
+  | "model_unavailable"
+  | "model_missing";
+
+export interface SuggestionCodeOption {
+  kind: "minimal" | "matches_pattern";
+  label: string;
+  after_html: string;
+  css: string | null;
+  check_outcome: SuggestionCheckOutcome;
+}
+
+export interface SuggestionResult {
+  version?: 1 | 2;
+  summary: string;
+  developer:
+    | { explanation: string; after_html: string | null; css: string | null }
+    | { change_sentence: string; options: SuggestionCodeOption[] };
+  editor: {
+    steps: string[];
+    paste_text: Array<{ label: string; value: string }>;
+    needs_developer: boolean;
+  };
+  /** From the scan's stored evidence, never from the model. */
+  before_html: string | null;
+  confidence: SuggestionConfidence;
+  needs_manual_check: boolean;
+  manual_check_reason: string | null;
+  check_rule_id: string | null;
+  /** Saved rule guidance, never a model-generated link. */
+  help_url?: string | null;
+}
+
+export interface SuggestionRecord {
+  id: number;
+  scan_id: number;
+  page_id: number;
+  occurrence_kind: SuggestionOccurrenceKind;
+  occurrence_id: number;
+  status: SuggestionStatus;
+  audience_default: SuggestionAudience;
+  text_model: string;
+  vision_model: string | null;
+  result: SuggestionResult | null;
+  check_outcome: SuggestionCheckOutcome | null;
+  error_code: SuggestionErrorCode | null;
+  error_detail: string | null;
+  feedback: SuggestionFeedback | null;
+  created_at: string;
+  finished_at: string | null;
+  /** 1 = next to run. Null once it is no longer waiting. */
+  queue_position: number | null;
+}
+
+export interface SuggestionAvailability {
+  enabled: boolean;
+  reason: SuggestionAvailabilityReason;
+  text_model: string;
+  vision_model: string;
+  missing_models: string[];
+  queue_length: number;
+  scan_running: boolean;
+}
+
+/** Desktop AI setup (`/api/ai/*`). Only the desktop app serves these. */
+export type AiTierId = "small" | "standard" | "large";
+export type AiInstallState = "idle" | "running" | "paused" | "failed" | "done";
+export type AiInstallStep = "program" | "starting" | "text_model" | "vision_model" | "finishing";
+
+export interface AiModelInfo {
+  tag: string;
+  size_bytes: number;
+  licence: string;
+}
+
+export interface AiTierPlan {
+  id: AiTierId;
+  label: string;
+  min_memory_gb: number;
+  text: AiModelInfo;
+  vision: AiModelInfo;
+  models_bytes: number;
+  download_bytes: number;
+  fits: boolean;
+}
+
+export interface AiInstallStatus {
+  state: AiInstallState;
+  tier: AiTierId | null;
+  step: AiInstallStep | null;
+  step_done_bytes: number;
+  step_total_bytes: number;
+  done_bytes: number;
+  total_bytes: number;
+  error: string | null;
+}
+
+export interface AiSetup {
+  source: "system" | "private";
+  base_url: string;
+  tier: AiTierId;
+  text_model: string;
+  vision_model: string;
+  ollama_version: string | null;
+}
+
+export interface AiPlan {
+  preferences: AiPreferences;
+  hardware: {
+    memory_bytes: number;
+    free_disk_bytes: number;
+    accelerator: "apple" | "nvidia" | "amd" | "none";
+  };
+  program: {
+    version: string;
+    licence: string;
+    release_url: string;
+    download_bytes: number;
+    available_for_this_computer: boolean;
+    system_version: string | null;
+  };
+  tiers: AiTierPlan[];
+  recommended: AiTierId | null;
+  current: AiSetup | null;
+  install: AiInstallStatus;
+}
+
+export interface AiPreferences {
+  enabled: boolean;
+  choice_recorded: boolean;
+}
+
+/** Private desktop AI service. No download happens when it is started. */
+export type AiRuntimeStartState = "started" | "already_running" | "model_missing" | "not_isolated" | "system_ollama_not_managed" | "ai_off" | "not_desktop" | "busy";
+export interface AiRuntimeStartResponse {
+  state: AiRuntimeStartState;
+  isolated: boolean;
+  reason: string | null;
+  download_bytes: number | null;
+  tier: AiTierId | null;
+}
+export interface AiRuntimeStatus {
+  running: boolean;
+  isolated: boolean;
+  reason: string | null;
 }

@@ -24,6 +24,7 @@ import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes, useLocation, useParams } from "react-router";
 import AppShell from "./components/AppShell";
 import ProtectedReportGate from "./components/ProtectedReportGate";
+import AiWelcomeGate from "./components/AiWelcomeGate";
 
 const A11yRoute = lazy(() => import("./routes/A11y"));
 const A11yByRuleRoute = lazy(() => import("./routes/A11yByRule"));
@@ -51,11 +52,14 @@ const PagesVisitedRoute = lazy(() => import("./routes/PagesVisited"));
 const InspectorRoute = lazy(() => import("./routes/Inspector"));
 const AboutRoute = lazy(() => import("./routes/About"));
 const SettingsRoute = lazy(() => import("./routes/Settings"));
+const AiSetupRoute = lazy(() => import("./routes/AiSetup"));
+const AiWelcomeRoute = lazy(() => import("./routes/AiWelcome"));
 const NotFoundRoute = lazy(() => import("./routes/NotFound"));
 
 export default function App() {
   return (
     <AppShell>
+      <AiWelcomeGate>
       <Suspense fallback={<p className="py-8 text-sm text-fg-muted" role="status">Loading page…</p>}>
         <Routes>
         {/* The Dashboard (routes/Dashboard.tsx) is hidden for now: Reports
@@ -107,9 +111,12 @@ export default function App() {
         <Route path="/tracking" element={<TrackingRoute />} />
         <Route path="/about" element={<AboutRoute />} />
         <Route path="/settings" element={<SettingsRoute />} />
+        <Route path="/settings/ai" element={<AiSetupRoute />} />
+        <Route path="/welcome/ai" element={<AiWelcomeRoute />} />
         <Route path="*" element={<NotFoundRoute />} />
         </Routes>
       </Suspense>
+      </AiWelcomeGate>
     </AppShell>
   );
 }

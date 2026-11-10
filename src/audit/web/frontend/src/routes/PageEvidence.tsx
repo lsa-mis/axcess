@@ -4,12 +4,13 @@ import { Crosshair, ExternalLink, ImageOff, ScanEye } from "lucide-react";
 import { useLocation, useParams } from "react-router";
 import { ApiError, api, blobUrl } from "../api/client";
 import AlfaEvidenceNote from "../components/AlfaEvidenceNote";
+import FixSuggestion, { SuggestionsBlockedNote } from "../components/FixSuggestion";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import { Card, ElementCode, StatusChip } from "../components/ui";
 import { httpStatusLabel, renderModeLabel } from "../lib/pageLabels";
 import { findingLocation } from "../lib/findingLocation";
-import type { DetectionPipeline, PageEvidence } from "../api/types";
-import { CHECK_LABEL, REVIEW_TYPE_LABEL } from "../lib/terms";
+import type { DetectionPipeline, PageEvidence, SuggestionAvailability } from "../api/types";
+import { OPENS_NEW_WINDOW, CHECK_LABEL, REVIEW_TYPE_LABEL } from "../lib/terms";
 import { useScanQuery } from "../hooks/useScanQuery";
 
 /** One row of a page's accessibility evidence. */
@@ -35,6 +36,15 @@ export default function PageEvidenceRoute() {
     queryKey: ["page-evidence", scan, page],
     queryFn: () => api.getPageEvidence(scan, page),
     enabled: Number.isFinite(scan) && Number.isFinite(page),
+  });
+  // AI fix suggestions are off unless an administrator turns them on. When
+  // the status cannot load, the feature stays hidden and the rest of the
+  // page works as before.
+  const { data: suggestionStatus } = useQuery({
+    queryKey: ["suggestion-status"],
+    queryFn: api.getSuggestionStatus,
+    retry: false,
+    staleTime: 30_000,
   });
 
   useEffect(() => {
@@ -74,6 +84,22 @@ export default function PageEvidenceRoute() {
   // Only group when a click actually revealed something: on a page where
   // nothing was, a lone "At page load" heading would divide nothing.
   const groups = findings.some((f) => f.revealed_by) ? groupByRevealingControl(findings) : null;
+
+  // Suggestions need a finished, unprotected report: a protected report's
+  // evidence is encrypted and must not reach a model, and a running scan's
+  // evidence is not final. The server refuses both too; hiding the button
+  // here means nobody is offered something that will be refused.
+  // Saved answers remain readable with AI off. FixSuggestion hides only
+  // new-request controls, not the saved answer (COGA: avoid loss of context,
+  // https://www.w3.org/TR/coga-usable/, paraphrased).
+  const suggestionsApply =
+    scanData.status === "completed" && !scanData.protection && suggestionStatus !== undefined;
+  const suggestions: SuggestionAvailability | null =
+    suggestionsApply ? suggestionStatus : null;
+  const suggestionsBlocked =
+    suggestionsApply && !suggestionStatus.enabled
+      ? suggestionStatus
+      : null;
 
   return (
     <>
@@ -121,6 +147,8 @@ export default function PageEvidenceRoute() {
         </Card>
       )}
 
+      {suggestionsBlocked && <SuggestionsBlockedNote status={suggestionsBlocked} />}
+
       <section className="mb-6">
         <h2 className="mb-2.5 text-base font-semibold text-fg">
           {findings.length === 0 ? "Accessibility checks" : "Issue occurrences"}
@@ -134,7 +162,13 @@ export default function PageEvidenceRoute() {
         ) : groups === null ? (
           <div className="space-y-3">
             {findings.map((finding) => (
-              <FindingCard key={finding.id} finding={finding} pageUrl={data.page.url_normalized} />
+              <FindingCard
+                key={finding.id}
+                finding={finding}
+                pageUrl={data.page.url_normalized}
+                scanId={scan}
+                suggestions={suggestions}
+              />
             ))}
           </div>
         ) : (
@@ -153,6 +187,8 @@ export default function PageEvidenceRoute() {
                       key={finding.id}
                       finding={finding}
                       pageUrl={data.page.url_normalized}
+                      scanId={scan}
+                      suggestions={suggestions}
                     />
                   ))}
                 </div>
@@ -191,7 +227,7 @@ export default function PageEvidenceRoute() {
                         a file name (found by review). */}
                     <span className="sr-only">
                       , image {imageIndex + 1} of {data.image_occurrences.length},{" "}
-                      {imageFileName(image.src_url_canonical)}, opens in a new tab
+                      {imageFileName(image.src_url_canonical)}, {OPENS_NEW_WINDOW}
                     </span>
                   </a>
                   <AltChip alt={image.alt_text} />
@@ -218,6 +254,15 @@ export default function PageEvidenceRoute() {
                     <span className="font-semibold text-fg">What the local AI model saw:</span>{" "}
                     {image.vlm_rationale}
                   </p>
+                )}
+                {/* Only an image the scan flagged has an issue to fix. */}
+                {suggestions && image.issue_key && (
+                  <FixSuggestion
+                    scanId={scan}
+                    kind="image"
+                    occurrenceId={image.occurrence_id}
+                    availability={suggestions}
+                  />
                 )}
               </Card>
             ))}
@@ -253,9 +298,14 @@ export default function PageEvidenceRoute() {
 function FindingCard({
   finding,
   pageUrl,
+  scanId,
+  suggestions,
 }: {
   finding: PageEvidenceFinding;
   pageUrl: string;
+  scanId: number;
+  /** Null when AI fix suggestions are off or cannot be used for this report. */
+  suggestions: SuggestionAvailability | null;
 }) {
   const location = findingLocation(pageUrl, finding.target_selector);
   const cantTell = finding.engine_outcome === "cant_tell";
@@ -313,7 +363,7 @@ function FindingCard({
           >
             <Crosshair className="h-4 w-4" aria-hidden />
             Show me on the live page
-            <span className="sr-only">, opens in a new tab and scrolls to this text</span>
+            <span className="sr-only">, {OPENS_NEW_WINDOW} and scrolls to this text</span>
           </a>
         </p>
       )}
@@ -340,6 +390,17 @@ function FindingCard({
             ? "No screenshot: the rule check (Alfa) runs in a separate browser that Axcess cannot take pictures of."
             : "Axcess did not take a screenshot of this occurrence."}
         </p>
+      )}
+
+      {/* Last in the card: the suggestion is built from the evidence above,
+          so it reads after it (SC 1.3.2 Meaningful Sequence, Level A). */}
+      {suggestions && (
+        <FixSuggestion
+          scanId={scanId}
+          kind="a11y"
+          occurrenceId={finding.id}
+          availability={suggestions}
+        />
       )}
     </Card>
   );

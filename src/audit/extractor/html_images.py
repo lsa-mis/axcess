@@ -93,6 +93,26 @@ def locate_image_refs(body: bytes, base_url: str) -> dict[int, ImageElement]:
     return out
 
 
+def image_element_html(body: bytes, base_url: str, position: int, alt: str | None) -> str | None:
+    """The element code (outer HTML) of the image stored at ``position``.
+
+    Uses the same walk as :func:`extract_image_refs`, so the position names the
+    same element. None when the copy and the stored occurrence disagree on the
+    alt text (the page changed), never a guess.
+    """
+    tree = HTMLParser(body)
+    if tree.body is None:
+        return None
+    for ref_position, node, _, _, _ in _walk_refs(tree, base_url):
+        if ref_position == position:
+            if _alt_text(node) != alt:
+                return None
+            return node.html
+        if ref_position > position:
+            break
+    return None
+
+
 def _walk_refs(tree: HTMLParser, base_url: str) -> Iterator[tuple[int, Node, str, str, bool]]:
     """Yield ``(position, node, url as written, resolved url, via_srcset)``.
 

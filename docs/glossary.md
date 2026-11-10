@@ -392,8 +392,17 @@ under **Checks** on New scan) and never runs in a sign-in scan.
 
 An optional AI model that reads text (a language model) or looks at images (a
 vision model), running on your own computer through a free program called
-Ollama. Axcess never installs one for you, and AI results
+Ollama. Axcess installs one only in the desktop app, from **Settings > AI
+features**, after you choose a size (Small, Standard or Large). AI results
 are never marked [Mostly sure](#mostly-sure).
+
+### AI features
+
+Optional model-based suggestions and checks that run on this computer.
+You can choose them when the desktop app first opens or in **Settings > AI
+features**. Turning AI off keeps downloaded models and saved results, but
+stops new model calls and Axcess's private Ollama. It does not stop an Ollama
+you started yourself. Regular checks and [OCR](#ocr) still work.
 
 ### OCR
 
@@ -476,6 +485,15 @@ or Still found. A report's **Compare reports** view shows the two reports
 side by side and links to it. No longer found means only that the later scan did not
 find that issue type again. It is not proof of a fix, so check the page
 yourself before you mark its occurrences Fixed.
+
+### AI suggestion
+
+A fix that the local AI model suggests for one [occurrence](#occurrence),
+when you press **Suggest a fix (AI)** on a page's details. It has a view for
+developers (element code before and after) and a view for content editors
+(steps and text to paste). It is written on this computer and can be wrong,
+so check it before you use it. It is off unless an administrator turns it
+on. See [AI fix suggestions](./ai-suggestions.md).
 
 ### Draft export
 

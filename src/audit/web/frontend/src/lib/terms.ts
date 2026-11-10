@@ -1,4 +1,7 @@
 import type {
+  AiInstallState,
+  AiInstallStep,
+  AiTierId,
   AxeImpact,
   DetectionPipeline,
   ExportFormat,
@@ -7,7 +10,12 @@ import type {
   ReviewLane,
   RuleCheck,
   ScanStatus,
+  SuggestionAudience,
+  SuggestionCheckOutcome,
+  SuggestionErrorCode,
+  SuggestionStatus,
 } from "../api/types";
+import { isDesktopApp } from "../hooks/useSwipeNavigation";
 
 /**
  * The words the interface uses for shared values, in one place.
@@ -214,3 +222,116 @@ export const SCAN_STATUS_LABEL: Record<ScanStatus, string> = {
   failed: "Failed",
   interrupted: "Stopped",
 };
+
+/** The feature's one name, on its button and in its heading. */
+export const AI_SUGGESTION = "AI suggestion";
+
+/** Where an AI suggestion is in its queue, for its status line. */
+export const SUGGESTION_STATUS_LABEL: Record<SuggestionStatus, string> = {
+  queued: "Waiting to start",
+  running: "Writing the fix",
+  ready: "Ready",
+  failed: "Could not write a suggestion",
+  cancelled: "Stopped",
+};
+
+/** Who an AI suggestion is written for. */
+export const SUGGESTION_AUDIENCE_LABEL: Record<SuggestionAudience, string> = {
+  developer: "For developers",
+  editor: "For content editors",
+};
+
+/**
+ * What Axcess saw when it re-ran the one rule check on the suggested code.
+ * A pass checks one rule only, so it never says the page now passes.
+ */
+export const SUGGESTION_CHECK_LABEL: Record<SuggestionCheckOutcome, string> = {
+  passed: "The rule check passed on the suggested code",
+  still_fails: "The rule check still fails on the suggested code",
+  not_checked: "Axcess could not check this suggestion",
+};
+
+/** Two code choices: the smaller change is always first. */
+export const SUGGESTION_OPTION_LABEL = {
+  minimal: "Option 1: Smallest change",
+  matches_pattern: "Option 2: Matches nearby code",
+};
+
+/** Desktop AI setup: what the download is doing now. */
+export const AI_INSTALL_STEP_LABEL: Record<AiInstallStep, string> = {
+  program: "Downloading the Ollama program",
+  starting: "Starting Ollama",
+  text_model: "Downloading the text model",
+  vision_model: "Downloading the image model",
+  finishing: "Finishing setup",
+};
+
+/** Desktop AI setup: where the download stands. */
+export const AI_INSTALL_STATE_LABEL: Record<AiInstallState, string> = {
+  idle: "Not set up",
+  running: "Downloading",
+  paused: "Paused",
+  failed: "Stopped with a problem",
+  done: "Ready",
+};
+
+/** Saved desktop AI choice, separate from whether models are ready. */
+export const AI_FEATURE_STATE_LABEL = {
+  on: "AI features are on",
+  off: "AI features are off",
+};
+
+/** Desktop AI setup: the size of the AI models. */
+export const AI_TIER_LABEL: Record<AiTierId, string> = {
+  small: "Small",
+  standard: "Standard",
+  large: "Large",
+};
+
+/** Why a suggestion failed, in words that say what to do next. */
+export const SUGGESTION_ERROR_LABEL: Record<SuggestionErrorCode, string> = {
+  model_unavailable: "The local AI service (Ollama) is not running. Start it, then try again.",
+  model_missing: "The AI model is not installed in Ollama. Install it with ollama pull, then try again.",
+  timeout: "The AI model took too long to answer. Try again when the computer is less busy.",
+  no_change: "The AI did not suggest a real change to the code, even when asked twice, so nothing is shown. A bigger AI model in Settings may do better. You can also fix it by hand with the rule guidance.",
+  bad_answer: "The AI wrote an answer Axcess could not show safely, even when asked twice, so nothing is shown. A bigger AI model in Settings may do better. You can also fix it by hand with the rule guidance.",
+  restarted: "Axcess restarted before the suggestion was finished. Try again.",
+  occurrence_gone: "This occurrence is no longer in the report.",
+  internal: "Something went wrong in Axcess. Try again.",
+};
+
+export const AI_RUNTIME_START_LABEL: Record<import("../api/types").AiRuntimeStartState, string> = {
+  started: "AI service started. It is isolated and stays on this computer.",
+  already_running: "AI service: isolated, local only.",
+  model_missing: "The private AI program or models are missing. Choose a size and confirm its download below.",
+  not_isolated: "AI was not started because Axcess could not keep it isolated.",
+  system_ollama_not_managed: "This is your own Ollama. Axcess does not start, stop or isolate it. Choose a private download for isolated AI.",
+  ai_off: "AI features are off. Turn them on before starting the service.",
+  not_desktop: "Starting AI is available only in the Axcess desktop app.",
+  busy: "Finish or stop current work before starting the AI service.",
+};
+export const AI_ISOLATION_REASON_LABEL: Record<string, string> = {
+  sandbox_unavailable: "This computer cannot isolate the AI service. AI was not started. Saved results still work.",
+  network_test_failed: "The isolation check could not prove that outside connections are blocked. AI was not started.",
+  namespace_unreachable: "Axcess cannot reach the AI service inside its private network on this computer. AI was not started.",
+  runtime_failed: "The isolated AI service could not start. Check the application log.",
+  system_ollama_not_managed: "Your own Ollama is not isolated by Axcess. Axcess never starts or stops it.",
+};
+
+/**
+ * What happens when someone opens a link to another website, for the
+ * screen-reader note and visible text on every external link.
+ *
+ * In a browser the link opens a new tab. In the desktop app, the app
+ * (desktop/src/main.cjs) blocks the new window and opens the address in
+ * the person's default web browser, so "new tab" would be wrong there.
+ * Rejected: keeping one wording everywhere, because it would describe
+ * something that does not happen in the app. People need to hear where
+ * a link takes them before they use it (WCAG 2.2 SC 3.2.5 Change on
+ * Request, Level AAA). Text must also match what the code does (repo
+ * plain-language rules), and one shared phrase keeps every link the same
+ * (SC 3.2.4 Consistent Identification, Level AA).
+ */
+export const OPENS_NEW_WINDOW = isDesktopApp()
+  ? "opens in your web browser"
+  : "opens in a new tab";

@@ -4,6 +4,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router";
 import { keepPreviousData, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, FileCode2, Layers, Loader2 } from "lucide-react";
 import DomSource from "../components/DomSource";
+import FixSuggestion, { SuggestionsBlockedNote } from "../components/FixSuggestion";
 import FlaggedStepper from "../components/FlaggedStepper";
 import ElementReview, { type ReviewDraft } from "../components/ElementReview";
 import { ApiError, api } from "../api/client";
@@ -13,6 +14,8 @@ import type {
   PageInspection,
   SavedFrame,
   SavedStyles,
+  SuggestionAvailability,
+  SuggestionOccurrenceKind,
 } from "../api/types";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import Tabs from "../components/Tabs";
@@ -52,6 +55,7 @@ import {
 } from "../lib/highlightTargets";
 import { checkFingerprint, looksDifferent } from "../lib/styleFingerprint";
 import { withSavedFrames } from "../lib/savedFrames";
+import { OPENS_NEW_WINDOW } from "../lib/terms";
 
 type TabId = "page" | "dom";
 
@@ -929,10 +933,41 @@ export default function InspectorRoute() {
         ? null
         : {
             attempt,
-            text: "This element cannot take focus in the saved copy, because it is hidden there or it is the whole page. The table above describes it.",
+            text: "This element cannot take focus in the saved copy, because it is hidden there or it is the whole page. The line under the saved copy says where the box is.",
           },
     );
   };
+  // The occurrence an AI suggestion is asked for: the first one on the
+  // element the reader is on. Occurrences sharing an element are of the same
+  // issue on the same markup, so one suggestion fixes them all.
+  const currentOccurrence = useMemo((): { kind: SuggestionOccurrenceKind; id: number } | null => {
+    for (const index of highlight?.steps[pageMark]?.targets ?? []) {
+      const target = scopedTargets[index];
+      if (target?.imageOccurrenceId !== undefined) return { kind: "image", id: target.imageOccurrenceId };
+      const findingId = target?.findingIds?.[0];
+      if (findingId !== undefined) return { kind: "a11y", id: findingId };
+    }
+    return null;
+  }, [highlight, pageMark, scopedTargets]);
+  // Same gating as the page details screen (PageEvidence): only a finished,
+  // unprotected report, and only when an administrator turned the feature on.
+  const { data: suggestionStatus } = useQuery({
+    queryKey: ["suggestion-status"],
+    queryFn: api.getSuggestionStatus,
+    retry: false,
+    staleTime: 30_000,
+  });
+  const suggestionsApply =
+    scanData?.status === "completed" && !scanData.protection && suggestionStatus !== undefined;
+  const suggestions: SuggestionAvailability | null =
+    // Keep saved answers visible when AI is off; request controls are hidden
+    // inside FixSuggestion. W3C COGA (paraphrased: preserve context),
+    // https://www.w3.org/TR/coga-usable/.
+    suggestionsApply ? suggestionStatus : null;
+  const suggestionsBlocked =
+    suggestionsApply && !suggestionStatus.enabled
+      ? suggestionStatus
+      : null;
   const goToPageMark = (index: number) => {
     const bounded = Math.max(0, Math.min(highlightedCount - 1, index));
     setPageMark(bounded);
@@ -1048,7 +1083,7 @@ export default function InspectorRoute() {
           <ExternalLinkButton
             href={liveUrl}
             variant="secondary"
-            aria-label={`Open live page: ${displayTitle} (opens in a new tab)`}
+            aria-label={`Open live page: ${displayTitle} (${OPENS_NEW_WINDOW})`}
           >
             <ExternalLink className="h-4 w-4" aria-hidden />
             Open live page
@@ -1463,6 +1498,38 @@ export default function InspectorRoute() {
                 </p>
               )}
             </div>
+            {/* The AI suggestion sits right under the toolbar and the review
+                of the element it is for, and follows Previous / Next: the
+                reader sees the outlined element and a suggested fix together.
+                Rejected: a list of suggestions under the page, which put the
+                fix a long scroll away from the element and left the reader to
+                match them up (W3C COGA "Making Content Usable", paraphrased:
+                keep related content together; https://www.w3.org/TR/coga-usable/).
+                Also rejected: a third tab beside "Saved copy", which would hide
+                the outlined element while the fix is read. Its own row: the
+                suggestion needs only the occurrence, so it must not wait for,
+                or vanish with, the saved copy. Keyed on the occurrence so
+                stepping never shows the last element's suggestion. Heading
+                level 2: this sits straight under the page's h1 (SC 1.3.1 Info
+                and Relationships, Level A). It sat under a table of facts
+                about the element until that table was removed (2026-11-10). */}
+            {showHighlights && highlightedCount > 0 && currentOccurrence && (suggestions || suggestionsBlocked) && (
+              <div className="border-b border-border bg-surface px-3 pb-3">
+                {suggestions && (
+                  <FixSuggestion
+                    key={`${currentOccurrence.kind}-${currentOccurrence.id}`}
+                    scanId={scan}
+                    kind={currentOccurrence.kind}
+                    occurrenceId={currentOccurrence.id}
+                    availability={suggestions}
+                    headingLevel={2}
+                  />
+                )}
+                {suggestionsBlocked && (
+                  <SuggestionsBlockedNote status={suggestionsBlocked} className="mt-3" />
+                )}
+              </div>
+            )}
             {layout && (
               <p className="border-b border-border bg-umich-blue/5 px-3 py-2 text-xs text-fg">
                 <span className="font-semibold">As the zoom and layout check saw it: </span>
@@ -2234,4 +2301,3 @@ function scheduleIdle(task: () => void): void {
     window.setTimeout(task, 0);
   }
 }
-

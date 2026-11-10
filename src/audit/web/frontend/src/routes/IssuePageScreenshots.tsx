@@ -7,6 +7,7 @@ import ReportHeader from "../components/ReportHeader";
 import { Card, EmptyState, LinkButton, pageEvidencePath } from "../components/ui";
 import { issueInspectorPath } from "./IssuePages";
 import { useScanQuery } from "../hooks/useScanQuery";
+import { OPENS_NEW_WINDOW } from "../lib/terms";
 
 /** The trail label for this view; ReportCrumb shows the same words. */
 export const ISSUE_SCREENSHOTS_VIEW = "Issue screenshots";
@@ -109,7 +110,7 @@ export default function IssuePageScreenshotsRoute() {
             >
               Open live page
               <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
-              <span className="sr-only">, opens in a new tab</span>
+              <span className="sr-only">, {OPENS_NEW_WINDOW}</span>
             </a>
             {" · "}
             <Link

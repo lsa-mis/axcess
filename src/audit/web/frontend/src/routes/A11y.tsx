@@ -35,7 +35,7 @@ import {
 import { ActiveFilters, FilterMenu, activeFilterItems, type FilterGroup } from "../components/table/FilterMenu";
 import { requestStatusRationale } from "../statusDecision";
 import { useScanQuery } from "../hooks/useScanQuery";
-import { CHECK_LABEL, REVIEW_TYPE_LABEL, STATUS_LABEL, STATUS_OPTION_LABEL } from "../lib/terms";
+import { CHECK_LABEL, OPENS_NEW_WINDOW, REVIEW_TYPE_LABEL, STATUS_LABEL, STATUS_OPTION_LABEL } from "../lib/terms";
 
 const STATUS_OPTIONS: FindingStatus[] = [
   "new",
@@ -302,7 +302,7 @@ function SCGroupCard({ scanId, group }: { scanId: number; group: A11ySCGroup }) 
                     be told apart (SC 2.4.9 Link Purpose (Link Only), Level
                     AAA; WCAG technique C7). The rule ID is the one shown on
                     the card. */}
-                <span className="sr-only">, {r.rule_id} (opens in a new tab)</span>
+                <span className="sr-only">, {r.rule_id} ({OPENS_NEW_WINDOW})</span>
               </a>
             )}
           </li>

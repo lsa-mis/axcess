@@ -25,6 +25,7 @@ import { useSwipeNavigation } from "../hooks/useSwipeNavigation";
 import { setPreference, usePreferences } from "../hooks/usePreferences";
 import PreferenceEffects from "./PreferenceEffects";
 import ShortcutsDialog from "./ShortcutsDialog";
+import { OPENS_NEW_WINDOW } from "../lib/terms";
 
 /**
  * One sidebar entry. ``isActive`` decides whether the item should render
@@ -410,7 +411,7 @@ function FeedbackAction({ collapsed }: { collapsed: boolean }) {
       href={FEEDBACK_FORM_URL}
       target="_blank"
       rel="noopener noreferrer"
-      title="Give feedback (opens in a new tab)"
+      title={`Give feedback (${OPENS_NEW_WINDOW})`}
       className={cn(SIDEBAR_ROW, SIDEBAR_ROW_IDLE, collapsed ? "justify-center px-2" : "px-3")}
     >
       <MessageSquarePlus className="h-5 w-5 shrink-0" aria-hidden />
@@ -844,6 +845,10 @@ function routeTitle(pathname: string): string {
     [/^\/tracking\/?$/, "Product roadmap"],
     [/^\/about\/?$/, "About"],
     [/^\/settings\/?$/, "Settings"],
+    [/^\/settings\/ai\/?$/, "AI features"],
+    // Match the welcome heading so route announcements use the same words
+    // (WCAG 2.2 SC 3.2.4 Consistent Identification, Level AA).
+    [/^\/welcome\/ai\/?$/, "Choose whether to use AI features"],
   ];
   for (const [pattern, title] of routes) {
     if (pattern.test(pathname)) return title;

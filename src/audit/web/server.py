@@ -19,7 +19,7 @@ import secrets
 import shutil
 import sqlite3
 import threading
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
 from time import perf_counter
@@ -51,6 +51,10 @@ from starlette.background import BackgroundTask
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from audit import __version__, coverage_matrix, evaluation, occurrence_reviews
+from audit.ai.manager import AIManager
+from audit.ai.state import AIConfig, ai_enabled, initialize_preferences
+from audit.ai.state import effective_settings as effective_ai_settings
+from audit.ai.state import semantic_model as ai_semantic_model
 from audit.analyzer.alfa import AlfaAnalyzer, AlfaResult, chromium_executable_path
 from audit.analyzer.alfa import availability as alfa_availability
 from audit.analyzer.axe import AxeAnalyzer
@@ -95,6 +99,20 @@ from audit.protected.repository import (
 )
 from audit.protected.session import ManualAuthenticationSession
 from audit.protected.vaults import resolve_configured_protected_vault
+from audit.suggest import repo as suggestion_repo
+from audit.suggest import service as suggest_service
+from audit.suggest.models import (
+    FeedbackUpdate,
+    OccurrenceKind,
+    SuggestionAvailability,
+    SuggestionCreate,
+    SuggestionRecord,
+)
+from audit.suggest.provider import OllamaSuggestionProvider
+from audit.suggest.provider import Provider as SuggestionProvider
+from audit.suggest.queue import SuggestionWorker
+from audit.suggest.verify import AxeFragmentVerifier
+from audit.suggest.verify import Verifier as SuggestionVerifier
 from audit.synthesizer.diff import compute_diff
 from audit.wcag_version import (
     DEFAULT_WCAG_VERSION,
@@ -104,6 +122,7 @@ from audit.wcag_version import (
     stored_wcag_version,
 )
 from audit.web import local_sign_in, pages_queries
+from audit.web.ai_api import build_ai_router
 from audit.web.comparison import (
     MAX_PAGE_SIZE,
     Category,
@@ -725,9 +744,18 @@ def create_app(
     blob_dir: Path | None = None,
     *,
     protected_vault: ProtectedVault | None = None,
+    suggestion_provider: SuggestionProvider | None = None,
+    suggestion_verifier: SuggestionVerifier | None = None,
 ) -> FastAPI:
     """Build the FastAPI app. Accepts overrides so tests can point at tmp paths."""
-    settings = get_settings()
+    base_settings = get_settings()
+    initialize_preferences(
+        base_settings, existing_install=(db_path or base_settings.db_path).exists()
+    )
+    # The desktop AI setup (if any) chooses the Ollama address and models.
+    # ``settings`` is rebound when that setup changes, so every route below
+    # reads the current choice.
+    settings = effective_ai_settings(base_settings)
     resolved_db = db_path or settings.db_path
     slow_request_ms = settings.slow_request_ms
     resolved_blob = blob_dir or settings.blob_dir
@@ -951,6 +979,149 @@ def create_app(
         with contextlib.suppress(asyncio.CancelledError):
             await retention_task
         retention_task = None
+
+    # AI fix suggestions: one background worker, started only when an
+    # administrator has turned the feature on. With it off, nothing talks
+    # to the model and no task runs.
+    suggestion_state: dict[str, Any] = {"worker": None, "provider": suggestion_provider}
+
+    async def _start_worker() -> None:
+        if not settings.suggestions_enabled:
+            return
+        provider = suggestion_state["provider"]
+        if provider is None:
+            client = httpx.AsyncClient()
+            suggestion_state["client"] = client
+            provider = OllamaSuggestionProvider(
+                client,
+                base_url=settings.ollama_base_url,
+                timeout_s=settings.suggestion_timeout_s,
+            )
+            suggestion_state["provider"] = provider
+        worker = SuggestionWorker(
+            db_path=resolved_db,
+            blob_dir=resolved_blob,
+            provider=provider,
+            verifier=suggestion_verifier or AxeFragmentVerifier(),
+            text_model=settings.suggestion_text_model,
+            vision_model=settings.suggestion_vision_model,
+            timeout_s=settings.suggestion_timeout_s,
+        )
+        suggestion_state["worker"] = worker
+        worker.start()
+
+    async def _stop_worker() -> None:
+        worker = suggestion_state.get("worker")
+        if worker is not None:
+            await worker.stop()
+            suggestion_state["worker"] = None
+        client = suggestion_state.pop("client", None)
+        if client is not None:
+            await client.aclose()
+            suggestion_state["provider"] = suggestion_provider
+
+    @app.on_event("startup")
+    async def _start_suggestion_worker() -> None:
+        await _start_worker()
+
+    @app.on_event("shutdown")
+    async def _stop_suggestion_worker() -> None:
+        await _stop_worker()
+
+    # Desktop AI setup. Only the desktop app has it: a server install keeps
+    # the AI settings its administrator chose in the environment.
+    ai_state: dict[str, Any] = {"manager": None, "loop": None}
+    ai_mutation_lock = asyncio.Lock()
+
+    def _ai_busy_reason() -> str | None:
+        task = crawl_state.get("task")
+        if isinstance(task, asyncio.Task) and not task.done():
+            return "Finish or stop the current scan before changing AI settings."
+        worker = suggestion_state.get("worker")
+        if worker is not None and worker.busy:
+            return "Wait for the current AI answer to finish before changing AI settings."
+        with get_conn() as conn:
+            if suggestion_repo.table_exists(conn) and suggestion_repo.queue_length(conn):
+                return "Finish or cancel waiting AI answers before changing AI settings."
+            if conn.execute("SELECT 1 FROM scans WHERE status = 'running' LIMIT 1").fetchone():
+                return "Finish or stop the current scan before changing AI settings."
+            if (
+                _protected_scan_table_exists(conn)
+                and conn.execute(
+                    "SELECT 1 FROM protected_scans WHERE protection_status = 'running' "
+                    "OR (run_lease_id IS NOT NULL "
+                    "AND julianday(run_lease_expires_at) > julianday('now')) LIMIT 1"
+                ).fetchone()
+            ):
+                return "Finish or stop the protected scan before changing AI settings."
+        return None
+
+    async def _apply_ai_setup() -> None:
+        nonlocal settings
+        previous = settings
+        next_settings = effective_ai_settings(base_settings)
+        try:
+            await _stop_worker()
+            settings = next_settings
+            await _start_worker()
+        except (Exception, asyncio.CancelledError):
+            # Do not leave a half-applied setting after a worker failure or
+            # an expired settings request. The caller rolls back the file.
+            settings = previous
+            await _stop_worker()
+            await _start_worker()
+            raise
+
+    def _ai_changed(_config: AIConfig | None) -> None:
+        # Called from the setup thread; the worker lives on the event loop.
+        loop = ai_state["loop"]
+        if loop is not None and loop.is_running():
+            # This callback runs in a thread. Do not report an updated choice
+            # before the event loop has applied it and replaced the worker.
+            change = asyncio.run_coroutine_threadsafe(_apply_ai_setup(), loop)
+            try:
+                change.result(timeout=30)
+            except TimeoutError:
+                change.cancel()
+                raise
+
+    if base_settings.desktop:
+        ai_state["manager"] = AIManager(base_settings, _ai_changed, busy_reason=_ai_busy_reason)
+
+    async def _serialize_desktop_ai_changes(request: Request, call_next):  # type: ignore[no-untyped-def]
+        # Serialize admission, not the scan itself: a setting cannot change
+        # between checking a request and queueing its model/crawl work.
+        related = request.url.path.startswith(
+            ("/api/ai", "/api/scans", "/api/local-login-scans", "/api/protected", "/api/agents")
+        )
+        releases_work = request.url.path.startswith("/api/agents/") and request.url.path.endswith(
+            "/work"
+        )
+        if (
+            base_settings.desktop
+            and related
+            and (request.method in {"POST", "PUT", "DELETE"} or releases_work)
+        ):
+            async with ai_mutation_lock:
+                return await call_next(request)
+        return await call_next(request)
+
+    async def _start_ai_runtime() -> None:
+        ai_state["loop"] = asyncio.get_running_loop()
+        manager = ai_state["manager"]
+        if manager is not None:
+            await asyncio.to_thread(manager.startup)
+
+    async def _stop_ai_runtime() -> None:
+        manager = ai_state["manager"]
+        if manager is not None:
+            await asyncio.to_thread(manager.shutdown)
+
+    if ai_state["manager"] is not None:
+        app.middleware("http")(_serialize_desktop_ai_changes)
+        app.router.add_event_handler("startup", _start_ai_runtime)
+        app.router.add_event_handler("shutdown", _stop_ai_runtime)
+        app.include_router(build_ai_router(ai_state["manager"]), prefix="/api")
 
     @app.middleware("http")
     async def _require_protected_scan_access(request: Request, call_next):  # type: ignore[no-untyped-def]
@@ -1230,6 +1401,37 @@ def create_app(
         request and returns only model names/sizes already present locally.
         """
 
+        if settings.desktop and not ai_enabled(settings):
+            reason = "AI features are off. Turn them on in Settings > AI features."
+            chosen = ai_semantic_model(settings)
+            return JSONResponse(
+                {
+                    "ai_enabled": False,
+                    "ocr": {
+                        "available": shutil.which("tesseract") is not None,
+                        "engine": "Tesseract 5",
+                        "language": settings.ocr_language,
+                        "max_workers": settings.ocr_max_workers,
+                        "bundled_in_desktop": bool(shutil.which("tesseract")),
+                    },
+                    "ollama": {"reachable": False},
+                    "vision": {
+                        "available": False,
+                        "model": settings.vlm_model,
+                        "installed_size_bytes": None,
+                        "reason": reason,
+                    },
+                    "semantic": {
+                        "available": False,
+                        "models": [chosen] if chosen else [],
+                        "ready_models": [],
+                        "missing_models": [],
+                        "checks_per_page": len(supported_criteria()),
+                        "reason": reason,
+                    },
+                }
+            )
+
         installed: dict[str, int] = {}
         ollama_reachable = False
         try:
@@ -1256,12 +1458,18 @@ def create_app(
 
         vision_model = settings.vlm_model
         vision_size = installed_size(vision_model)
-        semantic_models = sorted({get_pick(sc).primary for sc in supported_criteria()})
+        chosen_semantic = ai_semantic_model(settings)
+        semantic_models = (
+            [chosen_semantic]
+            if chosen_semantic
+            else sorted({get_pick(sc).primary for sc in supported_criteria()})
+        )
         semantic_ready = [model for model in semantic_models if installed_size(model) is not None]
         semantic_missing = [model for model in semantic_models if model not in semantic_ready]
 
         return JSONResponse(
             {
+                **({"ai_enabled": True} if settings.desktop else {}),
                 "ocr": {
                     "available": shutil.which("tesseract") is not None,
                     "engine": "Tesseract 5",
@@ -1449,6 +1657,9 @@ def create_app(
         """
 
         _require_local_login_request(request, mutation=True)
+        # AI features off (desktop setting): no image analysis by a model.
+        if not ai_enabled(settings) and not body.skip_vlm:
+            raise HTTPException(409, "AI features are off. Turn them on in Settings > AI features.")
         await _refresh_sign_in()
         existing = sign_ins.current()
         if existing is not None:
@@ -1741,6 +1952,14 @@ def create_app(
         request: Request, body: Annotated[dict[str, Any], Body()]
     ) -> JSONResponse:
         """Kick off a crawl. Body mirrors the new-scan form fields."""
+        desktop_ai_off = settings.desktop and not ai_enabled(settings)
+        if desktop_ai_off and any(
+            key in body and not bool(body[key]) for key in ("skip_vlm", "skip_semantic")
+        ):
+            return JSONResponse(
+                {"error": "AI features are off. Turn them on in Settings > AI features."},
+                status_code=409,
+            )
         url = str(body.get("url") or "").strip()
         validation_error = _validate_seed_url(url)
         if validation_error is not None:
@@ -1839,7 +2058,7 @@ def create_app(
             "whole_host": bool(body.get("whole_host")),
             "ignore_robots": bool(body.get("ignore_robots")),
             "skip_ocr": bool(body.get("skip_ocr")),
-            "skip_vlm": bool(body.get("skip_vlm")),
+            "skip_vlm": bool(body.get("skip_vlm", desktop_ai_off)),
             # Render-every-page is the default; `static_only` is the
             # opt-out fast path. (`js_eager` accepted for older callers.)
             "static_only": static_only,
@@ -1849,7 +2068,7 @@ def create_app(
             "skip_interaction": bool(body.get("skip_interaction")),
             "skip_keyboard": bool(body.get("skip_keyboard")),
             "skip_responsive": bool(body.get("skip_responsive")),
-            "skip_semantic": bool(body.get("skip_semantic")),
+            "skip_semantic": bool(body.get("skip_semantic", desktop_ai_off)),
             "skip_focus": bool(body.get("skip_focus")),
             "skip_visual": bool(body.get("skip_visual")),
             # Off unless asked for: an older client that sends nothing never
@@ -2182,6 +2401,99 @@ def create_app(
         return OccurrenceReviewResponse(
             decision=saved.decision, notes=saved.notes, updated_at=saved.updated_at
         )
+
+    def _suggestion_call(fn: Callable[[], SuggestionRecord]) -> SuggestionRecord:
+        try:
+            return fn()
+        except suggest_service.SuggestionRefusedError as exc:
+            raise HTTPException(status_code=exc.status, detail=exc.message) from exc
+
+    def _is_protected(conn: sqlite3.Connection, scan_id: int) -> bool:
+        return _get_protected_scan_compat(conn, scan_id=scan_id) is not None
+
+    @app.get("/api/suggestions/status")
+    async def api_suggestion_status() -> SuggestionAvailability:
+        """Whether AI fix suggestions can be used now, and why not if not."""
+        conn = get_conn()
+        try:
+            task = crawl_state.get("task")
+            running = isinstance(task, asyncio.Task) and not task.done()
+            return await suggest_service.availability(
+                conn, settings, suggestion_state["provider"], scan_running=running
+            )
+        finally:
+            conn.close()
+
+    @app.post("/api/scans/{scan_id:int}/suggestions", status_code=202)
+    def api_create_suggestion(scan_id: int, body: SuggestionCreate) -> SuggestionRecord:
+        """Queue an AI fix suggestion for one occurrence in this report."""
+        with get_conn() as conn:
+            protected = _is_protected(conn, scan_id)
+            record = _suggestion_call(
+                lambda: suggest_service.create(
+                    conn, settings, scan_id=scan_id, body=body, is_protected=protected
+                )
+            )
+        worker = suggestion_state.get("worker")
+        if worker is not None:
+            worker.wake()
+        return record
+
+    @app.get("/api/scans/{scan_id:int}/suggestions/{suggestion_id:int}")
+    def api_get_suggestion(scan_id: int, suggestion_id: int) -> SuggestionRecord:
+        with get_conn() as conn:
+            protected = _is_protected(conn, scan_id)
+            return _suggestion_call(
+                lambda: suggest_service.get(
+                    conn, scan_id=scan_id, suggestion_id=suggestion_id, is_protected=protected
+                )
+            )
+
+    @app.get(
+        "/api/scans/{scan_id:int}/occurrences/{occurrence_kind}/{occurrence_id:int}/suggestion"
+    )
+    def api_latest_suggestion(
+        scan_id: int, occurrence_kind: OccurrenceKind, occurrence_id: int
+    ) -> SuggestionRecord | None:
+        """The newest suggestion for one occurrence, or null if none yet."""
+        with get_conn() as conn:
+            protected = _is_protected(conn, scan_id)
+            try:
+                return suggest_service.latest(
+                    conn,
+                    scan_id=scan_id,
+                    occurrence_kind=occurrence_kind,
+                    occurrence_id=occurrence_id,
+                    is_protected=protected,
+                )
+            except suggest_service.SuggestionRefusedError as exc:
+                raise HTTPException(status_code=exc.status, detail=exc.message) from exc
+
+    @app.post("/api/scans/{scan_id:int}/suggestions/{suggestion_id:int}/cancel")
+    def api_cancel_suggestion(scan_id: int, suggestion_id: int) -> SuggestionRecord:
+        with get_conn() as conn:
+            protected = _is_protected(conn, scan_id)
+            return _suggestion_call(
+                lambda: suggest_service.cancel(
+                    conn, scan_id=scan_id, suggestion_id=suggestion_id, is_protected=protected
+                )
+            )
+
+    @app.post("/api/scans/{scan_id:int}/suggestions/{suggestion_id:int}/feedback")
+    def api_suggestion_feedback(
+        scan_id: int, suggestion_id: int, body: FeedbackUpdate
+    ) -> SuggestionRecord:
+        with get_conn() as conn:
+            protected = _is_protected(conn, scan_id)
+            return _suggestion_call(
+                lambda: suggest_service.set_feedback(
+                    conn,
+                    scan_id=scan_id,
+                    suggestion_id=suggestion_id,
+                    body=body,
+                    is_protected=protected,
+                )
+            )
 
     @app.get("/api/scans/{scan_id:int}/pages/{page_id:int}/inspect")
     async def api_page_inspect(
@@ -3598,11 +3910,12 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
         ocr_max_workers=settings.ocr_max_workers,
         ocr_min_confidence=settings.ocr_min_confidence,
         ocr_min_word_count=settings.ocr_min_word_count,
-        vlm_enabled=not bool(form["skip_vlm"]),
+        vlm_enabled=not bool(form["skip_vlm"]) and ai_enabled(settings),
         vlm_model=settings.vlm_model,
         vlm_base_url=settings.ollama_base_url,
         vlm_prompt_name=settings.vlm_prompt_name,
         vlm_concurrency=settings.vlm_concurrency,
+        semantic_model=ai_semantic_model(settings),
         # Render-every-page is the default (audit mode). `static_only`
         # is the opt-out fast path, HTML checkboxes can't post
         # "unchecked", so the form field is the inversion.
@@ -3624,7 +3937,7 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
         # the wiring to the runner lands in Phase 9.1, for now this
         # just plumbs the flag through so the web form has the same
         # surface as the CLI's `--skip-semantic`.
-        semantic_enabled=not bool(form.get("skip_semantic")),
+        semantic_enabled=not bool(form.get("skip_semantic")) and ai_enabled(settings),
         keyboard_probe_enabled=not bool(form.get("skip_keyboard")),
         responsive_checks_enabled=not bool(form.get("skip_responsive")),
         focus_checks_enabled=not bool(form.get("skip_focus")),

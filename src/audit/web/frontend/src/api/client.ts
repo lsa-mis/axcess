@@ -51,6 +51,14 @@ import type {
   ScanSummary,
   SiteGroup,
   ScopePreview,
+  AiInstallStatus,
+  AiPlan,
+  AiPreferences,
+  AiTierId,
+  SuggestionAvailability,
+  SuggestionFeedback,
+  SuggestionOccurrenceKind,
+  SuggestionRecord,
   TrackingData,
 } from "./types";
 
@@ -316,6 +324,54 @@ export const api = {
   },
   getPageEvidence: (scanId: number, pageId: number) =>
     request<PageEvidence>(`/api/scans/${scanId}/pages/${pageId}`),
+  /** Desktop only: this computer, the AI sizes it can run, and the current setup. 404 elsewhere. */
+  startAiRuntime,
+  getAiRuntime,
+  getAiPlan: () => request<AiPlan>("/api/ai/plan", { cache: "no-store" }),
+  getAiPreferences: () => request<AiPreferences>("/api/ai/preferences", { cache: "no-store" }),
+  setAiEnabled: (enabled: boolean) =>
+    request<AiPreferences>("/api/ai/preferences", {
+      method: "PUT",
+      body: JSON.stringify({ enabled }),
+    }),
+  getAiInstall: () => request<AiInstallStatus>("/api/ai/install", { cache: "no-store" }),
+  /** Start or resume downloading the AI program and models for one size. */
+  installAi: (tier: AiTierId) =>
+    request<AiInstallStatus>("/api/ai/install", {
+      method: "POST",
+      body: JSON.stringify({ tier }),
+    }),
+  pauseAiInstall: () => request<AiInstallStatus>("/api/ai/install", { method: "DELETE" }),
+  /** Turn AI features off and delete what Axcess downloaded. */
+  removeAi: () => request<void>("/api/ai", { method: "DELETE" }),
+  /** Whether AI fix suggestions are turned on and their local model is ready. */
+  getSuggestionStatus: () =>
+    request<SuggestionAvailability>("/api/suggestions/status", { cache: "no-store" }),
+  /** Queue an AI fix suggestion for one occurrence. Nothing leaves this computer. */
+  requestSuggestion: (scanId: number, kind: SuggestionOccurrenceKind, occurrenceId: number) =>
+    request<SuggestionRecord>(`/api/scans/${scanId}/suggestions`, {
+      method: "POST",
+      body: JSON.stringify({ occurrence_kind: kind, occurrence_id: occurrenceId }),
+    }),
+  /** The newest suggestion for one occurrence, or null when there is none. */
+  getLatestSuggestion: (scanId: number, kind: SuggestionOccurrenceKind, occurrenceId: number) =>
+    request<SuggestionRecord | null>(
+      `/api/scans/${scanId}/occurrences/${kind}/${occurrenceId}/suggestion`,
+      { cache: "no-store" },
+    ),
+  cancelSuggestion: (scanId: number, suggestionId: number) =>
+    request<SuggestionRecord>(`/api/scans/${scanId}/suggestions/${suggestionId}/cancel`, {
+      method: "POST",
+    }),
+  setSuggestionFeedback: (
+    scanId: number,
+    suggestionId: number,
+    feedback: SuggestionFeedback | null,
+  ) =>
+    request<SuggestionRecord>(`/api/scans/${scanId}/suggestions/${suggestionId}/feedback`, {
+      method: "POST",
+      body: JSON.stringify({ feedback }),
+    }),
   /**
    * Rendered page + DOM for the Page/DOM inspector. Serves the rendered
    * document persisted at scan time when present; otherwise re-renders the
@@ -644,3 +700,15 @@ export const exportUrl = (
   const query = params.toString();
   return `/api/scans/${scanId}/export/${format}${query ? `?${query}` : ""}`;
 };
+
+/** Start only Axcess's private, isolated service after a deliberate button press. */
+export function startAiRuntime(): Promise<import("./types").AiRuntimeStartResponse> {
+  return request("/api/ai/runtime/start", {
+    method: "POST",
+    body: JSON.stringify({ confirm: true }),
+  });
+}
+
+export function getAiRuntime(): Promise<import("./types").AiRuntimeStatus> {
+  return request("/api/ai/runtime", { cache: "no-store" });
+}

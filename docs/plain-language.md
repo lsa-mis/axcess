@@ -91,6 +91,9 @@ Use the word in the first column, and never the words in the last.
 | what was checked | Which checks ran and which pages and states a report covers. | coverage, method coverage |
 | Product roadmap | The page listing planned checks. | coverage tracking, coverage and tracking |
 | element code (HTML) | The code of one flagged element. | snippet, outerHTML, markup |
+| AI suggestion | A fix the local AI model suggests for one occurrence, on request. It can be wrong; a person checks it. | AI fix, AI remediation, recommendation, auto-fix |
+| AI features | The optional local AI program (Ollama) and models the desktop app can download, in one of three sizes: Small, Standard, Large. | AI pack, AI bundle, AI dependencies, tier |
+| Image model | The local AI model that looks at pictures. | vision model, VLM (outside developer notes) |
 | element locator (CSS selector) | The text that finds an element in the page code. | selector (alone) |
 | element locator (XPath) | The path that finds an element in the page code, as the rule check (Alfa) records it. | selector, path (alone) |
 | panel | One of the two reports on Compare reports, each in its own frame: "Go back in the report #24 panel". Never "left" or "right": on a narrow screen the panels are one above the other. | pane, side, left, right |

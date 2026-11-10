@@ -1,4 +1,4 @@
-.PHONY: real-pages help site site-install site-dev site-check site-test setup run run-stable serve protected-maintenance test test-unit test-integration test-ui quality-gate detection-evals lint lint-fix typecheck migrate migrate-rollback fetch-models fixture-site a11y-check clean frontend-install frontend-lint frontend-build frontend-dev alfa-install desktop-install desktop-setup desktop-run desktop-test desktop-backend desktop-browsers desktop-ocr desktop-package
+.PHONY: real-pages help site site-install site-dev site-check site-test setup run run-stable serve protected-maintenance test test-unit test-integration test-ui quality-gate detection-evals suggest-eval lint lint-fix typecheck migrate migrate-rollback fetch-models fixture-site a11y-check clean frontend-install frontend-lint frontend-build frontend-dev alfa-install desktop-install desktop-setup desktop-run desktop-test desktop-backend desktop-browsers desktop-ocr desktop-package
 
 PY := uv run
 DB := data/audit.db
@@ -171,6 +171,9 @@ detection-evals: ## Evaluate detector efficacy plus evidence-path efficiency and
 	$(PY) python -m audit.detection_evals \
 		--config tests/quality/detection_eval_config.json \
 		--output-dir artifacts/detection-evals
+
+suggest-eval: ## Measure AI fix suggestions on sample cases (needs Ollama + the suggestion model)
+	$(PY) python -m audit.suggest.evals
 
 a11y-check: ## Run axe-core accessibility checks against the UI
 	$(PY) pytest tests/ui -m ui -k axe

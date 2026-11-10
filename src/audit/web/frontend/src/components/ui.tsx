@@ -6,6 +6,7 @@ import { Link } from "react-router";
 import { cn } from "../lib/cn";
 import type { Severity, FindingStatus, ReviewDecision, ScanStatus } from "../api/types";
 import {
+  OPENS_NEW_WINDOW,
   REVIEW_DECISION_HELP,
   REVIEW_DECISION_LABEL,
   SCAN_STATUS_LABEL,
@@ -446,7 +447,8 @@ export function DownloadLink({
  * browser, which is why the href must be http(s).
  *
  * Pass ``aria-label`` whenever the visible text is hidden at small
- * widths, and say "opens in a new tab" in it, the new window is a
+ * widths, and include ``OPENS_NEW_WINDOW`` from lib/terms in it ("opens in
+ * a new tab", or "opens in your web browser" in the desktop app), the new window is a
  * change of context the user should hear about before they activate it
  * (WCAG 3.2.5).
  */
@@ -1300,7 +1302,7 @@ export function PageLink({
           <span aria-hidden className="text-2xs">
             ↗
           </span>
-          <span className="sr-only">opens in a new tab</span>
+          <span className="sr-only">{OPENS_NEW_WINDOW}</span>
         </a>
       )}
       {showUrlBelow && pageTitle && (
@@ -1373,7 +1375,7 @@ export function PageActionLinks({
     >
       <a href={pageUrl} target="_blank" rel="noopener noreferrer" className={link}>
         Open live page ↗
-        <span className="sr-only"> of {display} (opens in a new tab)</span>
+        <span className="sr-only"> of {display} ({OPENS_NEW_WINDOW})</span>
       </a>
       {scanId != null && (
         <>
