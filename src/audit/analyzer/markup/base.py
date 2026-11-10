@@ -57,6 +57,10 @@ class MarkupRule:
 RULE_PLACEHOLDER_ONLY = "markup-placeholder-only"
 RULE_LABEL_FOR_MISSING = "markup-label-for-missing"
 RULE_TITLE_REPEATS_TEXT = "markup-title-repeats-text"
+RULE_STYLED_AS_HEADING = "markup-styled-as-heading"
+# Results kept per page for the heading guess, fewer than the other rules':
+# it is a guess, and a page with more is one template to look at.
+MAX_STYLED_HEADINGS = 20
 
 # Each rule, by id; ``probe._RULE_JS`` holds the code that asks each rule's
 # question, under the same id.
@@ -122,6 +126,29 @@ RULES: dict[str, MarkupRule] = {
             "The page code check read the element's code (HTML). Its title says the "
             "same as its visible text. No WCAG criterion requires a fix."
         ),
+    ),
+    # WCAG 1.3.1, failure F2 (using changes in text presentation to convey
+    # information without using the appropriate markup): a short line that is
+    # bold or large and comes before more content, but is not a heading. It is
+    # a guess, because bold text is also used for emphasis, labels and
+    # notes, so Not sure, low confidence, and at most MAX_STYLED_HEADINGS a
+    # page.
+    RULE_STYLED_AS_HEADING: MarkupRule(
+        rule_id=RULE_STYLED_AS_HEADING,
+        title="Text may look like a heading but is not marked as one",
+        criterion_sc="1.3.1",
+        wcag_scs="1.3.1",
+        wcag_level="A",
+        impact="moderate",
+        help_url="https://www.w3.org/WAI/WCAG22/Techniques/failures/F2",
+        review_lane="expert_review",
+        evidence_confidence="low",
+        evidence_summary=(
+            "A guess from the text's style in the page code (HTML): short, bold or "
+            "large, on its own line, and followed by more content. A person decides "
+            "whether it is a heading."
+        ),
+        max_results=MAX_STYLED_HEADINGS,
     ),
 }
 

@@ -111,7 +111,8 @@ criteria:
     automated_check: >-
       axe checks list, table-header, definition-list, required-ARIA-children and
       heading-structure markup on the rendered DOM. The page code check flags a
-      label whose for value is tied to no field.
+      label whose for value is tied to no field, and guesses at text styled as
+      a heading without heading markup (failure F2), for a human to confirm.
     manual_check: >-
       Relationships conveyed only visually (grouped fields, columns, emphasis
       that implies meaning) need a human to confirm they're also programmatic.

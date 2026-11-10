@@ -47,7 +47,9 @@ it; if not, mark it as a [false positive](#false-positive) with a short note.
   image text whose [alt text](#alt-text) is missing or does not match, a
   [local AI model](#local-ai-model) (such as for link text, headings, or form
   labels), an [axe-core](#axe-core) "needs review" result, or a
-  [Siteimprove Alfa](#siteimprove-alfa) "cannot tell" result.
+  [Siteimprove Alfa](#siteimprove-alfa) "cannot tell" result, or the
+  [page code check](#page-code-check)'s guess that text styled like a heading
+  should be one.
 - Called "Needs review" in earlier versions of Axcess.
 
 ### For information
@@ -411,6 +413,10 @@ It looks for:
 - a `title` on a link, button or field that repeats its visible text, so
   some screen readers read the words twice. A [best practice](#best-practice),
   not a WCAG failure. Marked [For information](#for-information).
+- a short line of text that is bold or large, on its own line, with more
+  content after it, but that is not marked up as a heading (WCAG 1.3.1). This
+  is a guess from the text's style, so it is marked [Not sure](#not-sure),
+  and at most 20 are reported a page.
 
 ### Local AI model
 

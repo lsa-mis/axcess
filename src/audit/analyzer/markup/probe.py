@@ -23,6 +23,7 @@ from audit.analyzer.markup.base import (
     MAX_SNIPPET_CHARS,
     RULE_LABEL_FOR_MISSING,
     RULE_PLACEHOLDER_ONLY,
+    RULE_STYLED_AS_HEADING,
     RULE_TITLE_REPEATS_TEXT,
     RULES,
     MarkupFinding,
@@ -249,6 +250,128 @@ _SUMMARIES[RULE_TITLE_REPEATS_TEXT] = lambda d: (
     f"This element's title, {_quote(d.get('title'))}, says the same as its visible text. "
     "Some screen readers read both, so people hear the same words twice."
 )
+
+# Text styled like a heading but not marked up as one (WCAG failure F2). A
+# guess, so every condition narrows it:
+#   - a p, div or span drawn as a block (display block, flex, grid, table,
+#     list-item or flow-root) whose children are only inline text elements
+#     (span, strong, b, em, i and the like), so it is one line of text;
+#   - 1 to 80 characters on one line, with a letter, not ending like a
+#     sentence (. ! ? , ;);
+#   - every piece of its text bold (font-weight 600 or more), or every piece
+#     at least 1.25 times the body's font size;
+#   - not inside a heading or role=heading, nor inside a control or a part
+#     that already has its own meaning: label, button, a, li, th, td, legend,
+#     summary, caption, dt, option, or a role of button, link, tab,
+#     menuitem, option or treeitem;
+#   - followed by more content: the next element with text after it, which
+#     is not a heading;
+#   - not one of a run of short bold or large lines (the element with text
+#     just before or after it is not another one): a run is an address or a
+#     list of names, not headings;
+#   - shown: not hidden from everyone or visually hidden.
+# The outermost match wins: a styled span inside a matched p is not counted
+# again.
+_RULE_JS[RULE_STYLED_AS_HEADING] = """
+  const BLOCK = new Set(['block', 'flex', 'grid', 'table', 'list-item', 'flow-root']);
+  const INLINE = new Set(['SPAN', 'STRONG', 'B', 'EM', 'I', 'U', 'SMALL', 'MARK', 'FONT',
+    'SUP', 'SUB', 'ABBR', 'CODE', 'TIME', 'Q', 'CITE', 'DFN', 'S', 'DEL', 'INS']);
+  const MEANING = 'h1, h2, h3, h4, h5, h6, [role=heading], label, button, a, li, th, td, ' +
+    'legend, summary, caption, dt, option, [role=button], [role=link], [role=tab], ' +
+    '[role=menuitem], [role=option], [role=treeitem]';
+  const HEADING = 'h1, h2, h3, h4, h5, h6, [role=heading]';
+  const bodySize = parseFloat(getComputedStyle(document.body).fontSize) || 16;
+  const weight = s => {
+    const w = parseInt(s.fontWeight, 10);
+    if (Number.isFinite(w)) return w;
+    return s.fontWeight === 'bold' || s.fontWeight === 'bolder' ? 700 : 400;
+  };
+  const style = el => {
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    let bold = true, big = true, any = false, size = 0;
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      if (!n.nodeValue.trim()) continue;
+      any = true;
+      const s = getComputedStyle(n.parentElement);
+      if (weight(s) < 600) bold = false;
+      const fs = parseFloat(s.fontSize) || 0;
+      size = Math.max(size, fs);
+      if (fs < bodySize * 1.25) big = false;
+    }
+    return any && (bold || big) ? {bold, big, size} : null;
+  };
+  const line = el => (el.innerText || '').trim();
+  const looksLikeOne = el => {
+    const text = line(el);
+    return text.length > 0 && text.length <= 80 && !text.includes('\\n') && !!style(el);
+  };
+  // The nearest element with text after (or before) this one, leaving the
+  // blocks it sits in when they run out of siblings.
+  const near = (el, sibling) => {
+    let n = el;
+    for (let step = 0; n && step < 50; step++) {
+      if (n[sibling]) {
+        n = n[sibling];
+        if (rendered(n) && squash(n.innerText)) return n;
+        continue;
+      }
+      n = n.parentElement;
+      if (!n || n === document.body || n === document.documentElement) return null;
+    }
+    return null;
+  };
+  const out = [];
+  const taken = [];
+  const els = Array.from(document.querySelectorAll('p, div, span')).slice(0, limit);
+  for (const el of els) {
+    if (out.length >= cap) break;
+    if (taken.some(t => t.contains(el))) continue;
+    if (!BLOCK.has(getComputedStyle(el).display)) continue;
+    if (!Array.from(el.querySelectorAll('*')).every(c => INLINE.has(c.tagName))) continue;
+    const text = line(el);
+    if (!text || text.length > 80 || text.includes('\\n')) continue;
+    if (!/[A-Za-z\\u00C0-\\u024F\\u0370-\\u03FF\\u0400-\\u04FF]/.test(text)) continue;
+    if (/[.!?,;]$/.test(text)) continue;
+    if (el.closest(MEANING)) continue;
+    const styled = style(el);
+    if (!styled) continue;
+    const next = near(el, 'nextElementSibling');
+    if (!next || next.matches(HEADING) || next.querySelector(HEADING)) continue;
+    const previous = near(el, 'previousElementSibling');
+    if (looksLikeOne(next) || (previous && looksLikeOne(previous))) continue;
+    if (!shown(el)) continue;
+    taken.push(el);
+    out.push({
+      selector: path(el),
+      html: snippet(el),
+      detail: {
+        text: text.slice(0, 200),
+        bold: styled.bold,
+        big: styled.big,
+        size: Math.round(styled.size),
+        body: Math.round(bodySize),
+      },
+    });
+  }
+  return out;
+"""
+
+
+def _styled_heading_summary(d: Mapping[str, Any]) -> str:
+    looks = []
+    if d.get("bold"):
+        looks.append("bold")
+    if d.get("big"):
+        looks.append(f"larger than the body text ({d.get('size')} pixels, not {d.get('body')})")
+    style = " and ".join(looks) or "styled"
+    return (
+        f"This text may be a heading: {_quote(d.get('text'))}. It is {style}, on a line "
+        "of its own, and comes before more content, but it is not marked up as a heading "
+        "(h1 to h6). This is a guess: check whether it starts a section."
+    )
+
+
+_SUMMARIES[RULE_STYLED_AS_HEADING] = _styled_heading_summary
 
 
 def _script(body: str) -> str:

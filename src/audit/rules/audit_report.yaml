@@ -13532,3 +13532,68 @@ markup_rules:
       No link, button or field on the affected pages has a title that repeats
       its visible text.
     confidence_default: high
+
+  markup-styled-as-heading:
+    title: "Text may look like a heading but is not marked as one"
+    wcag_sc: "1.3.1"
+    wcag_name: "Info and Relationships"
+    wcag_level: "A"
+    abilities_affected: [vision, cognition]
+    what_happening: >-
+      The page code check found a short line of text that looks like a
+      heading: it is bold or larger than the body text, it is on a line of its
+      own, and more content comes after it. But it is not marked up as a
+      heading. For example: <code>&lt;p&gt;&lt;b&gt;Parking&lt;/b&gt;&lt;/p&gt;</code>
+      instead of <code>&lt;h2&gt;Parking&lt;/h2&gt;</code>. This is a guess
+      from the text's style: bold text is also used for emphasis, notes and
+      names, so a person decides. The check reports at most 20 a page.
+    why_matters: >-
+      Screen reader users move through a page by its headings, like a table of
+      contents. Text that only looks like a heading is not in that list, so
+      they miss the section it starts or must read everything to find it. W3C
+      documents this as a failure of WCAG 1.3.1 (failure F2).
+    owner: dev
+    effort: under_15m
+    fix_steps:
+      - >-
+        Look at the text on the live page. Does it start a section, with the
+        content after it about that topic? If not, it is not a heading: mark
+        the occurrence "Not a problem (false positive)".
+      - >-
+        If it is a heading, mark it up as one, at the right level for where
+        it sits: <code>&lt;h2&gt;Parking&lt;/h2&gt;</code>. Keep the look with
+        CSS if you need to.
+      - >-
+        In a content management system (CMS), choose the heading style from
+        the editor's list of styles instead of making text bold or bigger.
+      - >-
+        Check that the heading levels still go in order, without skipping a
+        level.
+    fix_options:
+      - label: "Use a heading element"
+        approach: >-
+          Replace the paragraph or div with h2 to h6, at the level that fits
+          the outline of the page.
+        watch_out: >-
+          Pick the level from the page's outline, not from how big the text
+          should look. Style the size with CSS.
+      - label: "Use role=heading when the element cannot change"
+        approach: >-
+          If a component library makes the element and you cannot change it,
+          add role="heading" and aria-level with the level number.
+        watch_out: >-
+          A real heading element is better: it works the same in every browser
+          and with every screen reader.
+    verify_manual: >-
+      Open the list of headings in a screen reader (VoiceOver: VO+U, then
+      Headings; NVDA: Insert+F7). Every line that looks like a heading on the
+      page should be in the list, at a level that fits. Mark the occurrence
+      "Not a problem (false positive)" if the text does not start a section.
+    verify_automated: >-
+      Scan again with the page code check turned on, and see if this text is
+      still found.
+    acceptance: >-
+      Every line that looks like a heading on the affected pages is marked up
+      as a heading, and bold or large text that is not a heading is left as
+      it is.
+    confidence_default: low

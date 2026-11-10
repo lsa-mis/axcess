@@ -4747,7 +4747,10 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
                 "a field named only by its placeholder text."
             ),
             # One sentence, as every limit in this table.
-            "caveat": "It reads each page only as it loads, not after clicking.",
+            "caveat": (
+                "It reads each page only as it loads, not after clicking, and a person "
+                "checks its guesses about text that looks like a heading."
+            ),
         },
         {
             "key": "image",

@@ -131,3 +131,20 @@ async def test_finds_the_title_that_repeats_its_link_text(page_code) -> None:  #
     # A best practice that axe has no rule for (row 8).
     links = page_code.get("markup-title-repeats-text", [])
     assert len(links) == 1 and 'title="Contact us"' in links[0], page_code
+
+
+async def test_guesses_the_bold_line_that_looks_like_a_heading(page_code) -> None:  # type: ignore[no-untyped-def]
+    # Row 9, and only row 9: the page's real headings, button and labels are
+    # not guessed at.
+    guesses = page_code.get("markup-styled-as-heading", [])
+    assert guesses == ["<p><b>Parking</b></p>"], page_code
+
+
+async def test_the_page_code_check_finds_nothing_else(page_code) -> None:  # type: ignore[no-untyped-def]
+    assert sorted(page_code) == [
+        "markup-label-for-missing",
+        "markup-placeholder-only",
+        "markup-styled-as-heading",
+        "markup-title-repeats-text",
+    ], page_code
+    assert all(len(found) == 1 for found in page_code.values()), page_code

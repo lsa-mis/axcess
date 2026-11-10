@@ -18,6 +18,7 @@ uv run pytest tests/integration/test_known_issues_page.py -rxX
 | 6 | A label whose `for` points at no field | `label` on the phone field it leaves unnamed (Rule check (axe)), and `markup-label-for-missing` on the label itself (Mostly sure) | Rule check (axe) and Page code check (backlog item 9) |
 | 7 | White text over a gradient | `color-contrast` as "needs review", shown as Not sure: axe cannot measure contrast over a gradient | Rule check (axe) |
 | 8 | A link whose `title` repeats its own text | `markup-title-repeats-text` (Best practice, For information) | Page code check (backlog item 11) |
+| 9 | A bold one-line paragraph ("Parking") before more text, not marked up as a heading | `markup-styled-as-heading` (Not sure: a guess) | Page code check (backlog item 13) |
 
 The known gaps are `xfail(strict=True)` tests. When a new check finds one of
 them, the test reports XPASS and fails: move that row out of the gaps and

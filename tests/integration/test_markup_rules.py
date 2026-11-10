@@ -15,6 +15,7 @@ from audit.analyzer.markup import probe as markup_probe
 from audit.analyzer.markup.base import (
     RULE_LABEL_FOR_MISSING,
     RULE_PLACEHOLDER_ONLY,
+    RULE_STYLED_AS_HEADING,
     RULE_TITLE_REPEATS_TEXT,
 )
 
@@ -192,3 +193,70 @@ async def test_a_title_that_adds_something_or_is_out_of_sight_is_not_flagged(  #
     page, body: str
 ) -> None:
     assert await _flagged(page, RULE_TITLE_REPEATS_TEXT, body) == []
+
+
+# --- markup-styled-as-heading (WCAG 1.3.1, failure F2) --------------------
+
+_AFTER = "<p>Use the car park on Elm Street, open from 7 in the morning.</p>"
+_BOLD_BLOCK = 'style="display:block;font-weight:700"'
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        f'<p id="e"><b>Parking</b></p>{_AFTER}',
+        f'<p id="e"><strong>Opening hours</strong></p>{_AFTER}',
+        f'<div id="e" style="font-weight:700">Parking</div>{_AFTER}',
+        f'<div id="e" style="font-size:24px">Parking</div>{_AFTER}',
+        f'<span id="e" style="display:block;font-weight:bold">Parking</span>{_AFTER}',
+        # More content further on, after the end of the block it sits in.
+        f'<section><div id="e" class="t" style="font-weight:600">Parking</div></section>{_AFTER}',
+    ],
+)
+async def test_text_styled_as_a_heading_is_flagged(page, body: str) -> None:  # type: ignore[no-untyped-def]
+    assert await _flagged(page, RULE_STYLED_AS_HEADING, body) == ["#e"]
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        # A real heading.
+        f'<h2 id="e">Parking</h2>{_AFTER}',
+        f'<div id="e" role="heading" aria-level="2" style="font-weight:700">Parking</div>{_AFTER}',
+        # Plain text, or only part of the line bold.
+        f'<p id="e">Parking</p>{_AFTER}',
+        f'<p id="e"><b>Note</b> the car park closes at 6</p>{_AFTER}',
+        # A sentence, or too long to be a heading.
+        f'<p id="e"><b>The car park is closed today.</b></p>{_AFTER}',
+        f'<p id="e"><b>{"Parking " * 12}</b></p>{_AFTER}',
+        # Nothing after it, or a heading after it.
+        '<p id="e"><b>Parking</b></p>',
+        '<p id="e"><b>Parking</b></p><h2>Getting here</h2>',
+        # A run of bold lines (an address), not headings.
+        '<p id="e"><b>Axcess Ltd</b></p><p><b>1 Elm Street</b></p><p><b>Springfield</b></p>',
+        # Inside something that has its own meaning.
+        f'<label><span id="e" style="display:block;font-weight:700">Email</span></label>{_AFTER}',
+        f'<button><span id="e" style="display:block;font-weight:700">Send</span></button>{_AFTER}',
+        f'<a href="/p"><span id="e" {_BOLD_BLOCK}>Parking</span></a>{_AFTER}',
+        f'<ul><li><p id="e"><b>Parking</b></p></li></ul>{_AFTER}',
+        f'<table><tr><th><p id="e"><b>Parking</b></p></th></tr></table>{_AFTER}',
+        f'<fieldset><legend><span id="e" {_BOLD_BLOCK}>Size</span></legend></fieldset>{_AFTER}',
+        # A block with a block inside it is not one line of text.
+        f'<div id="e" style="font-weight:700"><p>Parking</p><p>Elm Street</p></div>{_AFTER}',
+        # Hidden from everyone, or from sight.
+        f'<p id="e" style="display:none"><b>Parking</b></p>{_AFTER}',
+        f'<p id="e" style="{SR_ONLY}"><b>Parking</b></p>{_AFTER}',
+    ],
+)
+async def test_text_that_is_not_a_heading_is_not_flagged(page, body: str) -> None:  # type: ignore[no-untyped-def]
+    assert await _flagged(page, RULE_STYLED_AS_HEADING, body) == []
+
+
+async def test_a_styled_span_inside_a_flagged_line_is_not_counted_twice(page) -> None:  # type: ignore[no-untyped-def]
+    body = f'<p id="e"><span style="display:block;font-weight:700">Parking</span></p>{_AFTER}'
+    assert await _flagged(page, RULE_STYLED_AS_HEADING, body) == ["#e"]
+
+
+async def test_the_heading_guess_stops_at_twenty_a_page(page) -> None:  # type: ignore[no-untyped-def]
+    sections = "".join(f"<p><b>Section {i}</b></p>{_AFTER}" for i in range(30))
+    assert len(await _flagged(page, RULE_STYLED_AS_HEADING, sections)) == 20
