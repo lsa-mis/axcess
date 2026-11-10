@@ -863,6 +863,9 @@ export interface IssueLocation {
   /** Captured outerHTML of the flagged element, shown as escaped source in
    *  the inline inspector, never executed. Null when none was recorded. */
   html_snippet: string | null;
+  /** For an image issue type, the image file's address as the crawler saved
+   *  it; `target` is then a description, not a locator. Null for DOM rules. */
+  image_url: string | null;
 }
 
 export interface IssuePage {
@@ -1387,10 +1390,11 @@ export interface SiteHistory {
 }
 
 /** A file the report's Export panel offers (``export_options.PANEL_FORMATS``). */
-export type ExportFormat = "xlsx" | "audit" | "csv" | "json";
+/** The Export panel's files. ``brief`` is the fix brief for a coding agent. */
+export type ExportFormat = "xlsx" | "audit" | "brief" | "csv" | "json";
 export interface ExportFormatOption {
   format: ExportFormat;
-  /** The downloaded file's name, ``_DRAFT`` marker included. */
+  /** The downloaded file's name, ``_DRAFT`` and ``_REDACTED`` markers included. */
   filename: string;
   /** Bytes of the file as the download route renders it now. */
   size_bytes: number;
@@ -1401,5 +1405,8 @@ export interface ExportOptions {
   /** Every file downloads as a labeled draft: expert review is unfinished. */
   draft: boolean;
   evaluation_status: string;
+  /** The files described are redacted copies: likely private details are
+   *  replaced with "[redacted]". Names and sizes are for those copies. */
+  redacted: boolean;
   formats: ExportFormatOption[];
 }
