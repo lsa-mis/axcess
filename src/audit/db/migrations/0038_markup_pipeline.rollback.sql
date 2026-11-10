@@ -1,4 +1,4 @@
--- Rollback for 0037. Remove the page code check's findings and its page
+-- Rollback for 0038. Remove the page code check's findings and its page
 -- count before restoring the previous list of allowed pipelines.
 
 DELETE FROM page_a11y_findings WHERE pipeline = 'markup';

@@ -1,4 +1,4 @@
-"""Migration 0037: page_a11y_findings accepts the page code check's rows.
+"""Migration 0038: page_a11y_findings accepts the page code check's rows.
 
 Forward, rollback and forward again, keeping every other row (the form error
 check's included), both indexes that cover the pipeline column, and the
@@ -14,7 +14,7 @@ import pytest
 
 from audit.db import repo
 
-MIGRATION = Path(__file__).parents[2] / "src/audit/db/migrations/0037_markup_pipeline"
+MIGRATION = Path(__file__).parents[2] / "src/audit/db/migrations/0038_markup_pipeline"
 
 
 def _page(conn: sqlite3.Connection) -> tuple[int, int]:

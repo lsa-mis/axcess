@@ -1,4 +1,4 @@
--- 0037 — accept findings from the page code check, and count its pages.
+-- 0038 — accept findings from the page code check, and count its pages.
 --
 -- page_a11y_findings.pipeline names the check that produced each row, and a
 -- CHECK constraint lists the allowed names. The page code check

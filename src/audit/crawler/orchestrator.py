@@ -2329,7 +2329,7 @@ def _persist_markup(
     findings: tuple[MarkupFinding, ...],
     screenshots: Mapping[str, bytes],
 ) -> None:
-    """Write page code check findings and count the page (migration 0037).
+    """Write page code check findings and count the page (migration 0038).
 
     Counted even when nothing was found, so the report can say how many
     pages the check ran on.

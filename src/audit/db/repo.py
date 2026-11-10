@@ -1281,7 +1281,7 @@ def increment_scan_method_coverage(
         "semantic": "semantic_pages_analyzed",
         "keyboard": "keyboard_pages_probed",
         "responsive": "responsive_pages_probed",
-        # Migration 0037: pages the page code check ran on.
+        # Migration 0038: pages the page code check ran on.
         "markup": "markup_pages_checked",
     }
     column = columns[method]

@@ -3,7 +3,7 @@
 The known issues page (tests/fixtures/site/known_issues/) has one pattern for
 each page code rule. A crawl with the check on, the default, stores one
 occurrence per rule with ``pipeline='markup'``, counts the page in
-``scans.markup_pages_checked`` (migration 0037), and records the setting in
+``scans.markup_pages_checked`` (migration 0038), and records the setting in
 the scan's config; the issue list shows each rule as its own issue type.
 With ``--skip-markup`` it stores nothing and counts nothing.
 """

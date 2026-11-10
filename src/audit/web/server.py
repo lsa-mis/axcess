@@ -4735,7 +4735,7 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
         {
             "key": "markup",
             "label": "Page code check",
-            # Scans before migration 0037 never ran it and stored no setting.
+            # Scans before migration 0038 never ran it and stored no setting.
             "enabled": (flag("markup_checks_enabled", default=False) and rendered)
             or markup_pages > 0,
             "checked_count": markup_pages,
