@@ -1642,3 +1642,44 @@ async def test_every_table_has_lines_between_its_columns(
         assert len(shadows) > 2, shadows
         # Every cell but the last draws its line on its right.
         assert all("inset" in shadow for shadow in shadows[:-1]), (path, shadows)
+
+
+async def test_issue_page_says_how_many_occurrences_were_found_after_clicking(
+    live_server: tuple[str, int], new_page: Any
+) -> None:
+    """The Issue occurrences tile splits the count: "1 at page load, 7 after clicking".
+
+    WAVE checks a page with its menus closed, so an issue type Click-Through
+    found mostly in opened menus reads higher in Axcess. The split says why.
+    The table keeps its tags without counts (the developer's choice,
+    2026-11-10). With nothing found after clicking, no split shows.
+    """
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    row = (await (await page.request.get(f"{base}/api/scans/{scan_id}/issues")).json())["rows"][0]
+    key = quote(row["issue_key"], safe="")
+    detail = await (await page.request.get(f"{base}/api/scans/{scan_id}/issues/{key}")).json()
+    tile = page.locator("dl > div").filter(
+        has=page.locator("dt", has_text=re.compile(r"^Issue occurrences$"))
+    )
+
+    async def show(after_clicking: int) -> str:
+        body = {
+            **detail,
+            "row": {
+                **detail["row"],
+                "occurrence_count": 8,
+                "click_through_occurrence_count": after_clicking,
+            },
+        }
+
+        async def fulfil(route: Any) -> None:
+            await route.fulfill(json=body)
+
+        await page.unroute("**/api/scans/*/issues/**")
+        await page.route(f"**/api/scans/{scan_id}/issues/{key}*", fulfil)
+        await page.goto(f"{base}/app/scans/{scan_id}/issues/{key}", wait_until="networkidle")
+        return re.sub(r"\s+", " ", await tile.inner_text()).strip()
+
+    assert "1 at page load, 7 after clicking" in await show(7)
+    assert "after clicking" not in await show(0)

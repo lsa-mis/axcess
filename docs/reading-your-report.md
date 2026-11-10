@@ -214,6 +214,7 @@ problem visible at page load never gets this note.
 
 | Where | What it says |
 | --- | --- |
+| An issue page's **Issue occurrences** | Under the count, `1 at page load, 7 after clicking`. Shown only when something was found after clicking. |
 | A page's **Page details** | Groups `At page load (N occurrences)`, then `After clicking “Menu” (N occurrences)` |
 | Page inspector, **Page state** list | `At page load: N occurrences` and `After clicking “Menu” → “Settings”: N occurrences`. When every occurrence came after a click, At page load shows `Issue not here`. |
 | Workbook, **User action** column | `Open "Menu" on this page.` or `Load the page.` |

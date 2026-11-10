@@ -154,6 +154,27 @@ export const PRIORITY_HELP = {
 } as const;
 
 /**
+ * "1 at page load, 7 after clicking": where an issue type's occurrences were
+ * found, for the issue page's Issue occurrences tile. Empty when none needed
+ * a click, since then every one was there at page load and the Where it
+ * shows tag already says so.
+ *
+ * The developer chose this (2026-11-10) over a count inside the Issues
+ * table's "At page load" and "After clicking" tags: the table keeps its
+ * narrow stacked tags (see FindingTypeCell in routes/Issues.tsx), and the
+ * split is on the page a reader opens to compare Axcess with a tool such as
+ * WAVE, which checks the page with its menus closed and so finds fewer. The
+ * words are the tags' own, lower-cased, so one thing keeps one name (W3C
+ * COGA "Making Content Usable", https://www.w3.org/TR/coga-usable/; WCAG 2.2
+ * SC 3.2.4 Consistent Identification, Level AA).
+ */
+export function whereFoundText(occurrences: number, afterClicking: number): string {
+  if (afterClicking <= 0) return "";
+  const atLoad = Math.max(0, occurrences - afterClicking);
+  return `${atLoad.toLocaleString()} ${FINDING_TYPE_LABELS.wcag.toLowerCase()}, ${afterClicking.toLocaleString()} ${FINDING_TYPE_LABELS.click_through.toLowerCase()}`;
+}
+
+/**
  * The other criteria an issue type maps to, as "also 4.1.2 Name, Role,
  * Value": one axe rule can fail more than one criterion (link-name fails
  * 2.4.4 and 4.1.2), and naming only the first under-reports what a fix must

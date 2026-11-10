@@ -7,7 +7,7 @@ import { Button, Card } from "./ui";
 import IssuePagesTable from "./IssuePagesTable";
 import type { AbilityLabel, IssueDetail, IssueRow } from "../api/types";
 import { HIDDEN_ISSUE_FIELDS } from "../lib/hiddenIssueFields";
-import { REVIEW_LANE_HELP } from "../lib/labels";
+import { REVIEW_LANE_HELP, whereFoundText } from "../lib/labels";
 import { REVIEW_TYPE_LABEL } from "../lib/terms";
 
 /**
@@ -137,12 +137,26 @@ export function IssueGuidanceDialog({
  * note under the value. A ``dt`` and one or two ``dd``s, so the pairing is
  * announced, not just drawn.
  */
-function FactTile({ label, value, note }: { label: string; value: ReactNode; note?: string }) {
+/** A term and its value; each note is one more line under the value, empty ones left out. */
+function FactTile({
+  label,
+  value,
+  note,
+}: {
+  label: string;
+  value: ReactNode;
+  note?: string | readonly string[];
+}) {
+  const notes = (typeof note === "string" ? [note] : (note ?? [])).filter(Boolean);
   return (
     <div className="rounded-xs border border-border bg-surface-subtle px-4 py-3">
       <dt className="text-sm text-fg-muted">{label}</dt>
       <dd className="mt-1 text-lg font-semibold tabular-nums leading-snug text-fg">{value}</dd>
-      {note && <dd className="mt-0.5 text-sm text-fg-muted">{note}</dd>}
+      {notes.map((line) => (
+        <dd key={line} className="mt-0.5 text-sm text-fg-muted">
+          {line}
+        </dd>
+      ))}
     </div>
   );
 }
@@ -252,7 +266,11 @@ function IssueGuidance({ detail }: { detail: IssueDetail }) {
             <FactTile
               label="Issue occurrences"
               value={row.occurrence_count.toLocaleString()}
-              note={`across ${row.page_count.toLocaleString()} page${row.page_count === 1 ? "" : "s"}`}
+              note={[
+                `across ${row.page_count.toLocaleString()} page${row.page_count === 1 ? "" : "s"}`,
+                // Where they were found: why, whereFoundText in lib/labels.ts.
+                whereFoundText(row.occurrence_count, row.click_through_occurrence_count),
+              ]}
             />
             {!isInformational && row.abilities_affected.length > 0 && (
               <FactTile
