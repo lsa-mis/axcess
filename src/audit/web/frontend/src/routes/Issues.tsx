@@ -50,7 +50,6 @@ import {
   REVIEW_LANES,
   REVIEW_LANE_HELP,
   isFindingType,
-  repeatPagesText,
 } from "../lib/labels";
 import { CHECK_LABEL, REVIEW_TYPE_LABEL } from "../lib/terms";
 import { useScanQuery } from "../hooks/useScanQuery";
@@ -885,12 +884,6 @@ const IssueTableRow = memo(function IssueTableRow({
       </Cell>
       <Cell numeric className={cell}>
         {row.page_count}
-        {/* The pages a shared element repeats on, under the count it is
-            listed on: why, repeatPagesText in lib/labels.ts. Its own line,
-            so the number still lines up with the column. */}
-        {row.repeat_page_count > 0 && (
-          <span className="mt-0.5 block text-xs text-fg-muted">and {repeatPagesText(row.repeat_page_count)}</span>
-        )}
       </Cell>
       <Cell className={cell}>
         <FindingTypeCell row={row} />

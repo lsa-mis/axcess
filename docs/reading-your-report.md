@@ -129,9 +129,7 @@ how the page loaded and how many occurrences, images and page states the
 checks stored for it, the same counts as that page's **Page details**. A page
 that could not be loaded reads "Not checked" in those columns, because no
 check ran on it. An element that repeats on many pages, such as a menu,
-counts on each page in this table, but only once in the Issues table. There,
-**Affected pages** shows the page it was counted on and how many more it
-repeats on, such as "1 and repeats on 5 more pages".
+counts on each page in this table, but only once in the Issues table.
 
 Below the numbers, two closed rows open more detail. **What was checked**
 shows how many checks ran, such as "7 of 9 checks ran". It opens a table with
