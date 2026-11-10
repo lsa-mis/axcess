@@ -6,6 +6,7 @@ import IssuePagesTable from "../components/IssuePagesTable";
 import ReportHeader from "../components/ReportHeader";
 import { Card, EmptyState, LinkButton } from "../components/ui";
 import { useScanQuery } from "../hooks/useScanQuery";
+import { repeatPagesText } from "../lib/labels";
 
 export { ISSUE_PAGES_VIEW, issueInspectorPath } from "../components/IssuePagesTable";
 
@@ -110,9 +111,11 @@ export default function IssuePagesRoute() {
           </h2>
           {row.repeat_page_count > 0 && (
             <p className="text-sm text-fg-muted">
-              The same element is also on {row.repeat_page_count} other page
-              {row.repeat_page_count === 1 ? "" : "s"}. Axcess lists it once, on the first page
-              where it found it.
+              {/* The same phrase as the Issues table and the issue page
+                  (repeatPagesText in lib/labels.ts), so "repeats on" means
+                  one thing everywhere. */}
+              The same element {repeatPagesText(row.repeat_page_count)}. Axcess
+              lists it once, on the first page where it found it.
             </p>
           )}
         </div>

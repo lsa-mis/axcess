@@ -7,7 +7,7 @@ import { Button, Card } from "./ui";
 import IssuePagesTable from "./IssuePagesTable";
 import type { AbilityLabel, IssueDetail, IssueRow } from "../api/types";
 import { HIDDEN_ISSUE_FIELDS } from "../lib/hiddenIssueFields";
-import { REVIEW_LANE_HELP } from "../lib/labels";
+import { REVIEW_LANE_HELP, repeatPagesText } from "../lib/labels";
 import { REVIEW_TYPE_LABEL } from "../lib/terms";
 
 /**
@@ -252,7 +252,9 @@ function IssueGuidance({ detail }: { detail: IssueDetail }) {
             <FactTile
               label="Issue occurrences"
               value={row.occurrence_count.toLocaleString()}
-              note={`across ${row.page_count.toLocaleString()} page${row.page_count === 1 ? "" : "s"}`}
+              note={`across ${row.page_count.toLocaleString()} page${row.page_count === 1 ? "" : "s"}${
+                row.repeat_page_count > 0 ? `, and ${repeatPagesText(row.repeat_page_count)}` : ""
+              }`}
             />
             {!isInformational && row.abilities_affected.length > 0 && (
               <FactTile

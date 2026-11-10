@@ -107,7 +107,7 @@ export const ISSUE_COLUMN_HELP = {
   Priority:
     "High, Medium, or Low, from the impact rating of this issue type. More pages and more occurrences raise it. Not sure lowers it, because a person must confirm it first. Issue types from the rule check (Alfa) have no rating, so they start at the lowest. Issue types marked For information show Does not apply.",
   "Affected pages":
-    "Pages with at least one occurrence of this issue type. An element repeated on many pages, such as a shared menu, counts only on the first page it was found on. An image counts on every page it appears on.",
+    "Pages with at least one occurrence of this issue type. An element repeated on many pages, such as a shared menu, counts only on the first page it was found on, and the column says how many more pages it repeats on. An image counts on every page it appears on.",
   "Issue occurrences":
     "How many occurrences of this issue type were found. An occurrence is one place a problem appears: one element on one page, or in one page state. An element repeated on many pages, such as a shared menu, counts once. An image counts every time it appears.",
   Check:
@@ -152,6 +152,28 @@ export const PRIORITY_HELP = {
     "Look at these after the High ones with the same How sure value. For example: a serious problem on 1 page, or a moderate one on 2 or more pages. More pages and more occurrences raise the priority, and pages a shared element repeats on count too.",
   Low: "Look at these last among issue types with the same How sure value. For example: a minor problem, or a moderate one on 1 page. Low can still matter, so open it before you skip it.",
 } as const;
+
+/**
+ * "repeats on 5 more pages": the pages a shared element repeats on, said
+ * after the count of pages it is listed on ("1 page, and repeats on 5 more
+ * pages"). Callers add "and" where their sentence needs it.
+ *
+ * An element that repeats on every page, such as a menu, is one fix, so
+ * Axcess counts it once, on the first page it was found on (``_first_instances``
+ * in ``src/audit/web/issues.py``). That made "1 page" look like a miss next
+ * to tools that count every page (WAVE counts 6). The developer chose
+ * (2026-11-10) to keep "1 page" and add this phrase, rather than count every
+ * page, which would undo counting a shared element once and inflate the
+ * number of things to fix. One phrase, built here, so the table, the issue
+ * page and the issue's pages list use the same words (COGA "Making Content
+ * Usable": use the same word for the same thing,
+ * https://www.w3.org/TR/coga-usable/; WCAG 2.2 SC 3.2.4 Consistent
+ * Identification, Level AA).
+ */
+export function repeatPagesText(count: number): string {
+  if (count <= 0) return "";
+  return `repeats on ${count.toLocaleString()} more page${count === 1 ? "" : "s"}`;
+}
 
 /**
  * The other criteria an issue type maps to, as "also 4.1.2 Name, Role,
