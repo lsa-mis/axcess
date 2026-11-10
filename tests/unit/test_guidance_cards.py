@@ -129,6 +129,22 @@ def test_every_ai_review_criterion_has_a_card() -> None:
     assert sorted(set(criteria) - set(_cards()["semantic_criteria"])) == []
 
 
+def test_every_page_code_rule_has_its_own_card() -> None:
+    """A page code rule's card matches the rule: its criterion and level, or
+    no wcag_* fields for a best practice (so the issue shows Best practice)."""
+    from audit.analyzer.markup import RULES
+
+    cards = _cards()["markup_rules"]
+    assert sorted(set(RULES) ^ set(cards)) == []
+    for rule_id, rule in RULES.items():
+        card = cards[rule_id]
+        assert card["title"] == rule.title, rule_id
+        if rule.criterion_sc:
+            assert (card["wcag_sc"], card["wcag_level"]) == (rule.criterion_sc, rule.wcag_level)
+        else:
+            assert not {"wcag_sc", "wcag_name", "wcag_level"} & set(card), rule_id
+
+
 def test_every_image_group_has_a_card() -> None:
     groups = {
         f"{classification or 'unclassified'}_{adequacy.value}"

@@ -21,6 +21,7 @@ import pytest_asyncio
 
 from audit.analyzer.axe import AxeAnalyzer
 from audit.analyzer.interaction import InteractionProbe
+from audit.analyzer.markup import MarkupProbe
 from audit.crawler.js_fetcher import settle_dom
 
 PAGE = Path(__file__).resolve().parents[1] / "fixtures" / "site" / "known_issues" / "index.html"
@@ -58,6 +59,15 @@ async def needs_review(page):  # type: ignore[no-untyped-def]
     for v in await AxeAnalyzer.from_bundled().run(page, "AA", include_incomplete=True):
         if v.outcome == "cant_tell":
             found.setdefault(v.rule_id, []).append(v.target_selector)
+    return found
+
+
+@pytest_asyncio.fixture(loop_scope="module")
+async def page_code(page):  # type: ignore[no-untyped-def]
+    """The page code check's results at load, as a scan stores them: rule id -> selectors."""
+    found: dict[str, list[str]] = {}
+    for f in await MarkupProbe().run(page):
+        found.setdefault(f.rule_id, []).append(f.target_selector)
     return found
 
 
@@ -102,10 +112,11 @@ async def test_click_through_finds_the_link_in_the_hidden_menu(page) -> None:  #
     assert ("link-name", "Menu") in revealed, revealed
 
 
-@pytest.mark.xfail(strict=True, reason="Known gap: no placeholder-only label check yet (item 8)")
-async def test_finds_the_input_with_only_a_placeholder(at_load) -> None:  # type: ignore[no-untyped-def]
-    # axe's label rule accepts a placeholder as the field's name.
-    assert any("email" in s for rule in ("label",) for s in at_load.get(rule, [])), at_load
+async def test_finds_the_input_with_only_a_placeholder(at_load, page_code) -> None:  # type: ignore[no-untyped-def]
+    # axe's label rule accepts a placeholder as the field's name, so axe is
+    # quiet about it; the page code check reports it (backlog item 8).
+    assert "#email" not in at_load.get("label", []), at_load
+    assert page_code.get("markup-placeholder-only") == ["#email"], page_code
 
 
 @pytest.mark.xfail(strict=True, reason="Known gap: no check for a label tied to no field (item 9)")

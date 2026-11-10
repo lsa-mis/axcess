@@ -4742,7 +4742,10 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
             "total_count": coverage["rendered_pages"],
             "unit": "page",
             "verb": "checked",
-            "description": "Reads each page's code for problems the rule check (axe) misses.",
+            "description": (
+                "Reads each page's code for problems the rule check (axe) misses, such as "
+                "a field named only by its placeholder text."
+            ),
             # One sentence, as every limit in this table.
             "caveat": "It reads each page only as it loads, not after clicking.",
         },

@@ -20,6 +20,8 @@ A result Axcess is close to certain about. It comes from one of two places:
 - the [form error check](#form-error-check) saw a clear failure: after the
   press, a field was marked in error, or a general error message appeared,
   and no text named the field and said what was wrong.
+- the [page code check](#page-code-check) read a fact from the page code,
+  such as a form field whose only name is its placeholder text.
 
 Start here: check that the result applies to that part of the page, fix it,
 test the fix, then [rescan](#rescan-comparison) to see if it is still found.
@@ -397,6 +399,11 @@ clicking), and changes nothing on the page. Each problem it finds is its own
 [issue type](#issue-type), and each one says how sure Axcess is. It is on by
 default (**Check the page code for problems the rule check misses**, under
 **Checks** on New scan), and it also runs in a sign-in scan made in the app.
+It looks for:
+
+- a form field whose only name is its placeholder text, the hint inside the
+  field that disappears when someone types (WCAG 3.3.2). Marked
+  [Mostly sure](#mostly-sure).
 
 ### Local AI model
 

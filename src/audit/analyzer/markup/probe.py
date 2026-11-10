@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, Any
 
 from audit.analyzer.markup.base import (
     MAX_SNIPPET_CHARS,
+    RULE_PLACEHOLDER_ONLY,
     RULES,
     MarkupFinding,
 )
@@ -88,6 +89,62 @@ _RULE_JS: dict[str, str] = {}
 # the occurrence, so it follows docs/plain-language.md.
 _SUMMARIES: dict[str, Callable[[Mapping[str, Any]], str]] = {}
 
+# A field whose only name is its placeholder: an input (not hidden, submit,
+# button, reset or image), textarea or select with placeholder text, and no
+# label with text (``el.labels``), no aria-label, no aria-labelledby that
+# points at text, and no title. A label's text leaves out the text of the
+# controls inside it, so a select's options never count as its label.
+# Fields hidden from everyone, or visually hidden, are skipped.
+_RULE_JS[RULE_PLACEHOLDER_ONLY] = """
+  const NO_PLACEHOLDER = new Set(['hidden', 'submit', 'button', 'reset', 'image']);
+  const labelText = label => {
+    let text = '';
+    const walk = node => {
+      for (const child of node.childNodes) {
+        if (child.nodeType === 3) text += child.nodeValue;
+        else if (child.nodeType === 1) {
+          if (child.matches('input, select, textarea, button, option, script, style')) continue;
+          if (child.tagName === 'IMG') text += ' ' + (child.getAttribute('alt') || '');
+          else walk(child);
+        }
+      }
+    };
+    walk(label);
+    return squash(text);
+  };
+  const named = (root, id) => {
+    const target = root.getElementById ? root.getElementById(id) : document.getElementById(id);
+    return !!target && !!squash(target.getAttribute('aria-label') || target.textContent);
+  };
+  const out = [];
+  const fields = Array.from(
+    document.querySelectorAll('input[placeholder], textarea[placeholder], select[placeholder]')
+  ).slice(0, limit);
+  for (const el of fields) {
+    if (out.length >= cap) break;
+    if (el.tagName === 'INPUT' && NO_PLACEHOLDER.has((el.type || '').toLowerCase())) continue;
+    const placeholder = squash(el.getAttribute('placeholder'));
+    if (!placeholder) continue;
+    if (Array.from(el.labels || []).some(label => labelText(label))) continue;
+    if (squash(el.getAttribute('aria-label'))) continue;
+    const ids = squash(el.getAttribute('aria-labelledby')).split(' ').filter(Boolean);
+    if (ids.some(id => named(el.getRootNode(), id))) continue;
+    if (squash(el.getAttribute('title'))) continue;
+    if (!shown(el)) continue;
+    out.push({
+      selector: path(el),
+      html: snippet(el),
+      detail: {placeholder: placeholder.slice(0, 200), tag: el.tagName.toLowerCase()},
+    });
+  }
+  return out;
+"""
+_SUMMARIES[RULE_PLACEHOLDER_ONLY] = lambda d: (
+    f"This field's only name is its placeholder text, {_quote(d.get('placeholder'))}. "
+    "It has no label (a label element), aria-label, aria-labelledby or title, so once "
+    "someone types, nothing on screen says what the field is for."
+)
+
 
 def _script(body: str) -> str:
     return "(args) => {\n  const {cap, limit, SNIPPET} = args;\n" + _HELPERS + body + "\n}"
@@ -133,7 +190,8 @@ class MarkupProbe:
         summarize = _SUMMARIES[rule_id]
         out: list[MarkupFinding] = []
         seen: set[str] = set()
-        for item in raw or []:
+        # A page that redefines built-ins can hand back anything.
+        for item in raw if isinstance(raw, list) else []:
             if len(out) >= rule.max_results:
                 break
             if not isinstance(item, dict):

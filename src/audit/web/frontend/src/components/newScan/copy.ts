@@ -107,7 +107,7 @@ export const SWITCHES = {
   },
   markup: {
     label: "Check the page code for problems the rule check misses",
-    hint: "Reads each page’s code (HTML) for problems the rule check (axe) does not look for. It only reads the page and changes nothing.",
+    hint: "Reads each page’s code (HTML) for problems the rule check (axe) does not look for, such as a field named only by its placeholder text. It only reads the page and changes nothing.",
   },
   forms: {
     label: "Check that forms describe their errors",

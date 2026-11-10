@@ -54,9 +54,35 @@ class MarkupRule:
     max_results: int = MAX_RESULTS_PER_RULE
 
 
-# Filled in by each rule as it is added; ``probe._RULE_JS`` holds the code
-# that asks each rule's question, under the same id.
-RULES: dict[str, MarkupRule] = {}
+RULE_PLACEHOLDER_ONLY = "markup-placeholder-only"
+
+# Each rule, by id; ``probe._RULE_JS`` holds the code that asks each rule's
+# question, under the same id.
+RULES: dict[str, MarkupRule] = {
+    # WCAG 3.3.2, and 1.3.1: a field whose only name is its placeholder. axe's
+    # ``label`` rule accepts a placeholder as the field's name, so axe never
+    # reports it. W3C WAI forms tutorial, "Instructions"
+    # (https://www.w3.org/WAI/tutorials/forms/instructions/), paraphrased:
+    # placeholder text is not a replacement for a label. Mostly sure: whether
+    # the field has a label, aria-label, aria-labelledby text or title is a
+    # fact of the page code, and the placeholder disappears when typing
+    # starts.
+    RULE_PLACEHOLDER_ONLY: MarkupRule(
+        rule_id=RULE_PLACEHOLDER_ONLY,
+        title="Field is named only by its placeholder text",
+        criterion_sc="3.3.2",
+        wcag_scs="3.3.2,1.3.1",
+        wcag_level="A",
+        impact="serious",
+        help_url="https://www.w3.org/WAI/WCAG22/Understanding/labels-or-instructions.html",
+        review_lane="likely_barrier",
+        evidence_confidence="high",
+        evidence_summary=(
+            "The page code check read the field's code (HTML). Its only name is its "
+            "placeholder text, which disappears when someone types. Check it on the page."
+        ),
+    ),
+}
 
 
 def rule_for(rule_id: str) -> MarkupRule | None:

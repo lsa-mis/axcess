@@ -13341,3 +13341,73 @@ alfa_rules:
       Every show-and-hide section (details) has a first summary with a name
       that says what the section holds.
     confidence_default: high
+
+# ---------------------------------------------------------------------
+# Page code check cards, keyed on the rule id (audit.analyzer.markup.base).
+# One card per rule: two rules share WCAG 1.3.1 and one is a best practice,
+# so a card keyed by criterion could not tell them apart. A best-practice
+# rule's card has no wcag_* fields, so the issue shows Best practice.
+# ---------------------------------------------------------------------
+markup_rules:
+  markup-placeholder-only:
+    title: "Field is named only by its placeholder text"
+    wcag_sc: "3.3.2"
+    wcag_name: "Labels or Instructions"
+    wcag_level: "A"
+    abilities_affected: [cognition, vision]
+    what_happening: >-
+      The page code check found a form field, such as an
+      <code>&lt;input&gt;</code>, whose only name is its placeholder text: the
+      hint shown inside the field before anyone types. The field has no
+      <code>&lt;label&gt;</code>, no <code>aria-label</code>, no
+      <code>aria-labelledby</code> that points at text, and no
+      <code>title</code>. The placeholder disappears as soon as someone starts
+      typing, so the field then has no name on screen. The rule check (axe)
+      accepts a placeholder as a name, so it does not report this.
+    why_matters: >-
+      People with memory or attention difficulties can forget what the field
+      was for once the hint is gone, and cannot check their answer. Placeholder
+      text is often pale and hard to read, and it can look like a value that is
+      already filled in.
+    owner: dev
+    effort: under_15m
+    fix_steps:
+      - >-
+        Add a visible label and tie it to the field: <code>&lt;label
+        for="email"&gt;Email address&lt;/label&gt; &lt;input id="email"
+        type="email"&gt;</code>.
+      - >-
+        Keep the placeholder only for an extra hint, such as an example:
+        <code>placeholder="name@example.com"</code>. Do not repeat the label
+        in it.
+      - >-
+        If the design has no room for a visible label, ask the designer for
+        one. A label hidden from sight gives the field a name for screen
+        readers, but people who can see still lose the hint when they type.
+    fix_options:
+      - label: "Add a visible label tied to the field"
+        approach: >-
+          Use a label element whose for value matches the field's id, or wrap
+          the field inside the label.
+        watch_out: >-
+          Keep the label on screen while people type. A label that moves above
+          the field when it is selected is fine, if it stays readable.
+      - label: "Hide the label only when nearby text already names the field"
+        approach: >-
+          For a search box right next to a button that says Search, a label
+          that only screen readers get can be enough.
+        watch_out: >-
+          A hidden label does not help people who can see, so use it only when
+          the field's purpose is clear on screen without it.
+    verify_manual: >-
+      Open the page, type in the field, and check that you can still tell what
+      it is for. Then move to the field with a screen reader: you should hear
+      its label. Mark the occurrence "Not a problem (false positive)" only if
+      the field already has a label that stays on screen while you type.
+    verify_automated: >-
+      Scan again with the page code check turned on, and see if this field is
+      still found.
+    acceptance: >-
+      Every field on the affected pages has a label that stays on screen while
+      people type.
+    confidence_default: high
