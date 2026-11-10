@@ -125,3 +125,9 @@ async def test_finds_the_label_connected_to_no_field(page_code) -> None:  # type
     # check reports the label itself (backlog item 9).
     labels = page_code.get("markup-label-for-missing", [])
     assert len(labels) == 1 and labels[0].startswith('<label for="phone-number">'), page_code
+
+
+async def test_finds_the_title_that_repeats_its_link_text(page_code) -> None:  # type: ignore[no-untyped-def]
+    # A best practice that axe has no rule for (row 8).
+    links = page_code.get("markup-title-repeats-text", [])
+    assert len(links) == 1 and 'title="Contact us"' in links[0], page_code

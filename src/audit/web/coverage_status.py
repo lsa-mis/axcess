@@ -90,7 +90,8 @@ SHIPPED: tuple[ShippedPipeline, ...] = (
         engine="Deterministic Playwright (reads the rendered DOM after axe; changes nothing)",
         scs=(
             "3.3.2 Labels or Instructions (field named only by its placeholder), "
-            "1.3.1 Info and Relationships (label tied to no field)"
+            "1.3.1 Info and Relationships (label tied to no field); best practice "
+            "(a title that repeats the visible text)"
         ),
         needs_ai=False,
         note="Each rule is its own issue type with its own How sure; see "

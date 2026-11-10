@@ -56,6 +56,7 @@ class MarkupRule:
 
 RULE_PLACEHOLDER_ONLY = "markup-placeholder-only"
 RULE_LABEL_FOR_MISSING = "markup-label-for-missing"
+RULE_TITLE_REPEATS_TEXT = "markup-title-repeats-text"
 
 # Each rule, by id; ``probe._RULE_JS`` holds the code that asks each rule's
 # question, under the same id.
@@ -101,6 +102,25 @@ RULES: dict[str, MarkupRule] = {
         evidence_summary=(
             "The page code check read the label's code (HTML). Its for value points at "
             "no field, so the browser ties the label to nothing. Check it on the page."
+        ),
+    ),
+    # Best practice, no WCAG criterion: a title that says exactly what the
+    # control's own visible text says. Some screen readers read both, so the
+    # name is heard twice. Low impact and nothing to fix for conformance, so
+    # For information: a record of tidy-up work, not a problem to report.
+    RULE_TITLE_REPEATS_TEXT: MarkupRule(
+        rule_id=RULE_TITLE_REPEATS_TEXT,
+        title="Title repeats the text it is on",
+        criterion_sc=None,
+        wcag_scs=None,
+        wcag_level=None,
+        impact="minor",
+        help_url="https://www.w3.org/TR/html-aam-1.0/",
+        review_lane="informational",
+        evidence_confidence="high",
+        evidence_summary=(
+            "The page code check read the element's code (HTML). Its title says the "
+            "same as its visible text. No WCAG criterion requires a fix."
         ),
     ),
 }

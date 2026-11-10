@@ -56,7 +56,9 @@ A record kept so you can see what was checked, not a problem to fix. You do not
 need to act on it, and it should not be reported as an issue.
 
 - Examples: text in an image whose [alt text](#alt-text) already says the same
-  words, and results from older checks that are no longer considered reliable.
+  words, a link whose `title` repeats its own text (found by the
+  [page code check](#page-code-check)), and results from older checks that
+  are no longer considered reliable.
 - Called "Informational" in earlier versions of Axcess.
 
 ## Issues and findings
@@ -406,6 +408,9 @@ It looks for:
   [Mostly sure](#mostly-sure).
 - a label whose `for` value matches no field, so the label is tied to
   nothing (WCAG 1.3.1). Marked [Mostly sure](#mostly-sure).
+- a `title` on a link, button or field that repeats its visible text, so
+  some screen readers read the words twice. A [best practice](#best-practice),
+  not a WCAG failure. Marked [For information](#for-information).
 
 ### Local AI model
 

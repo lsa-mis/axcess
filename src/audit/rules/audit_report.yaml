@@ -13479,3 +13479,56 @@ markup_rules:
     acceptance: >-
       Every label on the affected pages is tied to the field it names.
     confidence_default: high
+
+  markup-title-repeats-text:
+    title: "Title repeats the text it is on"
+    abilities_affected: [vision]
+    what_happening: >-
+      The page code check found a link, button or field whose
+      <code>title</code> says exactly the same as its visible text, apart from
+      capital letters and spaces. For example: <code>&lt;a href="/contact"
+      title="Contact us"&gt;Contact us&lt;/a&gt;</code>. This is a best
+      practice, not a WCAG failure: no WCAG criterion requires a fix.
+    why_matters: >-
+      Some screen readers read the title as well as the text, so people hear
+      the same words twice. The title adds nothing for anyone else: it shows
+      only when someone rests a mouse pointer on the element, and never on a
+      touch screen or with the keyboard alone.
+    owner: dev
+    effort: under_15m
+    fix_steps:
+      - >-
+        Remove the <code>title</code>: <code>&lt;a
+        href="/contact"&gt;Contact us&lt;/a&gt;</code>.
+      - >-
+        If the title was meant to add something, such as where a link goes or
+        that it opens a new window, put those words in the visible text
+        instead.
+      - >-
+        If a template or component adds the title, fix it there, so every page
+        that uses it is fixed.
+    fix_options:
+      - label: "Remove the title"
+        approach: >-
+          Delete the title attribute. The visible text already names the
+          element.
+        watch_out: >-
+          Check that nothing else reads the title, such as a script or a test.
+      - label: "Put extra information in the visible text"
+        approach: >-
+          If the title said more than the text, move that information into the
+          text, such as "Annual report (PDF, 2 MB)".
+        watch_out: >-
+          Information only in a title is missed by most keyboard, touch screen
+          and screen reader users.
+    verify_manual: >-
+      Move to the element with a screen reader and listen: you should hear its
+      name once. Mark the occurrence "Not a problem (false positive)" if the
+      title and the text are different words.
+    verify_automated: >-
+      Scan again with the page code check turned on, and see if this element is
+      still found.
+    acceptance: >-
+      No link, button or field on the affected pages has a title that repeats
+      its visible text.
+    confidence_default: high

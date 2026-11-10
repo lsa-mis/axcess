@@ -12,7 +12,11 @@ import pytest_asyncio
 
 from audit.analyzer.markup import MarkupProbe
 from audit.analyzer.markup import probe as markup_probe
-from audit.analyzer.markup.base import RULE_LABEL_FOR_MISSING, RULE_PLACEHOLDER_ONLY
+from audit.analyzer.markup.base import (
+    RULE_LABEL_FOR_MISSING,
+    RULE_PLACEHOLDER_ONLY,
+    RULE_TITLE_REPEATS_TEXT,
+)
 
 playwright = pytest.importorskip("playwright.async_api")
 
@@ -146,3 +150,45 @@ async def test_the_summary_names_the_field_it_probably_meant(page) -> None:  # t
     assert finding.rule_id == RULE_LABEL_FOR_MISSING
     assert 'for="phone-number"' in finding.failure_summary
     assert 'id="phone"' in finding.failure_summary
+
+
+# --- markup-title-repeats-text (best practice) ----------------------------
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        '<a id="e" href="/contact" title="Contact us">Contact us</a>',
+        # Case and spacing do not matter.
+        '<a id="e" href="/c" title="contact  US">Contact us</a>',
+        '<button id="e" title="Search">  Search </button>',
+        '<input id="e" type="submit" value="Send" title="send">',
+        '<label for="e">Email</label><input id="e" title="Email">',
+        '<span id="e" role="button" tabindex="0" title="Close">Close</span>',
+    ],
+)
+async def test_a_title_that_repeats_the_text_is_flagged(page, body: str) -> None:  # type: ignore[no-untyped-def]
+    assert await _flagged(page, RULE_TITLE_REPEATS_TEXT, body) == ["#e"]
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        # The title says something else.
+        '<a id="e" href="/r.pdf" title="Annual report, PDF">Annual report</a>',
+        '<button id="e" title="Search the site">Search</button>',
+        # No visible text: the title may be the only name (a different question).
+        '<a id="e" href="/" title="Home"><img src="x.png" alt=""></a>',
+        '<input id="e" title="Email">',
+        # Not a link (no href), or no title.
+        '<a id="e" title="Contact us">Contact us</a>',
+        '<a id="e" href="/c">Contact us</a>',
+        # Hidden from everyone, or from sight.
+        '<a id="e" href="/c" title="Contact" style="display:none">Contact</a>',
+        f'<a id="e" href="/c" title="Skip" style="{SR_ONLY}">Skip</a>',
+    ],
+)
+async def test_a_title_that_adds_something_or_is_out_of_sight_is_not_flagged(  # type: ignore[no-untyped-def]
+    page, body: str
+) -> None:
+    assert await _flagged(page, RULE_TITLE_REPEATS_TEXT, body) == []

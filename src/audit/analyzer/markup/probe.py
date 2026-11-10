@@ -23,6 +23,7 @@ from audit.analyzer.markup.base import (
     MAX_SNIPPET_CHARS,
     RULE_LABEL_FOR_MISSING,
     RULE_PLACEHOLDER_ONLY,
+    RULE_TITLE_REPEATS_TEXT,
     RULES,
     MarkupFinding,
 )
@@ -209,6 +210,45 @@ def _label_for_summary(d: Mapping[str, Any]) -> str:
 
 
 _SUMMARIES[RULE_LABEL_FOR_MISSING] = _label_for_summary
+
+# A title on a link, button or input (or an element with role link or
+# button) that says the same as the element's own visible text, ignoring
+# case and spacing. The visible text is what is drawn (innerText), the value
+# of a submit, button or reset input, or another input's label text. A
+# control with no visible text is skipped: there, a title may be its only
+# name, which is a different question. Hidden elements are skipped.
+_RULE_JS[RULE_TITLE_REPEATS_TEXT] = """
+  const BUTTON_INPUTS = new Set(['submit', 'button', 'reset']);
+  const visibleText = el => {
+    if (el.tagName === 'INPUT') {
+      if (BUTTON_INPUTS.has((el.type || '').toLowerCase())) return squash(el.value);
+      return squash(Array.from(el.labels || []).map(label => label.innerText).join(' '));
+    }
+    return squash(el.innerText);
+  };
+  const out = [];
+  const els = Array.from(document.querySelectorAll(
+    'a[href][title], button[title], input[title], [role=link][title], [role=button][title]'
+  )).slice(0, limit);
+  for (const el of els) {
+    if (out.length >= cap) break;
+    const title = squash(el.getAttribute('title'));
+    if (!title) continue;
+    const text = visibleText(el);
+    if (!text || text.toLowerCase() !== title.toLowerCase()) continue;
+    if (!shown(el)) continue;
+    out.push({
+      selector: path(el),
+      html: snippet(el),
+      detail: {title: title.slice(0, 200), tag: el.tagName.toLowerCase()},
+    });
+  }
+  return out;
+"""
+_SUMMARIES[RULE_TITLE_REPEATS_TEXT] = lambda d: (
+    f"This element's title, {_quote(d.get('title'))}, says the same as its visible text. "
+    "Some screen readers read both, so people hear the same words twice."
+)
 
 
 def _script(body: str) -> str:
