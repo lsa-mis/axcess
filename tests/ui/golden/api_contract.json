@@ -345,7 +345,7 @@
           },
           "title": "string",
           "wcag_name": "string",
-          "wcag_sc": "null|string",
+          "wcag_sc": "string",
           "why_matters": "string"
         }
       ],
@@ -603,6 +603,7 @@
       "row": {
         "abilities_affected": ["string"],
         "acceptance": "string",
+        "also_wcag": [],
         "click_through_occurrence_count": "integer",
         "conformance": "string",
         "description": "string",
@@ -1132,7 +1133,7 @@
             "occurrences": "integer",
             "outcomes": {"cant_tell": "absent|integer", "failed": "absent|integer"},
             "pages": "integer",
-            "statuses": {"new": "integer"}
+            "statuses": {"new": "absent|integer", "reviewing": "absent|integer"}
           },
           "before": {
             "anyOf": [
@@ -1142,7 +1143,7 @@
                 "issue_occurrences": "integer",
                 "issues": [{"label": "string", "url": "string"}],
                 "occurrences": "integer",
-                "outcomes": {"failed": "absent|integer"},
+                "outcomes": {"failed": "integer"},
                 "pages": "integer",
                 "statuses": {"new": "integer"}
               }

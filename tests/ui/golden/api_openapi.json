@@ -2533,6 +2533,7 @@
           "skip_focus": {"type": "boolean", "title": "Skip Focus"},
           "skip_visual": {"type": "boolean", "title": "Skip Visual"},
           "skip_forms": {"type": "boolean", "title": "Skip Forms", "default": true},
+          "send_empty_forms": {"type": "boolean", "title": "Send Empty Forms", "default": false},
           "skip_rendered_storage": {"type": "boolean", "title": "Skip Rendered Storage"},
           "axe_level": {"type": "string", "enum": ["A", "AA", "AAA"], "title": "Axe Level"},
           "wcag_version": {"type": "string", "enum": ["2.1", "2.2"], "title": "Wcag Version"}
