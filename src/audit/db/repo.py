@@ -743,8 +743,13 @@ def upsert_axe_violation(
     screenshot_hash: str | None = None,
     revealed_by: str | None = None,
     revealed_state_key: str | None = None,
+    engine_outcome: str = "failed",
 ) -> int:
     """Idempotent upsert on ``(page_id, rule_id, target_hash)``.
+
+    ``engine_outcome`` is ``cant_tell`` for axe's "needs review" results. It
+    is part of ``target_hash`` (``AxeViolation.target_hash``), so a conflict
+    is always the same outcome and the update leaves it alone.
 
     Re-running a crawl against the same site updates rule metadata and
     snippet text (axe may have refined its wording between runs) but
@@ -758,9 +763,9 @@ def upsert_axe_violation(
             page_id, scan_id, rule_id, wcag_sc, wcag_scs, wcag_level,
             impact, help, help_url, target_selector, failure_summary,
             html_snippet, target_hash, screenshot_hash, revealed_by,
-            revealed_state_key
+            revealed_state_key, engine_outcome
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(page_id, rule_id, target_hash) DO UPDATE SET
             scan_id = excluded.scan_id,
             wcag_sc = excluded.wcag_sc,
@@ -799,6 +804,7 @@ def upsert_axe_violation(
             screenshot_hash,
             revealed_by,
             revealed_state_key,
+            engine_outcome,
         ),
     )
     row = conn.execute(

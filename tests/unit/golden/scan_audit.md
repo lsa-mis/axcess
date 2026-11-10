@@ -235,7 +235,7 @@ Specific locations:
 
 **What is happening:**
 
-The rule check (axe) measured the contrast between the text color and its background color, and it is too low. Normal text needs a ratio of at least 4.5:1, and large text needs 3:1. Large text is at least 18pt (24px), or at least 14pt (about 18.7px) and bold. The rule check does not report text it cannot measure, such as text over an image or a gradient.
+The rule check (axe) measured the contrast between the text color and its background color, and it is too low. Normal text needs a ratio of at least 4.5:1, and large text needs 3:1. Large text is at least 18pt (24px), or at least 14pt (about 18.7px) and bold. Text it cannot measure, such as text over an image or a gradient, is not counted as a failure here. It is listed separately as Not sure, for a person to check.
 
 **Why it matters:**
 

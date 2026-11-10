@@ -588,7 +588,7 @@
       "cells": [
         ["A1", "I12 · Text does not stand out enough from its background", "s", "General", "9d0bc644a4f5"],
         ["A2", "← Back to Issues Overview", "s", "General", "e6f5ed3ddee3"],
-        ["A4", "Current Behavior", "s", "General", "1ecd3620d64b"], ["B4", "The rule check (axe) measured the contrast between the text color and its background color, and it is too low. Normal text needs a ratio of at least 4.5:1, and large text needs 3:1. Large text is at least 18pt (24px), or at least 14pt (about 18.7px) and bold. The rule check does not report text it cannot measure, such as text over an image or a gradient.", "s", "General", "7680f9c98c33"],
+        ["A4", "Current Behavior", "s", "General", "1ecd3620d64b"], ["B4", "The rule check (axe) measured the contrast between the text color and its background color, and it is too low. Normal text needs a ratio of at least 4.5:1, and large text needs 3:1. Large text is at least 18pt (24px), or at least 14pt (about 18.7px) and bold. Text it cannot measure, such as text over an image or a gradient, is not counted as a failure here. It is listed separately as Not sure, for a person to check.", "s", "General", "7680f9c98c33"],
         ["A5", "Severity", "s", "General", "1ecd3620d64b"], ["B5", "Serious", "s", "General", "7680f9c98c33"],
         ["A6", "Category", "s", "General", "1ecd3620d64b"], ["B6", "Perceivable", "s", "General", "7680f9c98c33"],
         ["A7", "Impact", "s", "General", "1ecd3620d64b"], ["B7", "People with low vision or color blindness may not be able to read text that is too close in color to its background. Glare from bright sunlight makes such text hard for everyone to read.", "s", "General", "7680f9c98c33"],

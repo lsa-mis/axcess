@@ -273,8 +273,11 @@ function FindingCard({
           <p className="mt-1 text-xs text-fg-muted">
             {finding.wcag_sc ? `WCAG ${finding.wcag_sc}` : "Best practice"} ·{" "}
             {sourceLabel(finding.pipeline)}
-            {finding.pipeline === "alfa" &&
-              ` · ${cantTell ? `${REVIEW_TYPE_LABEL.expert_review}: the rule check could not decide` : "failed a standard test rule (ACT rule)"}`}
+            {/* "Could not decide" for either rule check: axe's "needs
+                review" is stored as the same cant_tell outcome as Alfa's. */}
+            {cantTell
+              ? ` · ${REVIEW_TYPE_LABEL.expert_review}: the rule check could not decide`
+              : finding.pipeline === "alfa" && " · failed a standard test rule (ACT rule)"}
           </p>
         </div>
         <StatusChip value={finding.status} />

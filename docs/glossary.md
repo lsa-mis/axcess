@@ -36,7 +36,8 @@ it; if not, mark it as a [false positive](#false-positive) with a short note.
   the [keyboard trap](#keyboard-trap) check, a [motion check](#motion-check),
   image text whose [alt text](#alt-text) is missing or does not match, a
   [local AI model](#local-ai-model) (such as for link text, headings, or form
-  labels), or a [Siteimprove Alfa](#siteimprove-alfa) "cannot tell" result.
+  labels), an [axe-core](#axe-core) "needs review" result, or a
+  [Siteimprove Alfa](#siteimprove-alfa) "cannot tell" result.
 - Called "Needs review" in earlier versions of Axcess.
 
 ### For information
@@ -302,7 +303,10 @@ Axcess runs [axe-core](#axe-core) by default and can also run, or instead run,
 ### axe-core
 
 The open-source rule engine from Deque Systems. By default, Axcess runs a
-bundled copy on every [rendered page](#rendered-page).
+bundled copy on every [rendered page](#rendered-page). When axe-core cannot
+decide a result by itself, such as the contrast of text over an image, it
+reports "needs review", and Axcess puts that result [Not sure](#not-sure), as
+its own issue type ending ", a person must decide".
 
 ### Siteimprove Alfa
 

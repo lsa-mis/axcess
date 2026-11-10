@@ -278,11 +278,13 @@ class _Group:
 
 
 def _group_key(row: issues.IssueRow) -> str:
-    """One Alfa rule is one group whichever outcome it had, so a finding that
-    moves between failed and cannot-tell is a change, not a new issue."""
+    """One Alfa or axe rule is one group whichever outcome it had, so a finding
+    that moves between failed and cannot-tell is a change, not a new issue."""
     key = row.issue_key
     if row.pipeline == "alfa" and key.rsplit(":", 1)[-1] in {"failed", "cant_tell"}:
         key = key.rsplit(":", 1)[0]
+    if row.pipeline == "axe":
+        key = key.removesuffix(issues.AXE_CANT_TELL_SUFFIX)
     return key
 
 

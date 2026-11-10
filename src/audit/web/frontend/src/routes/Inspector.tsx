@@ -2185,14 +2185,17 @@ function shorten(text: string, max: number): string {
  * keys the Issues page builds: ``axe:rule`` and ``keyboard:rule`` (and the
  * other browser checks), ``semantic:2.4.6`` for AI review (whose findings
  * keep the whole key as their rule), and ``alfa:rule:failed`` or
- * ``alfa:rule:cant_tell``, one issue for each Alfa outcome.
+ * ``alfa:rule:cant_tell``, one issue for each Alfa outcome. An axe rule has
+ * the same split: ``axe:rule`` is its failures and ``axe:rule:cant_tell``
+ * what axe could not decide ("needs review").
  */
 function findingInIssue(finding: PageEvidence["a11y_findings"][number], key: string): boolean {
   const [pipeline, rule, outcome] = key.split(":");
   if (!pipeline || !rule || finding.pipeline !== pipeline) return false;
   if (pipeline === "semantic") return finding.rule_id === key || finding.rule_id === rule;
   if (finding.rule_id !== rule) return false;
-  if (pipeline === "alfa") return (finding.engine_outcome || "failed") === (outcome || "failed");
+  if (pipeline === "alfa" || pipeline === "axe")
+    return (finding.engine_outcome || "failed") === (outcome || "failed");
   return true;
 }
 

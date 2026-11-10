@@ -51,6 +51,16 @@ async def at_load(page):  # type: ignore[no-untyped-def]
     return found
 
 
+@pytest_asyncio.fixture(loop_scope="module")
+async def needs_review(page):  # type: ignore[no-untyped-def]
+    """axe's "needs review" results at load, as a scan stores them: rule id -> selectors."""
+    found: dict[str, list[str]] = {}
+    for v in await AxeAnalyzer.from_bundled().run(page, "AA", include_incomplete=True):
+        if v.outcome == "cant_tell":
+            found.setdefault(v.rule_id, []).append(v.target_selector)
+    return found
+
+
 async def test_finds_the_button_with_no_name(at_load) -> None:  # type: ignore[no-untyped-def]
     assert any("icon-only" in s for s in at_load.get("button-name", [])), at_load
 
@@ -60,8 +70,18 @@ async def test_finds_the_skipped_heading_level(at_load) -> None:  # type: ignore
 
 
 async def test_finds_the_low_contrast_text(at_load) -> None:  # type: ignore[no-untyped-def]
-    # axe names it by its shortest unique selector, here just "p".
-    assert at_load.get("color-contrast") == ["p"], at_load
+    # axe names it by its shortest unique selector. With a second paragraph
+    # on the page (row 7), that is its class.
+    assert at_load.get("color-contrast") == [".faint"], at_load
+
+
+async def test_text_over_a_gradient_is_needs_review_not_a_failure(  # type: ignore[no-untyped-def]
+    at_load, needs_review
+) -> None:
+    # Not among the failures (the faint text is the only one), but kept as
+    # "needs review", which the report shows as Not sure.
+    assert at_load.get("color-contrast") == [".faint"], at_load
+    assert ".over-gradient" in needs_review.get("color-contrast", []), needs_review
 
 
 async def test_finds_the_field_an_unconnected_label_leaves_unnamed(at_load) -> None:  # type: ignore[no-untyped-def]

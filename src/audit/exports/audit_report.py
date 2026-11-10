@@ -1342,7 +1342,11 @@ def _appendix_b(best_practice: list[Any]) -> list[str]:
         plural = "s" if row.page_count != 1 else ""
         # Show the underlying rule id (stripped of the ``axe:`` UI prefix)
         # so a developer can grep for it; keep the human title up front.
-        rule_id = row.issue_key.split(":", 1)[-1]
+        rule_id = (
+            issues_mod.axe_rule_id(row.issue_key)
+            if row.pipeline == "axe"
+            else row.issue_key.split(":", 1)[-1]
+        )
         lines.append(
             f"- **{row.title}** (`{rule_id}`), {row.occurrence_count} "
             f"finding(s) on {row.page_count} page{plural}; "

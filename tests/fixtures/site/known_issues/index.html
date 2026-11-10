@@ -11,6 +11,7 @@
        the same file to compare counts (see docs/internal/known-issues-page.md). */
     body { font-family: sans-serif; margin: 0; padding: 1rem; }
     .faint { color: #b5b5b5; background: #ffffff; }        /* 2.0:1 contrast */
+    .over-gradient { color: #ffffff; background-image: linear-gradient(#336, #99c); }
     [x-cloak] { display: none !important; }
   </style>
 </head>
@@ -31,6 +32,9 @@
     <button type="button" class="icon-only"><svg width="16" height="16" aria-hidden="true"><rect width="16" height="16"></rect></svg></button>
     <!-- 4. Text with too little contrast. -->
     <p class="faint">Offices close at noon on Fridays.</p>
+    <!-- 7. Text over a gradient. axe cannot measure its contrast, so it
+         reports "needs review" rather than a pass or a failure. -->
+    <p class="over-gradient">Closed on public holidays.</p>
     <form>
       <!-- 5. An input with a placeholder and no real label. -->
       <input type="email" id="email" placeholder="Email address">

@@ -639,8 +639,14 @@ class InteractionProbe:
                 # spend its timeout.
                 if not await element.is_visible():
                     continue
+                # With "needs review" results, as every re-run below asks for
+                # them: a frame's load-time cant_tell rows would otherwise all
+                # look revealed by the first click inside it.
                 budget.seen_hashes.update(
-                    v.target_hash for v in await self.axe.run(frame, self.level, self.version)
+                    v.target_hash
+                    for v in await self.axe.run(
+                        frame, self.level, self.version, include_incomplete=True
+                    )
                 )
             except Exception as exc:
                 log.debug("interaction.frame_skipped", error_type=type(exc).__name__)
@@ -1090,7 +1096,7 @@ class InteractionProbe:
     ) -> None:
         """Run axe on the current state and keep only unseen violations."""
         try:
-            violations = await self.axe.run(page, self.level, self.version)
+            violations = await self.axe.run(page, self.level, self.version, include_incomplete=True)
         except Exception as exc:
             log.debug("interaction.axe_failed", error_type=type(exc).__name__)
             return

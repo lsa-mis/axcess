@@ -288,7 +288,7 @@ async def test_concurrent_pages_each_get_their_own_state_count(browser, axe) -> 
 
 
 class _NoopAxe:
-    async def run(self, *_args):  # type: ignore[no-untyped-def]
+    async def run(self, *_args, **_kwargs):  # type: ignore[no-untyped-def]
         return []
 
 
@@ -459,7 +459,7 @@ async def test_time_budget_retains_earlier_evidence_and_removes_guard(page) -> N
     await page.set_content("<button onclick=\"this.textContent='Opened'\">Open</button>")
 
     class SlowAxe:
-        async def run(self, *_args):  # type: ignore[no-untyped-def]
+        async def run(self, *_args, **_kwargs):  # type: ignore[no-untyped-def]
             await asyncio.sleep(10)
             return []
 

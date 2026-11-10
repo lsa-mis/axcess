@@ -1940,6 +1940,7 @@ def _persist_axe(
                 html_snippet=v.html_snippet,
                 target_hash=v.target_hash,
                 screenshot_hash=_store_screenshot(ctx, v.target_hash, screenshots),
+                engine_outcome=v.outcome,
             )
         except sqlite3.Error as exc:
             # One bad row must not kill the rest of the page's findings.
@@ -1949,14 +1950,17 @@ def _persist_axe(
                 page_id=page_id,
                 error=str(exc),
             )
+    # The scan's violation total counts failures only. A "needs review"
+    # result is not a violation; it reaches the report as a Not sure issue.
+    failed = sum(1 for v in violations if v.outcome == "failed")
     repo.increment_scan_axe_counters(
         ctx.conn,
         scan_id=ctx.scan_id,
         pages_delta=1,
-        violations_delta=len(violations),
+        violations_delta=failed,
     )
     ctx.summary.axe_pages_scanned += 1
-    ctx.summary.axe_violations_total += len(violations)
+    ctx.summary.axe_violations_total += failed
 
 
 @_batched_writes
@@ -2034,6 +2038,7 @@ def _persist_interaction(
                 screenshot_hash=_store_screenshot(ctx, v.target_hash, screenshots),
                 revealed_by=revealed.revealed_by,
                 revealed_state_key=revealed.state_key or None,
+                engine_outcome=v.outcome,
             )
         except sqlite3.Error as exc:
             log.warning(
@@ -2047,16 +2052,18 @@ def _persist_interaction(
     # counter claims. pages_delta stays 0: the page was already counted as
     # axe-scanned by the load-state pass, and counting it twice would make
     # "pages scanned" exceed the number of pages.
+    # Failures only, as at load: a "needs review" result is not a violation.
+    failed = sum(1 for revealed in findings if revealed.violation.outcome == "failed")
     repo.increment_scan_axe_counters(
         ctx.conn,
         scan_id=ctx.scan_id,
         pages_delta=0,
-        violations_delta=len(findings),
+        violations_delta=failed,
     )
     # Mirrored into the in-memory summary so the CLI table and the DB
     # cannot disagree, with the interaction-specific counters kept
     # alongside so the report can still say how much clicking bought.
-    ctx.summary.axe_violations_total += len(findings)
+    ctx.summary.axe_violations_total += failed
     ctx.summary.interaction_pages_probed += int(count_page)
     ctx.summary.interaction_findings_total += len(findings)
     # States reached, not findings produced: a clean revealed state is still

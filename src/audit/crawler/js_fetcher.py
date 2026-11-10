@@ -427,8 +427,14 @@ class JsFetcher:
                 and "text/html" in headers.get("content-type", "text/html")
             ):
                 with live_progress.check("axe"):
+                    # "Needs review" results too (axe's incomplete), stored
+                    # as cant_tell and shown as Not sure: dropping them hid
+                    # every element axe could not decide on.
                     axe_violations = await self._axe_analyzer.run(
-                        page, level=self._axe_level, version=self._wcag_version
+                        page,
+                        level=self._axe_level,
+                        version=self._wcag_version,
+                        include_incomplete=True,
                     )
             # Keyboard probe (SC 2.1.2) runs *after* axe because it
             # presses keys and alters focus, axe needs a quiet DOM.

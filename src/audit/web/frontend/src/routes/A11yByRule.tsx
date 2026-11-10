@@ -313,12 +313,19 @@ function RuleGroupCard({
               .map(([k, v]) => `${STATUS_LABEL[k as FindingStatus] ?? k} (${v})`)
               .join(" · ") || "None"}
           </div>
-          {group.pipeline === "alfa" && group.engine_outcomes.cant_tell > 0 && (
+          {group.engine_outcomes.cant_tell > 0 && (
             <p className="mb-2 text-xs text-fg-muted">
               <strong className="text-fg">{REVIEW_TYPE_LABEL.expert_review}:</strong> For{" "}
               {group.engine_outcomes.cant_tell} occurrence
-              {group.engine_outcomes.cant_tell === 1 ? "" : "s"}, Alfa could not
-              tell (<code>cantTell</code>) if the rule passed. A person needs to
+              {group.engine_outcomes.cant_tell === 1 ? "" : "s"},{" "}
+              {group.pipeline === "alfa" ? (
+                <>
+                  Alfa could not tell (<code>cantTell</code>)
+                </>
+              ) : (
+                <>axe could not tell (axe calls it &ldquo;needs review&rdquo;)</>
+              )}{" "}
+              if the rule passed. A person needs to
               check {group.engine_outcomes.cant_tell === 1 ? "it" : "them"}.{" "}
               {group.engine_outcomes.cant_tell === 1 ? "It does" : "They do"} not
               show that the page fails WCAG.

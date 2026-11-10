@@ -394,6 +394,48 @@ def filter_and_sort(
     return _sort_rows(rows, sort)
 
 
+#: The suffix on an axe issue key whose occurrences axe could not decide
+#: ("needs review", axe's ``incomplete``): ``axe:color-contrast:cant_tell``.
+#: An axe failure keeps the bare ``axe:<rule>`` key it always had.
+AXE_CANT_TELL_SUFFIX = ":cant_tell"
+
+#: The words a "could not decide" title ends with, the same as an Alfa
+#: cantTell issue's, so one idea has one phrase in the report.
+_CANT_TELL_TITLE_SUFFIX = ", a person must decide"
+
+
+def axe_rule_id(issue_key: str) -> str:
+    """The axe rule id an ``axe:`` issue key names, without its outcome."""
+    return issue_key.removeprefix("axe:").removesuffix(AXE_CANT_TELL_SUFFIX)
+
+
+def _axe_cant_tell_card(card: dict[str, Any], fallback_title: str | None) -> dict[str, Any]:
+    """An axe rule's card, reworded for occurrences axe could not decide.
+
+    The card's "what is happening" text says the rule failed ("the contrast
+    ... is too low"), which axe did not find. That text is replaced, and a
+    first fix step says to check by hand before fixing. The rest of the card
+    (criterion, who it affects, why it matters, how to fix) still applies.
+    """
+    base = str(card.get("title") or fallback_title or "Rule check (axe)")
+    title = base if base.endswith(_CANT_TELL_TITLE_SUFFIX) else f"{base}{_CANT_TELL_TITLE_SUFFIX}"
+    steps = [str(step) for step in card.get("fix_steps") or []]
+    return {
+        **card,
+        "title": title,
+        "what_happening": (
+            "The rule check (axe) could not decide whether these elements meet the "
+            "rule, so it did not report them as failures. Each occurrence says why, "
+            "for example text over a background image whose colors axe cannot measure."
+        ),
+        "fix_steps": [
+            "Check each element on the page by hand. If it meets the rule, record "
+            "that it is not a problem. If it does not, fix it as the next steps say.",
+            *steps,
+        ],
+    }
+
+
 def get_issue_detail(
     conn: sqlite3.Connection,
     scan_id: int,
@@ -405,6 +447,7 @@ def get_issue_detail(
 
     ``issue_key`` shape:
       * ``axe:<rule_id>`` , e.g. ``axe:color-contrast``
+      * ``axe:<rule_id>:cant_tell``, what axe could not decide ("needs review")
       * ``alfa:<rule_id>:<outcome>``, explicit ``failed`` / ``cant_tell`` subgroup
       * ``image:<classification>_<adequacy>``, e.g. ``image:essential_missing``
 
@@ -474,7 +517,7 @@ def detail_for_row(
     # one last look at the grouped data.
     help_url: str | None = meta.get("help_url") or row.help_url
     if row.pipeline == "axe" and not help_url:
-        rule_id = row.issue_key.removeprefix("axe:")
+        rule_id = axe_rule_id(row.issue_key)
         groups = a11y_queries.grouped_by_rule(conn, scan_id)
         match = next((g for g in groups if g["rule_id"] == rule_id), None)
         if match:
@@ -528,9 +571,12 @@ def rule_meta_for(row: IssueRow, rules: dict[str, Any]) -> dict[str, Any]:
     # The yaml-loaded dicts are typed as `Any` at this depth, coerce
     # via `dict(...)` so mypy sees a concrete dict[str, Any] return.
     if row.pipeline == "axe":
-        rule_id = row.issue_key.removeprefix("axe:")
+        rule_id = axe_rule_id(row.issue_key)
         meta = rules.get("axe_rules", {}).get(rule_id, {})
-        return dict(meta) if isinstance(meta, dict) else {}
+        card = dict(meta) if isinstance(meta, dict) else {}
+        if row.issue_key.endswith(AXE_CANT_TELL_SUFFIX):
+            return _axe_cant_tell_card(card, row.title)
+        return card
     if row.pipeline == "semantic":
         # `semantic:<sc>` → look up the SC in the semantic_criteria
         # YAML block we added in Phase 9.1.
@@ -1084,6 +1130,18 @@ def _axe_issue_rows(
                     "ACT outcome is resolved."
                 ),
             )
+        elif g.get("outcome_group") == "cant_tell":
+            # axe's "needs review" (incomplete): axe could not decide, so the
+            # row stays Not sure at medium confidence, like an Alfa cantTell,
+            # and never shares a key, count or bulk action with a failure.
+            issue_key = f"axe:{raw_rule_id}{AXE_CANT_TELL_SUFFIX}"
+            meta = _axe_cant_tell_card(meta, g.get("help"))
+            default_title = str(meta["title"])
+            evidence_summary = (
+                f"The rule check (axe) could not decide on {len(reported)} "
+                f"occurrence{'' if len(reported) == 1 else 's'}. That is not a failure. "
+                "Check the element on the page."
+            )
         else:
             issue_key = f"axe:{raw_rule_id}"
             default_title = f"axe rule: {raw_rule_id}"
@@ -1554,11 +1612,13 @@ def _load_rules() -> dict[str, Any]:
 
 # Re-export.
 __all__ = [
+    "AXE_CANT_TELL_SUFFIX",
     "IssueDetail",
     "IssuePage",
     "IssueRow",
     "WcagRef",
     "abilities_breakdown",
+    "axe_rule_id",
     "conformance_breakdown",
     "detail_for_row",
     "filter_and_sort",

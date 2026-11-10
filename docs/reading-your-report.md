@@ -419,5 +419,8 @@ running scan: cancel it first.
   appear. Click-Through cannot reach hover-only content, gestures,
   operating-system menus, closed shadow DOM, cross-origin embeds, or page
   states with no change to the page code (DOM).
-- **What axe-core could not decide.** Axcess keeps only axe-core's
-  violations, not the results it marks as incomplete.
+- **What axe-core could not decide.** axe-core marks some results "needs
+  review", such as text over a background image. Axcess lists them as Not
+  sure issue types ending ", a person must decide". They are not failures, and
+  the scan's count of axe failures leaves them out. Scans made before this
+  change do not have them.

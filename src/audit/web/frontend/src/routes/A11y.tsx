@@ -442,7 +442,7 @@ function DrillDownView({
                     </Cell>
                     <Cell className="text-xs text-fg-muted">
                       {CHECK_LABEL[f.pipeline] ?? f.pipeline}
-                      {f.pipeline === "alfa" && f.engine_outcome === "cant_tell" && (
+                      {f.engine_outcome === "cant_tell" && (
                         <span className="mt-1 block">{REVIEW_TYPE_LABEL.expert_review}</span>
                       )}
                     </Cell>
