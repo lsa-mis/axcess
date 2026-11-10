@@ -26,7 +26,12 @@ import pytest
 from audit.exports.audit_report import load_report_rules
 
 from ._paging import all_pages_text
-from ._seed_evidence import SCREENSHOT_ISSUE_KEY, add_screenshot_finding
+from ._seed_evidence import (
+    FORM_ERROR_ISSUE_KEY,
+    SCREENSHOT_ISSUE_KEY,
+    add_form_error_finding,
+    add_screenshot_finding,
+)
 
 # One browser per module (tests/ui/conftest.py), so the tests run on the
 # module's event loop. Each ``new_page`` call still opens its own context.
@@ -1553,6 +1558,49 @@ async def test_search_settings_keyboard_and_axe(
     ).check()
     violations = await _run_axe(page)
     assert not violations, _render_violations(violations)
+
+
+async def test_a_form_error_occurrence_shows_its_form_before_and_after_the_press(
+    live_server: tuple[str, int],
+    seeded_db: tuple[Path, Path, int],
+    new_page: Any,
+) -> None:
+    """The form error check's occurrence shows both pictures, each named in words.
+
+    "Before" and "After" are text above each picture, not told by position or
+    colour, and each picture's alt text says which it is (migration 0035).
+    """
+    base, scan_id = live_server
+    db_path, blob_dir, _ = seeded_db
+    page_id, before_hash, after_hash = add_form_error_finding(db_path, blob_dir, scan_id)
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    try:
+        await page.goto(
+            f"{base}/app/scans/{scan_id}/issues/{FORM_ERROR_ISSUE_KEY}/pages/{page_id}/screenshots",
+            wait_until="networkidle",
+        )
+        before = page.get_by_role("img", name=re.compile(r"^Occurrence 1 on .+: the form before"))
+        after = page.get_by_role(
+            "img", name=re.compile(r"^Occurrence 1 on .+: the form after its button was pressed")
+        )
+        await playwright_async.expect(before).to_be_visible()
+        await playwright_async.expect(after).to_be_visible()
+        assert before_hash in (await before.get_attribute("src") or "")
+        assert after_hash in (await after.get_attribute("src") or "")
+        # Both load: the image route serves the before picture too.
+        for image in (before, after):
+            assert await image.evaluate("img => img.complete && img.naturalWidth > 0")
+        figure = page.locator("figure").first
+        await playwright_async.expect(figure).to_contain_text("Before")
+        await playwright_async.expect(figure).to_contain_text("After")
+        # In reading order: Before, its picture, After, its picture.
+        before_box, after_box = await before.bounding_box(), await after.bounding_box()
+        assert before_box and after_box and before_box["y"] < after_box["y"]
+        await playwright_async.expect(figure).to_contain_text("stopped the form from being sent")
+        violations = await _run_axe(page)
+        assert not violations, _render_violations(violations)
+    finally:
+        await page.context.close()
 
 
 async def test_instance_screenshots_describe_the_outline_and_pass_axe(

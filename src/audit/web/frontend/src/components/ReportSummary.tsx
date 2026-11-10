@@ -96,7 +96,10 @@ export function ReportSummary({
           "Issue occurrences" second), the same order as the Reports table's
           columns, so one report reads the same way on both screens (SC 3.2.4
           Consistent Identification, Level AA). The paragraphs below are the
-          history before that. The first version
+          history before that. On the ITS export branch (2026-10-15) the
+          places came first, because an evaluator reviews element by element
+          and each occurrence becomes a row of the ITS technical review; the
+          2026-10-30 order replaced it on every screen. The first version
           read left to right as the scan ran (pages, then occurrences, then
           issues), and a coworker testing it misread it in three ways:
           "errors" as accessibility errors, "Occurrences found" as the issue

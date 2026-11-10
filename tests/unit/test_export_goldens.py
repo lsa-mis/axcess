@@ -68,7 +68,7 @@ from support.export_render import (
     render_unlabeled,
 )
 from support.golden_delta import DeltaError, apply_delta, make_delta
-from support.rich_scan import seed_rich_scan, write_evidence_blobs
+from support.rich_scan import seed_rich_reviews, seed_rich_scan, write_evidence_blobs
 from support.xlsx_fingerprint import dumps_fingerprint, fingerprint_diff, fingerprint_xlsx
 from test_exports_csv_json import scan_fixture  # noqa: F401  # fixture behind scan.csv
 
@@ -83,6 +83,10 @@ UPDATE_ENV = "AUDIT_UPDATE_GOLDEN"
 # Formats whose final golden predates this harness. Their finals are compared
 # against those files and never rewritten here.
 _EXISTING_FINALS = ("csv", "json", "jira", "markdown")
+
+# Formats rendered as .xlsx, pinned through the workbook fingerprint: the
+# Axcess workbook and the filled-in ITS technical review.
+_WORKBOOKS = frozenset({"xlsx", "its"})
 
 # Unchanged lines a draft diff keeps around each change, so a reader can see
 # where the labeling lands.
@@ -125,7 +129,7 @@ def _read_golden(name: str) -> str:
 
 def _golden_text(rendered: str | bytes, export_format: str) -> str:
     """What a golden holds for an export: the text, or the workbook's fingerprint."""
-    if export_format == "xlsx":
+    if export_format in _WORKBOOKS:
         assert isinstance(rendered, bytes)
         return dumps_fingerprint(fingerprint_xlsx(rendered))
     assert isinstance(rendered, str)
@@ -134,7 +138,7 @@ def _golden_text(rendered: str | bytes, export_format: str) -> str:
 
 def _golden_name(stem: str, export_format: str, *, draft: bool) -> str:
     name = export_filename(stem, export_format, draft=draft)
-    return f"{name}.json" if export_format == "xlsx" else name
+    return f"{name}.json" if export_format in _WORKBOOKS else name
 
 
 def _text_diff(expected: str, actual: str, labels: tuple[str, str]) -> list[str]:
@@ -155,7 +159,7 @@ def _assert_same(
     labels: tuple[str, str],
     message: str,
 ) -> None:
-    if export_format == "xlsx":
+    if export_format in _WORKBOOKS:
         assert isinstance(rendered, bytes)
         # Against the fingerprint itself, not a reserialized copy, so the
         # golden's layout cannot drop anything without failing here.
@@ -249,7 +253,8 @@ def test_scan_final_matches_existing_golden(
 
 @pytest.mark.parametrize(
     ("export_format", "draft"),
-    [(fmt, True) for fmt in _EXISTING_FINALS] + [("xlsx", False), ("xlsx", True)],
+    [(fmt, True) for fmt in _EXISTING_FINALS]
+    + [(fmt, draft) for fmt in sorted(_WORKBOOKS) for draft in (False, True)],
 )
 def test_scan_export_matches_golden(
     tmp_db: sqlite3.Connection,
@@ -271,7 +276,11 @@ def test_scan_export_matches_golden(
 
 @pytest.fixture
 def rich_scan(tmp_db: sqlite3.Connection) -> int:
-    return seed_rich_scan(tmp_db)
+    # With a person's reviews, so the ITS technical review pins real rows.
+    # Only that workbook reads reviews; every other export is unchanged.
+    scan_id = seed_rich_scan(tmp_db)
+    seed_rich_reviews(tmp_db, scan_id)
+    return scan_id
 
 
 @pytest.fixture

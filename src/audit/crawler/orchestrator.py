@@ -37,6 +37,7 @@ from audit.analyzer.alfa import availability as alfa_availability
 from audit.analyzer.axe import AxeAnalyzer, AxeViolation, bundled_axe_version
 from audit.analyzer.axe import Level as AxeLevel
 from audit.analyzer.focus import FocusFinding, FocusProbe
+from audit.analyzer.forms import ErrorIdentificationProbe, FormFinding
 from audit.analyzer.interaction import (
     DEFAULT_BLOCKED_LABELS,
     InteractionProbe,
@@ -270,6 +271,17 @@ class CrawlConfig:
     # (focuses each element, checks for a sticky/fixed overlay over its
     # centre); no model. Default on; disable with ``--skip-focus``.
     focus_checks_enabled: bool = True
+    # SC 3.3.1 Error Identification, form error check. Presses each form's
+    # submit control once, empty, inside the network guard, and reports a
+    # form that detects an error without describing it in text. Off by
+    # default until it is validated on real forms
+    # (docs/internal/form-error-check.md); public scans only.
+    form_error_checks_enabled: bool = False
+    # Let that check send a form to the site when every field it can see is
+    # empty, and judge the page the site sends back. Off unless the person
+    # starting the scan chose it; public scans only. Without it, a form the
+    # site checks only on its server is "not checked".
+    form_send_empty_forms: bool = False
     # SC 1.3.2 Meaningful Sequence, visual (VLM) probe. Screenshots the page
     # and asks a local vision model whether the visual reading order matches
     # the DOM order. Needs Ollama + a vision model; no-ops cleanly without
@@ -370,6 +382,7 @@ class CrawlSummary:
     responsive_findings_total: int = 0
     focus_pages_probed: int = 0
     focus_findings_total: int = 0
+    form_error_findings_total: int = 0
     visual_pages_probed: int = 0
     visual_findings_total: int = 0
     interaction_pages_probed: int = 0
@@ -537,6 +550,13 @@ async def run_crawl(
     focus_probe: FocusProbe | None = None
     if config.focus_checks_enabled:
         focus_probe = FocusProbe()
+    # SC 3.3.1 form error check, off by default. One per crawl, so a form
+    # repeated on every page (a footer sign-up) is checked once.
+    form_error_probe = (
+        ErrorIdentificationProbe(send_empty=config.form_send_empty_forms)
+        if config.form_error_checks_enabled
+        else None
+    )
     # Visual pipeline probe. SC 2.2.2 (motion) is deterministic and always
     # runs; SC 1.3.2 (meaningful sequence) needs a vision model, so we attach
     # the provider only when one is reachable (else that check no-ops).
@@ -583,6 +603,7 @@ async def run_crawl(
             focus_probe=focus_probe,
             visual_probe=visual_probe,
             interaction_probe=interaction_probe,
+            form_error_probe=form_error_probe,
             capture_screenshots=config.capture_screenshots,
             headless=config.browser_headless,
             search_explorer=build_search_explorer(config, axe_analyzer),
@@ -848,12 +869,17 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             "keyboard_probe_enabled": config.keyboard_probe_enabled,
             "responsive_checks_enabled": config.responsive_checks_enabled,
             "focus_checks_enabled": config.focus_checks_enabled,
+            "form_error_checks_enabled": config.form_error_checks_enabled,
+            "form_send_empty_forms": config.form_send_empty_forms,
             "visual_checks_enabled": config.visual_checks_enabled,
             "interaction_checks_enabled": config.interaction_checks_enabled,
             # 1: scan-level probed/states counters are persisted.
             # 2: adds the per-page scan_interaction_runs ledger, so a
             # report may state controls operated and the bounds hit.
             "interaction_coverage_version": 2,
+            # 1: the form error check's scan counts are kept (migration 0036),
+            # so a zero is a count, not a missing record.
+            "form_check_coverage_version": 1,
             "interaction_safety_version": 1,
             "interaction_max_clicks": config.interaction_max_clicks,
             "interaction_max_repeated": config.interaction_max_repeated,
@@ -954,6 +980,7 @@ class _LazyJs:
         focus_probe: FocusProbe | None = None,
         visual_probe: VisualProbe | None = None,
         interaction_probe: InteractionProbe | None = None,
+        form_error_probe: ErrorIdentificationProbe | None = None,
         capture_screenshots: bool = False,
         headless: bool = True,
         search_explorer: SearchExplorer | None = None,
@@ -970,6 +997,7 @@ class _LazyJs:
         self._focus_probe = focus_probe
         self._visual_probe = visual_probe
         self._interaction_probe = interaction_probe
+        self._form_error_probe = form_error_probe
         self._capture_screenshots = capture_screenshots
         self._headless = headless
         self._search_explorer = search_explorer
@@ -987,6 +1015,7 @@ class _LazyJs:
                 focus_probe=self._focus_probe,
                 visual_probe=self._visual_probe,
                 interaction_probe=self._interaction_probe,
+                form_error_probe=self._form_error_probe,
                 capture_screenshots=self._capture_screenshots,
                 headless=self._headless,
                 search_explorer=self._search_explorer,
@@ -1488,6 +1517,17 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
                 screenshots=result.screenshots,
             )
 
+        # SC 3.3.1 form error check. Rows tagged ``pipeline='forms'``.
+        if render_mode == "js" and ctx.config.form_error_checks_enabled:
+            _persist_form_errors(
+                ctx,
+                page_id=page_id,
+                findings=result.form_findings,
+                screenshots=result.form_screenshots,
+                ran=result.form_check_ran,
+                outcomes=result.form_outcomes,
+            )
+
         # SC 1.3.2 visual probe. Rows tagged ``pipeline='visual'``.
         if render_mode == "js" and ctx.config.visual_checks_enabled:
             _persist_visual(
@@ -1866,7 +1906,11 @@ def _store_screenshot(
     Returns its content hash, or ``None`` when there's no screenshot for
     this finding or the store write fails.
     """
-    png = screenshots.get(target_hash)
+    return _store_png(ctx, screenshots.get(target_hash), target_hash)
+
+
+def _store_png(ctx: _WorkerContext, png: bytes | None, target_hash: str) -> str | None:
+    """Persist one screenshot's PNG bytes; its content hash, or ``None``."""
     if not png:
         return None
     try:
@@ -2239,6 +2283,48 @@ def _persist_focus(
             )
     ctx.summary.focus_pages_probed += 1
     ctx.summary.focus_findings_total += len(findings)
+
+
+@_batched_writes
+def _persist_form_errors(
+    ctx: _WorkerContext,
+    *,
+    page_id: int,
+    findings: tuple[FormFinding, ...],
+    screenshots: Mapping[str, tuple[bytes | None, bytes | None]] | None = None,
+    ran: bool = False,
+    outcomes: Mapping[str, int] | None = None,
+) -> None:
+    """Write the form error check's findings (SC 3.3.1), each with its form's
+    screenshots before and after the press when the scan took them: the
+    after picture as the finding's screenshot, the before one beside it."""
+    for f in findings:
+        before, after = (screenshots or {}).get(f.target_hash, (None, None))
+        try:
+            repo.upsert_keyboard_finding(
+                ctx.conn,
+                page_id=page_id,
+                scan_id=ctx.scan_id,
+                screenshot_hash=_store_png(ctx, after, f.target_hash),
+                before_screenshot_hash=_store_png(ctx, before, f.target_hash),
+                **f.to_repo_kwargs(),
+            )
+        except sqlite3.Error as exc:
+            log.warning("forms.persist_failed", page_id=page_id, error=str(exc))
+    ctx.summary.form_error_findings_total += len(findings)
+    if ran:
+        counts = dict(outcomes or {})
+        skipped = counts.pop("skipped", 0)
+        try:
+            repo.record_form_check(
+                ctx.conn,
+                scan_id=ctx.scan_id,
+                pressed=sum(counts.values()),
+                skipped=skipped,
+                not_checked=counts.get("not_checked", 0),
+            )
+        except sqlite3.Error as exc:
+            log.warning("forms.count_failed", page_id=page_id, error=str(exc))
 
 
 @_batched_writes

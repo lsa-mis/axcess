@@ -49,6 +49,7 @@ _RAIL_NAME = {
     ),
     "Check for keyboard traps": "Keyboard check",
     "Check that keyboard focus is never hidden": "Focus check",
+    "Check that forms describe their errors": "Form error check",
     "Check narrow screens and zoom": "Zoom and layout check",
     "Read text inside images (OCR)": "Image text check",
     "Compare image text with alt text (vision model)": "Vision model review",
@@ -587,6 +588,8 @@ async def test_depth_dots_are_gone(live_server: tuple[str, int], new_page: Any) 
                 "Opens menus and pop-up windows (Click-Through)",
                 "Keyboard check",
                 "Focus check",
+                # On by default for public websites (2026-11-02).
+                "Form error check",
                 "Zoom and layout check",
                 "Image text check",
             ],
@@ -648,6 +651,18 @@ async def test_rail_names_every_switch_on_the_side_its_state_says(
                 label = _RAIL_NAME[await _switch_label(switch)]
                 runs = await switch.is_checked() and await switch.is_enabled()
                 assert (label in on, label in off) == (runs, not runs), (label, runs)
+        # The form error check is a question with three answers, not a
+        # switch; it runs when a checking answer is chosen and can be.
+        forms = page.get_by_role("group", name="Check that forms describe their errors")
+        if await forms.count():
+            chosen = forms.get_by_role("radio", checked=True)
+            runs = (
+                await chosen.count() == 1
+                and await chosen.get_attribute("value") != "off"
+                and await chosen.is_enabled()
+            )
+            label = "Form error check"
+            assert (label in on, label in off) == (runs, not runs), (label, runs)
 
     await agrees()
     if mode == "public":
@@ -825,7 +840,65 @@ async def test_failed_scan_explains_both_retries(
         page.get_by_role("alert").filter(has_text="Axcess could not start this scan again")
     ).to_be_visible()
     # "Scan again with faster settings" is the defaults with Click-Through
-    # off, on the same address.
+    # and the form error check off, on the same address.
     assert posted[-1]["url"] == "https://retry.example.test/"
     assert posted[-1]["skip_interaction"] is True
+    assert posted[-1]["skip_forms"] is True
+    assert posted[-1]["send_empty_forms"] is False
     assert posted[-1]["max_pages"] == 2500
+
+
+async def test_the_form_error_check_is_on_for_public_websites_and_absent_when_signed_in(
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """On by default for a public website (2026-11-02), without sending
+    anything; sending empty forms is a choice of its own (2026-11-04); no
+    question at all for a sign-in scan."""
+    base, _ = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    posted: list[dict[str, Any]] = []
+
+    async def capture(route: Any) -> None:
+        posted.append(route.request.post_data_json)
+        await route.fulfill(status=409, json={"error": "A crawl is already running."})
+
+    await page.route("**/api/scans", capture)
+    await page.goto(f"{base}/app/scans/new", wait_until="networkidle")
+    await _open_groups(page)
+    forms = page.get_by_role("group", name="Check that forms describe their errors")
+    await playwright_async.expect(
+        forms.get_by_role("radio", name="Check forms, and stop them from being sent")
+    ).to_be_checked()
+    send = forms.get_by_role("radio", name="Check forms, and send empty ones to this site")
+    await playwright_async.expect(send).not_to_be_checked()
+    # Its risk is read with it, as its description.
+    await playwright_async.expect(send).to_have_accessible_description(
+        re.compile("Use only on a site you own or a test site")
+    )
+    summary = page.get_by_role("complementary", name="What this scan will do")
+    assert "Form error check" in await _rail_items(summary, "Checks that run")
+    await page.get_by_role("textbox", name="Website address", exact=True).fill(
+        "https://example.com/"
+    )
+    await page.get_by_role("button", name="Start scan").click()
+    await playwright_async.expect(page.get_by_role("alert").first).to_be_visible()
+    assert posted and posted[-1]["skip_forms"] is False
+    assert posted[-1]["send_empty_forms"] is False
+
+    await send.check()
+    await page.get_by_role("button", name="Start scan").click()
+    for _ in range(50):
+        if len(posted) >= 2:
+            break
+        await page.wait_for_timeout(100)
+    assert posted[-1]["skip_forms"] is False and posted[-1]["send_empty_forms"] is True
+
+    await forms.get_by_role("radio", name="Don\u2019t check forms").check()
+    assert "Form error check" in await _rail_items(summary, "Not included")
+
+    await page.goto(f"{base}/app/scans/new?mode=login", wait_until="networkidle")
+    await _open_groups(page)
+    await playwright_async.expect(
+        page.get_by_role("group", name="Check that forms describe their errors")
+    ).to_have_count(0)

@@ -1107,6 +1107,43 @@
         }
       }
     },
+    "/api/scans/{scan_id}/pages/{page_id}/review": {
+      "put": {
+        "summary": "Api Save Occurrence Review",
+        "description": "Save a person's review of the occurrences on one element of this page.\n\nAny report can be reviewed, finished or not. A protected report is\nrefused: its ordinary tables keep only opaque aliases, and notes\nabout its pages would be the plaintext evidence they keep out.",
+        "operationId": "api_save_occurrence_review_api_scans__scan_id__pages__page_id__review_put",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "page_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Page Id"}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/OccurrenceReviewRequest"}}}
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {"schema": {"$ref": "#/components/schemas/OccurrenceReviewResponse"}}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
     "/api/scans/{scan_id}/pages/{page_id}/inspect": {
       "get": {
         "summary": "Api Page Inspect",
@@ -1633,7 +1670,17 @@
             "schema": {
               "anyOf": [
                 {
-                  "enum": ["axe", "alfa", "keyboard", "responsive", "focus", "visual", "semantic", "image"],
+                  "enum": [
+                    "axe",
+                    "alfa",
+                    "keyboard",
+                    "responsive",
+                    "focus",
+                    "visual",
+                    "forms",
+                    "semantic",
+                    "image"
+                  ],
                   "type": "string"
                 },
                 {"type": "null"}
@@ -1771,7 +1818,7 @@
     "/api/scans/{scan_id}/export/{fmt}": {
       "get": {
         "summary": "Export Scan",
-        "description": "Download a scan export as CSV / JSON / Jira CSV / Markdown / Audit.",
+        "description": "Download a scan export as CSV / JSON / Jira CSV / Markdown / Audit / Excel.",
         "operationId": "export_scan_api_scans__scan_id__export__fmt__get",
         "parameters": [
           {
@@ -1944,7 +1991,17 @@
           "key": {"type": "string", "title": "Key"},
           "pipeline": {
             "type": "string",
-            "enum": ["axe", "alfa", "keyboard", "responsive", "focus", "visual", "semantic", "image"],
+            "enum": [
+              "axe",
+              "alfa",
+              "keyboard",
+              "responsive",
+              "focus",
+              "visual",
+              "forms",
+              "semantic",
+              "image"
+            ],
             "title": "Pipeline"
           },
           "title": {"type": "string", "title": "Title"},
@@ -1992,7 +2049,17 @@
         "properties": {
           "pipeline": {
             "type": "string",
-            "enum": ["axe", "alfa", "keyboard", "responsive", "focus", "visual", "semantic", "image"],
+            "enum": [
+              "axe",
+              "alfa",
+              "keyboard",
+              "responsive",
+              "focus",
+              "visual",
+              "forms",
+              "semantic",
+              "image"
+            ],
             "title": "Pipeline"
           },
           "before": {"$ref": "#/components/schemas/MethodCoverage"},
@@ -2067,7 +2134,7 @@
       },
       "ExportFormatOption": {
         "properties": {
-          "format": {"type": "string", "enum": ["xlsx", "audit", "csv", "json"], "title": "Format"},
+          "format": {"type": "string", "enum": ["xlsx", "its", "audit", "csv", "json"], "title": "Format"},
           "filename": {"type": "string", "title": "Filename"},
           "size_bytes": {"type": "integer", "title": "Size Bytes"}
         },
@@ -2230,6 +2297,41 @@
         "type": "object",
         "required": ["state", "checked", "total"],
         "title": "MethodCoverage"
+      },
+      "OccurrenceReviewRequest": {
+        "properties": {
+          "a11y_finding_ids": {
+            "items": {"type": "integer"},
+            "type": "array",
+            "maxItems": 50,
+            "title": "A11Y Finding Ids"
+          },
+          "page_image_ids": {"items": {"type": "integer"}, "type": "array", "maxItems": 50, "title": "Page Image Ids"},
+          "decision": {
+            "anyOf": [{"type": "string", "enum": ["report", "repeat"]}, {"type": "null"}],
+            "title": "Decision"
+          },
+          "notes": {"anyOf": [{"type": "string", "maxLength": 2000}, {"type": "null"}], "title": "Notes"}
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["decision"],
+        "title": "OccurrenceReviewRequest",
+        "description": "A person's review of the occurrences on one circled element."
+      },
+      "OccurrenceReviewResponse": {
+        "properties": {
+          "decision": {
+            "anyOf": [{"type": "string", "enum": ["report", "repeat"]}, {"type": "null"}],
+            "title": "Decision"
+          },
+          "notes": {"type": "string", "title": "Notes"},
+          "updated_at": {"type": "string", "title": "Updated At"}
+        },
+        "type": "object",
+        "required": ["decision", "notes", "updated_at"],
+        "title": "OccurrenceReviewResponse",
+        "description": "The review as stored: notes are trimmed and redacted."
       },
       "ProtectedEnvironment": {
         "type": "string",
@@ -2430,6 +2532,7 @@
           "skip_semantic": {"type": "boolean", "title": "Skip Semantic"},
           "skip_focus": {"type": "boolean", "title": "Skip Focus"},
           "skip_visual": {"type": "boolean", "title": "Skip Visual"},
+          "skip_forms": {"type": "boolean", "title": "Skip Forms", "default": true},
           "skip_rendered_storage": {"type": "boolean", "title": "Skip Rendered Storage"},
           "axe_level": {"type": "string", "enum": ["A", "AA", "AAA"], "title": "Axe Level"},
           "wcag_version": {"type": "string", "enum": ["2.1", "2.2"], "title": "Wcag Version"}

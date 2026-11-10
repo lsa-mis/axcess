@@ -22,6 +22,7 @@ expect = playwright_async.expect
 
 _FORMATS = (
     "Issue types with fixes (Excel)",
+    "ITS technical review (Excel)",
     "Written report (Markdown)",
     "Occurrence list (CSV)",
     "All report data (JSON)",
@@ -56,6 +57,10 @@ async def test_panel_says_what_each_download_delivers(
     # The seeded scan's expert review is unfinished.
     await expect(panel).to_contain_text("each file is marked DRAFT")
     await expect(panel).to_contain_text("even if the table has filters on")
+    # The one file that does not hold every issue says so.
+    await expect(panel).to_contain_text(
+        "The ITS technical review lists only the elements checked as a problem to report."
+    )
     await expect(panel).to_contain_text("never prove")
 
     # Scoped to the panel: the rest of the page has its own axe coverage.
@@ -80,6 +85,8 @@ async def test_arrow_keys_move_between_downloads(
 
     link = lambda name: page.get_by_role("link", name=name, exact=True)  # noqa: E731
     await expect(link("Issue types with fixes (Excel)")).to_be_focused()
+    await page.keyboard.press("ArrowDown")
+    await expect(link("ITS technical review (Excel)")).to_be_focused()
     await page.keyboard.press("ArrowDown")
     await expect(link("Written report (Markdown)")).to_be_focused()
     await page.keyboard.press("End")

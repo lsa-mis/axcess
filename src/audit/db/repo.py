@@ -833,6 +833,8 @@ def upsert_keyboard_finding(
     criterion_sc: str,
     pipeline: str = "keyboard",
     screenshot_hash: str | None = None,
+    revealed_by: str | None = None,
+    before_screenshot_hash: str | None = None,
 ) -> int:
     """Idempotent upsert for a keyboard-trap probe finding.
 
@@ -845,15 +847,25 @@ def upsert_keyboard_finding(
     a future audit of "which call sites write keyboard findings" is
     a single grep instead of a "find all upsert_axe_violation
     callers and check their pipeline arg" exercise.
+
+    ``revealed_by`` names the control that had to be pressed before the
+    problem existed (the form error check's submit control), so the report
+    says "After clicking" rather than "At page load". The probes that check
+    the page as it loads leave it empty.
+
+    ``before_screenshot_hash`` is the picture from before that press, beside
+    ``screenshot_hash``, the picture after it (migration 0035). Only the
+    form error check has a before state; the other probes leave it empty.
     """
     conn.execute(
         """
         INSERT INTO page_a11y_findings (
             page_id, scan_id, rule_id, wcag_sc, wcag_scs, wcag_level,
             impact, help, help_url, target_selector, failure_summary,
-            html_snippet, target_hash, pipeline, criterion_sc, screenshot_hash
+            html_snippet, target_hash, pipeline, criterion_sc, screenshot_hash,
+            revealed_by, before_screenshot_hash
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(page_id, rule_id, target_hash) DO UPDATE SET
             scan_id = excluded.scan_id,
             wcag_sc = excluded.wcag_sc,
@@ -867,6 +879,9 @@ def upsert_keyboard_finding(
             html_snippet = excluded.html_snippet,
             criterion_sc = excluded.criterion_sc,
             screenshot_hash = excluded.screenshot_hash,
+            before_screenshot_hash = excluded.before_screenshot_hash,
+            -- First write wins, as for the rule check's revealed rows.
+            revealed_by = COALESCE(page_a11y_findings.revealed_by, excluded.revealed_by),
             updated_at = CURRENT_TIMESTAMP
         """,
         (
@@ -886,6 +901,8 @@ def upsert_keyboard_finding(
             pipeline,
             criterion_sc,
             screenshot_hash,
+            revealed_by,
+            before_screenshot_hash,
         ),
     )
     row = conn.execute(
@@ -1222,6 +1239,35 @@ def increment_scan_method_coverage(
     conn.execute(
         f"UPDATE scans SET {column} = {column} + ? WHERE id = ?",  # noqa: S608
         (pages_delta, scan_id),
+    )
+
+
+def record_form_check(
+    conn: sqlite3.Connection,
+    *,
+    scan_id: int,
+    pressed: int,
+    skipped: int,
+    not_checked: int,
+) -> None:
+    """Count one page the form error check ran on, and what it did there.
+
+    ``pressed`` counts the forms whose submit control was pressed,
+    ``not_checked`` the pressed ones with no verdict, ``skipped`` the ones
+    never pressed (migration 0036). Called once per page the check ran on,
+    including a page with no forms, so the report can say how many pages
+    were checked.
+    """
+    conn.execute(
+        """
+        UPDATE scans
+           SET forms_pages_checked = forms_pages_checked + 1,
+               forms_pressed = forms_pressed + ?,
+               forms_skipped = forms_skipped + ?,
+               forms_not_checked = forms_not_checked + ?
+         WHERE id = ?
+        """,
+        (pressed, skipped, not_checked, scan_id),
     )
 
 

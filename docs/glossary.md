@@ -11,18 +11,25 @@ in one of these three groups: how sure Axcess is that it is a real problem.
 
 ### Mostly sure
 
-A result where a [rule engine](#rule-engine) ([axe-core](#axe-core) or
-[Siteimprove Alfa](#siteimprove-alfa)) failed a fixed, machine-testable rule,
-such as an image with no [alt text](#alt-text). These rules give the same result
-every time, so these are the most certain results. Start here: check that the
-rule applies to that part of the page, fix it, test the fix, then
-[rescan](#rescan-comparison) to see if it is still found.
+A result Axcess is close to certain about. It comes from one of two places:
+
+- a [rule engine](#rule-engine) ([axe-core](#axe-core) or
+  [Siteimprove Alfa](#siteimprove-alfa)) failed a fixed, machine-testable
+  rule, such as an image with no [alt text](#alt-text). These rules give the
+  same result every time.
+- the [form error check](#form-error-check) saw a clear failure: after the
+  press, a field was marked in error, or a general error message appeared,
+  and no text named the field and said what was wrong.
+
+Start here: check that the result applies to that part of the page, fix it,
+test the fix, then [rescan](#rescan-comparison) to see if it is still found.
 
 - Good to know: some Mostly sure issues are [best practices](#best-practice),
   not WCAG failures. The Issues table's WCAG column shows Best practice for
   these.
-- Why "mostly": a fixed rule can still be wrong about a page, so check each one
-  (see [Zero false positive goal](#zero-false-positive-goal)).
+- Why "mostly": a fixed rule or a clear-looking form error can still be wrong
+  about a page, so check each one (see
+  [Zero false positive goal](#zero-false-positive-goal)).
 - Called "Barrier" in earlier versions of Axcess.
 
 ### Not sure
@@ -32,7 +39,8 @@ confirm before you report it. Open the page and check the item
 yourself. If it is a real problem, record that in its [status](#status) and fix
 it; if not, mark it as a [false positive](#false-positive) with a short note.
 
-- Found by: a [browser check](#browser-check) (such as focus, zoom, or reflow),
+- Found by: a [browser check](#browser-check) (such as focus, zoom, or reflow,
+  and the [form error check](#form-error-check) when its result is unclear),
   the [keyboard trap](#keyboard-trap) check, a [motion check](#motion-check),
   image text whose [alt text](#alt-text) is missing or does not match, a
   [local AI model](#local-ai-model) (such as for link text, headings, or form
@@ -164,6 +172,29 @@ Accepted risk (a known problem your team chose not to fix for now), or Not a
 problem (a [false positive](#false-positive)). The last four need a short
 reason. The Excel workbook uses Not Started for New, Resolved for Fixed, and
 Not an Issue for Not a problem.
+
+### Checked by a person
+
+A person's choice about an element in the page inspector, under **Your review
+of this element**:
+
+- **Not checked yet**: no one has decided. This is where every element starts.
+- **Checked: a problem to report**: a person looked at it, and it is a real
+  problem.
+- **Checked: a repeat of one already reported**: a real problem, but the same
+  as one already reported, such as the same menu on another page. Which
+  elements are repeats is the person's call; Axcess does not decide it.
+
+It is separate from the [status](#status): In progress means a fix is planned,
+which is a different decision. The **Pages with this issue** table counts it
+for each page: Not checked yet, 2 of 6 checked, or All checked.
+
+### Issue notes
+
+What a person writes about one element in the page inspector, for the vendor:
+where the problem is, what is wrong, and what to fix. The name matches the
+Issue notes column of the ITS technical review. Email addresses, phone numbers
+and sign-in tokens are removed when the notes are saved.
 
 ## WCAG terms
 
@@ -326,7 +357,8 @@ tools can run it the same way.
 
 A check that measures how a page behaves in a real browser, such as resizing it
 to phone width or pressing Tab through it. Its results are marked
-[Not sure](#not-sure).
+[Not sure](#not-sure), except the [form error check](#form-error-check)'s
+clear failures, which are [Mostly sure](#mostly-sure).
 
 ### Motion check
 
@@ -334,6 +366,27 @@ A check for audio that plays by itself with no control, and for autoplaying
 video or scrolling marquee text with no way to pause it (WCAG 1.4.2 and 2.2.2).
 Its results are marked [Not sure](#not-sure), and in the app it runs only
 when you turn on **Check motion and animation**.
+
+### Form error check
+
+A check for forms that show an error without saying in words what is wrong
+([error identification](#error-identification), WCAG 3.3.1). It presses each
+form's submit button once, with nothing typed. By default it stops the form
+from being sent, so a form that only the site's server checks is counted as
+could not judge. On New scan you can choose instead to let it send a form to
+the site when every field is empty, and check the page the site sends back:
+use that only on a site you own or a test site, because the site may still
+act on an empty form, for example by emailing a blank message to someone. It
+never presses sign-in, payment, search or delete forms, and it checks only a
+form's first step. Each result comes with a picture of the form before and
+after the press. A clear failure is marked [Mostly sure](#mostly-sure): a
+field marked in error, or a general error message, and no text that names the
+field and says what is wrong. An unclear one is marked [Not sure](#not-sure),
+as "Form may show an error without describing it in text": for example a
+"Required" hint that only turns red, or a message only screen readers get.
+Reports made before 5 November 2026 mark every result Not sure. In the app it is on by
+default for public websites (**Check that forms describe their errors**,
+under **Checks** on New scan) and never runs in a sign-in scan.
 
 ### Local AI model
 
@@ -388,6 +441,13 @@ paragraph spacing (WCAG 1.4.12).
 A control that has [keyboard focus](#keyboard-focus) should not be completely
 hidden behind something else on the page, such as a sticky header that stays
 on screen while you scroll (WCAG 2.4.11).
+
+### Error identification
+
+When a form finds a mistake, such as an empty required field, it should say
+in words which field is wrong and what is wrong (WCAG 3.3.1). A field that only
+turns red, or a message drawn as a picture, tells nothing to someone who cannot
+see the colour or who uses a [screen reader](#screen-reader).
 
 ### Target size
 

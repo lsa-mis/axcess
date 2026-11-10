@@ -52,6 +52,14 @@ export type Target = {
    * element's code, and matches as a prefix. See ``snippetCutFor``.
    */
   cutAt?: number | null;
+  /**
+   * The rule-check occurrences this outline stands for: one element can be
+   * flagged more than once (two rules, identical records). A person's review
+   * is saved for every one of them.
+   */
+  findingIds?: number[];
+  /** For an image, the occurrence (the image placed on this page). */
+  imageOccurrenceId?: number;
 };
 
 /**
@@ -62,6 +70,10 @@ export type Target = {
  */
 const SNIPPET_CUTS: Record<string, number> = {
   focus: 300,
+  // The form error check (``forms/probe.py``, ``_COLLECT_JS``). Missing, a
+  // form longer than this matched nothing, and the inspector said it "may
+  // not appear here", though the form is there at page load.
+  forms: 600,
   keyboard: 240,
   responsive: 240,
   visual: 240,

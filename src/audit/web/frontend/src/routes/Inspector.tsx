@@ -1,12 +1,19 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { serverDate } from "../lib/serverTime";
 import { useNavigate, useParams, useSearchParams } from "react-router";
-import { keepPreviousData, useQueries, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, FileCode2, Layers, Loader2 } from "lucide-react";
 import DomSource from "../components/DomSource";
 import FlaggedStepper from "../components/FlaggedStepper";
-import { api } from "../api/client";
-import type { PageEvidence, PageInspection, SavedFrame, SavedStyles } from "../api/types";
+import ElementReview, { type ReviewDraft } from "../components/ElementReview";
+import { ApiError, api } from "../api/client";
+import type {
+  OccurrenceReview,
+  PageEvidence,
+  PageInspection,
+  SavedFrame,
+  SavedStyles,
+} from "../api/types";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import Tabs from "../components/Tabs";
 import {
@@ -20,6 +27,7 @@ import {
 } from "../components/ui";
 import { useScanQuery } from "../hooks/useScanQuery";
 import { cn } from "../lib/cn";
+import { suggestIssueNotes } from "../lib/suggestedNotes";
 import {
   boxPlace,
   type BoxNote,
@@ -136,7 +144,7 @@ export default function InspectorRoute() {
   // identical siblings are intentionally one location). This list drives both
   // the highlight pass and the auto-scroll, so it is computed once.
   const targets = useMemo<Target[]>(() => {
-    const seen = new Set<string>();
+    const seen = new Map<string, Target>();
     const out: Target[] = [];
     for (const f of currentFindings) {
       const selector = f.target_selector || null;
@@ -152,16 +160,23 @@ export default function InspectorRoute() {
         selector ?? "",
         snippet ? normalizeWhitespace(snippet) : "",
       ].join("\u0000");
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push({
+      const same = seen.get(key);
+      if (same) {
+        // The same element again: one outline, but the review covers both.
+        same.findingIds?.push(f.id);
+        continue;
+      }
+      const target: Target = {
         selector,
         snippet,
         revealedBy: f.revealed_by || null,
         stateKey: f.revealed_state_key || null,
         place: f.element_place,
         cutAt: snippetCutFor(f.pipeline),
-      });
+        findingIds: [f.id],
+      };
+      seen.set(key, target);
+      out.push(target);
     }
     // Images were read at page load. Each occurrence is its own element.
     for (const image of shownImages) {
@@ -171,6 +186,7 @@ export default function InspectorRoute() {
         revealedBy: null,
         stateKey: null,
         image: { locator: image.locator, alt: image.alt_text },
+        imageOccurrenceId: image.occurrence_id,
       });
     }
     return out;
@@ -721,6 +737,186 @@ export default function InspectorRoute() {
   const currentAddress = currentTarget?.image?.locator?.candidate ?? null;
   // How many occurrences share the element the reader is on.
   const sharedCount = highlight?.steps[pageMark]?.targets.length ?? 0;
+
+  // A person's review of the element the reader is on: every occurrence of
+  // the issue outlined there, in this page state, gets the same review.
+  const queryClient = useQueryClient();
+  // Unsaved edits, by element, while this page is open: they outlast
+  // Previous / Next, and leaving the page discards them.
+  const [reviewDrafts, setReviewDrafts] = useState<Record<string, ReviewDraft>>({});
+  // Reviews saved while this page is open, by element. Kept here rather than
+  // written into the page evidence: changing that data re-runs the
+  // highlighting, which rebuilds this panel (losing the "Saved." message)
+  // and moves the saved copy under the reader.
+  const [savedReviews, setSavedReviews] = useState<Record<string, OccurrenceReview>>({});
+  // Each outlined element the stepper steps through, as the occurrences it
+  // stands for: the unit a review is saved for.
+  const reviewElements = (highlight?.steps ?? []).map((step) => {
+    const targets = step.targets
+      .map((index) => scopedTargets[index])
+      .filter((target): target is Target => Boolean(target));
+    const a11yIds = [...new Set(targets.flatMap((target) => target.findingIds ?? []))];
+    const imageIds = [
+      ...new Set(
+        targets.flatMap((target) =>
+          target.imageOccurrenceId === undefined ? [] : [target.imageOccurrenceId],
+        ),
+      ),
+    ];
+    return { key: `${a11yIds.join(",")}|${imageIds.join(",")}`, a11yIds, imageIds };
+  });
+  type ReviewElement = (typeof reviewElements)[number];
+  const storedReview = (element: ReviewElement): OccurrenceReview | null =>
+    savedReviews[element.key] ??
+    pageEvidence?.a11y_findings.find((f) => element.a11yIds.includes(f.id) && f.review)?.review ??
+    pageEvidence?.image_occurrences.find(
+      (image) => element.imageIds.includes(image.occurrence_id) && image.review,
+    )?.review ??
+    null;
+  const currentReviewElement = reviewElements[pageMark] ?? { key: "|", a11yIds: [], imageIds: [] };
+  const reviewFindingIds = currentReviewElement.a11yIds;
+  const reviewImageIds = currentReviewElement.imageIds;
+  const reviewKey = currentReviewElement.key;
+  const savedReview = storedReview(currentReviewElement);
+  const canReview = reviewing && reviewFindingIds.length + reviewImageIds.length > 0;
+  // The issue's plain-language title, for the suggested notes. The same
+  // query, and so the same cache, as the issue page the reader came from.
+  const { data: issueDetail } = useQuery({
+    queryKey: ["issue-detail", scan, issueKey, "occurrences_desc"],
+    queryFn: () => api.getIssueDetail(scan, issueKey ?? "", "occurrences_desc"),
+    enabled: canReview && Boolean(issueKey),
+    staleTime: 60_000,
+  });
+  // Issue notes suggested from the scan: page state, element, problem.
+  const activeState = data?.states.find((state) => state.state_key === activeStateKey) ?? null;
+  const suggestedNotes =
+    canReview && currentElement && issueDetail
+      ? suggestIssueNotes({
+          clickChain: activeState ? clickChain(activeState) : null,
+          kind: currentElement.kind,
+          text: currentElement.text,
+          title: issueDetail.row.title,
+          details: currentFindings
+            .filter((f) => reviewFindingIds.includes(f.id))
+            .map((f) => f.failure_summary ?? ""),
+        })
+      : "";
+  const setReviewDraft = (next: ReviewDraft | undefined) =>
+    setReviewDrafts((drafts) => {
+      const rest = { ...drafts };
+      delete rest[reviewKey];
+      return next ? { ...rest, [reviewKey]: next } : rest;
+    });
+  // The saved review is shown at once, from the server's answer. The page
+  // evidence is marked stale without refetching it now, so the next visit
+  // reads the stored review.
+  const reviewsChanged = () => {
+    void queryClient.invalidateQueries({
+      queryKey: ["page-evidence", scan, page],
+      refetchType: "none",
+    });
+    // The issue's counts (checked, reported) feed "Mark … as repeats".
+    void queryClient.invalidateQueries({ queryKey: ["issue-detail", scan, issueKey] });
+  };
+  const reviewSaved = (review: OccurrenceReview) => {
+    setSavedReviews((reviews) => ({ ...reviews, [reviewKey]: review }));
+    reviewsChanged();
+  };
+
+  // "Mark … as repeats": every element the stepper steps through in this
+  // page state that has no decision yet and no unsaved edit. Offered only
+  // once a person has reported an element of this issue, anywhere in the
+  // report: a repeat is a repeat of one already reported, and marking
+  // everything before that would leave the issue out of the ITS export.
+  const notCheckedElements = reviewElements.filter(
+    (element) => !storedReview(element)?.decision && !reviewDrafts[element.key],
+  );
+  const reportedInIssue =
+    (issueDetail?.pages.reduce((total, p) => total + (p.reported_count ?? 0), 0) ?? 0) +
+    Object.values(savedReviews).filter((review) => review.decision === "report").length;
+  // The elements the last "Mark … as repeats" changed, with the review each
+  // had before, so it can be taken back exactly.
+  const [lastRepeats, setLastRepeats] = useState<
+    { element: ReviewElement; before: OccurrenceReview | null }[]
+  >([]);
+  // A bulk change's outcome, said in the review region's status line.
+  const [bulkMessage, setBulkMessage] = useState<{ text: string; error?: boolean } | null>(null);
+  useEffect(() => setBulkMessage(null), [reviewKey]);
+  // A new page or page state is a new set of elements; its undo goes too.
+  useEffect(() => setLastRepeats([]), [page, activeStateKey]);
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  /** Save one decision for many elements, notes kept, in requests the server accepts. */
+  const saveDecision = async (elements: ReviewElement[], decision: "repeat" | null) => {
+    const a11y = elements.flatMap((element) => element.a11yIds);
+    const images = elements.flatMap((element) => element.imageIds);
+    for (let start = 0; start < a11y.length; start += REVIEW_BATCH) {
+      await api.saveOccurrenceReview(scan, page, {
+        a11y_finding_ids: a11y.slice(start, start + REVIEW_BATCH),
+        page_image_ids: [],
+        decision,
+        notes: null,
+      });
+    }
+    for (let start = 0; start < images.length; start += REVIEW_BATCH) {
+      await api.saveOccurrenceReview(scan, page, {
+        a11y_finding_ids: [],
+        page_image_ids: images.slice(start, start + REVIEW_BATCH),
+        decision,
+        notes: null,
+      });
+    }
+  };
+  const markRepeats = async () => {
+    if (bulkBusy || notCheckedElements.length === 0) return;
+    const elements = notCheckedElements;
+    const before = elements.map((element) => ({ element, before: storedReview(element) }));
+    setBulkBusy(true);
+    try {
+      await saveDecision(elements, "repeat");
+      const now = new Date().toISOString();
+      setSavedReviews((reviews) => ({
+        ...reviews,
+        ...Object.fromEntries(
+          before.map(({ element, before: was }) => [
+            element.key,
+            { decision: "repeat" as const, notes: was?.notes ?? "", updated_at: now },
+          ]),
+        ),
+      }));
+      setLastRepeats(before);
+      setBulkMessage({ text: `${plural(elements.length, "element")} marked as repeats.` });
+      reviewsChanged();
+    } catch (error) {
+      setBulkMessage({ text: `Axcess could not mark them as repeats. ${errorText(error)} Try again.`, error: true });
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+  const undoRepeats = async () => {
+    if (bulkBusy || lastRepeats.length === 0) return;
+    setBulkBusy(true);
+    try {
+      await saveDecision(lastRepeats.map(({ element }) => element), null);
+      const now = new Date().toISOString();
+      setSavedReviews((reviews) => ({
+        ...reviews,
+        ...Object.fromEntries(
+          lastRepeats.map(({ element, before: was }) => [
+            element.key,
+            { decision: null, notes: was?.notes ?? "", updated_at: now },
+          ]),
+        ),
+      }));
+      setBulkMessage({ text: `${plural(lastRepeats.length, "element")} set back to not checked yet.` });
+      setLastRepeats([]);
+      reviewsChanged();
+    } catch (error) {
+      setBulkMessage({ text: `Axcess could not take them back. ${errorText(error)} Try again.`, error: true });
+    } finally {
+      setBulkBusy(false);
+    }
+  };
   // "Go to element" (in FlaggedStepper): the button, to come back to with
   // Escape, and what it says when the element cannot take focus.
   const goToRef = useRef<HTMLButtonElement>(null);
@@ -1200,64 +1396,105 @@ export default function InspectorRoute() {
             {/* What the numbered box is on, as a short table with the same
                 labels in the same places for every flagged element, so
                 Previous / Next change only the values. The toolbar above
-                already says which one you are on, so this does not repeat it. */}
+                already says which one you are on, so this does not repeat it.
+                The person's review of the element (its decision, notes and
+                the "Review this element" button) sits to the right of the
+                table on a wide screen, in a column of fixed width so it does
+                not shift as the words change from element to element, and
+                under the table on a narrow one, after it in reading order;
+                see ElementReview for why. It is short, so the saved page
+                below stays where it was. Side by side only from xl:
+                narrower, the table's values would lose their width. */}
             {showHighlights && highlightedCount > 0 && currentElement && (
               <div
                 role="group"
                 aria-label="The flagged element you are on"
                 className="border-b border-border bg-surface px-3 py-2 text-sm text-fg"
               >
-                <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 sm:gap-x-4">
-                  <ElementFact term="What it is">{currentElement.kind}</ElementFact>
-                  <ElementFact term="Text or label">
-                    {currentElement.text ? (
-                      `“${currentElement.text}”`
-                    ) : (
-                      <span className="text-fg-muted">None found</span>
-                    )}
-                  </ElementFact>
-                  <ElementFact term="Size">
-                    <span className="tabular-nums">
-                      {pixels(currentElement.width)} wide, {pixels(currentElement.height)} tall
-                    </span>
-                    {/* The row below says where the box is when it is not on the element. */}
-                    {currentElement.where === null &&
-                      (currentElement.width === 0 || currentElement.height === 0) && (
-                      <span className="block text-xs text-fg-muted">
-                        It has no visible size in this saved copy, so the box marks where it sits.
-                      </span>
-                    )}
-                  </ElementFact>
-                  {currentElement.where && (
-                    <ElementFact term="Where the box is">{BOX_NOTES[currentElement.where]}</ElementFact>
-                  )}
-                  {sharedCount > 1 && <ElementFact term="Issue occurrences">{sharedCount} on this element</ElementFact>}
-                  {/* No "Element locator" row: the developer removed locators
-                      from every screen (2026-11-10; see ElementCode in
-                      components/ui.tsx). The rows above say what the element
-                      is, and the Page code (DOM) tab shows its code. Removed
-                      with it: "Copy element locator" and "Show all". A
-                      place in the page code still shows for an image or an
-                      AI review finding, which have no usable locator. */}
-                  {currentPlace && (
-                    <>
-                      <ElementFact term="Where it is in the page code" stack>
-                        Number {currentPlace.index + 1} of the {currentPlace.total}{" "}
-                        <code translate="no" className="font-mono text-xs">
-                          {currentPlace.selector}
-                        </code>{" "}
-                        {currentPlace.total === 1 ? "element" : "elements"}
-                      </ElementFact>
-                      {currentAddress && (
-                        <ElementFact term="Image address">
-                          <code translate="no" className="font-mono text-xs">
-                            {currentAddress}
-                          </code>
-                        </ElementFact>
+                <div className={cn(canReview && "xl:grid xl:grid-cols-[minmax(0,1fr)_21rem] xl:gap-6")}>
+                  <dl className="grid grid-cols-[auto_minmax(0,1fr)] content-start gap-x-3 gap-y-1 sm:gap-x-4">
+                    <ElementFact term="What it is">{currentElement.kind}</ElementFact>
+                    <ElementFact term="Text or label">
+                      {currentElement.text ? (
+                        `“${currentElement.text}”`
+                      ) : (
+                        <span className="text-fg-muted">None found</span>
                       )}
-                    </>
+                    </ElementFact>
+                    <ElementFact term="Size">
+                      <span className="tabular-nums">
+                        {pixels(currentElement.width)} wide, {pixels(currentElement.height)} tall
+                      </span>
+                      {/* The row below says where the box is when it is not on the element. */}
+                      {currentElement.where === null &&
+                        (currentElement.width === 0 || currentElement.height === 0) && (
+                        <span className="block text-xs text-fg-muted">
+                          It has no visible size in this saved copy, so the box marks where it sits.
+                        </span>
+                      )}
+                    </ElementFact>
+                    {currentElement.where && (
+                      <ElementFact term="Where the box is">{BOX_NOTES[currentElement.where]}</ElementFact>
+                    )}
+                    {sharedCount > 1 && <ElementFact term="Issue occurrences">{sharedCount} on this element</ElementFact>}
+                    {/* No "Element locator" row: the developer removed locators
+                        from every screen (2026-11-10; see ElementCode in
+                        components/ui.tsx). The rows above say what the element
+                        is, and the Page code (DOM) tab shows its code. Removed
+                        with it: "Copy element locator" and "Show all". A
+                        place in the page code still shows for an image or an
+                        AI review finding, which have no usable locator. */}
+                    {currentPlace && (
+                      <>
+                        <ElementFact term="Where it is in the page code" stack>
+                          Number {currentPlace.index + 1} of the {currentPlace.total}{" "}
+                          <code translate="no" className="font-mono text-xs">
+                            {currentPlace.selector}
+                          </code>{" "}
+                          {currentPlace.total === 1 ? "element" : "elements"}
+                        </ElementFact>
+                        {currentAddress && (
+                          <ElementFact term="Image address">
+                            <code translate="no" className="font-mono text-xs">
+                              {currentAddress}
+                            </code>
+                          </ElementFact>
+                        )}
+                      </>
+                    )}
+                  </dl>
+                  {canReview && (
+                    <div className="mt-3 max-w-md border-t border-border pt-3 xl:mt-0 xl:max-w-none xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
+                      <ElementReview
+                        key={`${scan}:${page}`}
+                        scanId={scan}
+                        pageId={page}
+                        elementKey={reviewKey}
+                        elementName={[
+                          currentElement.kind,
+                          currentElement.text ? `“${currentElement.text}”` : null,
+                        ]
+                          .filter(Boolean)
+                          .join(", ")}
+                        a11yFindingIds={reviewFindingIds}
+                        pageImageIds={reviewImageIds}
+                        suggestedNotes={suggestedNotes}
+                        bulk={{
+                          markCount: reportedInIssue > 0 ? notCheckedElements.length : 0,
+                          undoCount: lastRepeats.length,
+                          busy: bulkBusy,
+                          message: bulkMessage,
+                          onMark: markRepeats,
+                          onUndo: undoRepeats,
+                        }}
+                        saved={savedReview}
+                        draft={reviewDrafts[reviewKey]}
+                        onDraftChange={setReviewDraft}
+                        onSaved={reviewSaved}
+                      />
+                    </div>
                   )}
-                </dl>
+                </div>
               </div>
             )}
             {/* Says when the saved copy may not look like the page Axcess
@@ -1935,6 +2172,19 @@ function ElementFact({ term, stack = false, children }: { term: string; stack?: 
  * for a card can run on ("Fellowships · FundedTeach For Nepal…"), so each
  * name is cut at a word near 40 characters.
  */
+/** Occurrences one review request may name (the server's bound). */
+const REVIEW_BATCH = 50;
+
+function plural(count: number, noun: string): string {
+  return `${count.toLocaleString()} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+function errorText(error: unknown): string {
+  return error instanceof ApiError
+    ? error.message
+    : "The Axcess server did not respond. Check that it is still running.";
+}
+
 function clickChain(state: { path_labels: string[]; revealed_by: string }): string {
   const names = state.path_labels.length > 0 ? state.path_labels : [state.revealed_by];
   return names.map((name) => `“${shortName(name)}”`).join(" → ");

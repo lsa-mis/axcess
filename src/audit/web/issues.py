@@ -44,9 +44,13 @@ from typing import Any, Literal
 import yaml
 
 from audit.analyzer.alfa_evidence import humanize_target
+from audit.analyzer.forms import base as forms_base
 from audit.labels import FINDING_TYPES, FindingType
+from audit.logging import get_logger
 from audit.wcag_version import WcagVersion, stored_wcag_version
 from audit.web import a11y_queries, image_findings_queries
+
+log = get_logger(__name__)
 
 # Conformance label shown in the table's badge column.
 #   A   = WCAG Level A (legal floor in most jurisdictions)
@@ -128,6 +132,20 @@ class IssuePage:
     # at scan time (empty when none were captured). The Excel export reads
     # these to embed visual evidence next to each issue.
     screenshot_hashes: tuple[str, ...] = ()
+    # Beside each of ``screenshot_hashes``, in the same order, the picture
+    # from before the problem showed, or None: only the form error check has
+    # one (its form before the submit press; the after picture is the
+    # screenshot). Same length as ``screenshot_hashes``.
+    before_screenshot_hashes: tuple[str | None, ...] = ()
+    # How many of ``occurrence_count`` a person has checked in the page
+    # inspector: decided "a problem to report" or "a repeat of one already
+    # reported" (``audit.occurrence_reviews``). Counted over the same
+    # occurrences as ``occurrence_count``, so "3 of 19 checked" adds up.
+    checked_count: int = 0
+    # Of those, how many a person decided are "a problem to report". The
+    # inspector offers "Mark … as repeats" only once an issue has one: a
+    # repeat is a repeat of one already reported.
+    reported_count: int = 0
 
 
 @dataclass(frozen=True)
@@ -583,7 +601,7 @@ def rule_meta_for(row: IssueRow, rules: dict[str, Any]) -> dict[str, Any]:
         sc = row.issue_key.removeprefix("semantic:")
         meta = rules.get("semantic_criteria", {}).get(sc, {})
         return dict(meta) if isinstance(meta, dict) else {}
-    if row.pipeline in ("keyboard", "responsive", "focus", "visual"):
+    if row.pipeline in ("keyboard", "responsive", "focus", "visual", "forms"):
         # Dynamic-probe rows are carded by SC (one YAML card covers
         # several rule_ids, e.g. all three keyboard-trap shapes).
         # Check semantic_criteria first (where 2.1.2 and the responsive
@@ -646,6 +664,7 @@ def _pages_for_issue(
         "responsive",
         "focus",
         "visual",
+        "forms",
         "protected_image",
     ):
         # Every DOM pipeline lives in page_a11y_findings. The row's
@@ -663,7 +682,13 @@ def _pages_for_issue(
                    p.title AS page_title,
                    COUNT(*) AS occurrence_count,
                    GROUP_CONCAT(a.status) AS statuses,
-                   GROUP_CONCAT(a.screenshot_hash) AS screenshot_hashes
+                   -- "after:before" per finding with a screenshot, so the two
+                   -- lists stay paired; GROUP_CONCAT skips the NULLs.
+                   GROUP_CONCAT(
+                       CASE WHEN a.screenshot_hash IS NOT NULL
+                            THEN a.screenshot_hash || ':' || COALESCE(a.before_screenshot_hash, '')
+                       END
+                   ) AS screenshot_pairs
               FROM page_a11y_findings a
               JOIN pages p ON p.id = a.page_id
              WHERE a.scan_id = ?
@@ -699,6 +724,7 @@ def _pages_for_issue(
             (*row.finding_ids, scan_id),
         ).fetchall()
 
+    checked = _checked_counts(conn, scan_id, row)
     out: list[IssuePage] = []
     for r in rows:
         statuses = (r["statuses"] or "").split(",")
@@ -713,8 +739,10 @@ def _pages_for_issue(
         # sqlite3.Row's `in` iterates values, not keys, so we must check
         # `.keys()` explicitly (the image query lacks this column).
         row_keys = r.keys()
-        raw_shots = r["screenshot_hashes"] if "screenshot_hashes" in row_keys else None
-        shots = tuple(h for h in (raw_shots or "").split(",") if h and h != "None")
+        raw_shots = r["screenshot_pairs"] if "screenshot_pairs" in row_keys else None
+        pairs = [pair.partition(":") for pair in (raw_shots or "").split(",") if pair]
+        shots = tuple(after for after, _, _before in pairs if after and after != "None")
+        befores = tuple((before or None) for after, _, before in pairs if after and after != "None")
         out.append(
             IssuePage(
                 page_id=int(r["page_id"]),
@@ -723,9 +751,56 @@ def _pages_for_issue(
                 occurrence_count=int(r["occurrence_count"]),
                 status_summary=counts,
                 screenshot_hashes=shots,
+                before_screenshot_hashes=befores,
+                checked_count=checked.get(int(r["page_id"]), (0, 0))[0],
+                reported_count=checked.get(int(r["page_id"]), (0, 0))[1],
             )
         )
     return out
+
+
+def _checked_counts(
+    conn: sqlite3.Connection, scan_id: int, row: IssueRow
+) -> dict[int, tuple[int, int]]:
+    """Per page, how many of this issue's occurrences a person has checked,
+    and how many of those they reported: ``page_id -> (checked, reported)``.
+
+    The occurrences are the ones ``_pages_for_issue`` counts: the row's
+    finding ids for a DOM pipeline, and each placement of the row's images
+    on a page for the image pipeline (the unit the inspector reviews). A
+    database whose review table is missing or out of date counts none, so
+    the pages table still loads.
+    """
+    if not row.finding_ids:
+        return {}
+    ids = json.dumps(list(row.finding_ids))
+    if row.pipeline == "image":
+        sql = """
+            SELECT pi.page_id, COUNT(*), SUM(r.decision = 'report')
+              FROM occurrence_reviews r
+              JOIN page_images pi ON pi.id = r.page_image_id
+              JOIN findings f ON f.image_id = pi.image_id AND f.scan_id = r.scan_id
+             WHERE r.scan_id = ? AND r.decision IS NOT NULL
+               AND f.id IN (SELECT value FROM json_each(?))
+             GROUP BY pi.page_id
+        """
+    else:
+        sql = """
+            SELECT a.page_id, COUNT(*), SUM(r.decision = 'report')
+              FROM occurrence_reviews r
+              JOIN page_a11y_findings a ON a.id = r.a11y_finding_id
+             WHERE r.scan_id = ? AND r.decision IS NOT NULL
+               AND a.id IN (SELECT value FROM json_each(?))
+             GROUP BY a.page_id
+        """
+    try:
+        return {
+            int(page_id): (int(checked), int(reported or 0))
+            for page_id, checked, reported in conn.execute(sql, (scan_id, ids))
+        }
+    except sqlite3.OperationalError as exc:
+        log.warning("issues.checked_counts_unreadable", error=str(exc))
+        return {}
 
 
 def _sort_pages(pages: list[IssuePage], sort: str) -> list[IssuePage]:
@@ -905,7 +980,7 @@ def _axe_issue_rows(
             # with no card of its own borrows nothing: another criterion's
             # card is about a different check (the AI review's 3.3.2 card,
             # say) and would misdescribe the rule check (axe).
-            if not meta and pipeline in ("keyboard", "responsive", "focus", "visual"):
+            if not meta and pipeline in ("keyboard", "responsive", "focus", "visual", "forms"):
                 sc_from_db = g.get("wcag_sc")
                 if sc_from_db:
                     meta = axe_rules_meta.get(sc_from_db, {}) or semantic_meta.get(sc_from_db, {})
@@ -939,6 +1014,9 @@ def _axe_issue_rows(
         review_lane: ReviewLane = "expert_review"
         evidence_confidence: EvidenceConfidence = "medium"
         evidence_summary = "A check found this, but a person must confirm it on the page."
+        # A title that wins over the guidance card's, which is chosen by WCAG
+        # criterion and so cannot tell two rules of one criterion apart.
+        own_title: str | None = None
         high_confidence_occurrences = 0
         if pipeline == "semantic":
             sc = raw_rule_id.removeprefix("semantic:")
@@ -1020,6 +1098,35 @@ def _axe_issue_rows(
                 "Found by moving keyboard focus through the page in a browser. Check it "
                 "by hand, including after you open menus and dialogs."
             )
+        elif pipeline == "forms":
+            issue_key = f"{pipeline}:{raw_rule_id}"
+            default_title = forms_base.TITLE_NOT_DESCRIBED
+            evidence_summary = (
+                "Found by pressing the form's submit button once, with nothing typed, while "
+                "Axcess stopped the form from being sent. Check by hand that each error "
+                "names its field in text."
+            )
+            # How sure (the developer's decision, 2026-11-05;
+            # docs/internal/form-error-check.md): a clear failure is Mostly sure,
+            # one with an undecided sign Not sure. The old rule, from reports made
+            # before the split, keeps Not sure, so an old report reads as it did.
+            if raw_rule_id == forms_base.RULE_CLEAR:
+                review_lane = "likely_barrier"
+                evidence_confidence = "high"
+                high_confidence_occurrences = len(reported)
+                evidence_summary = (
+                    "Found by pressing the form's submit button once, with nothing typed. The "
+                    "form marked a field in error, or showed a general error message, and no "
+                    "text names the field and says what is wrong. Check it on the page."
+                )
+            elif raw_rule_id == forms_base.RULE_UNCLEAR:
+                own_title = forms_base.TITLE_UNCLEAR
+                evidence_summary = (
+                    "Found by pressing the form's submit button once, with nothing typed. The "
+                    "page did something an expert has yet to decide counts as describing the "
+                    "error, such as a 'Required' hint turning red or text only screen readers "
+                    "get. A person checks it."
+                )
         elif pipeline == "visual":
             issue_key = f"{pipeline}:{raw_rule_id}"
             if legacy_visual_motion_observation:
@@ -1160,7 +1267,8 @@ def _axe_issue_rows(
             IssueRow(
                 pipeline=pipeline,
                 issue_key=issue_key,
-                title=meta.get("title")
+                title=own_title
+                or meta.get("title")
                 or (
                     default_title
                     if pipeline in {"alfa", "protected_image", "visual"}

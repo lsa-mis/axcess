@@ -45,7 +45,10 @@ readers; this page tells contributors which words to use.
     Buttons and controls too: "Start a scan", not "Start A Scan". Names
     keep their capitals ("Axcess", "Excel"), and so do the named terms in
     the table below ("Mostly sure", "Not sure", "Best practice",
-    "Click-Through"). One exception: the logo beside the brand mark,
+    "Click-Through"). The ITS technical review export names the team it is
+    for, and that name keeps its capitals too: "University of Michigan
+    Information and Technology Services (ITS) Accessibility Team". One
+    exception: the logo beside the brand mark,
     top left, spells it "axcess", in lowercase, as a logo; text everywhere
     else writes "Axcess".
     Two tests enforce this: `tests/ui/test_control_label_case.py` reads
@@ -68,10 +71,12 @@ Use the word in the first column, and never the words in the last.
 | occurrence | One place a problem appears: one element on one page, or in one page state. "476 occurrences". As a label or column header: "Issue occurrences". Explain it where a screen first counts it: "An occurrence is one place a problem appears." | issue (for one place), instance, violation, result, finding, hit, error (for an occurrence); "Occurrences" alone as a label |
 | issue | A general word for a problem, and part of names: the Issues page, the Issues table, "All issues", "Issue type". | "N issues" as a count (count issue types or occurrences) |
 | image | One image the image text check looked at: "Image #12". | finding (for an image) |
-| Mostly sure / Not sure / For information | The three "How sure" values, in the Issues table's "How sure" column: how sure Axcess is that an issue type is a real problem. An Alfa "cannot tell" result is Not sure. | Barrier, Needs review, Informational, likely barrier, likely problem, possible problem, needs confirmation, review lead, lead, expert decision, cantTell, "Type" (for this column) |
+| Mostly sure / Not sure / For information | The three "How sure" values, in the Issues table's "How sure" column: how sure Axcess is that an issue type is a real problem. An Alfa "cannot tell" result is Not sure; a clear form error is Mostly sure, an unclear one Not sure. | Barrier, Needs review, Informational, likely barrier, likely problem, possible problem, needs confirmation, review lead, lead, expert decision, cantTell, "Type" (for this column) |
 | At page load / After clicking / In an image | The values of the Issues table's "Where it shows" column: where an issue type shows up. "At page load" and "After clicking" match the page state names. | Found by, Found (as the header), WCAG (as a value), Click-Through (as a value; it stays the feature's name), Alt Text (as a value), finding type |
 | Critical / Serious / Moderate / Minor | An issue type's impact rating: how badly the problem affects people (glossary "Impact"). | critical, serious (lower case, as raw values), severity (for this rating) |
 | status | Where an occurrence stands in review. Values: New, Reviewing, In progress, Fixed, Accepted risk, Not a problem (false positive). | triage status, review status, remediated, raw values like `in_progress` |
+| Checked by a person | A person's choice about an element in the page inspector. Values: Not checked yet; Checked: a problem to report; Checked: a repeat of one already reported. Separate from status. | confirmed, verified, validated, approved, human-checked, triaged, redundant, duplicate |
+| Issue notes | What a person writes about one element for the vendor. Matches the ITS technical review's column. | comment, annotation, remarks, rationale (for these notes) |
 | check | One way Axcess tests pages. See the check names below. | engine, pipeline, probe, method, detector, source |
 | page state | How a page looked at one moment: "At page load" or "After clicking Menu". | DOM state, interaction state, captured state |
 | saved copy | The copy of a page the scan stored. | capture, stored capture, stored render, loaded DOM |
@@ -188,6 +193,7 @@ issue type is a real problem? Each word was chosen against these alternatives.
 | Keyboard | Keyboard check |
 | Responsive and zoom | Zoom and layout check |
 | Focus | Focus check |
+| Form errors (WCAG 3.3.1) | Form error check |
 | Visual order, motion, and autoplay | Motion and reading-order check |
 | Semantic (local language model) | AI review |
 | Image text (OCR and vision model) | Image text check |

@@ -50,7 +50,7 @@ from pydantic import (
 from starlette.background import BackgroundTask
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from audit import __version__, coverage_matrix, evaluation
+from audit import __version__, coverage_matrix, evaluation, occurrence_reviews
 from audit.analyzer.alfa import AlfaAnalyzer, AlfaResult, chromium_executable_path
 from audit.analyzer.alfa import availability as alfa_availability
 from audit.analyzer.axe import AxeAnalyzer
@@ -70,6 +70,7 @@ from audit.db.schema import connect
 from audit.exports.audit_report import render_audit_report
 from audit.exports.collector import ExportScan, collect_scan
 from audit.exports.csv_export import render_csv
+from audit.exports.its_review import render_its_review
 from audit.exports.jira_export import render_jira_csv
 from audit.exports.json_export import render_json
 from audit.exports.markdown_report import render_markdown
@@ -158,6 +159,33 @@ _SEVERITY_OPTIONS = ("critical", "major", "minor", "info")
 _DESTRUCTIVE_TRANSITIONS = {"accepted_risk", "false_positive", "remediated"}
 _PAGE_SIZE = 50
 _CONTENT_HASH_RE = re.compile(r"^[0-9a-f]{64}$")
+
+
+class OccurrenceReviewRequest(BaseModel):
+    """A person's review of the occurrences on one circled element."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    a11y_finding_ids: list[int] = Field(
+        default_factory=list, max_length=occurrence_reviews.MAX_OCCURRENCES_PER_SAVE
+    )
+    page_image_ids: list[int] = Field(
+        default_factory=list, max_length=occurrence_reviews.MAX_OCCURRENCES_PER_SAVE
+    )
+    #: None: not checked yet. "report": checked, a problem to report.
+    #: "repeat": checked, a repeat of one already reported.
+    decision: occurrence_reviews.Decision | None
+    #: Leave out (or null) to set the decision only and keep each
+    #: occurrence's notes, as "Mark … as repeats" does.
+    notes: str | None = Field(default=None, max_length=occurrence_reviews.MAX_NOTES_LENGTH)
+
+
+class OccurrenceReviewResponse(BaseModel):
+    """The review as stored: notes are trimmed and redacted."""
+
+    decision: occurrence_reviews.Decision | None
+    notes: str
+    updated_at: str
 
 
 class LocalLoginScanRequest(BaseModel):
@@ -495,13 +523,15 @@ _EXPORT_RENDERERS: dict[str, Any] = {
     "json": render_json,
     "jira": render_jira_csv,
     "markdown": render_markdown,
-    # `audit` and `xlsx` are rendered via a special-case branch in the route
-    # handler because they need the live `conn` (not just the collector
+    # `audit`, `xlsx` and `its` are rendered via a special-case branch in the
+    # route handler because they need the live `conn` (not just the collector
     # result) to build their issue tables. The entries here exist only so
     # the format-validation check (`fmt in _EXPORT_RENDERERS`) accepts them;
     # the values are unused for those formats.
     "audit": render_audit_report,
     "xlsx": render_xlsx,
+    # The U-M ITS Accessibility Team's Technical Review template, filled in.
+    "its": render_its_review,
 }
 _EXPORT_MEDIA_TYPES = {
     "csv": "text/csv; charset=utf-8",
@@ -510,6 +540,7 @@ _EXPORT_MEDIA_TYPES = {
     "markdown": "text/markdown; charset=utf-8",
     "audit": "text/markdown; charset=utf-8",
     "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "its": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 }
 _EXPORT_EXTENSIONS = {
     "csv": "csv",
@@ -518,6 +549,7 @@ _EXPORT_EXTENSIONS = {
     "markdown": "md",
     "audit": "audit.md",
     "xlsx": "xlsx",
+    "its": "its.xlsx",
 }
 
 _BASE_DIR = Path(__file__).resolve().parent
@@ -1806,6 +1838,12 @@ def create_app(
             "skip_semantic": bool(body.get("skip_semantic")),
             "skip_focus": bool(body.get("skip_focus")),
             "skip_visual": bool(body.get("skip_visual")),
+            # Off unless asked for: an older client that sends nothing never
+            # starts the form error check, which presses submit buttons.
+            "skip_forms": bool(body.get("skip_forms", True)),
+            # Off unless asked for, and never on its own: sending an empty
+            # form to the site needs the check itself on.
+            "send_empty_forms": bool(body.get("send_empty_forms", False)),
             "skip_rendered_storage": bool(body.get("skip_rendered_storage")),
             "axe_level": str(body.get("axe_level", "AA")),
             "wcag_version": wcag_version,
@@ -2085,6 +2123,51 @@ def create_app(
         if payload is None:
             raise HTTPException(status_code=404, detail="Page is not part of this report")
         return JSONResponse(jsonable_encoder(payload))
+
+    @app.put(
+        "/api/scans/{scan_id:int}/pages/{page_id:int}/review",
+        response_model=OccurrenceReviewResponse,
+    )
+    def api_save_occurrence_review(
+        scan_id: int, page_id: int, body: OccurrenceReviewRequest
+    ) -> OccurrenceReviewResponse:
+        """Save a person's review of the occurrences on one element of this page.
+
+        Any report can be reviewed, finished or not. A protected report is
+        refused: its ordinary tables keep only opaque aliases, and notes
+        about its pages would be the plaintext evidence they keep out.
+        """
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            if _get_protected_scan_compat(conn, scan_id=scan_id) is not None:
+                raise HTTPException(
+                    status_code=403, detail="Reviews are not kept for protected reports."
+                )
+            try:
+                saved = occurrence_reviews.save_review(
+                    conn,
+                    scan_id=scan_id,
+                    page_id=page_id,
+                    a11y_finding_ids=body.a11y_finding_ids,
+                    page_image_ids=body.page_image_ids,
+                    decision=body.decision,
+                    notes=body.notes,
+                )
+            except occurrence_reviews.ReviewScopeError as exc:
+                raise HTTPException(status_code=404, detail=str(exc)) from exc
+            except occurrence_reviews.ReviewError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            except sqlite3.OperationalError as exc:
+                if "occurrence_reviews" not in str(exc) and "decision" not in str(exc):
+                    raise
+                raise HTTPException(
+                    status_code=503,
+                    detail="Database migrations are incomplete. Restart Axcess, or run "
+                    "`make migrate`, and try again.",
+                ) from exc
+        return OccurrenceReviewResponse(
+            decision=saved.decision, notes=saved.notes, updated_at=saved.updated_at
+        )
 
     @app.get("/api/scans/{scan_id:int}/pages/{page_id:int}/inspect")
     async def api_page_inspect(
@@ -2796,6 +2879,8 @@ def create_app(
             # Pass the blob store so the Issues Overview sheet can embed
             # each finding's marked location screenshot as evidence.
             rendered = render_xlsx(scan, conn=conn, blob_store=blob_store)
+        elif fmt == "its":
+            rendered = render_its_review(scan, conn=conn)
         else:
             rendered = _EXPORT_RENDERERS[fmt](scan)
         return label_draft_export(rendered, export_format=fmt, readiness=readiness)
@@ -2840,7 +2925,7 @@ def create_app(
             ),
         ] = None,
     ) -> Response:
-        """Download a scan export as CSV / JSON / Jira CSV / Markdown / Audit."""
+        """Download a scan export as CSV / JSON / Jira CSV / Markdown / Audit / Excel."""
         fmt_lower = fmt.lower()
         if fmt_lower not in _EXPORT_RENDERERS:
             raise HTTPException(status_code=400, detail="Unknown export format")
@@ -2900,6 +2985,8 @@ def create_app(
             mime = row["mime"] or "application/octet-stream"
         else:
             # Per-finding screenshots live in the same content-addressed store
+            # (the after picture in `screenshot_hash`, and for the form error
+            # check the before picture in `before_screenshot_hash`, 0035)
             # but have no `images` row: the crawler captures them from the live
             # element, they are not image content extracted from the page. This
             # lookup used to consider `images` only, so every marked screenshot
@@ -2911,7 +2998,7 @@ def create_app(
                         SELECT 1
                           FROM page_a11y_findings f
                           JOIN pages p ON p.id = f.page_id
-                         WHERE f.screenshot_hash = ?
+                         WHERE (f.screenshot_hash = ? OR f.before_screenshot_hash = ?)
                            AND NOT EXISTS (
                                SELECT 1
                                  FROM protected_scans ps
@@ -2919,7 +3006,7 @@ def create_app(
                            )
                          LIMIT 1
                         """,
-                        (content_hash,),
+                        (content_hash, content_hash),
                     ).fetchone()
                 else:
                     shot = conn.execute(
@@ -2927,10 +3014,10 @@ def create_app(
                         SELECT 1
                           FROM page_a11y_findings f
                           JOIN pages p ON p.id = f.page_id
-                         WHERE f.screenshot_hash = ?
+                         WHERE (f.screenshot_hash = ? OR f.before_screenshot_hash = ?)
                          LIMIT 1
                         """,
-                        (content_hash,),
+                        (content_hash, content_hash),
                     ).fetchone()
             if shot is None:
                 raise HTTPException(status_code=404, detail="Blob not found")
@@ -3445,6 +3532,9 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
         responsive_checks_enabled=not bool(form.get("skip_responsive")),
         focus_checks_enabled=not bool(form.get("skip_focus")),
         visual_checks_enabled=not bool(form.get("skip_visual")),
+        form_error_checks_enabled=not bool(form.get("skip_forms", True)),
+        form_send_empty_forms=not bool(form.get("skip_forms", True))
+        and bool(form.get("send_empty_forms", False)),
         store_rendered_html=not bool(form.get("skip_rendered_storage")),
     )
 
@@ -4154,6 +4244,7 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
     alfa_ran_counters = int(scan.get("alfa_pages_scanned") or 0) > 0
     interaction_pages = int(scan.get("interaction_pages_probed") or 0)
     interaction_states = int(scan.get("interaction_states_total") or 0)
+    forms_pages = int(scan.get("forms_pages_checked") or 0)
     coverage_version = int(cfg.get("method_coverage_version") or 0)
     scan_status = str(scan.get("status") or "")
     page_count = int(scan.get("page_count") or 0)
@@ -4299,6 +4390,37 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
                 else "It skips risky actions and may not reach every control."
             ),
         },
+        {
+            "key": "forms",
+            "label": "Form error check",
+            # Off unless the scan turned it on (New scan does, by default, for
+            # public websites); never in a sign-in scan.
+            "enabled": flag("form_error_checks_enabled", default=False) and rendered,
+            "checked_count": forms_pages,
+            "total_count": coverage["rendered_pages"],
+            "unit": "page",
+            "verb": "checked",
+            # Scans before migration 0036 kept no counts: their zero says
+            # nothing, so they say coverage was not recorded.
+            "coverage_known": forms_pages > 0
+            or int(cfg.get("form_check_coverage_version") or 0) >= 1,
+            "description": (
+                "Presses each form's submit button once, with nothing typed, and checks "
+                "that the form says in words what is wrong."
+                + (
+                    " This scan let it send a form to the site when every field was "
+                    "empty, and check the page the site sent back."
+                    if flag("form_send_empty_forms", default=False)
+                    else ""
+                )
+            ),
+            # One sentence, as every limit in this table. Which forms it never
+            # presses is the safety rule (analyzer/forms/base.skip_reason).
+            "caveat": (
+                "It never presses sign-in, payment, search or delete forms, checks only "
+                "the first step of a form, and a person confirms each result."
+            ),
+        },
     ]
 
     for method in method_specs:
@@ -4310,6 +4432,8 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
             )
         elif method["key"] == "interaction" and method["state"] == "not_run":
             method["result"] = "Selected, but no page checks were recorded"
+        elif method["key"] == "forms" and forms_pages > 0:
+            method["result"] = "; ".join([str(method["result"]), *_form_clauses(scan)])
         elif (
             method["key"] == "search" and method["enabled"] and coverage.get("search_attention", 0)
         ):
@@ -4319,6 +4443,34 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
                 "search stopped early or found no results. Check the search settings and limits."
             )
     return method_specs
+
+
+def _form_clauses(scan: dict[str, Any]) -> list[str]:
+    """What the form error check did with the forms it found, in counts.
+
+    "2 pages checked" holds for a page whose every form was skipped as a
+    sign-in form, and for one whose every form was pressed. These clauses
+    separate the two, each from a recorded count (migration 0036).
+    """
+
+    def plural(count: int, unit: str) -> str:
+        return f"{count} {unit}" if count == 1 else f"{count} {unit}s"
+
+    pressed = int(scan.get("forms_pressed") or 0)
+    skipped = int(scan.get("forms_skipped") or 0)
+    not_checked = int(scan.get("forms_not_checked") or 0)
+    clauses = [f"{plural(pressed, 'form')} pressed"]
+    if skipped:
+        clauses.append(
+            f"{plural(skipped, 'form')} not pressed, such as sign-in, payment or search forms"
+        )
+    if not_checked:
+        one = not_checked == 1
+        clauses.append(
+            f"{plural(not_checked, 'form')} tried to send {'itself' if one else 'themselves'}, "
+            f"so Axcess could not judge {'it' if one else 'them'}"
+        )
+    return clauses
 
 
 def _interaction_clauses(states: int, coverage: dict[str, int]) -> list[str]:

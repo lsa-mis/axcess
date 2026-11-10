@@ -606,16 +606,30 @@ criteria:
       Confirm help mechanisms (contact, self-help) appear in the same relative
       order on every page that has them.
 
+  # Counted as manual on purpose: the form error check exists and is on by
+  # default for public scans, but it is not yet validated on real forms. Its
+  # labelled real-page set (tests/real_pages/, 2026-11-05) has 9 failing
+  # forms, all found, most used to tune it, labelled without an expert
+  # (docs/internal/form-error-check.md). Promote it to partial, with its own
+  # pipeline, after expert validation on held-out real forms.
   - sc: "3.3.1"
     name: "Error Identification"
     level: A
     method: manual
     pipelines: []
     confidence: n/a
-    automated_check: ""
+    automated_check: >-
+      The form error check presses each form's submit button once, with
+      nothing typed, and reports a form that marks fields in error without
+      saying in words what is wrong. A clear failure is Mostly sure and an
+      unclear one Not sure, but it is not yet tested on enough real forms to
+      count toward coverage, so this criterion still counts as tested by hand.
     manual_check: >-
-      Submit forms with invalid data and confirm errors are identified in text.
-      Requires interaction the crawler doesn't perform.
+      Submit each form with missing and wrong values, and confirm every error
+      names the field and says in words what is wrong. The check types
+      nothing, never presses sign-in, payment, search or delete forms, checks
+      only a form's first step, and cannot judge a form that only the site's
+      server checks, unless the scan lets it send empty forms to the site.
 
   - sc: "3.3.2"
     name: "Labels or Instructions"

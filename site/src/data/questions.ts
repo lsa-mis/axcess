@@ -139,6 +139,9 @@ export const QUESTIONS: Question[] = [
     q: "How long does a scan take?",
     a: "It depends on how many pages you scan and which checks you turn on. Axcess opens each page in a real browser and checks it several ways, so large scans take a while. Start with about 25 pages and grow from there. To go faster, turn off checks you don't need in the Checks group of the New scan form.",
   },
+  // Form error check safety: base.skip_reason and the strict guard in
+  // src/audit/analyzer/forms/; on by default for public scans only
+  // (frontend newScan/scanPolicy.ts PUBLIC_DEFAULTS).
   // Click-through safety: DEFAULT_BLOCKED_LABELS and the limits in
   // src/audit/analyzer/interaction/probe.py; exploration_guard in
   // analyzer/interaction/safety.py blocks writes, new windows and page
@@ -147,12 +150,13 @@ export const QUESTIONS: Question[] = [
   {
     id: "will-it-break-anything",
     q: "Will it break anything on the site?",
-    a: "Axcess reads pages. Unless you turn it off, it also clicks visible controls such as menus and tabs, to check what they open. It takes care while it clicks, but that care is a safety net, not a guarantee. Use a test copy of the site when you can.",
+    a: "Axcess reads pages. Unless you turn them off, it also clicks visible controls such as menus and tabs, to check what they open, and on public websites it presses each form's submit button once, with nothing typed, to check how the form shows errors. It takes care while it does this, but that care is a safety net, not a guarantee. Use a test copy of the site when you can.",
     list: [
-      "It skips controls named like Sign out, Delete, Buy, Submit, Save and similar words.",
+      "While it clicks menus and tabs, it skips controls named like Sign out, Delete, Buy, Submit, Save and similar words.",
       "It blocks form submissions and other requests that could change data on the site.",
       "It does not leave the page or open new windows while it clicks.",
       "It stops after 100 clicks, 5 levels of menus, or 2 minutes on each page.",
+      "The form error check types nothing, and by default stops the form from being sent. Only if you choose it on New scan does it send forms whose every field is empty; the site may still act on those, so choose it only for a site you own or a test site. It never presses sign-in, payment, search or delete forms, and never runs in a sign-in scan.",
     ],
     after: "Scans of public sites follow the site's instructions for automated visitors (robots.txt) by default.",
     links: [{ href: "/docs/glossary/#click-through", text: "Click-Through, in the glossary" }],

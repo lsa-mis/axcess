@@ -152,7 +152,7 @@ def label_draft_export(
 ) -> str | bytes:
     """Add an in-artifact draft notice where the format supports it safely.
 
-    Markdown, JSON, XLSX, and CSV can carry a prominent notice without making
+    Markdown, JSON, XLSX (both workbooks), and CSV can carry a prominent notice without making
     the artifact invalid. Draft CSVs gain one additive state column, keeping a
     rectangular, standards-compliant file that importers can explicitly map
     or ignore.
@@ -185,7 +185,7 @@ def label_draft_export(
             **payload,
         }
         return json.dumps(labeled, indent=2, sort_keys=True, ensure_ascii=False)
-    if export_format == "xlsx":
+    if export_format in {"xlsx", "its"}:
         if not isinstance(rendered, bytes):
             raise TypeError("XLSX exports must be bytes")
         return _label_draft_workbook(rendered, status_label=status_label)

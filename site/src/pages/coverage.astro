@@ -159,6 +159,12 @@ const CHECK_CARDS: [string, string, string, string][] = [
     "Opens menus, tabs, and dialogs, then runs the rule check (axe) on each page state it reveals. It stops at 100 clicks, 5 levels deep, 120 seconds, or 25 saved page states per page. It skips buttons like Sign out, Delete, and Buy.",
     "It skips payments and other risky actions and blocks sending data, so a page state can be incomplete. It may not use every control it finds, and a dialog that would not close stops that page. A person checks custom controls and anything it did not reach.",
   ],
+  [
+    "forms",
+    "Form error check",
+    "Presses each form's submit button once, with nothing typed, and checks that the form says in words what is wrong. By default it stops the form from being sent; you can let it send empty forms to a site you own or a test site. On by default for public websites; never in a sign-in scan.",
+    "It never presses sign-in, payment, search or delete forms, checks only the first step of a form, and a person confirms each result. It is not yet tested on enough real forms to count toward coverage.",
+  ],
 ];
 
 /** Compared with Siteimprove and axe DevTools. The tool columns are sourced
@@ -352,14 +358,15 @@ const headings = [
     <Card heading="Mostly sure: confirm it, then fix it" level={3}>
       <p>
         Comes from failures in the Rule check (axe), including problems found by Click-Through or after a search you
-        set up, and failures in the Rule check (Alfa). Confirm it on the page, fix it, then scan again.
+        set up, failures in the Rule check (Alfa), and clear failures found by the Form error check. Confirm it on the
+        page, fix it, then scan again.
       </p>
     </Card>
     <Card heading="Not sure: a person decides" level={3}>
       <p>
-        Comes from the Zoom and layout, Focus, Keyboard, and Motion and reading-order checks, from the Image text
-        check when alt text is missing or does not match, from the AI review, and from Rule check (Alfa) "cannot
-        tell" results. Test it on the page and record your decision.
+        Comes from the Zoom and layout, Focus, Keyboard, and Motion and reading-order checks, from the Form error check
+        when its result is unclear, from the Image text check when alt text is missing or does not match, from the AI
+        review, and from Rule check (Alfa) "cannot tell" results. Test it on the page and record your decision.
       </p>
     </Card>
     <Card heading="For information: nothing to fix" level={3}>
@@ -464,7 +471,8 @@ const headings = [
     <Card heading="Real tasks" level={3}>
       <p>
         Complete real tasks from start to finish, such as applying or registering, including error messages and time
-        limits. Axcess does not submit forms or complete tasks on its own, apart from a search you set up.
+        limits. Axcess does not fill in forms or complete tasks on its own, apart from a search you set up. The form
+        error check presses a form's submit button with nothing typed; it does not try wrong values.
       </p>
     </Card>
   </div>

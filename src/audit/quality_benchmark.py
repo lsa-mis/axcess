@@ -60,7 +60,7 @@ class DetectionLayer(StrEnum):
 _LAYER_PIPELINES: dict[DetectionLayer, frozenset[str]] = {
     DetectionLayer.AXE: frozenset({"axe"}),
     DetectionLayer.ALFA: frozenset({"alfa"}),
-    DetectionLayer.BEHAVIORAL: frozenset({"keyboard", "responsive", "focus", "visual"}),
+    DetectionLayer.BEHAVIORAL: frozenset({"keyboard", "responsive", "focus", "visual", "forms"}),
     DetectionLayer.OCR_VLM: frozenset({"image", "visual"}),
     DetectionLayer.SEMANTIC: frozenset({"semantic"}),
 }

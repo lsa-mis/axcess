@@ -20,6 +20,8 @@ import type {
   PageInspection,
   DiffReport,
   ExportFormat,
+  OccurrenceReview,
+  OccurrenceReviewRequest,
   ExportOptions,
   FindingDetail,
   FindingsFilter,
@@ -246,6 +248,12 @@ export const api = {
     request<EvaluationRecord>(`/api/scans/${scanId}/evaluation`),
   updateEvaluation: (scanId: number, payload: Partial<EvaluationRecord>) =>
     request<EvaluationRecord>(`/api/scans/${scanId}/evaluation`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
+  /** Save a person's review of the occurrences on one element of a page. */
+  saveOccurrenceReview: (scanId: number, pageId: number, payload: OccurrenceReviewRequest) =>
+    request<OccurrenceReview>(`/api/scans/${scanId}/pages/${pageId}/review`, {
       method: "PUT",
       body: JSON.stringify(payload),
     }),

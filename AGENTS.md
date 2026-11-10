@@ -40,6 +40,61 @@ one axe/probe/semantic rule or one `(classification, alt_adequacy)` image
 finding group. Never mix data from different `scan_id` values in an answer
 unless the user explicitly requests a comparison.
 
+### Building a check: real pages first
+
+Build and tune a new check or probe against real websites, not only
+pages we write ourselves. Test pages written next to the detector share
+its assumptions, so they pass: the form error check scored 100% precision
+on 130 of them, then got every verdict wrong on its first real pages
+(Bootstrap's hidden feedback text, Parsley's radio-group message).
+
+1. Before writing the detector, collect real public pages that show the
+   pattern: library demos, design-system docs, and accessibility demo
+   sites (W3C BAD, WebAIM). Include ones that get it right and ones
+   that get it wrong. Get the user's approval before visiting them
+   (see Verification), and never press anything a real business acts on.
+2. Find failing pages as hard as passing ones. Most real pages pass or
+   are skipped, and passes alone cannot show that the check catches
+   anything: the form error check had 2 failures in 54 real pages.
+   Search until you have several proved failures for the exact
+   criterion the check tests.
+3. Prove a failure before you rely on it. A page counts as failing only
+   when a source outside this repo says it fails that exact criterion
+   (the demo's own evaluation report or annotations, or a published
+   audit), and you have seen the failure yourself in the browser. A
+   site built to be inaccessible is not proof, and one source may not
+   be either: read every source the demo has, and when they disagree,
+   what the page does decides. W3C's evaluation report on its BAD
+   "before" survey passes 3.3.1 ("no corresponding content"), but its
+   Easy Checks page says that, sent empty, "errors are only indicated by
+   the label being red, and there is no explanation of the errors", and
+   the survey's own code (in W3C's bad.zip) does exactly that: a 3.3.1
+   failure the form error check missed. Never give the user a page as
+   one that should fail, or as one that should pass, or score against
+   it, on a guess; say what you have not confirmed.
+4. Run the check on those pages in a visible browser while you build it.
+   Look at the screenshots to confirm each verdict yourself. A verdict
+   no one has looked at is not evidence.
+5. For each mistake on a real page, add a cut-down copy of that page's
+   markup to the test cases (a "real pages" batch), confirm it fails on
+   the old code, then fix the detector. Synthetic cases stay as
+   regression tests, not as proof that the check works.
+6. Measure on real pages. A check's precision and recall are the numbers
+   from its labelled set of real pages, kept in the repo: each page's
+   address, the form or element judged, the verdict it should get, and
+   the basis (an outside source, or a person who looked at the
+   screenshot). Rerun the set after every change to the detector, before
+   you report the change. A page whose source and visible behaviour
+   disagree is listed as disputed, not scored. The set visits outside
+   sites, so it runs only on request, never in CI.
+7. Pages we wrote are regression tests, not the metric. They gate CI and
+   catch one fix undoing another, but their score is always reported
+   second and named for what it is ("on pages we wrote"). Never lead
+   with it or present it as real-world accuracy: the form error check
+   scored 100% precision and 96.2% recall on 142 of them, while its real
+   set, the number that counts, had only 9 failing forms, most of them
+   used to tune it. Say how small and how independent the real set is.
+
 ## Code map
 
 - `src/audit/crawler/` scopes, fetches, renders, and queues pages.

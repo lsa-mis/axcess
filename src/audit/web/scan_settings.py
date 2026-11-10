@@ -68,6 +68,13 @@ class ScanFormSettings(BaseModel):
     skip_semantic: bool
     skip_focus: bool
     skip_visual: bool
+    # The form error check (WCAG 3.3.1) is off unless chosen: a missing value
+    # means skip it.
+    skip_forms: bool = True
+    # Let the form error check send an empty form to the site, to read the
+    # page the site sends back (a form checked only on its server). Off
+    # unless chosen, and only counts when the check itself is on.
+    send_empty_forms: bool = False
     skip_rendered_storage: bool
     axe_level: Literal["A", "AA", "AAA"]
     wcag_version: WcagVersion
@@ -180,6 +187,8 @@ def snapshot_from_config(
         skip_semantic=not _flag(config, "semantic_enabled", default=False),
         skip_focus=not _flag(config, "focus_checks_enabled", default=True),
         skip_visual=not _flag(config, "visual_checks_enabled", default=False),
+        skip_forms=not _flag(config, "form_error_checks_enabled", default=False),
+        send_empty_forms=_flag(config, "form_send_empty_forms", default=False),
         skip_rendered_storage=not _flag(config, "store_rendered_html", default=True),
         axe_level=axe_level,
         wcag_version=stored_wcag_version(config),

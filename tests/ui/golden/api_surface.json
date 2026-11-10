@@ -472,6 +472,16 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/pages/{page_id:int}/review",
+        "methods": ["PUT"],
+        "name": "api_save_occurrence_review",
+        "async": false,
+        "params": {"path": ["scan_id", "page_id"], "body": ["body"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/scans/{scan_id:int}/pages/{page_id:int}/inspect",
         "methods": ["GET"],
         "name": "api_page_inspect",
@@ -1248,6 +1258,16 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/pages/{page_id:int}/review",
+        "methods": ["PUT"],
+        "name": "api_save_occurrence_review",
+        "async": false,
+        "params": {"path": ["scan_id", "page_id"], "body": ["body"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/scans/{scan_id:int}/pages/{page_id:int}/inspect",
         "methods": ["GET"],
         "name": "api_page_inspect",
@@ -2005,6 +2025,16 @@
         "name": "api_page_evidence",
         "async": false,
         "params": {"path": ["scan_id", "page_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/pages/{page_id:int}/review",
+        "methods": ["PUT"],
+        "name": "api_save_occurrence_review",
+        "async": false,
+        "params": {"path": ["scan_id", "page_id"], "body": ["body"]},
         "request_param": null,
         "background_tasks_param": null
       },
@@ -2780,6 +2810,16 @@
         "name": "api_page_evidence",
         "async": false,
         "params": {"path": ["scan_id", "page_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/pages/{page_id:int}/review",
+        "methods": ["PUT"],
+        "name": "api_save_occurrence_review",
+        "async": false,
+        "params": {"path": ["scan_id", "page_id"], "body": ["body"]},
         "request_param": null,
         "background_tasks_param": null
       },
