@@ -88,7 +88,10 @@ SHIPPED: tuple[ShippedPipeline, ...] = (
         name="Page code check",
         pipeline="markup",
         engine="Deterministic Playwright (reads the rendered DOM after axe; changes nothing)",
-        scs="3.3.2 Labels or Instructions (field named only by its placeholder)",
+        scs=(
+            "3.3.2 Labels or Instructions (field named only by its placeholder), "
+            "1.3.1 Info and Relationships (label tied to no field)"
+        ),
         needs_ai=False,
         note="Each rule is its own issue type with its own How sure; see "
         "audit/analyzer/markup/base.py.",

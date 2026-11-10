@@ -13411,3 +13411,71 @@ markup_rules:
       Every field on the affected pages has a label that stays on screen while
       people type.
     confidence_default: high
+
+  markup-label-for-missing:
+    title: "Label is tied to no field"
+    wcag_sc: "1.3.1"
+    wcag_name: "Info and Relationships"
+    wcag_level: "A"
+    abilities_affected: [vision, motor, cognition]
+    what_happening: >-
+      The page code check found a <code>&lt;label&gt;</code> whose
+      <code>for</code> value does not match the <code>id</code> of any field,
+      or matches an element a label cannot name, such as a
+      <code>&lt;div&gt;</code>. The browser then ties the label to nothing. The
+      label shows on screen next to its field, but the page code does not say
+      they belong together. The rule check (axe) reports the field this leaves
+      without a name, when there is one; this occurrence is the label itself,
+      where the fix usually goes.
+    why_matters: >-
+      A screen reader does not read the label when someone moves to the field,
+      so they hear only "edit text" and must guess what to type. Clicking the
+      label does not move to the field, which makes small fields such as
+      checkboxes harder to use for people with tremors. Voice control users
+      cannot say the label's words to reach the field.
+    owner: dev
+    effort: under_15m
+    fix_steps:
+      - >-
+        Read the occurrence: it gives the label's <code>for</code> value and,
+        when there is one, the <code>id</code> of the field right after it.
+      - >-
+        Make the two match. For example, change <code>&lt;label
+        for="phone-number"&gt;Phone&lt;/label&gt; &lt;input id="phone"&gt;</code>
+        to <code>&lt;label for="phone"&gt;Phone&lt;/label&gt; &lt;input
+        id="phone"&gt;</code>.
+      - >-
+        If the id is made by a script or a template, fix it there, so every page
+        that uses the template is fixed. Each id must be used only once on the
+        page.
+      - >-
+        If the label names something that is not a field, such as a group of
+        radio buttons, use a <code>&lt;fieldset&gt;</code> with a
+        <code>&lt;legend&gt;</code> instead.
+    fix_options:
+      - label: "Match the label's for value to the field's id"
+        approach: >-
+          Change the label's for value, or the field's id, so they are the
+          same.
+        watch_out: >-
+          An id that appears twice on a page ties the label to the first one
+          only.
+      - label: "Wrap the field inside the label"
+        approach: >-
+          Put the field inside the label element and remove the for value. The
+          browser then ties them together with no id needed.
+        watch_out: >-
+          A label with a for value that points elsewhere still wins, so remove
+          the for value when you wrap the field.
+    verify_manual: >-
+      Click the label's text: the cursor should move into its field. Then move
+      to the field with a screen reader: you should hear the label's words. Mark
+      the occurrence "Not a problem (false positive)" only if the label is not
+      meant for any field.
+    verify_automated: >-
+      Scan again with the page code check turned on, and see if this label is
+      still found. Check that the rule check (axe) no longer reports the field
+      as having no name.
+    acceptance: >-
+      Every label on the affected pages is tied to the field it names.
+    confidence_default: high

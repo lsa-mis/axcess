@@ -106,11 +106,12 @@ criteria:
     name: "Info and Relationships"
     level: A
     method: partial
-    pipelines: [axe]
+    pipelines: [axe, markup]
     confidence: medium
     automated_check: >-
       axe checks list, table-header, definition-list, required-ARIA-children and
-      heading-structure markup on the rendered DOM.
+      heading-structure markup on the rendered DOM. The page code check flags a
+      label whose for value is tied to no field.
     manual_check: >-
       Relationships conveyed only visually (grouped fields, columns, emphasis
       that implies meaning) need a human to confirm they're also programmatic.

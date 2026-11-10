@@ -64,10 +64,10 @@ async def needs_review(page):  # type: ignore[no-untyped-def]
 
 @pytest_asyncio.fixture(loop_scope="module")
 async def page_code(page):  # type: ignore[no-untyped-def]
-    """The page code check's results at load, as a scan stores them: rule id -> selectors."""
+    """The page code check's results at load, as a scan stores them: rule id -> element code."""
     found: dict[str, list[str]] = {}
     for f in await MarkupProbe().run(page):
-        found.setdefault(f.rule_id, []).append(f.target_selector)
+        found.setdefault(f.rule_id, []).append(f.html_snippet)
     return found
 
 
@@ -116,10 +116,12 @@ async def test_finds_the_input_with_only_a_placeholder(at_load, page_code) -> No
     # axe's label rule accepts a placeholder as the field's name, so axe is
     # quiet about it; the page code check reports it (backlog item 8).
     assert "#email" not in at_load.get("label", []), at_load
-    assert page_code.get("markup-placeholder-only") == ["#email"], page_code
+    fields = page_code.get("markup-placeholder-only", [])
+    assert len(fields) == 1 and 'id="email"' in fields[0], page_code
 
 
-@pytest.mark.xfail(strict=True, reason="Known gap: no check for a label tied to no field (item 9)")
-async def test_finds_the_label_connected_to_no_field(at_load) -> None:  # type: ignore[no-untyped-def]
-    selectors = [s for found in at_load.values() for s in found]
-    assert any("phone-number" in s or s.startswith("label") for s in selectors), at_load
+async def test_finds_the_label_connected_to_no_field(page_code) -> None:  # type: ignore[no-untyped-def]
+    # axe reports the field the label leaves unnamed (above); the page code
+    # check reports the label itself (backlog item 9).
+    labels = page_code.get("markup-label-for-missing", [])
+    assert len(labels) == 1 and labels[0].startswith('<label for="phone-number">'), page_code

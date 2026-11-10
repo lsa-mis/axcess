@@ -404,6 +404,8 @@ It looks for:
 - a form field whose only name is its placeholder text, the hint inside the
   field that disappears when someone types (WCAG 3.3.2). Marked
   [Mostly sure](#mostly-sure).
+- a label whose `for` value matches no field, so the label is tied to
+  nothing (WCAG 1.3.1). Marked [Mostly sure](#mostly-sure).
 
 ### Local AI model
 

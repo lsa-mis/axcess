@@ -55,6 +55,7 @@ class MarkupRule:
 
 
 RULE_PLACEHOLDER_ONLY = "markup-placeholder-only"
+RULE_LABEL_FOR_MISSING = "markup-label-for-missing"
 
 # Each rule, by id; ``probe._RULE_JS`` holds the code that asks each rule's
 # question, under the same id.
@@ -80,6 +81,26 @@ RULES: dict[str, MarkupRule] = {
         evidence_summary=(
             "The page code check read the field's code (HTML). Its only name is its "
             "placeholder text, which disappears when someone types. Check it on the page."
+        ),
+    ),
+    # WCAG 1.3.1: a <label for> whose for value names no element, or one a
+    # label cannot name, so the label is tied to nothing. axe reports the
+    # field the label leaves unnamed (its ``label`` rule), never the label, so
+    # this is the label's own occurrence and the fix points at it. Mostly
+    # sure: the browser's own ``label.control`` is null.
+    RULE_LABEL_FOR_MISSING: MarkupRule(
+        rule_id=RULE_LABEL_FOR_MISSING,
+        title="Label is tied to no field",
+        criterion_sc="1.3.1",
+        wcag_scs="1.3.1",
+        wcag_level="A",
+        impact="moderate",
+        help_url="https://www.w3.org/WAI/WCAG22/Understanding/info-and-relationships.html",
+        review_lane="likely_barrier",
+        evidence_confidence="high",
+        evidence_summary=(
+            "The page code check read the label's code (HTML). Its for value points at "
+            "no field, so the browser ties the label to nothing. Check it on the page."
         ),
     ),
 }

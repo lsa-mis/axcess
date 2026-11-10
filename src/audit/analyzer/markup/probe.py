@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, Any
 
 from audit.analyzer.markup.base import (
     MAX_SNIPPET_CHARS,
+    RULE_LABEL_FOR_MISSING,
     RULE_PLACEHOLDER_ONLY,
     RULES,
     MarkupFinding,
@@ -144,6 +145,70 @@ _SUMMARIES[RULE_PLACEHOLDER_ONLY] = lambda d: (
     "It has no label (a label element), aria-label, aria-labelledby or title, so once "
     "someone types, nothing on screen says what the field is for."
 )
+
+# A <label for> the browser ties to nothing: ``label.control`` is null, so
+# the for value names no element in the label's document (or shadow root),
+# or names one a label cannot name (a div, a hidden input). A label hidden
+# from everyone (display:none) is skipped: it names nothing anyway. A label
+# hidden only from sight (the screen-reader-only pattern) is still flagged,
+# because it exists for screen reader users, the people this gap affects.
+# The detail names the field just after the label, when there is one, so
+# the summary can say which id the for value probably meant.
+_RULE_JS[RULE_LABEL_FOR_MISSING] = """
+  const LABELABLE = 'button, input:not([type=hidden]), meter, output, progress, select, textarea';
+  const nearby = label => {
+    let n = label;
+    for (let step = 0; step < 3 && n; step++) {
+      n = n.nextElementSibling;
+      if (!n) break;
+      const field = n.matches(LABELABLE) ? n : n.querySelector(LABELABLE);
+      if (field) return field;
+    }
+    return null;
+  };
+  const out = [];
+  const labels = Array.from(document.querySelectorAll('label[for]')).slice(0, limit);
+  for (const label of labels) {
+    if (out.length >= cap) break;
+    if (label.control) continue;
+    if (!rendered(label)) continue;
+    const forId = label.getAttribute('for') || '';
+    const root = label.getRootNode();
+    const target = forId && root.getElementById ? root.getElementById(forId) : null;
+    const field = nearby(label);
+    out.push({
+      selector: path(label),
+      html: snippet(label),
+      detail: {
+        for: forId.slice(0, 200),
+        text: squash(label.textContent).slice(0, 200),
+        target: target ? target.tagName.toLowerCase() : '',
+        next_id: field && field.id ? field.id.slice(0, 200) : '',
+      },
+    });
+  }
+  return out;
+"""
+
+
+def _label_for_summary(d: Mapping[str, Any]) -> str:
+    target = str(d.get("target") or "")
+    parts = [
+        f"This label, {_quote(d.get('text'))}, has for={_quote(d.get('for'))}, "
+        + (
+            f"which points at a <{target}> element, and a label cannot name that."
+            if target
+            else "but no element on the page has that id."
+        ),
+        "So the label is tied to no field, and a screen reader does not read it with any field.",
+    ]
+    next_id = str(d.get("next_id") or "")
+    if next_id and next_id != d.get("for"):
+        parts.append(f"The field after it has id={_quote(next_id)}.")
+    return " ".join(parts)
+
+
+_SUMMARIES[RULE_LABEL_FOR_MISSING] = _label_for_summary
 
 
 def _script(body: str) -> str:
