@@ -19,10 +19,10 @@ Two backends sit behind it (``docs/internal/llama-cpp-plan.md``, Phase 1):
   requests the call sites sent before this module existed (same keys,
   values and value types; see :func:`ollama_generate_body`).
 * :class:`LlamaCppClient`: ``llama-server`` from llama.cpp, over TCP or a
-  UNIX socket (:func:`open_model_http_client`). **Verified only against the
-  server README and fake transports**: no real ``llama-server`` was run
-  when this was written. Each behaviour that rests on the README alone is
-  marked "README only" below.
+  UNIX socket (:func:`open_model_http_client`). Built from the server
+  README; the main paths were then run against one real ``llama-server``
+  build. The comment above :func:`llama_cpp_generate_body` lists what was
+  run and what still rests on the README alone.
 
 What this module does not do, on purpose:
 
@@ -451,11 +451,21 @@ class OllamaClient(ModelClient):
 # launcher (Phase 2) must start the server with a context at least as large
 # as the largest ``context_tokens`` a caller asks for.
 #
-# README only, not run against a real llama-server: every request and
-# response shape in this section, /health's 503 "Loading model" state, the
-# /v1/models list shape, the ``model`` field routing in router mode
-# ("The router uses the `"model"` field in the JSON body"), and that
-# ``seed`` and ``max_tokens`` are honoured on the chat endpoint.
+# Run against a real llama-server (release b12284, CPU build, one
+# Qwen3-VL-2B-Instruct model with its mmproj, context 4096, UNIX socket; see
+# tests/integration/test_llama_cpp_live.py, opt-in with AXCESS_LLAMA_SOCKET):
+# /health 200 {"status": "ok"}; the /v1/models shape (``id`` is the model
+# file path when no ``--alias`` is set; ``meta.size`` is an integer); chat
+# completions with a JSON schema and an image (data: URL and raw base64) in
+# one call, a JSON schema without an image, and ``json_object`` mode; the
+# same answer twice at temperature 0 with a fixed seed; and a real crawl
+# reaching it through the socket.
+#
+# Still README only: /health's 503 "Loading model" state, router mode (the
+# ``model`` field routing: "The router uses the `"model"` field in the JSON
+# body", and the model list there), how ``--alias`` changes the listed id,
+# that ``max_tokens`` stops a long answer, and the error statuses and bodies
+# llama-server returns.
 # ---------------------------------------------------------------------------
 
 LLAMA_CPP_SCHEMA_NAME = "axcess_answer"
