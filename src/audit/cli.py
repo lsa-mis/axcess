@@ -11,6 +11,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from audit.ai.model_client import endpoint_from_settings
 from audit.blob_store import BlobStore
 from audit.config import get_settings
 from audit.crawler import url_policy
@@ -518,6 +519,7 @@ def crawl(
     _ = keyboard_probe
     settings = get_settings()
     settings.ensure_dirs()
+    model_endpoint = endpoint_from_settings(settings)
     conn = connect(settings.db_path)
     try:
         config = CrawlConfig(
@@ -543,7 +545,9 @@ def crawl(
             ocr_min_word_count=settings.ocr_min_word_count,
             vlm_enabled=not skip_vlm,
             vlm_model=settings.vlm_model,
-            vlm_base_url=settings.ollama_base_url,
+            vlm_base_url=model_endpoint.base_url,
+            model_backend=model_endpoint.backend,
+            model_socket=model_endpoint.socket_path,
             vlm_prompt_name=settings.vlm_prompt_name,
             vlm_concurrency=settings.vlm_concurrency,
             synthesize_enabled=not skip_synthesize,

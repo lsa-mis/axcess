@@ -52,6 +52,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from audit import __version__, coverage_matrix, evaluation, occurrence_reviews
 from audit.ai.manager import AIManager
+from audit.ai.model_client import endpoint_from_settings
 from audit.ai.state import AIConfig, ai_enabled, initialize_preferences
 from audit.ai.state import effective_settings as effective_ai_settings
 from audit.ai.state import semantic_model as ai_semantic_model
@@ -3893,6 +3894,7 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
     if scan_engine not in {"axe", "alfa", "both"}:
         # Legacy non-browser callers retain the original axe-default behavior.
         scan_engine = "axe"
+    model_endpoint = endpoint_from_settings(settings)
     return CrawlConfig(
         seed_url=str(form["url"]).strip(),
         search=form.get("search"),
@@ -3918,7 +3920,9 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
         ocr_min_word_count=settings.ocr_min_word_count,
         vlm_enabled=not bool(form["skip_vlm"]) and ai_enabled(settings),
         vlm_model=settings.vlm_model,
-        vlm_base_url=settings.ollama_base_url,
+        vlm_base_url=model_endpoint.base_url,
+        model_backend=model_endpoint.backend,
+        model_socket=model_endpoint.socket_path,
         vlm_prompt_name=settings.vlm_prompt_name,
         vlm_concurrency=settings.vlm_concurrency,
         semantic_model=ai_semantic_model(settings),

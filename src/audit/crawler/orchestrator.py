@@ -26,6 +26,7 @@ import httpx
 import structlog
 from selectolax.parser import HTMLParser
 
+from audit.ai.model_client import Backend, ModelEndpoint, open_model_http_client
 from audit.analyzer.alfa import (
     AlfaAnalyzer,
     AlfaError,
@@ -143,6 +144,13 @@ class CrawlConfig:
     vlm_base_url: str = "http://localhost:11434"
     vlm_prompt_name: str = "classify_v1.txt"
     vlm_concurrency: int = 1
+    # Which local model service ``vlm_base_url`` points at, for the image,
+    # vision and semantic checks (``audit.ai.model_client``): "ollama" or
+    # "llama_cpp". ``model_socket`` set: reach it through that UNIX socket.
+    # Not written to ``config_json``; a report records the model names it
+    # used, and the service that ran them does not change the stored result.
+    model_backend: Backend = "ollama"
+    model_socket: str | None = None
     # Synthesis, toggle off with ``--skip-synthesize`` if the caller wants
     # to run ``audit synthesize`` manually against the same scan later.
     synthesize_enabled: bool = True
@@ -509,7 +517,10 @@ async def run_crawl(
             min_confidence=config.ocr_min_confidence,
             min_word_count=config.ocr_min_word_count,
         )
-    vlm_config = await _build_vlm(config, client, vlm_provider)
+    # The AI checks share the crawl's client, as before, unless the model
+    # service is behind a UNIX socket, which needs its own transport.
+    model_client = _model_http_client(config, client)
+    vlm_config = await _build_vlm(config, model_client, vlm_provider)
     # Build the axe analyzer once for the whole crawl. Reads the bundled
     # axe.min.js off disk; reuses the same JS source across every page so
     # we pay the 553 KB I/O cost once. A missing bundle is loud, not
@@ -581,7 +592,7 @@ async def run_crawl(
     if config.visual_checks_enabled:
         vision_provider = None
         if config.vlm_enabled:
-            vision_provider = await _build_vision_provider(config, client)
+            vision_provider = await _build_vision_provider(config, model_client)
         visual_probe = VisualProbe(provider=vision_provider)
     # Interaction probe, opt-in. Shares the crawl's single AxeAnalyzer so
     # axe is injected once per page whether or not this probe runs.
@@ -630,7 +641,7 @@ async def run_crawl(
     # Phase 9+: build the semantic analyzer list once per crawl. The
     # provider holds the shared Ollama semaphore so per-page analyzers
     # don't multiply load on the daemon.
-    _semantic_provider, semantic_analyzers = await _build_semantic_analyzers(config, client)
+    _semantic_provider, semantic_analyzers = await _build_semantic_analyzers(config, model_client)
     if semantic_analyzers:
         log.info(
             "semantic.enabled",
@@ -700,6 +711,9 @@ async def run_crawl(
         if owned_client:
             with contextlib.suppress(Exception):
                 await client.aclose()
+        if model_client is not client:
+            with contextlib.suppress(Exception):
+                await model_client.aclose()
 
     return summary
 
@@ -725,6 +739,16 @@ def _signed_in_entry_url(start_url: str) -> str:
     if not fragment or urlsplit(canonical).fragment:
         return canonical
     return urlunsplit(urlsplit(canonical)._replace(fragment=fragment))
+
+
+def _model_http_client(config: CrawlConfig, client: httpx.AsyncClient) -> httpx.AsyncClient:
+    """The HTTP client the AI checks use: the crawl's, or one for a socket."""
+    if not config.model_socket:
+        return client
+    return open_model_http_client(
+        ModelEndpoint(config.model_backend, config.vlm_base_url, config.model_socket),
+        timeout=config.request_timeout_s,
+    )
 
 
 def _default_client(config: CrawlConfig) -> httpx.AsyncClient:
@@ -1127,6 +1151,7 @@ async def _build_vlm(
         base_url=config.vlm_base_url,
         prompt_name=config.vlm_prompt_name,
         concurrency=config.vlm_concurrency,
+        backend=config.model_backend,
     )
     if not await ollama.healthy():
         log.warning(
@@ -1153,6 +1178,7 @@ async def _build_vision_provider(
         model=config.vlm_model,
         base_url=config.vlm_base_url,
         concurrency=config.vlm_concurrency,
+        backend=config.model_backend,
     )
     if not await provider.healthy():
         log.warning(
@@ -1203,6 +1229,7 @@ async def _build_semantic_analyzers(
         model=default_model,
         base_url=config.vlm_base_url,
         concurrency=config.semantic_concurrency,
+        backend=config.model_backend,
     )
     if not await provider.healthy():
         log.warning(
