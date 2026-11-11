@@ -16,9 +16,10 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import sys
 import time
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
@@ -46,6 +47,7 @@ class CaseResult:
     outcome: str
     check: str
     seconds: float
+    raw: str = ""
 
 
 def _bundle(case: dict[str, Any]) -> EvidenceBundle:
@@ -84,6 +86,7 @@ async def _run(cases: list[dict[str, Any]], model: str) -> list[CaseResult]:
             bundle = _bundle(case)
             started = time.monotonic()
             check = "-"
+            raw = ""
             try:
                 raw = await provider.generate(build_prompt(bundle), model=model, image=None)
                 answer = parse_answer(raw)
@@ -98,7 +101,9 @@ async def _run(cases: list[dict[str, Any]], model: str) -> list[CaseResult]:
                 check = "/".join(checks)
             except SuggestionError as exc:
                 outcome = exc.code if exc.code != "bad_answer" else f"bad_answer: {exc.detail}"
-            results.append(CaseResult(case["name"], outcome, check, time.monotonic() - started))
+            results.append(
+                CaseResult(case["name"], outcome, check, time.monotonic() - started, raw)
+            )
     return results
 
 
@@ -106,10 +111,22 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--cases", type=Path, default=DEFAULT_CASES)
     parser.add_argument("--model", default=None, help="Ollama model; default: the setting")
+    parser.add_argument(
+        "--save",
+        type=Path,
+        default=None,
+        help="Write every answer to this JSON file so a person can read them",
+    )
     args = parser.parse_args(argv)
     cases = yaml.safe_load(args.cases.read_text(encoding="utf-8"))
     model = args.model or get_settings().suggestion_text_model
     results = asyncio.run(_run(cases, model))
+    if args.save:
+        args.save.parent.mkdir(parents=True, exist_ok=True)
+        args.save.write_text(
+            json.dumps([asdict(r) for r in results], indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
 
     print(f"Model: {model}   Prompt: {prompt_version()}   Cases: {len(results)}")
     print(f"{'case':32} {'answer':40} {'rule check':12} seconds")

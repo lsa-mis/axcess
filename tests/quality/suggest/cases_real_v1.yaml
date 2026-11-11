@@ -1,0 +1,86 @@
+# Real-page cases for `make suggest-eval` (pass `--cases` with this file).
+# Each one is an axe failure copied from the scan of
+# https://accessibility.umich.edu/ stored in data/audit.db (43 pages). The
+# markup, failure text and page address are as axe saved them; `problem` is
+# axe's own failure summary. `nearby_text` is not in the scan's axe record:
+# it is the element's own text, or for the icon link the heading its address
+# points to. Only aria-valid-attr can be re-checked on the
+# suggested markup by itself; the others need the whole page or its styles
+# (`audit.suggest.verify`), so a person reads those answers.
+- name: real-aria-role-on-link
+  source_url: https://accessibility.umich.edu/how-to/documents
+  rule_id: aria-valid-attr
+  pipeline: axe
+  wcag_sc: "4.1.2"
+  issue_title: ARIA attributes must conform to valid names
+  problem: "Invalid ARIA attribute name: aria-role"
+  snippet: '<a aria-role="button" href="#document-checklist" class="copy-link-btn before auto-heading-links--iconcolor" title="Copy link to this heading" aria-label="Copy link to this heading"><i class="far fa-bookmark"></i></a>'
+  nearby_text: Document checklist
+  expect_check: passed
+- name: real-contrast-blue-button
+  source_url: https://accessibility.umich.edu/basics/concepts-principles/color
+  rule_id: color-contrast
+  pipeline: axe
+  wcag_sc: "1.4.3"
+  issue_title: Elements must meet minimum color contrast ratio thresholds
+  problem: "Element has insufficient color contrast of 4.36 (foreground color: #333333, background color: #05a4d3, font size: 11.9pt (15.84px), font weight: normal). Expected contrast ratio of 4.5:1"
+  snippet: '<button class="testing-button-blue" name="order" type="button">Order Service</button>'
+  nearby_text: Order Service
+  expect_check: not_checked
+- name: real-contrast-red-text
+  source_url: https://accessibility.umich.edu/basics/concepts-principles/color
+  rule_id: color-contrast
+  pipeline: axe
+  wcag_sc: "1.4.3"
+  issue_title: Elements must meet minimum color contrast ratio thresholds
+  problem: "Element has insufficient color contrast of 3.97 (foreground color: #ff0000, background color: #fffefe, font size: 13.2pt (17.6px), font weight: normal). Expected contrast ratio of 4.5:1"
+  snippet: '<p style="color:red;">Red = Urgent</p>'
+  nearby_text: Red = Urgent
+  expect_check: not_checked
+- name: real-heading-skips-level
+  source_url: https://accessibility.umich.edu/basics/concepts-principles
+  rule_id: heading-order
+  pipeline: axe
+  issue_title: Heading levels should only increase by one
+  problem: Heading order invalid
+  snippet: <h3>Accessibility Concepts</h3>
+  nearby_text: Accessibility Concepts
+  expect_check: not_checked
+- name: real-hidden-pagination-heading
+  source_url: https://accessibility.umich.edu/news
+  rule_id: heading-order
+  pipeline: axe
+  issue_title: Heading levels should only increase by one
+  problem: Heading order invalid
+  snippet: <h4 id="pagination-heading" class="visually-hidden">Pagination</h4>
+  nearby_text: Pagination
+  expect_check: not_checked
+- name: real-search-landmark-unnamed
+  source_url: https://accessibility.umich.edu/
+  rule_id: landmark-unique
+  pipeline: axe
+  issue_title: Landmarks should have a unique role or role/label/title (i.e. accessible name) combination
+  problem: The landmark must have a unique aria-label, aria-labelledby, or title to make landmarks distinguishable
+  snippet: <div role="search">
+  nearby_text: Search
+  expect_check: not_checked
+- name: real-target-size-nav-link
+  source_url: https://accessibility.umich.edu/basics
+  rule_id: target-size
+  pipeline: axe
+  wcag_sc: "2.5.8"
+  issue_title: All touch targets must be 24px large, or leave sufficient space
+  problem: "Target has insufficient size because it is partially obscured (smallest space is 17.5px by 43.8px, should be at least 24px by 24px). Target has insufficient space to its closest neighbors. Safe clickable space has a diameter of 0px instead of at least 24px."
+  snippet: <a href="/basics/standards" data-drupal-link-system-path="node/338">Standards</a>
+  nearby_text: Standards
+  expect_check: not_checked
+- name: real-target-size-breadcrumb
+  source_url: https://accessibility.umich.edu/how-to/documents
+  rule_id: target-size
+  pipeline: axe
+  wcag_sc: "2.5.8"
+  issue_title: All touch targets must be 24px large, or leave sufficient space
+  problem: "Target has insufficient size (193px by 20px, should be at least 24px by 24px). Target has insufficient space to its closest neighbors. Safe clickable space has a diameter of 6px instead of at least 24px."
+  snippet: <a href="/how-to">How To Make It Accessible</a>
+  nearby_text: How To Make It Accessible
+  expect_check: not_checked
