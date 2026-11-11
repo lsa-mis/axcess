@@ -550,3 +550,22 @@ async def test_llama_cpp_over_a_real_unix_socket() -> None:
         "POST /v1/chat/completions HTTP/1.1",
     ]
     assert json.loads(requests[-1][1])["response_format"] == {"type": "json_object"}
+
+
+async def test_ready_models_one_request_on_ollama_health_first_on_llama_cpp() -> None:
+    handler, seen = _recording(httpx.Response(200, json={"models": [{"name": "m", "size": 3}]}))
+    async with _http(handler) as http:
+        assert await OllamaClient(http, base_url=BASE).ready_models() == [ServedModel("m", 3)]
+    assert [r.url.path for r in seen] == ["/api/tags"]
+
+    async with _http(_llama_server(health_status=503)) as http:
+        with pytest.raises(ModelStatusError) as caught:
+            await LlamaCppClient(http, base_url=BASE).ready_models()
+    assert caught.value.status_code == 503
+
+    def down(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("down", request=request)
+
+    async with _http(down) as http:
+        with pytest.raises(ModelUnreachableError):
+            await LlamaCppClient(http, base_url=BASE).ready_models()

@@ -9,8 +9,8 @@ It has a small interface:
   image and either a JSON schema or plain-JSON mode, at a fixed
   temperature, seed and context size.
 * :meth:`ModelClient.health`: is the service up, still loading, or gone.
-* :meth:`ModelClient.list_models` / :meth:`ModelClient.has_model`: which
-  models it serves.
+* :meth:`ModelClient.list_models`, :meth:`ModelClient.ready_models` and
+  :meth:`ModelClient.has_model`: which models it serves.
 
 Two backends sit behind it (``docs/internal/llama-cpp-plan.md``, Phase 1):
 
@@ -328,10 +328,14 @@ class ModelClient(ABC):
         """Models the service serves. Raises :class:`ModelServiceError`."""
         return self._parse_models(await self._get_json(self.models_path, timeout_s))
 
+    async def ready_models(self, *, timeout_s: float | None = None) -> list[ServedModel]:
+        """Models the service can answer with now. Raises :class:`ModelServiceError`."""
+        return await self.list_models(timeout_s=timeout_s)
+
     async def has_model(self, model: str, *, timeout_s: float | None = None) -> bool:
-        """True when the service is reachable and serves ``model``. Never raises."""
+        """True when the service is ready and serves ``model``. Never raises."""
         try:
-            return any(m.name == model for m in await self.list_models(timeout_s=timeout_s))
+            return any(m.name == model for m in await self.ready_models(timeout_s=timeout_s))
         except ModelServiceError:
             return False
 
@@ -557,17 +561,20 @@ class LlamaCppClient(ModelClient):
             return Health(HealthState.READY)
         return Health(HealthState.UNAVAILABLE, detail="unexpected health reply")
 
-    async def has_model(self, model: str, *, timeout_s: float | None = None) -> bool:
-        """Ready (not still loading) and serving ``model``.
+    async def ready_models(self, *, timeout_s: float | None = None) -> list[ServedModel]:
+        """Served models, but only once ``/health`` says the server is ready.
 
-        Outside router mode the server reports one model under its
-        ``--alias`` (or file path); the launcher must set the alias to the
-        name Axcess asks for.
+        A server still loading its model lists it but cannot answer yet.
+        Outside router mode the one model is listed under its ``--alias``
+        (or file path); the launcher must set the alias to the name Axcess
+        asks for.
         """
         health = await self.health(timeout_s=timeout_s)
+        if health.state is HealthState.LOADING:
+            raise ModelStatusError(503, "Loading model")
         if not health.ready:
-            return False
-        return await super().has_model(model, timeout_s=timeout_s)
+            raise ModelUnreachableError(health.detail or "not ready")
+        return await self.list_models(timeout_s=timeout_s)
 
 
 def _size(value: Any) -> int | None:

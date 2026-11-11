@@ -52,7 +52,12 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from audit import __version__, coverage_matrix, evaluation, occurrence_reviews
 from audit.ai.manager import AIManager
-from audit.ai.model_client import endpoint_from_settings, open_model_http_client
+from audit.ai.model_client import (
+    ModelServiceError,
+    endpoint_from_settings,
+    make_model_client,
+    open_model_http_client,
+)
 from audit.ai.state import AIConfig, ai_enabled, initialize_preferences
 from audit.ai.state import effective_settings as effective_ai_settings
 from audit.ai.state import semantic_model as ai_semantic_model
@@ -1437,21 +1442,18 @@ def create_app(
             )
 
         installed: dict[str, int] = {}
+        # Named for Ollama in the response; it means "the model service".
         ollama_reachable = False
+        endpoint = endpoint_from_settings(settings)
         try:
-            async with httpx.AsyncClient(timeout=2.0) as client:
-                response = await client.get(f"{settings.ollama_base_url.rstrip('/')}/api/tags")
-                response.raise_for_status()
-                payload = response.json()
-            models = payload.get("models", []) if isinstance(payload, dict) else []
-            for model in models if isinstance(models, list) else []:
-                if not isinstance(model, dict):
-                    continue
-                name = str(model.get("name") or "").strip()
-                if name:
-                    installed[name] = max(0, int(model.get("size") or 0))
+            async with open_model_http_client(endpoint, timeout=2.0) as client:
+                served = await make_model_client(
+                    endpoint.backend, client, base_url=endpoint.base_url
+                ).ready_models()
+            for model in served:
+                installed[model.name] = model.size_bytes or 0
             ollama_reachable = True
-        except (httpx.HTTPError, ValueError, TypeError, json.JSONDecodeError):
+        except ModelServiceError:
             pass
 
         def installed_size(model: str) -> int | None:
