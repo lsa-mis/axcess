@@ -135,5 +135,6 @@ Carried into Phase 2:
 | 1 | Keep "use my own Ollama" for the web and server versions? | Yes, through the Ollama backend; it costs little. | Yes, as recommended (2026-11-11; not yet confirmed by the developer) |
 | 2 | GPU builds to ship | Metal (macOS), Vulkan (Windows, Linux), CPU fallback; no CUDA/ROCm. | Yes (developer, 2026-11-11) |
 | 3 | Windows isolation | Needs research: AppContainer, a firewall rule bound to the binary, or none with a clear warning. | Research first (developer, 2026-11-11) |
-| 4 | Which llama.cpp build to pin | A tested build number, updated on purpose; releases come out several times a day. | Open |
+| 4 | Which llama.cpp build to pin | The newest build, once the live test passes on it (`tests/integration/test_llama_cpp_live.py`); bump the same way, on purpose, never automatically. | b12284, the newest on 2026-11-11 and the one Phase 1 was tested on (developer: "the newest one") |
 | 5 | Test Phase 1 against a real llama-server | Download one llama.cpp build and one small model, outside the repo. | Approved (developer, 2026-11-11) |
+| 6 | Upgrade the tier models? | Yes, by measurement: shortlist current models per tier (text and vision) with licence and size, run the repo's own evals on llama-server against today's Qwen3 / Qwen3-VL, and switch only where the numbers are better. | Developer open to it (2026-11-11); shortlist and downloads not yet approved |
