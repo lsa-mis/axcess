@@ -56,6 +56,33 @@ phase needs it.
   settings (AGENTS.md).
 - Tests with fake servers for both backends. No model downloads.
 
+Done 2026-11-11 (`src/audit/ai/model_client.py`; settings `model_backend`,
+`llama_cpp_url`, `llama_cpp_socket`). Verified against a real
+llama-server (b12284, CPU build, Qwen3-VL-2B Q4_K_M with its projector,
+UNIX socket): `/v1/chat/completions` carries an image (data URL or raw
+base64) and a JSON schema (`response_format` `json_schema`, `strict`) in
+one call, answers are schema-valid and repeat exactly at temperature 0
+and seed 1, and a crawl of the local fixture site classified image text
+through it. Opt-in test: `AXCESS_LLAMA_SOCKET=<socket> pytest
+tests/integration/test_llama_cpp_live.py`. Ollama request parity is
+checked against copies of the old code only (no live Ollama run); two
+bodies have one key in a new position, same keys and values.
+
+Carried into Phase 2:
+- The launcher sets the context size (`-c`) to at least 8192 (fix
+  suggestions ask for 8192; llama.cpp takes it at launch, not per
+  request) and `--alias` to the model names Axcess asks for.
+- A saved desktop AI setup forces `model_backend="ollama"` until the
+  private runtime's trust check knows llama.cpp
+  (`ai/state.py: effective_settings`).
+- Protected scans (helper app) and local sign-in scans still use Ollama:
+  their locality checks are written for loopback Ollama URLs and need a
+  socket-aware check.
+- `ai/runtime.py: ollama_version()` belongs to the private Ollama
+  installer and goes with it.
+- Not yet checked on a real server: the 503 "loading" health state,
+  router mode, `--alias` naming, `max_tokens` cut-off, and error bodies.
+
 ### Phase 2: llama.cpp inside Axcess Desktop, sandboxed
 
 - Ship a pinned `llama-server` build in each desktop package, verified
