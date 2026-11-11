@@ -165,6 +165,11 @@ def effective_settings(settings: Settings) -> Settings:
         return settings.model_copy(update={"suggestions_enabled": enabled})
     return settings.model_copy(
         update={
+            # The desktop AI setup installs and checks only Ollama, so its
+            # choice must reach Ollama even if the environment selects
+            # another backend (the private runtime's trust check above is
+            # Ollama-specific).
+            "model_backend": "ollama",
             "ollama_base_url": (
                 private_runtime_url(settings, config)
                 if config.source == "private"
