@@ -52,7 +52,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from audit import __version__, coverage_matrix, evaluation, occurrence_reviews
 from audit.ai.manager import AIManager
-from audit.ai.model_client import endpoint_from_settings
+from audit.ai.model_client import endpoint_from_settings, open_model_http_client
 from audit.ai.state import AIConfig, ai_enabled, initialize_preferences
 from audit.ai.state import effective_settings as effective_ai_settings
 from audit.ai.state import semantic_model as ai_semantic_model
@@ -992,12 +992,14 @@ def create_app(
             return
         provider = suggestion_state["provider"]
         if provider is None:
-            client = httpx.AsyncClient()
+            endpoint = endpoint_from_settings(settings)
+            client = open_model_http_client(endpoint)
             suggestion_state["client"] = client
             provider = OllamaSuggestionProvider(
                 client,
-                base_url=settings.ollama_base_url,
+                base_url=endpoint.base_url,
                 timeout_s=settings.suggestion_timeout_s,
+                backend=endpoint.backend,
             )
             suggestion_state["provider"] = provider
         worker = SuggestionWorker(

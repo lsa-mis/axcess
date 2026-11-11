@@ -1,15 +1,15 @@
-"""Ask the local Ollama model for a fix and check its answer is safe to show.
+"""Ask the local model for a fix and check its answer is safe to show.
 
-This talks to Ollama directly rather than through
-:class:`audit.analyzer.ollama_base.OllamaBase`: that class folds every
-failure into one ``OllamaError`` string, and the person asking needs to be
-told which of "Ollama is not running", "the model is not installed" and
-"it took too long" happened, because each has a different fix.
+This does not go through :class:`audit.analyzer.ollama_base.OllamaBase`:
+that class folds every failure into one ``OllamaError`` string, and the
+person asking needs to be told which of "the model service is not running",
+"the model is not installed" and "it took too long" happened, because each
+has a different fix. It uses the same model client
+(:mod:`audit.ai.model_client`), whose typed errors keep those apart.
 """
 
 from __future__ import annotations
 
-import base64
 import json
 import re
 from dataclasses import dataclass
@@ -20,6 +20,15 @@ from typing import Any, Protocol
 import httpx
 from pydantic import ValidationError
 
+from audit.ai.model_client import (
+    DEFAULT_BACKEND,
+    GenerateRequest,
+    ModelResponseError,
+    ModelServiceError,
+    ModelStatusError,
+    ModelTimeoutError,
+    make_model_client,
+)
 from audit.analyzer.ollama_base import prompt_content_version
 from audit.suggest.context import EvidenceBundle
 from audit.suggest.models import ErrorCode, ModelAnswer, ModelAnswerV2
@@ -173,56 +182,62 @@ class Provider(Protocol):
 
 
 class OllamaSuggestionProvider:
-    def __init__(self, client: httpx.AsyncClient, *, base_url: str, timeout_s: float) -> None:
+    """Fix suggestions from the local model service (Ollama by default).
+
+    The name predates the llama.cpp backend; ``backend`` picks the service.
+    """
+
+    def __init__(
+        self,
+        client: httpx.AsyncClient,
+        *,
+        base_url: str,
+        timeout_s: float,
+        backend: str = DEFAULT_BACKEND,
+    ) -> None:
         self._client = client
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout_s
+        self._model_client = make_model_client(backend, client, base_url=self._base_url)
 
     async def installed_models(self) -> set[str]:
         try:
-            resp = await self._client.get(f"{self._base_url}/api/tags", timeout=5.0)
-            resp.raise_for_status()
-            data = resp.json()
-        except (httpx.HTTPError, json.JSONDecodeError) as exc:
+            models = await self._model_client.list_models(timeout_s=5.0)
+        except ModelServiceError as exc:
             raise SuggestionError("model_unavailable", str(exc)[:200]) from exc
-        return {str(m.get("name")) for m in data.get("models", []) if m.get("name")}
+        return {m.name for m in models}
 
     async def generate(self, prompt: str, *, model: str, image: bytes | None) -> str:
-        payload: dict[str, object] = {
-            "model": model,
-            "prompt": prompt,
-            "stream": False,
-            # Ollama constrains the output to this schema (structured
+        request = GenerateRequest(
+            model=model,
+            prompt=prompt,
+            image=image,
+            # The service constrains the output to this schema (structured
             # outputs), so the answer cannot drift from the shape Axcess
             # checks. With "json" alone the model sometimes wrote
             # ``"paste_text": null`` and the suggestion failed.
-            "format": ANSWER_SCHEMA,
-            # Stays loaded between clicks, then frees the memory.
-            "keep_alive": KEEP_ALIVE,
-            "options": {
-                "temperature": 0,
-                # Room for the largest evidence bundle plus the answer, so a
-                # long prompt is never cut off silently.
-                "num_ctx": CONTEXT_TOKENS,
-                # Caps the time a runaway answer can take.
-                "num_predict": MAX_ANSWER_TOKENS,
-            },
-        }
-        if image is not None:
-            payload["images"] = [base64.b64encode(image).decode("ascii")]
+            json_schema=ANSWER_SCHEMA,
+            # Stays loaded between clicks, then frees the memory (Ollama).
+            keep_alive=KEEP_ALIVE,
+            temperature=0,
+            # Room for the largest evidence bundle plus the answer, so a
+            # long prompt is never cut off silently. Ollama takes it per
+            # request; llama-server must be started with at least this.
+            context_tokens=CONTEXT_TOKENS,
+            # Caps the time a runaway answer can take.
+            max_tokens=MAX_ANSWER_TOKENS,
+        )
         try:
-            resp = await self._client.post(
-                f"{self._base_url}/api/generate", json=payload, timeout=self._timeout
-            )
-        except httpx.TimeoutException as exc:
+            return await self._model_client.generate(request, timeout_s=self._timeout)
+        except ModelTimeoutError as exc:
             raise SuggestionError("timeout") from exc
-        except httpx.HTTPError as exc:
+        except ModelStatusError as exc:
+            if exc.status_code == 404:
+                raise SuggestionError("model_missing", model) from exc
+            raise SuggestionError("model_unavailable", f"HTTP {exc.status_code}") from exc
+        except ModelResponseError as exc:
+            raise SuggestionError(
+                "bad_answer", f"{self._model_client.label} did not return JSON."
+            ) from exc
+        except ModelServiceError as exc:
             raise SuggestionError("model_unavailable", str(exc)[:200]) from exc
-        if resp.status_code == 404:
-            raise SuggestionError("model_missing", model)
-        if resp.status_code != 200:
-            raise SuggestionError("model_unavailable", f"HTTP {resp.status_code}")
-        try:
-            return str(resp.json().get("response", ""))
-        except json.JSONDecodeError as exc:
-            raise SuggestionError("bad_answer", "Ollama did not return JSON.") from exc

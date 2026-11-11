@@ -22,9 +22,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import httpx
 import yaml
 
+from audit.ai.model_client import endpoint_from_settings, open_model_http_client
 from audit.config import get_settings
 from audit.suggest.context import EvidenceBundle
 from audit.suggest.models import ModelAnswerV2
@@ -72,9 +72,13 @@ async def _run(cases: list[dict[str, Any]], model: str) -> list[CaseResult]:
     settings = get_settings()
     verifier = AxeFragmentVerifier()
     results: list[CaseResult] = []
-    async with httpx.AsyncClient() as client:
+    endpoint = endpoint_from_settings(settings)
+    async with open_model_http_client(endpoint) as client:
         provider = OllamaSuggestionProvider(
-            client, base_url=settings.ollama_base_url, timeout_s=settings.suggestion_timeout_s
+            client,
+            base_url=endpoint.base_url,
+            timeout_s=settings.suggestion_timeout_s,
+            backend=endpoint.backend,
         )
         for case in cases:
             bundle = _bundle(case)
