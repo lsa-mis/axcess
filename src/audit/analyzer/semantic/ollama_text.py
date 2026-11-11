@@ -24,6 +24,7 @@ from typing import Any
 
 import httpx
 
+from audit.ai.model_client import DEFAULT_BACKEND, GenerateRequest
 from audit.analyzer.ollama_base import OllamaBase, OllamaError
 
 
@@ -52,6 +53,7 @@ class OllamaTextProvider(OllamaBase):
         max_attempts: int = 3,
         timeout_s: float = 120.0,
         keep_alive: str | int = -1,
+        backend: str = DEFAULT_BACKEND,
     ) -> None:
         super().__init__(
             client,
@@ -60,6 +62,7 @@ class OllamaTextProvider(OllamaBase):
             concurrency=concurrency,
             max_attempts=max_attempts,
             timeout_s=timeout_s,
+            backend=backend,
         )
         # keep_alive=-1 -> model stays resident in Ollama between calls.
         # At 10k pages x 10 criteria, we'd otherwise pay the ~5s model
@@ -92,16 +95,16 @@ class OllamaTextProvider(OllamaBase):
           producing valid-JSON-but-wrong-schema output, the caller
           owns that parse step.
         """
-        payload: dict[str, Any] = {
-            "model": model or self._model,
-            "prompt": prompt,
-            "stream": False,
-            "keep_alive": self._keep_alive,
-            "options": {"temperature": temperature},
-        }
-        if force_json:
-            payload["format"] = "json"
-        return await self._post_with_retries(payload)
+        return await self._generate(
+            GenerateRequest(
+                model=model or self._model,
+                prompt=prompt,
+                json_mode=force_json,
+                temperature=temperature,
+                # Ollama only; llama-server keeps its model loaded anyway.
+                keep_alive=self._keep_alive,
+            )
+        )
 
     async def generate_json(
         self,

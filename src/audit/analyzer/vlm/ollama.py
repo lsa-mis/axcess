@@ -16,12 +16,12 @@ and extractor.pipeline don't need to change.
 
 from __future__ import annotations
 
-import base64
 import json
 from importlib import resources
 
 import httpx
 
+from audit.ai.model_client import DEFAULT_BACKEND, GenerateRequest
 from audit.analyzer.ollama_base import (
     OllamaBase,
     OllamaError,
@@ -54,7 +54,7 @@ def prompt_version(prompt_text: str) -> str:
 
 
 class OllamaProvider(OllamaBase):
-    """VLM classifier that dispatches to a local Ollama ``/api/generate`` endpoint.
+    """VLM classifier that dispatches to the local model service (Ollama by default).
 
     Inherits the shared HTTP plumbing from :class:`OllamaBase`. The
     image-specific bits, prompt template loading, base64 image
@@ -71,6 +71,7 @@ class OllamaProvider(OllamaBase):
         concurrency: int = 1,
         max_attempts: int = 3,
         timeout_s: float = 120.0,
+        backend: str = DEFAULT_BACKEND,
     ) -> None:
         super().__init__(
             client,
@@ -79,6 +80,7 @@ class OllamaProvider(OllamaBase):
             concurrency=concurrency,
             max_attempts=max_attempts,
             timeout_s=timeout_s,
+            backend=backend,
         )
         self._prompt_template = load_prompt(prompt_name)
         self.prompt_version = prompt_version(self._prompt_template)
@@ -90,22 +92,24 @@ class OllamaProvider(OllamaBase):
         context: ClassifyContext,
     ) -> Classification:
         """Run one classification. Retries on transient HTTP errors with backoff."""
-        _ = mime  # Ollama infers format from the base64 payload
         filled = self._prompt_template.format(
             alt=_for_prompt(context.alt_text),
             figcaption=_for_prompt(context.figcaption),
             snippet=_for_prompt(context.context_snippet),
             ocr=_for_prompt(context.ocr_text or None),
         )
-        payload = {
-            "model": self._model,
-            "prompt": filled,
-            "images": [base64.b64encode(image_bytes).decode("ascii")],
-            "stream": False,
-            "format": "json",
-            "options": {"temperature": 0.0},
-        }
-        raw = await self._post_with_retries(payload)
+        raw = await self._generate(
+            GenerateRequest(
+                model=self._model,
+                prompt=filled,
+                image=image_bytes,
+                # Ollama infers the format from the bytes; llama.cpp gets a
+                # data: URL.
+                image_mime=mime,
+                json_mode=True,
+                temperature=0.0,
+            )
+        )
         label, rationale = _parse_model_output(raw)
         return Classification(
             label=label,
