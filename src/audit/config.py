@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -45,6 +46,17 @@ class Settings(BaseSettings):
     vlm_model: str = "qwen3-vl:2b-instruct"
     vlm_concurrency: int = 1
     vlm_prompt_name: str = "classify_v1.txt"
+
+    # Which local model service the scan-analysis checks and AI fix
+    # suggestions talk to (``audit.ai.model_client``). "ollama" (the
+    # default) uses ``ollama_base_url``; "llama_cpp" uses a ``llama-server``
+    # at ``llama_cpp_url``, or through the UNIX socket ``llama_cpp_socket``
+    # when one is set. A future report chat must get its own provider
+    # setting, never this one, so changing a chat model cannot change how a
+    # finished report was produced (AGENTS.md).
+    model_backend: Literal["ollama", "llama_cpp"] = "ollama"
+    llama_cpp_url: str = "http://127.0.0.1:8080"
+    llama_cpp_socket: Path | None = None
 
     # AI fix suggestions (on demand, per occurrence). Off until an
     # administrator turns them on. The models are deliberately separate from
