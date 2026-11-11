@@ -307,6 +307,43 @@ async def test_page_inspector_suggests_a_fix_for_the_element_you_are_on(
     assert not violations, _render_violations(violations)
 
 
+@pytest.mark.parametrize("width", [1280, 400])
+async def test_suggestion_and_review_share_a_row_suggestion_first(
+    suggest_server: tuple[str, int, int, int], new_page: Any, width: int
+) -> None:
+    """The AI suggestion takes the left two thirds and the review the right
+    third on a wide screen; on a narrow one they stack. The suggestion comes
+    first in the page code too, so focus order follows what is seen
+    (SC 2.4.3, SC 1.3.2). The developer's layout, 2026-11-11."""
+    base, scan_id, page_id, _ = suggest_server
+    page = await new_page(viewport={"width": width, "height": 900})
+    await page.goto(
+        f"{base}/app/scans/{scan_id}/pages/{page_id}/inspect?issue=axe:aria-input-field-name",
+        wait_until="networkidle",
+    )
+    suggest = page.get_by_role("button", name="Suggest a fix (AI)")
+    review = page.get_by_role("group", name="The flagged element you are on")
+    await suggest.wait_for()
+    await review.wait_for()
+    assert await suggest.evaluate(
+        "(el, other) => Boolean("
+        "el.compareDocumentPosition(other) & Node.DOCUMENT_POSITION_FOLLOWING)",
+        await review.element_handle(),
+    )
+    column = suggest.locator("xpath=ancestor::div[contains(@class, 'lg:col-span-2')][1]")
+    left, right = await column.bounding_box(), await review.bounding_box()
+    assert left and right
+    if width >= 1024:
+        # Side by side, the suggestion on the left at about twice the width.
+        assert right["x"] >= left["x"] + left["width"], (left, right)
+        assert abs(right["y"] - left["y"]) < 2, (left, right)
+        assert 1.6 < left["width"] / right["width"] < 2.4, (left, right)
+    else:
+        # Stacked, suggestion first, nothing wider than the screen.
+        assert right["y"] >= left["y"] + left["height"], (left, right)
+        assert right["x"] + right["width"] <= width and left["x"] + left["width"] <= width
+
+
 @pytest.mark.parametrize("suggest_server", ["guidance"], indirect=True)
 async def test_guidance_is_the_saved_rule_link(
     suggest_server: tuple[str, int, int, int], new_page: Any

@@ -968,6 +968,12 @@ export default function InspectorRoute() {
     suggestionsApply && !suggestionStatus.enabled
       ? suggestionStatus
       : null;
+  // Which of the two panels under the toolbar show (see the comment on that
+  // row for the layout).
+  const showSuggestion = Boolean(
+    showHighlights && highlightedCount > 0 && currentOccurrence && (suggestions || suggestionsBlocked),
+  );
+  const showReview = Boolean(showHighlights && highlightedCount > 0 && currentElement && canReview);
   const goToPageMark = (index: number) => {
     const bounded = Math.max(0, Math.min(highlightedCount - 1, index));
     setPageMark(bounded);
@@ -1415,9 +1421,39 @@ export default function InspectorRoute() {
                 screenshot is captured or stored. `onLoad` is a document-load
                 lifecycle signal, not an interaction, so the a11y rule below is
                 a false positive for an iframe. */}
-            {/* The person's review of the flagged element (its decision,
-                notes and the "Review this element" button), under the
-                toolbar; see ElementReview for why.
+            {/* The AI suggestion and the person's review of the flagged
+                element share one row under the toolbar: the suggestion on
+                the left, two thirds of the width, and the review on the
+                right, one third (the developer's layout, 2026-11-11). Both
+                are about the element the reader is on, so they sit together
+                and follow Previous / Next (W3C COGA "Making Content Usable",
+                paraphrased: keep related content together;
+                https://www.w3.org/TR/coga-usable/).
+                - The suggestion comes first in the page code too, not only on
+                  screen, so Tab and a screen reader meet them in the order
+                  they are seen, left then right (SC 2.4.3 Focus Order,
+                  Level A; SC 1.3.2 Meaningful Sequence, Level A). Rejected:
+                  keeping the review first in the code and moving it right
+                  with CSS, which would send focus right and then back left.
+                - Side by side from lg (1024 px). Narrower, they stack in the
+                  same order, so nothing needs scrolling sideways at 320 px
+                  (SC 1.4.10 Reflow, Level AA).
+                - When only one shows (no suggestion when AI suggestions are
+                  not set up, no review on a protected report), it keeps the
+                  width it had alone: the suggestion the full row, the review
+                  its 21rem column.
+                - The review keeps its 21rem column inside its third, so its
+                  buttons keep the rows ElementReview's layout is built for
+                  ("Mark ... as repeats" under "Review this element").
+                - The suggestion needs only the occurrence, so it must not
+                  wait for, or vanish with, the saved copy; the review needs
+                  the element described, so it waits. Keyed on the occurrence
+                  so stepping never shows the last element's suggestion.
+                  Heading level 2: this sits straight under the page's h1
+                  (SC 1.3.1 Info and Relationships, Level A). Rejected for
+                  the suggestion: a list under the page, a long scroll from
+                  the element, and a third tab beside "Saved copy", which
+                  would hide the outlined element while the fix is read.
 
                 There was a table of facts here too: What it is, Text or
                 label, Size, Where the box is, and an element's place in the
@@ -1431,17 +1467,41 @@ export default function InspectorRoute() {
                 Characteristics, Level A: the box's absence alone cannot say
                 why). Lost with it: the size in pixels, the image address,
                 and the count of occurrences on one element. */}
-            {showHighlights && highlightedCount > 0 && currentElement && canReview && (
+            {(showSuggestion || showReview) && (
               <div
-                role="group"
-                aria-label="The flagged element you are on"
-                className="border-b border-border bg-surface px-3 py-2 text-sm text-fg"
+                className={cn(
+                  "border-b border-border bg-surface px-3 py-2 text-sm text-fg",
+                  showSuggestion && showReview && "lg:grid lg:grid-cols-3 lg:gap-6",
+                )}
               >
-                {/* The width of the column it had beside the facts table, so
-                    its buttons keep the rows ElementReview's layout is built
-                    for ("Mark ... as repeats" under "Review this element"). */}
-                <div className="max-w-[21rem]">
-                  <ElementReview
+                {showSuggestion && currentOccurrence && (
+                  <div className="min-w-0 lg:col-span-2">
+                    {suggestions && (
+                      <FixSuggestion
+                        key={`${currentOccurrence.kind}-${currentOccurrence.id}`}
+                        scanId={scan}
+                        kind={currentOccurrence.kind}
+                        occurrenceId={currentOccurrence.id}
+                        availability={suggestions}
+                        headingLevel={2}
+                      />
+                    )}
+                    {suggestionsBlocked && (
+                      <SuggestionsBlockedNote status={suggestionsBlocked} className={suggestions ? "mt-3" : ""} />
+                    )}
+                  </div>
+                )}
+                {showReview && currentElement && (
+                  <div
+                    role="group"
+                    aria-label="The flagged element you are on"
+                    className={cn(
+                      showSuggestion &&
+                        "mt-3 border-t border-border pt-3 lg:mt-0 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0",
+                    )}
+                  >
+                    <div className="max-w-[21rem]">
+                      <ElementReview
                         key={`${scan}:${page}`}
                         scanId={scan}
                         pageId={page}
@@ -1468,7 +1528,9 @@ export default function InspectorRoute() {
                         onDraftChange={setReviewDraft}
                         onSaved={reviewSaved}
                       />
-                </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             {/* Says when the saved copy may not look like the page Axcess
@@ -1498,38 +1560,6 @@ export default function InspectorRoute() {
                 </p>
               )}
             </div>
-            {/* The AI suggestion sits right under the toolbar and the review
-                of the element it is for, and follows Previous / Next: the
-                reader sees the outlined element and a suggested fix together.
-                Rejected: a list of suggestions under the page, which put the
-                fix a long scroll away from the element and left the reader to
-                match them up (W3C COGA "Making Content Usable", paraphrased:
-                keep related content together; https://www.w3.org/TR/coga-usable/).
-                Also rejected: a third tab beside "Saved copy", which would hide
-                the outlined element while the fix is read. Its own row: the
-                suggestion needs only the occurrence, so it must not wait for,
-                or vanish with, the saved copy. Keyed on the occurrence so
-                stepping never shows the last element's suggestion. Heading
-                level 2: this sits straight under the page's h1 (SC 1.3.1 Info
-                and Relationships, Level A). It sat under a table of facts
-                about the element until that table was removed (2026-11-10). */}
-            {showHighlights && highlightedCount > 0 && currentOccurrence && (suggestions || suggestionsBlocked) && (
-              <div className="border-b border-border bg-surface px-3 pb-3">
-                {suggestions && (
-                  <FixSuggestion
-                    key={`${currentOccurrence.kind}-${currentOccurrence.id}`}
-                    scanId={scan}
-                    kind={currentOccurrence.kind}
-                    occurrenceId={currentOccurrence.id}
-                    availability={suggestions}
-                    headingLevel={2}
-                  />
-                )}
-                {suggestionsBlocked && (
-                  <SuggestionsBlockedNote status={suggestionsBlocked} className="mt-3" />
-                )}
-              </div>
-            )}
             {layout && (
               <p className="border-b border-border bg-umich-blue/5 px-3 py-2 text-xs text-fg">
                 <span className="font-semibold">As the zoom and layout check saw it: </span>
