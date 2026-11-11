@@ -69,8 +69,24 @@ phase needs it.
   process per model; decide after trying router mode with a text and a
   vision model.
 - Sandbox: macOS `sandbox-exec` as now; Linux Bubblewrap with
-  `--unshare-net` and a UNIX socket; Windows needs a design (none
-  today, so private AI does not start there).
+  `--unshare-net` and a UNIX socket. Windows: see
+  `docs/internal/windows-ai-sandbox.md` (research, 2026-11-11). It
+  recommends an LPAC AppContainer with no network capabilities inside a
+  job object, started by a small native launcher (Python's `subprocess`
+  cannot set AppContainer capabilities). Unconfirmed and to test first:
+  whether the official Windows llama-server build listens on AF_UNIX,
+  whether an AF_UNIX socket made inside the AppContainer is reachable
+  from outside it, and whether Vulkan works inside an LPAC. Python has
+  no AF_UNIX on Windows, so the backend needs a shim or a bridge.
+- Router mode starts its child servers on loopback TCP, which an LPAC
+  blocks; plan on one llama-server process per model.
+- Likely bug to fix in this phase (found by reading, not yet run): the
+  sandbox's network probe runs `sys.executable -I -S -c ...`. In the
+  packaged desktop app `sys.executable` is the frozen backend, whose
+  entry point (`desktop/backend_entry.py`) ignores those flags and
+  starts the server, so the probe would fail and private AI would never
+  start in the packaged app, macOS included. Confirm on a packaged
+  build; the native launcher (or an explicit probe entry point) fixes it.
 - Settings > AI features: the download is the model only.
 
 ### Phase 3: wording, docs and measurement
