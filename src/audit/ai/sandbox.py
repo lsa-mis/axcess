@@ -95,7 +95,17 @@ def build_sandbox(
                 "--dev",
                 "/dev",
             ]
-            for p in ("/usr", "/lib", "/lib64", sys.base_prefix, str(runtime.resolve())):
+            # The executable's own folder too: in the packaged app it holds
+            # the backend that runs the network probe, and PyInstaller's
+            # ``sys.base_prefix`` is only its ``_internal`` subfolder.
+            for p in (
+                "/usr",
+                "/lib",
+                "/lib64",
+                sys.base_prefix,
+                str(Path(sys.executable).resolve().parent),
+                str(runtime.resolve()),
+            ):
                 if Path(p).exists():
                     args += ["--ro-bind", p, p]
             args += [
@@ -133,12 +143,31 @@ except OSError as e:
 sys.exit(1)
 """
 
+# The packaged desktop backend is a PyInstaller executable, not a Python
+# interpreter: it ignores ``-I -S -c`` and starts the server's argument
+# parser, which exits with a usage error, so the probe could never pass.
+# It answers this flag instead (``desktop/backend_entry.py``).
+NETWORK_PROBE_FLAG = "--axcess-network-probe"
+
+
+def run_network_probe() -> None:
+    """Run the probe in this process and exit; for the packaged backend."""
+    exec(compile(_PROBE, "<axcess-network-probe>", "exec"), {"__name__": "__probe__"})  # noqa: S102 - fixed constant
+    sys.exit(1)
+
+
+def _probe_argv() -> list[str]:
+    executable = str(Path(sys.executable).resolve())
+    if getattr(sys, "frozen", False):
+        return [executable, NETWORK_PROBE_FLAG]
+    return [executable, "-I", "-S", "-c", _PROBE]
+
 
 def test_network_boundary(sandbox: Sandbox) -> None:
     """A timeout or broken probe is not proof: only an OS denial passes."""
     try:
         result = subprocess.run(  # noqa: S603 - fixed probe inside the selected OS sandbox
-            sandbox.command([str(Path(sys.executable).resolve()), "-I", "-S", "-c", _PROBE]),
+            sandbox.command(_probe_argv()),
             capture_output=True,
             text=True,
             timeout=5,

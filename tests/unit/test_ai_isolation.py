@@ -16,7 +16,13 @@ from audit.ai.catalog import load_catalog
 from audit.ai.downloader import download_model, model_path, model_present
 from audit.ai.manager import AIManager
 from audit.ai.runtime import OllamaRuntime
-from audit.ai.sandbox import IsolationError, Sandbox, build_sandbox, macos_profile
+from audit.ai.sandbox import (
+    NETWORK_PROBE_FLAG,
+    IsolationError,
+    Sandbox,
+    build_sandbox,
+    macos_profile,
+)
 from audit.ai.sandbox import test_network_boundary as check_network
 from audit.ai.state import (
     AIConfig,
@@ -84,6 +90,51 @@ def test_os_denial_passes_network_preflight(monkeypatch) -> None:
         lambda *a, **k: subprocess.CompletedProcess(a[0], 0, stdout="AXCESS_NETWORK_BLOCKED\n"),
     )
     check_network(Sandbox(["sandbox"]))
+
+
+def _probe_command(monkeypatch) -> list[str]:
+    seen: list[list[str]] = []
+
+    def run(argv, **_kwargs):
+        seen.append(argv)
+        return subprocess.CompletedProcess(argv, 0, stdout="AXCESS_NETWORK_BLOCKED\n")
+
+    monkeypatch.setattr("audit.ai.sandbox.subprocess.run", run)
+    check_network(Sandbox(["sandbox"]))
+    return seen[0]
+
+
+def test_probe_uses_python_flags_when_not_packaged(monkeypatch) -> None:
+    monkeypatch.delattr("sys.frozen", raising=False)
+    command = _probe_command(monkeypatch)
+    assert command[0] == "sandbox"
+    assert command[2:5] == ["-I", "-S", "-c"]
+
+
+def test_packaged_backend_gets_its_probe_flag_not_python_flags(monkeypatch) -> None:
+    """A PyInstaller backend ignores -I -S -c and exits with a usage error."""
+    monkeypatch.setattr("sys.frozen", True, raising=False)
+    command = _probe_command(monkeypatch)
+    assert command[2:] == [NETWORK_PROBE_FLAG]
+
+
+def test_backend_entry_answers_the_same_probe_flag() -> None:
+    entry = (Path(__file__).parents[2] / "desktop" / "backend_entry.py").read_text()
+    assert f'sys.argv[1:] == ["{NETWORK_PROBE_FLAG}"]' in entry
+    assert entry.index("run_network_probe()") < entry.index("from audit.desktop_server")
+
+
+def test_linux_builder_binds_the_executables_folder(tmp_path, monkeypatch) -> None:
+    """The packaged backend runs the probe, so its folder must exist inside."""
+    app = tmp_path / "app"
+    (app / "_internal").mkdir(parents=True)
+    (app / "axcess-server").write_text("")
+    monkeypatch.setattr("audit.ai.sandbox.shutil.which", lambda tool: "/usr/bin/bwrap")
+    monkeypatch.setattr("sys.executable", str(app / "axcess-server"))
+    monkeypatch.setattr("sys.base_prefix", str(app / "_internal"))
+    sandbox = build_sandbox(tmp_path, tmp_path / "models", tmp_path / "scratch", platform="linux")
+    binds = [sandbox.prefix[i + 1] for i, a in enumerate(sandbox.prefix) if a == "--ro-bind"]
+    assert str(app.resolve()) in binds
 
 
 def registry_client(payload: bytes, *, wrong_blob: bool = False, wrong_manifest: bool = False):
