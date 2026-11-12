@@ -173,6 +173,16 @@ Built 2026-11-12 (Linux and macOS; Windows still refuses to start AI):
   starts from one long-lived launcher thread; and with reasoning
   extraction on, Qwen3-4B-Instruct-2507 wrote a preamble before its JSON
   that emptied short answers, so the preset sets `reasoning-format = none`.
+- macOS checked on GitHub's macOS 15 runner (`ai-sandbox.yml`, empty model
+  list): the profile, its UNIX-socket rule and the network check pass, and
+  the router answers through its socket. Two fixes were needed, and both
+  also blocked the old Ollama path: `file-read-metadata` (Python could not
+  resolve its own path) and running programs inside Python's install folder
+  (a framework Python starts `Python.app`). Not yet run on a Mac with a
+  model loaded on Metal.
+- Desktop test build 43304128432: all three platforms bundle llama.cpp
+  b12284 and pass `verify-resources`. The Windows build includes it, but AI
+  still refuses to start on Windows.
 - Checked in a desktop-mode server with the bundled-program layout: setup
   through the API, background start at launch (about 10 s), AI off and on,
   no service left after Axcess is killed, and the fix-suggestion evals
