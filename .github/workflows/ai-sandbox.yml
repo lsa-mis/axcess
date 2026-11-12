@@ -55,7 +55,11 @@ jobs:
           python-version: "3.13"
       - name: Install Bubblewrap
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends bubblewrap
+        # Ubuntu 24.04 blocks unprivileged user namespaces through AppArmor
+        # by default; desktop distributions Axcess supports allow them.
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends bubblewrap
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - name: Install locked dependencies
         # Tests import from src; installing the Axcess wheel would need the
         # packaged React dist, which this job does not build.
@@ -70,6 +74,11 @@ jobs:
           uv run --no-sync pytest -v -p no:cacheprovider
           tests/integration/test_llama_runtime_live.py
           tests/integration/test_ai_sandbox_live.py
+      - name: Show what the network check sees
+        if: failure()
+        env:
+          PYTHONPATH: src
+        run: uv run --no-sync python scripts/ai_sandbox_diagnose.py
       - name: Show the service log
         if: failure()
         run: find /tmp -maxdepth 3 -name llama-server.log -exec tail -n 80 {} \; || true

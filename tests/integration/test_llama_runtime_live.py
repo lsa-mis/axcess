@@ -19,6 +19,7 @@ from __future__ import annotations
 import asyncio
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import threading
@@ -36,6 +37,7 @@ from audit.ai.model_client import (
     open_model_http_client,
 )
 from audit.ai.runtime import SOCKET_BASE_URL, LlamaRuntime
+from audit.ai.sandbox import build_sandbox
 
 SERVER_DIR = os.environ.get("AXCESS_LLAMA_SERVER_DIR")
 AI_DIR = os.environ.get("AXCESS_LLAMA_AI_DIR")
@@ -50,6 +52,19 @@ def _short_tmp() -> Path:
     # A UNIX socket path must stay under about 100 bytes; pytest's tmp_path
     # on macOS is long, so use a short private folder of our own.
     return Path(tempfile.mkdtemp(prefix="axl-", dir="/tmp" if Path("/tmp").is_dir() else None))  # noqa: S108 - mkdtemp makes a private folder
+
+
+@pytest.fixture(autouse=True)
+def _sandbox_works(tmp_path: Path) -> None:
+    """Skip where the OS sandbox itself cannot run (some CI containers)."""
+    if not sys.platform.startswith("linux"):
+        return
+    sandbox = build_sandbox(tmp_path, tmp_path, tmp_path)
+    smoke = subprocess.run(  # noqa: S603 - fixed command in the test sandbox
+        sandbox.command(["/usr/bin/true"]), capture_output=True, check=False
+    )
+    if smoke.returncode != 0:
+        pytest.skip(f"Bubblewrap cannot run here: {smoke.stderr.decode()[:120]}")
 
 
 def test_router_answers_through_its_socket_inside_the_sandbox() -> None:
