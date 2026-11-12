@@ -57,6 +57,12 @@ def macos_profile(runtime: Path, models: Path, scratch: Path) -> str:
             f"(literal {path(Path(sys.executable).resolve())}))",
             "(allow sysctl-read)",
             '(allow file-read* (literal "/"))',
+            # File details only (what ``stat`` returns), never contents: a
+            # program resolving its own path looks up every parent folder
+            # (/Library, /Applications, ...). Without this, Python stopped
+            # at start with "realpath: Operation not permitted" (GitHub
+            # macOS 15 runner, 2026-11-12), so the isolation check failed.
+            "(allow file-read-metadata)",
             "(allow file-read* " + " ".join(f"(subpath {path(p)})" for p in reads) + ")",
             f"(allow file-write* (subpath {path(models.resolve())}) "
             f'(subpath {path(scratch.resolve())}) (literal "/dev/null"))',
