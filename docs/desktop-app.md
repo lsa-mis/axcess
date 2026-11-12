@@ -22,31 +22,54 @@ React workbench in a sandboxed Electron window.
 - Alfa can use Electron's bundled Node runtime. Users do not need a separate
   Node installation in a packaged build.
 - The installer includes the matching Playwright Chromium, Siteimprove Alfa
-  packages, Tesseract executable, and English OCR language data. Users do not
-  need Python, Node.js, Chromium, or Tesseract installed separately.
-- Ollama and its optional local language/vision models are not silently
-  installed or downloaded. **Settings > AI features** (on because
-  `desktopEnvironment` sets `AUDIT_DESKTOP=1`) checks memory, disk and
-  graphics chip, suggests a size, and downloads a pinned, checksum-verified
-  Ollama and the models only after the person selects **Download and set up**.
-  It always installs a private copy, not an Ollama already on port 11434.
-  **Start AI service** starts that private copy without downloading anything.
-  On macOS it uses a deny-by-default OS sandbox and a checked loopback-only
-  connection. The service cannot reach the internet; downloads run separately.
-  The sandbox allows only the Mac graphics driver and shader compiler, so
-  models still run on the graphics chip (Metal).
-  Windows and systems without supported isolation refuse to start AI. Linux
-  network namespaces are supported by the command builder, but starting stays
-  blocked until Axcess has a private connection bridge to that namespace. See
+  packages, Tesseract executable, English OCR language data, and the AI
+  program (llama.cpp `llama-server`, MIT licence) pinned in
+  `src/audit/ai/catalog.json`. Users do not need Python, Node.js, Chromium,
+  or Tesseract installed separately.
+- The desktop app no longer installs or runs Ollama. Its private AI service
+  is the included AI program (llama.cpp). The optional AI models are not silently
+  downloaded. **Settings > AI features** (on because `desktopEnvironment`
+  sets `AUDIT_DESKTOP=1`) checks memory, disk and graphics chip, and
+  suggests a size: Small, Standard or Large. Only after the person selects
+  **Download and set up** does it download the two AI models for that size
+  (GGUF files) from Hugging Face. Each file is pinned to an exact version
+  and checked against its SHA-256 before use.
+- The AI models, all under the Apache 2.0 licence, are a text model and an
+  image model for each size. Small: Qwen3-4B-Instruct-2507 and Qwen3-VL-2B.
+  Standard: Qwen2.5-Coder-7B and Qwen3-VL-4B. Large: Qwen2.5-Coder-14B and
+  Qwen3-VL-8B.
+- The private AI service runs in an operating-system sandbox with no
+  internet access: Bubblewrap with no network on Linux (Bubblewrap must be
+  installed, or AI does not start), and a deny-by-default `sandbox-exec`
+  profile on macOS. Axcess talks to it through a private connection, a UNIX
+  socket file in its data folder. Before starting, Axcess checks that
+  outside connections are blocked; if that check fails, AI does not start.
+  On Windows, the private AI service cannot be isolated yet, so AI does not
+  start there; saved results still work. Downloads run outside the sandbox.
+  See
   [Set up AI features](ai-suggestions.md#set-up-ai-features-in-the-desktop-app).
-  Model-assisted scan checks stay off for each new scan and clearly report
-  when Ollama is unavailable.
+- The service tries a graphics chip build first: Metal on Apple Silicon
+  Macs, Vulkan on Linux and Windows. If it cannot load the models, Axcess
+  uses the processor-only (CPU) build. There are no CUDA or ROCm builds.
+  On macOS the sandbox allows only the Mac graphics driver and shader
+  compiler, so models still run on the graphics chip (Metal).
+- **Start AI service** starts the private AI service without downloading
+  anything. When the app opens with AI on, the service starts in the
+  background; until it is ready, AI requests say it is not running.
+  Model-assisted scan checks stay off for each new scan and report when the
+  AI service is unavailable.
+- An AI setup saved by an older version used a private copy of Ollama. It no
+  longer runs: the person downloads the models again, and a successful
+  download deletes the old private Ollama files. An older setup that uses
+  the person's own Ollama keeps using it; Axcess does not start, stop or
+  isolate that Ollama.
 - **Settings > AI features** has **Turn AI off** and **Turn AI on**.
-  Off stops Axcess's private Ollama, blocks new model calls, and keeps the
+  Off stops the private AI service, blocks new model calls, and keeps the
   downloaded files and saved results. It never stops an Ollama you started
-  yourself. Turning AI on reuses kept models; new scan AI checks still need
-  a separate choice for each scan. Finish or stop a scan, finish or cancel
-  waiting answers, and pause a download before changing the setting.
+  yourself. Turning AI on starts the service again and reuses kept models;
+  new scan AI checks still need a separate choice for each scan. Finish or
+  stop a scan, finish or cancel waiting answers, and pause a download before
+  changing the setting.
   Existing installations keep their setup without repeating the welcome.
   The saved desktop choice takes precedence over `AUDIT_SUGGESTIONS_ENABLED`.
   See

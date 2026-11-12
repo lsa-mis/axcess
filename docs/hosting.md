@@ -22,11 +22,14 @@ a few minutes of setup. This is the runbook for that ("Path A").
 * **Heavy runtime.** Most checks need a real browser: axe-core and the
   keyboard, focus, zoom, motion and Click-Through checks run only on pages
   rendered in Chromium. So the host needs Playwright and Chromium installed
-  (`make setup` does this). The optional AI checks also need an
-  [Ollama](https://ollama.com) service with models pulled: `make fetch-models`
-  pulls the vision models, and `make fetch-analyzer-models` pulls the
-  recommended models for every AI check. You can run without Ollama (see
-  [Running without Ollama](#running-without-ollama)).
+  (`make setup` does this). The optional AI checks also need an AI service
+  that you run. One choice is an [Ollama](https://ollama.com) service with
+  models pulled: `make fetch-models` pulls the vision models, and
+  `make fetch-analyzer-models` pulls the recommended models for every AI
+  check. The other is a llama.cpp server: set `AUDIT_MODEL_BACKEND=llama_cpp`
+  and its address in `AUDIT_LLAMA_CPP_URL`, or its UNIX socket file in
+  `AUDIT_LLAMA_CPP_SOCKET`. You can run without either (see
+  [Running without an AI service](#running-without-an-ai-service)).
 * **It's a crawler.** Anyone with access can point it at any URL. Keep
   access restricted to people you trust.
 
@@ -126,10 +129,10 @@ that's Path B/C.
 ### Outbound links
 
 The app makes no outbound request of its own beyond the site being
-scanned and, when the AI checks are used, the Ollama service it is
-configured for (by default `http://localhost:11434`). The one outbound
-*link* is **Give feedback** in the top bar, which opens a hosted Asana
-form in a new tab. It carries no scan data (the form receives only
+scanned and, when the AI checks are used, the AI service it is configured
+for: Ollama (by default `http://localhost:11434`) or a llama.cpp server.
+The one outbound *link* is **Give feedback** in the top bar, which
+opens a hosted Asana form in a new tab. It carries no scan data (the form receives only
 what the person types into it), and nothing happens until someone
 clicks it. In the packaged desktop app the Electron shell hands
 http(s) links to the system browser rather than opening a window
@@ -195,7 +198,7 @@ U-M security team before approving a production target.
 
 ---
 
-## Running without Ollama
+## Running without an AI service
 
 You can skip the local AI service: its models are large downloads and add
 time to every page. Without it, Axcess still renders pages and runs axe-core,
@@ -212,13 +215,13 @@ model. On the command line these checks are on by default, so turn them off:
 uv run audit crawl https://example.com --skip-vlm --skip-semantic --skip-visual
 ```
 
-If Ollama isn't reachable when a scan starts, Axcess logs a warning and
-continues without those checks. The report's "What this scan actually checked"
+If the AI service isn't reachable when a scan starts, Axcess logs a warning
+and continues without those checks. The report's "What this scan actually checked"
 list shows whether the vision model and the wording check ran. The motion
 check has no row there, so note it separately when it was off.
 
-AI fix suggestions are off by default and also need Ollama. When they are
-on and Ollama is not reachable, the page details show one note saying so;
+AI fix suggestions are off by default and also need the AI service. When
+they are on and it is not reachable, the page details show one note saying so;
 everything else works. See [AI fix suggestions](./ai-suggestions.md).
 
 ---
@@ -256,7 +259,7 @@ When one-crawl-at-a-time or the shared token stops being enough:
   already supports, and swap the shared token for real accounts.
 * **Path C (public SaaS):** add tenant isolation, per-user quotas, abuse
   controls on the crawler, and a hosted-GPU or cloud-LLM story to
-  replace local Ollama.
+  replace the local AI service.
 
 Both are real projects, not settings you can change, because much of Axcess
 depends on running on one computer. The quick start above covers what most

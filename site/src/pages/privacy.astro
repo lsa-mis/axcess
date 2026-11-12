@@ -14,11 +14,14 @@
  * one idea per chunk, https://www.w3.org/TR/coga-usable/, paraphrased).
  *
  * Every fact was checked against the code (desktop/src/updates.cjs and
- * main.cjs for the update check, src/audit/config.py for Ollama,
+ * main.cjs for the update check, src/audit/config.py for Ollama and a
+ * llama.cpp server, src/audit/ai/ for the desktop app's private AI service
+ * (catalog.json, runtime.py, sandbox.py, downloader.py),
  * src/audit/web/server.py and src/audit/protected/ for sign-in scans,
  * docs/desktop-app.md for the folders). Where the old page said more than
  * the code does, the claim is narrowed here, never dropped: for example,
- * Ollama's address can be changed for public scans, so the page says so.
+ * the AI service's address can be changed for public scans, so the page
+ * says so.
  *
  * Rejected: the old page's two diagrams (privacy-boundary.png,
  * login-scan-flow.png). Their words are out of date ("Site with a login or
@@ -86,8 +89,9 @@ import { REPO, url } from "../lib/site";
       includes it. If you run Axcess from the source code, you install Tesseract yourself.
     </li>
     <li>
-      <strong>Optional AI.</strong> If you install Ollama, a program that runs AI models, Axcess uses it on this
-      computer by default. <a href="#ai">More about the AI checks</a>.
+      <strong>Optional AI.</strong> In the desktop app, AI models run on this computer, in a private AI service with
+      no internet access. If you run Axcess from source code or on a server, it uses an Ollama or llama.cpp server
+      that you run, on this computer by default. <a href="#ai">More about the AI checks</a>.
     </li>
   </ul>
 
@@ -103,6 +107,12 @@ import { REPO, url } from "../lib/site";
       <strong>GitHub, to check for a newer desktop app.</strong> Each time you open the desktop app, it asks GitHub
       once whether a newer version exists. On a Mac it also asks when you reopen its window. The request carries no
       scan data. Nothing is downloaded unless you choose to update. Setting <code>AXCESS_DISABLE_UPDATE_CHECK=1</code> turns the check off.
+    </li>
+    <li>
+      <strong>Hugging Face, only if you set up AI features.</strong> When you choose a size and select
+      <em>Download and set up</em>, the desktop app downloads the AI models from Hugging Face, a website that shares
+      AI models. If you run Axcess from source code, setup also downloads the AI program (llama.cpp) from GitHub.
+      These downloads carry no scan data.
     </li>
     <li>
       <strong>Links you choose to open.</strong> <em>Give feedback</em> opens a form in your browser, and <em>About this rule</em> opens the rule's help page. They open only when you select them, and nothing about
@@ -159,15 +169,27 @@ import { REPO, url } from "../lib/site";
        site the same (SC 3.2.4 Consistent Identification, Level AA). */
   }
   <div class="not-content ax-prose cards">
-    <Card heading="You install it, or you don't">
+    <Card heading="You choose it, or you don't">
       <p>
-        AI review, and comparing image text with alt text, need Ollama and models you download yourself. Axcess
-        never installs them or downloads a model by itself, and every other check works without them.
+        AI review, and comparing image text with alt text, need AI models. Axcess never downloads them by itself.
+        The desktop app downloads them only after you choose a size in Settings and select
+        <em>Download and set up</em>. Each file is pinned to an exact version and checked before it is used. Every
+        other check works without them.
       </p>
       <p>
-        Axcess looks for Ollama on this computer. Whoever sets up Axcess can point a public scan at Ollama on
-        another computer (the <code>AUDIT_OLLAMA_BASE_URL</code> setting). A sign-in scan only accepts Ollama on this
-        same computer.
+        In the desktop app, the models run in a private AI service: the AI program (llama.cpp) that comes with the
+        app. It runs in a sandbox that the operating system keeps away from the internet (Bubblewrap on Linux,
+        <code>sandbox-exec</code> on macOS). Axcess talks to it through
+        a private connection, a file in its data folder (a UNIX socket). Before the service starts, Axcess checks
+        that outside connections are blocked. If that check fails, AI does not start. On Windows, the service cannot
+        be kept apart from the internet yet, so AI does not start there.
+      </p>
+      <p>
+        If you run Axcess from source code or on a server, it uses an Ollama or llama.cpp server that you run.
+        Whoever sets up Axcess can point a public scan at an AI service on another computer (the
+        <code>AUDIT_OLLAMA_BASE_URL</code> or <code>AUDIT_LLAMA_CPP_URL</code> setting). A sign-in scan only accepts
+        the private AI service, or an AI service on this same computer at an address written as numbers, such as
+        <code>127.0.0.1</code> (a loopback address).
       </p>
     </Card>
     <Card heading="Every AI result is marked">

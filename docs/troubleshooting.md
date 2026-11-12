@@ -61,7 +61,7 @@ and the page title.
 - **Local AI is slow.** The optional AI checks add time to every page, which
   is why the app leaves them off by default. The vision model reviews one
   image at a time (`AUDIT_VLM_CONCURRENCY`, default 1), and raising that can
-  back up the Ollama service on a small machine.
+  back up the AI service on a small machine.
 
 ## I closed the sign-in window before starting
 
@@ -79,44 +79,55 @@ open the window again on the page you were on.
 
 ## The local AI checks aren't running
 
-A [local AI model](./glossary.md#local-ai-model) runs through Ollama. In the
-desktop app, **Settings > AI features** can install Ollama and the models for
-you. Otherwise you install it separately.
+A [local AI model](./glossary.md#local-ai-model) needs an AI service to run
+it. The desktop app has its own private AI service: the AI program
+(llama.cpp) comes with the app, and **Settings > AI features** downloads the
+AI models after you choose a size. If you run Axcess from source code or on a
+server, you run Ollama or a llama.cpp server yourself.
 
 - **Is the switch on?** For a public website, the AI switches under Advanced
   settings, **Local AI**, are off by default. **Read text inside images
   (OCR)** is on and needs no AI model. When a switch can't be used, the form
-  says why, for example "Ollama is not running on this computer."
-- **Is Ollama running?** In the desktop app, select **Start AI service** in
-  Settings. For a separate source install, `curl -s http://localhost:11434/api/tags`
-  should return JSON.
+  says why.
+- **Is the AI service running?** In the desktop app, select **Start AI
+  service** in Settings. If you run your own Ollama,
+  `curl -s http://localhost:11434/api/tags` should return JSON.
 - **Is the model installed?** In the desktop app, choose a size in **AI features**
-  and confirm the size-labelled download. Do not use `ollama pull` with its
-  private service. On a separate source install, install a model with
-  `ollama pull <model>`. `AUDIT_VLM_MODEL` picks a different image model.
+  and confirm the size-labelled download. `ollama pull` does not work with
+  the desktop app's private AI service. If you run your own Ollama, install a
+  model with `ollama pull <model>`. `AUDIT_VLM_MODEL` picks a different image
+  model.
 - **Want the AI checks off?** Leave the switches off. On the command line they
   are on by default, so pass `--skip-vlm --skip-semantic --skip-visual`. Image
   findings are still created from OCR text and the alt text comparison.
 
-If Ollama can't be reached when a scan starts, Axcess logs a warning and
-continues without those checks.
+If the AI service can't be reached when a scan starts, Axcess logs a warning
+and continues without those checks.
 
 ## AI features setup in the desktop app stopped or failed
 
 - **AI service is not running**: select **Start AI service** in Settings. This
-  starts only Axcess's private copy. It never starts or stops your own Ollama.
+  starts only Axcess's private AI service. It never starts or stops your own
+  Ollama. When the app opens with AI on, the service starts in the background;
+  until it is ready, AI requests say it is not running.
 - **Private models are missing**: choose a size in **AI features**. Check the
   download size, then select **Download and set up**. Starting the service
   never downloads files without that separate choice.
-- **AI could not be isolated**: the service stays stopped. Windows and systems
-  without the required sandbox are not supported. Linux startup also stays
-  blocked until a private connection bridge is available. Do not disable the
-  isolation check or expose a service to the internet to get past this error.
+- **"The AI models need to be downloaded again for this version of Axcess"**:
+  your AI setup was saved by an older version, which used a private copy of
+  Ollama. Choose a size and select **Download and set up**. When the download
+  finishes, Axcess deletes the old private Ollama files.
+- **AI could not be isolated**: the service stays stopped. On Windows, the
+  private AI service cannot be isolated yet, so AI does not start. On Linux,
+  install Bubblewrap (`bwrap`); without it, AI does not start. Do not disable
+  the isolation check or expose a service to the internet to get past this
+  error.
 - **Isolation check failed**: check the application log. Axcess requires proof
-  that the OS blocks outside connections; a timeout does not count. Reports
-  and saved suggestions remain readable.
-- **Your own Ollama is not managed**: Axcess leaves it alone. Select a private
-  download for isolated AI. Never run `ollama pull` against Axcess's service.
+  that the operating system blocks outside connections; a timeout does not
+  count. Reports and saved suggestions remain readable.
+- **Your own Ollama is not managed**: Axcess leaves it alone. To use the
+  isolated private AI service instead, choose a size and select **Download
+  and set up**.
 
 - **AI features are off**: open **Settings > AI features** and select
   **Turn AI on** to reuse kept models, or choose a size and download if you
@@ -131,10 +142,12 @@ continues without those checks.
   The page shows how much each size downloads.
 - **The download stopped or was paused**: select **Resume download**. It
   carries on from where it stopped. After an error, select **Try again**.
-- **"The Ollama download did not match its published checksum"**: the file
-  was changed or damaged on the way. Axcess deletes it and does not run it.
-  Try again later.
-- **Ollama did not start**: read `ai/ollama.log` in the Axcess data folder.
+- **"The AI model download did not match its published checksum"** (or "The
+  AI program download"): the file was changed or damaged on the way. Axcess
+  deletes it and does not use it. Try again later.
+- **"The isolated AI service could not start"**: read `ai/llama-server.log`
+  in the Axcess data folder. If the graphics chip build cannot load the
+  models, Axcess tries the processor-only (CPU) build by itself.
 - **Start over**: select **Remove AI features**, then download again.
 
 ## Compare reports has nothing to compare, or shows a surprise

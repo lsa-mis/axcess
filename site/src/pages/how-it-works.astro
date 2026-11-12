@@ -229,8 +229,10 @@ const headings = [
     }
   </div>
   <p>
-    Every check that uses AI is optional and runs on a local model you install yourself, in Ollama. Without one, the
-    other checks still run in full. <a href={url("/coverage/")}>See which WCAG criteria each check helps with.</a>
+    Every check that uses AI is optional and runs on your computer. The desktop app downloads its AI models only when
+    you choose a size in Settings, and runs them in a private AI service with no internet access. On Windows, that
+    service cannot be kept apart from the internet yet, so AI does not start there. Without AI, the other checks still
+    run in full. <a href={url("/coverage/")}>See which WCAG criteria each check helps with.</a>
   </p>
 
   <h2 id="how-sure">How sure is each result?</h2>

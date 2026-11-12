@@ -92,7 +92,8 @@ Use the word in the first column, and never the words in the last.
 | Product roadmap | The page listing planned checks. | coverage tracking, coverage and tracking |
 | element code (HTML) | The code of one flagged element. | snippet, outerHTML, markup |
 | AI suggestion | A fix the local AI model suggests for one occurrence, on request. It can be wrong; a person checks it. | AI fix, AI remediation, recommendation, auto-fix |
-| AI features | The optional local AI program (Ollama) and models the desktop app can download, in one of three sizes: Small, Standard, Large. | AI pack, AI bundle, AI dependencies, tier |
+| AI features | The optional local AI models the desktop app can download, in one of three sizes: Small, Standard, Large, and the private AI service that runs them. | AI pack, AI bundle, AI dependencies, tier |
+| Private AI service | The desktop app's own AI program (llama.cpp), kept away from the internet, that runs the downloaded models. Name Ollama only for an Ollama the person runs. | AI runtime, AI backend, model server, Ollama (for the desktop app's own service) |
 | Image model | The local AI model that looks at pictures. | vision model, VLM (outside developer notes) |
 | element locator (CSS selector) | The text that finds an element in the page code. | selector (alone) |
 | element locator (XPath) | The path that finds an element in the page code, as the rule check (Alfa) records it. | selector, path (alone) |

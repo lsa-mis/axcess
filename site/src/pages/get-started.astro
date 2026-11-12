@@ -600,9 +600,11 @@ const SMARTSCREEN_TEXT =
   <h3 id="after-install">After you install</h3>
   <p>
     AI checks are optional. AI review, and the part of the Image text check that compares image text with alt text,
-    need Ollama: a separate program that runs AI models on your computer, with models you download yourself. Skip
-    this at first. Every other check runs without it. <a href={url("/privacy/#ai")}>How the AI checks stay on
-    your computer</a>.
+    need AI models. Axcess downloads them only when you choose a size in Settings, under AI features. It runs them on
+    your computer, in a private AI service with no internet access. On Linux, this needs Bubblewrap, a program that
+    keeps apps apart from the rest of the computer. On Windows, the private AI service cannot be kept apart from the
+    internet yet, so AI does not start there. Skip this at first. Every other check runs without it.
+    <a href={url("/privacy/#ai")}>How the AI checks stay on your computer</a>.
   </p>
   <p>
     For updates, where Axcess keeps your reports, and what to do if the app does not start, read <a href={url("/docs/desktop-app/")}>Using the desktop app</a> and <a href={url("/docs/troubleshooting/")}>Troubleshooting</a>.

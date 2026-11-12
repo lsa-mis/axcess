@@ -62,8 +62,11 @@ The preview does not yet carry the signatures macOS and Windows look for
 (notarization and code signing), so they warn you the first time. Follow the
 [first-launch steps on the Get started page](https://lsa-mis.github.io/axcess/get-started/#first-launch),
 then run a small scan. Optional [AI checks](./docs/glossary.md#local-ai-model)
-need a separately installed local service called Ollama; everything else works
-without it. Release notes and earlier builds are on the
+need AI models that the app downloads only when you choose a size in
+**Settings > AI features**. They run on your computer, in a private AI service
+with no internet access. On Windows, that service cannot be kept apart from
+the internet yet, so AI does not start there. Everything else works without AI. Release notes and
+earlier builds are on the
 [releases page](https://github.com/lsa-mis/axcess/releases).
 
 ## Read your report

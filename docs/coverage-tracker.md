@@ -99,7 +99,7 @@ requires manual reproduction.
 | Focus probe | `focus` | Positive `tabindex` and focus obscured by fixed/sticky overlays. | Full focus order and interaction-created overlays remain manual. |
 | Visual probe | `visual` | Meaningful sequence through local vision analysis; measured autoplay/moving-content leads. | Model-dependent 1.3.2 results require confirmation; media coverage remains partial. |
 | Image analysis | `image` | Image discovery, Tesseract OCR, and local VLM classification. | OCR/VLM results are evidence, not a legal conclusion. |
-| Semantic review | `semantic` | Registered analyzers for 1.2.1, 2.4.4, 2.4.6, and 3.3.2. | Requires an explicitly configured local Ollama service; unsupported configured criteria are skipped and logged. |
+| Semantic review | `semantic` | Registered analyzers for 1.2.1, 2.4.4, 2.4.6, and 3.3.2. | Requires a local AI service: the desktop app's private AI service, or an Ollama or llama.cpp server that the administrator configures. Unsupported configured criteria are skipped and logged. |
 
 The default public scan renders every page in a browser and runs axe-core as
 its rule engine. Under Advanced settings you can:
@@ -182,9 +182,13 @@ certificate, hardened runtime, Apple notarization, and a stapled ticket on
 macOS, and code signing on Windows. Intel macOS and Linux builds are not
 currently published.
 
-Optional Ollama models are not bundled or downloaded silently. AI-assisted
-checks use a separately installed Ollama service, on the same computer by
-default.
+Optional AI models are not bundled or downloaded silently. The desktop app
+includes the AI program (llama.cpp) and downloads the AI models only after the
+person chooses a size in **Settings > AI features**. It runs them in its own
+private AI service, sandboxed with no internet access; on Windows that service
+cannot be isolated yet, so AI does not start there. Web and server installs
+use an Ollama or llama.cpp server that the administrator runs, on the same
+computer by default.
 
 ## Next coverage priorities
 

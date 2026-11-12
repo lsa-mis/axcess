@@ -421,18 +421,20 @@ It looks for:
 ### Local AI model
 
 An optional AI model that reads text (a language model) or looks at images (a
-vision model), running on your own computer through a free program called
-Ollama. Axcess installs one only in the desktop app, from **Settings > AI
-features**, after you choose a size (Small, Standard or Large). AI results
-are never marked [Mostly sure](#mostly-sure).
+vision model), running on your own computer. The desktop app runs it in its
+own private AI service: the AI program (llama.cpp), which comes with the app,
+kept away from the internet. It downloads the models only from **Settings >
+AI features**, after you choose a size (Small, Standard or Large). If you [run Axcess from source
+code](https://github.com/lsa-mis/axcess#run-from-source) or on a server, it can
+use an Ollama you run instead. AI results are never marked [Mostly sure](#mostly-sure).
 
 ### AI features
 
 Optional model-based suggestions and checks that run on this computer.
 You can choose them when the desktop app first opens or in **Settings > AI
 features**. Turning AI off keeps downloaded models and saved results, but
-stops new model calls and Axcess's private Ollama. It does not stop an Ollama
-you started yourself. Regular checks and [OCR](#ocr) still work.
+stops new model calls and Axcess's private AI service. It does not stop an
+Ollama you started yourself. Regular checks and [OCR](#ocr) still work.
 
 ### OCR
 
