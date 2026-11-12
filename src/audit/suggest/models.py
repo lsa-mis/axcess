@@ -229,6 +229,9 @@ class SuggestionAvailability(BaseModel):
     enabled: bool
     # One machine code for the interface to turn into words.
     reason: AvailabilityReason
+    # Which AI service to name when telling the person what to do:
+    # "private" (the desktop app's own), "ollama" or "llama_cpp".
+    service: Literal["private", "ollama", "llama_cpp"] = "ollama"
     text_model: str
     vision_model: str
     missing_models: list[str] = Field(default_factory=list)

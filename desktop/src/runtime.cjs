@@ -137,20 +137,23 @@ function desktopEnvironment({
     AUDIT_NODE_RUN_AS_NODE: "1",
     // AI fix suggestions are on in the desktop app: one person on their own
     // computer, and each suggestion is asked for with a click and answered
-    // by the Ollama on this computer. Without Ollama or its model the
+    // by the private AI service on this computer. Without its models the
     // button explains what is missing and links to Settings > AI features;
     // nothing is downloaded until the person chooses to. Setting
     // This is the legacy/default value; the saved desktop on/off choice
     // takes precedence. A fresh installation starts with AI off.
     AUDIT_SUGGESTIONS_ENABLED: inherited.AUDIT_SUGGESTIONS_ENABLED || "true",
-    // Turns on the Settings > AI features page. It downloads Ollama and
-    // models only after the person chooses a size and selects Download.
+    // Turns on the Settings > AI features page. It downloads the AI models
+    // only after the person chooses a size and selects Download.
     AUDIT_DESKTOP: "1",
     PYTHONUNBUFFERED: "1",
   };
   if (packaged) {
     environment.PLAYWRIGHT_BROWSERS_PATH = path.join(resourcesPath, "playwright-browsers");
     environment.TESSDATA_PREFIX = path.join(ocrRoot, "share", "tessdata");
+    // The pinned llama.cpp builds the private AI service runs
+    // (scripts/bundle-llama-server.py), so AI setup downloads only models.
+    environment.AUDIT_LLAMA_SERVER_DIR = path.join(resourcesPath, "llama-runtime");
     environment.PATH = [path.join(ocrRoot, "bin"), process.env.PATH || ""]
       .filter(Boolean)
       .join(path.delimiter);

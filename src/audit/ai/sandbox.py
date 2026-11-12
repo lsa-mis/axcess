@@ -67,6 +67,12 @@ def macos_profile(runtime: Path, models: Path, scratch: Path) -> str:
             '"AGXDeviceUserClient" "AGXSharedUserClient" "IOSurfaceRootUserClient" '
             '"IOAccelerator"))',
             '(allow mach-lookup (global-name "com.apple.MTLCompilerService"))',
+            # The service's own UNIX socket, in the scratch folder only.
+            f"(allow network-bind network-inbound (local unix-socket (subpath "
+            f"{path(scratch.resolve())})))",
+            # The llama.cpp router reaches its per-model children on
+            # loopback. macOS has no private network namespace, so loopback
+            # is the narrowest network the router can use.
             '(allow network-inbound (local ip "localhost:*"))',
             '(allow network-outbound (remote ip "localhost:*"))',
             '(allow network-bind (local ip "localhost:*"))',
@@ -74,8 +80,20 @@ def macos_profile(runtime: Path, models: Path, scratch: Path) -> str:
     )
 
 
+# Read-only system folders a GPU build needs to find the graphics card inside
+# Bubblewrap (checked 2026-11-12 with llama.cpp's Vulkan build on Intel Iris
+# Xe and Mesa): without them Vulkan reports no device and the model runs on
+# the CPU. Device information only; nothing here opens a network path.
+_LINUX_GPU_READS = ("/sys/dev/char", "/sys/devices", "/sys/bus/pci")
+
+
 def build_sandbox(
-    runtime: Path, models: Path, scratch: Path, *, platform: str | None = None
+    runtime: Path,
+    models: Path,
+    scratch: Path,
+    *,
+    platform: str | None = None,
+    gpu: bool = False,
 ) -> Sandbox:
     platform = platform or sys.platform
     if platform == "darwin":
@@ -108,6 +126,14 @@ def build_sandbox(
             ):
                 if Path(p).exists():
                     args += ["--ro-bind", p, p]
+            if gpu:
+                # The graphics devices: /dev/dri (Mesa: Intel, AMD) and the
+                # NVIDIA driver's device files when they exist.
+                args += ["--dev-bind-try", "/dev/dri", "/dev/dri"]
+                for name in ("nvidiactl", "nvidia-uvm", "nvidia0", "nvidia1"):
+                    args += ["--dev-bind-try", f"/dev/{name}", f"/dev/{name}"]
+                for p in _LINUX_GPU_READS:
+                    args += ["--ro-bind-try", p, p]
             args += [
                 "--bind",
                 str(models.resolve()),

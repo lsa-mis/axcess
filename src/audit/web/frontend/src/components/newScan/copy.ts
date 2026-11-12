@@ -232,7 +232,7 @@ export const IMAGE_ACK = {
   hintOcr:
     "Axcess saves the images and the text it reads from them (OCR) in its folder and database on this computer.",
   hintVision:
-    "Axcess saves the images, the text it reads from them, and the vision model’s explanations on this computer. It sends image data only to Ollama at a checked address on this same computer (loopback).",
+    "Axcess saves the images, the text it reads from them, and the vision model’s explanations on this computer. It sends image data only to the AI service on this same computer, through a checked private connection or local address (loopback).",
 } as const;
 
 export const SUBMIT = {
@@ -366,7 +366,7 @@ export const SUMMARY = {
   htmlOnly: "Page code (HTML) only, no browser",
   loginPrivacy: "Axcess uploads nothing. It deletes the sign-in cookie (session cookie) when the scan ends.",
   localModels:
-    "Uses only AI models already installed in Ollama on this computer. Axcess downloads nothing, and no image leaves this computer. Ollama may use several gigabytes (GB) of memory while it runs.",
+    "Uses only AI models already on this computer. Axcess downloads nothing, and no image leaves this computer. The AI service may use several gigabytes (GB) of memory while it runs.",
   defaultState: "Default settings",
   customized: "Customized",
   reset: "Reset to default settings",

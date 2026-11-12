@@ -1268,7 +1268,7 @@
         "language": "string",
         "max_workers": "integer"
       },
-      "ollama": {"reachable": "boolean"},
+      "ollama": {"reachable": "boolean", "service": "string"},
       "semantic": {
         "available": "boolean",
         "checks_per_page": "integer",

@@ -1,15 +1,81 @@
 {
-  "ollama": {
-    "version": "0.33.0",
-    "release_url": "https://github.com/ollama/ollama/releases/tag/v0.33.0",
+  "llama_cpp": {
+    "version": "b12284",
+    "release_url": "https://github.com/ggml-org/llama.cpp/releases/tag/b12284",
     "licence": "MIT",
     "assets": {
-      "darwin-arm64": {"name": "ollama-darwin.tgz", "size": 154169325, "sha256": "63e05ad537bc02a9ee790345341ca1aff7803d289fdd4f5fda065190a2087124", "binary": "ollama"},
-      "darwin-x64": {"name": "ollama-darwin.tgz", "size": 154169325, "sha256": "63e05ad537bc02a9ee790345341ca1aff7803d289fdd4f5fda065190a2087124", "binary": "ollama"},
-      "linux-x64": {"name": "ollama-linux-amd64.tar.zst", "size": 1422232853, "sha256": "72c4b9d91c317742ffd11b92e0a7fbe6353072c6354d910f1a03fd3ce40403d4", "binary": "bin/ollama"},
-      "linux-arm64": {"name": "ollama-linux-arm64.tar.zst", "size": 1543385573, "sha256": "c09f5ae1fc90f70ac6e19e325bd958d9c8c02c29ec0908785c21672fab5f4ee4", "binary": "bin/ollama"},
-      "win32-x64": {"name": "ollama-windows-amd64.zip", "size": 1460309471, "sha256": "cb8f0eb7b84efd19222bf5dfa96dac2fe97f963e778c0d92082d4227cce338ee", "binary": "ollama.exe"},
-      "win32-arm64": {"name": "ollama-windows-arm64.zip", "size": 209964143, "sha256": "96bd9dd8dbf82f1076922f7b54f715fbae6bd3526e6609277cf8059500796f5c", "binary": "ollama.exe"}
+      "darwin-arm64": [
+        {
+          "name": "llama-b12284-bin-macos-arm64.tar.gz",
+          "size": 16870569,
+          "sha256": "7965e7701df311c49cfc629cfe14cc5092fcc590ef8c85f4c436a2973031e9d0",
+          "accelerator": "metal"
+        }
+      ],
+      "darwin-x64": [
+        {
+          "name": "llama-b12284-bin-macos-x64.tar.gz",
+          "size": 12613082,
+          "sha256": "4513149cdc86dff07dcfafcaca1b3522b81a2ccd6476e32b9ef185b3fcdbbe49",
+          "accelerator": "cpu"
+        }
+      ],
+      "linux-x64": [
+        {
+          "name": "llama-b12284-bin-ubuntu-vulkan-x64.tar.gz",
+          "size": 36106190,
+          "sha256": "94bfdf9ad9ab4e5544acc71d8699942fe8013b6c3b39f24570262782619de707",
+          "accelerator": "vulkan"
+        },
+        {
+          "name": "llama-b12284-bin-ubuntu-x64.tar.gz",
+          "size": 23284029,
+          "sha256": "50b5f85d45f8ddc7179d1b9b65de6534fbb18dc075942413238cb3471570123f",
+          "accelerator": "cpu"
+        }
+      ],
+      "linux-arm64": [
+        {
+          "name": "llama-b12284-bin-ubuntu-vulkan-arm64.tar.gz",
+          "size": 29382068,
+          "sha256": "1d7574f7143f15c8f600906b8f5f0a7bd0977e284d9729363e0178d5212b9f89",
+          "accelerator": "vulkan"
+        },
+        {
+          "name": "llama-b12284-bin-ubuntu-arm64.tar.gz",
+          "size": 18926615,
+          "sha256": "88cd4ac318056bcbcc05d92613481c303eecb03b6ded77367cbd5711aaba4435",
+          "accelerator": "cpu"
+        }
+      ],
+      "win32-x64": [
+        {
+          "name": "llama-b12284-bin-win-vulkan-x64.zip",
+          "size": 38022154,
+          "sha256": "c1d73d3bfdb3e65556f73a7fe79da2cca64aaa8f27e7ee73cf423890e83d4b76",
+          "accelerator": "vulkan"
+        },
+        {
+          "name": "llama-b12284-bin-win-cpu-x64.zip",
+          "size": 25058030,
+          "sha256": "6b3d2c7034b0c0bac65aa0524ddf01ba9c2b622ce7e32675976df642627defa9",
+          "accelerator": "cpu"
+        }
+      ],
+      "win32-arm64": [
+        {
+          "name": "llama-b12284-bin-win-vulkan-arm64.zip",
+          "size": 25954539,
+          "sha256": "f22800751fd1d2510962dad24f2721a162be54046cdf97e08bcfb4f75dd4b6e4",
+          "accelerator": "vulkan"
+        },
+        {
+          "name": "llama-b12284-bin-win-cpu-arm64.zip",
+          "size": 13408918,
+          "sha256": "be2eb55c767c1066824e2738715d820059bff9cd6f99560daa2f498e5df7f745",
+          "accelerator": "cpu"
+        }
+      ]
     }
   },
   "tiers": [
@@ -17,22 +83,109 @@
       "id": "small",
       "label": "Small",
       "min_memory_gb": 8,
-      "text": {"tag": "qwen3:4b-instruct-2507-q4_K_M", "size": 2500000000, "licence": "Apache-2.0"},
-      "vision": {"tag": "qwen3-vl:2b-instruct", "size": 1890000000, "licence": "Apache-2.0"}
+      "text": {
+        "tag": "qwen3:4b-instruct-2507-q4_K_M",
+        "size": 2497281120,
+        "licence": "Apache-2.0",
+        "gguf": {
+          "repo": "unsloth/Qwen3-4B-Instruct-2507-GGUF",
+          "revision": "a06e946bb6b655725eafa393f4a9745d460374c9",
+          "file": "Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
+          "size": 2497281120,
+          "sha256": "3605803b982cb64aead44f6c1b2ae36e3acdb41d8e46c8a94c6533bc4c67e597"
+        }
+      },
+      "vision": {
+        "tag": "qwen3-vl:2b-instruct",
+        "size": 1926804800,
+        "licence": "Apache-2.0",
+        "gguf": {
+          "repo": "Qwen/Qwen3-VL-2B-Instruct-GGUF",
+          "revision": "52d6c8ffea26cc873ac5ad116f8631268d7eb503",
+          "file": "Qwen3VL-2B-Instruct-Q4_K_M.gguf",
+          "size": 1107409952,
+          "sha256": "089d75c52f4b7ffc56ba998ffc50aae89fcafc755f9e7208aacca281dca6c2ae"
+        },
+        "mmproj": {
+          "repo": "Qwen/Qwen3-VL-2B-Instruct-GGUF",
+          "revision": "52d6c8ffea26cc873ac5ad116f8631268d7eb503",
+          "file": "mmproj-Qwen3VL-2B-Instruct-F16.gguf",
+          "size": 819394848,
+          "sha256": "c3d5afbef5287953acd57b4043d2269456e5761a4eaccb3b71b062996970aea5"
+        }
+      }
     },
     {
       "id": "standard",
       "label": "Standard",
       "min_memory_gb": 16,
-      "text": {"tag": "qwen2.5-coder:7b-instruct", "size": 4680000000, "licence": "Apache-2.0"},
-      "vision": {"tag": "qwen3-vl:4b-instruct", "size": 3300000000, "licence": "Apache-2.0"}
+      "text": {
+        "tag": "qwen2.5-coder:7b-instruct",
+        "size": 4683073536,
+        "licence": "Apache-2.0",
+        "gguf": {
+          "repo": "Qwen/Qwen2.5-Coder-7B-Instruct-GGUF",
+          "revision": "13fb94bfda8c8cf22497dc57b78f391a9acb426a",
+          "file": "qwen2.5-coder-7b-instruct-q4_k_m.gguf",
+          "size": 4683073536,
+          "sha256": "509287f78cb4d4cf6b3843734733b914b2c158e43e22a7f4bf5e963800894d3c"
+        }
+      },
+      "vision": {
+        "tag": "qwen3-vl:4b-instruct",
+        "size": 3333461920,
+        "licence": "Apache-2.0",
+        "gguf": {
+          "repo": "Qwen/Qwen3-VL-4B-Instruct-GGUF",
+          "revision": "1cd86afb9a95c410a6038ab3b40d8b578c892266",
+          "file": "Qwen3VL-4B-Instruct-Q4_K_M.gguf",
+          "size": 2497281664,
+          "sha256": "66358cb18bb6b3b1b6675aa412c7a88ef01d228f481184d13668e5201c730a0a"
+        },
+        "mmproj": {
+          "repo": "Qwen/Qwen3-VL-4B-Instruct-GGUF",
+          "revision": "1cd86afb9a95c410a6038ab3b40d8b578c892266",
+          "file": "mmproj-Qwen3VL-4B-Instruct-F16.gguf",
+          "size": 836180256,
+          "sha256": "256f3a43bd4205ffef48d6b92715e1e70b5b0e9aef06522584967513a9985331"
+        }
+      }
     },
     {
       "id": "large",
       "label": "Large",
       "min_memory_gb": 32,
-      "text": {"tag": "qwen2.5-coder:14b-instruct", "size": 8990000000, "licence": "Apache-2.0"},
-      "vision": {"tag": "qwen3-vl:8b-instruct", "size": 6140000000, "licence": "Apache-2.0"}
+      "text": {
+        "tag": "qwen2.5-coder:14b-instruct",
+        "size": 8988110272,
+        "licence": "Apache-2.0",
+        "gguf": {
+          "repo": "Qwen/Qwen2.5-Coder-14B-Instruct-GGUF",
+          "revision": "d0a692ef765eefbf2fabb130b3cb2e8917e3d225",
+          "file": "qwen2.5-coder-14b-instruct-q4_k_m.gguf",
+          "size": 8988110272,
+          "sha256": "c1e659736d89ac1065fb495330fb824d94001974a4bfa78e7270e43476a8d940"
+        }
+      },
+      "vision": {
+        "tag": "qwen3-vl:8b-instruct",
+        "size": 6186814624,
+        "licence": "Apache-2.0",
+        "gguf": {
+          "repo": "Qwen/Qwen3-VL-8B-Instruct-GGUF",
+          "revision": "f982a07559d4a2f6c8744d840bf6fccab30eea96",
+          "file": "Qwen3VL-8B-Instruct-Q4_K_M.gguf",
+          "size": 5027784800,
+          "sha256": "67d1659bfe71b89d50b45a4ad1a9e5b997e5bb16ce5da66a6a6167abd569e9e2"
+        },
+        "mmproj": {
+          "repo": "Qwen/Qwen3-VL-8B-Instruct-GGUF",
+          "revision": "f982a07559d4a2f6c8744d840bf6fccab30eea96",
+          "file": "mmproj-Qwen3VL-8B-Instruct-F16.gguf",
+          "size": 1159029824,
+          "sha256": "ca524100ebf825c9a870db1c580d03879e0da0ab2541697e2458e64891cf9d38"
+        }
+      }
     }
   ]
 }

@@ -55,4 +55,19 @@ if (["darwin", "win32", "linux"].includes(process.platform)) {
   );
 }
 
+if (["darwin", "win32", "linux"].includes(process.platform)) {
+  // The private AI service (scripts/bundle-llama-server.py): at least one
+  // llama.cpp build with its server program.
+  const llamaRoot = path.join(desktopRoot, "llama-runtime");
+  requirePath(llamaRoot, "llama.cpp server builds");
+  const serverName = process.platform === "win32" ? "llama-server.exe" : "llama-server";
+  const found = (dir) =>
+    fs.readdirSync(dir, { withFileTypes: true }).some((entry) =>
+      entry.isDirectory()
+        ? found(path.join(dir, entry.name))
+        : entry.name === serverName,
+    );
+  if (!found(llamaRoot)) throw new Error(`llama-server is missing from ${llamaRoot}`);
+}
+
 console.log("Axcess desktop build resources are complete.");

@@ -286,7 +286,8 @@ export interface LocalAnalysisCapability {
     max_workers: number;
     bundled_in_desktop: boolean;
   };
-  ollama: { reachable: boolean };
+  /** The model service; named for Ollama, it means whichever runs. */
+  ollama: { reachable: boolean; service?: AiService };
   vision: {
     available: boolean;
     model: string;
@@ -1535,6 +1536,13 @@ export type SuggestionErrorCode =
   | "restarted"
   | "occurrence_gone"
   | "internal";
+/**
+ * Which AI service help text should name: "private" is the desktop app's
+ * own sandboxed service (Settings > AI features); "ollama" an Ollama the
+ * person runs; "llama_cpp" a llama.cpp server an administrator set up.
+ */
+export type AiService = "private" | "ollama" | "llama_cpp";
+
 export type SuggestionAvailabilityReason =
   | "ready"
   | "turned_off"
@@ -1595,6 +1603,7 @@ export interface SuggestionRecord {
 export interface SuggestionAvailability {
   enabled: boolean;
   reason: SuggestionAvailabilityReason;
+  service: AiService;
   text_model: string;
   vision_model: string;
   missing_models: string[];
@@ -1638,10 +1647,14 @@ export interface AiInstallStatus {
 export interface AiSetup {
   source: "system" | "private";
   base_url: string;
+  /** "llama_cpp" for the private service; "ollama" for a setup saved before it. */
+  backend: "ollama" | "llama_cpp";
+  socket_path: string | null;
   tier: AiTierId;
   text_model: string;
   vision_model: string;
   ollama_version: string | null;
+  llama_cpp_version: string | null;
 }
 
 export interface AiPlan {
@@ -1657,7 +1670,8 @@ export interface AiPlan {
     release_url: string;
     download_bytes: number;
     available_for_this_computer: boolean;
-    system_version: string | null;
+    /** True when the desktop app includes the program: setup downloads only models. */
+    included: boolean;
   };
   tiers: AiTierPlan[];
   recommended: AiTierId | null;

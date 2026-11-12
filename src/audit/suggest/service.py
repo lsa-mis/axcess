@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import sqlite3
 
-from audit.ai.state import ai_enabled
+from audit.ai.state import ai_enabled, model_service
 from audit.config import Settings
 from audit.suggest import context, repo
 from audit.suggest.models import (
@@ -204,6 +204,7 @@ async def availability(
         return SuggestionAvailability(
             enabled=reason == "ready",
             reason=reason,
+            service=model_service(settings),
             text_model=settings.suggestion_text_model,
             vision_model=settings.suggestion_vision_model,
             missing_models=missing or [],

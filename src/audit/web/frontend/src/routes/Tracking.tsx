@@ -286,8 +286,9 @@ export default function TrackingRoute() {
         pipelines shipped. */}
         <p className="mb-3 max-w-measure text-sm text-fg-muted">
           {deterministicCount} checks use fixed rules. They need only the
-          Chromium browser, not Ollama. {aiCount} checks use AI. They need
-          Ollama, an app that runs AI models on this computer.
+          Chromium browser, not AI. {aiCount} checks use AI. They need an AI
+          service on this computer: the desktop app&rsquo;s own, set up in
+          Settings → AI features, or Ollama, a free app that runs AI models.
         </p>
         <Card>
           {pipelines.pages > 1 && (

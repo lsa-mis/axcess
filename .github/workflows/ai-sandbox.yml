@@ -1,0 +1,61 @@
+name: Private AI sandbox
+
+# Starts the desktop app's private llama.cpp service for real inside the
+# operating system's sandbox (Bubblewrap on Linux, sandbox-exec on macOS) and
+# checks that Axcess reaches it through its UNIX socket while the network
+# check proves outside connections are blocked
+# (tests/integration/test_llama_runtime_live.py). No AI model is downloaded:
+# the service starts with an empty model list. It downloads only the pinned
+# llama.cpp builds, checked against catalog.json.
+#
+# Runs on demand and on pull requests that change the AI service or this file.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "src/audit/ai/**"
+      - "desktop/scripts/bundle-llama-server.py"
+      - "tests/integration/test_llama_runtime_live.py"
+      - "tests/integration/test_ai_sandbox_live.py"
+      - ".github/workflows/ai-sandbox.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-sandbox-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sandbox:
+    name: Sandbox on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          python-version: "3.13"
+      - name: Install Bubblewrap
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends bubblewrap
+      - name: Install locked dependencies
+        run: uv sync --frozen
+      - name: Bundle the pinned llama.cpp builds
+        run: uv run --no-sync python desktop/scripts/bundle-llama-server.py
+      - name: Start the private service in the sandbox
+        env:
+          AXCESS_LLAMA_SERVER_DIR: ${{ github.workspace }}/desktop/llama-runtime
+        run: >-
+          uv run --no-sync pytest -v -p no:cacheprovider
+          tests/integration/test_llama_runtime_live.py
+          tests/integration/test_ai_sandbox_live.py
+      - name: Show the service log
+        if: failure()
+        run: find /tmp -maxdepth 3 -name llama-server.log -exec tail -n 80 {} \; || true

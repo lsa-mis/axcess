@@ -53,12 +53,13 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from audit import __version__, coverage_matrix, evaluation, occurrence_reviews
 from audit.ai.manager import AIManager
 from audit.ai.model_client import (
+    ModelEndpoint,
     ModelServiceError,
     endpoint_from_settings,
     make_model_client,
     open_model_http_client,
 )
-from audit.ai.state import AIConfig, ai_enabled, initialize_preferences
+from audit.ai.state import AIConfig, ai_enabled, initialize_preferences, model_service
 from audit.ai.state import effective_settings as effective_ai_settings
 from audit.ai.state import semantic_model as ai_semantic_model
 from audit.analyzer.alfa import AlfaAnalyzer, AlfaResult, chromium_executable_path
@@ -1119,12 +1120,22 @@ def create_app(
         ai_state["loop"] = asyncio.get_running_loop()
         manager = ai_state["manager"]
         if manager is not None:
-            await asyncio.to_thread(manager.startup)
+            # In the background: the private service loads both models
+            # before it counts as started, which can take a while, and the
+            # app should open at once. Until it is ready, AI requests fail
+            # closed (``private_runtime_socket``) and say the service is
+            # not running.
+            ai_state["startup"] = asyncio.create_task(asyncio.to_thread(manager.startup))
 
     async def _stop_ai_runtime() -> None:
         manager = ai_state["manager"]
         if manager is not None:
+            # Stopping also ends a start that is still loading models.
             await asyncio.to_thread(manager.shutdown)
+            startup = ai_state.get("startup")
+            if startup is not None:
+                with contextlib.suppress(Exception):
+                    await startup
 
     if ai_state["manager"] is not None:
         app.middleware("http")(_serialize_desktop_ai_changes)
@@ -1423,7 +1434,7 @@ def create_app(
                         "max_workers": settings.ocr_max_workers,
                         "bundled_in_desktop": bool(shutil.which("tesseract")),
                     },
-                    "ollama": {"reachable": False},
+                    "ollama": {"reachable": False, "service": model_service(settings)},
                     "vision": {
                         "available": False,
                         "model": settings.vlm_model,
@@ -1483,7 +1494,7 @@ def create_app(
                     "max_workers": settings.ocr_max_workers,
                     "bundled_in_desktop": bool(shutil.which("tesseract")),
                 },
-                "ollama": {"reachable": ollama_reachable},
+                "ollama": {"reachable": ollama_reachable, "service": model_service(settings)},
                 "vision": {
                     "available": vision_size is not None,
                     "model": vision_model,
@@ -1492,9 +1503,9 @@ def create_app(
                         None
                         if vision_size is not None
                         else (
-                            f"Install the local model with: ollama pull {vision_model}"
+                            _model_missing_reason(settings, [vision_model])
                             if ollama_reachable
-                            else "Ollama is not running on this computer."
+                            else _service_down_reason(settings)
                         )
                     ),
                 },
@@ -1508,9 +1519,9 @@ def create_app(
                         None
                         if ollama_reachable and not semantic_missing
                         else (
-                            "Missing local model(s): " + ", ".join(semantic_missing)
+                            _model_missing_reason(settings, semantic_missing)
                             if ollama_reachable
-                            else "Ollama is not running on this computer."
+                            else _service_down_reason(settings)
                         )
                     ),
                 },
@@ -1672,12 +1683,13 @@ def create_app(
             _sync_sign_in_window(existing)
             return _sign_in_json(_sign_in_state(existing, already_waiting=True))
 
-        local_vlm_url = _local_login_ollama_url(settings.ollama_base_url)
-        if not body.skip_vlm and local_vlm_url is None:
+        local_model = _local_login_model_endpoint(settings)
+        if not body.skip_vlm and local_model is None:
             return JSONResponse(
                 {
                     "error": (
-                        "Protected VLM analysis requires Ollama on a literal loopback "
+                        "AI image checks on a signed-in site need the AI service on this "
+                        "computer: a private connection (UNIX socket) or a literal loopback "
                         "address such as http://127.0.0.1:11434."
                     )
                 },
@@ -1720,7 +1732,9 @@ def create_app(
             ocr_min_word_count=settings.ocr_min_word_count,
             vlm_enabled=not body.skip_vlm,
             vlm_model=settings.vlm_model,
-            vlm_base_url=local_vlm_url or "http://127.0.0.1:11434",
+            vlm_base_url=local_model.base_url if local_model else "http://127.0.0.1:11434",
+            model_backend=local_model.backend if local_model else "ollama",
+            model_socket=local_model.socket_path if local_model else None,
             vlm_prompt_name=settings.vlm_prompt_name,
             vlm_concurrency=1,
             semantic_enabled=False,
@@ -4275,6 +4289,43 @@ def _local_login_completion(summary: CrawlSummary) -> tuple[str, str | None]:
     if summary.status in {"completed", "failed", "interrupted"}:
         return summary.status, None
     return "failed", "The login scan ended before Axcess could finish the report."
+
+
+def _service_down_reason(settings: Settings) -> str:
+    """Why AI checks cannot run: the service in use is not reachable."""
+    service = model_service(settings)
+    if service == "private":
+        return "The private AI service is not running. Start it in Settings → AI features."
+    if service == "llama_cpp":
+        return "Axcess cannot reach its AI service. Ask the person who set up Axcess."
+    return "Ollama is not running on this computer."
+
+
+def _model_missing_reason(settings: Settings, models: list[str]) -> str:
+    """Why AI checks cannot run: the service lacks a model."""
+    service = model_service(settings)
+    if service == "private":
+        return "The AI models are not downloaded. Download them in Settings → AI features."
+    if service == "llama_cpp":
+        return "The AI service does not have this model: " + ", ".join(models)
+    if len(models) == 1:
+        return f"Install the local model with: ollama pull {models[0]}"
+    return "Missing local model(s): " + ", ".join(models)
+
+
+def _local_login_model_endpoint(settings: Settings) -> ModelEndpoint | None:
+    """The model service for signed-in content, only if it is on this computer.
+
+    A UNIX socket is a file on this computer, so it is local by
+    construction; a TCP address must be a literal loopback address.
+    """
+    endpoint = endpoint_from_settings(settings)
+    if endpoint.socket_path:
+        return endpoint
+    url = _local_login_ollama_url(endpoint.base_url)
+    if url is None:
+        return None
+    return ModelEndpoint(endpoint.backend, url)
 
 
 def _local_login_ollama_url(value: str) -> str | None:

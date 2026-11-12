@@ -69,13 +69,14 @@ class ProtectedLocalOllama:
         backend: str = DEFAULT_BACKEND,
     ) -> None:
         self._base_url = base_url.rstrip("/")
-        # The companion passes nothing here, so protected scans use Ollama;
-        # its loopback check is written for an Ollama URL.
+        # "ollama" for a loopback Ollama URL; "llama_cpp" for the desktop's
+        # private service, reached through ``transport`` (a UNIX socket the
+        # companion has checked).
         self._backend = backend
         self._model = model
         self._timeout_s = max(5.0, min(timeout_s, 120.0))
-        # This is useful for an in-process test transport only; it cannot
-        # alter the loopback base URL enforced by the companion.
+        # A test transport, or the companion's checked UNIX-socket transport;
+        # it cannot alter the loopback base URL enforced by the companion.
         self._transport = transport
         self._client: httpx.AsyncClient | None = None
         self._model_client: ModelClient | None = None

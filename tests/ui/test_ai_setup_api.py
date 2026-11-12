@@ -24,8 +24,6 @@ from .test_fix_suggestions import FakeProvider, FakeVerifier, _add_finding
 def db(seeded_db: tuple[Path, Path, int], tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("AUDIT_ACCESS_TOKEN", "")
     monkeypatch.setenv("AUDIT_DATA_DIR", str(tmp_path))
-    # No real Ollama is contacted: point the port-11434 check nowhere.
-    monkeypatch.setattr("audit.ai.manager.system_ollama", lambda: None)
     return seeded_db[0]
 
 
@@ -45,6 +43,9 @@ def test_plan_describes_this_computer_and_every_size(
         assert plan["current"] is None
         assert plan["install"]["state"] == "idle"
         assert plan["program"]["licence"] == "MIT"
+        # Run from source, the program is downloaded; no system Ollama is looked up.
+        assert plan["program"]["included"] is False
+        assert "system_version" not in plan["program"]
         for tier in plan["tiers"]:
             assert (
                 tier["download_bytes"] == tier["models_bytes"] + plan["program"]["download_bytes"]
@@ -303,29 +304,34 @@ def test_runtime_start_states(
     from unittest.mock import Mock
 
     from audit.ai.catalog import load_catalog
-    from audit.ai.runtime import OllamaRuntime
+    from audit.ai.runtime import LlamaRuntime
     from audit.ai.sandbox import IsolationError
 
     monkeypatch.setenv("AUDIT_DESKTOP", "1")
     settings = Settings(data_dir=tmp_path, desktop=True)
     save_preferences(settings, AIPreferences(enabled=True, choice_recorded=True))
+    small = load_catalog().tier("small")
+    socket = str(tmp_path / "ai" / "scratch" / "llama.sock")
+    system = state == "system_ollama_not_managed"
     save_config(
         settings,
         AIConfig(
-            source="system" if state == "system_ollama_not_managed" else "private",
-            base_url="http://127.0.0.1:12345",
+            source="system" if system else "private",
+            base_url="http://127.0.0.1:12345" if system else "http://localhost",
+            backend="ollama" if system else "llama_cpp",
+            socket_path=None if system else socket,
             tier="small",
-            text_model="text:test",
-            vision_model="vision:test",
+            text_model=small.text.served_name,
+            vision_model=small.vision.served_name,
         ),
     )
-    runtime = Mock(spec=OllamaRuntime(tmp_path / "ai", load_catalog()))
+    runtime = Mock(spec=LlamaRuntime(tmp_path / "ai", load_catalog()))
     runtime.running.return_value = state == "already_running"
     runtime.installed.return_value = True
     runtime.has_model.return_value = state != "model_missing"
     runtime.download_remaining.return_value = 0
     runtime.isolation_reason = None
-    runtime.start.return_value = "http://127.0.0.1:12345"
+    runtime.start.return_value = socket
     if state == "not_isolated":
         runtime.start.side_effect = IsolationError("network_test_failed", "AI isolation failed")
     original = AIManager.__init__
@@ -351,4 +357,6 @@ def test_runtime_start_states(
             assert result["download_bytes"] == load_catalog().tier("small").size
         if state not in {"started", "not_isolated"}:
             runtime.start.assert_not_called()
+        else:
+            runtime.start.assert_called_once_with((small.text, small.vision))
         runtime.download.assert_not_called()

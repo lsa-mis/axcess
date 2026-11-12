@@ -263,7 +263,9 @@ function AiSetupPage({
           </p>
           <ul className="list-disc space-y-1 pl-5">
             <li>
-              {`Downloads: the Ollama program ${plan.program.version} (${plan.program.licence} licence) from GitHub and two models from the Ollama library. Axcess checks every file first.`}
+              {plan.program.included
+                ? `Downloads: two AI models from Hugging Face, a website that shares AI models. The AI program (llama.cpp ${plan.program.version}, ${plan.program.licence} licence) comes with Axcess. Axcess checks every file first.`
+                : `Downloads: the AI program (llama.cpp ${plan.program.version}, ${plan.program.licence} licence) from GitHub and two AI models from Hugging Face, a website that shares AI models. Axcess checks every file first.`}
             </li>
             <li>The private AI service cannot reach the internet.</li>
             <li>Your reports, pages and screenshots are never sent anywhere.</li>
@@ -392,8 +394,10 @@ function AiSetupPage({
                 Pause download
               </Button>
             ) : (
-              // Keep the same-size download available to replace missing files
-              // or move from a system Ollama to a private copy. Hiding it based
+              // Keep the same-size download available to replace missing files,
+              // to move from a system Ollama to the private service, or to
+              // replace a private Ollama setup saved before llama.cpp (its
+              // models no longer run). Hiding it based
               // on the saved size would leave no repair action. The size-labelled
               // button keeps download consent separate from start (W3C COGA,
               // https://www.w3.org/TR/coga-usable/, paraphrased: prevent mistakes).
@@ -438,8 +442,7 @@ function AiSetupPage({
               Continue without AI
             </Button>
           </div>}
-          {!plan.program.available_for_this_computer &&
-            !plan.program.system_version && (
+          {!plan.program.available_for_this_computer && (
               <p className="mt-3 text-sm text-fg">
                 Axcess has no private AI program for this kind of computer.
                 AI stays off. Saved results still work.
@@ -451,7 +454,7 @@ function AiSetupPage({
               <p>
                 {current?.source === "system"
                   ? "This turns AI features off in Axcess. The models stay in your own Ollama, where other apps may use them."
-                  : "This turns AI features off and deletes the Ollama program and models Axcess downloaded."}{" "}
+                  : "This turns AI features off and deletes the AI files Axcess downloaded."}{" "}
                 Reports are not changed.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">

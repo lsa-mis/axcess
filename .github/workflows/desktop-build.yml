@@ -110,6 +110,8 @@ jobs:
         run: |
           brew install tesseract
           desktop/scripts/bundle-tesseract-macos.sh
+      - name: Bundle llama.cpp server
+        run: uv run --no-sync python desktop/scripts/bundle-llama-server.py
       - name: Bundle Python backend
         run: uv run pyinstaller --clean --noconfirm --distpath desktop/backend-dist --workpath build/desktop-pyinstaller desktop/backend.spec
       - name: Package desktop installer
@@ -188,6 +190,8 @@ jobs:
             Start-Sleep -Seconds (30 * $attempt)
           }
           desktop/scripts/bundle-tesseract-windows.ps1
+      - name: Bundle llama.cpp server
+        run: uv run --no-sync python desktop/scripts/bundle-llama-server.py
       - name: Bundle Python backend
         run: uv run pyinstaller --clean --noconfirm --distpath desktop/backend-dist --workpath build/desktop-pyinstaller desktop/backend.spec
       # Forge packages the app; electron-builder wraps it in the NSIS
@@ -277,6 +281,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng
           desktop/scripts/bundle-tesseract-linux.sh
+      - name: Bundle llama.cpp server
+        run: uv run --no-sync python desktop/scripts/bundle-llama-server.py
       - name: Bundle Python backend
         run: uv run pyinstaller --clean --noconfirm --distpath desktop/backend-dist --workpath build/desktop-pyinstaller desktop/backend.spec
       # Forge packages the app; electron-builder wraps it in the AppImage

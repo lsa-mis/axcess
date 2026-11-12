@@ -1,7 +1,7 @@
 """Settings > AI features in the desktop app: axe and keyboard-only use.
 
 No test here downloads anything: the download button is never pressed, the
-check for an Ollama on port 11434 is stubbed, and removal works on a
+setup never looks for an Ollama on port 11434, and removal works on a
 temporary data folder.
 """
 
@@ -15,6 +15,7 @@ from typing import Any
 import pytest
 from playwright.async_api import expect
 
+from audit.ai.catalog import load_catalog
 from audit.ai.state import AIConfig, AIPreferences, save_config, save_preferences
 from audit.config import Settings
 
@@ -29,7 +30,6 @@ def desktop(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     monkeypatch.setenv("AUDIT_DESKTOP", "1")
     monkeypatch.setenv("AUDIT_DATA_DIR", str(data))
     monkeypatch.setenv("AUDIT_ACCESS_TOKEN", "")
-    monkeypatch.setattr("audit.ai.manager.system_ollama", lambda: None)
     save_preferences(Settings(data_dir=data, desktop=True), AIPreferences())
     yield data
 
@@ -126,6 +126,8 @@ async def test_first_launch_setup_never_downloads_without_confirmation(
     try:
         await page.goto(f"{server}/app/", wait_until="networkidle")
         await page.get_by_role("heading", name="Choose whether to use AI features").wait_for()
+        # Says where the large download comes from before anything starts.
+        await page.get_by_text("AI models from Hugging Face").first.wait_for()
         await _tab_to(page, "Set up AI features")
         await page.keyboard.press("Enter")
         await page.get_by_role("group", name="Choose the size of the AI models").wait_for()
@@ -266,6 +268,16 @@ async def test_choose_a_size_by_keyboard_without_downloading(new_page: Any, serv
         assert await button.count() == 1
         # The button says how big the download is before anything starts.
         assert "GB" in (await button.inner_text())
+        # Run from source, the program is not included: the page says what
+        # comes from where, in plain words, and names no Ollama.
+        version = load_catalog().llama_cpp.version
+        await page.get_by_text(
+            f"Downloads: the AI program (llama.cpp {version}, MIT licence) from GitHub and "
+            "two AI models from Hugging Face, a website that shares AI models. "
+            "Axcess checks every file first.",
+            exact=True,
+        ).wait_for()
+        assert "Ollama" not in await page.locator("main").inner_text()
     finally:
         await page.context.close()
 
@@ -370,5 +382,50 @@ async def test_missing_private_model_shows_size_without_downloading(
         )
         violations = await _run_axe(page)
         assert not violations, _render_violations(violations)
+    finally:
+        await page.context.close()
+
+
+@pytest.mark.parametrize(
+    ("step", "label"),
+    [
+        ("program", "Downloading the AI program"),
+        ("starting", "Starting the private AI service"),
+    ],
+)
+async def test_download_progress_names_the_private_ai_service(
+    new_page: Any, server: str, step: str, label: str
+) -> None:
+    """The progress words name Axcess's own service, not Ollama."""
+    page = await new_page()
+    status = {
+        "state": "running",
+        "tier": "small",
+        "step": step,
+        "step_done_bytes": 0,
+        "step_total_bytes": 0,
+        "done_bytes": 1_000_000_000,
+        "total_bytes": 4_000_000_000,
+        "error": None,
+    }
+    try:
+
+        async def plan(route):
+            response = await route.fetch()
+            data = await response.json()
+            data["install"] = status
+            await route.fulfill(json=data)
+
+        async def install(route):
+            # Only the progress read is faked; nothing may start a download.
+            assert route.request.method == "GET"
+            await route.fulfill(json=status)
+
+        await page.route("**/api/ai/plan", plan)
+        await page.route("**/api/ai/install", install)
+        await page.goto(f"{server}/app/settings/ai")
+        await page.get_by_text(label, exact=True).first.wait_for()
+        await page.get_by_role("status").filter(has_text=f"{label}.").wait_for()
+        assert "Ollama" not in await page.locator("main").inner_text()
     finally:
         await page.context.close()

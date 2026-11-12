@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
+import socket
+from pathlib import Path
 
 import httpx
 import pytest
@@ -76,6 +79,32 @@ def test_companion_only_accepts_loopback_ollama_and_detects_login_forms() -> Non
     assert not companion.looks_like_authentication_page(
         "https://app.example.test/dashboard", b"<main>Account overview</main>"
     )
+
+
+@pytest.mark.skipif(os.name != "posix", reason="UNIX sockets need a POSIX system")
+def test_companion_accepts_only_this_users_unix_socket(tmp_path: Path) -> None:
+    """The desktop's private AI service is a socket file this user owns."""
+    path = tmp_path / "s.sock"
+    server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        server.bind(str(path))
+        assert companion.is_own_unix_socket(str(path))
+        # The same socket by a relative path is refused: only absolute paths.
+        relative = os.path.relpath(path)
+        assert not os.path.isabs(relative)
+        assert not companion.is_own_unix_socket(relative)
+        # A link to the socket is not the socket (no following symlinks).
+        link = tmp_path / "link.sock"
+        link.symlink_to(path)
+        assert not companion.is_own_unix_socket(str(link))
+    finally:
+        server.close()
+    regular = tmp_path / "regular.sock"
+    regular.write_text("not a socket")
+    assert not companion.is_own_unix_socket(str(regular))
+    assert not companion.is_own_unix_socket(str(tmp_path / "missing.sock"))
+    assert not companion.is_own_unix_socket(str(tmp_path))
+    assert not companion.is_own_unix_socket("")
 
 
 def test_companion_indexes_each_axe_violation_once() -> None:

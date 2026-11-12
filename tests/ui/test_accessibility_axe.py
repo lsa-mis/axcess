@@ -1487,7 +1487,7 @@ async def test_login_scan_is_visible_and_explains_login_before_crawl(
     await use_vlm.check()
     # The no-downloads promise moved into the summary rail.
     await playwright_async.expect(
-        page.get_by_text(re.compile(r"Uses only AI models already installed"))
+        page.get_by_text(re.compile(r"Uses only AI models already on this computer"))
     ).to_be_visible()
     await playwright_async.expect(
         page.get_by_role("checkbox", name=re.compile(r"^Save images from signed-in pages"))

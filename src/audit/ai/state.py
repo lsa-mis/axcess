@@ -20,22 +20,28 @@ from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
 from audit.config import Settings
 
 SYSTEM_OLLAMA_URL = "http://127.0.0.1:11434"
+# The HTTP Host header sent through the private service's socket.
+SOCKET_BASE_URL = "http://localhost"
 log = logging.getLogger(__name__)
 _PRIVATE_RUNTIMES: dict[Path, tuple[str, Callable[[], bool]]] = {}
 
 
-def trust_private_runtime(settings: Settings, url: str, running: Callable[[], bool]) -> None:
-    """Process-local proof, never a saved flag that could survive an unsafe restart."""
-    _PRIVATE_RUNTIMES[ai_dir(settings).resolve()] = (url, running)
+def trust_private_runtime(settings: Settings, address: str, running: Callable[[], bool]) -> None:
+    """Process-local proof, never a saved flag that could survive an unsafe restart.
+
+    ``address`` is the private service's UNIX socket path.
+    """
+    _PRIVATE_RUNTIMES[ai_dir(settings).resolve()] = (address, running)
 
 
-def private_runtime_url(settings: Settings, config: AIConfig) -> str:
+def private_runtime_socket(settings: Settings, config: AIConfig) -> str:
     trusted = _PRIVATE_RUNTIMES.get(ai_dir(settings).resolve())
-    if trusted is not None and trusted[0] == config.base_url and trusted[1]():
+    if trusted is not None and trusted[0] == config.socket_path and trusted[1]():
         return trusted[0]
-    # A previous private port could now belong to an unisolated service. Never
-    # send evidence there merely because its address is in the saved setup.
-    return "http://127.0.0.1:0"
+    # A socket file left from an earlier run proves nothing about what now
+    # listens there. Point at a path that never exists, so every request
+    # fails closed until this process has started and checked the service.
+    return str(ai_dir(settings) / "scratch" / "not-started.sock")
 
 
 class AIStateError(Exception):
@@ -98,10 +104,15 @@ def ai_enabled(settings: Settings) -> bool:
 class AIConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    # "system": an Ollama the person already runs on port 11434.
-    # "private": the pinned Ollama Axcess downloaded into ``data_dir/ai``.
+    # "system": an Ollama the person already runs on port 11434 (saved by
+    # versions before llama.cpp; no longer offered by the setup page).
+    # "private": the sandboxed service Axcess runs from ``data_dir/ai``.
     source: Literal["system", "private"]
     base_url: str
+    # "llama_cpp" for the private service since llama.cpp. A private setup
+    # saved before it says "ollama" and needs its models downloaded again.
+    backend: Literal["ollama", "llama_cpp"] = "ollama"
+    socket_path: str | None = None
 
     @field_validator("base_url")
     @classmethod
@@ -123,6 +134,7 @@ class AIConfig(BaseModel):
     text_model: str
     vision_model: str
     ollama_version: str | None = None
+    llama_cpp_version: str | None = None
 
 
 def ai_dir(settings: Settings) -> Path:
@@ -163,24 +175,43 @@ def effective_settings(settings: Settings) -> Settings:
         if settings.suggestions_enabled == enabled:
             return settings
         return settings.model_copy(update={"suggestions_enabled": enabled})
+    if config.source == "private" and config.backend == "llama_cpp":
+        service: dict[str, object] = {
+            "model_backend": "llama_cpp",
+            "llama_cpp_url": SOCKET_BASE_URL,
+            "llama_cpp_socket": Path(private_runtime_socket(settings, config)),
+        }
+    elif config.source == "private":
+        # A private Ollama setup from before llama.cpp: nothing runs it any
+        # more. Fail closed (port 0) until the person downloads again.
+        service = {"model_backend": "ollama", "ollama_base_url": "http://127.0.0.1:0"}
+    else:
+        service = {"model_backend": "ollama", "ollama_base_url": config.base_url}
     return settings.model_copy(
         update={
-            # The desktop AI setup installs and checks only Ollama, so its
-            # choice must reach Ollama even if the environment selects
-            # another backend (the private runtime's trust check above is
-            # Ollama-specific).
-            "model_backend": "ollama",
-            "ollama_base_url": (
-                private_runtime_url(settings, config)
-                if config.source == "private"
-                else config.base_url
-            ),
+            **service,
             "vlm_model": config.vision_model,
             "suggestion_text_model": config.text_model,
             "suggestion_vision_model": config.vision_model,
             "suggestions_enabled": enabled,
         }
     )
+
+
+ModelService = Literal["private", "ollama", "llama_cpp"]
+
+
+def model_service(settings: Settings) -> ModelService:
+    """Which AI service the interface should name in its help text.
+
+    "private": the desktop app's own sandboxed service, set up in Settings >
+    AI features. "ollama": an Ollama the person or an administrator runs.
+    "llama_cpp": a llama.cpp server an administrator configured.
+    """
+    if settings.desktop:
+        config = load_config(settings)
+        return "ollama" if config is not None and config.source == "system" else "private"
+    return "llama_cpp" if settings.model_backend == "llama_cpp" else "ollama"
 
 
 def semantic_model(settings: Settings) -> str | None:

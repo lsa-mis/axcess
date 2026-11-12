@@ -26,7 +26,7 @@ import { Button, Card, ExternalLinkButton, LinkButton, relativeTime } from "./ui
 /**
  * "Suggest a fix (AI)" for one occurrence, and the suggestion it produces.
  *
- * **What it does.** One button asks the local AI model (Ollama, on this
+ * **What it does.** One button asks the local AI model (on this
  * computer) to suggest a fix. The request waits in a queue and runs in the
  * background; this panel checks on it every few seconds and shows the answer
  * in two views, one for developers (code) and one for content editors (steps
@@ -687,9 +687,14 @@ export function SuggestionsBlockedNote({
   // a fix is known, tell the person) and W3C COGA "Making Content Usable",
   // objective 5 (help users avoid mistakes or know how to correct them),
   // https://www.w3.org/TR/coga-usable/.
-  // In the desktop app the first fix offered is Settings > AI features,
-  // which downloads Ollama and the models with a button; the terminal
-  // command stays for people who run their own Ollama.
+  // The words follow the AI service in use (`status.service`). The desktop
+  // app runs its own private service, set up and started from Settings > AI
+  // features, so it names no other program and offers no terminal command:
+  // the earlier text told desktop users to install Ollama, which the
+  // desktop app no longer uses. People who run their own Ollama keep its
+  // name and the `ollama pull` command; a llama.cpp server set up by an
+  // administrator gets "ask the person who set it up", since Axcess cannot
+  // know how it was installed. Repo rule: text must match what the code does.
   const aiSetup = useAiSetup();
   const setupLink = aiSetup ? (
     <p className="mt-3">
@@ -714,6 +719,28 @@ export function SuggestionsBlockedNote({
     </Card>;
   }
   if (status.reason === "model_missing") {
+    if (status.service === "private") {
+      return (
+        <Card className={`${className} p-4 text-sm text-fg-muted`}>
+          <p className="max-w-measure">
+            AI fix suggestions are turned on, but the AI models they use are not downloaded.
+            Download them in Settings → AI features. It downloads several gigabytes.
+          </p>
+          {setupLink}
+        </Card>
+      );
+    }
+    if (status.service === "llama_cpp") {
+      return (
+        <Card className={`${className} p-4 text-sm text-fg-muted`}>
+          <p className="max-w-measure">
+            AI fix suggestions are turned on, but the AI service does not have the model they
+            use ({status.text_model}). Ask the person who set up Axcess to add it.
+          </p>
+          {setupLink}
+        </Card>
+      );
+    }
     return (
       <Card className={`${className} p-4 text-sm text-fg-muted`}>
         <p className="max-w-measure">AI fix suggestions are turned on, but the AI model they use is not installed.</p>
@@ -731,6 +758,28 @@ export function SuggestionsBlockedNote({
       <Card className={`${className} p-4 text-sm text-fg-muted`}>
         AI fix suggestions are turned on, but cannot run because the Axcess database needs an
         update first (run make migrate).
+      </Card>
+    );
+  }
+  if (status.service === "private") {
+    return (
+      <Card className={`${className} p-4 text-sm text-fg-muted`}>
+        <p className="max-w-measure">
+          AI fix suggestions are turned on, but the private AI service on this computer is not
+          running. Start it in Settings → AI features, then reload this page.
+        </p>
+        {setupLink}
+      </Card>
+    );
+  }
+  if (status.service === "llama_cpp") {
+    return (
+      <Card className={`${className} p-4 text-sm text-fg-muted`}>
+        <p className="max-w-measure">
+          AI fix suggestions are turned on, but Axcess cannot reach its AI service. Ask the
+          person who set up Axcess to start it, then reload this page.
+        </p>
+        {setupLink}
       </Card>
     );
   }

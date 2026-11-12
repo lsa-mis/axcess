@@ -3055,6 +3055,12 @@
             "enum": ["ready", "turned_off", "database_update_needed", "model_unavailable", "model_missing"],
             "title": "Reason"
           },
+          "service": {
+            "type": "string",
+            "enum": ["private", "ollama", "llama_cpp"],
+            "title": "Service",
+            "default": "ollama"
+          },
           "text_model": {"type": "string", "title": "Text Model"},
           "vision_model": {"type": "string", "title": "Vision Model"},
           "missing_models": {"items": {"type": "string"}, "type": "array", "title": "Missing Models"},

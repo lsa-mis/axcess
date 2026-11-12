@@ -14,9 +14,9 @@ from typing import Literal
 from pydantic import BaseModel
 
 from audit.ai import hardware as hw
-from audit.ai.catalog import Catalog, Tier, load_catalog
+from audit.ai.catalog import Catalog, ModelEntry, Tier, load_catalog
 from audit.ai.installer import Installer, InstallStatus
-from audit.ai.runtime import OllamaRuntime, RuntimeSetupError, system_ollama
+from audit.ai.runtime import LlamaRuntime, RuntimeSetupError
 from audit.ai.sandbox import IsolationError
 from audit.ai.state import (
     AIConfig,
@@ -58,12 +58,16 @@ class HardwareInfo(BaseModel):
 
 
 class ProgramInfo(BaseModel):
+    """The llama.cpp program that runs the models."""
+
     version: str
     licence: str
     release_url: str
     download_bytes: int
     available_for_this_computer: bool
-    system_version: str | None
+    # True when the desktop app includes the program, so setup downloads
+    # only the models.
+    included: bool
 
 
 class AIPlan(BaseModel):
@@ -114,9 +118,8 @@ class AIManager:
         on_change: Callable[[AIConfig | None], None],
         *,
         catalog: Catalog | None = None,
-        runtime: OllamaRuntime | None = None,
+        runtime: LlamaRuntime | None = None,
         probe: Callable[[], hw.Hardware] | None = None,
-        find_system: Callable[[], str | None] | None = None,
         installer: Installer | None = None,
         busy_reason: Callable[[], str | None] = lambda: None,
     ) -> None:
@@ -125,15 +128,15 @@ class AIManager:
         self.on_change = on_change
         self.catalog = catalog or load_catalog()
         self.dir = ai_dir(settings)
-        self.runtime = runtime or OllamaRuntime(self.dir, self.catalog)
+        self.runtime = runtime or LlamaRuntime(
+            self.dir, self.catalog, bundled_dir=settings.llama_server_dir
+        )
         self.probe = probe or (lambda: hw.probe(self.dir))
-        self.find_system = find_system or system_ollama
         self.busy_reason = busy_reason
         self.installer = installer or Installer(
             self.catalog,
             self.runtime,
             self._installed,
-            find_system=self.find_system,
             on_stopped=self._download_stopped,
         )
 
@@ -142,8 +145,8 @@ class AIManager:
             self.runtime.stop()
 
     def _installed(self, config: AIConfig) -> None:
-        if config.source == "private":
-            trust_private_runtime(self.settings, config.base_url, self.runtime.running)
+        if config.source == "private" and config.socket_path:
+            trust_private_runtime(self.settings, config.socket_path, self.runtime.running)
         previous_config = self.config()
         previous_preferences = self.preferences()
         try:
@@ -176,9 +179,15 @@ class AIManager:
         self._require_idle()
         config = self.config()
         if enabled and config is not None and config.source == "private":
-            url = self.runtime.start(preferred_url=config.base_url)
-            trust_private_runtime(self.settings, url, self.runtime.running)
-            config = config.model_copy(update={"base_url": url})
+            models = self._models(config)
+            if models is None:
+                raise RuntimeSetupError(
+                    "The AI models need to be downloaded again for this version of Axcess. "
+                    "Choose a size and select Download and set up."
+                )
+            socket_path = self.runtime.start(models)
+            trust_private_runtime(self.settings, socket_path, self.runtime.running)
+            config = config.model_copy(update={"socket_path": socket_path})
             save_config(self.settings, config)
         elif enabled and config is None:
             raise RuntimeSetupError(
@@ -201,10 +210,25 @@ class AIManager:
     def config(self) -> AIConfig | None:
         return load_config(self.settings)
 
+    def _models(self, config: AIConfig) -> tuple[ModelEntry, ModelEntry] | None:
+        """The catalog models a private llama.cpp setup runs, if still current.
+
+        None for a private Ollama setup from before llama.cpp, or when the
+        catalog no longer has these models: both need a new download.
+        """
+        if config.backend != "llama_cpp":
+            return None
+        try:
+            tier = self.catalog.tier(config.tier)
+        except KeyError:
+            return None
+        names = (tier.text.served_name, tier.vision.served_name)
+        if names != (config.text_model, config.vision_model):
+            return None
+        return tier.text, tier.vision
+
     def plan(self) -> AIPlan:
         machine = self.probe()
-        # Setup discovery reads only the program version, never a model.
-        system = self.find_system()
         program_bytes = self.runtime.download_remaining()
         accelerator: Literal["apple", "nvidia", "amd", "none"] = (
             "apple"
@@ -216,7 +240,7 @@ class AIManager:
             else "none"
         )
         recommended = hw.recommend(machine, self.catalog, program_bytes)
-        release = self.catalog.ollama
+        release = self.catalog.llama_cpp
         return AIPlan(
             preferences=self.preferences(),
             hardware=HardwareInfo(
@@ -230,7 +254,7 @@ class AIManager:
                 release_url=release.release_url,
                 download_bytes=program_bytes,
                 available_for_this_computer=self.runtime.asset is not None,
-                system_version=system,
+                included=self.runtime.bundled(),
             ),
             tiers=[
                 TierPlan(
@@ -333,12 +357,12 @@ class AIManager:
             except IsolationError as exc:
                 return AiRuntimeStartResponse(state="not_isolated", reason=exc.reason)
             tier = self.catalog.tier(config.tier) if config else None
+            models = self._models(config) if config else None
             if (
                 not self.runtime.installed()
                 or config is None
-                or not all(
-                    self.runtime.has_model(tag) for tag in (config.text_model, config.vision_model)
-                )
+                or models is None
+                or not all(self.runtime.has_model(m) for m in models)
             ):
                 return AiRuntimeStartResponse(
                     state="model_missing",
@@ -348,14 +372,14 @@ class AIManager:
                     else None,
                 )
             try:
-                url = self.runtime.start(preferred_url=config.base_url)
+                socket_path = self.runtime.start(models)
             except IsolationError as exc:
                 return AiRuntimeStartResponse(state="not_isolated", reason=exc.reason)
             except RuntimeSetupError:
                 return AiRuntimeStartResponse(state="not_isolated", reason="runtime_failed")
-            trust_private_runtime(self.settings, url, self.runtime.running)
+            trust_private_runtime(self.settings, socket_path, self.runtime.running)
             previous = config
-            config = config.model_copy(update={"base_url": url})
+            config = config.model_copy(update={"socket_path": socket_path})
             try:
                 save_config(self.settings, config)
                 self.on_change(config)
@@ -368,7 +392,7 @@ class AIManager:
             self._start_lock.release()
 
     def startup(self) -> None:
-        """Start the private Ollama if the saved setup uses it."""
+        """Start the private service if the saved setup uses it."""
         config = self.config()
         try:
             enabled = self.preferences().enabled
@@ -377,14 +401,17 @@ class AIManager:
             return
         if not enabled or config is None or config.source != "private":
             return
+        models = self._models(config)
+        if models is None or not all(self.runtime.has_model(m) for m in models):
+            return
         try:
-            url = self.runtime.start(preferred_url=config.base_url)
+            socket_path = self.runtime.start(models)
         except (RuntimeSetupError, IsolationError):
             logging.getLogger(__name__).exception("ai.runtime_start_failed")
             return
-        trust_private_runtime(self.settings, url, self.runtime.running)
-        if url != config.base_url:
-            config = config.model_copy(update={"base_url": url})
+        trust_private_runtime(self.settings, socket_path, self.runtime.running)
+        if socket_path != config.socket_path:
+            config = config.model_copy(update={"socket_path": socket_path})
             save_config(self.settings, config)
         self.on_change(config)
 

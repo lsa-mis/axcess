@@ -260,8 +260,8 @@ export const SUGGESTION_OPTION_LABEL = {
 
 /** Desktop AI setup: what the download is doing now. */
 export const AI_INSTALL_STEP_LABEL: Record<AiInstallStep, string> = {
-  program: "Downloading the Ollama program",
-  starting: "Starting Ollama",
+  program: "Downloading the AI program",
+  starting: "Starting the private AI service",
   text_model: "Downloading the text model",
   vision_model: "Downloading the image model",
   finishing: "Finishing setup",
@@ -291,8 +291,8 @@ export const AI_TIER_LABEL: Record<AiTierId, string> = {
 
 /** Why a suggestion failed, in words that say what to do next. */
 export const SUGGESTION_ERROR_LABEL: Record<SuggestionErrorCode, string> = {
-  model_unavailable: "The local AI service (Ollama) is not running. Start it, then try again.",
-  model_missing: "The AI model is not installed in Ollama. Install it with ollama pull, then try again.",
+  model_unavailable: "The AI service on this computer was not running. Start it, then try again.",
+  model_missing: "The AI model was not installed. Install it, then try again.",
   timeout: "The AI model took too long to answer. Try again when the computer is less busy.",
   no_change: "The AI did not suggest a real change to the code, even when asked twice, so nothing is shown. A bigger AI model in Settings may do better. You can also fix it by hand with the rule guidance.",
   bad_answer: "The AI wrote an answer Axcess could not show safely, even when asked twice, so nothing is shown. A bigger AI model in Settings may do better. You can also fix it by hand with the rule guidance.",

@@ -1,170 +1,153 @@
-"""Confirmed host-side registry downloads. Never call Ollama's pull API."""
+"""Confirmed host-side model downloads for the private llama.cpp service.
+
+Each model is one or two GGUF files pinned in ``catalog.json`` by Hugging
+Face repository, commit, size and SHA-256. A file is downloaded over HTTPS
+to ``<name>.part`` (resuming a partial file), checked against its pinned
+size and SHA-256, and only then renamed into place. The model service never
+downloads anything itself: it runs with no network.
+"""
 
 from __future__ import annotations
 
-import hashlib
-import re
 import threading
 from collections.abc import Callable
 from pathlib import Path
 
 import httpx
-from pydantic import BaseModel, Field
 
+from audit.ai.catalog import GgufFile, ModelEntry
 from audit.ai.runtime import CHUNK, PausedError, RuntimeSetupError, sha256_of
 
-REGISTRY = "https://registry.ollama.ai"
-_DIGEST = re.compile(r"sha256:[a-f0-9]{64}\Z")
+
+def file_path(models: Path, entry: GgufFile) -> Path:
+    """Where a pinned file lives: one folder per repository and commit."""
+    owner, name = entry.repo.split("/", 1)
+    return models / f"{owner}--{name}" / entry.revision[:12] / entry.file
 
 
-class Descriptor(BaseModel):
-    digest: str = Field(pattern=r"^sha256:[a-f0-9]{64}$")
-    size: int = Field(ge=0, le=100_000_000_000)
+def _verified_marker(path: Path) -> Path:
+    return path.with_name(path.name + ".sha256")
 
 
-class Manifest(BaseModel):
-    schema_version: int = Field(alias="schemaVersion")
-    config: Descriptor
-    layers: list[Descriptor] = Field(max_length=100)
+def file_present(models: Path, entry: GgufFile) -> bool:
+    """True when the file is in place with its pinned size and was checked.
 
-
-def model_path(models: Path, tag: str) -> tuple[Path, str, str]:
-    match = re.fullmatch(r"([a-zA-Z0-9][a-zA-Z0-9_.-]*):([a-zA-Z0-9][a-zA-Z0-9_.-]*)", tag)
-    if match is None:
-        raise RuntimeSetupError("The AI model name is not supported by the private downloader.")
-    name, version = match.groups()
-    return models / "manifests" / "registry.ollama.ai" / "library" / name / version, name, version
-
-
-def model_present(models: Path, tag: str) -> bool:
+    The full SHA-256 is computed once, when the download finishes; the
+    marker beside the file records it so a start does not read gigabytes.
+    """
+    path = file_path(models, entry)
     try:
-        path, _, _ = model_path(models, tag)
-        manifest = Manifest.model_validate_json(path.read_bytes())
-        return all(
-            (models / "blobs" / d.digest.replace(":", "-")).is_file()
-            and (models / "blobs" / d.digest.replace(":", "-")).stat().st_size == d.size
-            for d in [manifest.config, *manifest.layers]
+        return (
+            path.is_file()
+            and path.stat().st_size == entry.size
+            and _verified_marker(path).read_text(encoding="ascii").strip() == entry.sha256
         )
-    except (OSError, ValueError, RuntimeSetupError):
+    except OSError:
         return False
+
+
+def model_present(models: Path, model: ModelEntry) -> bool:
+    return all(file_present(models, f) for f in model.files)
+
+
+def model_remaining(models: Path, model: ModelEntry) -> int:
+    """Bytes still to download for ``model``, counting partial files."""
+    remaining = 0
+    for entry in model.files:
+        if file_present(models, entry):
+            continue
+        part = file_path(models, entry).with_name(entry.file + ".part")
+        done = part.stat().st_size if part.exists() else 0
+        remaining += max(0, entry.size - min(done, entry.size))
+    return remaining
+
+
+def _https_only(request: httpx.Request) -> None:
+    if request.url.scheme != "https":
+        raise RuntimeSetupError("AI files can only be downloaded over a secure connection.")
+
+
+def _download_file(
+    http: httpx.Client,
+    models: Path,
+    entry: GgufFile,
+    progress: Callable[[int], None],
+    cancel: threading.Event,
+) -> None:
+    target = file_path(models, entry)
+    if file_present(models, entry):
+        progress(entry.size)
+        return
+    target.parent.mkdir(parents=True, exist_ok=True)
+    partial = target.with_name(target.name + ".part")
+    offset = partial.stat().st_size if partial.exists() else 0
+    if offset > entry.size:
+        partial.unlink()
+        offset = 0
+    if offset < entry.size:
+        headers = {"Range": f"bytes={offset}-"} if offset else {}
+        with http.stream("GET", entry.url, headers=headers) as response:
+            if response.status_code == 200 and offset:
+                # The server ignored the range; start the file again.
+                partial.unlink()
+                offset = 0
+            elif response.status_code not in (200, 206):
+                raise RuntimeSetupError(
+                    f"The AI model download failed (HTTP {response.status_code})."
+                )
+            with partial.open("ab") as fh:
+                for chunk in response.iter_bytes(CHUNK):
+                    if cancel.is_set():
+                        raise PausedError
+                    offset += len(chunk)
+                    if offset > entry.size:
+                        fh.close()
+                        partial.unlink(missing_ok=True)
+                        raise RuntimeSetupError("The AI model download is larger than expected.")
+                    fh.write(chunk)
+                    progress(offset)
+    if offset != entry.size or sha256_of(partial) != entry.sha256:
+        partial.unlink(missing_ok=True)
+        raise RuntimeSetupError(
+            "The AI model download did not match its published checksum, so it was "
+            "deleted. Try again."
+        )
+    partial.replace(target)
+    marker = _verified_marker(target)
+    marker.write_text(entry.sha256 + "\n", encoding="ascii")
+    progress(entry.size)
 
 
 def download_model(
     models: Path,
-    tag: str,
+    model: ModelEntry,
     progress: Callable[[int, int], None],
     cancel: threading.Event,
     client: httpx.Client | None = None,
 ) -> None:
-    """Verify the registry manifest and every blob before publishing an offline model.
-
-    A verified manifest is pinned locally so retries never switch model contents.
-    The catalogue currently pins tags, not manifest digests; HTTPS and the registry's
-    content digest authenticate first acquisition, not an independent release pin.
-    """
-    path, name, version = model_path(models, tag)
+    """Download and check every file of ``model``; resumes partial files."""
     if cancel.is_set():
         raise PausedError
     own = client is None
-
-    def https_only(request: httpx.Request) -> None:
-        if request.url.scheme != "https":
-            raise RuntimeSetupError("AI files can only be downloaded over a secure connection.")
-
     http = client or httpx.Client(
-        follow_redirects=True, timeout=httpx.Timeout(30), event_hooks={"request": [https_only]}
+        follow_redirects=True,
+        timeout=httpx.Timeout(30),
+        event_hooks={"request": [_https_only]},
     )
+    total = sum(f.size for f in model.files)
     try:
-        pin = path.with_name(path.name + ".verified")
-        if pin.exists():
-            body = pin.read_bytes()
-        else:
-            response = http.get(
-                f"{REGISTRY}/v2/library/{name}/manifests/{version}",
-                headers={"Accept": "application/vnd.docker.distribution.manifest.v2+json"},
-            )
-            response.raise_for_status()
-            body = response.content
-            digest = response.headers.get("Docker-Content-Digest", "")
-            if (
-                len(body) > 1_000_000
-                or not _DIGEST.fullmatch(digest)
-                or hashlib.sha256(body).hexdigest() != digest[7:]
-            ):
-                raise RuntimeSetupError(
-                    "The AI model list did not match its checksum. Nothing was installed."
-                )
-            Manifest.model_validate_json(body)
-            path.parent.mkdir(parents=True, exist_ok=True)
-            staged_pin = pin.with_suffix(pin.suffix + ".ready")
-            staged_pin.write_bytes(body)
-            staged_pin.replace(pin)
-        manifest = Manifest.model_validate_json(body)
-        descriptors = {d.digest: d for d in [manifest.config, *manifest.layers]}
-        total = sum(d.size for d in descriptors.values())
-        done = 0
-        blobs = models / "blobs"
-        blobs.mkdir(parents=True, exist_ok=True)
-        for d in descriptors.values():
+        base = 0
+        for entry in model.files:
             if cancel.is_set():
                 raise PausedError
-            target = blobs / d.digest.replace(":", "-")
-            if (
-                target.exists()
-                and target.stat().st_size == d.size
-                and sha256_of(target) == d.digest[7:]
-            ):
-                done += d.size
-                progress(done, total)
-                continue
-            partial = target.with_suffix(".part")
-            offset = partial.stat().st_size if partial.exists() else 0
-            if offset == d.size and partial.exists():
-                if sha256_of(partial) == d.digest[7:]:
-                    partial.replace(target)
-                    done += d.size
-                    progress(done, total)
-                    continue
-                partial.unlink()
-                offset = 0
-            if offset > d.size:
-                partial.unlink()
-                offset = 0
-            with http.stream(
-                "GET",
-                f"{REGISTRY}/v2/library/{name}/blobs/{d.digest}",
-                headers={"Range": f"bytes={offset}-"} if offset else {},
-            ) as response:
-                response.raise_for_status()
-                if response.status_code == 200 and offset:
-                    partial.unlink()
-                    offset = 0
-                if response.status_code not in (200, 206):
-                    raise RuntimeSetupError("The AI model download could not resume safely.")
-                with partial.open("ab") as fh:
-                    for chunk in response.iter_bytes(CHUNK):
-                        if cancel.is_set():
-                            raise PausedError
-                        offset += len(chunk)
-                        if offset > d.size:
-                            partial.unlink(missing_ok=True)
-                            raise RuntimeSetupError(
-                                "The AI model download is larger than expected."
-                            )
-                        fh.write(chunk)
-                        progress(done + offset, total)
-            if offset != d.size or sha256_of(partial) != d.digest[7:]:
-                partial.unlink(missing_ok=True)
-                raise RuntimeSetupError(
-                    "The AI model download did not match its checksum. It was deleted."
-                )
-            partial.replace(target)
-            done += d.size
-        staged = path.with_name(path.name + ".ready")
-        staged.write_bytes(body)
-        staged.replace(path)
-    except (httpx.HTTPError, ValueError) as exc:
-        raise RuntimeSetupError("The AI model download could not be checked. Try again.") from exc
+
+            def report(done: int, start: int = base) -> None:
+                progress(start + done, total)
+
+            _download_file(http, models, entry, report, cancel)
+            base += entry.size
+    except httpx.HTTPError as exc:
+        raise RuntimeSetupError("The AI model download stopped. Try again.") from exc
     finally:
         if own:
             http.close()

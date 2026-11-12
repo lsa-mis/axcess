@@ -48,7 +48,6 @@ def suggest_server(
     if getattr(request, "param", False) in (True, "offline"):
         monkeypatch.setenv("AUDIT_DESKTOP", "1")
         monkeypatch.setenv("AUDIT_DATA_DIR", str(db_path.parent))
-        monkeypatch.setattr("audit.ai.manager.system_ollama", lambda: None)
         save_preferences(
             Settings(data_dir=db_path.parent, desktop=True),
             AIPreferences(enabled=True, choice_recorded=True),
@@ -476,6 +475,12 @@ async def test_start_ai_service_then_writes_the_suggestion(
         await card.get_by_role("button", name="Suggest a fix (AI)").click()
         start = card.get_by_role("button", name="Start AI service")
         await start.wait_for(timeout=10000)
+        # The failure names the AI service on this computer, not Ollama.
+        failed = await card.inner_text()
+        assert (
+            "The AI service on this computer was not running. Start it, then try again." in failed
+        )
+        assert "Ollama" not in failed
         violations = await _run_axe(page)
         assert not violations, _render_violations(violations)
         await start.focus()

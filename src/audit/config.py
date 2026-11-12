@@ -57,12 +57,18 @@ class Settings(BaseSettings):
     model_backend: Literal["ollama", "llama_cpp"] = "ollama"
     llama_cpp_url: str = "http://127.0.0.1:8080"
     llama_cpp_socket: Path | None = None
+    # The desktop app's own llama.cpp builds (``resources/llama-runtime``,
+    # one folder per accelerator), set by the desktop shell. Unset when
+    # running from source: the AI setup then downloads the same pinned
+    # build into the data folder.
+    llama_server_dir: Path | None = None
 
     # AI fix suggestions (on demand, per occurrence). Off until an
     # administrator turns them on. The models are deliberately separate from
     # the scan-analysis models above and in ``analyzer_models.yaml``, so
     # changing them can never change how a finished report was produced.
-    # They talk only to the Ollama daemon at ``ollama_base_url``. Axcess never
+    # They talk only to the model service chosen by ``model_backend`` above
+    # (the desktop app's private llama.cpp service, or Ollama). Axcess never
     # downloads a model by itself: only the desktop app's Settings > AI
     # features page does, after the person chooses a size (``audit.ai``).
     suggestions_enabled: bool = False
