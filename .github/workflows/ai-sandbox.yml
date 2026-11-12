@@ -57,12 +57,15 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends bubblewrap
       - name: Install locked dependencies
-        run: uv sync --frozen
+        # Tests import from src; installing the Axcess wheel would need the
+        # packaged React dist, which this job does not build.
+        run: uv sync --frozen --no-install-project
       - name: Bundle the pinned llama.cpp builds
         run: uv run --no-sync python desktop/scripts/bundle-llama-server.py
       - name: Start the private service in the sandbox
         env:
           AXCESS_LLAMA_SERVER_DIR: ${{ github.workspace }}/desktop/llama-runtime
+          PYTHONPATH: src
         run: >-
           uv run --no-sync pytest -v -p no:cacheprovider
           tests/integration/test_llama_runtime_live.py
