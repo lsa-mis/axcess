@@ -25,7 +25,7 @@ far too small (see "What this can and cannot show").
 | Model | Size (Q4_K_M) | Licence | Role tried |
 | --- | --- | --- | --- |
 | Qwen3-VL-2B-Instruct (today's Small vision model) | 1.1 GB + 0.45 GB projector | Apache-2.0 | images, fixes |
-| Qwen3-4B-Instruct-2507 (newer than today's `qwen3:4b`) | 2.5 GB | Apache-2.0 | fixes |
+| Qwen3-4B-Instruct-2507 (today's Small text model, `qwen3:4b-instruct-2507-q4_K_M`) | 2.5 GB | Apache-2.0 | fixes |
 | LFM3-Omni-2B (Liquid AI) | 1.1 GB + 0.5 GB projector | LFM Open License 1.0: no licence for commercial use by an organisation with $10M or more in yearly revenue | images, fixes |
 | LFM3-VL-2B (Liquid AI) | 1.1 GB + 0.2 GB projector | LFM Open License 1.0 | images |
 | LFM3-1.7B (Liquid AI) | 1.1 GB | LFM Open License 1.0 | fixes |
@@ -92,8 +92,9 @@ this is accuracy.
 
 ## Leads for the next round
 
-1. Fix suggestions, Small tier: Qwen3-4B-Instruct-2507 is the lead (Apache-2.0,
-   best on the real cases). Today's Standard and Large text models
+1. Fix suggestions, Small tier: keep today's Qwen3-4B-Instruct-2507
+   (Apache-2.0, best on the real cases). Developer, 2026-11-12: "keep qwen 3 4b
+   for now". Today's Standard and Large text models
    (`qwen2.5-coder:7b`, `:14b`) were not tried (disk space).
 2. A 2B vision model is not good enough at fixes to serve both jobs, so plan
    on two models per tier.
