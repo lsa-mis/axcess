@@ -1,7 +1,8 @@
 # Moving the private AI service from Ollama to llama.cpp
 
-Status: started 2026-11-11. Agreed in Slack: Harry Gu proposed the move and
-Regan Maharjan agreed. Regan also asked to package the installation and
+Status: started 2026-11-11. Work is on the `llama-cpp` branch, built on
+`UX-Nov-6` (split 2026-11-12 so the rest of UX-Nov-6 can merge without
+it). Agreed in Slack: Harry Gu proposed the move and Regan Maharjan agreed. Regan also asked to package the installation and
 sandbox it inside Axcess Desktop.
 
 ## Why
@@ -144,9 +145,9 @@ Carried into Phase 2:
 
 | # | Question | Recommendation | Decided |
 | --- | --- | --- | --- |
-| 1 | Keep "use my own Ollama" for the web and server versions? | Yes, through the Ollama backend; it costs little. | Yes, as recommended (2026-11-11; not yet confirmed by the developer) |
+| 1 | Keep "use my own Ollama" for the web and server versions? | Yes, through the Ollama backend; it costs little. | Yes (developer, 2026-11-12) |
 | 2 | GPU builds to ship | Metal (macOS), Vulkan (Windows, Linux), CPU fallback; no CUDA/ROCm. | Yes (developer, 2026-11-11) |
-| 3 | Windows isolation | Needs research: AppContainer, a firewall rule bound to the binary, or none with a clear warning. | Research first (developer, 2026-11-11) |
+| 3 | Windows isolation | Needs research: AppContainer, a firewall rule bound to the binary, or none with a clear warning. | Research first (developer, 2026-11-11). Test builds come from GitHub Actions and the developer runs them on Windows (2026-11-12) |
 | 4 | Which llama.cpp build to pin | The newest build, once the live test passes on it (`tests/integration/test_llama_cpp_live.py`); bump the same way, on purpose, never automatically. | b12284, the newest on 2026-11-11 and the one Phase 1 was tested on (developer: "the newest one") |
 | 5 | Test Phase 1 against a real llama-server | Download one llama.cpp build and one small model, outside the repo. | Approved (developer, 2026-11-11) |
 | 6 | Upgrade the tier models? | Yes, by measurement: shortlist current models per tier (text and vision) with licence and size, run the repo's own evals on llama-server against today's Qwen3 / Qwen3-VL, and switch only where the numbers are better. | Downloads approved (developer, 2026-11-11). First look: `model-trials-2026-11.md`. Keep Qwen3-4B-Instruct-2507, today's Small text model (developer, 2026-11-12: "keep qwen 3 4b for now"); image model not decided (needs labelled real images; LFM3-Omni-2B needs a licence decision) |
