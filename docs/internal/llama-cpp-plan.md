@@ -96,7 +96,14 @@ Carried into Phase 2:
   process per model; decide after trying router mode with a text and a
   vision model.
 - Sandbox: macOS `sandbox-exec` as now; Linux Bubblewrap with
-  `--unshare-net` and a UNIX socket. Windows: see
+  `--unshare-net` and a UNIX socket. Linux checked 2026-11-12 with today's
+  `build_sandbox` unchanged (b12284, CPU and Vulkan builds, LFM3-1.7B): the
+  server answers through a socket in the scratch folder, the only network
+  interface inside is `lo`, and a connection to 1.1.1.1 fails at once.
+  Vulkan sees no GPU inside unless the sandbox adds `--dev-bind /dev/dri`
+  and read-only `/sys/dev/char`, `/sys/devices` and `/sys/bus/pci`
+  (Intel Iris Xe, Mesa; `/etc` not needed). Today's sandbox has none of
+  these, so the private AI would run on the CPU only. Windows: see
   `docs/internal/windows-ai-sandbox.md` (research, 2026-11-11). It
   recommends an LPAC AppContainer with no network capabilities inside a
   job object, started by a small native launcher (Python's `subprocess`
@@ -107,13 +114,18 @@ Carried into Phase 2:
   no AF_UNIX on Windows, so the backend needs a shim or a bridge.
 - Router mode starts its child servers on loopback TCP, which an LPAC
   blocks; plan on one llama-server process per model.
-- Likely bug to fix in this phase (found by reading, not yet run): the
-  sandbox's network probe runs `sys.executable -I -S -c ...`. In the
-  packaged desktop app `sys.executable` is the frozen backend, whose
-  entry point (`desktop/backend_entry.py`) ignores those flags and
-  starts the server, so the probe would fail and private AI would never
-  start in the packaged app, macOS included. Confirm on a packaged
-  build; the native launcher (or an explicit probe entry point) fixes it.
+- Fixed 2026-11-12: the sandbox's network probe ran
+  `sys.executable -I -S -c ...`. In the packaged desktop app that is the
+  frozen backend, whose argument parser exits with a usage error (exit 2,
+  reproduced by calling `desktop_server.main` with those arguments), so the
+  probe always failed and private AI could not start in the packaged app,
+  macOS included. The packaged backend now answers `--axcess-network-probe`
+  (`desktop/backend_entry.py`), and Bubblewrap also mounts the executable's
+  folder (PyInstaller's `sys.base_prefix` is only `_internal`). Tested with
+  real Bubblewrap through the entry script
+  (`tests/integration/test_ai_sandbox_live.py`); not yet run in a packaged
+  build.
+- The launcher passes `--reasoning off` (or a budget) for reasoning models.
 - Settings > AI features: the download is the model only.
 
 ### Phase 3: wording, docs and measurement

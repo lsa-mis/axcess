@@ -49,7 +49,7 @@ can be re-checked by axe on the fragment.
 | LFM3-Omni-2B | 3/5 (one answer unusable) | 2/8 | ~20 s |
 | Spark-X2.5-1.7B (thinking off) | 4/5 | about 1/8 | ~30 s |
 | Qwen3-VL-2B | 4/5 | 0/8 | ~20 s |
-| LFM3-1.7B | none: each request thought until the 120 s limit; not rerun with thinking off | | |
+| LFM3-1.7B (thinking off) | 3/5 (one answer unusable) | about 1/8 | ~22 s |
 
 What went wrong, by case:
 - Blue button (#333333 on #05a4d3, 4.37:1): every model made it worse
@@ -63,7 +63,10 @@ What went wrong, by case:
   size; the others set width on an inline link, which does nothing, or
   fixed the width at 24 px, which cuts the text.
 - Reasoning models (LFM3-1.7B, both Spark models) think for 2,000+ tokens
-  per answer unless `llama-server` runs with `--reasoning off`.
+  per answer unless `llama-server` runs with `--reasoning off`. With it
+  off (2026-11-12), LFM3-1.7B was the fastest (about 16 tokens a second)
+  but turned a link into a `div` with a button role, invented headings, and
+  put HTML in the CSS field.
 
 The made-up cases do not separate the models; the real ones do.
 
