@@ -129,6 +129,59 @@ Carried into Phase 2:
 - The launcher passes `--reasoning off` (or a budget) for reasoning models.
 - Settings > AI features: the download is the model only.
 
+Built 2026-11-12 (Linux and macOS; Windows still refuses to start AI):
+
+- `src/audit/ai/catalog.json` pins llama.cpp b12284 per platform (GPU build
+  first, CPU build as the fallback) and, per tier, GGUF files on Hugging Face
+  pinned to a commit with size and SHA-256. The tier models are today's:
+  Small is Qwen3-4B-Instruct-2507 Q4_K_M (Unsloth's conversion; Qwen
+  publishes no GGUF of it) and Qwen3-VL-2B; Standard and Large use Qwen's own
+  GGUFs. Each model keeps its Ollama tag, which is also the name the private
+  service answers to.
+- `desktop/scripts/bundle-llama-server.py` puts the pinned builds in the
+  desktop app (`resources/llama-runtime`, `AUDIT_LLAMA_SERVER_DIR`); the
+  desktop build workflow runs it on all three platforms. Run from source,
+  the setup downloads the same builds into the data folder.
+- `ai/runtime.py: LlamaRuntime` runs **one router-mode llama-server**
+  (`--models-preset`, one section per model, `c = 8192`, `reasoning =
+  off`, `load-on-startup`) on a UNIX socket in the scratch folder, inside the
+  sandbox. Router mode was chosen over one process per model: one socket
+  keeps one model endpoint for the scan, suggestion and readiness code. Its
+  children use loopback, which exists only inside the Linux sandbox's
+  private network; on macOS it is the host loopback, as Ollama used. Start
+  waits until both models report "loaded"; if a GPU build fails to load
+  them, it retries with the CPU build.
+- Linux Bubblewrap adds the GPU devices and read-only `/sys` folders only
+  for a GPU build. macOS gets a rule for the service's own UNIX socket;
+  unverified on a Mac, checked by `.github/workflows/ai-sandbox.yml` on a
+  macOS runner (empty model list, no model download).
+- The desktop saved setup now selects `model_backend="llama_cpp"` with the
+  socket this process started and checked (`trust_private_runtime`); an
+  unchecked setup points at a socket that never exists, so requests fail
+  closed. A private Ollama setup saved before this fails closed and asks for
+  a new download; a successful download deletes the old private Ollama
+  files. The private Ollama installer and the Ollama registry downloader
+  are removed.
+- Signed-in scans and the protected-scan helper accept the private socket
+  (a socket is local by construction; the helper also checks it is a socket
+  owned by the same user). TCP addresses still need a literal loopback.
+- Found in the live run (Linux, Intel Iris Xe, Vulkan) and fixed:
+  the router renames a model whose name has a colon (`qwen3:4b-...`
+  became `qwen3:Q4_K_M`), so the private service uses the tag with "-";
+  Bubblewrap's `--die-with-parent` follows the *thread* that started the
+  service, which was the setup's download thread, so every process now
+  starts from one long-lived launcher thread; and with reasoning
+  extraction on, Qwen3-4B-Instruct-2507 wrote a preamble before its JSON
+  that emptied short answers, so the preset sets `reasoning-format = none`.
+- Checked in a desktop-mode server with the bundled-program layout: setup
+  through the API, background start at launch (about 10 s), AI off and on,
+  no service left after Axcess is killed, and the fix-suggestion evals
+  through the app's own service (5/5 usable, 4/5 rule check passed,
+  about 28 s each, the same as the model trial).
+- Interface text names the private AI service in the desktop app and
+  Ollama only for an Ollama the person runs (`service` in the suggestion
+  status and scan readiness responses).
+
 ### Phase 3: wording, docs and measurement
 
 - Every "Ollama" in the interface and docs becomes accurate to the
