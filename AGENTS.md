@@ -101,6 +101,11 @@ on 130 of them, then got every verdict wrong on its first real pages
 - `src/audit/extractor/` discovers images/SVG text and stores blobs.
 - `src/audit/analyzer/` contains axe, OCR, VLM, semantic, and behavioral
   probes.
+- `src/audit/linked_files/` records the PDF, Office and Google files pages
+  link to (the report's Documents tab) and checks PDFs with pypdf. Called
+  "linked files" in code because a crawler "document" is an HTML page.
+  Storage: `src/audit/db/linked_files.py` (migration 0039); list:
+  `src/audit/web/linked_files_queries.py`.
 - `src/audit/synthesizer/` turns raw evidence into image findings, severity,
   priority, remediation, and scan diffs.
 - `src/audit/db/` owns SQLite migrations, transactions, repositories, and the

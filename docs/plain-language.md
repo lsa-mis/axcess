@@ -99,6 +99,8 @@ Use the word in the first column, and never the words in the last.
 | panel | One of the two reports on Compare reports, each in its own frame: "Go back in the report #24 panel". Never "left" or "right": on a narrow screen the panels are one above the other. | pane, side, left, right |
 | What changed | The page that lists what is new, still found and no longer found between two reports. | Compare reports (for this page), diff, verify changes |
 | Does not apply | A table cell with no value for this row. | n/a |
+| document | A PDF, Word, Excel, PowerPoint, OpenDocument, RTF or Google file that a scanned page links to or shows: the **Documents** tab. In code, a "linked file". | attachment, asset, download (as a noun), linked file (in the interface) |
+| Could not check | The Documents tab's third "How sure" value: Axcess has no result for the file, and the row says why. Keep "does not check this file type yet" (a later version may) apart from "cannot check" (no machine check can). | Unknown, Error, Skipped, Not applicable, Accessible, Passed |
 | remove private details (redact) | Replace likely private details in a download with "[redacted]". The choice is "Remove private details (redact)"; the file is a "redacted copy". | sanitize, scrub, anonymize, mask, PII |
 
 ### Why "occurrence" and "issue type"
@@ -188,6 +190,12 @@ issue type is a real problem? Each word was chosen against these alternatives.
 | "For information" | "Informational" | A longer word for the same idea. |
 | "For information" | "Not a problem" | Already the status for a false positive. One phrase names one thing. |
 
+The Documents tab uses "Mostly sure" and "Not sure" with the same meaning:
+proved by a machine check, or needing a person. Its third value is "Could not
+check", not "For information": Axcess has no result for the file at all. It
+has no "Accessible" or "Passed" value, because a machine check cannot prove a
+file is accessible.
+
 ### Check names
 
 | Check | Name in the interface |
@@ -202,6 +210,7 @@ issue type is a real problem? Each word was chosen against these alternatives.
 | Visual order, motion, and autoplay | Motion and reading-order check |
 | Semantic (local language model) | AI review |
 | Image text (OCR and vision model) | Image text check |
+| Linked files (PDF checks) | Document check |
 
 Name the tool only when it matters to the reader, and in parentheses.
 

@@ -12,6 +12,7 @@ it never proves [WCAG](glossary.md#wcag) conformance or legal compliance.
 - [Find a problem and fix it (for developers)](#find-a-problem-and-fix-it-for-developers)
 - [The report summary](#the-report-summary)
 - [The Issues tab](#the-issues-tab)
+- [The Documents tab](#the-documents-tab)
 - [The full evidence record](#the-full-evidence-record)
 - [The note that shows which button revealed a problem](#the-note-that-shows-which-button-revealed-a-problem)
 - [Recording decisions](#recording-decisions)
@@ -224,6 +225,49 @@ sure 3, Not sure 7, For information 2".
 The name of each issue type opens [its page](#the-full-evidence-record).
 **Delete report**, at the end of the Issues page, is described under
 [Delete a report](#delete-a-report).
+
+## The Documents tab
+
+**Documents**, the third tab, lists the files the scanned pages link to or
+show inside the page: PDF, Word, Excel, PowerPoint, OpenDocument, Rich Text
+Format (RTF), and Google Docs, Sheets, Slides and Drive files. Use it to decide
+which file to fix first. Axcess checks only the PDF files; see
+[Document check](glossary.md#document-check) for what it checks.
+
+Each row shows:
+
+- **Document**: the file's name, which opens the file in a new tab, and its
+  address. "On another site" and "Has a form to fill in" show where they apply.
+- **Type**: such as "PDF" or "Word, old format (.doc)".
+- **How sure**: how sure Axcess is that the file has accessibility problems.
+  - **Mostly sure**: a machine check found a problem, such as a PDF with no
+    tags or no text a screen reader can read.
+  - **Not sure**: the PDF passed the machine checks. A person must still check
+    the reading order, the image descriptions (alt text) and the table headers.
+    Not sure never means the file is accessible.
+  - **Could not check**: the row says why. "Axcess does not check this file
+    type yet" (Word .docx, Excel .xlsx, PowerPoint .pptx, OpenDocument, RTF)
+    is different from "Axcess cannot check" (old .doc, .xls and .ppt files,
+    and Google files). A broken link, a password, a file over 10 MB, or a slow
+    download are reasons too.
+- **What Axcess found**: the failed checks, or the reason.
+- **Linked from**: each page that links to the file (up to 20), with the
+  link's text, and, where it applies, "Shown inside the page" or "Appears
+  only after pressing" a named button.
+
+The order is fixed: Mostly sure, then Not sure, then Could not check. Within
+each, files linked from more pages come first, then files with a form to fill
+in, then files with more serious problems. There is no single score.
+
+To check a PDF, Axcess downloads it once to your computer, checks it, and
+keeps only the result, not the file. A PDF on another site is downloaded once;
+that site is not scanned. Nothing is sent to any other service.
+
+Limits: a link that appears only after pressing a button is found only if the
+scan pressed that button, and the scan never presses buttons that may
+download, buy or delete something. A file whose address has no file extension
+is found only on the scanned site. Sign-in scans, and reports made before this
+tab existed, do not list documents.
 
 ## The full evidence record
 
