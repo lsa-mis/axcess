@@ -53,7 +53,13 @@ def macos_profile(runtime: Path, models: Path, scratch: Path) -> str:
             "(version 1)",
             "(deny default)",
             "(allow process-fork)",
+            # The service's own folder, and Python for the isolation check.
+            # A framework Python (python.org, GitHub's macOS runners) starts
+            # by running Python.app inside its install folder; without that
+            # folder the check failed with "posix_spawn ... Python"
+            # (2026-11-12). The packaged app's backend is the literal path.
             f"(allow process-exec (subpath {path(runtime.resolve())}) "
+            f"(subpath {path(Path(sys.base_prefix).resolve())}) "
             f"(literal {path(Path(sys.executable).resolve())}))",
             "(allow sysctl-read)",
             '(allow file-read* (literal "/"))',
