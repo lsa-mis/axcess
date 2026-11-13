@@ -430,6 +430,7 @@ export const api = {
     request<ReportImage>(`/api/scans/${scanId}/images/${imageId}/alt-check`, {
       method: "POST",
     }),
+  downloadImagesZip,
   getFinding: (id: number) => request<FindingDetail>(`/api/findings/${id}`),
   setStatus: (id: number, status: FindingStatus, rationale?: string) =>
     request<{ status: FindingStatus }>(`/api/findings/${id}/status`, {
@@ -598,6 +599,25 @@ export const api = {
 /** Direct URL (bypass fetch) for image blobs, used in <img src=…>. */
 export const blobUrl = (contentHash: string): string =>
   `/blobs/${contentHash}`;
+
+/**
+ * Fetch the Images tab's ZIP and hand it to the browser to save, the way
+ * Export report does (downloadExport): a plain download link was ignored in
+ * some windows (the developer's report, 2026-11-13), and fetching lets the
+ * page say it is working and show an error in words.
+ */
+async function downloadImagesZip(scanId: number): Promise<{ filename: string; sizeBytes: number }> {
+  const res = await fetch(imagesZipUrl(scanId), { credentials: "same-origin", cache: "no-store" });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new ApiError(res.status, apiErrorMessage(res.status, body));
+  }
+  const blob = await res.blob();
+  const filename =
+    dispositionFilename(res.headers.get("Content-Disposition")) ?? `report-${scanId}-images.zip`;
+  saveBlob(blob, filename);
+  return { filename, sizeBytes: blob.size };
+}
 
 /** Download URL for the Images tab's ZIP: pictures in folders by group and verdict, and a sheet. */
 export const imagesZipUrl = (scanId: number): string => `/api/scans/${scanId}/images/export.zip`;

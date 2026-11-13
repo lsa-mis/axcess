@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
 import { Download, X } from "lucide-react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, blobUrl, imagesZipUrl, ApiError } from "../api/client";
+import { api, blobUrl, ApiError } from "../api/client";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import Tabs from "../components/Tabs";
 import { TablePagination } from "../components/TablePagination";
@@ -20,7 +20,7 @@ import {
   TableStatus,
 } from "../components/table/Table";
 import { ActiveFilters, FilterMenu, activeFilterItems, type FilterGroup } from "../components/table/FilterMenu";
-import { AltTag, Button, Card, DownloadLink, PageLink } from "../components/ui";
+import { AltTag, Button, Card, PageLink } from "../components/ui";
 import { useModalDialog } from "../hooks/useModalDialog";
 import { useScanQuery } from "../hooks/useScanQuery";
 import { cn } from "../lib/cn";
@@ -203,17 +203,10 @@ export default function ImagesRoute() {
         // sheet listing them all (src/audit/exports/images_zip.py). In the
         // header's action slot, top right, where Issues keeps Export report,
         // so a report's downloads are in one place (SC 3.2.3 Consistent
-        // Navigation, Level AA). A plain link to the file, not a button
-        // that fetches: the browser shows its own download progress. Only a
-        // completed report offers it; the server refuses the rest.
-        actions={
-          scan?.status === "completed" ? (
-            <DownloadLink href={imagesZipUrl(id)}>
-              <Download className="h-4 w-4" aria-hidden />
-              Download images and sheet (ZIP)
-            </DownloadLink>
-          ) : undefined
-        }
+        // Navigation, Level AA). Fetched and saved like Export report, not a
+        // plain link: a plain link did nothing in some windows (2026-11-13).
+        // Only a completed report offers it; the server refuses the rest.
+        actions={scan?.status === "completed" ? <ZipDownload scanId={id} /> : undefined}
         meta={
           <ReportMeta
             counts={allImages == null ? "Loading images…" : plural(allImages, "image", "images")}
@@ -366,6 +359,49 @@ export default function ImagesRoute() {
       </Card>
       <ImageViewer image={viewing} onClose={() => setViewing(null)} />
     </>
+  );
+}
+
+/**
+ * The ZIP download button, with what it is doing in words: "Preparing…"
+ * while the server builds it (a large report takes a few seconds), then the
+ * file name and size, or what went wrong. The words are in a polite live
+ * region beside the button (SC 4.1.3 Status Messages, Level AA). The button
+ * stays enabled and focusable while it works (aria-disabled), so focus is
+ * not lost (SC 2.4.3).
+ */
+function ZipDownload({ scanId }: { scanId: number }) {
+  const [state, setState] = useState<{ busy: boolean; message: string; error: boolean }>({
+    busy: false,
+    message: "",
+    error: false,
+  });
+  const start = async () => {
+    if (state.busy) return;
+    setState({ busy: true, message: "Preparing the ZIP. A large report takes a few seconds.", error: false });
+    try {
+      const { filename, sizeBytes } = await api.downloadImagesZip(scanId);
+      const mb = (sizeBytes / 1_000_000).toFixed(1);
+      setState({ busy: false, message: `Saved ${filename} (${mb} MB) to your downloads.`, error: false });
+    } catch (error) {
+      const text = error instanceof Error ? error.message : "Try again later.";
+      setState({ busy: false, message: `The ZIP could not be downloaded. ${text}`, error: true });
+    }
+  };
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <Button onClick={() => void start()} aria-disabled={state.busy || undefined}>
+        <Download className="h-4 w-4" aria-hidden />
+        {state.busy ? "Preparing images and sheet (ZIP)…" : "Download images and sheet (ZIP)"}
+      </Button>
+      <p
+        role="status"
+        aria-live="polite"
+        className={cn("max-w-xs text-right text-xs", state.error ? "text-sev-critical" : "text-fg-muted")}
+      >
+        {state.message}
+      </p>
+    </div>
   );
 }
 
