@@ -1508,6 +1508,28 @@
         }
       }
     },
+    "/api/scans/{scan_id}/images/export.zip": {
+      "get": {
+        "summary": "Api Scan Images Zip",
+        "description": "The report's images in folders by group and verdict, with a sheet.\n\nA download a person asks for from the Images tab. Only for a completed,\nnon-protected report: a protected report's images stay in its store.\nBuilt in a temporary file, not in memory, because a report can hold\nthousands of images; the file is removed once it has been sent.",
+        "operationId": "api_scan_images_zip_api_scans__scan_id__images_export_zip_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
     "/api/findings/{finding_id}/status": {
       "post": {
         "summary": "Api Set Finding Status",

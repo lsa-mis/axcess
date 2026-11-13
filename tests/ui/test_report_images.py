@@ -255,3 +255,77 @@ def test_rollback_drops_the_table(tmp_path: Path) -> None:
         conn.execute("SELECT name FROM sqlite_master WHERE name = 'alt_text_checks'").fetchone()
         is None
     )
+
+
+def _zip(client: TestClient, scan_id: int) -> Any:
+    import io
+    import zipfile
+
+    response = client.get(f"/api/scans/{scan_id}/images/export.zip")
+    assert response.status_code == 200, response.text
+    assert response.headers["content-type"] == "application/zip"
+    assert f"report-{scan_id}-images.zip" in response.headers["content-disposition"]
+    return zipfile.ZipFile(io.BytesIO(response.content))
+
+
+def test_zip_puts_images_in_group_and_verdict_folders(app_and_ids: Any) -> None:
+    from openpyxl import load_workbook
+
+    client, scan_id, photo, db_path = app_and_ids
+    # Alt text from a crawled page that looks like a formula.
+    conn = connect(db_path)
+    try:
+        conn.execute(
+            "UPDATE page_images SET alt_text = ? WHERE image_id = ?",
+            ('=HYPERLINK("http://evil.test","x")', photo),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    archive = _zip(client, scan_id)
+    names = archive.namelist()
+    root = f"report-{scan_id}-images/"
+    banner = [n for n in names if n.endswith("banner.png")]
+    # An image with text and no alt text is in both of its groups.
+    assert sorted(n.removeprefix(root).rsplit("/", 1)[0] for n in banner) == [
+        "Images with text/Needs alt text",
+        "Images without alt text/Needs alt text",
+    ]
+    assert any(
+        n.startswith(root + "Images with text/Good alt text/") and n.endswith("logo.png")
+        for n in names
+    )
+    assert any(
+        n.startswith(root + "Images with alt text/Not checked yet/") and n.endswith("students.png")
+        for n in names
+    )
+
+    import io
+
+    wb = load_workbook(io.BytesIO(archive.read(root + "images.xlsx")))
+    assert wb.sheetnames == ["About", "Images"]
+    ws = wb["Images"]
+    header = [c.value for c in ws[1]]
+    assert header[:4] == ["Image number", "File name", "Groups", "Alt text verdict"]
+    rows = [[c.value for c in r] for r in ws.iter_rows(min_row=2)]
+    assert len(rows) == 3
+    alt_col = header.index("Current alt text")
+    photo_row = next(r for r in rows if r[0] == photo)
+    cell = ws.cell(row=rows.index(photo_row) + 2, column=alt_col + 1)
+    assert cell.data_type == "s" and cell.value.startswith("=HYPERLINK")
+    files_col = header.index("Files in this ZIP")
+    assert "Images with alt text/Not checked yet/" in photo_row[files_col]
+    about = " ".join(str(c.value) for c in wb["About"]["A"] if c.value)
+    assert "does not prove" in about
+
+
+def test_zip_refuses_report_that_is_not_complete(app_and_ids: Any) -> None:
+    client, scan_id, _, db_path = app_and_ids
+    conn = connect(db_path)
+    try:
+        conn.execute("UPDATE scans SET status = 'running' WHERE id = ?", (scan_id,))
+        conn.commit()
+    finally:
+        conn.close()
+    assert client.get(f"/api/scans/{scan_id}/images/export.zip").status_code == 409
+    assert client.get("/api/scans/9999/images/export.zip").status_code == 404

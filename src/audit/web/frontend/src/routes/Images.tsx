@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
-import { X } from "lucide-react";
+import { Download, X } from "lucide-react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, blobUrl, ApiError } from "../api/client";
+import { api, blobUrl, imagesZipUrl, ApiError } from "../api/client";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import Tabs from "../components/Tabs";
 import { TablePagination } from "../components/TablePagination";
@@ -20,7 +20,7 @@ import {
   TableStatus,
 } from "../components/table/Table";
 import { ActiveFilters, FilterMenu, activeFilterItems, type FilterGroup } from "../components/table/FilterMenu";
-import { AltTag, Button, Card, PageLink } from "../components/ui";
+import { AltTag, Button, Card, DownloadLink, PageLink } from "../components/ui";
 import { useModalDialog } from "../hooks/useModalDialog";
 import { useScanQuery } from "../hooks/useScanQuery";
 import { cn } from "../lib/cn";
@@ -199,6 +199,21 @@ export default function ImagesRoute() {
         scanId={id}
         previousScanId={scan?.previous_scan_id ?? null}
         title="Images"
+        // The ZIP: the pictures in folders by group, then by verdict, and a
+        // sheet listing them all (src/audit/exports/images_zip.py). In the
+        // header's action slot, top right, where Issues keeps Export report,
+        // so a report's downloads are in one place (SC 3.2.3 Consistent
+        // Navigation, Level AA). A plain link to the file, not a button
+        // that fetches: the browser shows its own download progress. Only a
+        // completed report offers it; the server refuses the rest.
+        actions={
+          scan?.status === "completed" ? (
+            <DownloadLink href={imagesZipUrl(id)}>
+              <Download className="h-4 w-4" aria-hidden />
+              Download images and sheet (ZIP)
+            </DownloadLink>
+          ) : undefined
+        }
         meta={
           <ReportMeta
             counts={allImages == null ? "Loading images…" : plural(allImages, "image", "images")}

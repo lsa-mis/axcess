@@ -2548,6 +2548,47 @@ def create_app(
             raise HTTPException(status_code=404, detail="This image is not in this report")
         return JSONResponse(row.model_dump())
 
+    @app.get("/api/scans/{scan_id:int}/images/export.zip")
+    def api_scan_images_zip(scan_id: int) -> Response:
+        """The report's images in folders by group and verdict, with a sheet.
+
+        A download a person asks for from the Images tab. Only for a completed,
+        non-protected report: a protected report's images stay in its store.
+        Built in a temporary file, not in memory, because a report can hold
+        thousands of images; the file is removed once it has been sent.
+        """
+        import os
+        import tempfile
+
+        from audit.exports.images_zip import images_zip_filename, write_images_zip
+
+        if _protected_scan_owner(resolved_db, scan_id) is not None:
+            raise HTTPException(
+                status_code=403,
+                detail="A protected report's images cannot be downloaded.",
+            )
+        fd, zip_path = tempfile.mkstemp(prefix="axcess-images-", suffix=".zip")
+        try:
+            with os.fdopen(fd, "wb") as out, get_conn() as conn:
+                scan = _load_scan_or_404(conn, scan_id)
+                _require_completed_scan(scan)
+                write_images_zip(
+                    conn,
+                    scan_id=scan_id,
+                    seed_url=str(scan.get("seed_url") or ""),
+                    blob_store=blob_store,
+                    out=out,
+                )
+        except BaseException:
+            os.unlink(zip_path)
+            raise
+        return FileResponse(
+            zip_path,
+            media_type="application/zip",
+            filename=images_zip_filename(scan_id),
+            background=BackgroundTask(os.unlink, zip_path),
+        )
+
     @app.post("/api/findings/{finding_id:int}/status")
     async def api_set_finding_status(
         finding_id: int, body: Annotated[dict[str, Any], Body()]

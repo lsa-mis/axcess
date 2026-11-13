@@ -379,6 +379,13 @@ def list_report_images(
     )
 
 
+def all_report_images(conn: sqlite3.Connection, scan_id: int) -> list[ReportImage]:
+    """Every image of the report, worst verdict first, for the ZIP export."""
+    rows = _build_rows(conn, scan_id)
+    rows.sort(key=lambda row: (_VERDICT_ORDER[row.verdict], -row.page_count, row.image_id))
+    return rows
+
+
 def get_report_image(conn: sqlite3.Connection, scan_id: int, image_id: int) -> ReportImage | None:
     """One image's row, or None when the image is not on a page of this scan."""
     for row in _build_rows(conn, scan_id):

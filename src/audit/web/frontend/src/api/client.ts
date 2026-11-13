@@ -599,6 +599,9 @@ export const api = {
 export const blobUrl = (contentHash: string): string =>
   `/blobs/${contentHash}`;
 
+/** Download URL for the Images tab's ZIP: pictures in folders by group and verdict, and a sheet. */
+export const imagesZipUrl = (scanId: number): string => `/api/scans/${scanId}/images/export.zip`;
+
 /** Download URL for a scan export; incomplete reports require explicit draft acknowledgement. */
 export const exportUrl = (scanId: number, format: string, acknowledgedDraft = false): string =>
   `/api/scans/${scanId}/export/${format}${acknowledgedDraft ? "?draft=acknowledged" : ""}`;
