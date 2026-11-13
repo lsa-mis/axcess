@@ -1,14 +1,16 @@
-"""The Documents tab: ``GET /api/scans/{id}/documents``.
+"""The Documents tab: ``GET /api/scans/{id}/documents`` and the screen.
 
 The seeded report gets one file of each kind the screen must show: two
 Mostly sure PDFs (one a form linked from two pages, one also revealed by a
 click), a Not sure PDF shown in a frame, and four that could not be checked
 for four different reasons. The API tests pin the order, the counts and scan
-isolation.
+isolation; the browser tests drive the tab by keyboard and run axe and the
+AAA checks the other screens get, on the populated table.
 """
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -19,7 +21,13 @@ from fastapi.testclient import TestClient
 from audit.db import linked_files as store
 from audit.db import repo
 
+from .test_accessibility_axe import _AXE_TAGS_AA, _render_violations, _run_axe
+from .test_control_text_purpose import _COLLECT, vague
+from .test_wcag_aaa import _SHARED_NAMES, _SMALL_TARGETS, _TEXT_LAYOUT
+
 pytestmark = pytest.mark.ui
+# The browser tests share the module's browser, so they run on its loop.
+on_module_loop = pytest.mark.asyncio(loop_scope="module")
 
 HOME = "http://example.com/"
 ABOUT = "http://example.com/about"
@@ -257,3 +265,133 @@ def test_one_report_never_lists_another_reports_files(
     theirs = client.get(f"/api/scans/{other}/documents").json()
     assert [f["name"] for f in theirs["files"]] == ["secret.pdf"]
     assert theirs["files"][0]["refs"][0]["page_url"] == "http://other.example/"
+
+
+# -- the screen -------------------------------------------------------------
+
+
+@on_module_loop
+async def test_the_tab_works_by_keyboard_and_lists_each_file(
+    documents: int, live_server: tuple[str, int], new_page: Any
+) -> None:
+    from playwright.async_api import expect
+
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+    tab = page.get_by_role("navigation", name="Report views").get_by_role("link", name="Documents")
+    # Reached and opened with the keyboard alone.
+    for _ in range(30):
+        await page.keyboard.press("Tab")
+        if await tab.evaluate("el => el === document.activeElement"):
+            break
+    else:
+        pytest.fail("Tab never reached the Documents tab")
+    await page.keyboard.press("Enter")
+    await page.wait_for_url(f"**/app/scans/{scan_id}/documents")
+    await expect(page.get_by_role("heading", name="Documents", level=1)).to_be_visible()
+    await expect(tab).to_have_attribute("aria-current", "page")
+    assert await page.title() == "Documents · Axcess"
+
+    table = page.get_by_role("table", name=f"Documents linked from report #{scan_id}", exact=False)
+    rows = table.locator("tbody tr")
+    await expect(rows).to_have_count(7)
+    names = [
+        "permit-form.pdf",
+        "no-title.pdf",
+        "map.pdf",
+        "budget.xls",
+        "missing.pdf",
+        "report.docx",
+        "Meeting notes",
+    ]
+    await expect(table.get_by_role("rowheader")).to_have_text(
+        [re.compile(rf"^{re.escape(name)}\b") for name in names], use_inner_text=True
+    )
+    form = rows.nth(0)
+    await expect(form).to_contain_text("Mostly sure")
+    await expect(form).to_contain_text("Not tagged")
+    await expect(form).to_contain_text("Has a form to fill in")
+    await expect(form).to_contain_text("2 pages link to it.")
+    await expect(form).to_contain_text("Appears only after pressing “More forms”")
+    # Not sure says what a person must still check: never read as a pass.
+    await expect(rows.nth(2)).to_contain_text("Not sure")
+    await expect(rows.nth(2)).to_contain_text(
+        "the reading order, the image descriptions (alt text) and the table headers"
+    )
+    await expect(rows.nth(2)).to_contain_text("Shown inside the page (in a frame)")
+    # "Does not check yet" and "cannot check" read differently.
+    await expect(rows.nth(3)).to_contain_text("Axcess cannot check this file type.")
+    await expect(rows.nth(4)).to_contain_text("(HTTP 404)")
+    await expect(rows.nth(5)).to_contain_text("Axcess does not check this file type yet.")
+    await expect(rows.nth(6)).to_contain_text("Axcess cannot check files kept in Google")
+    await expect(rows.nth(6)).to_contain_text("On another site")
+    # The file link names the file and says it opens a new tab.
+    link = table.get_by_role("link", name=re.compile(r"^permit-form\.pdf\s*, opens the file"))
+    await expect(link).to_have_attribute("href", "http://example.com/files/permit-form.pdf")
+    await expect(link).to_have_attribute("target", "_blank")
+
+    # Keyboard order follows the reading order: the tab, then the first
+    # file, then the first page that links to it, each with a visible focus.
+    await tab.focus()
+    stops = []
+    for _ in range(4):
+        await page.keyboard.press("Tab")
+        stops.append(
+            await page.evaluate(
+                """() => {
+                    const el = document.activeElement;
+                    const s = getComputedStyle(el);
+                    return {
+                        text: el.innerText.replace(/\\s+/g, ' ').trim(),
+                        ring: (s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0)
+                            || s.boxShadow !== 'none',
+                    };
+                }"""
+            )
+        )
+    texts = [stop["text"] for stop in stops]
+    first_file = next(i for i, t in enumerate(texts) if t.startswith("permit-form.pdf"))
+    first_page = next(i for i, t in enumerate(texts) if t.startswith("Home"))
+    assert first_file < first_page, texts
+    assert all(stop["ring"] for stop in stops), stops
+
+
+@on_module_loop
+@pytest.mark.parametrize("width", [1280, 320])
+@pytest.mark.parametrize("theme", ["light", "dark"])
+async def test_the_populated_tab_passes_axe(
+    documents: int, live_server: tuple[str, int], new_page: Any, theme: str, width: int
+) -> None:
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": width, "height": 800})
+    await page.add_init_script(
+        f"localStorage.setItem('axcess.preferences', JSON.stringify({{theme: '{theme}'}}))"
+    )
+    await page.goto(f"{base}/app/scans/{scan_id}/documents", wait_until="networkidle")
+    await page.get_by_role("table").wait_for()
+    for tags in (_AXE_TAGS_AA, None):
+        violations = await _run_axe(page, tags)
+        assert not violations, f"{theme} {width}px:\n{_render_violations(violations)}"
+    # Nothing but the table scrolls sideways (SC 1.4.10 Reflow).
+    assert await page.evaluate(
+        "document.documentElement.scrollWidth <= document.documentElement.clientWidth"
+    )
+
+
+@on_module_loop
+async def test_the_populated_tab_meets_the_aaa_checks(
+    documents: int, live_server: tuple[str, int], new_page: Any
+) -> None:
+    """44 px targets, one place per link name, short running text, and
+    controls whose own words say what they do."""
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 720})
+    await page.goto(f"{base}/app/scans/{scan_id}/documents", wait_until="networkidle")
+    await page.get_by_role("table").wait_for()
+    assert await page.evaluate(_SMALL_TARGETS) == []
+    assert await page.evaluate(_SHARED_NAMES) == []
+    layout = await page.evaluate(_TEXT_LAYOUT)
+    assert layout == {"long": [], "tight": []}
+    controls = await page.evaluate(_COLLECT)
+    assert not [c for c in controls if vague(c["text"], in_nav=c["inNav"])], controls

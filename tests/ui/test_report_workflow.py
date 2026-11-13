@@ -954,14 +954,14 @@ def _assert_current_is_plain_text(items: list[dict[str, Any]]) -> None:
 async def test_report_breadcrumb_ends_at_the_report_on_its_views(
     live_server: tuple[str, int], new_page: Any
 ) -> None:
-    """``Reports > example.com [scan N]``, and nothing after it, on Issues and Compare reports.
+    """``Reports > example.com [scan N]``, and nothing after it, on the report's three views.
 
     The lit tab says which view; "Issues" as a crumb as well was the third
     time the word appeared on one screen.
     """
     base, scan_id = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
-    for suffix in ("/issues", "/compare"):
+    for suffix in ("/issues", "/documents", "/compare"):
         await page.goto(f"{base}/app/scans/{scan_id}{suffix}", wait_until="networkidle")
         items = await _breadcrumb(page)
         assert [item["text"] for item in items] == ["Reports", f"example.com Report #{scan_id}"], (
@@ -969,9 +969,9 @@ async def test_report_breadcrumb_ends_at_the_report_on_its_views(
         )
         assert items[0]["link"] == "/app/scans", items
         _assert_current_is_plain_text(items)
-    # The tabs are the report's two views; Overview is gone.
+    # The tabs are the report's three views; Overview is gone.
     tabs = page.get_by_role("navigation", name="Report views").get_by_role("link")
-    await playwright_async.expect(tabs).to_have_text(["Issues", "Compare reports"])
+    await playwright_async.expect(tabs).to_have_text(["Issues", "Compare reports", "Documents"])
 
 
 async def test_issue_evidence_trail_names_the_issue(
@@ -1105,7 +1105,8 @@ async def test_report_crumb_returns_to_the_searched_list(
 async def test_first_report_has_no_compare_tab(live_server: tuple[str, int], new_page: Any) -> None:
     """A site's first report has nothing to compare with, so no tab offers it.
 
-    A saved link to its Compare reports page still opens, with its tabs.
+    Its other two views, Issues and Documents, are still tabs. A saved link
+    to its Compare reports page still opens, with its tabs.
     """
     base, scan_id = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
@@ -1113,15 +1114,13 @@ async def test_first_report_has_no_compare_tab(live_server: tuple[str, int], new
     await playwright_async.expect(
         page.get_by_role("heading", name="Issues", exact=True, level=1)
     ).to_be_visible()
-    await playwright_async.expect(
-        page.get_by_role("navigation", name="Report views")
-    ).to_have_count(0)
+    tabs = page.get_by_role("navigation", name="Report views").get_by_role("link")
+    await playwright_async.expect(tabs).to_have_text(["Issues", "Documents"])
     await page.goto(f"{base}/app/scans/{scan_id}/compare", wait_until="networkidle")
     await playwright_async.expect(
         page.get_by_role("heading", name="Nothing to compare with yet")
     ).to_be_visible()
-    tabs = page.get_by_role("navigation", name="Report views").get_by_role("link")
-    await playwright_async.expect(tabs).to_have_text(["Issues", "Compare reports"])
+    await playwright_async.expect(tabs).to_have_text(["Issues", "Compare reports", "Documents"])
 
 
 async def test_report_opens_keyboard_only_in_reading_order(

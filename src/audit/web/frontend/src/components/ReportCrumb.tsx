@@ -14,8 +14,8 @@ import { useScanQuery } from "../hooks/useScanQuery";
  * ``Reports › app.codegra.de #40 › Contrast (Minimum) › 12 affected pages ›
  * Dashboard | Sage Campus``: where you are in the app, which report you are reading (one
  * site can have several, so the number is part of the name), and the path
- * from the report down to this page. On the report's own views, Issues and
- * Compare reports, the trail ends at the report: the lit tab already says
+ * from the report down to this page. On the report's own views, Issues,
+ * Compare reports and Documents, the trail ends at the report: the lit tab already says
  * which view, and "Issues" as a crumb, a tab and a heading was the same word
  * three times on one screen.
  *
@@ -32,6 +32,7 @@ const VIEWS: Array<[RegExp, string]> = [
   [/^\/scans\/\d+\/issues\/?$/, "Issues"],
   [/^\/scans\/\d+\/compare\/?$/, "Compare reports"],
   [/^\/scans\/\d+\/compare\/changes\/?$/, "What changed"],
+  [/^\/scans\/\d+\/documents\/?$/, "Documents"],
   [/^\/scans\/\d+\/pages\/\d+\/inspect\/?$/, "Page inspector"],
   [/^\/scans\/\d+\/pages\/\d+\/?$/, "Page details"],
   [/^\/scans\/\d+\/pages\/?$/, "Pages visited"],
@@ -356,9 +357,9 @@ export function useReportTrail(): {
   return { match, trail: labelled };
 }
 
-/** The report's own views: its URL, the issue table, and Compare reports. */
+/** The report's own views: its URL, the issue table, Compare reports and Documents. */
 function isReportView(pathname: string): boolean {
-  return /^\/scans\/\d+(?:\/issues|\/compare)?\/?$/.test(pathname);
+  return /^\/scans\/\d+(?:\/issues|\/compare|\/documents)?\/?$/.test(pathname);
 }
 
 /**

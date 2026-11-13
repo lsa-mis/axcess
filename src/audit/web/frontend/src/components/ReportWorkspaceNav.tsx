@@ -3,10 +3,11 @@ import Tabs from "./Tabs";
 import { FRAMED } from "../lib/framed";
 
 /**
- * Report navigation: the issue table, and Compare reports, which shows this
- * report and another of the site side by side. (What changed between the
- * two, the older comparison page, opens from Compare reports and keeps this
- * tab lit: it is part of that view.)
+ * Report navigation: the issue table; Compare reports, which shows this
+ * report and another of the site side by side; and Documents, the files the
+ * report's pages link to. (What changed between two reports, the older
+ * comparison page, opens from Compare reports and keeps that tab lit: it is
+ * part of that view.)
  *
  * These are two *views of the same report*, not two steps of a task. An
  * early numbered-pill treatment read as a wizard ("1 Overview → 2 Issues →
@@ -59,6 +60,18 @@ export const REPORT_VIEWS: readonly ReportView[] = [
     available: (previousScanId) => previousScanId != null,
     path: (scanId) => `/scans/${scanId}/compare`,
   },
+  // The files the report's pages link to (PDF, Word, Excel, Google), with
+  // what the PDF checks found (routes/Documents.tsx). Third, after the two
+  // views of the report's issues: it is a separate kind of result, and a
+  // reader looks at the page issues first. Always shown, even for a report
+  // that did not look for documents: the tab then says why there is no
+  // list, which a missing tab could not.
+  {
+    key: "documents",
+    label: "Documents",
+    segment: "documents",
+    path: (scanId) => `/scans/${scanId}/documents`,
+  },
 ];
 
 /** The view a report path belongs to; the landing view when none matches. */
@@ -78,11 +91,13 @@ export default function ReportWorkspaceNav({
   const active = activeReportView(pathname);
   // The current view stays, so a saved link to it still has its tab. As a
   // panel of Compare reports (lib/framed.ts) there is no Compare reports tab:
-  // it would open the comparison inside one of its own panels. With Issues
-  // alone left, the row is not drawn at all (below).
+  // it would open the comparison inside one of its own panels. No Documents
+  // tab there either: a panel compares two reports' issues, and a panel that
+  // could wander off to a file list would no longer be side by side with its
+  // neighbour. With one view left, the row is not drawn at all (below).
   const views = REPORT_VIEWS.filter(
     (view) =>
-      !(FRAMED && view.key === "compare") &&
+      !(FRAMED && (view.key === "compare" || view.key === "documents")) &&
       (view === active || (view.available?.(previousScanId) ?? true)),
   );
   // One view is not a choice; the heading already names it.
