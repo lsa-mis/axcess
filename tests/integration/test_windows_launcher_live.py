@@ -70,7 +70,9 @@ def test_python_reaches_the_sandboxed_server_through_the_launcher() -> None:
                 endpoint = ModelEndpoint(
                     "llama_cpp", "http://localhost", None, tuple(routes.items())
                 )
-                async with open_model_http_client(endpoint, timeout=10) as http:
+                async with open_model_http_client(
+                    endpoint, base_url="http://localhost", timeout=10
+                ) as http:
                     health = await http.get("/health")
                     named = await http.get("/models", params={"model": "router"})
                     return health.status_code, named.status_code
