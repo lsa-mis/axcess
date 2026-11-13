@@ -38,7 +38,13 @@ import {
 import ReportHeader from "../components/ReportHeader";
 import HowSureTag from "../components/HowSureTag";
 import ReportDangerZone from "../components/ReportDangerZone";
-import { ReportCoverageNote, ReportNote, ReportNotes, ReportSummary } from "../components/ReportSummary";
+import {
+  GlossaryList,
+  ReportCoverageNote,
+  ReportNote,
+  ReportNotes,
+  ReportSummary,
+} from "../components/ReportSummary";
 import { cn } from "../lib/cn";
 import { liveSearchParams } from "../lib/liveSearchParams";
 import { HIDDEN_ISSUE_FIELDS } from "../lib/hiddenIssueFields";
@@ -1056,34 +1062,6 @@ function IssueGlossary() {
         />
       </div>
     </ReportNote>
-  );
-}
-
-/**
- * One glossary list under a real heading (an h3 under the note's h2), so a
- * screen-reader user can jump between the two lists. Each term is the same
- * chip the table draws, above its definition rather than run into one line,
- * so an entry reads on its own and reflows cleanly when zoomed.
- */
-function GlossaryList({
-  heading,
-  items,
-}: {
-  heading: string;
-  items: { key: string; term: ReactNode; help: string }[];
-}) {
-  return (
-    <div>
-      <h3 className="text-sm font-semibold text-fg">{heading}</h3>
-      <dl className="mt-2 space-y-3">
-        {items.map(({ key, term, help }) => (
-          <div key={key}>
-            <dt>{term}</dt>
-            <dd className="mt-1">{help}</dd>
-          </div>
-        ))}
-      </dl>
-    </div>
   );
 }
 

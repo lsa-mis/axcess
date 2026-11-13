@@ -331,6 +331,40 @@ export function ReportNote({
   );
 }
 
+/**
+ * One glossary list under a real heading (an h3 under the note's h2), so a
+ * screen-reader user can jump between the lists. Each term is the same chip
+ * the table draws, above its definition rather than run into one line, so
+ * an entry reads on its own and reflows cleanly when zoomed.
+ *
+ * The part every report view's "What … labels mean" note is built from
+ * (Issues, Documents), so the notes look and read the same on each tab (SC
+ * 3.2.4 Consistent Identification, Level AA). It was local to the Issues
+ * route until Documents needed the same note; moved here unchanged rather
+ * than copied, so the two cannot drift.
+ */
+export function GlossaryList({
+  heading,
+  items,
+}: {
+  heading: string;
+  items: { key: string; term: ReactNode; help: string }[];
+}) {
+  return (
+    <div>
+      <h3 className="text-sm font-semibold text-fg">{heading}</h3>
+      <dl className="mt-2 space-y-3">
+        {items.map(({ key, term, help }) => (
+          <div key={key}>
+            <dt>{term}</dt>
+            <dd className="mt-1">{help}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
 export function BlockedScanNotice({
   scanId,
   blocked,
