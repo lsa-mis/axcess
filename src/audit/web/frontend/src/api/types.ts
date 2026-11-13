@@ -979,8 +979,10 @@ export interface IssuesResponse {
   };
   total_unfiltered: number;
   /**
-   * What the Issues page shows when it opens (Mostly sure and Measured), and
-   * what it leaves one click away. Counted over the whole report.
+   * What the Issues page shows when it opens, and what it leaves out.
+   * Counted over the whole report. Since 2026-11-13 the page opens on every
+   * issue type, so the `hidden_*` counts are 0 (`default_view_counts` in
+   * `src/audit/web/issues.py`).
    */
   default_view_counts?: {
     issue_types: number;
