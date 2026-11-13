@@ -113,7 +113,8 @@ function Checks({
           <p className="mt-1 text-base leading-7 text-fg">
             Of {all.length} WCAG {data.wcag_version} criteria, Axcess checks <strong>{count("automated")}</strong>,
             partly checks <strong>{count("partial")}</strong> and gives AI hints on{" "}
-            <strong>{count("ai-assisted")}</strong>. You check the other <strong>{count("manual")}</strong>.
+            <strong>{count("ai-assisted")}</strong>. You check the other <strong>{count("manual")}</strong>, and
+            confirm the rest.
           </p>
           <p className="mt-1 text-sm text-fg-muted">No scan proves a site meets WCAG.</p>
         </div>

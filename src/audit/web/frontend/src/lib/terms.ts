@@ -297,7 +297,10 @@ export const CHECK_METHOD_TECH: Record<CheckMethod, string> = {
 };
 
 export const CHECK_METHOD_BLURB: Record<CheckMethod, string> = {
-  automated: "A full test. Review what it finds.",
+  // Not "a full test": each of these still has a part only a person can
+  // judge (a title's meaning, nothing lost at 200% zoom), shown in the
+  // criterion's "You check" line (AGENTS.md, Interface language rule 4).
+  automated: "Tests it on every page. You still confirm the result.",
   partial: "Finds some problems. You test the rest.",
   "ai-assisted": "Points to possible problems. You decide.",
   manual: "Axcess can't test these.",
