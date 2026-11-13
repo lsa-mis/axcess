@@ -161,6 +161,7 @@ export default function ProtectedIssueIndexRoute() {
                   </tbody>
                 </Table>
               </TableRegion>
+              <TablePagination label="Sign-in scan issues" noun="issue types" place="end" {...paged} />
             </Card>
           )}
           <p className="mt-4 text-sm text-fg-muted">

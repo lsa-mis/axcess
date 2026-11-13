@@ -268,6 +268,7 @@ export default function TrackingRoute() {
               </tbody>
             </Table>
           </TableRegion>
+          <TablePagination label="Criteria" noun="criteria" place="end" {...criteria} />
         </Card>
         {!isLoading && rows.length === 0 && (
           <EmptyState
@@ -342,6 +343,7 @@ export default function TrackingRoute() {
               </tbody>
             </Table>
           </TableRegion>
+          <TablePagination label="Checks" noun="checks" place="end" {...pipelines} />
         </Card>
       </section>
 

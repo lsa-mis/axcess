@@ -347,6 +347,7 @@ export default function IssuesRoute() {
             regionRef={region}
           />
         )}
+        <TablePagination label="Issues" noun="issue types" place="end" {...paged} />
       </Card>
 
       {/* Under the table since user testing (2026-10-28): the table follows

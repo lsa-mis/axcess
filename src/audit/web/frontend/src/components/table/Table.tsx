@@ -23,6 +23,9 @@ import { ariaSort, nextSort, sortChip, type Sort, type SortKind } from "./sort";
  *   TableRegion    the keyboard-scrollable region
  *     Table, TableHead, SortHeader / ColumnHeader
  *     Row, RowHeader, Cell    striped rows, one target tall
+ *   TableFoot      the pager again, under the last row (../TablePagination,
+ *                  `place="end"`), so a reader who has read to the end
+ *                  turns the page there
  *
  * Tables compose these rather than restyling a <table>, so a change to the
  * design lands everywhere at once.
@@ -59,6 +62,27 @@ export function TableBar({
         {pager}
       </div>
       {footer}
+    </div>
+  );
+}
+
+/**
+ * The bar under a table's last row, styled like `TableBar` above it, with
+ * the pager on the right where it sits in the top bar. It holds only the
+ * end-of-table pager (`TablePagination` with `place="end"` draws it), so it
+ * is there exactly when the top pager is: on a table with more than one
+ * page. Search and filters stay in the top bar only; they change what the
+ * table holds, which a reader decides before reading it, not after.
+ */
+export function TableFoot({ children }: { children: ReactNode }) {
+  return (
+    <div
+      className={cn(
+        "flex flex-wrap items-center justify-end border-t border-border bg-surface-subtle px-4 py-3",
+        CARD_EDGE,
+      )}
+    >
+      {children}
     </div>
   );
 }

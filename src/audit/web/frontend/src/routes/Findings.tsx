@@ -111,6 +111,21 @@ export default function FindingsRoute() {
     setParams(next);
   };
   const empty = !isLoading && rows.length === 0;
+  // One set of props for the pager over the list and the one under it.
+  const pagerProps = {
+    label: "Images",
+    noun: "images",
+    page: filter.page,
+    pages: data?.total_pages ?? 1,
+    total: data?.total ?? 0,
+    pageSize: PAGE_SIZE,
+    pagerId: FINDINGS_PAGER_ID,
+    setPage: (page: number) => {
+      const next = new URLSearchParams(params);
+      next.set("page", String(page));
+      setParams(next);
+    },
+  };
 
   return (
     <>
@@ -154,24 +169,7 @@ export default function FindingsRoute() {
           emptied the list is still there to undo. */}
       <Card className={empty ? "mb-4" : undefined}>
         <TableBar
-          pager={
-            data && (
-              <TablePagination
-                label="Images"
-                noun="images"
-                page={filter.page}
-                pages={data.total_pages}
-                total={data.total}
-                pageSize={PAGE_SIZE}
-                pagerId={FINDINGS_PAGER_ID}
-                setPage={(page) => {
-                  const next = new URLSearchParams(params);
-                  next.set("page", String(page));
-                  setParams(next);
-                }}
-              />
-            )
-          }
+          pager={data && <TablePagination {...pagerProps} />}
           footer={<ActiveFilters items={activeFilterItems(filters)} onClear={resetFilters} />}
         >
           <TableSearch
@@ -189,6 +187,7 @@ export default function FindingsRoute() {
             : "Loading…"}
         </TableStatus>
         {!empty && <FindingsTable rows={rows} isLoading={isLoading} />}
+        {data && !empty && <TablePagination {...pagerProps} place="end" />}
       </Card>
 
       {empty && (

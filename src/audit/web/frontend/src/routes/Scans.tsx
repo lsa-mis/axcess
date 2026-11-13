@@ -563,6 +563,7 @@ export default function ScansRoute() {
               </tbody>
             </Table>
           </TableRegion>
+          <TablePagination label="Public reports" noun="sites" place="end" {...sitePages} />
         </Card>
       )}
 
@@ -626,6 +627,7 @@ export default function ScansRoute() {
                   </tbody>
                 </Table>
               </TableRegion>
+              <TablePagination label="Sign-in scans" noun="sign-in scans" place="end" {...protectedPages} />
             </Card>
           )}
         </section>
