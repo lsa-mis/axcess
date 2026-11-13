@@ -85,13 +85,13 @@ def test_issue_api_separates_barriers_review_leads_and_information(
         "expert_review": 1,
         "informational": 1,
     }
-    # Nothing here is Mostly sure or Measured, so the Issues page opens on
-    # an empty table and says how much it holds back.
+    # Nothing here is Mostly sure or Measured; the Issues page still opens on
+    # every issue type (2026-11-13), so nothing is held back.
     assert payload["default_view_counts"] == {
-        "issue_types": 0,
-        "occurrences": 0,
-        "hidden_issue_types": 2,
-        "hidden_occurrences": 3,
+        "issue_types": 2,
+        "occurrences": 3,
+        "hidden_issue_types": 0,
+        "hidden_occurrences": 0,
     }
     assert payload["occurrence_counts"]["high_confidence"] == 0
     assert payload["occurrence_counts"]["all_evidence"] == 3

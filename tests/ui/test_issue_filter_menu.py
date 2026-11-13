@@ -107,10 +107,14 @@ async def _api_keys(page: Any, base: str, scan_id: int, **filters: str) -> set[s
     return {quote(unquote(r["issue_key"]), safe="") for r in body["rows"]}
 
 
-# With nothing checked under "How sure" the table shows these two values and
-# holds the rest back (audit.labels.DEFAULT_REVIEW_LANES).
-_DEFAULT_LANES = "likely_barrier,measured"
+# With nothing checked under "How sure" the table shows every value
+# (audit.labels.DEFAULT_REVIEW_LANES, every level since 2026-11-13).
+_SUREST_LANES = "likely_barrier,measured"
 _ALL_LANES = "likely_barrier,measured,expert_review,informational"
+_DEFAULT_LANES = _ALL_LANES
+# The seed's issue types: 3 Mostly sure or Measured, 1 Not sure, 1 For information.
+_ALL_COUNT = 5
+_SUREST_COUNT = 3
 
 
 async def _assert_matches_api(page: Any, base: str, scan_id: int) -> set[str]:
@@ -191,10 +195,16 @@ async def test_several_in_a_group_and_across_groups_match_the_api(
     base, scan_id = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
     await _open(page, base, scan_id)
-    # The table opens on the three rule-check groups; the two image groups
-    # (Not sure, For information) are held back.
+    # The table opens on every group: the three rule-check groups and the two
+    # image groups (Not sure, For information).
     opened = await _assert_matches_api(page, base, scan_id)
-    assert opened == {"axe%3Abutton-name", "axe%3Acolor-contrast", "axe%3Aregion"}, opened
+    assert opened == {
+        "axe%3Abutton-name",
+        "axe%3Acolor-contrast",
+        "axe%3Aregion",
+        "image%3Aessential_missing",
+        "image%3Alogo_adequate",
+    }, opened
 
     await _open_menu(page)
     # AA first, then A: the URL keeps option order, not click order.
@@ -222,18 +232,19 @@ async def test_several_in_a_group_and_across_groups_match_the_api(
     assert ct == {"axe%3Abutton-name"}, ct
     await _box(page, "Where it shows", "alt_text").check()
     await page.wait_for_url(re.compile(r"finding_type=click_through(%2C|,)alt_text"))
-    # Image groups are never Mostly sure or Measured, so with nothing checked
-    # under How sure the table still holds them back, and says so.
-    assert await _assert_matches_api(page, base, scan_id) == ct
-    await pw.expect(page.get_by_role("note", name="Hidden issue types")).to_contain_text(
-        "2 issue types are hidden"
+    # Image groups are never Mostly sure or Measured; with nothing checked
+    # under How sure the table shows them too, and the note says what they are.
+    both = await _assert_matches_api(page, base, scan_id)
+    assert ct < both and any(key.startswith("image%3A") for key in both), both
+    await pw.expect(page.get_by_role("note", name="Issue types shown")).to_contain_text(
+        "Showing every issue type"
     )
     await _box(page, "How sure", "informational").check()
     narrowed = await _assert_matches_api(page, base, scan_id)
     assert narrowed and narrowed.isdisjoint(ct), narrowed
     assert all(key.startswith("image%3A") for key in narrowed), narrowed
-    # A How sure box is checked, so nothing is held back any more.
-    await pw.expect(page.get_by_role("note", name="Hidden issue types")).to_have_count(0)
+    # A How sure box is checked, so the table shows exactly that and no note.
+    await pw.expect(page.get_by_role("note", name="Issue types shown")).to_have_count(0)
 
     # The badge counts groups in use; the line under the bar names them.
     await pw.expect(_filter_button(page)).to_contain_text("2")
@@ -289,7 +300,7 @@ async def test_a_reload_and_an_old_single_value_link_keep_the_checks(
     assert await _shown_keys(page) == await _api_keys(
         page, base, scan_id, review_lane=_DEFAULT_LANES
     )
-    assert len(await _shown_keys(page)) == 3
+    assert len(await _shown_keys(page)) == _ALL_COUNT
 
 
 async def test_keyboard_only(enriched, live_server, new_page) -> None:
@@ -333,43 +344,44 @@ async def test_clear_all_and_clear_filters_reset_every_group(
     await _open_menu(page)
     await page.get_by_role("button", name="Clear all filters", exact=True).click()
     await page.wait_for_url(lambda url: not re.search(r"conformance|type=", url))
-    assert len(await _assert_matches_api(page, base, scan_id)) == 3
+    assert len(await _assert_matches_api(page, base, scan_id)) == _ALL_COUNT
     for group in ("Level", "How sure", "Where it shows"):
         boxes = page.get_by_role("group", name=group, exact=True).get_by_role("checkbox")
         for i in range(await boxes.count()):
             await pw.expect(boxes.nth(i)).not_to_be_checked()
-    assert len(await _shown_keys(page)) == 3
+    assert len(await _shown_keys(page)) == _ALL_COUNT
 
     await _open(page, base, scan_id, "?conformance=A&finding_type=click_through")
     await page.get_by_role("button", name="Clear filters", exact=True).click()
     await page.wait_for_url(lambda url: not re.search(r"conformance|finding_type", url))
-    assert len(await _assert_matches_api(page, base, scan_id)) == 3
+    assert len(await _assert_matches_api(page, base, scan_id)) == _ALL_COUNT
     await pw.expect(page.get_by_text("Filtered by", exact=False)).to_have_count(0)
 
 
-async def test_table_opens_on_the_surest_groups_and_one_button_shows_the_rest(
+async def test_table_opens_on_every_group_and_one_button_shows_the_surest(
     enriched, live_server, new_page
 ) -> None:
-    """The default view, its count of what it holds back, and the way to all of it."""
+    """The default view shows every issue type, says what each How sure value means,
+    and offers one way to narrow to the surest (2026-11-13)."""
     base, scan_id = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
     await _open(page, base, scan_id)
-    assert len(await _assert_matches_api(page, base, scan_id)) == 3
+    assert len(await _assert_matches_api(page, base, scan_id)) == _ALL_COUNT
     body = await (await page.request.get(f"{base}/api/scans/{scan_id}/issues")).json()
     counts = body["default_view_counts"]
-    assert (counts["issue_types"], counts["hidden_issue_types"]) == (3, 2), counts
+    assert (counts["issue_types"], counts["hidden_issue_types"]) == (_ALL_COUNT, 0), counts
 
-    # The numbers over the table count the rows under it, and say what is held back.
+    # The numbers over the table count every row under it; nothing is hidden.
     summary = page.locator("dl").first
-    await pw.expect(summary).to_contain_text(re.compile(r"Issue types\s*3\s*Plus 2 hidden"))
-    await pw.expect(summary).to_contain_text("Plus 2 hidden")
+    await pw.expect(summary).to_contain_text(re.compile(rf"Issue types\s*{_ALL_COUNT}"))
+    await pw.expect(summary).not_to_contain_text("hidden")
 
     # No filter was set by the reader, so none is shown as set.
     await pw.expect(page.get_by_text("Filtered by", exact=False)).to_have_count(0)
     await _open_menu(page)
     group = page.get_by_role("group", name="How sure", exact=True)
     await pw.expect(group).to_contain_text(
-        "With nothing checked, the table shows Mostly sure and Measured only."
+        "With nothing checked, the table shows every issue type."
     )
     boxes = group.get_by_role("checkbox")
     assert await boxes.count() == 4
@@ -377,8 +389,8 @@ async def test_table_opens_on_the_surest_groups_and_one_button_shows_the_rest(
         await pw.expect(boxes.nth(i)).not_to_be_checked()
     await page.keyboard.press("Escape")
 
-    note = page.get_by_role("note", name="Hidden issue types")
-    await pw.expect(note).to_contain_text("2 issue types are hidden")
+    note = page.get_by_role("note", name="Issue types shown")
+    await pw.expect(note).to_contain_text("Showing every issue type")
     await pw.expect(note).to_contain_text("Not sure 1, For information 1")
     await pw.expect(note).to_contain_text(
         "A person must check a Not sure issue type before you report it."
@@ -387,37 +399,37 @@ async def test_table_opens_on_the_surest_groups_and_one_button_shows_the_rest(
     assert await _run_axe(page) == []
 
     # By keyboard: the button is reachable, at least one target tall, and
-    # focus lands on the table it filled.
-    show = note.get_by_role("button", name="Show hidden issue types", exact=True)
-    box = await show.bounding_box()
+    # focus lands on the table it narrowed.
+    surest = note.get_by_role("button", name="Show only Mostly sure and Measured", exact=True)
+    box = await surest.bounding_box()
     assert box and box["height"] >= 44, box
-    await show.focus()
+    await surest.focus()
     await page.keyboard.press("Enter")
-    await page.wait_for_url(re.compile(r"type=likely_barrier(%2C|,)measured(%2C|,)expert_review"))
-    assert _params(page)["type"] == _ALL_LANES
-    assert len(await _assert_matches_api(page, base, scan_id)) == 5
+    await page.wait_for_url(re.compile(r"type=likely_barrier(%2C|,)measured"))
+    assert _params(page)["type"] == _SUREST_LANES
+    assert len(await _assert_matches_api(page, base, scan_id)) == _SUREST_COUNT
     await pw.expect(note).to_have_count(0)
     await pw.expect(page.get_by_role("region", name="Issues table")).to_be_focused()
     filtered = page.get_by_text("Filtered by", exact=False).locator("xpath=..")
-    await pw.expect(filtered).to_contain_text(
-        "How sure: Mostly sure, Measured, Not sure, For information"
-    )
+    await pw.expect(filtered).to_contain_text("How sure: Mostly sure, Measured")
     # The way back is the same one every filter has.
     await page.get_by_role("button", name="Clear filters", exact=True).click()
     await page.wait_for_url(lambda url: "type=" not in url)
-    assert len(await _assert_matches_api(page, base, scan_id)) == 3
-    await pw.expect(page.get_by_role("note", name="Hidden issue types")).to_be_visible()
+    assert len(await _assert_matches_api(page, base, scan_id)) == _ALL_COUNT
+    await pw.expect(page.get_by_role("note", name="Issue types shown")).to_be_visible()
 
 
-async def test_hidden_note_reflows_at_320(enriched, live_server, new_page) -> None:
+async def test_issue_types_note_reflows_at_320(enriched, live_server, new_page) -> None:
     base, scan_id = live_server
     page = await new_page(viewport={"width": 320, "height": 800})
     await _open(page, base, scan_id)
-    note = page.get_by_role("note", name="Hidden issue types")
+    note = page.get_by_role("note", name="Issue types shown")
     await pw.expect(note).to_be_visible()
     box = await note.bounding_box()
     assert box and box["x"] >= 0 and box["x"] + box["width"] <= 320, box
-    button = await note.get_by_role("button", name="Show hidden issue types").bounding_box()
+    button = await note.get_by_role(
+        "button", name="Show only Mostly sure and Measured"
+    ).bounding_box()
     assert button and button["x"] + button["width"] <= 320 and button["height"] >= 44, button
 
 

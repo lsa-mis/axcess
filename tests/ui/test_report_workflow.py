@@ -75,22 +75,18 @@ async def test_report_links_and_review_lanes(
     await page.wait_for_url("**/app/scans")
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
     issues = page.get_by_role("table", name="Accessibility issue types")
-    # The table opens on the issue types Axcess is surest of: the Mostly sure
-    # row shows, and the Not sure and For information rows are held back,
-    # counted in a note with the one button that shows them.
+    # The table opens on every issue type, with a note that counts each How
+    # sure value and says what Not sure and For information mean (2026-11-13).
     await playwright_async.expect(
         issues.get_by_role("rowheader").get_by_role("link", name="Named control failure")
     ).to_be_visible()
-    await playwright_async.expect(issues.locator("tbody tr")).to_have_count(1)
-    hidden_note = page.get_by_role("note", name="Hidden issue types")
-    await playwright_async.expect(hidden_note).to_contain_text(
-        "2 issue types are hidden: Not sure 1, For information 1."
+    await playwright_async.expect(issues.locator("tbody tr")).to_have_count(3)
+    note = page.get_by_role("note", name="Issue types shown")
+    await playwright_async.expect(note).to_contain_text(
+        "Showing every issue type: Mostly sure 1, Not sure 1, For information 1."
     )
     assert await page.evaluate("document.body.scrollWidth <= innerWidth")
-    await hidden_note.get_by_role("button", name="Show hidden issue types", exact=True).click()
-    await page.wait_for_url("**type=likely_barrier*")
-    await playwright_async.expect(hidden_note).to_have_count(0)
-    # Every issue group is then a row of one table, whatever lane it is in.
+    # Every issue group is a row of one table, whatever lane it is in.
     # Scoped to the row header: the count link in the same row also
     # names the issue, because a link's purpose has to be clear from
     # its own name (SC 2.4.9).
@@ -577,9 +573,9 @@ async def test_issue_table_recommended_order_is_lane_first_and_headers_sort_flat
     """
     base, scan_id = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
-    # Every "How sure" value is shown here (the URL "Show hidden issue types"
-    # writes), because the order under test runs across all four. That is a
-    # filter, so the status line says "filtered".
+    # Every "How sure" value is checked here, because the order under test
+    # runs across all four. That is a filter, so the status line says
+    # "filtered".
     await page.goto(f"{base}/app/scans/{scan_id}/issues?{ALL_HOW_SURE}", wait_until="networkidle")
     issues = page.get_by_role("table", name="Accessibility issue types")
     group_headers = issues.locator("tbody th[scope='rowgroup']")
@@ -1238,9 +1234,9 @@ async def test_report_opens_keyboard_only_in_reading_order(
         first(lambda s: s["name"] == "Search issues"),
         # One Filter menu holds Level, How sure and Where it shows.
         first(lambda s: s["tag"] == "BUTTON" and s["name"] == "Filter issues"),
-        # The note over the rows says what the table holds back; its button
-        # comes after the Filter menu and before the rows, as it reads.
-        first(lambda s: s["tag"] == "BUTTON" and s["name"] == "Show hidden issue types"),
+        # The note over the rows says what the table shows; its button comes
+        # after the Filter menu and before the rows, as it reads.
+        first(lambda s: s["tag"] == "BUTTON" and s["name"] == "Show only Mostly sure and Measured"),
         first(lambda s: s["group"] == "table"),
     ]
     assert order == sorted(order), names
