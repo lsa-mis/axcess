@@ -932,9 +932,11 @@ def default_view_counts(rows: list[IssueRow]) -> dict[str, int]:
     """What the Issues page shows when it opens, and what it leaves hidden.
 
     ``rows`` is the whole report.  Shown are the levels in
-    ``audit.labels.DEFAULT_REVIEW_LANES``; everything else is hidden until the
-    reader asks for it.  The numbers above the table and on the Reports list
-    come from here, so they count what the table shows.
+    ``audit.labels.DEFAULT_REVIEW_LANES``.  Since 2026-11-13 that is every
+    level, so the ``hidden_*`` counts are always 0; they stay in the response
+    so the interface can say what a narrower default leaves out.  The numbers
+    above the table and on the Reports list come from here, so they count
+    what the table shows.
     """
     shown = [row for row in rows if row.review_lane in DEFAULT_REVIEW_LANES]
     return {

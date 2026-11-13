@@ -214,15 +214,16 @@ export function ReportSummary({
           pages take the row under them, so nothing is squeezed at 320px (SC
           1.4.10 Reflow, Level AA).
 
-          Since 2026-11-10 the two problem numbers count what the table
-          shows when it opens (Mostly sure and Measured), not every row, so
-          the number over the table is the number of rows under it (SC 3.2.4
-          Consistent Identification, Level AA). What is held back is a line
-          under each number ("Plus 12 hidden"), in the same words as the
-          note over the table, because a limitation is never dropped to make
-          a number look smaller (Interface language rule 4). The line shows
-          only when something is hidden, like the other lines here. The
-          Reports list counts the same way (routes/Scans.tsx). */}
+          The two problem numbers count what the table shows when it opens,
+          so the number over the table is the number of rows under it (SC
+          3.2.4 Consistent Identification, Level AA). Since 2026-11-13 the
+          table opens on every issue type, so these are the whole report and
+          nothing is hidden. (From 2026-11-10 it opened on Mostly sure and
+          Measured only.) If the default view ever leaves rows out again, a
+          line under each number ("Plus 12 hidden") says so, because a
+          limitation is never dropped to make a number look smaller
+          (Interface language rule 4); it shows only when something is
+          hidden. The Reports list counts the same way (routes/Scans.tsx). */}
       <dl className="mt-10 mb-5 grid grid-cols-2 gap-x-8 gap-y-8 sm:grid-cols-3 lg:gap-x-12">
         <SummaryStat
           label={issueGroups === 1 ? "Issue type" : "Issue types"}

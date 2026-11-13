@@ -977,14 +977,16 @@ function ScanCountCells({ scan, className }: { scan: ScanSummary; className?: st
 }
 
 /**
- * A report's count as its Issues page shows it when it opens: the issue
- * types Axcess is surest of (Mostly sure and Measured), with what that view
- * holds back on a second line ("plus 12 hidden"), the words the Issues page
- * uses. One number for one thing on both screens (SC 3.2.4 Consistent
- * Identification, Level AA), and the held-back count is never dropped
- * (Interface language rule 4). The second line shows only when something is
- * hidden. Rejected: the total alone, which no longer matches the table a
- * reader lands on; and the shown number alone, which hides a limitation.
+ * A report's count as its Issues page shows it when it opens. Since
+ * 2026-11-13 that is every issue type, so the count is the whole report and
+ * the second line never shows. (From 2026-11-10 the page opened on Mostly
+ * sure and Measured only.) If the default view leaves rows out again, a
+ * second line ("plus 12 hidden") counts them, in the Issues page's words:
+ * one number for one thing on both screens (SC 3.2.4 Consistent
+ * Identification, Level AA), and a held-back count is never dropped
+ * (Interface language rule 4). Rejected then: the total alone, which would
+ * not match the table a reader lands on; and the shown number alone, which
+ * hides a limitation.
  *
  * `shown` is absent from a response cached before the field existed; the
  * total then stands alone, as it did before, until the next fetch.
