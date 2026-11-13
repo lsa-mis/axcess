@@ -286,6 +286,26 @@ async def test_running_text_is_short_and_spaced(
     assert not problems, "\n".join(problems)
 
 
+async def test_an_empty_table_says_why_in_short_lines(
+    live_server: tuple[str, int], new_page: Any, seeded_db: tuple[Path, Path, int]
+) -> None:
+    """SC 1.4.8 on the message an empty table shows in place of rows: it
+    says why and where to look next in a few sentences, and across the
+    card's full width those ran to about 150 characters a line."""
+    base, _ = live_server
+    with sqlite3.connect(seeded_db[0]) as conn:
+        empty = conn.execute(
+            "INSERT INTO scans (seed_url, status, config_json) "
+            "VALUES ('http://empty.example/', 'completed', '{}')"
+        ).lastrowid
+    page = await _open(new_page, base, f"/scans/{empty}/issues")
+    await playwright_async.expect(
+        page.get_by_text(re.compile(r"^Axcess found no issues\. That does not mean"))
+    ).to_be_visible()
+    assert await page.evaluate(_TEXT_LAYOUT) == {"long": [], "tight": []}
+    await page.context.close()
+
+
 async def test_the_checks_catch_what_they_claim(new_page: Any) -> None:
     """The link and line-length checks, on cases built to slip past them: two
     links that differ only after #, one long line followed by a short one,

@@ -579,7 +579,19 @@ export function Cell({
   );
 }
 
-/** What a table shows in place of rows when none match or none exist. */
+/**
+ * What a table shows in place of rows when none match or none exist.
+ *
+ * Centred in a column about 72 characters wide (52ch, the measure the
+ * report's short paragraphs use), not the card's full width. An empty table
+ * often says why it is empty and where to look next, in two or three
+ * sentences (Issues: "That does not mean the site meets WCAG… See “What was
+ * checked”, below this table."); across a 1280px card those ran to about 150
+ * characters a line. SC 1.4.8 Visual Presentation (Level AAA) asks for no
+ * more than 80. Rejected: keeping each message to one short sentence, which
+ * is how Documents worked around it and which pushed the caveat out of the
+ * empty table. A one-line message looks the same as before.
+ */
 export function TableEmpty({ children }: { children: ReactNode }) {
-  return <p className="px-4 py-8 text-center text-sm text-fg-muted">{children}</p>;
+  return <p className="mx-auto max-w-[52ch] px-4 py-8 text-center text-sm text-fg-muted">{children}</p>;
 }
