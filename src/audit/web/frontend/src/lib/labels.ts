@@ -75,12 +75,20 @@ export const isFindingType = (value: string): value is FindingType =>
 export const REVIEW_LANES = ["likely_barrier", "measured", "expert_review", "informational"] as const satisfies readonly ReviewLane[];
 
 /**
- * The "How sure" values the Issues table shows when it opens. Mirrors
- * `DEFAULT_REVIEW_LANES` in `src/audit/labels.py`, which the server counts
- * by (`default_view_counts`), so the numbers above the table are the rows
- * under them. The rest (Not sure, For information) is one click away.
+ * The "How sure" values the Issues table shows when it opens: all four, since
+ * 2026-11-13 (the developer's request). Mirrors `DEFAULT_REVIEW_LANES` in
+ * `src/audit/labels.py`, which the server counts by (`default_view_counts`),
+ * so the numbers above the table are the rows under them.
  */
-export const DEFAULT_REVIEW_LANES = ["likely_barrier", "measured"] as const satisfies readonly ReviewLane[];
+export const DEFAULT_REVIEW_LANES = [
+  "likely_barrier",
+  "measured",
+  "expert_review",
+  "informational",
+] as const satisfies readonly ReviewLane[];
+
+/** The surest "How sure" values: what "Show only the surest" narrows the Issues table to. */
+export const SUREST_REVIEW_LANES = ["likely_barrier", "measured"] as const satisfies readonly ReviewLane[];
 
 /** The "How sure" values' names: `REVIEW_TYPE_LABEL` from terms.ts, under the name this module used. */
 export const REVIEW_LANE_LABELS: Record<ReviewLane, string> = REVIEW_TYPE_LABEL;

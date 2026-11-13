@@ -76,8 +76,10 @@ def _finding(
     )
 
 
-def test_default_view_is_the_two_surest_levels() -> None:
-    assert labels.DEFAULT_REVIEW_LANES == ("likely_barrier", "measured")
+def test_default_view_is_every_level() -> None:
+    # Every issue type is in the table when it opens (2026-11-13); the note
+    # over it explains Not sure and For information.
+    assert labels.DEFAULT_REVIEW_LANES == labels.REVIEW_LANES
     assert labels.REVIEW_LANES == ("likely_barrier", "measured", "expert_review", "informational")
 
 
@@ -137,7 +139,7 @@ def test_each_measured_rule_lands_in_measured(
         ("focus", "focus-some-new-rule", "failed"),
     ],
 )
-def test_model_judged_and_unlisted_results_are_never_shown_by_default(
+def test_model_judged_and_unlisted_results_are_not_sure(
     tmp_db: sqlite3.Connection, pipeline: str, rule_id: str, engine_outcome: str
 ) -> None:
     scan_id, page_id = _scan(tmp_db)
@@ -146,7 +148,6 @@ def test_model_judged_and_unlisted_results_are_never_shown_by_default(
     )
 
     (row,) = issues_mod.list_issues(tmp_db, scan_id)
-    assert row.review_lane not in labels.DEFAULT_REVIEW_LANES
     assert row.review_lane == "expert_review"
 
 
@@ -174,10 +175,10 @@ def test_default_view_counts_and_report_counts_agree(tmp_db: sqlite3.Connection)
     }
     counts = issues_mod.default_view_counts(rows)
     assert counts == {
-        "issue_types": 2,
-        "occurrences": 2,
-        "hidden_issue_types": 2,
-        "hidden_occurrences": 2,
+        "issue_types": 4,
+        "occurrences": 4,
+        "hidden_issue_types": 0,
+        "hidden_occurrences": 0,
     }
     # The default sort keeps the levels in order.
     assert [row.review_lane for row in rows] == [
@@ -192,4 +193,4 @@ def test_default_view_counts_and_report_counts_agree(tmp_db: sqlite3.Connection)
 
     report = sites.report_counts(tmp_db, scan_id)
     assert (report.issue_count, report.occurrence_count) == (4, 4)
-    assert (report.shown_issue_count, report.shown_occurrence_count) == (2, 2)
+    assert (report.shown_issue_count, report.shown_occurrence_count) == (4, 4)

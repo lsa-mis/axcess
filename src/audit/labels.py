@@ -79,12 +79,12 @@ REVIEW_LANES: tuple[ReviewLane, ...] = (
     "expert_review",
     "informational",
 )
-# What the Issues page shows when it opens: the rule checks and the browser
-# measurements. Results a model judged (AI review, image text), a rule check
-# that could not decide, and records kept only for information are one click
-# away, never removed. The API itself still returns every level unless asked;
-# this is the screen's default, and the counts beside "Issue types" follow it.
-DEFAULT_REVIEW_LANES: tuple[ReviewLane, ...] = ("likely_barrier", "measured")
+# What the Issues page shows when it opens: every level. From 2026-11-10 the
+# page opened on Mostly sure and Measured only; on 2026-11-13 the developer
+# asked for every issue type in the table, with a note over it that says what
+# Not sure and For information mean (routes/Issues.tsx, ``AllIssuesNote``).
+# The counts beside "Issue types" follow this, so they are the whole report.
+DEFAULT_REVIEW_LANES: tuple[ReviewLane, ...] = REVIEW_LANES
 
 REVIEW_LANE_LABELS: dict[ReviewLane, str] = {
     "likely_barrier": "Mostly sure",

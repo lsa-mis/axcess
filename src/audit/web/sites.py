@@ -55,7 +55,7 @@ class SiteGroup(BaseModel):
     # total; null when there is no completed scan.
     most_recent_completed_occurrence_count: int | None
     # The same two counts for the levels the Issues page shows when it opens
-    # (``audit.labels.DEFAULT_REVIEW_LANES``); the rest is one click away.
+    # (``audit.labels.DEFAULT_REVIEW_LANES``, every level since 2026-11-13).
     most_recent_completed_shown_issue_count: int | None
     most_recent_completed_shown_occurrence_count: int | None
     scans: list[ScanSummaryModel]
@@ -72,8 +72,8 @@ class ReportCounts(BaseModel):
     issue_count: int
     occurrence_count: int
     # What the Issues page shows when it opens: the levels in
-    # ``audit.labels.DEFAULT_REVIEW_LANES``. The totals above minus these are
-    # the issue types a reader has to ask for.
+    # ``audit.labels.DEFAULT_REVIEW_LANES``, every level since 2026-11-13, so
+    # these equal the totals above; kept so the field names stay stable.
     shown_issue_count: int
     shown_occurrence_count: int
 
