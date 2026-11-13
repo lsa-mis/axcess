@@ -3,6 +3,7 @@ import FlaggedStepper from "./FlaggedStepper";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Check, Copy } from "lucide-react";
 import { cn } from "../lib/cn";
+import { copyText } from "../lib/clipboard";
 import { Button } from "./ui";
 
 type TokenKind = "punct" | "tag" | "attr" | "value" | "text" | "comment" | "doctype";
@@ -197,11 +198,10 @@ export default function DomSource({
 
   const [copied, setCopied] = useState(false);
   const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(html);
+    if (await copyText(html)) {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 2000);
-    } catch {
+    } else {
       setCopied(false);
     }
   };

@@ -280,9 +280,10 @@ async def test_a_long_locator_shows_its_end_and_copies_whole(
         assert await page.evaluate("window.__copied") == _LONG_SELECTOR
         await playwright_async.expect(copy).to_have_accessible_name("Copy element locator")
 
-        # No clipboard (plain http on a network address): shown and selected.
+        # Both copy methods refused: shown and selected for copying by hand.
         await page.evaluate(
-            "() => { navigator.clipboard.writeText = () => Promise.reject(new Error('blocked')); }"
+            "() => { navigator.clipboard.writeText = () => Promise.reject(new Error('blocked'));"
+            " document.execCommand = () => false; }"
         )
         await copy.click()
         await playwright_async.expect(

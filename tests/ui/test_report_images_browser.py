@@ -127,6 +127,26 @@ async def test_images_tab_works_by_keyboard_alone(
         await playwright_async.expect(copy).to_contain_text("Copied")
         pasted = await page.evaluate("() => navigator.clipboard.readText()")
         assert pasted == "Students talking outside Haven Hall"
+
+        # Plain http on a network address has no clipboard API: the older
+        # copy method still copies the text, and focus stays on the button.
+        await page.reload()
+        await page.evaluate(
+            """() => {
+              Object.defineProperty(navigator, "clipboard", { configurable: true, value: undefined });
+              document.addEventListener("copy", () => {
+                window.__copied = document.activeElement && document.activeElement.value;
+              });
+            }"""
+        )
+        copy = page.get_by_role(
+            "button", name=re.compile(r"^(Copy alt text|Copied) for students\.png")
+        )
+        await copy.focus()
+        await page.keyboard.press("Enter")
+        await playwright_async.expect(copy).to_contain_text("Copied")
+        assert await page.evaluate("window.__copied") == "Students talking outside Haven Hall"
+        assert await copy.evaluate("el => el === document.activeElement")
     finally:
         await page.context.close()
 

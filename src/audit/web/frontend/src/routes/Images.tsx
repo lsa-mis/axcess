@@ -24,6 +24,7 @@ import { AltTag, Button, Card, PageLink } from "../components/ui";
 import { useModalDialog } from "../hooks/useModalDialog";
 import { useScanQuery } from "../hooks/useScanQuery";
 import { cn } from "../lib/cn";
+import { copyText } from "../lib/clipboard";
 import { ALT_VERDICT_LABEL, ALT_VERDICT_SOURCE_LABEL, IMAGE_GROUP_LABEL } from "../lib/terms";
 import type { AltVerdict, ImageGroup, ReportImage, ReportImagesFilter } from "../api/types";
 
@@ -492,18 +493,17 @@ function ImageViewer({ image, onClose }: { image: ReportImage | null; onClose: (
  * region, so the result is heard. The repo has no shared copy button; this
  * is the second one, and a third should move both into components/ui.tsx.
  * Its name ends with the image's file name in screen-reader-only text, so
- * each row's button says which alt text it copies (WCAG technique C7). If
- * the browser refuses the clipboard, it says so and the text can still be
- * selected by hand.
+ * each row's button says which alt text it copies (WCAG technique C7). It
+ * copies through lib/clipboard.ts, which also works on plain http. If the
+ * browser still refuses, it says so and the text can be selected by hand.
  */
 function SuggestionBox({ text, name }: { text: string; name: string }) {
   const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
   const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(text);
+    if (await copyText(text)) {
       setState("copied");
       window.setTimeout(() => setState("idle"), 2000);
-    } catch {
+    } else {
       setState("failed");
     }
   };

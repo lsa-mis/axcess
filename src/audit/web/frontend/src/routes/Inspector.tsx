@@ -21,6 +21,7 @@ import {
 } from "../components/ui";
 import { useScanQuery } from "../hooks/useScanQuery";
 import { cn } from "../lib/cn";
+import { copyText } from "../lib/clipboard";
 import {
   boxPlace,
   type BoxNote,
@@ -2030,10 +2031,9 @@ function LocatorValue({
   const copy = async () => {
     attempts.current += 1;
     const attempt = attempts.current;
-    try {
-      await navigator.clipboard.writeText(value);
+    if (await copyText(value)) {
       setCopied({ attempt, ok: true });
-    } catch {
+    } else {
       setCopied({ attempt, ok: false });
       if (open) selectLocator();
       else {
