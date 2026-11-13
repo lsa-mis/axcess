@@ -3250,7 +3250,9 @@
           "send_empty_forms": {"type": "boolean", "title": "Send Empty Forms", "default": false},
           "skip_rendered_storage": {"type": "boolean", "title": "Skip Rendered Storage"},
           "axe_level": {"type": "string", "enum": ["A", "AA", "AAA"], "title": "Axe Level"},
-          "wcag_version": {"type": "string", "enum": ["2.1", "2.2"], "title": "Wcag Version"}
+          "wcag_version": {"type": "string", "enum": ["2.1", "2.2"], "title": "Wcag Version"},
+          "user_agent_choice": {"type": "string", "title": "User Agent Choice", "default": "axcess"},
+          "user_agent": {"type": "string", "title": "User Agent", "default": ""}
         },
         "additionalProperties": false,
         "type": "object",
