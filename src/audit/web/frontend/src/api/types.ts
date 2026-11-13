@@ -1185,6 +1185,99 @@ export interface ScanPagesResponse {
   pages: ScanPageRow[];
 }
 
+/** A linked file's type (`linked_files.formats.FileType`). */
+export type LinkedFileType =
+  | "pdf"
+  | "docx"
+  | "doc"
+  | "pptx"
+  | "ppt"
+  | "xlsx"
+  | "xls"
+  | "odt"
+  | "odp"
+  | "ods"
+  | "rtf"
+  | "google_doc"
+  | "google_sheet"
+  | "google_slides"
+  | "google_drive";
+
+/** The three statuses the Documents tab shows (`linked_files_queries.ShownStatus`). */
+export type LinkedFileStatus = "mostly_sure" | "not_sure" | "could_not_check";
+
+/** Why a file could not be checked (`linked_files.formats.Reason`). */
+export type LinkedFileReason =
+  | "type_not_checked_yet"
+  | "old_format"
+  | "google_file"
+  | "broken_link"
+  | "http_error"
+  | "password"
+  | "too_large"
+  | "timed_out"
+  | "not_a_pdf"
+  | "damaged"
+  | "robots"
+  | "blocked"
+  | "limit"
+  | "not_checked";
+
+/** A machine check a PDF failed (`linked_files.formats.FailedCheck`). */
+export type LinkedFileCheck =
+  | "not_tagged"
+  | "no_text"
+  | "blocks_assistive_tech"
+  | "no_title"
+  | "no_language";
+
+/** How a page reaches a file (`linked_files.formats.RefKind`). */
+export type LinkedFileRefKind = "link" | "revealed_link" | "iframe" | "object" | "embed";
+
+/** One place a page of the report reaches a file (`linked_files_queries.LinkedFileRef`). */
+export interface LinkedFileRef {
+  page_id: number;
+  page_url: string;
+  page_title: string | null;
+  how: LinkedFileRefKind;
+  /** The link's accessible name, or the frame's or embed's title. */
+  link_text: string;
+  /** The control a reader presses before the link exists, if any. */
+  revealed_by: string | null;
+}
+
+/** One file in the Documents tab (`linked_files_queries.LinkedFileRow`). */
+export interface LinkedFileRow {
+  file_id: number;
+  url: string;
+  /** Its file name, else the first link's text. */
+  name: string;
+  file_type: LinkedFileType;
+  off_site: boolean;
+  status: LinkedFileStatus;
+  reason: LinkedFileReason | null;
+  failed_checks: LinkedFileCheck[];
+  http_status: number | null;
+  is_form: boolean | null;
+  page_count: number | null;
+  /** Distinct pages of the report that reach the file. */
+  referring_page_count: number;
+  /** The first referring pages, at most 20, in address order. */
+  refs: LinkedFileRef[];
+}
+
+/** `GET /api/scans/{id}/documents` (`linked_files_queries.ScanDocumentsResponse`). */
+export interface ScanDocumentsResponse {
+  scan_id: number;
+  /** False when the scan did not look for documents at all. */
+  recorded: boolean;
+  total: number;
+  counts: Record<LinkedFileStatus, number>;
+  limit: number;
+  offset: number;
+  files: LinkedFileRow[];
+}
+
 /** What a person decided about an occurrence: a problem to report, or a
  *  repeat of one already reported. Null means not checked yet. */
 export type ReviewDecision = "report" | "repeat";

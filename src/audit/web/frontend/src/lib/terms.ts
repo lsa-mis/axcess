@@ -6,6 +6,11 @@ import type {
   DetectionPipeline,
   ExportFormat,
   FindingStatus,
+  LinkedFileCheck,
+  LinkedFileReason,
+  LinkedFileRefKind,
+  LinkedFileStatus,
+  LinkedFileType,
   ReviewDecision,
   ReviewLane,
   RuleCheck,
@@ -80,6 +85,103 @@ export const REVIEW_TYPE_LABEL: Record<ReviewLane, string> = {
   likely_barrier: "Mostly sure",
   expert_review: "Not sure",
   informational: "For information",
+};
+
+/**
+ * The Documents tab's three "How sure" values: how sure Axcess is that a
+ * linked file (a PDF, Word, Excel or Google file) has accessibility
+ * problems.
+ *
+ * The first two are the same words as the Issues table's (REVIEW_TYPE_LABEL)
+ * because they mean the same thing: "Mostly sure" is a machine check that
+ * proves a problem, "Not sure" needs a person. One word for one thing (W3C
+ * COGA "Making Content Usable", https://www.w3.org/TR/coga-usable/,
+ * paraphrased: use the same word for the same thing). The third differs on
+ * purpose: Issues' "For information" is a result, and here Axcess has no
+ * result at all, so the words say that. There is no "Accessible" value: a
+ * machine check cannot prove a file is accessible (AGENTS.md, Interface
+ * language rule 4).
+ */
+export const LINKED_FILE_STATUS_LABEL: Record<LinkedFileStatus, string> = {
+  mostly_sure: "Mostly sure",
+  not_sure: "Not sure",
+  could_not_check: "Could not check",
+};
+
+/** What each value means, in one sentence: the hover hint and the page's key. */
+export const LINKED_FILE_STATUS_HELP: Record<LinkedFileStatus, string> = {
+  mostly_sure: "A machine check found a problem that makes the file hard or impossible to use with a screen reader.",
+  not_sure:
+    "The file passed the machine checks. A person must still check it: the reading order, the image descriptions (alt text) and the table headers.",
+  could_not_check: "Axcess could not check the file. The row says why.",
+};
+
+/** A linked file's type: the plain name first, the file extension after. */
+export const LINKED_FILE_TYPE_LABEL: Record<LinkedFileType, string> = {
+  pdf: "PDF",
+  docx: "Word (.docx)",
+  doc: "Word, old format (.doc)",
+  pptx: "PowerPoint (.pptx)",
+  ppt: "PowerPoint, old format (.ppt)",
+  xlsx: "Excel (.xlsx)",
+  xls: "Excel, old format (.xls)",
+  odt: "OpenDocument text (.odt)",
+  odp: "OpenDocument slides (.odp)",
+  ods: "OpenDocument spreadsheet (.ods)",
+  rtf: "Rich Text Format (.rtf)",
+  google_doc: "Google Docs",
+  google_sheet: "Google Sheets",
+  google_slides: "Google Slides",
+  google_drive: "Google Drive file",
+};
+
+/**
+ * Why a file could not be checked. Two groups read differently on purpose,
+ * as the developer asked: "does not check this file type yet" (a later
+ * version may) and "cannot check" (no machine check can read it). A
+ * reason that names a server answer gets its status code added by
+ * ``linkedFileReasonText``.
+ */
+export const LINKED_FILE_REASON_TEXT: Record<LinkedFileReason, string> = {
+  type_not_checked_yet: "Axcess does not check this file type yet. Only PDF files are checked.",
+  old_format:
+    "Axcess cannot check this file type. Old Office files (.doc, .xls, .ppt) do not store the structure that a check needs.",
+  google_file: "Axcess cannot check files kept in Google Docs, Sheets, Slides or Drive. It cannot download them.",
+  broken_link: "Broken link: the file could not be downloaded.",
+  http_error: "Broken link: the site answered with an error",
+  password: "The file needs a password to open.",
+  too_large: "The file is larger than 10 MB, the most Axcess downloads.",
+  timed_out: "Downloading or checking the file took too long.",
+  not_a_pdf: "The link did not lead to a PDF file. The site sent something else, such as a web page.",
+  damaged: "Axcess could not read the file. It may be damaged.",
+  robots: "The site asks scanners not to open this file (in its robots.txt file).",
+  blocked: "The scan's settings say not to visit this address.",
+  limit: "The scan reached its limit of 200 files to download.",
+  not_checked: "The scan stopped before Axcess checked this file.",
+};
+
+/** The reason in words, with the server's status code where there is one. */
+export function linkedFileReasonText(reason: LinkedFileReason, httpStatus: number | null): string {
+  if (reason === "http_error") {
+    return `${LINKED_FILE_REASON_TEXT.http_error}${httpStatus != null ? ` (HTTP ${httpStatus})` : ""}.`;
+  }
+  return LINKED_FILE_REASON_TEXT[reason];
+}
+
+/** A failed machine check, as the problem it causes for a reader. */
+export const LINKED_FILE_CHECK_TEXT: Record<LinkedFileCheck, string> = {
+  not_tagged: "Not tagged: a screen reader cannot tell its headings, lists and tables apart.",
+  no_text: "No text a screen reader can read: the pages are pictures only, as in a scan.",
+  blocks_assistive_tech: "Its security settings stop screen readers from reading it.",
+  no_title: "No document title.",
+  no_language: "No language set, so a screen reader may read it in the wrong voice.",
+};
+
+/** How a page shows a file other than by a plain link. A plain link needs no note. */
+export const LINKED_FILE_REF_LABEL: Record<Exclude<LinkedFileRefKind, "link" | "revealed_link">, string> = {
+  iframe: "Shown inside the page (in a frame)",
+  object: "Shown inside the page (as an object)",
+  embed: "Shown inside the page (embedded)",
 };
 
 /**
