@@ -171,3 +171,83 @@ def test_create_refuses_limits_out_of_range(
     response = client.post("/api/scans", json={"url": "https://limits.example.test/", **overrides})
     assert response.status_code == 422
     assert response.json()["fields"] == [field]
+
+
+CHROME_WINDOWS = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36"
+)
+
+
+def _config(db_path: Path, scan_id: int) -> dict[str, Any]:
+    import json
+
+    with connect(db_path) as conn:
+        row = conn.execute("SELECT config_json FROM scans WHERE id = ?", (scan_id,)).fetchone()
+    return dict(json.loads(row[0]))
+
+
+def test_a_chosen_browser_name_is_sent_and_its_choice_comes_back(
+    client: TestClient, seeded_db: tuple[Path, Path, int], no_crawl: None
+) -> None:
+    scan_id = _create(client, user_agent_choice="chrome_windows", user_agent=CHROME_WINDOWS)
+    config = _config(seeded_db[0], scan_id)
+    assert config["user_agent"] == CHROME_WINDOWS
+    assert config["user_agent_choice"] == "chrome_windows"
+
+    _stop(seeded_db[0], scan_id, "failed")
+    response = client.get(f"/api/scans/{scan_id}/settings")
+    settings = response.json()["settings"]
+    # The choice comes back; the form fills in that entry's current string.
+    assert settings["user_agent_choice"] == "chrome_windows"
+    assert settings["user_agent"] == ""
+    assert "Chrome/157" not in response.text
+
+
+def test_a_typed_browser_name_is_never_sent_back(
+    client: TestClient, seeded_db: tuple[Path, Path, int], no_crawl: None
+) -> None:
+    typed = "PartnerScanner/2 allow-token-5c1e"
+    scan_id = _create(client, user_agent_choice="custom", user_agent=f"  {typed}  ")
+    assert _config(seeded_db[0], scan_id)["user_agent"] == typed
+
+    _stop(seeded_db[0], scan_id, "failed")
+    response = client.get(f"/api/scans/{scan_id}/settings")
+    assert response.json()["settings"]["user_agent_choice"] == "custom"
+    assert "allow-token" not in response.text
+
+
+def test_without_a_choice_the_scan_sends_its_own_name(
+    client: TestClient, seeded_db: tuple[Path, Path, int], no_crawl: None
+) -> None:
+    from audit.config import get_settings
+
+    # A string with no choice, or with Axcess's own, is ignored.
+    for extra in ({}, {"user_agent_choice": "axcess", "user_agent": CHROME_WINDOWS}):
+        scan_id = _create(client, **extra)
+        config = _config(seeded_db[0], scan_id)
+        assert config["user_agent"] == get_settings().user_agent
+        assert "user_agent_choice" not in config
+        _stop(seeded_db[0], scan_id, "failed")
+        settings = client.get(f"/api/scans/{scan_id}/settings").json()["settings"]
+        assert settings["user_agent_choice"] == "axcess"
+
+
+@pytest.mark.parametrize(
+    ("overrides", "field"),
+    [
+        ({"user_agent_choice": "custom"}, "user_agent"),
+        ({"user_agent_choice": "custom", "user_agent": "   "}, "user_agent"),
+        ({"user_agent_choice": "custom", "user_agent": "Bot/1\r\nX-Injected: 1"}, "user_agent"),
+        ({"user_agent_choice": "custom", "user_agent": "Navigateur/1 é"}, "user_agent"),
+        ({"user_agent_choice": "custom", "user_agent": "A" * 513}, "user_agent"),
+        ({"user_agent_choice": "Chrome on Windows", "user_agent": "x"}, "user_agent_choice"),
+        ({"user_agent_choice": 7, "user_agent": "x"}, "user_agent_choice"),
+    ],
+)
+def test_create_refuses_a_browser_name_it_cannot_send(
+    client: TestClient, no_crawl: None, overrides: dict[str, Any], field: str
+) -> None:
+    response = client.post("/api/scans", json={"url": "https://ua.example.test/", **overrides})
+    assert response.status_code == 422, response.text
+    assert response.json()["fields"] == [field]

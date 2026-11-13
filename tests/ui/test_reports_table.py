@@ -273,7 +273,7 @@ async def test_reports_table_keyboard_and_columns(
     await region.focus()
     await page.keyboard.press("ArrowRight")
     await playwright_async.expect(region).to_be_focused()
-    pagination = page.get_by_role("navigation", name="Public reports: page controls")
+    pagination = page.get_by_role("navigation", name="Public reports: page controls", exact=True)
     previous = pagination.get_by_role("button", name="Previous page of public reports")
     next_page = pagination.get_by_role("button", name="Next page of public reports")
     if site_count > 10:

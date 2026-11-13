@@ -339,6 +339,19 @@ page again in each new [page state](#page-state) it reaches. It is on by
 default. On the New scan form it is **Open menus, tabs, and pop-up windows
 (Click-Through)**.
 
+### Browser the site sees
+
+The browser name a scan sends to the site with every page request. Developers
+call it the user agent. By default Axcess sends its own name, so the site can
+see that a scanner is visiting. On the New scan form, under **Speed and
+browser window**, you can choose a current browser instead, such as Chrome on
+Windows or Safari on iPhone, or type your own. Some sites show a different
+page, or block scans, depending on this name.
+
+Only the name changes. Every page still opens in Chromium, so a site that
+checks what the browser can do may still tell. The site's robots.txt rules
+for Axcess still apply. Sign-in scans always send Axcess's own name.
+
 ## Accuracy
 
 ### False positive

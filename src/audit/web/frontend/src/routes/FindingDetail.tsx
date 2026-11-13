@@ -399,6 +399,7 @@ export default function FindingDetailRoute() {
               </tbody>
             </Table>
           </TableRegion>
+          <TablePagination label="Pages with this image" noun="pages" place="end" {...paged} />
         </Card>
       )}
     </>

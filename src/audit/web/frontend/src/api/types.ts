@@ -388,6 +388,18 @@ export interface NewScanPayload {
   skip_rendered_storage: boolean;
   axe_level: "A" | "AA" | "AAA";
   wcag_version: WcagVersion;
+  /**
+   * Which browser name (user agent) the scan sends: "axcess" for Axcess's
+   * own, an id from `components/newScan/userAgents.ts`, or "custom".
+   * Public scans only; a sign-in scan always sends Axcess's own.
+   */
+  user_agent_choice: string;
+  /**
+   * In the form: the text typed for "custom". In the payload: the exact
+   * string to send for any choice but "axcess" (see `publicPayload`). Always
+   * empty in a settings snapshot: a typed name is never sent back.
+   */
+  user_agent: string;
 }
 
 /**

@@ -15,6 +15,7 @@ import {
   type ScanSettings,
 } from "./scanPolicy";
 import type { ScopePreviewState } from "./useScopePreview";
+import { CUSTOM_USER_AGENT_CHOICE, presetFor } from "./userAgents";
 
 function engineName(engine: ScanSettings["scan_engine"]): string {
   return engine === "both" ? "Rule checks (axe and Alfa)" : engine === "alfa" ? CHECK_LABEL.alfa : CHECK_LABEL.axe;
@@ -149,6 +150,7 @@ export default function ScanSummaryCard({
         ? "Axcess could not work out what to scan from that address."
         : SUMMARY.siteEmpty;
 
+  const userAgentPreset = presetFor(settings.user_agent_choice);
   // No page limit reads as what the scan will do, not as a number.
   const pagesLine =
     settings.all_pages && !isFixed(policy, "all_pages")
@@ -160,6 +162,12 @@ export default function ScanSummaryCard({
     !login && switchOn(settings, "include_subdomain") ? "Includes subdomains" : null,
     settings.static_only ? SUMMARY.htmlOnly : null,
     settings.search ? "Uses a search box to find more pages" : null,
+    // Only when it is not Axcess's own name: the default needs no line.
+    settings.user_agent_choice === CUSTOM_USER_AGENT_CHOICE
+      ? SUMMARY.userAgentCustom
+      : userAgentPreset
+        ? SUMMARY.userAgent(userAgentPreset.label)
+        : null,
   ].filter((part): part is string => Boolean(part));
 
   const running = checks.filter((line) => line.on).map((line) => line.label);

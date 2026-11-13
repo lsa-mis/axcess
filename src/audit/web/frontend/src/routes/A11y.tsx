@@ -490,6 +490,7 @@ function DrillDownView({
             </Table>
           </TableRegion>
         )}
+        <TablePagination label="Occurrences" noun="occurrences" place="end" {...paged} />
       </Card>
     </>
   );

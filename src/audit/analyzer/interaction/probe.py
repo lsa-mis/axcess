@@ -28,7 +28,8 @@ import asyncio
 import contextlib
 import gzip
 import re
-from collections.abc import Sequence
+import time
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -468,6 +469,29 @@ class _Budget:
     #: for the same button in another: Google Sites' embeds all have the
     #: address about:blank and the same markup.
     frame: str = ""
+    #: Seconds spent in each phase of the sweep, for the ``interaction.coverage``
+    #: log line. Diagnostic only: never stored, never shown in a report. The
+    #: phases do not nest, so they add up to at most the sweep's own time and
+    #: the rest ("other") is the work between them.
+    timing: dict[str, float] = field(default_factory=dict)
+
+
+@contextlib.contextmanager
+def _timed(budget: _Budget, phase: str) -> Iterator[None]:
+    """Add the time spent inside the block to ``budget.timing[phase]``."""
+    start = time.perf_counter()
+    try:
+        yield
+    finally:
+        budget.timing[phase] = budget.timing.get(phase, 0.0) + time.perf_counter() - start
+
+
+def _timing_ms(budget: _Budget, total_s: float) -> dict[str, int]:
+    """Phase times in whole milliseconds, plus ``other`` and ``total``."""
+    phases = {name: round(seconds * 1000) for name, seconds in sorted(budget.timing.items())}
+    phases["other"] = max(0, round(total_s * 1000) - sum(phases.values()))
+    phases["total"] = round(total_s * 1000)
+    return phases
 
 
 @dataclass
@@ -548,6 +572,7 @@ class InteractionProbe:
         )
         found: list[RevealedViolation] = []
         evaluated = False
+        started = time.perf_counter()
         try:
             async with exploration_guard(page, budget.urls, self.blocked_labels):
                 async with asyncio.timeout(self.timeout_s):
@@ -583,6 +608,7 @@ class InteractionProbe:
             dialogs_opened=budget.dialogs_opened,
             dialogs_stuck=budget.dialogs_stuck,
             limits=sorted(budget.limits),
+            time_ms=_timing_ms(budget, time.perf_counter() - started),
         )
         if found:
             log.info(
@@ -694,7 +720,10 @@ class InteractionProbe:
         # depth 0. Termination no longer rests on a progress counter: the
         # control list is finite and the recursion is bounded by max_depth.
         try:
-            controls: list[dict[str, Any]] = await page.evaluate(_COLLECT_JS, _CANDIDATE_SELECTOR)
+            with _timed(budget, "find_controls"):
+                controls: list[dict[str, Any]] = await page.evaluate(
+                    _COLLECT_JS, _CANDIDATE_SELECTOR
+                )
         except Exception:
             return  # navigated or detached mid-sweep
         if fresh_only:
@@ -813,24 +842,29 @@ class InteractionProbe:
         """Replay only missing ancestors, charging every replay to the budget."""
         for index, ancestor in enumerate(path):
             next_control = path[index + 1] if index + 1 < len(path) else control
-            if await self._resolve_control(page, next_control) is not None:
-                continue
+            with _timed(budget, "find_controls"):
+                if await self._resolve_control(page, next_control) is not None:
+                    continue
             if budget.remaining <= 0:
                 return None
-            opener = await self._resolve_control(page, ancestor)
+            with _timed(budget, "find_controls"):
+                opener = await self._resolve_control(page, ancestor)
             if opener is None:
                 return None
             budget.remaining -= 1
-            await opener.click(timeout=3000)
-            budget.clicks_succeeded += 1
-            await page.wait_for_timeout(self.settle_ms)
+            with _timed(budget, "reopen"):
+                await opener.click(timeout=3000)
+                budget.clicks_succeeded += 1
+                await page.wait_for_timeout(self.settle_ms)
             if page.url != pinned:
                 if safe_url(page.url, self.blocked_labels) and len(budget.urls) < 1000:
                     budget.urls.add(page.url)
-                await self._restore(page, pinned)
+                with _timed(budget, "go_back"):
+                    await self._restore(page, pinned)
                 return None
             log.info("interaction.reopened", control=ancestor["label"][:60], depth=index)
-        return await self._resolve_control(page, control)
+        with _timed(budget, "find_controls"):
+            return await self._resolve_control(page, control)
 
     def _is_blocked(self, label: str, *, in_frame: bool = False) -> bool:
         lowered = re.sub(r"[-_]+", " ", label).casefold()
@@ -871,7 +905,8 @@ class InteractionProbe:
         selector = control["selector"]
         label = _control_label(control)
         try:
-            locator = await self._resolve_control(page, control)
+            with _timed(budget, "find_controls"):
+                locator = await self._resolve_control(page, control)
             if locator is None and path:
                 locator = await self._reopen_path(page, budget, control, path, pinned=pinned)
             if locator is None or budget.remaining <= 0:
@@ -881,21 +916,26 @@ class InteractionProbe:
             # Everything operable right now is "old". Whatever the click
             # makes operable will be the only unmarked set afterwards, which
             # is exactly what the nested sweep descends into.
-            await page.evaluate(_MARK_JS, _CANDIDATE_SELECTOR)
+            with _timed(budget, "find_controls"):
+                await page.evaluate(_MARK_JS, _CANDIDATE_SELECTOR)
 
-            before_hash = await page.evaluate(_DOM_HASH_JS)
-            before_dialogs = {item["id"] for item in await self._open_dialogs(page)}
+            with _timed(budget, "page_hash"):
+                before_hash = await page.evaluate(_DOM_HASH_JS)
+            with _timed(budget, "dialogs"):
+                before_dialogs = {item["id"] for item in await self._open_dialogs(page)}
             budget.remaining -= 1
-            await locator.click(timeout=3000)
+            with _timed(budget, "click"):
+                await locator.click(timeout=3000)
             budget.clicks_succeeded += 1
             budget.operated_keys.add(self._interaction_key(control, pinned))
-            with contextlib.suppress(Exception):
-                await page.wait_for_function(
-                    "before => (" + _DOM_HASH_JS + ")() !== before",
-                    arg=before_hash,
-                    timeout=max(1000, self.settle_ms),
-                )
-            await page.wait_for_timeout(self.settle_ms)
+            with _timed(budget, "wait"):
+                with contextlib.suppress(Exception):
+                    await page.wait_for_function(
+                        "before => (" + _DOM_HASH_JS + ")() !== before",
+                        arg=before_hash,
+                        timeout=max(1000, self.settle_ms),
+                    )
+                await page.wait_for_timeout(self.settle_ms)
 
             # A click that navigated is out of this probe's remit: the page
             # it landed on belongs to the crawl frontier, which owns scope,
@@ -910,10 +950,12 @@ class InteractionProbe:
                     depth=depth,
                     outcome="navigated",
                 )
-                await self._restore(page, pinned)
+                with _timed(budget, "go_back"):
+                    await self._restore(page, pinned)
                 return True
 
-            after_hash = await page.evaluate(_DOM_HASH_JS)
+            with _timed(budget, "page_hash"):
+                after_hash = await page.evaluate(_DOM_HASH_JS)
             if before_hash == after_hash:
                 log.info(
                     "interaction.clicked",
@@ -932,15 +974,19 @@ class InteractionProbe:
             # Recorded here rather than after the nested sweep: exploring a
             # dialog can click its own close control, and a dialog that
             # closed itself is still a dialog this click opened.
-            opened = [
-                item for item in await self._open_dialogs(page) if item["id"] not in before_dialogs
-            ]
+            with _timed(budget, "dialogs"):
+                opened = [
+                    item
+                    for item in await self._open_dialogs(page)
+                    if item["id"] not in before_dialogs
+                ]
             budget.dialogs_opened += len(opened)
             # Links can be created by menus/dialogs after the load-time
             # snapshot. Keep them for the crawler's normal scope checks.
-            links = await page.locator("a[href]").evaluate_all(
-                "nodes => nodes.slice(0, 1000).map(n => n.href).filter(u => u.length <= 2048)"
-            )
+            with _timed(budget, "links"):
+                links = await page.locator("a[href]").evaluate_all(
+                    "nodes => nodes.slice(0, 1000).map(n => n.href).filter(u => u.length <= 2048)"
+                )
             for url in links:
                 if (
                     isinstance(url, str)
@@ -950,21 +996,24 @@ class InteractionProbe:
                     budget.urls.add(url)
             before_found = len(found)
             state_key = self._interaction_key(control, pinned)
-            await self._collect(page, budget, found, label, state_key)
+            with _timed(budget, "axe"):
+                await self._collect(page, budget, found, label, state_key)
             # Only states that held something new are worth keeping: a state
             # nothing was found in is real coverage, but no finding points at
             # it, so nothing would ever ask the inspector to show it.
             if len(found) > before_found:
                 # Before the nested sweep and before any dialog is dismissed:
                 # this is the only moment the revealed element is on screen.
-                await self._capture_shots(page, budget, found[before_found:], shot)
-                await self._capture_state(
-                    page,
-                    budget,
-                    state_key=state_key,
-                    label=label,
-                    path_labels=tuple(_control_label(item) for item in (*path, control)),
-                )
+                with _timed(budget, "screenshots"):
+                    await self._capture_shots(page, budget, found[before_found:], shot)
+                with _timed(budget, "save_state"):
+                    await self._capture_state(
+                        page,
+                        budget,
+                        state_key=state_key,
+                        label=label,
+                        path_labels=tuple(_control_label(item) for item in (*path, control)),
+                    )
             log.info(
                 "interaction.clicked",
                 control=label[:60],
@@ -993,25 +1042,30 @@ class InteractionProbe:
             # unverified Escape is how a sweep ends up reporting clicks that
             # only ever hit an overlay. Dialogs the nested sweep already
             # closed need nothing further.
-            still_open = {item["id"] for item in await self._open_dialogs(page)}
-            for dialog in [item for item in opened if item["id"] in still_open]:
-                if not await self._dismiss_dialog(page, budget, dialog, opener=label, depth=depth):
-                    return True
+            with _timed(budget, "dialogs"):
+                still_open = {item["id"] for item in await self._open_dialogs(page)}
+                for dialog in [item for item in opened if item["id"] in still_open]:
+                    if not await self._dismiss_dialog(
+                        page, budget, dialog, opener=label, depth=depth
+                    ):
+                        return True
 
             # Close the state we opened so the next sibling is reachable.
             # Escaping every nested click can close the ancestor menu and
             # hide all its remaining siblings. Unwind at the root only, and
             # not when a dialog was already dismissed above.
             if depth == 0 and not opened:
-                await page.page.keyboard.press("Escape")
-                await page.wait_for_timeout(150)
+                with _timed(budget, "wait"):
+                    await page.page.keyboard.press("Escape")
+                    await page.wait_for_timeout(150)
             return True
 
         except Exception as exc:
             log.debug("interaction.click_failed", label=label[:40], error_type=type(exc).__name__)
             # If the failure left the browser somewhere else, get back.
             if page.url != pinned:
-                await self._restore(page, pinned)
+                with _timed(budget, "go_back"):
+                    await self._restore(page, pinned)
             return True
 
     async def _open_dialogs(self, page: Frame) -> list[dict[str, Any]]:

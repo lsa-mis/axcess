@@ -908,7 +908,7 @@ async def test_pager_arrows_are_named_and_look_unavailable_at_either_end(
 
     await page.route(f"**/api/scans/{scan_id}/issues*", issues)
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
-    pager = page.get_by_role("navigation", name="Issues: page controls")
+    pager = page.get_by_role("navigation", name="Issues: page controls", exact=True)
     previous = pager.get_by_role("button", name="Previous page of issues", exact=True)
     next_page = pager.get_by_role("button", name="Next page of issues", exact=True)
 
@@ -938,6 +938,58 @@ async def test_pager_arrows_are_named_and_look_unavailable_at_either_end(
     assert "page=2" in page.url
     assert float((await look(next_page))["opacity"]) < 1
     assert float((await look(previous))["opacity"]) == 1
+    violations = await _run_axe(page)
+    assert not violations, _render_violations(violations)
+
+
+async def test_pager_under_the_table_turns_the_page_and_returns_focus_to_the_top(
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """A reader at the last row turns the page there, and lands at the new rows.
+
+    The pager is drawn again under the table (TablePagination, ``place="end"``)
+    with its own landmark name and no second live region, so the new range
+    is announced once. A page turn from it moves focus to the pager over the
+    table, so the reader is not left below rows they have not read.
+    """
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 600})
+    payload = await (await page.request.get(f"{base}/api/scans/{scan_id}/issues")).json()
+    template = payload["rows"][0]
+    rows = [{**template, "issue_key": f"k{n}", "title": f"Issue {n:02d}"} for n in range(12)]
+
+    async def issues(route: Any) -> None:
+        await route.fulfill(json={**payload, "rows": rows, "total_unfiltered": len(rows)})
+
+    await page.route(f"**/api/scans/{scan_id}/issues*", issues)
+    await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+    top = page.get_by_role("navigation", name="Issues: page controls", exact=True)
+    end = page.get_by_role("navigation", name="Issues: page controls under the table", exact=True)
+    region = page.get_by_role("region", name="Issues table")
+    await playwright_async.expect(end).to_have_count(1)
+
+    # Under the last row, and saying the same range in words.
+    region_box, end_box = await region.bounding_box(), await end.bounding_box()
+    assert region_box and end_box and end_box["y"] >= region_box["y"] + region_box["height"] - 1
+    await playwright_async.expect(top.get_by_role("status")).to_have_count(1)
+    await playwright_async.expect(end.get_by_role("status")).to_have_count(0)
+    await playwright_async.expect(end).to_contain_text(
+        "Showing 1\u201310 of 12 issue types · Page 1 of 2"
+    )
+
+    end_next = end.get_by_role("button", name="Next page of issues", exact=True)
+    await end_next.focus()
+    await page.keyboard.press("Enter")
+    await page.wait_for_url("**page=2*")
+    await playwright_async.expect(top).to_be_focused()
+    await playwright_async.expect(top.get_by_role("status")).to_have_text(
+        "Showing 11\u201312 of 12 issue types · Page 2 of 2"
+    )
+    top_box = await top.bounding_box()
+    # In view, below the 72 px sticky top bar (SC 2.4.11).
+    assert top_box and 72 <= top_box["y"] < 600, top_box
+    await playwright_async.expect(end).to_contain_text("Page 2 of 2")
     violations = await _run_axe(page)
     assert not violations, _render_violations(violations)
 

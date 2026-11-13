@@ -1,6 +1,13 @@
 import type { LocalLoginScanPayload, NewScanPayload, ScanSettingsSnapshot } from "../../api/types";
 import { withScheme } from "../../lib/webAddress";
 import { ERRORS, FIXED_NOTE_LOGIN, NUMBERS, SUBMIT, URL_COPY } from "./copy";
+import {
+  CUSTOM_USER_AGENT_CHOICE,
+  DEFAULT_USER_AGENT_CHOICE,
+  knownChoice,
+  MAX_USER_AGENT_LENGTH,
+  userAgentToSend,
+} from "./userAgents";
 
 /**
  * One settings model for both scan forms.
@@ -22,6 +29,7 @@ export type FieldKey =
   | "max_pages"
   | "max_depth"
   | "static_only"
+  | "user_agent"
   | "authorized"
   | "image_ack"
   | "form";
@@ -72,6 +80,9 @@ const SETTING_KEYS = [
   "skip_rendered_storage",
   "axe_level",
   "wcag_version",
+  // The choice, not the typed text: text left in the box after choosing
+  // another entry is not sent, so it does not make the settings Customized.
+  "user_agent_choice",
 ] as const satisfies ReadonlyArray<keyof ScanSettings>;
 
 export const PUBLIC_DEFAULTS: ScanSettings = {
@@ -117,6 +128,9 @@ export const PUBLIC_DEFAULTS: ScanSettings = {
   // The current U-M standard. 2.2 is a deliberate choice, and marks the
   // settings Customized.
   wcag_version: "2.1",
+  // Axcess names itself unless the person chooses a browser's name.
+  user_agent_choice: DEFAULT_USER_AGENT_CHOICE,
+  user_agent: "",
 };
 
 /** The login form's own defaults, on the shared shape. */
@@ -189,6 +203,11 @@ export const LOGIN_POLICY: ScanPolicy = {
     // person signed in, even with requests blocked.
     skip_forms: true,
     send_empty_forms: false,
+    // A sign-in scan always sends Axcess's own name: the sign-in API has no
+    // field for another, and a site that ties a session to the browser
+    // would see the name change between signing in and scanning.
+    user_agent_choice: DEFAULT_USER_AGENT_CHOICE,
+    user_agent: "",
   },
   fixedNote: FIXED_NOTE_LOGIN,
   urlLabel: URL_COPY.login.label,
@@ -274,6 +293,10 @@ export function validateScan(
   if (settings.static_only && settings.scan_engine !== "alfa") {
     errors.push({ field: "static_only", message: ERRORS.staticWithAxe });
   }
+  if (settings.user_agent_choice === CUSTOM_USER_AGENT_CHOICE) {
+    const message = userAgentError(settings.user_agent);
+    if (message) errors.push({ field: "user_agent", message });
+  }
   if (policy.mode === "login") {
     if (!extras.authorized) {
       errors.push({ field: "authorized", message: ERRORS.notAuthorized });
@@ -283,6 +306,31 @@ export function validateScan(
     }
   }
   return errors;
+}
+
+/**
+ * A message for a typed browser name (user agent), or null when it can be
+ * sent. The same rules the server applies (`audit.crawler.user_agent`).
+ */
+export function userAgentError(typed: string): string | null {
+  const text = typed.trim();
+  if (!text) return ERRORS.userAgentEmpty;
+  if (text.length > MAX_USER_AGENT_LENGTH) return ERRORS.userAgentLong(MAX_USER_AGENT_LENGTH);
+  if (!/^[\x20-\x7e]+$/.test(text)) return ERRORS.userAgentCharacters;
+  return null;
+}
+
+/**
+ * What the public create endpoint is sent: the address completed, and the
+ * chosen browser's exact string in `user_agent` (empty for Axcess's own
+ * name, which the server fills in).
+ */
+export function publicPayload(settings: ScanSettings): ScanSettings {
+  return {
+    ...settings,
+    url: withScheme(settings.url),
+    user_agent: userAgentToSend(settings.user_agent_choice, settings.user_agent) ?? "",
+  };
 }
 
 /** The subset the local-login API accepts, with the URL normalized. */
@@ -461,5 +509,12 @@ export function quickRetrySettings(url: string, wcagVersion: ScanSettings["wcag_
  * were so validation can name them instead of silently changing them.
  */
 export function settingsFromSnapshot(snapshot: ScanSettingsSnapshot, policy: ScanPolicy): ScanSettings {
-  return applyPolicy({ ...policy.defaults, ...snapshot.settings }, policy);
+  const settings = { ...policy.defaults, ...snapshot.settings };
+  // A browser this form no longer lists falls back to Axcess's own name
+  // rather than to a choice the Select cannot show.
+  if (!knownChoice(settings.user_agent_choice)) {
+    settings.user_agent_choice = DEFAULT_USER_AGENT_CHOICE;
+    settings.user_agent = "";
+  }
+  return applyPolicy(settings, policy);
 }
