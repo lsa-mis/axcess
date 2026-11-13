@@ -699,7 +699,9 @@ def compare_reports(
         for k in old_cfg.keys() | new_cfg.keys()
         if old_cfg.get(k) != new_cfg.get(k)
         and not k.endswith("coverage_version")
-        and k not in {"seed_url", "db_path", "blob_dir", "workers"}
+        # ``user_agent_choice`` never changes without ``user_agent`` (the
+        # string sent) changing too, so it would name one change twice.
+        and k not in {"seed_url", "db_path", "blob_dir", "workers", "user_agent_choice"}
     )
     if changed:
         common.append("Scan settings changed: " + ", ".join(changed[:12]) + ".")
