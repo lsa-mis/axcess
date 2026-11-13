@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
+import { X } from "lucide-react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, blobUrl, ApiError } from "../api/client";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
@@ -20,6 +21,7 @@ import {
 } from "../components/table/Table";
 import { ActiveFilters, FilterMenu, activeFilterItems, type FilterGroup } from "../components/table/FilterMenu";
 import { AltTag, Button, Card, PageLink } from "../components/ui";
+import { useModalDialog } from "../hooks/useModalDialog";
 import { useScanQuery } from "../hooks/useScanQuery";
 import { cn } from "../lib/cn";
 import { ALT_VERDICT_LABEL, ALT_VERDICT_SOURCE_LABEL, IMAGE_GROUP_LABEL } from "../lib/terms";
@@ -135,6 +137,7 @@ export default function ImagesRoute() {
   const [announcement, setAnnouncement] = useState("");
   const [errors, setErrors] = useState<Record<number, string>>({});
   const [focusId, setFocusId] = useState<number | null>(null);
+  const [viewing, setViewing] = useState<ReportImage | null>(null);
   const check = useMutation({
     mutationFn: (image: ReportImage) => api.checkImageAlt(id, image.image_id),
     onMutate: (image) => {
@@ -338,6 +341,7 @@ export default function ImagesRoute() {
                     focus={focusId === image.image_id}
                     onFocused={() => setFocusId(null)}
                     onCheck={() => check.mutate(image)}
+                    onView={() => setViewing(image)}
                   />
                 ))}
               </tbody>
@@ -345,7 +349,75 @@ export default function ImagesRoute() {
           </TableRegion>
         )}
       </Card>
+      <ImageViewer image={viewing} onClose={() => setViewing(null)} />
     </>
+  );
+}
+
+/**
+ * The image at full size, in a native modal ``<dialog>`` (useModalDialog), the
+ * same pattern as the issue guidance dialog: the browser traps focus inside,
+ * Escape closes it, and focus goes back to the thumbnail that opened it (WAI-ARIA
+ * APG, Dialog (Modal) pattern, https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/).
+ * A click on the dimmed area around it also closes it, as people expect of an
+ * image viewer; the close button is the way that works for everyone.
+ *
+ * The close button says "Close image viewer" in visible words, not an X with
+ * an aria-label (the repo's control-text rule). The picture itself has
+ * alt="": the dialog's heading names it, and its current alt text and the
+ * text read from it are written out below, so a screen reader user gets the
+ * same facts without the picture claiming one of them as its description.
+ */
+function ImageViewer({ image, onClose }: { image: ReportImage | null; onClose: () => void }) {
+  const ref = useModalDialog(image != null);
+  const name = image ? imageName(image) : "";
+  return (
+    // The click handler only catches clicks on the dimmed backdrop, a mouse
+    // extra. Keyboard users close the dialog with Escape (native to a modal
+    // <dialog>) or the close button, so no key listener is needed here.
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- Keep: backdrop click; Escape and the close button cover keyboard
+    <dialog
+      ref={ref}
+      aria-labelledby="image-viewer-title"
+      onClose={onClose}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+      className="max-h-[92vh] w-[min(94vw,60rem)] overflow-y-auto rounded-xs border border-border bg-surface-raised p-0 text-fg shadow-raised backdrop:bg-black/60"
+    >
+      {image && (
+        <>
+          <div className="sticky top-0 z-[1] flex flex-wrap items-start justify-between gap-3 border-b border-border bg-surface px-5 py-3">
+            <h2 id="image-viewer-title" className="min-w-0 break-all text-lg font-semibold">
+              {name}
+            </h2>
+            <Button type="button" variant="secondary" onClick={onClose}>
+              <X className="h-4 w-4" aria-hidden />
+              Close image viewer
+            </Button>
+          </div>
+          <div className="px-5 py-4">
+            <img
+              src={blobUrl(image.content_hash)}
+              alt=""
+              className="mx-auto max-h-[65vh] max-w-full rounded-xs border border-border bg-white object-contain"
+            />
+            <dl className="mt-4 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[max-content_minmax(0,1fr)]">
+              <dt className="font-semibold text-fg-muted">Current alt text</dt>
+              <dd className="min-w-0">
+                <AltTag value={image.alt_text} wrap />
+              </dd>
+              <dt className="font-semibold text-fg-muted">Text in the image</dt>
+              <dd className="min-w-0 break-words">{image.image_text ?? "None found"}</dd>
+              <dt className="font-semibold text-fg-muted">Alt text verdict</dt>
+              <dd>
+                {ALT_VERDICT_LABEL[image.verdict]}. {image.verdict_reason}
+              </dd>
+            </dl>
+          </div>
+        </>
+      )}
+    </dialog>
   );
 }
 
@@ -360,6 +432,7 @@ function ImageRow({
   focus,
   onFocused,
   onCheck,
+  onView,
 }: {
   index: number;
   scanId: number;
@@ -371,6 +444,7 @@ function ImageRow({
   focus: boolean;
   onFocused: () => void;
   onCheck: () => void;
+  onView: () => void;
 }) {
   const name = imageName(image);
   const answerRef = useRef<HTMLDivElement>(null);
@@ -395,17 +469,27 @@ function ImageRow({
             SVG
           </span>
         ) : (
-          // The row's name is the file name beside it; the picture repeats
-          // it for sighted readers, so it is decorative here (alt="").
-          <img
-            src={blobUrl(image.content_hash)}
-            alt=""
-            loading="lazy"
-            decoding="async"
-            width={72}
-            height={48}
-            className="h-12 w-[72px] rounded-xs border border-border bg-white object-contain"
-          />
+          // The thumbnail is the button that opens the image viewer (the
+          // developer's request, 2026-11-13): a 72 by 48 picture is too small
+          // to judge alt text against. The picture is decorative (alt=""); the
+          // button's words, partly screen-reader-only (WCAG technique C7),
+          // say what it does and which image. A 44 px tall target (SC 2.5.5).
+          <Button
+            variant="ghost"
+            onClick={onView}
+            className="min-h-target p-0.5"
+          >
+            <img
+              src={blobUrl(image.content_hash)}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              width={72}
+              height={48}
+              className="h-12 w-[72px] rounded-xs border border-border bg-white object-contain"
+            />
+            <span className="sr-only">View larger image: {name}</span>
+          </Button>
         )}
         <span className="mt-1 block break-all text-xs font-semibold">{name}</span>
       </RowHeader>

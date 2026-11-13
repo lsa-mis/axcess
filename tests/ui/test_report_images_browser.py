@@ -115,3 +115,32 @@ async def test_images_tab_works_by_keyboard_alone(
         await playwright_async.expect(row).to_contain_text("Local AI model")
     finally:
         await page.context.close()
+
+
+async def test_image_viewer_opens_and_closes(images_server: tuple[str, int], new_page: Any) -> None:
+    """The thumbnail opens the image large; Escape or the close button shuts
+    it, and focus returns to the thumbnail."""
+    base, scan_id = images_server
+    page = await new_page()
+    try:
+        await page.goto(f"{base}/app/scans/{scan_id}/images", wait_until="networkidle")
+        await _tab_to(page, "View larger image")
+        opener = await page.evaluate("() => document.activeElement.textContent.trim()")
+        await page.keyboard.press("Enter")
+        viewer = page.get_by_role("dialog")
+        await playwright_async.expect(viewer).to_be_visible()
+        await playwright_async.expect(viewer.get_by_role("heading", level=2)).to_be_visible()
+        await playwright_async.expect(viewer).to_contain_text("Current alt text")
+        violations = await _run_axe(page)
+        assert not violations, _render_violations(violations)
+
+        await page.keyboard.press("Escape")
+        await playwright_async.expect(viewer).to_be_hidden()
+        assert await page.evaluate("() => document.activeElement.textContent.trim()") == opener
+
+        await page.keyboard.press("Enter")
+        await playwright_async.expect(viewer).to_be_visible()
+        await viewer.get_by_role("button", name="Close image viewer").click()
+        await playwright_async.expect(viewer).to_be_hidden()
+    finally:
+        await page.context.close()
