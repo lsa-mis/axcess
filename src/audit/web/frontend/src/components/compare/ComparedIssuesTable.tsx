@@ -269,6 +269,7 @@ export default function ComparedIssuesTable({
           </Table>
         </TableRegion>
       )}
+      <TablePagination label="Compared issues" noun="issue types" place="end" {...paged} />
     </>
   );
 }

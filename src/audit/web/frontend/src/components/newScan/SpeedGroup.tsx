@@ -1,9 +1,23 @@
-import { GROUPS, NUMBERS, SWITCHES } from "./copy";
+import { Select } from "../ui";
+import { GROUPS, NUMBERS, SWITCHES, USER_AGENT } from "./copy";
 import type { GroupProps } from "./groupProps";
 import NumberField from "./NumberField";
 import { isFixed, switchOn, switchPatch } from "./scanPolicy";
 import SettingsGroup, { SwitchList } from "./SettingsGroup";
 import SwitchRow from "./SwitchRow";
+import TextField from "./TextField";
+import {
+  CUSTOM_USER_AGENT_CHOICE,
+  DEFAULT_USER_AGENT_CHOICE,
+  presetFor,
+  USER_AGENT_PRESETS,
+} from "./userAgents";
+
+const USER_AGENT_OPTIONS = [
+  { value: DEFAULT_USER_AGENT_CHOICE, label: USER_AGENT.defaultOption },
+  ...USER_AGENT_PRESETS.map((preset) => ({ value: preset.id, label: preset.label })),
+  { value: CUSTOM_USER_AGENT_CHOICE, label: USER_AGENT.customOption },
+];
 
 /**
  * How hard the crawler works and whether you can watch it. Fast crawl lives
@@ -14,10 +28,29 @@ import SwitchRow from "./SwitchRow";
  * It renders inside the "Speed and browser window" disclosure, which already
  * shows its name, so the fieldset is `plain` and its legend is for a screen
  * reader only.
+ *
+ * The browser the site sees (user agent) is last, after the switches about
+ * the browser window: it is a browser setting too, and it is the one most
+ * people never change. One shared `Select` lists Axcess's own name first
+ * (the default), then current browsers by name and device, then "Type your
+ * own…", which shows a text box under it. Rejected: a text box with a list
+ * of suggestions (`<input list>` and `<datalist>`), which would put "type or
+ * pick" into one control, but screen readers announce its suggestions
+ * unevenly, and each suggestion would be a 120-character string, not a
+ * name. Rejected too: a radio group, which is ten rows for a setting that is
+ * usually left alone (W3C COGA, "Making Content Usable": keep the page
+ * simple, paraphrased; https://www.w3.org/TR/coga-usable/).
+ *
+ * The exact string a choice sends is shown under it, so a developer can
+ * check it without opening developer tools; it is text, not a control.
+ * A sign-in scan pins the choice to Axcess's own name (LOGIN_POLICY), so
+ * the control is not shown there.
  */
 export default function SpeedGroup({ settings, update, policy, errors, fieldIds }: GroupProps) {
   const login = policy.mode === "login";
   const staticError = errors.find((error) => error.field === "static_only")?.message;
+  const userAgentError = errors.find((error) => error.field === "user_agent")?.message;
+  const preset = presetFor(settings.user_agent_choice);
 
   return (
     <SettingsGroup
@@ -73,6 +106,38 @@ export default function SpeedGroup({ settings, update, policy, errors, fieldIds 
           />
         )}
       </SwitchList>
+      {!isFixed(policy, "user_agent_choice") && (
+        <div className="flex min-w-0 flex-col gap-3">
+          <Select
+            id="scan-user-agent-choice"
+            label={USER_AGENT.label}
+            stacked
+            hint={USER_AGENT.hint}
+            value={settings.user_agent_choice}
+            onChange={(value) => update({ user_agent_choice: value })}
+            options={USER_AGENT_OPTIONS}
+          />
+          {settings.user_agent_choice === CUSTOM_USER_AGENT_CHOICE ? (
+            <TextField
+              id={fieldIds.user_agent}
+              label={USER_AGENT.customLabel}
+              hint={USER_AGENT.customHint}
+              value={settings.user_agent}
+              onChange={(value) => update({ user_agent: value })}
+              error={userAgentError}
+            />
+          ) : preset ? (
+            <div className="flex flex-col gap-1 text-xs text-fg-muted">
+              <p>
+                {USER_AGENT.sends} <code className="break-all font-mono text-fg">{preset.value}</code>
+              </p>
+              {preset.phone && <p>{USER_AGENT.phone}</p>}
+            </div>
+          ) : (
+            <p className="text-xs text-fg-muted">{USER_AGENT.sendsDefault}</p>
+          )}
+        </div>
+      )}
     </SettingsGroup>
   );
 }

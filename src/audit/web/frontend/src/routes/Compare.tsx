@@ -597,6 +597,8 @@ const SETTING_NAMES: Record<string, string> = {
   search: "Search",
   rps: "Pages per second",
   browser_headless: "Show the browser",
+  // The New scan label, word for word.
+  user_agent: "Browser the site sees (user agent)",
   resumable: "Resume after a stop",
 };
 

@@ -53,7 +53,7 @@ export const GROUPS = {
   speed: {
     legend: "Speed and browser window",
     description:
-      "How fast the scan runs, and whether you can watch it.",
+      "How fast the scan runs, whether you can watch it, and which browser the site sees.",
   },
 } as const;
 
@@ -153,6 +153,26 @@ export const SWITCHES = {
     hint:
       "Leave this off to scan in the background while you use other apps. If you close the window, the browser checks stop.",
   },
+} as const;
+
+/**
+ * The browser name (user agent) a public scan sends (SpeedGroup). The hint
+ * keeps both limits, never to be dropped for length: only the name changes,
+ * not the browser, and robots.txt is still read for Axcess.
+ */
+export const USER_AGENT = {
+  label: "Browser the site sees (user agent)",
+  hint:
+    "Some sites show a different page, or block scans, depending on which browser they think is visiting. This changes only the browser name Axcess sends. Every page still opens in Chromium, so a site that checks what the browser can do may still tell. The site’s robots.txt rules for Axcess still apply.",
+  defaultOption: "Axcess (default)",
+  customOption: "Type your own…",
+  sendsDefault: "Sends Axcess’s own name, so the site can see that a scanner is visiting.",
+  sends: "Sends:",
+  phone:
+    "The scanning window stays computer-sized. The site may send its phone layout to that wide window.",
+  customLabel: "Browser name to send (user agent)",
+  customHint:
+    "Paste the exact text a browser sends. For example, copy it from your browser’s developer tools. One line, up to 512 characters. Axcess does not keep this text for a later scan.",
 } as const;
 
 /** New scan's no-limit switch, beside Maximum pages (public scans only). */
@@ -256,6 +276,10 @@ export const ERRORS = {
   notAuthorized: "Confirm that the site owner allows this accessibility scan.",
   imageAck:
     "Before you turn on reading text inside images, confirm where Axcess saves the images and their text.",
+  userAgentEmpty: "Type the browser name (user agent) to send, or choose one from the list.",
+  userAgentLong: (max: number) => `The browser name (user agent) can be at most ${max} characters.`,
+  userAgentCharacters:
+    "The browser name (user agent) can use only English letters, numbers, spaces and keyboard symbols, on one line.",
   limitEmpty: (label: string, min: number, max: number) =>
     `${label} is empty. Enter a whole number from ${min} to ${max.toLocaleString()}.`,
   limitWhole: (label: string) => `${label} must be a whole number.`,
@@ -324,6 +348,7 @@ export const RECOVERY = {
     "Axcess never saves your sign-in. Sign in again in the browser window, and confirm again below that the site owner allows this scan.",
   failed: (id: number) =>
     `Axcess could not load the settings from scan ${id}. The form shows the default settings instead.`,
+  typedUserAgent: `Axcess does not keep a browser name you typed. Type it again under ${GROUPS.speed.legend}.`,
 } as const;
 
 /**
@@ -362,6 +387,10 @@ export const SUMMARY = {
   noSignIn: "Pages behind a sign-in",
   /** For a sign-in scan: it never leaves the approved website. */
   noOtherSites: "Pages on any other website",
+  /** A Pages to scan line when the scan sends a browser's name. */
+  userAgent: (browser: string) => `Tells the site it is ${browser}`,
+  /** The same line for a name the person typed. */
+  userAgentCustom: "Tells the site it is the browser you typed",
   /** A Pages to scan line during a Fast scan. */
   htmlOnly: "Page code (HTML) only, no browser",
   loginPrivacy: "Axcess uploads nothing. It deletes the sign-in cookie (session cookie) when the scan ends.",

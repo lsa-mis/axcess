@@ -426,6 +426,7 @@ function FindingsInGroup({
           </tbody>
         </Table>
       </TableRegion>
+      <TablePagination label="Images in this group" noun="images" place="end" {...paged} />
     </>
   );
 }

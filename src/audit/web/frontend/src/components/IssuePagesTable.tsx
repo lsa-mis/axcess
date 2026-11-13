@@ -276,6 +276,7 @@ export default function IssuePagesTable({
           </Table>
         </TableRegion>
       )}
+      <TablePagination label="Pages with this issue type" noun="pages" place="end" {...paged} />
     </>
   );
 }

@@ -367,6 +367,18 @@ export default function PagesVisitedRoute() {
             </Table>
           </TableRegion>
         )}
+        <TablePagination
+          label={PAGES_VISITED_VIEW}
+          noun="pages"
+          page={shownPage}
+          pages={pages}
+          total={total}
+          setPage={setPage}
+          pageSize={pageSize}
+          pagerId="pager-pages-visited"
+          disabled={pagesQuery.isPlaceholderData}
+          place="end"
+        />
       </Card>
     </>
   );

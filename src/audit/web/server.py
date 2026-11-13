@@ -70,6 +70,7 @@ from audit.config import Settings, get_settings
 from audit.crawler import live_progress, url_policy
 from audit.crawler.orchestrator import CrawlConfig, CrawlSummary, build_search_explorer, run_crawl
 from audit.crawler.search import SearchConfig, search_url_allowed
+from audit.crawler.user_agent import chosen_user_agent
 from audit.db import repo
 from audit.db.schema import connect
 from audit.exports.audit_report import render_audit_report
@@ -2042,7 +2043,14 @@ def create_app(
                 },
                 status_code=422,
             )
-        from audit.web.scan_settings import limit_refusal
+        from audit.web.scan_settings import limit_refusal, user_agent_refusal
+
+        # The browser name sent to the site. A missing choice, or Axcess's
+        # own, keeps the server's ``settings.user_agent``.
+        ua_refusal = user_agent_refusal(body)
+        if ua_refusal is not None:
+            field, message = ua_refusal
+            return JSONResponse({"error": message, "fields": [field]}, status_code=422)
 
         # "Scan every page it finds": no page limit, so any max_pages sent
         # alongside is the form's hidden value, not a limit to check.
@@ -2087,6 +2095,8 @@ def create_app(
             "skip_rendered_storage": bool(body.get("skip_rendered_storage")),
             "axe_level": str(body.get("axe_level", "AA")),
             "wcag_version": wcag_version,
+            "user_agent_choice": body.get("user_agent_choice"),
+            "user_agent": body.get("user_agent"),
         }
         config = _build_crawl_config(form, settings)
         scan_id = _prepare_scan_row(resolved_db, config)
@@ -3909,6 +3919,10 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
     if scan_engine not in {"axe", "alfa", "both"}:
         # Legacy non-browser callers retain the original axe-default behavior.
         scan_engine = "axe"
+    # A browser name chosen on New scan (already checked by
+    # ``user_agent_refusal``); otherwise the server's own name. robots.txt
+    # is matched against the server's own name either way.
+    chosen = chosen_user_agent(form)
     return CrawlConfig(
         seed_url=str(form["url"]).strip(),
         search=form.get("search"),
@@ -3925,7 +3939,9 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
         allow_subdomains=bool(form["include_subdomain"]),
         whole_host=bool(form.get("whole_host")),
         ignore_robots=bool(form["ignore_robots"]),
-        user_agent=settings.user_agent,
+        user_agent=chosen or settings.user_agent,
+        robots_user_agent=settings.user_agent if chosen else None,
+        user_agent_choice=str(form["user_agent_choice"]) if chosen else None,
         request_timeout_s=settings.request_timeout_s,
         ocr_enabled=not bool(form["skip_ocr"]),
         ocr_language=settings.ocr_language,

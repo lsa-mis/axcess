@@ -363,6 +363,7 @@ function RuleGroupCard({
               </tbody>
             </Table>
           </TableRegion>
+          <TablePagination label={`${group.rule_id} occurrences`} noun="occurrences" place="end" {...paged} />
         </div>
       )}
     </Card>

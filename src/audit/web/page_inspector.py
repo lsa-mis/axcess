@@ -55,6 +55,7 @@ from pydantic import BaseModel, ConfigDict
 
 from audit.crawler import url_policy
 from audit.crawler.style_snapshot import StoredStyles, concatenate
+from audit.crawler.user_agent import chosen_user_agent
 from audit.db import repo
 from audit.labels import CLICK_THROUGH_STATE
 
@@ -406,6 +407,9 @@ def _validate(conn: sqlite3.Connection, scan_id: int, page_id: int) -> dict[str,
         "scan": scan,
         "page": page,
         "target_url": target_url,
+        # The browser name the scan sent, when New scan chose one. A live
+        # render under a different name can be served a different page.
+        "user_agent": chosen_user_agent(config),
         "store_rendered_html": store_rendered_html,
         "allow_live_render": completed,
     }
@@ -632,7 +636,7 @@ async def inspect_page(
         }
     outcome, error = await _render_page(
         validated["target_url"],
-        user_agent=user_agent,
+        user_agent=validated["user_agent"] or user_agent,
         viewport=viewport or _DEFAULT_VIEWPORT,
         nav_timeout_ms=nav_timeout_ms,
         idle_timeout_ms=idle_timeout_ms,
