@@ -35,6 +35,7 @@ from typing import TYPE_CHECKING, Any
 from audit.analyzer.axe import AxeAnalyzer, AxeViolation, Level
 from audit.analyzer.interaction.base import (
     InteractionResult,
+    RevealedLink,
     RevealedViolation,
     StateCapture,
 )
@@ -130,6 +131,23 @@ _CANDIDATE_SELECTOR = (
     '[role="switch"], [role="checkbox"], [role="radio"], '
     "details > summary, [aria-expanded], [aria-haspopup], [onclick], [tabindex]"
 )
+
+# Every link in a revealed state: its resolved address and an approximate
+# accessible name (aria-labelledby, aria-label, text, image alt, title), the
+# order the link-purpose check's reader uses (semantic/extractor.py).
+# Bounded to 1000 links and 2048-character addresses, as before.
+_LINKS_JS = r"""
+nodes => nodes.slice(0, 1000).filter(n => n.href.length <= 2048).map(n => {
+  const squash = s => (s || '').replace(/\s+/g, ' ').trim();
+  const byId = (n.getAttribute('aria-labelledby') || '').split(/\s+/)
+    .map(id => id && document.getElementById(id)).filter(Boolean)
+    .map(el => squash(el.textContent)).filter(Boolean).join(' ');
+  const img = n.querySelector('img[alt]');
+  const name = byId || squash(n.getAttribute('aria-label')) || squash(n.innerText)
+    || squash(img && img.getAttribute('alt')) || squash(n.getAttribute('title'));
+  return [n.href, name.slice(0, 300)];
+})
+"""
 
 # Keep identity separate from the repeat-sampling shape. A broad selector such
 # as button.card must never be passed to .first(): that re-clicks card one
@@ -436,6 +454,9 @@ class _Budget:
     detail: str = ""
     limits: set[str] = field(default_factory=set)
     urls: set[str] = field(default_factory=set)
+    #: url -> the first link seen there after a click, with that click's
+    #: control. Bounded like ``urls``.
+    revealed_links: dict[str, RevealedLink] = field(default_factory=dict)
     # Every control this page exposed, including the ones a click revealed
     # and the ones that were then refused or capped. Keyed the same way as
     # ``seen_keys`` so a control found again in a later sweep is one control,
@@ -596,6 +617,7 @@ class InteractionProbe:
             screenshots=dict(budget.screenshots),
             captures=tuple(budget.captures.values()),
             urls=tuple(sorted(budget.urls)),
+            revealed_links=tuple(budget.revealed_links.values()),
             evaluated=evaluated,
             controls_discovered=len(budget.discovered_keys),
             clicks_attempted=self.max_clicks - budget.remaining,
@@ -937,17 +959,21 @@ class InteractionProbe:
             ]
             budget.dialogs_opened += len(opened)
             # Links can be created by menus/dialogs after the load-time
-            # snapshot. Keep them for the crawler's normal scope checks.
-            links = await page.locator("a[href]").evaluate_all(
-                "nodes => nodes.slice(0, 1000).map(n => n.href).filter(u => u.length <= 2048)"
-            )
-            for url in links:
-                if (
-                    isinstance(url, str)
-                    and safe_url(url, self.blocked_labels)
-                    and len(budget.urls) < 1000
-                ):
+            # snapshot. Keep them for the crawler's normal scope checks, and
+            # with their names and this control's for the Documents tab.
+            links = await page.locator("a[href]").evaluate_all(_LINKS_JS)
+            for item in links:
+                if not (isinstance(item, list) and len(item) == 2):
+                    continue
+                url, name = item
+                if not (isinstance(url, str) and safe_url(url, self.blocked_labels)):
+                    continue
+                if len(budget.urls) < 1000:
                     budget.urls.add(url)
+                if url not in budget.revealed_links and len(budget.revealed_links) < 1000:
+                    budget.revealed_links[url] = RevealedLink(
+                        url=url, name=str(name)[:300], revealed_by=label[:300]
+                    )
             before_found = len(found)
             state_key = self._interaction_key(control, pinned)
             await self._collect(page, budget, found, label, state_key)

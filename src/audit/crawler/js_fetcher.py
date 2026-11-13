@@ -666,6 +666,7 @@ class JsFetcher:
                 discovered_urls=tuple(
                     sorted(set(interaction.urls) | set(search_result.urls if search_result else ()))
                 ),
+                revealed_links=interaction.revealed_links,
                 search_result=search_result,
                 screenshots=screenshots,
                 styles=styles,
