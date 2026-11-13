@@ -188,6 +188,30 @@ def test_check_saves_and_returns_the_row(app_and_ids: Any) -> None:
     assert next(r for r in listed["rows"] if r["image_id"] == photo)["suggestion"]
 
 
+@pytest.mark.parametrize(
+    ("model", "available"),
+    [
+        ("llava:7b", True),
+        ("qwen2.5vl:latest", True),
+        ("gpt-oss:120b-cloud", False),
+        ("qwen3-vl:235b-cloud", False),
+        ("some-model:cloud", False),
+    ],
+)
+def test_check_refuses_ollama_cloud_models(
+    seeded_db: tuple[Path, Path, int],
+    monkeypatch: pytest.MonkeyPatch,
+    model: str,
+    available: bool,
+) -> None:
+    # Ollama runs a cloud model on its own servers, even through localhost.
+    db_path, blob_dir, _ = seeded_db
+    monkeypatch.setenv("AUDIT_ALT_CHECK_MODEL", model)
+    monkeypatch.setenv("AUDIT_OLLAMA_BASE_URL", "http://127.0.0.1:11434")
+    app = create_app(db_path=db_path, blob_dir=blob_dir)
+    assert (app.state.alt_checker_factory is not None) is available
+
+
 def test_check_ignores_proxy_settings(app_and_ids: Any, monkeypatch: pytest.MonkeyPatch) -> None:
     # A proxy in the environment would send the image and page text to
     # another computer even though the model address is loopback.

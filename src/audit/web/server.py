@@ -2864,7 +2864,15 @@ def create_app(
     # the model, and the Images tab says that stays on this computer. So it
     # runs only against a literal loopback Ollama address, the same rule as
     # sign-in scans; a remote AUDIT_OLLAMA_BASE_URL leaves the check off.
-    alt_check_url = _local_login_ollama_url(settings.ollama_base_url)
+    # An Ollama cloud model (tag "cloud" or "...-cloud") runs on Ollama's
+    # servers even through the local daemon, so it leaves the check off too.
+    from audit.analyzer.vlm.alt_check import is_cloud_model
+
+    alt_check_url = (
+        None
+        if is_cloud_model(settings.alt_check_model)
+        else _local_login_ollama_url(settings.ollama_base_url)
+    )
 
     def _default_alt_checker_factory(client: httpx.AsyncClient) -> Any:
         from audit.analyzer.vlm.alt_check import OllamaAltChecker
