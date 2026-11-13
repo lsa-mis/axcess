@@ -905,3 +905,154 @@ async def test_the_form_error_check_is_on_for_public_websites_and_absent_when_si
     await playwright_async.expect(
         page.get_by_role("group", name="Check that forms describe their errors")
     ).to_have_count(0)
+
+
+_CHROME_WINDOWS = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36"
+)
+_BROWSER_NAME = "Browser the site sees (user agent)"
+_TYPED_NAME = "Browser name to send (user agent)"
+
+
+async def test_a_browser_name_is_chosen_typed_checked_and_posted(
+    live_server: tuple[str, int],
+    new_page: Any,
+    choose_option: Any,
+) -> None:
+    """The site sees the chosen browser's exact string; a typed one is checked first."""
+    base, _ = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    posted: list[dict[str, Any]] = []
+
+    async def capture(route: Any) -> None:
+        posted.append(route.request.post_data_json)
+        await route.fulfill(status=409, json={"error": "A crawl is already running."})
+
+    await page.route("**/api/scans", capture)
+    await page.goto(f"{base}/app/scans/new", wait_until="networkidle")
+    await page.get_by_role("textbox", name="Website address", exact=True).fill(
+        "https://example.com/"
+    )
+    summary = page.get_by_role("complementary", name="What this scan will do")
+    await _open_groups(page)
+    speed = page.locator("#speed")
+    # Axcess's own name by default, and the form says what that means.
+    await playwright_async.expect(
+        page.get_by_role("combobox", name=_BROWSER_NAME, exact=True)
+    ).to_contain_text("Axcess (default)")
+    await playwright_async.expect(speed).to_contain_text("so the site can see that a scanner")
+    # Both limits are stated beside the choice.
+    await playwright_async.expect(speed).to_contain_text("Every page still opens in Chromium")
+    await playwright_async.expect(speed).to_contain_text("robots.txt rules for Axcess still apply")
+
+    await choose_option(page, _BROWSER_NAME, "chrome_windows")
+    await playwright_async.expect(speed).to_contain_text(f"Sends: {_CHROME_WINDOWS}")
+    await playwright_async.expect(summary).to_contain_text("Tells the site it is Chrome on Windows")
+    await playwright_async.expect(summary.get_by_text("Customized", exact=True)).to_be_visible()
+    await page.get_by_role("button", name="Start scan").click()
+    await playwright_async.expect(page.get_by_role("alert").first).to_be_visible()
+    assert posted[-1]["user_agent_choice"] == "chrome_windows"
+    assert posted[-1]["user_agent"] == _CHROME_WINDOWS
+
+    # A phone browser says the window does not change size.
+    await choose_option(page, _BROWSER_NAME, "safari_iphone")
+    await playwright_async.expect(speed).to_contain_text("iPhone OS 18_7")
+    await playwright_async.expect(speed).to_contain_text("The scanning window stays computer-sized")
+
+    # Typed: an empty box is named in the alert and on the field.
+    await choose_option(page, _BROWSER_NAME, "custom")
+    typed = page.get_by_role("textbox", name=_TYPED_NAME, exact=True)
+    await playwright_async.expect(typed).to_be_visible()
+    count = len(posted)
+    speed_button = page.get_by_role("button", name="Speed and browser window", exact=True)
+    await speed_button.click()
+    await page.get_by_role("button", name="Start scan").click()
+    await playwright_async.expect(speed_button).to_have_attribute("aria-expanded", "true")
+    alert = page.get_by_role("alert").first
+    await playwright_async.expect(alert).to_be_focused()
+    await playwright_async.expect(alert).to_contain_text("Type the browser name (user agent)")
+    assert await typed.get_attribute("aria-invalid") == "true"
+    assert len(posted) == count  # nothing was sent
+    violations = await _run_axe_aaa(page)
+    assert not violations, _render_violations(violations)
+
+    await typed.fill("Navigateur/1 é")
+    await page.get_by_role("button", name="Start scan").click()
+    await playwright_async.expect(page.locator("#scan-user-agent-error")).to_contain_text(
+        "only English letters"
+    )
+    await typed.fill("  PartnerScanner/2  ")
+    await playwright_async.expect(page.locator("#scan-user-agent-error")).to_have_count(0)
+    async with page.expect_request("**/api/scans"):
+        await page.get_by_role("button", name="Start scan").click()
+    await playwright_async.expect(alert).to_contain_text("A crawl is already running")
+    assert len(posted) == count + 1
+    assert posted[-1]["user_agent_choice"] == "custom"
+    assert posted[-1]["user_agent"] == "PartnerScanner/2"
+    await playwright_async.expect(summary).to_contain_text(
+        "Tells the site it is the browser you typed"
+    )
+
+    await page.locator("form").get_by_role("button", name="Reset to default settings").click()
+    await playwright_async.expect(
+        page.get_by_role("combobox", name=_BROWSER_NAME, exact=True)
+    ).to_contain_text("Axcess (default)")
+
+
+async def test_a_sign_in_scan_offers_no_browser_name(
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    base, _ = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(f"{base}/app/scans/new?mode=login", wait_until="networkidle")
+    if not await page.locator("form#scan-form").count():
+        pytest.skip("Sign-in scans are not available on this server.")
+    await _open_groups(page)
+    await playwright_async.expect(
+        page.get_by_role("combobox", name=_BROWSER_NAME, exact=True)
+    ).to_have_count(0)
+
+
+@pytest.mark.parametrize("choice", ["chrome_windows", "custom"])
+async def test_a_restarted_scan_keeps_its_browser_choice_but_not_typed_text(
+    live_server: tuple[str, int],
+    seeded_db: tuple[Any, Any, int],
+    new_page: Any,
+    choice: str,
+) -> None:
+    from audit.crawler.orchestrator import CrawlConfig
+
+    base, _ = live_server
+    sent = _CHROME_WINDOWS.replace("157", "150") if choice != "custom" else "Partner/1 secret-77"
+    scan_id = _insert_scan(
+        seeded_db[0],
+        seed_url="https://agent.example.test/",
+        config=CrawlConfig(
+            seed_url="https://agent.example.test/",
+            user_agent=sent,
+            user_agent_choice=choice,
+        ),
+        status="interrupted",
+    )
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(f"{base}/app/scans/new?from={scan_id}", wait_until="networkidle")
+    notice = page.get_by_role("status").filter(has_text="Axcess copied the settings")
+    await playwright_async.expect(notice).to_be_visible()
+    await _open_groups(page)
+    box = page.get_by_role("combobox", name=_BROWSER_NAME, exact=True)
+    if choice == "custom":
+        await playwright_async.expect(box).to_contain_text("Type your own")
+        await playwright_async.expect(
+            page.get_by_role("textbox", name=_TYPED_NAME, exact=True)
+        ).to_have_value("")
+        await playwright_async.expect(notice).to_contain_text(
+            "Axcess does not keep a browser name you typed"
+        )
+    else:
+        # The listed browser as it is now, not the version the old scan sent.
+        await playwright_async.expect(box).to_contain_text("Chrome on Windows")
+        await playwright_async.expect(page.locator("#speed")).to_contain_text(_CHROME_WINDOWS)
+    assert "secret-77" not in await page.content()
+    assert "Chrome/150" not in await page.content()
