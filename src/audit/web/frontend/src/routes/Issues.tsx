@@ -36,6 +36,7 @@ import {
   type SortKind,
 } from "../components/table/sort";
 import ReportHeader from "../components/ReportHeader";
+import HowSureTag from "../components/HowSureTag";
 import ReportDangerZone from "../components/ReportDangerZone";
 import { ReportCoverageNote, ReportNote, ReportNotes, ReportSummary } from "../components/ReportSummary";
 import { cn } from "../lib/cn";
@@ -945,18 +946,14 @@ const IssueTableRow = memo(function IssueTableRow({
  * glossary, where the meaning is printed beside it.
  */
 function LaneTag({ lane, hint = true }: { lane: ReviewLane; hint?: boolean }) {
+  // The shared tag (components/HowSureTag.tsx), so Documents shows its "How
+  // sure" values the same way.
   return (
-    <span
-      title={hint ? REVIEW_LANE_HELP[lane] : undefined}
-      className={cn(
-        "inline-flex items-center rounded-2xs px-2 py-0.5 text-2xs font-semibold",
-        lane === "informational"
-          ? "border border-border bg-surface-muted text-fg-muted"
-          : "bg-sev-major-bg text-sev-major",
-      )}
-    >
-      {REVIEW_TYPE_LABEL[lane]}
-    </span>
+    <HowSureTag
+      label={REVIEW_TYPE_LABEL[lane]}
+      help={hint ? REVIEW_LANE_HELP[lane] : undefined}
+      quiet={lane === "informational"}
+    />
   );
 }
 
