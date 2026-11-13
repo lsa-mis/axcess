@@ -306,7 +306,7 @@ def test_zip_puts_images_in_group_and_verdict_folders(app_and_ids: Any) -> None:
     assert wb.sheetnames == ["About", "Images"]
     ws = wb["Images"]
     header = [c.value for c in ws[1]]
-    assert header[:4] == ["Image number", "File name", "Groups", "Alt text verdict"]
+    assert header[:5] == ["Image number", "Image", "File name", "Groups", "Alt text verdict"]
     rows = [[c.value for c in r] for r in ws.iter_rows(min_row=2)]
     assert len(rows) == 3
     alt_col = header.index("Current alt text")
@@ -317,6 +317,20 @@ def test_zip_puts_images_in_group_and_verdict_folders(app_and_ids: Any) -> None:
     assert "Images with alt text/Not checked yet/" in photo_row[files_col]
     about = " ".join(str(c.value) for c in wb["About"]["A"] if c.value)
     assert "does not prove" in about
+
+    # Each picture is previewed in the Image column, beside its row.
+    assert header[1] == "Image"
+    anchored_rows = sorted(img.anchor._from.row + 1 for img in ws._images)
+    assert anchored_rows == [2, 3, 4]
+    assert all(img.anchor._from.col == 1 for img in ws._images)
+    # The file name opens that picture from the unzipped folder.
+    name_col = header.index("File name") + 1
+    link = ws.cell(row=rows.index(photo_row) + 2, column=name_col).hyperlink
+    assert link is not None and link.target == photo_row[files_col].split("\n")[0]
+    assert root + link.target in names
+    # The image address opens the picture on the site.
+    address = ws.cell(row=rows.index(photo_row) + 2, column=header.index("Image address") + 1)
+    assert address.hyperlink.target == "http://example.com/students.png"
 
 
 def test_zip_refuses_report_that_is_not_complete(app_and_ids: Any) -> None:
