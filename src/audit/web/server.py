@@ -2866,7 +2866,7 @@ def create_app(
     # sign-in scans; a remote AUDIT_OLLAMA_BASE_URL leaves the check off.
     # An Ollama cloud model (tag "cloud" or "...-cloud") runs on Ollama's
     # servers even through the local daemon, so it leaves the check off too.
-    from audit.analyzer.vlm.alt_check import is_cloud_model
+    from audit.analyzer.ollama_base import is_cloud_model
 
     alt_check_url = (
         None

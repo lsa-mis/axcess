@@ -35,17 +35,6 @@ _FIELD_LIMIT = 500
 CheckVerdict = Literal["good", "needs_better"]
 
 
-def is_cloud_model(name: str) -> bool:
-    """True for an Ollama cloud model, such as ``gpt-oss:120b-cloud``.
-
-    Ollama runs these on its own servers even when asked through the local
-    daemon, so the image and page text would leave the computer. Ollama marks
-    them with a tag that is ``cloud`` or ends in ``-cloud``.
-    """
-    _, _, tag = name.strip().lower().rpartition(":")
-    return tag == "cloud" or tag.endswith("-cloud")
-
-
 @dataclass(frozen=True)
 class AltCheckInput:
     """What the model is told about the image besides its pixels."""
