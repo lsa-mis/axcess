@@ -9,6 +9,7 @@ local model is a stub: these tests never contact Ollama.
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -113,6 +114,19 @@ async def test_images_tab_works_by_keyboard_alone(
         row = page.get_by_role("row", name="students.png", exact=False)
         await playwright_async.expect(row).to_contain_text("Needs better alt text")
         await playwright_async.expect(row).to_contain_text("Local AI model")
+        # The suggestion, its copy button and the AI note pass axe (AAA).
+        violations = await _run_axe(page)
+        assert not violations, _render_violations(violations)
+        await page.context.grant_permissions(["clipboard-read", "clipboard-write"], origin=base)
+        # The name changes from "Copy alt text" to "Copied", so match both.
+        copy = row.get_by_role(
+            "button", name=re.compile(r"^(Copy alt text|Copied) for students\.png")
+        )
+        await copy.focus()
+        await page.keyboard.press("Enter")
+        await playwright_async.expect(copy).to_contain_text("Copied")
+        pasted = await page.evaluate("() => navigator.clipboard.readText()")
+        assert pasted == "Students talking outside Haven Hall"
     finally:
         await page.context.close()
 

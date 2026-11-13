@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router";
-import { Download, X } from "lucide-react";
+import { Check, Copy, Download, Sparkles, X } from "lucide-react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, blobUrl, ApiError } from "../api/client";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
@@ -472,6 +472,64 @@ function ImageViewer({ image, onClose }: { image: ReportImage | null; onClose: (
   );
 }
 
+/**
+ * A suggested alt text, ready to paste: the text in a box of its own with
+ * "Copy alt text" under it, then the caution about where it came from (the
+ * developer's request, 2026-11-13).
+ *
+ * The box is a plain bordered panel, so the suggestion reads as the thing to
+ * take. The caution sits below it as a separate note in the accent
+ * colour, with a sparkle icon and in bold, so it is clearly seen and
+ * cannot be mistaken for part of the alt text, nor for a verdict (the
+ * verdict chips use the critical, major and ok colours). A dashed accent
+ * border and italic text, not the information colours first tried: in the
+ * dark theme those were nearly the box's own grey (2026-11-13 check). Its words carry
+ * the meaning; the icon and colour only repeat it (SC 1.4.1 Use of Color,
+ * Level A).
+ *
+ * The copy button follows the page code viewer's (components/DomSource.tsx):
+ * its words change to "Copied" for two seconds and it is a polite live
+ * region, so the result is heard. The repo has no shared copy button; this
+ * is the second one, and a third should move both into components/ui.tsx.
+ * Its name ends with the image's file name in screen-reader-only text, so
+ * each row's button says which alt text it copies (WCAG technique C7). If
+ * the browser refuses the clipboard, it says so and the text can still be
+ * selected by hand.
+ */
+function SuggestionBox({ text, name }: { text: string; name: string }) {
+  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setState("copied");
+      window.setTimeout(() => setState("idle"), 2000);
+    } catch {
+      setState("failed");
+    }
+  };
+  return (
+    <div className="space-y-2">
+      <div className="rounded-xs border border-border-strong bg-surface p-2.5">
+        <p className="break-words text-sm leading-6 text-fg">{text}</p>
+        <Button size="sm" className="mt-2 min-h-target" onClick={() => void copy()} aria-live="polite">
+          {state === "copied" ? <Check className="h-3.5 w-3.5" aria-hidden /> : <Copy className="h-3.5 w-3.5" aria-hidden />}
+          {state === "copied" ? "Copied" : "Copy alt text"}
+          <span className="sr-only"> for {name}</span>
+        </Button>
+        {state === "failed" && (
+          <p className="mt-1 text-xs text-sev-critical">
+            Your browser did not allow copying. Select the text and copy it instead.
+          </p>
+        )}
+      </div>
+      <p className="flex items-start gap-1.5 rounded-xs border border-dashed border-umich-blue/70 bg-umich-blue/10 px-2 py-1.5 text-xs font-semibold italic leading-5 text-fg-accent">
+        <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+        Written by the local AI model. Check it before you use it.
+      </p>
+    </div>
+  );
+}
+
 function ImageRow({
   index,
   scanId,
@@ -600,10 +658,7 @@ function ImageRow({
         {image.suggestion ? (
           // Focus lands here when the model answers (see the route comment).
           <div ref={answerRef} tabIndex={-1} className="rounded-xs focus:outline-none focus-visible:shadow-focus">
-            <span className="block break-words text-sm text-fg">{image.suggestion}</span>
-            <span className="mt-1 block text-xs text-fg-muted">
-              Written by the local AI model. Check it before you use it.
-            </span>
+            <SuggestionBox text={image.suggestion} name={name} />
           </div>
         ) : !checkAvailable ? (
           <span className="text-xs text-fg-subtle">Local AI check is off</span>
