@@ -278,6 +278,13 @@ def choose_option() -> Callable[[Page, str, str], Awaitable[None]]:
     return choose
 
 
+# The Issues table opens on "Mostly sure" and "Measured" and holds the other
+# two "How sure" values back (audit.labels.DEFAULT_REVIEW_LANES). A test that
+# is about the held-back rows, not about that default, opens the page with
+# every value checked: the URL "Show hidden issue types" writes.
+ALL_HOW_SURE = "type=likely_barrier,measured,expert_review,informational"
+
+
 @pytest.fixture
 def choose_filter() -> Callable[..., Awaitable[None]]:
     """Make ``value`` the only choice in group ``group`` of a table's Filter menu.

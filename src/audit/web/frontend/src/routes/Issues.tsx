@@ -2,7 +2,7 @@ import { Fragment, memo, useMemo, useRef, type ReactNode, type Ref } from "react
 import { Link, useLocation, useParams, useSearchParams } from "react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
-import { Card, withReturnTrail } from "../components/ui";
+import { Button, Card, withReturnTrail } from "../components/ui";
 // The same helper the topbar trail uses.
 import { siteLabel } from "../components/ReportCrumb";
 import ConformanceBadge from "../components/ConformanceBadge";
@@ -47,7 +47,9 @@ import {
   FINDING_TYPE_LABELS,
   ISSUE_COLUMN_HELP,
   PRIORITY_HELP,
+  DEFAULT_REVIEW_LANES,
   REVIEW_LANES,
+  SUREST_REVIEW_LANES,
   REVIEW_LANE_HELP,
   isFindingType,
 } from "../lib/labels";
@@ -95,6 +97,7 @@ export default function IssuesRoute() {
   // Each filter is a comma-separated list of the values checked ("A,AA"),
   // kept to the values the group offers, in its order; "" is every row.
   const conformance = parseList(params.get("conformance"), CONFORMANCE_LEVELS);
+  // "" is the default view, not every row: see ``shownByDefault`` below.
   const lane = parseList(params.get("type"), REVIEW_LANES);
   const findingType = parseList(params.get("finding_type"), FINDING_TYPES);
   const q = params.get("q") ?? "";
@@ -166,10 +169,30 @@ export default function IssuesRoute() {
     );
   };
 
-  const rows = useMemo(
-    () => sortRows(issuesQuery.data?.rows ?? [], sort),
-    [issuesQuery.data, sort],
-  );
+  // The default view: with nothing chosen under "How sure", the table shows
+  // every issue type. From 2026-11-10 it held back Not sure and For
+  // information behind a "hidden" note; on 2026-11-13 the developer asked for
+  // all of them in the table instead, with a note over it that counts each
+  // "How sure" value, says what Not sure and For information mean, and offers
+  // one button to narrow to the surest (``AllIssuesNote``). Nothing is held
+  // back, so the numbers above the table, the table and the exports agree.
+  //
+  // Kept from before: the Filter menu opens with nothing checked, its rule
+  // being "nothing checked is all" (FilterMenu.tsx), and its How sure group
+  // says in words what nothing checked shows (``hint``).
+  const shownByDefault = !lane;
+  const rows = useMemo(() => {
+    const all = issuesQuery.data?.rows ?? [];
+    const visible = shownByDefault
+      ? all.filter((row) => (DEFAULT_REVIEW_LANES as readonly ReviewLane[]).includes(row.review_lane))
+      : all;
+    return sortRows(visible, sort);
+  }, [issuesQuery.data, sort, shownByDefault]);
+  // The note over the table: in the default view, when it holds an issue
+  // type a person must judge or one kept for information.
+  const needsNote =
+    shownByDefault &&
+    rows.some((row) => !(SUREST_REVIEW_LANES as readonly ReviewLane[]).includes(row.review_lane));
   // The pager sits in the bar over the table, so the rows are paged here,
   // before the table is drawn, and the bar shows even when no row matches.
   // A new filter, search or sort starts over at page 1; the key is built
@@ -203,7 +226,8 @@ export default function IssuesRoute() {
       site={siteLabel(scan.seed_url)}
       pageCount={scan.page_count}
       issueGroups={data.total_unfiltered}
-      shownIssueGroups={hasFilter ? rows.length : undefined}
+      // Also when only the default view holds rows back: the export has them.
+      shownIssueGroups={rows.length < data.total_unfiltered ? rows.length : undefined}
     />
   );
   // The button that was pressed goes away with the column sort, so focus
@@ -212,6 +236,16 @@ export default function IssuesRoute() {
     onSort(null);
     region.current?.focus();
   };
+  // Narrows to the surest values, so the URL says exactly what is shown and
+  // "Clear filters" is the way back. The button goes away with the note, so
+  // focus moves to the table it just narrowed (SC 2.4.3 Focus Order, Level A).
+  const showSurest = () => {
+    setParam("type", SUREST_REVIEW_LANES.join(","));
+    region.current?.focus();
+  };
+  // ``default_view_counts`` is absent from a response cached before the
+  // field existed; the totals then stand in until the next fetch.
+  const defaultCounts = data.default_view_counts;
 
   return (
     <>
@@ -236,8 +270,10 @@ export default function IssuesRoute() {
       {isComplete && (
         <ReportSummary
           scan={scan}
-          issueGroups={data.total_unfiltered}
-          occurrences={data.occurrence_counts.all_evidence}
+          issueGroups={defaultCounts?.issue_types ?? data.total_unfiltered}
+          occurrences={defaultCounts?.occurrences ?? data.occurrence_counts.all_evidence}
+          hiddenIssueGroups={defaultCounts?.hidden_issue_types ?? 0}
+          hiddenOccurrences={defaultCounts?.hidden_occurrences ?? 0}
         />
       )}
 
@@ -330,6 +366,7 @@ export default function IssuesRoute() {
             {sort && `${describeSort(sort)}.`}
           </TableStatus>
         )}
+        {needsNote && <AllIssuesNote rows={rows} narrowed={hasFilter} onShowSurest={showSurest} />}
         {rows.length === 0 ? (
           <TableEmpty>
             {hasFilter
@@ -420,6 +457,10 @@ function IssueToolbar({
       label: COLUMN_LABEL.Type,
       value: lane,
       multiple: true,
+      // What nothing checked means in this one group (see ``shownByDefault``
+      // in the route). In words, in the group itself, so the menu and the
+      // table never disagree silently.
+      hint: "With nothing checked, the table shows every issue type.",
       options: [
         ...REVIEW_LANES.map((key) => ({
           value: key,
@@ -623,7 +664,7 @@ function describeSort(sort: SortState): string {
   return `Sorted by ${COLUMN_LABEL[sort.column]}, ${sortWords(SORT_KINDS[sort.column], sort.direction)}`;
 }
 
-const LANE_RANK: Record<ReviewLane, number> = { likely_barrier: 0, expert_review: 1, informational: 2 };
+const LANE_RANK: Record<ReviewLane, number> = { likely_barrier: 0, measured: 1, expert_review: 2, informational: 3 };
 
 /**
  * Finding types in table order, the first type leading: a WCAG row, then a
@@ -939,6 +980,67 @@ const IssueTableRow = memo(function IssueTableRow({
     </Row>
   );
 });
+
+/**
+ * The line over the table that says the table shows every issue type,
+ * counts each "How sure" value, says what Not sure and For information mean,
+ * and has one button that narrows the table to the surest.
+ *
+ * It sits inside the table's card, right over the rows it speaks about and
+ * after the Filter menu in reading and Tab order, because it is about what
+ * the table shows (W3C COGA, "Making Content Usable",
+ * https://www.w3.org/TR/coga-usable/: keep related things together).
+ * Rejected: a line in the page header, far from the table; and no line at
+ * all, which would leave Not sure and For information rows looking like
+ * confirmed problems (AGENTS.md, Interface language rule 4).
+ *
+ * A ``role="note"`` paragraph like the other report notes, not an alert:
+ * nothing went wrong. The counts are words and numbers, never colour alone
+ * (SC 1.4.1 Use of Color, Level A). The button names what it shows (rule 8)
+ * and is the shared ``Button``, a full 44px target (SC 2.5.5 Target Size
+ * (Enhanced), Level AAA). It wraps under the text at 320px (SC 1.4.10
+ * Reflow, Level AA).
+ */
+function AllIssuesNote({
+  rows,
+  narrowed,
+  onShowSurest,
+}: {
+  rows: IssueRow[];
+  /** Search, Level or Where it shows has narrowed the rows. */
+  narrowed: boolean;
+  onShowSurest: () => void;
+}) {
+  const counts = REVIEW_LANES.map((key) => ({ key, count: rows.filter((row) => row.review_lane === key).length })).filter(
+    (entry) => entry.count > 0,
+  );
+  const has = (key: ReviewLane) => counts.some((entry) => entry.key === key);
+  return (
+    <div
+      role="note"
+      aria-label="Issue types shown"
+      className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-border bg-surface-muted px-4 py-2 text-sm text-fg"
+    >
+      <p className="max-w-measure">
+        {/* With another filter on, the rows are not the whole report, so the
+            heading says so rather than claim "every" (AGENTS.md, Interface
+            language rule 5: text matches what the table shows). */}
+        <span className="font-semibold">
+          {narrowed ? "Showing every issue type that matches your filters" : "Showing every issue type"}
+        </span>
+        {": "}
+        {counts.map((entry) => `${REVIEW_TYPE_LABEL[entry.key]} ${entry.count.toLocaleString()}`).join(", ")}.
+        {/* One sentence per value that needs one, because the two differ and
+            the text must match the rows (AGENTS.md, Interface language rule 5). */}
+        {has("expert_review") && ` A person must check a ${REVIEW_TYPE_LABEL.expert_review} issue type before you report it.`}
+        {has("informational") && ` A ${REVIEW_TYPE_LABEL.informational} issue type is not a problem to fix.`}
+      </p>
+      <Button type="button" variant="secondary" onClick={onShowSurest}>
+        Show only {SUREST_REVIEW_LANES.map((key) => REVIEW_TYPE_LABEL[key]).join(" and ")}
+      </Button>
+    </div>
+  );
+}
 
 /**
  * A row's type as the table shows it; the glossary reuses it so the two match.

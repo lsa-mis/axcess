@@ -2,6 +2,7 @@ import { Link, useLocation, useNavigate } from "react-router";
 import {
   Info,
   LayoutDashboard,
+  ListChecks,
   Menu,
   MessageSquarePlus,
   PanelLeftClose,
@@ -428,7 +429,7 @@ function FeedbackAction({ collapsed }: { collapsed: boolean }) {
 }
 
 /**
- * About and Settings are places, but reference ones: they sit at the foot of
+ * Coverage, About and Settings are places, but reference ones: they sit at the foot of
  * the sidebar with feedback rather than among the working sections, so the
  * nav above stays the places the work happens.
  *
@@ -440,6 +441,10 @@ function FeedbackAction({ collapsed }: { collapsed: boolean }) {
  * fixed foot group gives.
  */
 const FOOT_PLACES = [
+  // Coverage is a reference place too: what Axcess can check and what it has
+  // found, not a place where a report is worked on. One entry serves both of
+  // its parts (routes/Coverage.tsx); it is current on either of them.
+  { to: "/coverage", label: "Coverage", name: "Coverage", icon: ListChecks },
   { to: "/about", label: "About", name: "About Axcess", icon: Info },
   { to: "/settings", label: "Settings", name: "Settings", icon: Settings },
 ] as const;
@@ -601,7 +606,7 @@ function Sidebar({
       <div className={cn("space-y-1 border-t border-border py-3", collapsed ? "px-2" : "px-3")}>
         <FeedbackAction collapsed={collapsed} />
         {FOOT_PLACES.map((place) => (
-          <FootLink key={place.to} place={place} collapsed={collapsed} active={pathname === place.to} />
+          <FootLink key={place.to} place={place} collapsed={collapsed} active={pathname === place.to || pathname.startsWith(`${place.to}/`)} />
         ))}
       </div>
     </aside>
@@ -805,7 +810,7 @@ function MobileNav({ pathname, onSearch }: { pathname: string; onSearch: () => v
       <div className="mt-3 space-y-1 border-t border-border pt-3">
         <FeedbackAction collapsed={false} />
         {FOOT_PLACES.map((place) => (
-          <FootLink key={place.to} place={place} collapsed={false} active={pathname === place.to} />
+          <FootLink key={place.to} place={place} collapsed={false} active={pathname === place.to || pathname.startsWith(`${place.to}/`)} />
         ))}
       </div>
     </div>
@@ -832,6 +837,7 @@ function routeTitle(pathname: string): string {
     [/^\/scans\/\d+\/issues\/[^/]+\/pages\/?$/, "Pages with this issue type"],
     [/^\/scans\/\d+\/issues\/[^/]+\/?$/, "Issue evidence"],
     [/^\/scans\/\d+\/issues\/?$/, "Accessibility issues"],
+    [/^\/scans\/\d+\/images\/?$/, "Images and alt text"],
     [/^\/scans\/\d+\/findings\/grouped\/?$/, "Images, grouped by issue type"],
     [/^\/scans\/\d+\/findings\/?$/, "Images"],
     [/^\/scans\/\d+\/a11y\/by-rule\/?$/, "Rule check issues by rule"],
@@ -843,6 +849,8 @@ function routeTitle(pathname: string): string {
     [/^\/scans\/\d+\/?$/, "Scan status"],
     [/^\/findings\/\d+\/?$/, "Image details"],
     [/^\/tracking\/?$/, "Product roadmap"],
+    [/^\/coverage\/?$/, "What Axcess checks"],
+    [/^\/coverage\/found\/?$/, "What Axcess found"],
     [/^\/about\/?$/, "About"],
     [/^\/settings\/?$/, "Settings"],
     [/^\/settings\/ai\/?$/, "AI features"],

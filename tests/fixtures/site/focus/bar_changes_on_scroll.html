@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Focus: a bar that turns solid when the page scrolls</title>
+  <style>
+    /* A very common header: clear at the top of the page, solid once the
+       page has scrolled (the script below adds a class past 40px), with a
+       300ms fade between the two. The page sets no scroll-padding.
+
+       What a keyboard user gets:
+         - #hero-link sits under the bar at the very top of the page, where
+           the bar is clear. Focus on it can be seen through the bar, so it
+           is NOT an SC 2.4.11 failure.
+         - Further down the bar is solid. Moving backward with Shift+Tab,
+           some links land wholly behind it: those ARE failures.
+
+       A check that does not let the page's script run sees the bar as it
+       was when the check began. Begun at the top, it misses every hidden
+       link. Begun on a scrolled page, it reports #hero-link in error. The
+       test presses the real keys to get the expected answer.
+
+       Geometry, at 1440x900: links 24px tall, one every 40px, link i
+       starting at 200 + 40i. */
+    body { margin: 0; font-family: sans-serif; }
+    #bar {
+      position: fixed; top: 0; left: 0; right: 0; height: 80px;
+      box-sizing: border-box; z-index: 10;
+      background-color: rgba(0, 63, 117, 0);
+      transition: background-color 300ms;
+    }
+    #bar.scrolled { background-color: rgb(0, 63, 117); }
+    #bar a { color: #111; line-height: 80px; margin-left: 24px; }
+    #bar.scrolled a { color: #fff; }
+    #hero-link {
+      position: absolute; top: 30px; left: 400px; height: 24px; line-height: 24px;
+      color: #111;
+    }
+    main { padding: 200px 24px 80px; }
+    a.row {
+      display: block; width: 240px; height: 24px; line-height: 24px;
+      margin: 0 0 16px; color: #111;
+    }
+  </style>
+</head>
+<body>
+  <div id="bar"><a id="bar-home" href="#home">Home</a></div>
+  <a id="hero-link" href="#hero">Read the story</a>
+  <main>
+    <a class="row" id="link-00" href="#item-00">Item 00</a>
+    <a class="row" id="link-01" href="#item-01">Item 01</a>
+    <a class="row" id="link-02" href="#item-02">Item 02</a>
+    <a class="row" id="link-03" href="#item-03">Item 03</a>
+    <a class="row" id="link-04" href="#item-04">Item 04</a>
+    <a class="row" id="link-05" href="#item-05">Item 05</a>
+    <a class="row" id="link-06" href="#item-06">Item 06</a>
+    <a class="row" id="link-07" href="#item-07">Item 07</a>
+    <a class="row" id="link-08" href="#item-08">Item 08</a>
+    <a class="row" id="link-09" href="#item-09">Item 09</a>
+    <a class="row" id="link-10" href="#item-10">Item 10</a>
+    <a class="row" id="link-11" href="#item-11">Item 11</a>
+    <a class="row" id="link-12" href="#item-12">Item 12</a>
+    <a class="row" id="link-13" href="#item-13">Item 13</a>
+    <a class="row" id="link-14" href="#item-14">Item 14</a>
+    <a class="row" id="link-15" href="#item-15">Item 15</a>
+    <a class="row" id="link-16" href="#item-16">Item 16</a>
+    <a class="row" id="link-17" href="#item-17">Item 17</a>
+    <a class="row" id="link-18" href="#item-18">Item 18</a>
+    <a class="row" id="link-19" href="#item-19">Item 19</a>
+    <a class="row" id="link-20" href="#item-20">Item 20</a>
+    <a class="row" id="link-21" href="#item-21">Item 21</a>
+    <a class="row" id="link-22" href="#item-22">Item 22</a>
+    <a class="row" id="link-23" href="#item-23">Item 23</a>
+    <a class="row" id="link-24" href="#item-24">Item 24</a>
+    <a class="row" id="link-25" href="#item-25">Item 25</a>
+    <a class="row" id="link-26" href="#item-26">Item 26</a>
+    <a class="row" id="link-27" href="#item-27">Item 27</a>
+    <a class="row" id="link-28" href="#item-28">Item 28</a>
+    <a class="row" id="link-29" href="#item-29">Item 29</a>
+    <a class="row" id="link-30" href="#item-30">Item 30</a>
+    <a class="row" id="link-31" href="#item-31">Item 31</a>
+    <a class="row" id="link-32" href="#item-32">Item 32</a>
+    <a class="row" id="link-33" href="#item-33">Item 33</a>
+    <a class="row" id="link-34" href="#item-34">Item 34</a>
+    <a class="row" id="link-35" href="#item-35">Item 35</a>
+    <a class="row" id="link-36" href="#item-36">Item 36</a>
+    <a class="row" id="link-37" href="#item-37">Item 37</a>
+    <a class="row" id="link-38" href="#item-38">Item 38</a>
+    <a class="row" id="link-39" href="#item-39">Item 39</a>
+    <a class="row" id="link-40" href="#item-40">Item 40</a>
+    <a class="row" id="link-41" href="#item-41">Item 41</a>
+    <a class="row" id="link-42" href="#item-42">Item 42</a>
+    <a class="row" id="link-43" href="#item-43">Item 43</a>
+    <a class="row" id="link-44" href="#item-44">Item 44</a>
+    <a class="row" id="link-45" href="#item-45">Item 45</a>
+    <a class="row" id="link-46" href="#item-46">Item 46</a>
+    <a class="row" id="link-47" href="#item-47">Item 47</a>
+    <a class="row" id="link-48" href="#item-48">Item 48</a>
+    <a class="row" id="link-49" href="#item-49">Item 49</a>
+    <a class="row" id="link-50" href="#item-50">Item 50</a>
+    <a class="row" id="link-51" href="#item-51">Item 51</a>
+    <a class="row" id="link-52" href="#item-52">Item 52</a>
+    <a class="row" id="link-53" href="#item-53">Item 53</a>
+    <a class="row" id="link-54" href="#item-54">Item 54</a>
+    <a class="row" id="link-55" href="#item-55">Item 55</a>
+    <a class="row" id="link-56" href="#item-56">Item 56</a>
+    <a class="row" id="link-57" href="#item-57">Item 57</a>
+    <a class="row" id="link-58" href="#item-58">Item 58</a>
+    <a class="row" id="link-59" href="#item-59">Item 59</a>
+  </main>
+  <script>
+    const bar = document.getElementById('bar');
+    const update = () => bar.classList.toggle('scrolled', window.scrollY > 40);
+    window.addEventListener('scroll', update, { passive: true });
+    update();
+  </script>
+</body>
+</html>

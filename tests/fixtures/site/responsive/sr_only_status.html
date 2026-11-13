@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Screen-reader-only text fixture (no clipping failure)</title>
+  <style>
+    /* False-positive guard for SC 1.4.4 and SC 1.4.12. Modelled on a real
+       page where the old check reported a status line for screen readers
+       as "content 262px in a 1px box".
+
+       Every piece of hidden text below is hidden on purpose and paints no
+       pixel at any window size or text spacing, so there is no visible text
+       to cut off. The page must produce ZERO findings. */
+    body { margin: 0; font-family: sans-serif; }
+    main { padding: 1rem; max-width: 100%; }
+    p { max-width: 60ch; }
+    /* The standard visually-hidden pattern (Tailwind and Bootstrap call it
+       .sr-only): the text is there for screen readers and paints no pixel. */
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap;
+      border-width: 0;
+    }
+    /* The same pattern with clip-path in place of the older clip. */
+    .visually-hidden {
+      position: absolute; width: 1px; height: 1px; margin: -1px;
+      overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+    }
+    /* An older variant: a 1px box moved off the left edge, with no clip. */
+    .offscreen {
+      position: absolute; left: -10000px; top: auto; width: 1px; height: 1px;
+      overflow: hidden; white-space: nowrap;
+    }
+    /* A closed panel: its text is put away until someone opens it. */
+    .closed-panel { height: 0; overflow: hidden; }
+    /* Text that fades in later; nothing shows while opacity is 0. */
+    .faded-out { opacity: 0; width: 80px; overflow: hidden; white-space: nowrap; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Projects</h1>
+    <button type="button">Web Development</button>
+    <!-- The element from the real page: a live region that tells screen
+         reader users what the filter button did. -->
+    <div class="sr-only" role="status" aria-live="polite">Showing Web Development projects</div>
+    <span class="visually-hidden">Opens in a new window, so your place here is kept</span>
+    <span class="offscreen">Skip the list of projects and go to the page footer</span>
+    <div class="closed-panel">These details stay put away until the reader opens this panel.</div>
+    <div class="faded-out">This line is not shown until it fades in later on.</div>
+    <p>Everything a sighted reader can see on this page wraps normally.</p>
+  </main>
+</body>
+</html>

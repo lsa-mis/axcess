@@ -65,10 +65,13 @@ _LAYER_PIPELINES: dict[DetectionLayer, frozenset[str]] = {
     DetectionLayer.SEMANTIC: frozenset({"semantic"}),
 }
 # Browser probes are repeatable observations, but their heuristics do not see
-# the complete interaction state or assistive-technology behavior.  Keep them
-# in the same expert-confirmation lane as model-assisted evidence.  This must
-# stay aligned with ``audit.web.issues`` so a benchmark cannot bless stronger
-# report language than the product actually permits.
+# the complete interaction state or assistive-technology behavior.  A report
+# states them only once a person has confirmed them, as it does model-assisted
+# evidence.  ``audit.web.issues`` shows the measured ones by default under
+# their own "Measured" level, which changes what the Issues page lists, not
+# what a report may claim: export readiness and the report cards still wait
+# for a person.  This must stay aligned with ``audit.web.issues`` so a
+# benchmark cannot bless stronger report language than the product permits.
 _REVIEW_ONLY_LAYERS = frozenset(
     {DetectionLayer.BEHAVIORAL, DetectionLayer.OCR_VLM, DetectionLayer.SEMANTIC}
 )

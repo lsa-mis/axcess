@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Focus: see-through bar (no SC 2.4.11 failure)</title></head>
+<body style="margin:0;">
+  <!-- A bar that stays in place but is half see-through. The link under it
+       can still be seen through the bar, so it is not "entirely hidden" and
+       must NOT be reported as SC 2.4.11. (Whether its focus ring has enough
+       contrast there is SC 1.4.11 Non-text Contrast, for a person to judge.) -->
+  <header style="position:fixed;top:0;left:0;width:100%;height:120px;background:rgba(0,63,117,0.5);z-index:1000;"></header>
+  <a href="#under" id="under-glass" style="position:absolute;top:40px;left:20px;">Under a see-through bar</a>
+</body>
+</html>

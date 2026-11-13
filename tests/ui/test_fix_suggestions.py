@@ -619,6 +619,10 @@ def test_migration_rolls_back(tmp_path: Path) -> None:
         conn.close()
 
 
+# Starts Chromium inside AxeFragmentVerifier, which the module scan in
+# tests/conftest.py cannot see, so it is marked here: CI's job without a
+# browser leaves it out, and the browser job runs it.
+@pytest.mark.browser
 async def test_real_offline_axe_check() -> None:
     from audit.suggest.verify import AxeFragmentVerifier
 

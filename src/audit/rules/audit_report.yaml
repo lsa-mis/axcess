@@ -254,11 +254,11 @@ axe_rules:
         watch_out: >-
           The id must exist and be unique on the page. If two elements share
           the id, the link can get the wrong name.
+    screen_reader_check: links
     verify_manual: >-
-      Turn on a screen reader and open its list of links (VoiceOver:
-      Control+Option+U, then choose Links; NVDA: Insert+F7). Every link should
-      have a name that says where it goes. Then press Tab to each fixed link
-      and listen to what the screen reader says.
+      Open the list of links with a screen reader (steps for Mac and Windows
+      are below). Every link should have a name that says where it goes. Then
+      press Tab to each fixed link and listen to what the screen reader says.
     verify_automated: "Scan again and see if this link is still found."
     acceptance: >-
       Every link on the affected pages has a name a screen reader can read,
@@ -684,12 +684,11 @@ axe_rules:
           Prefer the native elements. A role on the wrong container, such as
           one that wraps both the menu and the content, misleads more than no
           role at all.
+    screen_reader_check: landmarks
     verify_manual: >-
-      Open the landmark list in a screen reader (VoiceOver on Mac:
-      Control+Option+U, then choose Landmarks; NVDA on Windows: Insert+F7,
-      then choose Landmarks). Every part of the page you can see should belong
-      to one of the listed regions. In NVDA you can also press D to jump from
-      landmark to landmark.
+      Open the list of landmarks with a screen reader (steps for Mac and
+      Windows are below). Every part of the page you can see should belong to
+      one of the listed landmarks.
     verify_automated: >-
       Scan again and see if content outside a landmark is still found on this
       page.
@@ -751,10 +750,10 @@ axe_rules:
           the page still fails. Moving a view off screen with CSS hides it
           only from sight, not from screen readers. Check what the browser
           passes to screen readers (accessibility tree), not just the screen.
+    screen_reader_check: landmarks
     verify_manual: >-
-      Open the landmark list in a screen reader (VoiceOver on Mac:
-      Control+Option+U, then choose Landmarks; NVDA on Windows: Insert+F7,
-      then choose Landmarks). There should be exactly one main region, and it
+      Open the list of landmarks with a screen reader (steps for Mac and
+      Windows are below). There should be exactly one main landmark, and it
       should hold the page's own content.
     verify_automated: "Scan again and see if this page is still found."
     acceptance: >-
@@ -817,10 +816,10 @@ axe_rules:
           Heading tags bring their own margins and font sizes, which can
           override your component library's spacing. Check the layout after
           the change.
+    screen_reader_check: headings
     verify_manual: >-
-      Open the heading list in a screen reader (VoiceOver on Mac:
-      Control+Option+U, then choose Headings; NVDA on Windows: Insert+F7, then
-      choose Headings). There should be one level 1 heading that names the
+      Open the list of headings with a screen reader (steps for Mac and
+      Windows are below). There should be one level 1 heading that names the
       page, and the levels below it should step down without gaps. Everything
       that looks like a heading should be in the list.
     verify_automated: "Scan again and see if this page is still found."
@@ -894,11 +893,11 @@ axe_rules:
           Levels show how sections nest, not how big the text is. Pick the
           level the structure needs, then change the look with CSS. Do not
           pick a level for its font size.
+    screen_reader_check: headings
     verify_manual: >-
-      Open the heading list in a screen reader (VoiceOver on Mac:
-      Control+Option+U, then choose Headings; NVDA on Windows: Insert+F7, then
-      choose Headings). The list should read like a table of contents, with no
-      level skipped on the way down.
+      Open the list of headings with a screen reader (steps for Mac and
+      Windows are below). The list should read like a table of contents, with
+      no level skipped on the way down.
     verify_automated: "Scan again and see if this heading is still found."
     acceptance: >-
       Every heading on the affected pages is at most one level deeper than the
@@ -4009,11 +4008,11 @@ axe_rules:
           Equivalent means the same key content. Two "Contact us" links that
           lead to pages with different contact details still need different
           names.
+    screen_reader_check: links
     verify_manual: >-
-      Open the list of links in a screen reader (VoiceOver on Mac: VO+U, then
-      Links; NVDA on Windows: Insert+F7, then Links). Each link name should
-      say where it goes without the text around it. Links with the same name
-      should lead to the same content.
+      Open the list of links with a screen reader (steps for Mac and Windows
+      are below). Each link name should say where it goes without the text
+      around it. Links with the same name should lead to the same content.
     verify_automated: >-
       Scan again at Level AAA and see if links with the same name and
       different addresses are still found.
@@ -4340,12 +4339,12 @@ axe_rules:
           Keep one banner for the real site header. If every banner role is
           removed, screen reader users lose their quick way to the site
           header.
+    screen_reader_check: landmarks
     verify_manual: >-
       In developer tools, none of the banner's parent elements should be
-      another landmark, such as a menu, the footer or a named section. In a
-      screen reader's landmark list (VoiceOver on Mac: VO+U, then Landmarks;
-      NVDA on Windows: Insert+F7, then Landmarks), one banner should hold the
-      site header.
+      another landmark, such as a menu, the footer or a named section. Then
+      open the list of landmarks with a screen reader (steps for Mac and
+      Windows are below): one banner should hold the site header.
     verify_automated: >-
       Scan again and see if a banner inside another landmark is still found.
     acceptance: >-
@@ -4418,12 +4417,12 @@ axe_rules:
         watch_out: >-
           It disappears from the screen reader's landmark list. Without a
           heading, screen reader users lose their quick way to reach it.
+    screen_reader_check: landmarks
     verify_manual: >-
       In developer tools, the only landmark among its parent elements should
-      be the main content, or none. Check you can reach it from a screen
-      reader's landmark list (VoiceOver on Mac: VO+U, then Landmarks; NVDA on
-      Windows: Insert+F7, then Landmarks). If you made it plain content, find
-      it by its heading instead.
+      be the main content, or none. Then open the list of landmarks with a
+      screen reader (steps for Mac and Windows are below) and check you can
+      reach it. If you made it plain content, find it by its heading instead.
     verify_automated: >-
       Scan again and see if side content inside another landmark is still
       found.
@@ -4499,13 +4498,14 @@ axe_rules:
           Keep one site footer region for the real site-wide footer. If you
           strip the role from every footer and the site footer sits inside
           <main>, screen reader users lose the jump to it.
+    screen_reader_check: landmarks
     verify_manual: >-
-      Use a screen reader to move through the page regions (NVDA: press D;
-      VoiceOver on Mac: press VO+U, then choose Landmarks). The site footer
-      should be its own region, not part of main or another region. You can
-      also open the page structure a screen reader uses (accessibility tree)
-      in the browser. There, the contentinfo item should not sit inside main,
-      navigation, banner, region or any other landmark.
+      Open the list of landmarks with a screen reader (steps for Mac and
+      Windows are below). The site footer should be its own landmark, not part
+      of main or another landmark. You can also open the page structure a
+      screen reader uses (accessibility tree) in the browser. There, the
+      contentinfo item should not sit inside main, navigation, banner, region
+      or any other landmark.
     verify_automated: >-
       Scan again and see if a site footer inside another page region is still
       found.
@@ -4565,12 +4565,13 @@ axe_rules:
         watch_out: >-
           If that wrapper is a region people need, such as a search area, keep
           its role. Move the main content out of it instead.
+    screen_reader_check: landmarks
     verify_manual: >-
       In developer tools, none of the main element's parent elements should be
-      a landmark, such as the site header, a menu or a named section. In a
-      screen reader's landmark list (VoiceOver on Mac: VO+U, then Landmarks;
-      NVDA on Windows: Insert+F7, then Landmarks), choose the main landmark.
-      It should take you to the start of the main content.
+      a landmark, such as the site header, a menu or a named section. Then
+      open the list of landmarks with a screen reader (steps for Mac and
+      Windows are below) and choose the main landmark. It should take you to
+      the start of the main content.
     verify_automated: >-
       Scan again and see if a main content region inside another landmark is
       still found.
@@ -4640,12 +4641,12 @@ axe_rules:
           still leaves it for screen readers. Adding aria-hidden="true" to a
           header with links in it hides it from screen readers, but people can
           still reach those links by keyboard.
+    screen_reader_check: landmarks
     verify_manual: >-
-      Use a screen reader to move through the page regions (NVDA: press D;
-      VoiceOver on Mac: press VO+U, then choose Landmarks). The page should
-      have only one site header region (banner), and it should be the real
-      site header. If the site swaps headers, check at phone and desktop
-      widths.
+      Open the list of landmarks with a screen reader (steps for Mac and
+      Windows are below). The page should have only one site header landmark
+      (banner), and it should be the real site header. If the site swaps
+      headers, check at phone and desktop widths.
     verify_automated: >-
       Scan again and see if more than one site header region is still found.
     acceptance: >-
@@ -4713,12 +4714,12 @@ axe_rules:
           still leaves it for screen readers. Adding aria-hidden="true" to a
           footer with links in it hides it from screen readers, but people can
           still reach those links by keyboard.
+    screen_reader_check: landmarks
     verify_manual: >-
-      Use a screen reader to move through the page regions (NVDA: press D;
-      VoiceOver on Mac: press VO+U, then choose Landmarks). The page should
-      have only one site footer region (contentinfo), and it should be the
-      real site footer. If the site swaps footers, check at phone and desktop
-      widths.
+      Open the list of landmarks with a screen reader (steps for Mac and
+      Windows are below). The page should have only one site footer landmark
+      (contentinfo), and it should be the real site footer. If the site swaps
+      footers, check at phone and desktop widths.
     verify_automated: >-
       Scan again and see if more than one site footer region is still found.
     acceptance: >-
@@ -4776,12 +4777,12 @@ axe_rules:
           Moving a view off screen or making it see-through (opacity 0) does
           not hide it from screen readers. It still counts as a second main
           region. Use the hidden attribute instead.
+    screen_reader_check: landmarks
     verify_manual: >-
-      Open the list of landmarks (page regions) in a screen reader (VoiceOver
-      on Mac: VO+U, then Landmarks; NVDA on Windows: Insert+F7, then
-      Landmarks). It should show exactly one main landmark, and choosing it
-      should take you to the page's primary content. Check this on each view
-      of a single-page app.
+      Open the list of landmarks with a screen reader (steps for Mac and
+      Windows are below). It should show exactly one main landmark, and
+      choosing it should take you to the page's primary content. Check this on
+      each view of a single-page app.
     verify_automated: >-
       Scan again and see if more than one main content region is still found.
     acceptance: >-
@@ -4855,10 +4856,11 @@ axe_rules:
           Do not strip headers and footers from cards and sections. A header
           or footer inside an article, section, aside, menu or the main
           content is not a landmark. The rule check does not count it.
+    screen_reader_check: landmarks
     verify_manual: >-
-      Open a screen reader's landmark list (VoiceOver on Mac: VO+U, then
-      Landmarks; NVDA on Windows: Insert+F7, then Landmarks). Each entry's
-      type and name should be its own and say what the region holds.
+      Open the list of landmarks with a screen reader (steps for Mac and
+      Windows are below). Each landmark's type and name should be its own and
+      say what the landmark holds.
     verify_automated: >-
       Scan again and see if landmarks with the same type and name are still
       found.
@@ -8398,12 +8400,12 @@ semantic_criteria:
           This name replaces the visible text for screen readers. It must
           include the visible words, or people who use voice control cannot
           say the link's name to click it (WCAG 2.5.3 Label in Name).
+    screen_reader_check: links
     verify_manual: >-
-      Open the list of links in a screen reader (VoiceOver: VO+U, then Links;
-      NVDA: Insert+F7). For a link that is unclear on its own, read its
-      sentence, paragraph, list item or table cell, and the heading before it.
-      Each link should make clear where it goes, from its text or from that
-      context.
+      Open the list of links with a screen reader (steps for Mac and Windows
+      are below). For a link that is unclear on its own, read its sentence,
+      paragraph, list item or table cell, and the heading before it. Each link
+      should make clear where it goes, from its text or from that context.
     verify_automated: >-
       Scan again with AI review of wording turned on, and see if the link is
       still found.
@@ -9127,11 +9129,12 @@ semantic_criteria:
         watch_out: >-
           A heading that fits one page may not fit another. If the heading
           text comes from a field, check what each page fills in.
+    screen_reader_check: headings
     verify_manual: >-
       Read each flagged heading on the live page with the section below it.
       Mark the occurrence "Not a problem (false positive)" if the heading
-      predicts the section, even if it is short. Open the list of headings in
-      a screen reader (VoiceOver: VO+U, then Headings; NVDA: Insert+F7) and
+      predicts the section, even if it is short. Then open the list of
+      headings with a screen reader (steps for Mac and Windows are below) and
       check that each heading makes sense on its own.
     verify_automated: >-
       Scan again with AI review of wording turned on, and see if this heading
@@ -9902,11 +9905,12 @@ alfa_rules:
         watch_out: >-
           Check that the link you remove is not the only way to reach that
           place with a keyboard.
+    screen_reader_check: links
     verify_manual: >-
-      Press Tab to each affected link with a screen reader on (VoiceOver:
-      Cmd+F5 on macOS; NVDA on Windows). It should read a name that says where
-      the link goes, not just "link" or a web address. You can also open the
-      screen reader's list of links and check that no entry is blank.
+      Turn on a screen reader and press Tab to each affected link. It should
+      read a name that says where the link goes, not just "link" or a web
+      address. Then open the list of links (steps for Mac and Windows are
+      below) and check that no entry is blank.
     verify_automated: >-
       Scan again with Alfa or Both as the rule check tool, and see if this
       link is still found.
@@ -10968,12 +10972,13 @@ alfa_rules:
           Small differences, such as a #section or a tracking code, do not
           break WCAG if the content is the same. They do make the rule check
           mark the links Not sure again.
+    screen_reader_check: links
     verify_manual: >-
-      Open the screen reader's list of links, such as the NVDA Elements List
-      (Insert+F7) or the VoiceOver Rotor. Each name should say where the link
-      goes. Where links share a name, follow each one: if they lead to the
-      same content, it is not a problem; if not, it is. The next scan lists
-      the set again while the links' addresses differ.
+      Open the list of links with a screen reader (steps for Mac and Windows
+      are below). Each name should say where the link goes. Where links share
+      a name, follow each one: if they lead to the same content, it is not a
+      problem; if not, it is. The next scan lists the set again while the
+      links' addresses differ.
     verify_automated: >-
       Scan again at Level AAA, with Alfa or Both as the rule check tool, and
       see if this set of links is still found.
@@ -11654,12 +11659,13 @@ alfa_rules:
         watch_out: >-
           role="presentation" or alt="" on that image removes its text, so the
           heading stays empty.
+    screen_reader_check: headings
     verify_manual: >-
       Inspect the heading in the browser's accessibility panel and check that
       it has a name. Some screen readers leave empty headings out of their
-      heading list, so do not rely on that list alone. Then open the heading
-      list, for example with the rotor in VoiceOver or the elements list in
-      NVDA. Check that every heading has words that describe its section.
+      heading list, so do not rely on that list alone. Then open the list of
+      headings with a screen reader (steps for Mac and Windows are below).
+      Check that every heading has words that describe its section.
     verify_automated: >-
       Scan again with Alfa or Both as the rule check tool, and see if this
       heading is still found.
@@ -13584,11 +13590,12 @@ markup_rules:
         watch_out: >-
           A real heading element is better: it works the same in every browser
           and with every screen reader.
+    screen_reader_check: headings
     verify_manual: >-
-      Open the list of headings in a screen reader (VoiceOver: VO+U, then
-      Headings; NVDA: Insert+F7). Every line that looks like a heading on the
-      page should be in the list, at a level that fits. Mark the occurrence
-      "Not a problem (false positive)" if the text does not start a section.
+      Open the list of headings with a screen reader (steps for Mac and Windows
+      are below). Every line that looks like a heading on the page should be in
+      the list, at a level that fits. Mark the occurrence "Not a problem (false
+      positive)" if the text does not start a section.
     verify_automated: >-
       Scan again with the page code check turned on, and see if this text is
       still found.

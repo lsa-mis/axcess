@@ -28,10 +28,13 @@ from audit.exports.audit_report import load_report_rules
 from ._paging import all_pages_text
 from ._seed_evidence import (
     FORM_ERROR_ISSUE_KEY,
+    LANDMARK_ISSUE_KEY,
     SCREENSHOT_ISSUE_KEY,
     add_form_error_finding,
+    add_landmark_finding,
     add_screenshot_finding,
 )
+from .conftest import ALL_HOW_SURE
 
 # One browser per module (tests/ui/conftest.py), so the tests run on the
 # module's event loop. Each ``new_page`` call still opens its own context.
@@ -185,6 +188,52 @@ async def test_tracking_page_has_no_axe_violations(
     # text labels (not colour alone) and the tables are properly headed.
     base, _ = live_server
     await _axe_clean(new_page, base, "/app/tracking")
+
+
+async def test_coverage_pages_have_no_axe_violations(
+    live_server: tuple[str, int], new_page: Any
+) -> None:
+    base, _ = live_server
+    await _axe_clean(new_page, base, "/app/coverage")
+    await _axe_clean(new_page, base, "/app/coverage?type=partial&criterion=1.4.3")
+    await _axe_clean(new_page, base, "/app/coverage/found")
+
+
+async def test_coverage_works_by_keyboard_alone(
+    live_server: tuple[str, int], new_page: Any
+) -> None:
+    """Tab reaches a filter button, Enter filters the map, and a square opens its details."""
+    base, _ = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(f"{base}/app/coverage", wait_until="networkidle")
+    partly = page.get_by_role("button", name=re.compile(r"^Show only Axcess partly checks"))
+    for _ in range(60):
+        await page.keyboard.press("Tab")
+        if await partly.evaluate("(button) => button === document.activeElement"):
+            break
+    else:
+        pytest.fail("Tab never reached the Axcess partly checks filter button")
+    await page.keyboard.press("Enter")
+    await playwright_async.expect(partly).to_have_attribute("aria-pressed", "true")
+    await playwright_async.expect(
+        page.get_by_role("status").filter(has_text="Showing 15 of 50: Axcess partly checks")
+    ).to_be_visible()
+
+    square = page.get_by_role("button", name=re.compile(r"^1\.4\.3\b.*Contrast \(Minimum\)"))
+    await square.focus()
+    await page.keyboard.press("Enter")
+    await playwright_async.expect(square).to_have_attribute("aria-pressed", "true")
+    await playwright_async.expect(
+        page.get_by_role("heading", name="1.4.3 Contrast (Minimum)")
+    ).to_be_visible()
+    # Focus stays on the square; the status line names what opened.
+    assert await square.evaluate("(button) => button === document.activeElement")
+
+    details = page.get_by_role("button", name="Details for developers")
+    await details.focus()
+    await page.keyboard.press("Enter")
+    await playwright_async.expect(details).to_have_attribute("aria-expanded", "true")
+    await playwright_async.expect(page.get_by_text("color-contrast", exact=True)).to_be_visible()
 
 
 async def test_about_page_has_no_axe_violations(
@@ -495,7 +544,8 @@ async def test_issue_table_fits_the_default_desktop_width(
     """
     base, scan_id = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
-    await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+    # Every "How sure" value shown, so the table has its widest rows.
+    await page.goto(f"{base}/app/scans/{scan_id}/issues?{ALL_HOW_SURE}", wait_until="networkidle")
     issues = page.get_by_role("table", name="Accessibility issue types")
     scroller = page.get_by_role("region", name="Issues table")
     # Who fixes it is hidden for now (HIDDEN_ISSUE_FIELDS), so Pages stands in.
@@ -579,7 +629,8 @@ async def test_informational_evidence_is_read_only_and_not_barrier_language(
             else None
         ),
     )
-    await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+    # For information rows are held back when the table opens; show them.
+    await page.goto(f"{base}/app/scans/{scan_id}/issues?{ALL_HOW_SURE}", wait_until="networkidle")
     issues = page.get_by_role("table", name="Accessibility issue types")
     logo_title = load_report_rules()["image_findings"]["logo_adequate"]["title"]
     row_link = issues.get_by_role("rowheader").get_by_role("link", name=logo_title, exact=False)
@@ -671,7 +722,7 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     ).to_be_visible()
     workspace = page.get_by_role("navigation", name="Report views")
     await playwright_async.expect(workspace.get_by_role("link")).to_have_text(
-        ["Issues", "Compare reports"]
+        ["Issues", "Images", "Compare reports"]
     )
     await playwright_async.expect(
         workspace.get_by_role("link", name="Issues", exact=True)
@@ -732,7 +783,13 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     ledger = page.get_by_role("region", name="What was checked")
     await playwright_async.expect(ledger).to_be_hidden()
     # Under the table since user testing (2026-10-28), not between it and
-    # the numbers; the summary numbers carry no line under them.
+    # the numbers. The seeded report has only Not sure and For information
+    # issue types; the table opens on every issue type (2026-11-13), so it
+    # shows both, and the note over it says what they mean.
+    note = page.get_by_role("note", name="Issue types shown")
+    await playwright_async.expect(note).to_contain_text("Showing every issue type")
+    await playwright_async.expect(summary.get_by_text("hidden", exact=False)).to_have_count(0)
+    await playwright_async.expect(note).to_contain_text("Not sure 1, For information 1")
     table_box = await page.get_by_role("region", name="Issues table").bounding_box()
     coverage_box = await coverage.bounding_box()
     assert table_box and coverage_box and coverage_box["y"] > table_box["y"], (
@@ -1038,6 +1095,8 @@ async def test_every_spa_route_has_an_accurate_document_title(
         (f"/app/scans/{scan_id}/compare/changes", "What changed"),
         ("/app/findings/1", "Image details"),
         ("/app/tracking", "Product roadmap"),
+        ("/app/coverage", "What Axcess checks"),
+        ("/app/coverage/found", "What Axcess found"),
         ("/app/about", "About"),
         ("/app/not-a-real-route", "Page not found"),
     ]
@@ -1163,6 +1222,36 @@ async def test_search_finds_every_sidebar_place(
         await page.keyboard.press("Enter")
         await playwright_async.expect(dialog).to_have_count(0)
         await playwright_async.expect(page).to_have_url(re.compile(re.escape(path) + r"$"))
+
+
+@pytest.mark.parametrize(
+    ("query", "label", "url"),
+    [
+        ("1.4.3", "1.4.3 Contrast (Minimum)", r"version=2\.1&criterion=1\.4\.3"),
+        # Only in WCAG 2.2: it opens the 2.2 map, the one that holds it.
+        ("2.5.8", "2.5.8 Target Size (Minimum)", r"version=2\.2&criterion=2\.5\.8"),
+    ],
+)
+async def test_search_opens_a_wcag_criterion_on_its_own_version(
+    live_server: tuple[str, int],
+    new_page: Any,
+    query: str,
+    label: str,
+    url: str,
+) -> None:
+    """A criterion from either WCAG version can be found with Search."""
+    base, _scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(f"{base}/app/scans", wait_until="networkidle")
+    sidebar = page.get_by_role("complementary", name="Primary")
+    await sidebar.get_by_role("button", name="Search everything (Cmd+K)", exact=True).click()
+    dialog = page.get_by_role("dialog", name="Search everything")
+    await dialog.get_by_role("textbox", name="Search").fill(query)
+    option = dialog.get_by_role("option").filter(has_text=label).first
+    await playwright_async.expect(option).to_be_visible()
+    await option.click()
+    await playwright_async.expect(page).to_have_url(re.compile(url))
+    await playwright_async.expect(page.get_by_role("heading", name=label)).to_be_visible()
 
 
 @pytest.mark.parametrize(
@@ -1635,6 +1724,68 @@ async def test_instance_screenshots_describe_the_outline_and_pass_axe(
         assert not violations, _render_violations(violations)
     finally:
         await page.context.close()
+
+
+@pytest.mark.parametrize("width", [1280, 320])
+async def test_landmark_guidance_gives_mac_and_windows_steps(
+    live_server: tuple[str, int],
+    seeded_db: tuple[Path, Path, int],
+    new_page: Any,
+    width: int,
+) -> None:
+    """A landmark issue's guidance shows numbered VoiceOver and NVDA steps.
+
+    Both computers' steps are visible at once, each under its own heading as
+    a numbered list, keys spelled out; the dialog passes axe and, at 320 px,
+    nothing in it scrolls sideways (SC 1.4.10).
+    """
+    base, scan_id = live_server
+    db_path, _, _ = seeded_db
+    add_landmark_finding(db_path, scan_id)
+    page = await new_page(viewport={"width": width, "height": 900})
+    await page.goto(
+        f"{base}/app/scans/{scan_id}/issues/{LANDMARK_ISSUE_KEY.replace(':', '%3A')}",
+        wait_until="networkidle",
+    )
+    # Keyboard only: Tab to the guidance button and open it with Enter.
+    guidance = page.get_by_role("button", name="Issue guidance", exact=True)
+    await guidance.focus()
+    await page.keyboard.press("Enter")
+    dialog = page.get_by_role("dialog", name="Issue guidance")
+    await playwright_async.expect(dialog).to_be_visible()
+    await playwright_async.expect(
+        dialog.get_by_role("heading", name="Check the landmarks with a screen reader")
+    ).to_be_visible()
+    mac = dialog.get_by_role("region", name="Mac, with VoiceOver")
+    windows = dialog.get_by_role("region", name="Windows, with NVDA")
+    await playwright_async.expect(mac.get_by_role("listitem")).to_have_count(5)
+    await playwright_async.expect(windows.get_by_role("listitem")).to_have_count(5)
+    await playwright_async.expect(mac.get_by_role("listitem").first).to_contain_text(
+        "Turn VoiceOver on: press Command + F5."
+    )
+    await playwright_async.expect(mac.get_by_role("listitem").nth(2)).to_contain_text(
+        'Press Right Arrow until you hear "Landmarks".'
+    )
+    await playwright_async.expect(windows.get_by_role("listitem").nth(1)).to_contain_text(
+        "press NVDA key + F7"
+    )
+    await playwright_async.expect(
+        windows.get_by_role(
+            "link", name=re.compile(r"^Get NVDA from NV Access\s*, opens in a new tab$")
+        )
+    ).to_have_attribute("href", "https://www.nvaccess.org/download/")
+    # No raw {Key} markup reaches the screen.
+    assert "{" not in await dialog.inner_text()
+    violations = await _run_axe(page)
+    assert not violations, _render_violations(violations)
+    if width == 320:
+        overflow = await dialog.evaluate(
+            "el => [...el.querySelectorAll('section')].filter("
+            "s => s.scrollWidth > s.clientWidth + 1).length"
+        )
+        assert overflow == 0
+    await page.keyboard.press("Escape")
+    await playwright_async.expect(guidance).to_be_focused()
 
 
 async def test_pages_visited_list_says_which_pages_failed_and_passes_axe(

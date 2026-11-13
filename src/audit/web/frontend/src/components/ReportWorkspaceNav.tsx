@@ -3,7 +3,8 @@ import Tabs from "./Tabs";
 import { FRAMED } from "../lib/framed";
 
 /**
- * Report navigation: the issue table, and Compare reports, which shows this
+ * Report navigation: the issue table, the Images tab (every image and its
+ * alt text), and Compare reports, which shows this
  * report and another of the site side by side. (What changed between the
  * two, the older comparison page, opens from Compare reports and keeps this
  * tab lit: it is part of that view.)
@@ -51,6 +52,15 @@ export const REPORT_VIEWS: readonly ReportView[] = [
     segment: "issues",
     path: (scanId) => `/scans/${scanId}/issues`,
   },
+  // Images (2026-11-13): every image with a verdict on its alt text. After
+  // Issues, so the report still opens on its issues, and before Compare
+  // reports, which looks across two reports rather than into this one.
+  {
+    key: "images",
+    label: "Images",
+    segment: "images",
+    path: (scanId) => `/scans/${scanId}/images`,
+  },
   {
     key: "compare",
     label: "Compare reports",
@@ -80,9 +90,14 @@ export default function ReportWorkspaceNav({
   // panel of Compare reports (lib/framed.ts) there is no Compare reports tab:
   // it would open the comparison inside one of its own panels. With Issues
   // alone left, the row is not drawn at all (below).
+  // In a panel, only the current view stays (2026-11-13, when Images was
+  // added): a panel is the page alone, and Compare reports was its only other
+  // tab. Letting a panel switch to Images would bring a tab row back into
+  // panels; that is a separate decision for the developer, not part of
+  // adding the Images view.
   const views = REPORT_VIEWS.filter(
     (view) =>
-      !(FRAMED && view.key === "compare") &&
+      !(FRAMED && view !== active) &&
       (view === active || (view.available?.(previousScanId) ?? true)),
   );
   // One view is not a choice; the heading already names it.

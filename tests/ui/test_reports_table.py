@@ -84,9 +84,23 @@ async def _open_reports(
                 await route.fulfill(status=409, json={"detail": "Not finished"})
             else:
                 await route.fulfill(
+                    # The shown counts are left out when a site has none, as
+                    # in a response cached before the fields existed.
                     json={
                         "issue_count": site["most_recent_completed_issue_count"],
                         "occurrence_count": site["most_recent_completed_occurrence_count"],
+                        **(
+                            {
+                                "shown_issue_count": site[
+                                    "most_recent_completed_shown_issue_count"
+                                ],
+                                "shown_occurrence_count": site[
+                                    "most_recent_completed_shown_occurrence_count"
+                                ],
+                            }
+                            if "most_recent_completed_shown_issue_count" in site
+                            else {}
+                        ),
                     }
                 )
         elif path.startswith("/api/"):
@@ -365,6 +379,10 @@ def _comparable_site() -> dict[str, Any]:
         "most_recent_completed": latest,
         "most_recent_completed_issue_count": 3,
         "most_recent_completed_occurrence_count": 6,
+        # What the report's Issues table shows when it opens: 2 of the 3
+        # issue types (Mostly sure, Measured), 4 of the 6 occurrences.
+        "most_recent_completed_shown_issue_count": 2,
+        "most_recent_completed_shown_occurrence_count": 4,
         "scans": [stopped, latest, earlier],
     }
 
@@ -389,6 +407,10 @@ async def test_compare_with_on_each_completed_scan_row(width: int, new_page: Any
     table = page.get_by_role("table", name="Public reports by site", exact=False)
     rows = table.locator(":scope > tbody > tr")
     compared = rows.nth(0)
+    # The counts are what the report's Issues table shows when it opens,
+    # with what it holds back said under each number, never dropped.
+    await playwright_async.expect(compared.locator("td").nth(1)).to_have_text("2plus 1 hidden")
+    await playwright_async.expect(compared.locator("td").nth(2)).to_have_text("4plus 2 hidden")
     # The site row has no compare link any more: its two links stay.
     await playwright_async.expect(
         table.get_by_role("link", name=re.compile(r"^Compare"))

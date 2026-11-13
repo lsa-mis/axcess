@@ -7,7 +7,11 @@ again. If a word is missing or unclear, please open an issue on GitHub.
 ## Report groups
 
 The Issues table's **How sure** column puts every [issue type](#issue-type)
-in one of these three groups: how sure Axcess is that it is a real problem.
+in one of these four groups: how sure Axcess is that it is a real problem.
+The table opens showing every group. A line over the table counts each one and
+says what [Not sure](#not-sure) and [For information](#for-information) mean;
+**Show only Mostly sure and Measured** there, or the **How sure** boxes in the
+**Filter issues** menu, narrow the table. Exports always include every group.
 
 ### Mostly sure
 
@@ -34,6 +38,29 @@ test the fix, then [rescan](#rescan-comparison) to see if it is still found.
   [Zero false positive goal](#zero-false-positive-goal)).
 - Called "Barrier" in earlier versions of Axcess.
 
+### Measured
+
+A result where a [browser check](#browser-check) measured the page itself and
+no AI was used: the [keyboard trap](#keyboard-trap) check, the
+[reflow](#reflow) check at phone width, the check for a changed Tab order (positive tabindex), and the
+[motion check](#motion-check). The measurement is repeatable, but it can miss
+how a person uses the page. For example, focus that looks stuck may leave
+with a key the check did not press. Check each occurrence on the page before
+you report it.
+
+- Shown when the Issues table opens, after Mostly sure.
+- In exports and the written report it is handled like [Not sure](#not-sure):
+  it stays a lead until a person records a decision.
+- Three browser checks are not Measured: text cut off at 200% zoom
+  ([resize text](#resize-text)), text cut off with wider
+  [text spacing](#text-spacing), and a focused control hidden behind a sticky
+  bar ([focus not obscured](#focus-not-obscured)). A check of a real report
+  in November 2026 found the zoom and sticky bar checks reporting problems
+  that were not on the page. The text spacing check finds cut-off text the
+  same way as the zoom check. All three are marked Not sure until they are
+  shown to be right on real pages.
+- Added in November 2026. Earlier these results were marked Not sure.
+
 ### Not sure
 
 A possible problem, found by a check that cannot be sure, that a person must
@@ -41,12 +68,13 @@ confirm before you report it. Open the page and check the item
 yourself. If it is a real problem, record that in its [status](#status) and fix
 it; if not, mark it as a [false positive](#false-positive) with a short note.
 
-- Found by: a [browser check](#browser-check) (such as focus, zoom, or reflow,
-  and the [form error check](#form-error-check) when its result is unclear),
-  the [keyboard trap](#keyboard-trap) check, a [motion check](#motion-check),
-  image text whose [alt text](#alt-text) is missing or does not match, a
+- Found by: the reading-order check, the three browser checks that are not
+  yet trusted (text cut off at 200% zoom, text cut off with wider text
+  spacing, and a focused control hidden behind a sticky bar), the
+  [form error check](#form-error-check) when its result is unclear, image
+  text whose [alt text](#alt-text) is missing or does not match, a
   [local AI model](#local-ai-model) (such as for link text, headings, or form
-  labels), an [axe-core](#axe-core) "needs review" result, or a
+  labels), an [axe-core](#axe-core) "needs review" result, a
   [Siteimprove Alfa](#siteimprove-alfa) "cannot tell" result, or the
   [page code check](#page-code-check)'s guess that text styled like a heading
   should be one.
@@ -220,6 +248,24 @@ The written description of an image that [screen readers](#screen-reader) read
 aloud, and that appears if the image does not load. WCAG calls it a text
 alternative.
 
+### Alt text verdict
+
+On a report's Images tab, one verdict on each image's alt text:
+
+- **Needs alt text**: the image has no alt attribute, or it has empty alt
+  text (`alt=""`) but the scan read text in it. Found in the page code.
+- **Needs better alt text**: the image has alt text, but it only partly
+  matches, or does not match, the text the scan read in the image. For an
+  image with no text in it, the local AI model said so when a person asked.
+- **Good alt text**: it matches the text in the image, or the local AI model
+  said it is good when a person asked.
+- **Not checked yet**: the image has no text to compare, and no one has
+  asked the local AI model. Empty alt text on such an image means the author
+  marked it decorative; a person checks that it adds nothing.
+
+A verdict from the local AI model, and its suggested alt text, is a lead for
+a person to confirm. No verdict proves that the site meets WCAG.
+
 ### Conformance
 
 A page conforms to WCAG when it meets every success criterion at a chosen
@@ -246,6 +292,17 @@ practice items as recommended.
 What a scan actually checked: which pages it tested, which checks ran, and how
 many [page states](#page-state) it reached. The report shows this under **What
 was checked**, above the Issues table.
+
+### Coverage page
+
+The page at the bottom of the sidebar that answers two questions in two parts.
+**What Axcess checks** is built from Axcess's own code and is the same for
+every site: for each WCAG criterion, whether Axcess checks it, partly checks
+it, gives AI hints, or leaves it to you, plus an estimate from a published
+study of how many real problems Axcess finds. **What Axcess found** counts the
+[occurrences](#occurrence) in the completed reports on this computer, after
+each scan. Neither part shows that a site meets WCAG. Not to be confused with
+[scan coverage](#scan-coverage), which is what one scan checked.
 
 ### Crawl
 
@@ -307,7 +364,8 @@ it out of the written report's worklist.
 
 Our goal is that nothing Axcess marks [Mostly sure](#mostly-sure) is a false
 positive, which is why only rule-engine failures go there and every other
-check waits for a person. It is a goal, not a guarantee, so confirm each
+check waits for a person. A [Measured](#measured) result is shown beside
+them, under its own name, and still waits for a person before it is reported. It is a goal, not a guarantee, so confirm each
 Mostly sure issue on the page before you report it.
 
 ## Testing methods
@@ -329,6 +387,14 @@ can only be judged this way.
 Software that reads a page aloud, or shows it on a braille display, for people
 who are blind or have low vision. JAWS, NVDA, and VoiceOver are common screen
 readers.
+
+### Rotor (VoiceOver)
+
+VoiceOver's list of page parts on a Mac, such as headings, links, and
+landmarks. Open it with Control + Option + U, then press Right Arrow to move
+from one kind of part to the next. NVDA on Windows has the same kind of list,
+called the Elements List (NVDA key + F7). Issue guidance for landmark,
+heading, and link issues gives the full steps for both.
 
 ### Keyboard focus
 
@@ -375,15 +441,18 @@ tools can run it the same way.
 ### Browser check
 
 A check that measures how a page behaves in a real browser, such as resizing it
-to phone width or pressing Tab through it. Its results are marked
-[Not sure](#not-sure), except the [form error check](#form-error-check)'s
-clear failures, which are [Mostly sure](#mostly-sure).
+to phone width or pressing Tab through it. Most of its results are marked
+[Measured](#measured). Four are marked [Not sure](#not-sure): the
+reading-order check, because a vision model judges it, and the three checks
+named under [Measured](#measured) that are not yet trusted. The
+[form error check](#form-error-check)'s clear failures are
+[Mostly sure](#mostly-sure), and its unclear ones Not sure.
 
 ### Motion check
 
 A check for audio that plays by itself with no control, and for autoplaying
 video or scrolling marquee text with no way to pause it (WCAG 1.4.2 and 2.2.2).
-Its results are marked [Not sure](#not-sure), and in the app it runs only
+Its results are marked [Measured](#measured), and in the app it runs only
 when you turn on **Check motion and animation**.
 
 ### Form error check
@@ -437,7 +506,7 @@ An optional AI model that reads text (a language model) or looks at images (a
 vision model), running on your own computer through a free program called
 Ollama. Axcess installs one only in the desktop app, from **Settings > AI
 features**, after you choose a size (Small, Standard or Large). AI results
-are never marked [Mostly sure](#mostly-sure).
+are never marked [Mostly sure](#mostly-sure) or [Measured](#measured).
 
 ### AI features
 

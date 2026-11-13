@@ -8,7 +8,7 @@ it never proves [WCAG](glossary.md#wcag) conformance or legal compliance.
 
 ## On this page
 
-- [The three report groups at a glance](#the-three-report-groups-at-a-glance)
+- [The report groups at a glance](#the-report-groups-at-a-glance)
 - [Find a problem and fix it (for developers)](#find-a-problem-and-fix-it-for-developers)
 - [The report summary](#the-report-summary)
 - [The Issues tab](#the-issues-tab)
@@ -21,21 +21,27 @@ it never proves [WCAG](glossary.md#wcag) conformance or legal compliance.
 - [Delete a report](#delete-a-report)
 - [What the report cannot tell you](#what-the-report-cannot-tell-you)
 
-## The three report groups at a glance
+## The report groups at a glance
 
 ![Diagram of the three report groups in the How sure column. Mostly sure holds rule-engine failures from axe-core and Siteimprove Alfa, including problems found after clicking or after a configured search, and clear form errors, where a field is marked in error with no text that says what is wrong; confirm them on the page, fix, and rescan. Not sure holds browser checks, the keyboard trap check, form errors that are unclear, motion checks, text in images whose alt text is missing or does not match, AI checks, and Alfa "cannot tell" results; a person tests and records a decision. For information holds images whose alt text already matches and older records kept for history; no action is needed.](images/diagrams/report-groups.png)
 
 Each [issue type](glossary.md#issue-type) lands in one report group,
 based on the check that found it and its result. Only rule-engine failures,
 the form error check's clear failures, and the page code check's facts (such as
-a field named only by its placeholder text) are marked Mostly sure; anything a
-person has to judge is marked Not sure. The app
+a field named only by its placeholder text) are marked Mostly sure. Most
+browser checks that measure the page with no AI are marked
+[Measured](glossary.md#measured); the glossary names the three that are not.
+Anything a model or a person has to judge is marked Not sure. The Issues table
+opens showing every issue type; a line over the table counts each kind, and
+**Show only Mostly sure and Measured** narrows it. (The diagram above predates
+Measured.) The app
 shows the report group in the Issues table's **How sure** column: how sure
 Axcess is that the issue type is a real problem.
 
 | Report group | What to do |
 | --- | --- |
 | [Mostly sure](glossary.md#mostly-sure) | Start here. Confirm it on the page, fix it, and rescan. |
+| [Measured](glossary.md#measured) | A browser check measured it with no AI. Check it on the page before you report it. |
 | [Not sure](glossary.md#not-sure) | Test it on the page and record a decision before anyone calls it a problem. |
 | [For information](glossary.md#for-information) | Nothing to fix. It shows you what was checked. |
 
@@ -147,8 +153,8 @@ column. Three numbers above the table count:
 
 | Number | What it counts |
 | --- | --- |
-| Issue types | Rows in the Issues table, across all three report groups. |
-| Issue occurrences | Every [occurrence](glossary.md#occurrence): one place a problem appears, such as one element on one page. It counts every report group, including Not sure and For information, so it is not a count of confirmed problems. |
+| Issue types | Every row the Issues table shows when it opens: all four report groups. |
+| Issue occurrences | Every [occurrence](glossary.md#occurrence): one place a problem appears, such as one element on one page. It counts the same rows as Issue types, in all four report groups. It is not a count of confirmed problems: a person still checks each one. |
 | Pages visited | Every page the scan recorded, including pages that answered with an error and most pages that failed to load. |
 
 Two lines under **Pages visited** say more about it:
@@ -200,7 +206,7 @@ summary counts issue types, then occurrences. The table's columns, in order:
 | Column | What it shows |
 | --- | --- |
 | Issue type | Its name. Select it to open its page. |
-| How sure | The report group: Mostly sure, Not sure, or For information. |
+| How sure | The report group: Mostly sure, Measured, Not sure, or For information. |
 | Priority | High, Medium, or Low (see [priority](glossary.md#priority)); "Does not apply" for rows marked For information. |
 | Issue occurrences | How many [occurrences](glossary.md#occurrence) of this issue type the scan found: how many places it appears. |
 | Affected pages | How many pages have it. The issue type's page lists them. |
@@ -214,12 +220,17 @@ or Best practice), **How sure** (a report group), and **Where it shows**. When y
 one **Where it shows** value, a link to its detailed view appears above the table:
 **Rule check issues by WCAG criterion**, or **Images** for In an image.
 
-The table opens in the recommended order: Mostly sure, then Not sure, then
-For information, each by priority. Select a column header to sort by that
+The table opens showing every issue type. With nothing checked under **How
+sure**, all four report groups show, and a note over the table counts each
+one and says what Not sure and For information mean. When search, **Level**
+or **Where it shows** narrows the rows, the note says it shows every issue
+type that matches your filters. **Show only Mostly sure and Measured** in the
+note narrows the table to those two. The recommended order is Mostly sure,
+then Measured, then Not sure, then For information, each by priority. Select a column header to sort by that
 column, and **Back to recommended order** to return. As the filters change, a
 screen reader hears how many issue types show and how many of them are in
 each report group, such as "12 of 40 issue types shown, filtered: Mostly
-sure 3, Not sure 7, For information 2".
+sure 3, Measured 2, Not sure 5, For information 2".
 
 The name of each issue type opens [its page](#the-full-evidence-record).
 **Delete report**, at the end of the Issues page, is described under
@@ -408,8 +419,8 @@ Notes on the exports:
 ### Draft labels
 
 Export menu downloads are labeled a [draft](glossary.md#draft-export) until
-the report's expert review is complete and every Mostly sure and Not sure
-occurrence has a status other than New or Reviewing. A draft has `_DRAFT` in
+the report's expert review is complete and every Mostly sure, Measured and
+Not sure occurrence has a status other than New or Reviewing. A draft has `_DRAFT` in
 its file name and a notice inside, such as a "DRAFT NOTICE" sheet or an
 "Axcess export state" CSV column. The app has no screen for completing the
 review yet, so for now every download from the **Export report** menu is a
@@ -471,12 +482,14 @@ Progress Over Perfection: each barrier you fix helps someone use the site today.
 1. **Mostly sure first.** They top the Issues table; confirm each one, then fix
    it, starting with High [priority](glossary.md#priority). Priority starts
    from the impact rating, so a critical problem on a single page is High.
-2. **Then Not sure.** Check each one on the page and record a decision.
-3. **Batch shared fixes.** Axcess groups by check, not by
+2. **Then Measured.** A browser check measured these with no AI. Check each
+   one on the page and record a decision.
+3. **Then Not sure.** Check each one on the page and record a decision.
+4. **Batch shared fixes.** Axcess groups by check, not by
    [root cause](glossary.md#root-cause), so look for one template or component
    behind an issue type on many pages, and route the fix to whoever owns
    it.
-4. **Rescan** and check your work in **Compare reports** and **What changed**.
+5. **Rescan** and check your work in **Compare reports** and **What changed**.
 
 ## Delete a report
 

@@ -2,6 +2,7 @@ import { type RefObject, useEffect, useId, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronRight, CircleCheck, CircleHelp, CircleX, Copy, Sparkles } from "lucide-react";
 import { ApiError, api } from "../api/client";
+import { copyText } from "../lib/clipboard";
 import type {
   SuggestionAudience,
   SuggestionCheckOutcome,
@@ -642,12 +643,8 @@ function CopyButton({ value, name }: { value: string; name: string }) {
   const copy = async () => {
     attempts.current += 1;
     const attempt = attempts.current;
-    try {
-      await navigator.clipboard.writeText(value);
-      setResult({ attempt, ok: true });
-    } catch {
-      setResult({ attempt, ok: false });
-    }
+    // The shared helper also works on plain http (lib/clipboard.ts).
+    setResult({ attempt, ok: await copyText(value) });
   };
   return (
     <div className="mt-1 flex flex-wrap items-center gap-2">

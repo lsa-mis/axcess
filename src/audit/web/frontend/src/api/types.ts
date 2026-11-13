@@ -52,6 +52,12 @@ export interface SiteGroup {
   most_recent_completed_issue_count: number | null;
   /** Occurrences across those issues (the Issues page's total); null when there is none. */
   most_recent_completed_occurrence_count: number | null;
+  /**
+   * The same two counts for the levels the Issues page shows when it opens.
+   * Optional: absent from a response cached before the fields existed.
+   */
+  most_recent_completed_shown_issue_count?: number | null;
+  most_recent_completed_shown_occurrence_count?: number | null;
   scans: ScanSummary[];
 }
 
@@ -63,6 +69,12 @@ export interface SiteGroup {
 export interface ScanIssueCounts {
   issue_count: number;
   occurrence_count: number;
+  /**
+   * The same two counts for the levels the Issues page shows when it opens.
+   * Optional: absent from a response cached before the fields existed.
+   */
+  shown_issue_count?: number;
+  shown_occurrence_count?: number;
 }
 
 export interface ScanProgress {
@@ -823,7 +835,7 @@ export interface GroupedFindingsResponse {
 
 export type ConformanceLabel = "A" | "AA" | "AAA" | "BP";
 export type AbilityLabel = "vision" | "cognition" | "motor" | "hearing";
-export type ReviewLane = "likely_barrier" | "expert_review" | "informational";
+export type ReviewLane = "likely_barrier" | "measured" | "expert_review" | "informational";
 export type EvidenceConfidence = "high" | "medium" | "low";
 /** Which family of checks produced an issue's evidence (labels: lib/labels.ts). */
 export type FindingType = "wcag" | "click_through" | "alt_text";
@@ -932,6 +944,25 @@ export interface IssueDetail {
   verify_automated: string | null;
   acceptance: string | null;
   help_url: string | null;
+  /** Numbered screen reader steps for each computer, when the issue type has them. */
+  screen_reader_check: ScreenReaderCheck | null;
+}
+
+/** The steps for one computer. A key to press is written `{Command}`. */
+export interface ScreenReaderPlatform {
+  id: string;
+  name: string;
+  intro: string | null;
+  link_text: string | null;
+  link_url: string | null;
+  steps: string[];
+}
+
+/** One shared screen reader check (rules/screen_reader_checks.yaml). */
+export interface ScreenReaderCheck {
+  id: string;
+  title: string;
+  platforms: ScreenReaderPlatform[];
 }
 
 export interface IssuesResponse {
@@ -947,6 +978,18 @@ export interface IssuesResponse {
     high_confidence: number;
   };
   total_unfiltered: number;
+  /**
+   * What the Issues page shows when it opens, and what it leaves out.
+   * Counted over the whole report. Since 2026-11-13 the page opens on every
+   * issue type, so the `hidden_*` counts are 0 (`default_view_counts` in
+   * `src/audit/web/issues.py`).
+   */
+  default_view_counts?: {
+    issue_types: number;
+    occurrences: number;
+    hidden_issue_types: number;
+    hidden_occurrences: number;
+  };
 }
 
 // ---------------------------------------------------------------
@@ -1099,6 +1142,128 @@ export interface TrackingData {
   roadmap: RoadmapItem[];
   counts: { shipped: number; in_progress: number; planned: number };
   coverage: CoverageData;
+}
+
+// --- Coverage (/api/coverage/checks, /api/coverage/found) -------------
+// Mirrors src/audit/web/coverage_checks.py and src/audit/web/issue_share.py.
+
+/** How Axcess checks a criterion; "not_needed" is 4.1.1 Parsing in WCAG 2.1. */
+export type CheckMethod = "automated" | "partial" | "ai-assisted" | "manual" | "not_needed";
+
+/** The other checks a study row credits; "click_through" is axe-core after Click-Through. */
+export type StudyCheck = "click_through" | "image" | "focus" | "keyboard" | "visual" | "semantic" | "responsive";
+
+export interface StudyFigures {
+  sc: string; // WCAG number, or "other"
+  share: number; // of all problems, 0-1 (4.1.1 left out)
+  rule_check: number; // of this criterion's problems, the share axe-core finds
+  other_checks: number; // the share Axcess's other checks add (an estimate)
+  checks: StudyCheck[];
+}
+
+export interface AxeRuleInfo {
+  id: string;
+  help: string;
+  description: string;
+  url: string;
+}
+
+export interface Guidance {
+  title: string;
+  url: string;
+}
+
+export interface CheckCriterion {
+  sc: string;
+  name: string;
+  understanding_url: string;
+  apg: Guidance[];
+  level: string;
+  principle: string;
+  guideline: string;
+  method: CheckMethod;
+  checks: DetectionPipeline[];
+  rules: AxeRuleInfo[];
+  confidence: string;
+  does: string;
+  you: string;
+  technical: string;
+  study: StudyFigures | null;
+}
+
+export interface CommonProblem {
+  label: string;
+  share_of_sites: number;
+  rule: string;
+  sc: string;
+}
+
+export interface CoverageChecks {
+  wcag_version: WcagVersion;
+  scan_default_version: WcagVersion;
+  axe_version: string;
+  criteria: CheckCriterion[];
+  study: StudyFigures[];
+  study_source_url: string;
+  other_checks_hit_rate: number;
+  common_problems: CommonProblem[];
+  common_source_url: string;
+}
+
+export type FoundLayer = "axe_loaded" | "axe_click_through" | "alfa" | "probes" | "image" | "semantic";
+
+export interface CoverageScanOption {
+  id: number;
+  seed_url: string;
+  finished_at: string | null;
+}
+
+export interface CoverageFound {
+  scan_id: number | null;
+  scans: CoverageScanOption[];
+  scans_included: number;
+  scans_completed: number;
+  layers: {
+    total: number;
+    layers: { layer: FoundLayer; count: number; share: number | null }[];
+    excluded_not_a_problem: number;
+    excluded_records: number;
+  };
+  axe_rules: {
+    rule_id: string;
+    help: string;
+    category: string;
+    criteria: string[];
+    loaded: number;
+    click_through: number;
+  }[];
+  found_by_criterion: { sc: string; count: number }[];
+  estimate: {
+    available: boolean;
+    axe_sample: number;
+    min_sample: number;
+    found: number;
+    estimated_total: number | null;
+    share: number | null;
+    criteria: {
+      sc: string;
+      deque_share: number;
+      axe_rate: number;
+      axe_found: number;
+      found: number;
+      estimated_total: number;
+      method: "axe_rate" | "issue_share";
+    }[];
+    source_title: string;
+    source_url: string;
+  };
+  manual_review: {
+    evaluations: number;
+    failed: number;
+    found: number;
+    share: number | null;
+    scans: { scan_id: number; seed_url: string; failed: number; found: number }[];
+  };
 }
 
 // --- Expert evaluation workbench --------------------------------------
@@ -1525,6 +1690,73 @@ export interface ExportOptions {
    *  replaced with "[redacted]". Names and sizes are for those copies. */
   redacted: boolean;
   formats: ExportFormatOption[];
+}
+
+// ---------------------------------------------------------------------------
+// Report Images tab (GET /api/scans/:id/images, src/audit/web/image_inventory.py)
+// ---------------------------------------------------------------------------
+
+/** A question asked of the report's images. An image is in one or two groups. */
+export type ImageGroup = "with_text" | "missing_alt" | "with_alt";
+
+/** One verdict on an image's alt text, worst first. */
+export type AltVerdict = "needs_alt" | "needs_better" | "not_checked" | "good";
+
+/** What decided the verdict: the page code, the text match, or the local model. */
+export type AltVerdictSource = "page_code" | "text_match" | "local_model";
+
+export interface ImageGroupCounts {
+  total: number;
+  good: number;
+  needs_better: number;
+  needs_alt: number;
+  not_checked: number;
+}
+
+export interface ReportImage {
+  image_id: number;
+  content_hash: string;
+  mime: string | null;
+  image_url: string;
+  has_svg_text: boolean;
+  groups: ImageGroup[];
+  page_count: number;
+  sample_page_id: number | null;
+  sample_page_url: string | null;
+  /** null: no alt attribute. "": alt="" (marked decorative). */
+  alt_text: string | null;
+  alt_text_variants: number;
+  has_text: boolean;
+  image_text: string | null;
+  verdict: AltVerdict;
+  verdict_source: AltVerdictSource | null;
+  verdict_reason: string;
+  suggestion: string | null;
+  suggestion_model: string | null;
+  can_check: boolean;
+  finding_id: number | null;
+}
+
+export interface ReportImagesResponse {
+  scan_id: number;
+  group: ImageGroup;
+  verdict: AltVerdict | null;
+  q: string;
+  counts: Record<ImageGroup, ImageGroupCounts>;
+  total: number;
+  limit: number;
+  offset: number;
+  rows: ReportImage[];
+  /** Whether a local model is set up to check alt text. */
+  check_available: boolean;
+}
+
+export interface ReportImagesFilter {
+  group: ImageGroup;
+  verdict: AltVerdict | "";
+  q: string;
+  limit: number;
+  offset: number;
 }
 
 /* ---------------------------------------------------------------------------

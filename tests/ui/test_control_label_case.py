@@ -73,6 +73,7 @@ _NAMES = {
 # alone in ``_NAMES`` would let "Copy Code" pass.
 _PHRASES = (
     "Mostly sure",  # issue type, lib/terms.ts
+    "Measured",  # issue type, lib/terms.ts
     "Not sure",  # issue type, lib/terms.ts
     "For information",  # issue type, lib/terms.ts
     "Best practice",  # level, docs/plain-language.md
@@ -145,8 +146,10 @@ _COLLECT = r"""
     '[role=option]', 'option', '[role=switch]', '[role=radio]',
     '[role=checkbox]', 'summary', 'label',
   ].join(',');
-  // Text from the scanned site is shown as the site wrote it.
-  const scanned = '[data-scanned-content], code, pre, kbd, samp';
+  // Text from the scanned site is shown as the site wrote it,
+  // and so is a title quoted from the W3C, such as a WCAG criterion's name
+  // ("Contrast (Minimum)"), marked [data-official-title].
+  const scanned = '[data-scanned-content], [data-official-title], code, pre, kbd, samp';
   const out = [];
   for (const el of document.querySelectorAll(selector)) {
     const label = el.getAttribute('aria-label');
@@ -212,6 +215,8 @@ async def _labels_on(new_page: Any, url: str, *, open_groups: bool = False) -> l
         "/app/scans/{scan_id}/compare",
         "/app/scans/{scan_id}/compare/changes",
         "/app/tracking",
+        "/app/coverage",
+        "/app/coverage/found",
         "/app/about",
         "/app/settings",
         "/app/no-such-page",

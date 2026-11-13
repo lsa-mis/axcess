@@ -54,6 +54,10 @@ class SiteGroup(BaseModel):
     # Occurrences across those issues, the Issues page's "all evidence"
     # total; null when there is no completed scan.
     most_recent_completed_occurrence_count: int | None
+    # The same two counts for the levels the Issues page shows when it opens
+    # (``audit.labels.DEFAULT_REVIEW_LANES``, every level since 2026-11-13).
+    most_recent_completed_shown_issue_count: int | None
+    most_recent_completed_shown_occurrence_count: int | None
     scans: list[ScanSummaryModel]
 
 
@@ -67,6 +71,11 @@ class ReportCounts(BaseModel):
 
     issue_count: int
     occurrence_count: int
+    # What the Issues page shows when it opens: the levels in
+    # ``audit.labels.DEFAULT_REVIEW_LANES``, every level since 2026-11-13, so
+    # these equal the totals above; kept so the field names stay stable.
+    shown_issue_count: int
+    shown_occurrence_count: int
 
 
 def report_counts(conn: sqlite3.Connection, scan_id: int) -> ReportCounts:
@@ -75,8 +84,13 @@ def report_counts(conn: sqlite3.Connection, scan_id: int) -> ReportCounts:
     The caller checks that the report exists and is completed; a partial
     scan's counts would stand in for evidence it never gathered.
     """
-    issue_count, occurrence_count = _issue_count(conn, scan_id)
-    return ReportCounts(issue_count=issue_count, occurrence_count=occurrence_count)
+    issue_count, occurrence_count, shown_issues, shown_occurrences = _issue_count(conn, scan_id)
+    return ReportCounts(
+        issue_count=issue_count,
+        occurrence_count=occurrence_count,
+        shown_issue_count=shown_issues,
+        shown_occurrence_count=shown_occurrences,
+    )
 
 
 def group_scans(conn: sqlite3.Connection, summaries: Iterable[dict[str, Any]]) -> list[SiteGroup]:
@@ -105,6 +119,8 @@ def group_scans(conn: sqlite3.Connection, summaries: Iterable[dict[str, Any]]) -
                 ),
                 most_recent_completed_issue_count=counts[0] if counts else None,
                 most_recent_completed_occurrence_count=counts[1] if counts else None,
+                most_recent_completed_shown_issue_count=counts[2] if counts else None,
+                most_recent_completed_shown_occurrence_count=counts[3] if counts else None,
                 scans=[ScanSummaryModel(**scan) for scan in scans],
             )
         )
@@ -117,7 +133,7 @@ def group_scans(conn: sqlite3.Connection, summaries: Iterable[dict[str, Any]]) -
 # number of sites times their evidence. A completed report's count changes
 # only if its evidence does (``audit synthesize`` rewrites image findings),
 # so the cheap fingerprint below decides when to count again.
-_issue_counts: dict[tuple[str, int], tuple[tuple[int, ...], tuple[int, int]]] = {}
+_issue_counts: dict[tuple[str, int], tuple[tuple[int, ...], tuple[int, int, int, int]]] = {}
 _issue_counts_lock = threading.Lock()
 
 
@@ -134,8 +150,11 @@ def _evidence_fingerprint(conn: sqlite3.Connection, scan_id: int) -> tuple[int, 
     return tuple(int(value) for value in row)
 
 
-def _issue_count(conn: sqlite3.Connection, scan_id: int) -> tuple[int, int]:
-    """Issues and occurrences in a completed report, as the Issues page counts them."""
+def _issue_count(conn: sqlite3.Connection, scan_id: int) -> tuple[int, int, int, int]:
+    """Issues and occurrences in a completed report, as the Issues page counts them.
+
+    All of them first, then those the Issues page shows when it opens.
+    """
     # The file as well as the id: report ids start at 1 in every database.
     key = (str(conn.execute("PRAGMA database_list").fetchone()[2]), scan_id)
     fingerprint = _evidence_fingerprint(conn, scan_id)
@@ -144,7 +163,13 @@ def _issue_count(conn: sqlite3.Connection, scan_id: int) -> tuple[int, int]:
     if cached is not None and cached[0] == fingerprint:
         return cached[1]
     rows = issues.list_issues(conn, scan_id)
-    counts = (len(rows), sum(row.occurrence_count for row in rows))
+    shown = issues.default_view_counts(rows)
+    counts = (
+        len(rows),
+        sum(row.occurrence_count for row in rows),
+        shown["issue_types"],
+        shown["occurrences"],
+    )
     with _issue_counts_lock:
         _issue_counts[key] = (fingerprint, counts)
     return counts

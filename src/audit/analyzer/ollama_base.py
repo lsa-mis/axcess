@@ -44,6 +44,22 @@ class OllamaError(Exception):
     """
 
 
+def is_cloud_model(name: str) -> bool:
+    """True for an Ollama cloud model, such as ``gpt-oss:120b-cloud``.
+
+    Ollama runs these on its own servers even when asked through the local
+    daemon, so the prompt, page text and images would leave the computer.
+    Ollama marks them with a tag that is ``cloud`` or ends in ``-cloud``.
+    Every Axcess model call refuses them: no AI feature sends scan data off
+    the computer unless an administrator chooses a remote address
+    (AGENTS.md, "Context construction and privacy").
+    """
+    # No colon means the default tag (":latest"), a local model, even when
+    # the name itself ends in "-cloud".
+    _, colon, tag = name.strip().lower().rpartition(":")
+    return bool(colon) and (tag == "cloud" or tag.endswith("-cloud"))
+
+
 def prompt_content_version(prompt_text: str) -> str:
     """Short content hash used as a ``prompt_version`` tag.
 
@@ -120,6 +136,12 @@ class OllamaBase:
         Raises :class:`OllamaError` on permanent failures (4xx that
         aren't 408/429, exhausted retries, malformed Ollama envelope).
         """
+        model = str(payload.get("model") or self._model)
+        if is_cloud_model(model):
+            raise OllamaError(
+                f"{model} is an Ollama cloud model, which runs off this computer. "
+                "Choose a local model."
+            )
         url = f"{self._base_url}/api/generate"
         backoff = 1.0
         last_error: Exception | None = None

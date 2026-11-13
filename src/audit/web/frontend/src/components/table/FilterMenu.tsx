@@ -48,6 +48,13 @@ export type FilterGroup = {
   options: readonly FilterOption[];
   /** Checkboxes, several at once. Only where the data can take a list. */
   multiple?: boolean;
+  /**
+   * One plain sentence under the group's name, for a group where nothing
+   * checked does not mean every row (the Issues table's "How sure", which
+   * then shows its surest values only). Real text inside the fieldset, so
+   * it is read with the group, not a tooltip.
+   */
+  hint?: string;
 };
 
 /** A group's value as a list: "A,AA" → ["A", "AA"]; "" → []. */
@@ -183,6 +190,7 @@ export function FilterMenu({
         {groups.map((group) => (
           <fieldset key={group.key} className="mb-3 border-b border-border pb-3 last-of-type:mb-0">
             <legend className="mb-1 px-2 text-xs font-semibold text-fg">{group.label}</legend>
+            {group.hint && <p className="mb-1 px-2 text-xs text-fg-muted">{group.hint}</p>}
             {group.options.map((option) => {
               if (group.multiple && !option.value) return null;
               const current = valueOf(group);

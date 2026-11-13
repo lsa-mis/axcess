@@ -94,6 +94,15 @@ on 130 of them, then got every verdict wrong on its first real pages
    scored 100% precision and 96.2% recall on 142 of them, while its real
    set, the number that counts, had only 9 failing forms, most of them
    used to tune it. Say how small and how independent the real set is.
+## Project management (Asana)
+
+All project management for this repo lives in one Asana project:
+**"Axcess – Feature & Development Tracker"** (project GID `1218150267797869`,
+https://app.asana.com/1/939514425027676/project/1218150267797869).
+
+When reading or writing Asana tasks for this project, scope every query and
+update to that project only. Do not pull tasks from, or create tasks in, any
+other Asana project on behalf of this repo.
 
 ## Code map
 

@@ -7,7 +7,7 @@
 > Out of date:
 >
 > - Coverage: the coverage matrix now lists automated, partial, or
->   AI-assisted checks for 29 of 55 WCAG 2.2 A and AA criteria, so the job
+>   AI-assisted checks for 28 of 55 WCAG 2.2 A and AA criteria, so the job
 >   to be done and the "roughly 80 %" estimate no longer hold.
 > - Access: Axcess now has login scans and an optional shared access token
 >   for hosted use, so "Auth. The tool runs on Sam's laptop" no longer holds.

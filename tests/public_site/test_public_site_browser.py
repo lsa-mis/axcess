@@ -71,6 +71,8 @@ SITE_NAMES = {
     # Named parts the guides refer to: the app's "Issues" tab, and the hosting
     # guide's options "Path A", "Path B" and "Path C".
     *("Issues", "Path"),
+    # Apple's screen reader, named in the glossary's "Rotor (VoiceOver)".
+    "VoiceOver",
 }
 # WCAG criterion names are W3C titles ("Focus Visible") and keep their capitals.
 CRITERION_NAMES = sorted(

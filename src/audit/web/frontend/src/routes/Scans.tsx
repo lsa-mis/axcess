@@ -138,6 +138,8 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  *   appears. They are the words and the order the Issues page summary
  *   uses (ReportSummary), so the list and the report name the same
  *   numbers the same way (SC 3.2.4 Consistent Identification, Level AA).
+ *   Both count what the Issues table shows when it opens, with "plus N
+ *   hidden" under the number (ShownCount, 2026-11-10).
  *   The developer set this order and these words on 2026-10-30: what was
  *   found, then how much of the site it came from. History: these columns
  *   were "Issues" (the rows) and "Occurrences" (the places) until
@@ -289,9 +291,9 @@ function sortValue(site: SiteGroup, key: SortKey): number | string | null {
     case "pages":
       return completed ? completed.page_count : null;
     case "issues":
-      return site.most_recent_completed_occurrence_count;
+      return site.most_recent_completed_shown_occurrence_count ?? site.most_recent_completed_occurrence_count;
     case "kinds":
-      return site.most_recent_completed_issue_count;
+      return site.most_recent_completed_shown_issue_count ?? site.most_recent_completed_issue_count;
     case "checks":
       return completed?.rule_checks ? ruleChecksText(completed.rule_checks).toLowerCase() : null;
     case "completed":
@@ -703,10 +705,16 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
               {relativeTime(completed.finished_at ?? completed.started_at)}
             </Cell>
             <Cell numeric className="text-fg">
-              {(site.most_recent_completed_issue_count ?? 0).toLocaleString()}
+              <ShownCount
+                shown={site.most_recent_completed_shown_issue_count}
+                total={site.most_recent_completed_issue_count ?? 0}
+              />
             </Cell>
             <Cell numeric className="text-fg">
-              {(site.most_recent_completed_occurrence_count ?? 0).toLocaleString()}
+              <ShownCount
+                shown={site.most_recent_completed_shown_occurrence_count}
+                total={site.most_recent_completed_occurrence_count ?? 0}
+              />
             </Cell>
             <Cell numeric className="text-fg">
               {completed.page_count.toLocaleString()}
@@ -959,11 +967,39 @@ function ScanCountCells({ scan, className }: { scan: ScanSummary; className?: st
   return (
     <>
       <Cell numeric className={cn("text-fg", className)}>
-        {counts.data.issue_count.toLocaleString()}
+        <ShownCount shown={counts.data.shown_issue_count} total={counts.data.issue_count} />
       </Cell>
       <Cell numeric className={cn("text-fg", className)}>
-        {counts.data.occurrence_count.toLocaleString()}
+        <ShownCount shown={counts.data.shown_occurrence_count} total={counts.data.occurrence_count} />
       </Cell>
+    </>
+  );
+}
+
+/**
+ * A report's count as its Issues page shows it when it opens. Since
+ * 2026-11-13 that is every issue type, so the count is the whole report and
+ * the second line never shows. (From 2026-11-10 the page opened on Mostly
+ * sure and Measured only.) If the default view leaves rows out again, a
+ * second line ("plus 12 hidden") counts them, in the Issues page's words:
+ * one number for one thing on both screens (SC 3.2.4 Consistent
+ * Identification, Level AA), and a held-back count is never dropped
+ * (Interface language rule 4). Rejected then: the total alone, which would
+ * not match the table a reader lands on; and the shown number alone, which
+ * hides a limitation.
+ *
+ * `shown` is absent from a response cached before the field existed; the
+ * total then stands alone, as it did before, until the next fetch.
+ */
+function ShownCount({ shown, total }: { shown: number | null | undefined; total: number }) {
+  const visible = shown ?? total;
+  const hidden = total - visible;
+  return (
+    <>
+      {visible.toLocaleString()}
+      {hidden > 0 && (
+        <span className="block text-xs font-normal text-fg-muted">plus {hidden.toLocaleString()} hidden</span>
+      )}
     </>
   );
 }

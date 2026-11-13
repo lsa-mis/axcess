@@ -76,3 +76,29 @@ def add_form_error_finding(db_path: Path, blob_dir: Path, scan_id: int) -> tuple
             (page_id, scan_id, after_hash, before_hash),
         )
     return int(page_id), before_hash, after_hash
+
+
+LANDMARK_ISSUE_KEY = "axe:region"
+
+
+def add_landmark_finding(db_path: Path, scan_id: int) -> None:
+    """Store one axe ``region`` occurrence (content outside a landmark).
+
+    Its guidance card names the shared Mac and Windows screen reader steps,
+    which the seed otherwise never shows.
+    """
+    with sqlite3.connect(db_path) as conn:
+        (page_id,) = conn.execute(
+            "SELECT id FROM pages WHERE scan_id = ? ORDER BY id LIMIT 1", (scan_id,)
+        ).fetchone()
+        conn.execute(
+            """
+            INSERT INTO page_a11y_findings (
+                page_id, scan_id, rule_id, help, target_selector, target_hash,
+                status, created_at, updated_at, engine_outcome, pipeline, impact
+            ) VALUES (?, ?, 'region', 'All page content should be contained by landmarks',
+                      'div.promo', 'seeded-region', 'new', CURRENT_TIMESTAMP,
+                      CURRENT_TIMESTAMP, 'failed', 'axe', 'moderate')
+            """,
+            (page_id, scan_id),
+        )

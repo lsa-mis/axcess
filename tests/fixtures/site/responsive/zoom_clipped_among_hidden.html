@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Zoom clipping among hidden text fixture (SC 1.4.4)</title>
+  <style>
+    /* True positives for SC 1.4.4 on a page that also has hidden text.
+       Six pieces of screen-reader-only text come FIRST in the page. The
+       check reports at most five elements, so a check that counts hidden
+       text fills its report with them and never reaches the real problems.
+
+       Two real problems follow, both fine at the 1440px viewport:
+         - #vw-box is 55vw wide. At 640px it is 352px and cuts off a line
+           that needs about 420px.
+         - #squeezed is as wide as the window minus 660px (at most 300px).
+           At 640px that is nothing at all, so ALL of its text is lost.
+           A box squeezed to nothing by the narrow window is not text
+           "hidden on purpose": the same box shows its text at 1440px.
+       With WCAG's text spacing at 1440px both lines still fit, so the
+       text-spacing check stays quiet. */
+    body { margin: 0; font-family: sans-serif; }
+    main { padding: 1rem; max-width: 100%; }
+    /* The standard visually-hidden pattern (Tailwind and Bootstrap call it
+       .sr-only): the text is there for screen readers and paints no pixel. */
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap;
+      border-width: 0;
+    }
+    /* The same pattern with clip-path in place of the older clip. */
+    .visually-hidden {
+      position: absolute; width: 1px; height: 1px; margin: -1px;
+      overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+    }
+    /* An older variant: a 1px box moved off the left edge, with no clip. */
+    .offscreen {
+      position: absolute; left: -10000px; top: auto; width: 1px; height: 1px;
+      overflow: hidden; white-space: nowrap;
+    }
+    #vw-box {
+      width: 55vw; white-space: nowrap; overflow: hidden;
+      font-size: 16px; background: #f5f5f5;
+    }
+    #squeezed {
+      width: calc(100vw - 660px); max-width: 300px;
+      white-space: nowrap; overflow: hidden;
+      font-size: 16px; background: #f5f5f5;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Zoom-sensitive layout with screen-reader text</h1>
+    <div class="sr-only" role="status" aria-live="polite">Showing Web Development projects</div>
+    <span class="sr-only">First note for screen reader users only</span>
+    <span class="sr-only">Second note for screen reader users only</span>
+    <span class="visually-hidden">Third note for screen reader users only</span>
+    <span class="visually-hidden">Fourth note for screen reader users only</span>
+    <span class="offscreen">Fifth note for screen reader users only</span>
+    <p id="vw-box">This single nowrap line is about four hundred pixels wide in total.</p>
+    <p id="squeezed">Short label</p>
+  </main>
+</body>
+</html>
