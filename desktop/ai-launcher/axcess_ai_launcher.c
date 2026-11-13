@@ -39,8 +39,8 @@
  *   standard input, and see only SystemRoot, TEMP, TMP, PATH, and the
  *   LOCALAPPDATA and USERPROFILE that Windows rewrites to the container's
  *   own folder.
- *   --gpu adds only the "registryRead" and "lpacPnpNotifications"
- *   capabilities, never a network one. The TCP relay listens on 127.0.0.1
+ *   They get the "registryRead" capability (Winsock needs it) and, with
+ *   --gpu, "lpacPnpNotifications"; never a network capability. The TCP relay listens on 127.0.0.1
  *   only, with an exclusive port, and closes every connection that does
  *   not come from --client-pid.
  *   This launcher itself is NOT sandboxed: it runs as the user, and trusts
@@ -469,11 +469,16 @@ static void sandbox_init(struct sandbox *sb, const struct options *o, DWORD proc
     if (FAILED(hr))
         fail("CreateAppContainerProfile", (DWORD)hr);
 
-    /* GPU drivers read the registry and watch for devices. Neither is a
-     * network capability. */
+    /* registryRead always: Winsock reads its settings from the registry, so
+     * without it WSAStartup fails inside an LPAC and llama-server cannot even
+     * open its UNIX socket (GitHub windows-2022 runner, 2026-11-13). GPU
+     * drivers also watch for devices (lpacPnpNotifications). Neither is a
+     * network capability; the boundary check below still proves the
+     * network is blocked. */
+    sb->caps[0].Sid = capability_sid(L"registryRead");
+    sb->caps[0].Attributes = SE_GROUP_ENABLED;
+    sb->cap_count = 1;
     if (o->gpu) {
-        sb->caps[0].Sid = capability_sid(L"registryRead");
-        sb->caps[0].Attributes = SE_GROUP_ENABLED;
         sb->caps[1].Sid = capability_sid(L"lpacPnpNotifications");
         sb->caps[1].Attributes = SE_GROUP_ENABLED;
         sb->cap_count = 2;
@@ -930,8 +935,11 @@ static int run_inner(const struct options *o)
     int net, files, sock, wsa_error = 0;
     if (!o->inner_sock || !o->scratch || !o->runtime)
         fail_usage("usage", 0);
-    if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
-        fail("WSAStartup", (DWORD)WSAGetLastError());
+    {
+        int wsa_started = WSAStartup(MAKEWORD(2, 2), &wsa);
+        if (wsa_started != 0)
+            fail("WSAStartup", (DWORD)wsa_started);
+    }
     net = probe_network(&wsa_error);
     files = probe_files(o->scratch, o->runtime);
     sock = probe_socket(o->inner_sock);
@@ -991,8 +999,11 @@ static int run_check(struct options *o)
     self_full = full_path(self);
     if (!self_full || !is_inside(o->runtime, self_full))
         fail_usage("launcher_outside_runtime", 0);
-    if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
-        fail("WSAStartup", (DWORD)WSAGetLastError());
+    {
+        int wsa_started = WSAStartup(MAKEWORD(2, 2), &wsa);
+        if (wsa_started != 0)
+            fail("WSAStartup", (DWORD)wsa_started);
+    }
 
     n = wcslen(o->scratch) + 16;
     sock = (wchar_t *)xalloc(n * sizeof(wchar_t));
@@ -1430,8 +1441,11 @@ static int run_serve(struct options *o)
         fail_usage("usage", 0);
     g_client_pid = o->client_pid;
     parse_spec(o);
-    if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
-        fail("WSAStartup", (DWORD)WSAGetLastError());
+    {
+        int wsa_started = WSAStartup(MAKEWORD(2, 2), &wsa);
+        if (wsa_started != 0)
+            fail("WSAStartup", (DWORD)wsa_started);
+    }
 
     sandbox_init(&sb, o, (DWORD)g_model_count);
     for (i = 0; i < g_model_count; i++) {
