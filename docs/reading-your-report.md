@@ -42,8 +42,8 @@ Axcess is that the issue type is a real problem.
 | --- | --- |
 | [Mostly sure](glossary.md#mostly-sure) | Start here. Confirm it on the page, fix it, and rescan. |
 | [Measured](glossary.md#measured) | A browser check measured it with no AI. Check it on the page before you report it. |
-| [Not sure](glossary.md#not-sure) | Hidden until you show it. Test it on the page and record a decision before anyone calls it a problem. |
-| [For information](glossary.md#for-information) | Hidden until you show it. Nothing to fix. It shows you what was checked. |
+| [Not sure](glossary.md#not-sure) | Test it on the page and record a decision before anyone calls it a problem. |
+| [For information](glossary.md#for-information) | Nothing to fix. It shows you what was checked. |
 
 ## Find a problem and fix it (for developers)
 
@@ -153,8 +153,8 @@ column. Three numbers above the table count:
 
 | Number | What it counts |
 | --- | --- |
-| Issue types | Rows the Issues table shows when it opens: the Mostly sure and Measured groups. "Plus N hidden" under the number counts the Not sure and For information rows. |
-| Issue occurrences | Every [occurrence](glossary.md#occurrence): one place a problem appears, such as one element on one page. It counts the same rows as Issue types (Mostly sure and Measured), with "Plus N hidden" for the rest. It is not a count of confirmed problems: a person still checks each one. |
+| Issue types | Every row the Issues table shows when it opens: all four report groups. |
+| Issue occurrences | Every [occurrence](glossary.md#occurrence): one place a problem appears, such as one element on one page. It counts the same rows as Issue types, in all four report groups. It is not a count of confirmed problems: a person still checks each one. |
 | Pages visited | Every page the scan recorded, including pages that answered with an error and most pages that failed to load. |
 
 Two lines under **Pages visited** say more about it:
@@ -220,9 +220,12 @@ or Best practice), **How sure** (a report group), and **Where it shows**. When y
 one **Where it shows** value, a link to its detailed view appears above the table:
 **Rule check issues by WCAG criterion**, or **Images** for In an image.
 
-The table opens showing Mostly sure and Measured only. With nothing checked
-under **How sure**, the other two groups stay hidden; **Show hidden issue
-types** over the table checks all four. The recommended order is Mostly sure,
+The table opens showing every issue type. With nothing checked under **How
+sure**, all four report groups show, and a note over the table counts each
+one and says what Not sure and For information mean. When search, **Level**
+or **Where it shows** narrows the rows, the note says it shows every issue
+type that matches your filters. **Show only Mostly sure and Measured** in the
+note narrows the table to those two. The recommended order is Mostly sure,
 then Measured, then Not sure, then For information, each by priority. Select a column header to sort by that
 column, and **Back to recommended order** to return. As the filters change, a
 screen reader hears how many issue types show and how many of them are in
