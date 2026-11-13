@@ -296,6 +296,23 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
     table = page.get_by_role("table", name=f"Documents linked from report #{scan_id}", exact=False)
     rows = table.locator("tbody tr")
     await expect(rows).to_have_count(7)
+
+    # As on Issues: nothing under the heading, and the counts in the row of
+    # summary numbers over the table, every value shown.
+    await expect(
+        page.locator("main header").get_by_text(re.compile(r"documents ·|expert to review"))
+    ).to_have_count(0)
+    numbers = page.locator("main dl").filter(
+        has=page.get_by_role("term").filter(has_text=re.compile(r"^Documents$"))
+    )
+    await expect(numbers.get_by_role("term")).to_have_text(
+        ["Documents", "Mostly sure", "Not sure", "Could not check"]
+    )
+    await expect(numbers.get_by_role("definition")).to_have_text(["7", "2", "1", "4"])
+    numbers_box = await numbers.bounding_box()
+    table_box = await table.bounding_box()
+    assert numbers_box and table_box
+    assert numbers_box["y"] + numbers_box["height"] <= table_box["y"], (numbers_box, table_box)
     names = [
         "permit-form.pdf",
         "no-title.pdf",

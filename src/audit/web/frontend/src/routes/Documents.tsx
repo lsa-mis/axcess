@@ -5,7 +5,8 @@ import { ApiError, api } from "../api/client";
 import type { LinkedFileRef, LinkedFileRow, LinkedFileStatus } from "../api/types";
 import BreakableUrl from "../components/BreakableUrl";
 import HowSureTag from "../components/HowSureTag";
-import ReportHeader, { ReportMeta } from "../components/ReportHeader";
+import ReportHeader from "../components/ReportHeader";
+import { SummaryNumbers, SummaryStat } from "../components/ReportSummary";
 import { TablePagination } from "../components/TablePagination";
 import {
   Cell,
@@ -50,9 +51,10 @@ function plural(count: number, one: string, many: string): string {
  * where each is linked from, and what the PDF checks found. A web editor
  * opens it to decide which file to fix first.
  *
- * Laid out as Pages visited (routes/PagesVisited.tsx), the closest existing
- * list: the same header, the same short paragraphs before the table, the same
- * table parts, paging and page links. One pattern for one kind of list (SC
+ * The header and the numbers over the table are Issues' (routes/Issues.tsx),
+ * the tab beside it. The rest is laid out as Pages visited
+ * (routes/PagesVisited.tsx): the same short paragraphs before the table, the
+ * same table parts, paging and page links. One pattern for one kind of list (SC
  * 3.2.4 Consistent Identification, Level AA; W3C COGA, "Making Content
  * Usable", https://www.w3.org/TR/coga-usable/, paraphrased: the same pattern
  * for the same kind of thing).
@@ -173,27 +175,34 @@ export default function DocumentsRoute() {
       { replace: true },
     );
   const shownPage = Math.min(page, pages);
-  const counts = data.recorded
-    ? [
-        plural(data.total, "document", "documents"),
-        ...STATUSES.filter((status) => data.counts[status] > 0).map(
-          (status) => `${data.counts[status].toLocaleString()} ${LINKED_FILE_STATUS_LABEL[status]}`,
-        ),
-      ].join(" · ")
-    : "Documents not checked in this report";
 
   return (
     <>
-      <ReportHeader
-        scanId={scan.id}
-        previousScanId={scan.previous_scan_id}
-        title={DOCUMENTS_VIEW}
-        tabs
-        // The counts only; the caveat is the first paragraph below, where its
-        // lines stay under 80 characters (SC 1.4.8 Visual Presentation, Level
-        // AAA), as on Pages visited.
-        meta={<ReportMeta counts={counts} note="" />}
-      />
+      {/* The heading and the tabs only, as on Issues: no line under the
+          heading. The counts are the numbers row below it. */}
+      <ReportHeader scanId={scan.id} previousScanId={scan.previous_scan_id} title={DOCUMENTS_VIEW} tabs />
+
+      {/* The counts as Issues shows its own: the shared row of summary
+          numbers over the table (SummaryNumbers, SummaryStat), how many
+          documents and then how many of each "How sure" value, in the
+          table's order. Four numbers, so four across from 640px and two by
+          two below that, where nothing is squeezed at 320px (SC 1.4.10
+          Reflow, Level AA). Every value is shown, zero included, as Issues
+          shows a zero: "0 Mostly sure" is a result the reader needs.
+          Rejected: the counts in the header's meta line ("7 documents · 2
+          Mostly sure"), which Issues does not have, so the two tabs put the
+          same kind of fact in two places (SC 3.2.4 Consistent
+          Identification, Level AA). Shown only when the report looked for
+          documents: with nothing looked for, there is nothing to count, as
+          Issues shows its numbers only for a completed report. */}
+      {data.recorded && (
+        <SummaryNumbers className="sm:grid-cols-4">
+          <SummaryStat label={data.total === 1 ? "Document" : "Documents"} value={data.total} />
+          {STATUSES.map((status) => (
+            <SummaryStat key={status} label={LINKED_FILE_STATUS_LABEL[status]} value={data.counts[status]} />
+          ))}
+        </SummaryNumbers>
+      )}
 
       {/* What the list is and what it leaves out, before the table, in short
           paragraphs, one idea each (W3C COGA, "Making Content Usable": one
