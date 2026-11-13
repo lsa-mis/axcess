@@ -29,6 +29,7 @@ from audit.ai.state import (
     load_preferences,
     save_config,
     save_preferences,
+    service_address,
     trust_private_runtime,
 )
 from audit.config import Settings
@@ -145,8 +146,9 @@ class AIManager:
             self.runtime.stop()
 
     def _installed(self, config: AIConfig) -> None:
-        if config.source == "private" and config.socket_path:
-            trust_private_runtime(self.settings, config.socket_path, self.runtime.running)
+        address = service_address(config)
+        if config.source == "private" and address:
+            trust_private_runtime(self.settings, address, self.runtime.running)
         previous_config = self.config()
         previous_preferences = self.preferences()
         try:
@@ -185,9 +187,9 @@ class AIManager:
                     "The AI models need to be downloaded again for this version of Axcess. "
                     "Choose a size and select Download and set up."
                 )
-            socket_path = self.runtime.start(models)
-            trust_private_runtime(self.settings, socket_path, self.runtime.running)
-            config = config.model_copy(update={"socket_path": socket_path})
+            self.runtime.start(models)
+            config = config.model_copy(update=self.runtime.service_fields())
+            self._trust(config)
             save_config(self.settings, config)
         elif enabled and config is None:
             raise RuntimeSetupError(
@@ -209,6 +211,12 @@ class AIManager:
 
     def config(self) -> AIConfig | None:
         return load_config(self.settings)
+
+    def _trust(self, config: AIConfig) -> None:
+        """Trust the service this process just started, at its address."""
+        address = service_address(config)
+        if address:
+            trust_private_runtime(self.settings, address, self.runtime.running)
 
     def _models(self, config: AIConfig) -> tuple[ModelEntry, ModelEntry] | None:
         """The catalog models a private llama.cpp setup runs, if still current.
@@ -372,14 +380,14 @@ class AIManager:
                     else None,
                 )
             try:
-                socket_path = self.runtime.start(models)
+                self.runtime.start(models)
             except IsolationError as exc:
                 return AiRuntimeStartResponse(state="not_isolated", reason=exc.reason)
             except RuntimeSetupError:
                 return AiRuntimeStartResponse(state="not_isolated", reason="runtime_failed")
-            trust_private_runtime(self.settings, socket_path, self.runtime.running)
             previous = config
-            config = config.model_copy(update={"socket_path": socket_path})
+            config = config.model_copy(update=self.runtime.service_fields())
+            self._trust(config)
             try:
                 save_config(self.settings, config)
                 self.on_change(config)
@@ -405,13 +413,14 @@ class AIManager:
         if models is None or not all(self.runtime.has_model(m) for m in models):
             return
         try:
-            socket_path = self.runtime.start(models)
+            self.runtime.start(models)
         except (RuntimeSetupError, IsolationError):
             logging.getLogger(__name__).exception("ai.runtime_start_failed")
             return
-        trust_private_runtime(self.settings, socket_path, self.runtime.running)
-        if socket_path != config.socket_path:
-            config = config.model_copy(update={"socket_path": socket_path})
+        started = config.model_copy(update=self.runtime.service_fields())
+        self._trust(started)
+        if started != config:
+            config = started
             save_config(self.settings, config)
         self.on_change(config)
 

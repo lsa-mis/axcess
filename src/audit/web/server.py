@@ -1735,6 +1735,7 @@ def create_app(
             vlm_base_url=local_model.base_url if local_model else "http://127.0.0.1:11434",
             model_backend=local_model.backend if local_model else "ollama",
             model_socket=local_model.socket_path if local_model else None,
+            model_routes=dict(local_model.routes) or None if local_model else None,
             vlm_prompt_name=settings.vlm_prompt_name,
             vlm_concurrency=1,
             semantic_enabled=False,
@@ -3941,6 +3942,7 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
         vlm_base_url=model_endpoint.base_url,
         model_backend=model_endpoint.backend,
         model_socket=model_endpoint.socket_path,
+        model_routes=dict(model_endpoint.routes) or None,
         vlm_prompt_name=settings.vlm_prompt_name,
         vlm_concurrency=settings.vlm_concurrency,
         semantic_model=ai_semantic_model(settings),
@@ -4320,6 +4322,12 @@ def _local_login_model_endpoint(settings: Settings) -> ModelEndpoint | None:
     construction; a TCP address must be a literal loopback address.
     """
     endpoint = endpoint_from_settings(settings)
+    if endpoint.routes:
+        # Windows private service: every route is a launcher port on
+        # 127.0.0.1 that accepts only this Axcess process.
+        if all(_local_login_ollama_url(url) for _, url in endpoint.routes):
+            return endpoint
+        return None
     if endpoint.socket_path:
         return endpoint
     url = _local_login_ollama_url(endpoint.base_url)

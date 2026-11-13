@@ -22,6 +22,8 @@ on:
       - "desktop/scripts/bundle-llama-server.py"
       - "tests/integration/test_llama_runtime_live.py"
       - "tests/integration/test_ai_sandbox_live.py"
+      - "tests/integration/test_windows_launcher_live.py"
+      - "desktop/ai-launcher/**"
       - ".github/workflows/ai-sandbox.yml"
   pull_request:
     paths:
@@ -29,6 +31,8 @@ on:
       - "desktop/scripts/bundle-llama-server.py"
       - "tests/integration/test_llama_runtime_live.py"
       - "tests/integration/test_ai_sandbox_live.py"
+      - "tests/integration/test_windows_launcher_live.py"
+      - "desktop/ai-launcher/**"
       - ".github/workflows/ai-sandbox.yml"
 
 permissions:
@@ -82,3 +86,31 @@ jobs:
       - name: Show the service log
         if: failure()
         run: find /tmp -maxdepth 3 -name llama-server.log -exec tail -n 80 {} \; || true
+
+  windows:
+    name: Sandbox on windows-2022
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          python-version: "3.13"
+      - name: Install locked dependencies
+        run: uv sync --frozen --no-install-project
+      - name: Bundle the pinned llama.cpp builds
+        run: uv run --no-sync python desktop/scripts/bundle-llama-server.py
+      - name: Build the sandbox launcher
+        shell: pwsh
+        run: desktop/ai-launcher/build.ps1 -Output desktop/llama-runtime/axcess-ai-launcher.exe
+      - name: Launcher smoke test (check, serve, other process refused, stop)
+        shell: pwsh
+        run: >-
+          desktop/ai-launcher/smoke.ps1 -Launcher desktop/llama-runtime/axcess-ai-launcher.exe
+          -Runtime desktop/llama-runtime -WorkDir "$env:RUNNER_TEMP\axl"
+      - name: Python reaches the sandboxed service through the launcher
+        env:
+          AXCESS_LLAMA_SERVER_DIR: ${{ github.workspace }}\desktop\llama-runtime
+          PYTHONPATH: src
+        run: uv run --no-sync pytest -v -p no:cacheprovider tests/integration/test_windows_launcher_live.py

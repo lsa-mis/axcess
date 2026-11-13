@@ -119,13 +119,13 @@ class Installer:
                 self.status.done_bytes = min(base, self.status.total_bytes)
             step("starting")
             self.runtime.stop()  # A service started for another size.
-            socket_path = self.runtime.start((tier.text, tier.vision))
+            self.runtime.start((tier.text, tier.vision))
             step("finishing")
             config = AIConfig(
                 source="private",
                 base_url=SOCKET_BASE_URL,
                 backend="llama_cpp",
-                socket_path=socket_path,
+                **self.runtime.service_fields(),
                 tier=tier.id,
                 text_model=tier.text.served_name,
                 vision_model=tier.vision.served_name,

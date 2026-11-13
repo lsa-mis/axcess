@@ -548,6 +548,7 @@ def crawl(
             vlm_base_url=model_endpoint.base_url,
             model_backend=model_endpoint.backend,
             model_socket=model_endpoint.socket_path,
+            model_routes=dict(model_endpoint.routes) or None,
             vlm_prompt_name=settings.vlm_prompt_name,
             vlm_concurrency=settings.vlm_concurrency,
             synthesize_enabled=not skip_synthesize,

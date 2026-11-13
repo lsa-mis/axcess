@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import json
 import shutil
 import stat
 import subprocess
@@ -36,12 +37,23 @@ import zipfile
 from collections.abc import Callable, Iterable
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import TypedDict
 
 import httpx
 
 from audit.ai.catalog import Catalog, ModelEntry, RuntimeAsset, platform_key
 from audit.ai.sandbox import IsolationError, build_sandbox, test_network_boundary
 from audit.ai.state import SOCKET_BASE_URL
+from audit.ai.windows_launcher import (
+    LAUNCHER_NAME,
+    LauncherModelError,
+    LauncherService,
+    ModelProcess,
+    private_copy,
+    require_windows_sandbox,
+    run_check,
+    with_launcher,
+)
 
 Progress = Callable[[int, int], None]
 CHUNK = 1024 * 1024
@@ -148,6 +160,11 @@ def preset_text(models: Iterable[tuple[ModelEntry, Path, Path | None]], *, gpu: 
 _LAUNCHER = ThreadPoolExecutor(max_workers=1, thread_name_prefix="axcess-ai-launcher")
 
 
+class ServiceFields(TypedDict):
+    socket_path: str | None
+    routes: dict[str, str] | None
+
+
 class LlamaRuntime:
     """The private llama.cpp service kept in ``ai_dir``."""
 
@@ -166,6 +183,9 @@ class LlamaRuntime:
         # Set by stop() so a start still waiting for models gives up at once.
         self._abort = threading.Event()
         self.socket_path: str | None = None
+        # Windows: model name -> the launcher's port for that model.
+        self.routes: dict[str, str] | None = None
+        self._windows: LauncherService | None = None
         self.accelerator: str | None = None
         self.isolated = False
         self.isolation_reason: str | None = None
@@ -343,16 +363,18 @@ class LlamaRuntime:
     def _socket(self) -> Path:
         return (self.scratch / SOCKET_NAME).resolve()
 
+    def _launcher(self) -> Path | None:
+        return self.bundled_dir / LAUNCHER_NAME if self.bundled_dir else None
+
+    def service_fields(self) -> ServiceFields:
+        """Where the running service is, for the saved setup."""
+        return {"socket_path": self.socket_path, "routes": self.routes}
+
     def require_isolation(self) -> None:
         """Raise unless this computer can run the service sandboxed."""
         if sys.platform.startswith("win"):
-            # The Windows AppContainer launcher is not built yet, and
-            # Python on Windows has no UNIX sockets to reach the service.
-            raise IsolationError(
-                "sandbox_unavailable",
-                "This computer cannot isolate the AI service yet. AI was not started. "
-                "Saved results still work.",
-            )
+            require_windows_sandbox(self._launcher())
+            return
         root = self.bundled_dir if self.bundled() else self.download_dir
         build_sandbox(root or self.download_dir, self.models_dir, self.scratch)
         if len(str(self._socket()).encode()) > MAX_SOCKET_PATH:
@@ -375,8 +397,8 @@ class LlamaRuntime:
         """
         models = list(models)
         with self._lock:
-            if self.running() and self.socket_path:
-                return self.socket_path
+            if self.running() and (self.socket_path or self.routes):
+                return self.socket_path or json.dumps(self.routes, sort_keys=True)
             try:
                 self.require_isolation()
             except IsolationError as exc:
@@ -388,14 +410,90 @@ class LlamaRuntime:
             if not all(self.has_model(m) for m in models):
                 raise RuntimeSetupError("The AI models are not downloaded yet.")
             last: RuntimeSetupError | None = None
+            start = (
+                self._start_windows_locked if sys.platform.startswith("win") else self._start_locked
+            )
             for accelerator, server in builds:
                 try:
-                    return self._start_locked(accelerator, server, models, wait_s)
+                    return start(accelerator, server, models, wait_s)
                 except _ModelLoadError as exc:
                     last = RuntimeSetupError(str(exc))
                     continue
             self.isolation_reason = "runtime_failed"
             raise last or RuntimeSetupError("The isolated AI service could not start.")
+
+    def _start_windows_locked(
+        self, accelerator: str, server: Path, models: list[ModelEntry], wait_s: float
+    ) -> str:
+        """Windows: one server per model, each in the launcher's AppContainer."""
+        launcher = self._launcher()
+        require_windows_sandbox(launcher)
+        if launcher is None:  # pragma: no cover - require_windows_sandbox raised
+            raise RuntimeSetupError("The isolated AI service could not start.")
+        gpu = accelerator != "cpu"
+        self.models_dir.mkdir(parents=True, exist_ok=True)
+        self.scratch.mkdir(parents=True, exist_ok=True)
+        program = server.parent.resolve()
+        if not program.is_relative_to(self.ai_dir.resolve()):
+            program = private_copy(program, self.download_dir / accelerator).resolve()
+        # The check runs a copy of the launcher inside the sandbox, which
+        # may run programs only from the folder it is given.
+        launcher = with_launcher(program, launcher)
+        log = (self.ai_dir / "llama-server.log").resolve()
+        scratch = self.scratch.resolve()
+        models_dir = self.models_dir.resolve()
+        try:
+            run_check(launcher, program, models_dir, scratch, log, gpu=gpu)
+        except IsolationError as exc:
+            self.isolated = False
+            self.isolation_reason = exc.reason
+            raise
+        processes = []
+        for index, (entry, model, mmproj) in enumerate(self._model_paths(models)):
+            sock = scratch / f"m{index}.sock"
+            sock.unlink(missing_ok=True)
+            argv = [str(program / "llama-server.exe"), "-m", str(model)]
+            if mmproj is not None:
+                argv += ["--mmproj", str(mmproj)]
+            argv += [
+                "--alias",
+                entry.served_name,
+                "-c",
+                str(CONTEXT_TOKENS),
+                "-ngl",
+                "99" if gpu else "0",
+                "--reasoning",
+                "off",
+                "--reasoning-format",
+                "none",
+                "--host",
+                str(sock),
+                "--no-webui",
+                "--offline",
+            ]
+            processes.append(ModelProcess(entry.served_name, sock, argv))
+        service = LauncherService(launcher)
+        self._windows = service
+        try:
+            routes = _LAUNCHER.submit(
+                lambda: service.start(processes, program, models_dir, scratch, log, gpu=gpu)
+            ).result()
+            service.wait_ready(self._abort, wait_s)
+        except LauncherModelError as exc:
+            self._stop_locked()
+            raise _ModelLoadError(
+                "The AI service could not load its models with this computer's graphics driver."
+            ) from exc
+        except IsolationError as exc:
+            self._stop_locked()
+            self.isolation_reason = exc.reason
+            raise RuntimeSetupError(str(exc)) from exc
+        self.routes = routes
+        self.socket_path = None
+        self.accelerator = accelerator
+        self.isolated = True
+        self.isolation_reason = None
+        return json.dumps(routes, sort_keys=True)
 
     def _start_locked(
         self, accelerator: str, server: Path, models: list[ModelEntry], wait_s: float
@@ -503,6 +601,8 @@ class LlamaRuntime:
         raise RuntimeSetupError("The isolated AI service did not start in time.")
 
     def running(self) -> bool:
+        if self._windows is not None:
+            return self._windows.running() and self.isolated
         return self._process is not None and self._process.poll() is None and self.isolated
 
     def stop(self) -> None:
@@ -517,8 +617,12 @@ class LlamaRuntime:
 
     def _stop_locked(self) -> None:
         process, self._process = self._process, None
+        windows, self._windows = self._windows, None
         self.socket_path = None
+        self.routes = None
         self.isolated = False
+        if windows is not None:
+            windows.stop()
         if process is not None and process.poll() is None:
             process.terminate()
             try:

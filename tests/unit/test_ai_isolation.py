@@ -408,6 +408,7 @@ def manager_for(tmp_path, *, enabled=True, desktop=True, source="private", backe
     runtime.download_remaining.return_value = 0
     runtime.isolation_reason = None
     runtime.start.return_value = socket
+    runtime.service_fields.return_value = {"socket_path": socket, "routes": None}
     return AIManager(settings, Mock(), runtime=runtime), runtime
 
 

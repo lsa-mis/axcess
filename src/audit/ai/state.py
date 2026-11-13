@@ -34,10 +34,22 @@ def trust_private_runtime(settings: Settings, address: str, running: Callable[[]
     _PRIVATE_RUNTIMES[ai_dir(settings).resolve()] = (address, running)
 
 
-def private_runtime_socket(settings: Settings, config: AIConfig) -> str:
+def service_address(config: AIConfig) -> str | None:
+    """What identifies a running private service: its socket, or its routes."""
+    if config.routes:
+        return json.dumps(config.routes, sort_keys=True)
+    return config.socket_path
+
+
+def private_runtime_trusted(settings: Settings, config: AIConfig) -> bool:
     trusted = _PRIVATE_RUNTIMES.get(ai_dir(settings).resolve())
-    if trusted is not None and trusted[0] == config.socket_path and trusted[1]():
-        return trusted[0]
+    address = service_address(config)
+    return trusted is not None and address is not None and trusted[0] == address and trusted[1]()
+
+
+def private_runtime_socket(settings: Settings, config: AIConfig) -> str:
+    if private_runtime_trusted(settings, config) and config.socket_path:
+        return config.socket_path
     # A socket file left from an earlier run proves nothing about what now
     # listens there. Point at a path that never exists, so every request
     # fails closed until this process has started and checked the service.
@@ -113,6 +125,8 @@ class AIConfig(BaseModel):
     # saved before it says "ollama" and needs its models downloaded again.
     backend: Literal["ollama", "llama_cpp"] = "ollama"
     socket_path: str | None = None
+    # Windows: model name -> the launcher's 127.0.0.1 port for that model.
+    routes: dict[str, str] | None = None
 
     @field_validator("base_url")
     @classmethod
@@ -175,11 +189,24 @@ def effective_settings(settings: Settings) -> Settings:
         if settings.suggestions_enabled == enabled:
             return settings
         return settings.model_copy(update={"suggestions_enabled": enabled})
-    if config.source == "private" and config.backend == "llama_cpp":
+    if config.source == "private" and config.backend == "llama_cpp" and config.routes:
+        # Windows: one server per model behind the launcher's ports. Not
+        # started and checked by this process: port 0, which never answers.
+        trusted = private_runtime_trusted(settings, config)
         service: dict[str, object] = {
             "model_backend": "llama_cpp",
             "llama_cpp_url": SOCKET_BASE_URL,
+            "llama_cpp_socket": None,
+            "llama_cpp_routes": dict(config.routes)
+            if trusted
+            else dict.fromkeys(config.routes, "http://127.0.0.1:0"),
+        }
+    elif config.source == "private" and config.backend == "llama_cpp":
+        service = {
+            "model_backend": "llama_cpp",
+            "llama_cpp_url": SOCKET_BASE_URL,
             "llama_cpp_socket": Path(private_runtime_socket(settings, config)),
+            "llama_cpp_routes": None,
         }
     elif config.source == "private":
         # A private Ollama setup from before llama.cpp: nothing runs it any

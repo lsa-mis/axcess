@@ -181,6 +181,12 @@ class ModelEndpoint:
     backend: Backend
     base_url: str
     socket_path: str | None = None
+    # Model name -> base URL of the server that runs only that model. Set on
+    # Windows, where the private service runs one llama-server per model
+    # (a Windows AppContainer blocks the loopback a router needs);
+    # :class:`ModelRoutingTransport` sends each request to its model's
+    # server. Sorted pairs so the endpoint stays hashable.
+    routes: tuple[tuple[str, str], ...] = ()
 
 
 def endpoint_from_settings(settings: Settings) -> ModelEndpoint:
@@ -191,8 +197,92 @@ def endpoint_from_settings(settings: Settings) -> ModelEndpoint:
             backend="llama_cpp",
             base_url=settings.llama_cpp_url,
             socket_path=str(socket) if socket else None,
+            routes=tuple(sorted((settings.llama_cpp_routes or {}).items())),
         )
     return ModelEndpoint(backend="ollama", base_url=settings.ollama_base_url)
+
+
+class ModelRoutingTransport(httpx.AsyncBaseTransport):
+    """Send each request to the server that runs its model.
+
+    The model comes from the JSON body's ``model`` (POST) or the ``model``
+    query parameter (GET), as llama-server's own router reads it. Requests
+    that name no model are answered for all servers together: ``/health``
+    is ready only when every server is; the model lists are joined.
+    """
+
+    def __init__(
+        self,
+        routes: Mapping[str, str],
+        transport: httpx.AsyncBaseTransport | None = None,
+    ) -> None:
+        if not routes:
+            raise ValueError("A routing transport needs at least one model route.")
+        self._routes = {name: httpx.URL(url) for name, url in routes.items()}
+        self._inner = transport or httpx.AsyncHTTPTransport()
+
+    def _target(self, request: httpx.Request, base: httpx.URL) -> httpx.Request:
+        url = request.url.copy_with(scheme=base.scheme, host=base.host, port=base.port)
+        headers = httpx.Headers(request.headers)
+        headers["host"] = url.netloc.decode("ascii")
+        return httpx.Request(
+            request.method,
+            url,
+            headers=headers,
+            stream=request.stream,
+            extensions=request.extensions,
+        )
+
+    @staticmethod
+    def _model_of(request: httpx.Request) -> str | None:
+        named = request.url.params.get("model")
+        if named:
+            return str(named)
+        if request.method != "POST":
+            return None
+        try:
+            body = json.loads(request.content or b"null")
+        except (ValueError, httpx.RequestNotRead):
+            return None
+        value = body.get("model") if isinstance(body, dict) else None
+        return value if isinstance(value, str) else None
+
+    async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
+        model = self._model_of(request)
+        if model is not None:
+            base = self._routes.get(model)
+            if base is None:
+                return httpx.Response(
+                    404,
+                    json={"error": {"code": 404, "message": "model not found"}},
+                    request=request,
+                )
+            return await self._inner.handle_async_request(self._target(request, base))
+        # No model named: ask every server.
+        replies: list[httpx.Response] = []
+        for base in self._routes.values():
+            reply = await self._inner.handle_async_request(self._target(request, base))
+            await reply.aread()
+            replies.append(reply)
+        failed = next((r for r in replies if r.status_code != 200), None)
+        if failed is not None:
+            return httpx.Response(
+                failed.status_code,
+                headers=failed.headers,
+                content=failed.content,
+                request=request,
+            )
+        if request.url.path.rstrip("/") in {"/v1/models", "/models"}:
+            joined: list[Any] = []
+            for reply in replies:
+                data = reply.json().get("data") if reply.content else None
+                joined.extend(data if isinstance(data, list) else [])
+            return httpx.Response(200, json={"object": "list", "data": joined}, request=request)
+        first = replies[0]
+        return httpx.Response(200, headers=first.headers, content=first.content, request=request)
+
+    async def aclose(self) -> None:
+        await self._inner.aclose()
 
 
 def open_model_http_client(endpoint: ModelEndpoint, **kwargs: Any) -> httpx.AsyncClient:
@@ -203,7 +293,11 @@ def open_model_http_client(endpoint: ModelEndpoint, **kwargs: Any) -> httpx.Asyn
     socket it adds ``httpx.AsyncHTTPTransport(uds=...)`` (httpx's documented
     way to speak HTTP over a socket). The caller owns and closes the client.
     """
-    if endpoint.socket_path:
+    if endpoint.routes:
+        if "transport" in kwargs:
+            raise ValueError("A routed endpoint chooses its own transport.")
+        kwargs["transport"] = ModelRoutingTransport(dict(endpoint.routes))
+    elif endpoint.socket_path:
         if "transport" in kwargs:
             raise ValueError("A UNIX-socket endpoint chooses its own transport.")
         kwargs["transport"] = httpx.AsyncHTTPTransport(uds=endpoint.socket_path)
@@ -619,6 +713,7 @@ __all__ = [
     "ModelClient",
     "ModelEndpoint",
     "ModelResponseError",
+    "ModelRoutingTransport",
     "ModelServiceError",
     "ModelStatusError",
     "ModelTimeoutError",

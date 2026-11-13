@@ -332,6 +332,7 @@ def test_runtime_start_states(
     runtime.download_remaining.return_value = 0
     runtime.isolation_reason = None
     runtime.start.return_value = socket
+    runtime.service_fields.return_value = {"socket_path": socket, "routes": None}
     if state == "not_isolated":
         runtime.start.side_effect = IsolationError("network_test_failed", "AI isolation failed")
     original = AIManager.__init__

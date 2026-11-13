@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     model_backend: Literal["ollama", "llama_cpp"] = "ollama"
     llama_cpp_url: str = "http://127.0.0.1:8080"
     llama_cpp_socket: Path | None = None
+    # Windows only: model name -> URL of the llama-server that runs just
+    # that model (``ModelRoutingTransport``); set by the desktop app.
+    llama_cpp_routes: dict[str, str] | None = None
     # The desktop app's own llama.cpp builds (``resources/llama-runtime``,
     # one folder per accelerator), set by the desktop shell. Unset when
     # running from source: the AI setup then downloads the same pinned

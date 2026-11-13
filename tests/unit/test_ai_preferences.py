@@ -92,6 +92,7 @@ def test_off_keeps_models_and_on_reuses_them(tmp_path: Path, source: str) -> Non
     marker.write_text("model")
     runtime = Mock(spec=LlamaRuntime)
     runtime.start.return_value = socket_path(settings)
+    runtime.service_fields.return_value = {"socket_path": socket_path(settings), "routes": None}
     applied = []
     manager = AIManager(settings, applied.append, runtime=runtime)
     assert manager.set_enabled(False).enabled is False
@@ -179,6 +180,7 @@ def test_failed_application_rolls_back_preference(tmp_path: Path) -> None:
     save_preferences(settings, AIPreferences(enabled=False, choice_recorded=True))
     runtime = Mock(spec=LlamaRuntime)
     runtime.start.return_value = socket_path(settings)
+    runtime.service_fields.return_value = {"socket_path": socket_path(settings), "routes": None}
     manager = AIManager(settings, Mock(side_effect=RuntimeError("worker failed")), runtime=runtime)
     with pytest.raises(RuntimeError, match="worker failed"):
         manager.set_enabled(True)

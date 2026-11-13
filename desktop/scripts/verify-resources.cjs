@@ -68,6 +68,10 @@ if (["darwin", "win32", "linux"].includes(process.platform)) {
         : entry.name === serverName,
     );
   if (!found(llamaRoot)) throw new Error(`llama-server is missing from ${llamaRoot}`);
+  if (process.platform === "win32") {
+    // Windows isolates the service with this launcher (desktop/ai-launcher).
+    requirePath(path.join(llamaRoot, "axcess-ai-launcher.exe"), "AI sandbox launcher");
+  }
 }
 
 console.log("Axcess desktop build resources are complete.");

@@ -151,6 +151,8 @@ class CrawlConfig:
     # used, and the service that ran them does not change the stored result.
     model_backend: Backend = "ollama"
     model_socket: str | None = None
+    # Windows private service: model name -> its own server's URL.
+    model_routes: dict[str, str] | None = None
     # Synthesis, toggle off with ``--skip-synthesize`` if the caller wants
     # to run ``audit synthesize`` manually against the same scan later.
     synthesize_enabled: bool = True
@@ -743,10 +745,15 @@ def _signed_in_entry_url(start_url: str) -> str:
 
 def _model_http_client(config: CrawlConfig, client: httpx.AsyncClient) -> httpx.AsyncClient:
     """The HTTP client the AI checks use: the crawl's, or one for a socket."""
-    if not config.model_socket:
+    if not config.model_socket and not config.model_routes:
         return client
     return open_model_http_client(
-        ModelEndpoint(config.model_backend, config.vlm_base_url, config.model_socket),
+        ModelEndpoint(
+            config.model_backend,
+            config.vlm_base_url,
+            config.model_socket,
+            tuple(sorted((config.model_routes or {}).items())),
+        ),
         timeout=config.request_timeout_s,
     )
 

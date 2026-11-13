@@ -285,6 +285,7 @@ def test_install_saves_private_llama_cpp_setup(tmp_path: Path) -> None:
 
     def fake_start(models, **_kw):  # type: ignore[no-untyped-def]
         started.append([m.tag for m in models])
+        manager.runtime.socket_path = socket
         return socket
 
     manager = AIManager(settings, changes.append, probe=lambda: machine(24))
