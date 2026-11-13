@@ -36,7 +36,9 @@
  *   run on --runtime, read on --models and change on --scratch, and nothing
  *   else. They cannot start child processes, run in a job object that kills
  *   them when this launcher exits, inherit only the log file and an empty
- *   standard input, and see only SystemRoot, TEMP, TMP and PATH.
+ *   standard input, and see only SystemRoot, TEMP, TMP, PATH, and the
+ *   LOCALAPPDATA and USERPROFILE that Windows rewrites to the container's
+ *   own folder.
  *   --gpu adds only the "registryRead" and "lpacPnpNotifications"
  *   capabilities, never a network one. The TCP relay listens on 127.0.0.1
  *   only, with an exclusive port, and closes every connection that does
@@ -580,22 +582,46 @@ static wchar_t *build_cmdline(wchar_t **args, int count)
     return buf;
 }
 
-/* The child's whole environment, sorted as Windows expects. */
+static wchar_t *parent_variable(const wchar_t *name)
+{
+    DWORD n = GetEnvironmentVariableW(name, NULL, 0);
+    wchar_t *v;
+    if (!n)
+        fail("GetEnvironmentVariableW", GetLastError());
+    v = (wchar_t *)xalloc((size_t)n * sizeof(wchar_t));
+    if (GetEnvironmentVariableW(name, v, n) + 1 != n)
+        fail("GetEnvironmentVariableW", GetLastError());
+    return v;
+}
+
+/* The child's whole environment, sorted as Windows expects. LOCALAPPDATA
+ * and USERPROFILE are there because CreateProcessW rewrites them (and
+ * TEMP/TMP) to the AppContainer's own folder and fails with error 203
+ * (ERROR_ENVVAR_NOT_FOUND) when they are missing (GitHub windows-2022
+ * runner, 2026-11-13). The rewritten folder is the container's, which it
+ * may use; the person's own profile stays out of reach. */
 static wchar_t *child_environment(const wchar_t *exe_dir, const wchar_t *scratch)
 {
     wchar_t sysroot[MAX_PATH + 1];
+    wchar_t *local = parent_variable(L"LOCALAPPDATA");
+    wchar_t *profile = parent_variable(L"USERPROFILE");
     size_t cap, n = 0;
     wchar_t *env;
     UINT len = GetSystemWindowsDirectoryW(sysroot, MAX_PATH + 1);
     if (!len || len > MAX_PATH)
         fail("GetSystemWindowsDirectoryW", GetLastError());
-    cap = wcslen(exe_dir) + wcslen(sysroot) + 2 * wcslen(scratch) + 64;
+    cap = wcslen(local) + wcslen(profile) + wcslen(exe_dir) + wcslen(sysroot) +
+          2 * wcslen(scratch) + 96;
     env = (wchar_t *)xalloc(cap * sizeof(wchar_t));
+    n += (size_t)_snwprintf(env + n, cap - n, L"LOCALAPPDATA=%ls", local) + 1;
     n += (size_t)_snwprintf(env + n, cap - n, L"PATH=%ls", exe_dir) + 1;
     n += (size_t)_snwprintf(env + n, cap - n, L"SystemRoot=%ls", sysroot) + 1;
     n += (size_t)_snwprintf(env + n, cap - n, L"TEMP=%ls", scratch) + 1;
     n += (size_t)_snwprintf(env + n, cap - n, L"TMP=%ls", scratch) + 1;
+    n += (size_t)_snwprintf(env + n, cap - n, L"USERPROFILE=%ls", profile) + 1;
     env[n] = 0;
+    free(local);
+    free(profile);
     return env;
 }
 
