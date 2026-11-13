@@ -234,6 +234,15 @@ Format (RTF), and Google Docs, Sheets, Slides and Drive files. Use it to decide
 which file to fix first. Axcess checks only the PDF files; see
 [Document check](glossary.md#document-check) for what it checks.
 
+The tab is laid out like the Issues tab. Four numbers above the table count
+the documents, then how many are Mostly sure, Not sure and Could not check.
+Under the table, two closed rows open more detail. **What was checked** shows
+"Only PDFs checked" and opens what the list covers, what Axcess downloaded and
+kept, and what the list can miss (the same facts as below). **What "Mostly
+sure", "Not sure" and the other labels mean** explains a document, the How
+sure values, and the order. A report that did not look for documents shows no
+numbers, and its empty table says so.
+
 Each row shows:
 
 - **Document**: the file's name, which opens the file in a new tab, and its
