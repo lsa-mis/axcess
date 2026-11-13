@@ -120,6 +120,19 @@ DEFAULT_BLOCKED_LABELS: tuple[str, ...] = (
     "connect account",
     "start trial",
     "upgrade",
+    # Marking messages or tasks changes the account, not just the page. A
+    # signed-in scan pressed a notifications menu's "Mark all as read" on 98
+    # of 100 pages before these were added. Phrases, not the bare word: "mark"
+    # alone would also refuse "Markdown" and "Market". "archive" is left out
+    # on purpose: these words also stop click-through from queueing a link
+    # whose address holds them, and "/blog/archive" is an ordinary page.
+    "mark all",
+    "mark as",
+    "mark read",
+    "mark unread",
+    "mark complete",
+    "mark done",
+    "bookmark",
 )
 
 # Native and explicitly semantic controls, including controls implemented as
