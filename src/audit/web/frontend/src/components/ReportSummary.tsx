@@ -28,7 +28,7 @@ import { CLICK_THROUGH_STATES, clickThroughStates } from "../lib/labels";
  * 4px spacing of the lines above it and the group stays one unit (see the
  * spacing rule in ReportSummary).
  */
-function SummaryStat({
+export function SummaryStat({
   label,
   value,
   details = [],
@@ -207,7 +207,7 @@ export function ReportSummary({
           and Issue occurrences) share a row, as the pair they are, and the
           pages take the row under them, so nothing is squeezed at 320px (SC
           1.4.10 Reflow, Level AA). */}
-      <dl className="mt-10 mb-5 grid grid-cols-2 gap-x-8 gap-y-8 sm:grid-cols-3 lg:gap-x-12">
+      <SummaryNumbers>
         <SummaryStat label={issueGroups === 1 ? "Issue type" : "Issue types"} value={issueGroups} />
         <SummaryStat
           label={occurrences === 1 ? "Issue occurrence" : "Issue occurrences"}
@@ -241,8 +241,25 @@ export function ReportSummary({
               : undefined
           }
         />
-      </dl>
+      </SummaryNumbers>
     </>
+  );
+}
+
+/**
+ * The row of summary numbers over a report view's table: a ``dl`` of
+ * ``SummaryStat``s, with no panel, border or fill. The spacing, the columns
+ * and why there is no frame are explained on the Issues numbers above
+ * (ReportSummary); this is the same row, so every report view that counts
+ * its table's rows shows them in the same place and the same form (SC 3.2.4
+ * Consistent Identification, Level AA). ``className`` may change the column
+ * count for a view with more or fewer numbers; nothing else should differ.
+ */
+export function SummaryNumbers({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <dl className={cn("mt-10 mb-5 grid grid-cols-2 gap-x-8 gap-y-8 sm:grid-cols-3 lg:gap-x-12", className)}>
+      {children}
+    </dl>
   );
 }
 
