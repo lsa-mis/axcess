@@ -236,8 +236,9 @@ async def test_several_in_a_group_and_across_groups_match_the_api(
     # under How sure the table shows them too, and the note says what they are.
     both = await _assert_matches_api(page, base, scan_id)
     assert ct < both and any(key.startswith("image%3A") for key in both), both
+    # Other filters narrowed the rows, so the note does not say "every" alone.
     await pw.expect(page.get_by_role("note", name="Issue types shown")).to_contain_text(
-        "Showing every issue type"
+        "Showing every issue type that matches your filters"
     )
     await _box(page, "How sure", "informational").check()
     narrowed = await _assert_matches_api(page, base, scan_id)
@@ -391,6 +392,7 @@ async def test_table_opens_on_every_group_and_one_button_shows_the_surest(
 
     note = page.get_by_role("note", name="Issue types shown")
     await pw.expect(note).to_contain_text("Showing every issue type")
+    await pw.expect(note).not_to_contain_text("matches your filters")
     await pw.expect(note).to_contain_text("Not sure 1, For information 1")
     await pw.expect(note).to_contain_text(
         "A person must check a Not sure issue type before you report it."

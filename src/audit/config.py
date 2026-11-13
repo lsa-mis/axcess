@@ -50,7 +50,9 @@ class Settings(BaseSettings):
     # model about one image's alt text after the scan. Empty means off, and
     # no image is sent anywhere. Kept apart from ``vlm_model`` on purpose:
     # changing this model must not change how a completed scan was analysed.
-    # The check goes to ``ollama_base_url`` above, the local daemon.
+    # The check goes to ``ollama_base_url`` above, and stays off unless that
+    # is a loopback address (localhost or 127.0.0.1), so nothing leaves this
+    # computer.
     alt_check_model: str = ""
     alt_check_timeout_s: float = Field(default=90.0, ge=5.0, le=600.0)
     # AI fix suggestions (on demand, per occurrence). Off until an

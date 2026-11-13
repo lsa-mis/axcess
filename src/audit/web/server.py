@@ -2850,20 +2850,29 @@ def create_app(
     # a verdict on its alt text (audit/web/image_inventory.py). Asking the
     # local model about one image is a separate POST a person makes with a
     # button; nothing here calls a model on its own.
+    # The check sends the saved image, its OCR text and nearby page text to
+    # the model, and the Images tab says that stays on this computer. So it
+    # runs only against a literal loopback Ollama address, the same rule as
+    # sign-in scans; a remote AUDIT_OLLAMA_BASE_URL leaves the check off.
+    alt_check_url = _local_login_ollama_url(settings.ollama_base_url)
+
     def _default_alt_checker_factory(client: httpx.AsyncClient) -> Any:
         from audit.analyzer.vlm.alt_check import OllamaAltChecker
 
+        # Only installed when alt_check_url is a loopback address (below).
         return OllamaAltChecker(
             client,
             model=settings.alt_check_model.strip(),
-            base_url=settings.ollama_base_url,
+            base_url=str(alt_check_url),
             timeout_s=settings.alt_check_timeout_s,
         )
 
-    # None when no model is set: the tab then says the check is off. Tests
-    # replace this with a stub.
+    # None when no model is set, or the model is not on this computer: the
+    # tab then says the check is off. Tests replace this with a stub.
     app.state.alt_checker_factory = (
-        _default_alt_checker_factory if settings.alt_check_model.strip() else None
+        _default_alt_checker_factory
+        if settings.alt_check_model.strip() and alt_check_url is not None
+        else None
     )
 
     @app.get("/api/scans/{scan_id:int}/images")

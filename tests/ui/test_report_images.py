@@ -148,6 +148,30 @@ def test_check_without_model_is_refused(app_and_ids: Any) -> None:
     assert "No local model" in response.json()["detail"]
 
 
+@pytest.mark.parametrize(
+    ("base_url", "available"),
+    [
+        ("http://127.0.0.1:11434", True),
+        ("http://localhost:11434", True),
+        ("http://192.168.1.20:11434", False),
+        ("https://ollama.example.com", False),
+    ],
+)
+def test_check_runs_only_against_a_model_on_this_computer(
+    seeded_db: tuple[Path, Path, int],
+    monkeypatch: pytest.MonkeyPatch,
+    base_url: str,
+    available: bool,
+) -> None:
+    # The check sends the image and nearby page text to the model, and the
+    # Images tab says that stays on this computer.
+    db_path, blob_dir, _ = seeded_db
+    monkeypatch.setenv("AUDIT_ALT_CHECK_MODEL", "llava:7b")
+    monkeypatch.setenv("AUDIT_OLLAMA_BASE_URL", base_url)
+    app = create_app(db_path=db_path, blob_dir=blob_dir)
+    assert (app.state.alt_checker_factory is not None) is available
+
+
 def test_check_saves_and_returns_the_row(app_and_ids: Any) -> None:
     client, scan_id, photo, _ = app_and_ids
     stub = _Stub()

@@ -63,7 +63,10 @@ export default function ScreenReaderSteps({
                   href={platform.link_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 font-semibold text-umich-blue underline underline-offset-2"
+                  // On its own line, so the inline-link exception does not
+                  // apply: 44 px tall like every standalone link (SC 2.5.5
+                  // Target Size (Enhanced), Level AAA).
+                  className="inline-flex min-h-target items-center gap-1 font-semibold text-umich-blue underline underline-offset-2"
                 >
                   {platform.link_text ?? platform.link_url}
                   <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden />

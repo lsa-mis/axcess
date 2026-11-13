@@ -789,7 +789,8 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     note = page.get_by_role("note", name="Issue types shown")
     await playwright_async.expect(note).to_contain_text("Showing every issue type")
     await playwright_async.expect(summary.get_by_text("hidden", exact=False)).to_have_count(0)
-    table_box = await note.bounding_box()
+    await playwright_async.expect(note).to_contain_text("Not sure 1, For information 1")
+    table_box = await page.get_by_role("region", name="Issues table").bounding_box()
     coverage_box = await coverage.bounding_box()
     assert table_box and coverage_box and coverage_box["y"] > table_box["y"], (
         table_box,
@@ -1221,6 +1222,36 @@ async def test_search_finds_every_sidebar_place(
         await page.keyboard.press("Enter")
         await playwright_async.expect(dialog).to_have_count(0)
         await playwright_async.expect(page).to_have_url(re.compile(re.escape(path) + r"$"))
+
+
+@pytest.mark.parametrize(
+    ("query", "label", "url"),
+    [
+        ("1.4.3", "1.4.3 Contrast (Minimum)", r"version=2\.1&criterion=1\.4\.3"),
+        # Only in WCAG 2.2: it opens the 2.2 map, the one that holds it.
+        ("2.5.8", "2.5.8 Target Size (Minimum)", r"version=2\.2&criterion=2\.5\.8"),
+    ],
+)
+async def test_search_opens_a_wcag_criterion_on_its_own_version(
+    live_server: tuple[str, int],
+    new_page: Any,
+    query: str,
+    label: str,
+    url: str,
+) -> None:
+    """A criterion from either WCAG version can be found with Search."""
+    base, _scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(f"{base}/app/scans", wait_until="networkidle")
+    sidebar = page.get_by_role("complementary", name="Primary")
+    await sidebar.get_by_role("button", name="Search everything (Cmd+K)", exact=True).click()
+    dialog = page.get_by_role("dialog", name="Search everything")
+    await dialog.get_by_role("textbox", name="Search").fill(query)
+    option = dialog.get_by_role("option").filter(has_text=label).first
+    await playwright_async.expect(option).to_be_visible()
+    await option.click()
+    await playwright_async.expect(page).to_have_url(re.compile(url))
+    await playwright_async.expect(page.get_by_role("heading", name=label)).to_be_visible()
 
 
 @pytest.mark.parametrize(

@@ -112,10 +112,18 @@ export default function CommandPalette({
     enabled: open,
   });
   // WCAG criteria, so typing "contrast" or "1.4.3" opens that criterion on
-  // Coverage. WCAG 2.1, the version scans use; only fetched while Search is open.
-  const criteriaQuery = useQuery({
+  // Coverage. Both versions are searched: 2.1 (the version scans use) and the
+  // criteria only 2.2 has, such as 2.5.8, each opening the map that holds it.
+  // Only fetched while Search is open.
+  const criteria21Query = useQuery({
     queryKey: ["coverage-checks", "2.1"],
     queryFn: () => api.getCoverageChecks("2.1"),
+    enabled: open,
+    staleTime: Infinity,
+  });
+  const criteria22Query = useQuery({
+    queryKey: ["coverage-checks", "2.2"],
+    queryFn: () => api.getCoverageChecks("2.2"),
     enabled: open,
     staleTime: Infinity,
   });
@@ -204,16 +212,22 @@ export default function CommandPalette({
     // Criteria only for a real query, at most MAX_CRITERIA, so an empty
     // Search still opens on places and reports.
     if (q) {
-      const criteria = (criteriaQuery.data?.criteria ?? []).filter((c) =>
-        `${c.sc} ${c.name}`.toLowerCase().includes(q),
-      );
-      for (const c of criteria.slice(0, MAX_CRITERIA)) {
+      // A 2.1 criterion opens on 2.1; one only in 2.2 opens on 2.2.
+      const in21 = new Set((criteria21Query.data?.criteria ?? []).map((c) => c.sc));
+      const both = [
+        ...(criteria21Query.data?.criteria ?? []).map((c) => ({ c, version: "2.1", only22: false })),
+        ...(criteria22Query.data?.criteria ?? [])
+          .filter((c) => !in21.has(c.sc))
+          .map((c) => ({ c, version: "2.2", only22: true })),
+      ];
+      const criteria = both.filter(({ c }) => `${c.sc} ${c.name}`.toLowerCase().includes(q));
+      for (const { c, version, only22 } of criteria.slice(0, MAX_CRITERIA)) {
         out.push({
-          id: `criterion-${c.sc}`,
+          id: `criterion-${version}-${c.sc}`,
           group: "WCAG criteria",
           label: `${c.sc} ${c.name}`,
-          sublabel: `How Axcess checks it: ${CHECK_METHOD_LABEL[c.method]}`,
-          to: `/coverage?criterion=${c.sc}`,
+          sublabel: `${only22 ? "WCAG 2.2 only. " : ""}How Axcess checks it: ${CHECK_METHOD_LABEL[c.method]}`,
+          to: `/coverage?version=${version}&criterion=${c.sc}`,
         });
       }
     }
@@ -233,7 +247,7 @@ export default function CommandPalette({
       }
     }
     return out;
-  }, [query, scansQuery.data, criteriaQuery.data, issuesQuery.data, scanId, prefs]);
+  }, [query, scansQuery.data, criteria21Query.data, criteria22Query.data, issuesQuery.data, scanId, prefs]);
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "ArrowDown") {

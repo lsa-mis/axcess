@@ -366,7 +366,7 @@ export default function IssuesRoute() {
             {sort && `${describeSort(sort)}.`}
           </TableStatus>
         )}
-        {needsNote && <AllIssuesNote rows={rows} onShowSurest={showSurest} />}
+        {needsNote && <AllIssuesNote rows={rows} narrowed={hasFilter} onShowSurest={showSurest} />}
         {rows.length === 0 ? (
           <TableEmpty>
             {hasFilter
@@ -1000,7 +1000,16 @@ const IssueTableRow = memo(function IssueTableRow({
  * (Enhanced), Level AAA). It wraps under the text at 320px (SC 1.4.10
  * Reflow, Level AA).
  */
-function AllIssuesNote({ rows, onShowSurest }: { rows: IssueRow[]; onShowSurest: () => void }) {
+function AllIssuesNote({
+  rows,
+  narrowed,
+  onShowSurest,
+}: {
+  rows: IssueRow[];
+  /** Search, Level or Where it shows has narrowed the rows. */
+  narrowed: boolean;
+  onShowSurest: () => void;
+}) {
   const counts = REVIEW_LANES.map((key) => ({ key, count: rows.filter((row) => row.review_lane === key).length })).filter(
     (entry) => entry.count > 0,
   );
@@ -1012,8 +1021,11 @@ function AllIssuesNote({ rows, onShowSurest }: { rows: IssueRow[]; onShowSurest:
       className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-border bg-surface-muted px-4 py-2 text-sm text-fg"
     >
       <p className="max-w-measure">
+        {/* With another filter on, the rows are not the whole report, so the
+            heading says so rather than claim "every" (AGENTS.md, Interface
+            language rule 5: text matches what the table shows). */}
         <span className="font-semibold">
-          Showing every issue type
+          {narrowed ? "Showing every issue type that matches your filters" : "Showing every issue type"}
         </span>
         {": "}
         {counts.map((entry) => `${REVIEW_TYPE_LABEL[entry.key]} ${entry.count.toLocaleString()}`).join(", ")}.
