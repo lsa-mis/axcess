@@ -34,6 +34,7 @@ _ROUTES = [
     "/app/scans/{scan_id}/issues/image:logo_adequate",
     "/app/scans/{scan_id}/issues/image:logo_adequate/pages",
     "/app/scans/{scan_id}/pages",
+    "/app/scans/{scan_id}/documents",
     "/app/scans/{scan_id}/pages/1",
     "/app/scans/{scan_id}/pages/1/inspect",
     "/app/scans/{scan_id}/findings",
