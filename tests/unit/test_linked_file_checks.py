@@ -1,10 +1,79 @@
-"""The type rules for linked files."""
+"""The PDF checks and the type rules, against the seeded fixture files.
+
+Each fixture PDF (tests/support/linked_file_pdfs.py) differs from the clean
+control in one way, so each must fail exactly one check, and the control
+none. These are files we wrote, so they are regression tests for the checks,
+not evidence that the checks are right on real files.
+"""
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
+from support.linked_file_pdfs import build
 
 from audit.linked_files import formats
+from audit.linked_files.pdf_check import check_pdf
+
+FILES = Path(__file__).resolve().parents[1] / "fixtures" / "site" / "documents" / "files"
+
+
+@pytest.mark.parametrize(
+    ("name", "failed"),
+    [
+        ("clean.pdf", ()),
+        ("revealed.pdf", ()),
+        ("form.pdf", ()),
+        ("untagged.pdf", ("not_tagged",)),
+        ("offsite.pdf", ("not_tagged",)),
+        ("scanned.pdf", ("no_text",)),
+        ("no-title.pdf", ("no_title",)),
+        ("no-language.pdf", ("no_language",)),
+        ("encrypted.pdf", ("blocks_assistive_tech",)),
+    ],
+)
+def test_each_seeded_pdf_fails_exactly_its_check(name: str, failed: tuple[str, ...]) -> None:
+    result = check_pdf((FILES / name).read_bytes())
+    assert result.outcome == "checked"
+    assert result.failed == failed
+    assert result.page_count == 1
+
+
+def test_a_password_protected_pdf_is_not_checked() -> None:
+    result = check_pdf((FILES / "password.pdf").read_bytes())
+    assert (result.outcome, result.failed) == ("password", ())
+
+
+def test_form_fields_are_detected() -> None:
+    assert check_pdf((FILES / "form.pdf").read_bytes()).is_form is True
+    assert check_pdf((FILES / "clean.pdf").read_bytes()).is_form is False
+
+
+def test_the_committed_files_match_the_generator() -> None:
+    """The hand-written files are rebuilt byte for byte (encrypted ones aside)."""
+    assert (FILES / "clean.pdf").read_bytes() == build()
+    assert (FILES / "untagged.pdf").read_bytes() == build(tagged=False)
+    assert (FILES / "scanned.pdf").read_bytes() == build(text=False)
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        b"",
+        b"<html><body>Not found</body></html>",
+        b"%PDF-1.7\n" + b"\x00" * 200,
+        b"%PDF-1.7\n1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\ntrailer << /Root 1 0 R >>",
+    ],
+)
+def test_untrusted_bytes_never_raise(data: bytes) -> None:
+    result = check_pdf(data)
+    assert result.outcome in {"not_a_pdf", "damaged"}
+    assert result.failed == ()
+
+
+def test_html_is_not_a_pdf() -> None:
+    assert check_pdf(b"<!doctype html><title>Sign in</title>").outcome == "not_a_pdf"
 
 
 @pytest.mark.parametrize(
