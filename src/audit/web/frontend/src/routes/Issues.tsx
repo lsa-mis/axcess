@@ -2,7 +2,7 @@ import { memo, useMemo, useRef, type ReactNode, type Ref } from "react";
 import { Link, useLocation, useParams, useSearchParams } from "react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
-import { Card, withReturnTrail } from "../components/ui";
+import { Button, Card, withReturnTrail } from "../components/ui";
 // The same helper the topbar trail uses.
 import { siteLabel } from "../components/ReportCrumb";
 import ConformanceBadge from "../components/ConformanceBadge";
@@ -47,6 +47,7 @@ import {
   FINDING_TYPE_LABELS,
   ISSUE_COLUMN_HELP,
   PRIORITY_HELP,
+  DEFAULT_REVIEW_LANES,
   REVIEW_LANES,
   REVIEW_LANE_HELP,
   isFindingType,
@@ -95,6 +96,7 @@ export default function IssuesRoute() {
   // Each filter is a comma-separated list of the values checked ("A,AA"),
   // kept to the values the group offers, in its order; "" is every row.
   const conformance = parseList(params.get("conformance"), CONFORMANCE_LEVELS);
+  // "" is the default view, not every row: see ``shownByDefault`` below.
   const lane = parseList(params.get("type"), REVIEW_LANES);
   const findingType = parseList(params.get("finding_type"), FINDING_TYPES);
   const q = params.get("q") ?? "";
@@ -166,10 +168,36 @@ export default function IssuesRoute() {
     );
   };
 
-  const rows = useMemo(
-    () => sortRows(issuesQuery.data?.rows ?? [], sort),
-    [issuesQuery.data, sort],
-  );
+  // The default view: with nothing chosen under "How sure", the table shows
+  // the issue types Axcess is surest of (Mostly sure and Measured) and holds
+  // back Not sure and For information, which a notice over the table counts
+  // and one button shows (``HiddenIssuesNote``). The developer asked for this
+  // on 2026-11-10: results a model judged were crowding out the ones a
+  // reviewer can act on. They are held back, never removed: the reader is
+  // told how many, and the exports still carry all of them (AGENTS.md,
+  // Interface language rule 4: never drop a limitation).
+  //
+  // Done here, not by the server: the request stays unfiltered by "How
+  // sure", so one response holds the whole report for "What was checked",
+  // and the hidden count is of the rows the other filters and the search
+  // left, not of the whole report.
+  //
+  // Rejected: Mostly sure and Measured checked in the Filter menu when the
+  // page opens. The menu's rule is "nothing checked is all" and its count,
+  // "Filtered by" line and "Clear all filters" are all built on it
+  // (FilterMenu.tsx); two boxes that start checked would show a filter the
+  // reader never set and could not clear. So the menu opens with nothing
+  // checked, as it always has, and its How sure group says in words what
+  // nothing checked shows here (``hint``). Checking any How sure box shows
+  // exactly the boxes checked, as before.
+  const shownByDefault = !lane;
+  const rows = useMemo(() => {
+    const all = issuesQuery.data?.rows ?? [];
+    const visible = shownByDefault
+      ? all.filter((row) => (DEFAULT_REVIEW_LANES as readonly ReviewLane[]).includes(row.review_lane))
+      : all;
+    return sortRows(visible, sort);
+  }, [issuesQuery.data, sort, shownByDefault]);
   // The pager sits in the bar over the table, so the rows are paged here,
   // before the table is drawn, and the bar shows even when no row matches.
   // A new filter, search or sort starts over at page 1; the key is built
@@ -203,7 +231,8 @@ export default function IssuesRoute() {
       site={siteLabel(scan.seed_url)}
       pageCount={scan.page_count}
       issueGroups={data.total_unfiltered}
-      shownIssueGroups={hasFilter ? rows.length : undefined}
+      // Also when only the default view holds rows back: the export has them.
+      shownIssueGroups={rows.length < data.total_unfiltered ? rows.length : undefined}
     />
   );
   // The button that was pressed goes away with the column sort, so focus
@@ -212,6 +241,21 @@ export default function IssuesRoute() {
     onSort(null);
     region.current?.focus();
   };
+  // Rows the default view holds back, among those the other filters left.
+  const hiddenRows = shownByDefault
+    ? data.rows.filter((row) => !(DEFAULT_REVIEW_LANES as readonly ReviewLane[]).includes(row.review_lane))
+    : [];
+  // Every How sure box checked, so the URL says exactly what is shown and
+  // "Clear filters" is the way back. The button goes away with the note, so
+  // focus moves to the table it just added rows to (SC 2.4.3 Focus Order,
+  // Level A).
+  const showHidden = () => {
+    setParam("type", REVIEW_LANES.join(","));
+    region.current?.focus();
+  };
+  // ``default_view_counts`` is absent from a response cached before the
+  // field existed; the totals then stand in until the next fetch.
+  const defaultCounts = data.default_view_counts;
 
   return (
     <>
@@ -236,8 +280,10 @@ export default function IssuesRoute() {
       {isComplete && (
         <ReportSummary
           scan={scan}
-          issueGroups={data.total_unfiltered}
-          occurrences={data.occurrence_counts.all_evidence}
+          issueGroups={defaultCounts?.issue_types ?? data.total_unfiltered}
+          occurrences={defaultCounts?.occurrences ?? data.occurrence_counts.all_evidence}
+          hiddenIssueGroups={defaultCounts?.hidden_issue_types ?? 0}
+          hiddenOccurrences={defaultCounts?.hidden_occurrences ?? 0}
         />
       )}
 
@@ -330,11 +376,14 @@ export default function IssuesRoute() {
             {sort && `${describeSort(sort)}.`}
           </TableStatus>
         )}
+        {hiddenRows.length > 0 && <HiddenIssuesNote rows={hiddenRows} onShow={showHidden} />}
         {rows.length === 0 ? (
           <TableEmpty>
             {hasFilter
               ? "No issues match these filters. Clear a filter to see more results."
-              : "Axcess found no issues. That does not mean the site meets WCAG, because some checks may not have run. See “What was checked”, below this table."}
+              : hiddenRows.length > 0
+                ? `Axcess found no issue types marked ${DEFAULT_REVIEW_LANES.map((key) => REVIEW_TYPE_LABEL[key]).join(" or ")}. The hidden issue types above may still be real problems. That does not mean the site meets WCAG, because some checks may not have run. See “What was checked”, below this table.`
+                : "Axcess found no issues. That does not mean the site meets WCAG, because some checks may not have run. See “What was checked”, below this table."}
           </TableEmpty>
         ) : (
           <IssueTable
@@ -419,6 +468,10 @@ function IssueToolbar({
       label: COLUMN_LABEL.Type,
       value: lane,
       multiple: true,
+      // What nothing checked means in this one group (see ``shownByDefault``
+      // in the route). In words, in the group itself, so the menu and the
+      // table never disagree silently.
+      hint: `With nothing checked, the table shows ${DEFAULT_REVIEW_LANES.map((key) => REVIEW_TYPE_LABEL[key]).join(" and ")} only.`,
       options: [
         ...REVIEW_LANES.map((key) => ({
           value: key,
@@ -622,7 +675,7 @@ function describeSort(sort: SortState): string {
   return `Sorted by ${COLUMN_LABEL[sort.column]}, ${sortWords(SORT_KINDS[sort.column], sort.direction)}`;
 }
 
-const LANE_RANK: Record<ReviewLane, number> = { likely_barrier: 0, expert_review: 1, informational: 2 };
+const LANE_RANK: Record<ReviewLane, number> = { likely_barrier: 0, measured: 1, expert_review: 2, informational: 3 };
 
 /**
  * Finding types in table order, the first type leading: a WCAG row, then a
@@ -921,6 +974,59 @@ const IssueTableRow = memo(function IssueTableRow({
     </Row>
   );
 });
+
+/**
+ * The line over the table that says how many issue types the default view
+ * holds back, why, and the one button that shows them.
+ *
+ * It sits inside the table's card, right over the rows it speaks about and
+ * after the Filter menu in reading and Tab order, because it is about what
+ * the table shows (W3C COGA, "Making Content Usable",
+ * https://www.w3.org/TR/coga-usable/: keep related things together).
+ * Rejected: a line in the page header, far from the table; and no line at
+ * all with the count only in the Filter menu, which hides a limitation of
+ * the view behind a closed control (AGENTS.md, Interface language rule 4).
+ *
+ * A ``role="note"`` paragraph like the other report notes, not an alert:
+ * nothing went wrong. The counts are words and numbers, never colour alone
+ * (SC 1.4.1 Use of Color, Level A). The button names what it shows (rule 8)
+ * and is the shared ``Button``, a full 44px target (SC 2.5.5 Target Size
+ * (Enhanced), Level AAA). It wraps under the text at 320px (SC 1.4.10
+ * Reflow, Level AA).
+ */
+function HiddenIssuesNote({ rows, onShow }: { rows: IssueRow[]; onShow: () => void }) {
+  const hidden = REVIEW_LANES.filter(
+    (key) => !(DEFAULT_REVIEW_LANES as readonly ReviewLane[]).includes(key),
+  )
+    .map((key) => ({ key, count: rows.filter((row) => row.review_lane === key).length }))
+    .filter((entry) => entry.count > 0);
+  return (
+    <div
+      role="note"
+      aria-label="Hidden issue types"
+      className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-border bg-surface-muted px-4 py-2 text-sm text-fg"
+    >
+      <p className="max-w-measure">
+        <span className="font-semibold">
+          {rows.length.toLocaleString()} {rows.length === 1 ? "issue type is" : "issue types are"} hidden
+        </span>
+        {": "}
+        {hidden.map((entry) => `${REVIEW_TYPE_LABEL[entry.key]} ${entry.count.toLocaleString()}`).join(", ")}
+        .
+        {/* One sentence per value that is really hidden, because the two are
+            hidden for different reasons and the text must match the rows
+            (AGENTS.md, Interface language rule 5). */}
+        {hidden.some((entry) => entry.key === "expert_review") &&
+          ` A person must check a ${REVIEW_TYPE_LABEL.expert_review} issue type before you report it.`}
+        {hidden.some((entry) => entry.key === "informational") &&
+          ` A ${REVIEW_TYPE_LABEL.informational} issue type is not a problem to fix.`}
+      </p>
+      <Button type="button" variant="secondary" onClick={onShow}>
+        Show hidden issue types
+      </Button>
+    </div>
+  );
+}
 
 /**
  * A row's type as the table shows it; the glossary reuses it so the two match.

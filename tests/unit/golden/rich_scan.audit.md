@@ -1103,7 +1103,20 @@ Screen reader users do not know where the link goes, on the page or in their lis
 
 **Verify it is fixed:**
 
-- **Manual:** Turn on a screen reader and open its list of links (VoiceOver: Control+Option+U, then choose Links; NVDA: Insert+F7). Every link should have a name that says where it goes. Then press Tab to each fixed link and listen to what the screen reader says.
+- **Manual:** Open the list of links with a screen reader (steps for Mac and Windows are below). Every link should have a name that says where it goes. Then press Tab to each fixed link and listen to what the screen reader says.
+  - **Mac, with VoiceOver:** VoiceOver is built into every Mac.
+    1. Turn VoiceOver on: press Command + F5. On some keyboards: Fn + Command + F5.
+    2. Open the rotor (VoiceOver's list of page parts): press Control + Option + U.
+    3. Press Right Arrow until you hear "Links".
+    4. Press Up Arrow or Down Arrow to hear each link. Press Return to go to one.
+    5. When you are done: Escape closes the rotor, and Command + F5 turns VoiceOver off.
+  - **Windows, with NVDA:** NVDA is a free screen reader. Below, "NVDA key" means Insert, or Caps Lock if you chose the laptop keyboard layout.
+    [Get NVDA from NV Access](https://www.nvaccess.org/download/)
+    1. Turn NVDA on: press Control + Alt + N. Then go to the page in your browser.
+    2. Open the Elements List (NVDA's list of page parts): press NVDA key + F7.
+    3. Choose Links: press Alt + K.
+    4. Press Tab to reach the list, then Up Arrow or Down Arrow to hear each link. Press Enter to go to one. Or close the list and press K to jump from link to link.
+    5. When you are done: Escape closes the list, and NVDA key + Q, then Enter, turns NVDA off.
 - **Automated:** Scan again and see if this link is still found.
 - **Acceptance:** Every link on the affected pages has a name a screen reader can read, and the name says where the link goes.
 
@@ -1545,7 +1558,20 @@ Screen reader users often jump from link to link, or open a list of all links. T
 
 **Verify it is fixed:**
 
-- **Manual:** Open the list of links in a screen reader (VoiceOver: VO+U, then Links; NVDA: Insert+F7). For a link that is unclear on its own, read its sentence, paragraph, list item or table cell, and the heading before it. Each link should make clear where it goes, from its text or from that context.
+- **Manual:** Open the list of links with a screen reader (steps for Mac and Windows are below). For a link that is unclear on its own, read its sentence, paragraph, list item or table cell, and the heading before it. Each link should make clear where it goes, from its text or from that context.
+  - **Mac, with VoiceOver:** VoiceOver is built into every Mac.
+    1. Turn VoiceOver on: press Command + F5. On some keyboards: Fn + Command + F5.
+    2. Open the rotor (VoiceOver's list of page parts): press Control + Option + U.
+    3. Press Right Arrow until you hear "Links".
+    4. Press Up Arrow or Down Arrow to hear each link. Press Return to go to one.
+    5. When you are done: Escape closes the rotor, and Command + F5 turns VoiceOver off.
+  - **Windows, with NVDA:** NVDA is a free screen reader. Below, "NVDA key" means Insert, or Caps Lock if you chose the laptop keyboard layout.
+    [Get NVDA from NV Access](https://www.nvaccess.org/download/)
+    1. Turn NVDA on: press Control + Alt + N. Then go to the page in your browser.
+    2. Open the Elements List (NVDA's list of page parts): press NVDA key + F7.
+    3. Choose Links: press Alt + K.
+    4. Press Tab to reach the list, then Up Arrow or Down Arrow to hear each link. Press Enter to go to one. Or close the list and press K to jump from link to link.
+    5. When you are done: Escape closes the list, and NVDA key + Q, then Enter, turns NVDA off.
 - **Automated:** Scan again with AI review of wording turned on, and see if the link is still found.
 - **Acceptance:** Every link on the affected pages tells people where it goes, from its own text or from the text and heading around it.
 
@@ -1888,8 +1914,8 @@ These results are preserved for transparency but are not included in the remedia
 
 - **The page has no main heading (h1)** (`page-has-heading-one`), 3 finding(s) on 3 pages; **Mostly sure / high confidence**. The rule check (axe) found the page code breaks this rule.
 - **Some content sits outside any page region** (`region`), 2 finding(s) on 2 pages; **Mostly sure / high confidence**. The rule check (axe) found the page code breaks this rule.
+- **Keyboard focus may be stuck on one element** (`keyboard-trap-stuck`), 1 finding(s) on 1 page; **Measured / medium confidence**. Pressing Tab and pressing Shift+Tab both left focus on the same element. Check by hand whether another key, such as Escape, moves focus out.
 - **Images with important text have no alt text** (`essential_missing`), 2 finding(s) on 2 pages; **Not sure / medium confidence**. Text recognition (OCR) and a vision model found text in this image. Check what the image is for and whether its alt text says the same.
-- **Keyboard focus may be stuck on one element** (`keyboard-trap-stuck`), 1 finding(s) on 1 page; **Not sure / medium confidence**. Pressing Tab and pressing Shift+Tab both left focus on the same element. Check by hand whether another key, such as Escape, moves focus out.
 - **Link text may not say where the link goes** (`2.4.4`), 2 finding(s) on 2 pages; **Not sure / medium confidence**. The AI review (a language model on this computer) judged this. Check it on the page before you report it.
 - **Image with words has empty or different alt text** (`unclassified_inadequate`), 2 finding(s) on 2 pages; **Not sure / low confidence**. Axcess could not tell what this image is for: the vision model did not sort it. Decide that by hand before you report a barrier.
 - **Rule check (Alfa), a person must decide (Alfa sia-r111)** (`sia-r111:cant_tell`), 1 finding(s) on 1 page; **Not sure / medium confidence**. The rule check (Alfa) could not decide on 1 occurrence. That is not a failure. Alfa could not decide whether the target spacing is sufficient. [Stored evidence is unavailable.]

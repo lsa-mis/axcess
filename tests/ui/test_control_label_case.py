@@ -71,6 +71,7 @@ _NAMES = {
 # Each is one name from docs/plain-language.md's terms table or lib/.
 _PHRASES = (
     "Mostly sure",  # issue type, lib/terms.ts
+    "Measured",  # issue type, lib/terms.ts
     "Not sure",  # issue type, lib/terms.ts
     "For information",  # issue type, lib/terms.ts
     "Best practice",  # level, docs/plain-language.md

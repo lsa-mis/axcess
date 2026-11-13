@@ -46,6 +46,14 @@ class Settings(BaseSettings):
     vlm_concurrency: int = 1
     vlm_prompt_name: str = "classify_v1.txt"
 
+    # Alt text checks on the report's Images tab: a person asks the local
+    # model about one image's alt text after the scan. Empty means off, and
+    # no image is sent anywhere. Kept apart from ``vlm_model`` on purpose:
+    # changing this model must not change how a completed scan was analysed.
+    # The check goes to ``ollama_base_url`` above, the local daemon.
+    alt_check_model: str = ""
+    alt_check_timeout_s: float = Field(default=90.0, ge=5.0, le=600.0)
+
     # Hosting / access control. Empty by default → the tool stays a
     # zero-auth local app (binds to 127.0.0.1, no token needed). Set
     # ``AUDIT_ACCESS_TOKEN`` before binding to a LAN/Tailscale address

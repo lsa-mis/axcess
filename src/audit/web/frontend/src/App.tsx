@@ -31,6 +31,7 @@ const IssueDetailRoute = lazy(() => import("./routes/IssueDetail"));
 const IssuePagesRoute = lazy(() => import("./routes/IssuePages"));
 const IssuePageScreenshotsRoute = lazy(() => import("./routes/IssuePageScreenshots"));
 const IssuesRoute = lazy(() => import("./routes/Issues"));
+const ImagesRoute = lazy(() => import("./routes/Images"));
 const ScansRoute = lazy(() => import("./routes/Scans"));
 const ScanDetailRoute = lazy(() => import("./routes/ScanDetail"));
 const NewScanRoute = lazy(() => import("./routes/NewScan"));
@@ -94,6 +95,7 @@ export default function App() {
           path="/scans/:scanId/a11y/by-rule"
           element={<ProtectedReportGate><A11yByRuleRoute /></ProtectedReportGate>}
         />
+        <Route path="/scans/:scanId/images" element={<ProtectedReportGate><ImagesRoute /></ProtectedReportGate>} />
         <Route path="/scans/:scanId/compare" element={<ProtectedReportGate><CompareReportsRoute /></ProtectedReportGate>} />
         <Route
           path="/scans/:scanId/compare/changes"

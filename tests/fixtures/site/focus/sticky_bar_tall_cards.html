@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Focus: sticky bar, tall cards, scroll padding (no failure)</title>
+  <style>
+    /* False-positive guard for SC 2.4.11. Modelled on a real page where the
+       old check reported a card link that a keyboard user can always see.
+
+       The page does the right thing: an 80px bar that stays in place, and
+       scroll-padding-top: 112px so the browser scrolls a focused card clear
+       of the bar. scroll-behavior: smooth is here on purpose: the check
+       must judge the card after the scroll has finished, not part-way.
+
+       Geometry, at the crawl's 1440x900 viewport:
+         bar 80px; main starts 112px down; 6 rows of cards, each 536px tall
+         with a 24px gap (row k starts at 112 + 560k); footer 32px.
+         Page height 3480, so the furthest scroll is 2580. Left there (an
+         earlier check can leave a page scrolled anywhere), the fifth row
+         (k = 4, Project 13 to 15) spans -228px to 308px and its centre sits
+         at 40px, under the bar. A check that looks at the centre without
+         letting the browser scroll reports those cards. With real Tab or
+         Shift+Tab every card lands fully below the bar.
+
+         The cards have no id on purpose, so the stored element locator is
+         "a.block", as it was on the real page. */
+    html { scroll-padding-top: 112px; scroll-behavior: smooth; }
+    body { margin: 0; font-family: sans-serif; }
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; height: 80px;
+      background: #003f75; z-index: 10;
+    }
+    nav a { color: #fff; line-height: 80px; margin-left: 24px; }
+    main {
+      padding: 112px 24px 0;
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;
+    }
+    a.block {
+      display: block; height: 536px; box-sizing: border-box; padding: 16px;
+      background: #f5f5f5; border: 1px solid #555; color: #111;
+    }
+    footer { height: 32px; line-height: 32px; padding: 0 24px; }
+  </style>
+</head>
+<body>
+  <nav aria-label="Main"><a id="nav-home" href="#home">Home</a><a id="nav-work" href="#work">Work</a></nav>
+  <main>
+    <a class="block" href="#project-01">Project 01</a>
+    <a class="block" href="#project-02">Project 02</a>
+    <a class="block" href="#project-03">Project 03</a>
+    <a class="block" href="#project-04">Project 04</a>
+    <a class="block" href="#project-05">Project 05</a>
+    <a class="block" href="#project-06">Project 06</a>
+    <a class="block" href="#project-07">Project 07</a>
+    <a class="block" href="#project-08">Project 08</a>
+    <a class="block" href="#project-09">Project 09</a>
+    <a class="block" href="#project-10">Project 10</a>
+    <a class="block" href="#project-11">Project 11</a>
+    <a class="block" href="#project-12">Project 12</a>
+    <a class="block" href="#project-13">Project 13</a>
+    <a class="block" href="#project-14">Project 14</a>
+    <a class="block" href="#project-15">Project 15</a>
+    <a class="block" href="#project-16">Project 16</a>
+    <a class="block" href="#project-17">Project 17</a>
+    <a class="block" href="#project-18">Project 18</a>
+  </main>
+  <footer><a id="footer-link" href="#contact">Contact</a></footer>
+</body>
+</html>

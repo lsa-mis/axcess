@@ -40,6 +40,16 @@ one axe/probe/semantic rule or one `(classification, alt_adequacy)` image
 finding group. Never mix data from different `scan_id` values in an answer
 unless the user explicitly requests a comparison.
 
+## Project management (Asana)
+
+All project management for this repo lives in one Asana project:
+**"Axcess – Feature & Development Tracker"** (project GID `1218150267797869`,
+https://app.asana.com/1/939514425027676/project/1218150267797869).
+
+When reading or writing Asana tasks for this project, scope every query and
+update to that project only. Do not pull tasks from, or create tasks in, any
+other Asana project on behalf of this repo.
+
 ## Code map
 
 - `src/audit/crawler/` scopes, fetches, renders, and queues pages.

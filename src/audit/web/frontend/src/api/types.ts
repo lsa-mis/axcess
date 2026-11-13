@@ -52,6 +52,12 @@ export interface SiteGroup {
   most_recent_completed_issue_count: number | null;
   /** Occurrences across those issues (the Issues page's total); null when there is none. */
   most_recent_completed_occurrence_count: number | null;
+  /**
+   * The same two counts for the levels the Issues page shows when it opens.
+   * Optional: absent from a response cached before the fields existed.
+   */
+  most_recent_completed_shown_issue_count?: number | null;
+  most_recent_completed_shown_occurrence_count?: number | null;
   scans: ScanSummary[];
 }
 
@@ -63,6 +69,12 @@ export interface SiteGroup {
 export interface ScanIssueCounts {
   issue_count: number;
   occurrence_count: number;
+  /**
+   * The same two counts for the levels the Issues page shows when it opens.
+   * Optional: absent from a response cached before the fields existed.
+   */
+  shown_issue_count?: number;
+  shown_occurrence_count?: number;
 }
 
 export interface ScanProgress {
@@ -796,7 +808,7 @@ export interface GroupedFindingsResponse {
 
 export type ConformanceLabel = "A" | "AA" | "AAA" | "BP";
 export type AbilityLabel = "vision" | "cognition" | "motor" | "hearing";
-export type ReviewLane = "likely_barrier" | "expert_review" | "informational";
+export type ReviewLane = "likely_barrier" | "measured" | "expert_review" | "informational";
 export type EvidenceConfidence = "high" | "medium" | "low";
 /** Which family of checks produced an issue's evidence (labels: lib/labels.ts). */
 export type FindingType = "wcag" | "click_through" | "alt_text";
@@ -885,6 +897,25 @@ export interface IssueDetail {
   verify_automated: string | null;
   acceptance: string | null;
   help_url: string | null;
+  /** Numbered screen reader steps for each computer, when the issue type has them. */
+  screen_reader_check: ScreenReaderCheck | null;
+}
+
+/** The steps for one computer. A key to press is written `{Command}`. */
+export interface ScreenReaderPlatform {
+  id: string;
+  name: string;
+  intro: string | null;
+  link_text: string | null;
+  link_url: string | null;
+  steps: string[];
+}
+
+/** One shared screen reader check (rules/screen_reader_checks.yaml). */
+export interface ScreenReaderCheck {
+  id: string;
+  title: string;
+  platforms: ScreenReaderPlatform[];
 }
 
 export interface IssuesResponse {
@@ -900,6 +931,16 @@ export interface IssuesResponse {
     high_confidence: number;
   };
   total_unfiltered: number;
+  /**
+   * What the Issues page shows when it opens (Mostly sure and Measured), and
+   * what it leaves one click away. Counted over the whole report.
+   */
+  default_view_counts?: {
+    issue_types: number;
+    occurrences: number;
+    hidden_issue_types: number;
+    hidden_occurrences: number;
+  };
 }
 
 // ---------------------------------------------------------------
@@ -1402,4 +1443,71 @@ export interface ExportOptions {
   draft: boolean;
   evaluation_status: string;
   formats: ExportFormatOption[];
+}
+
+// ---------------------------------------------------------------------------
+// Report Images tab (GET /api/scans/:id/images, src/audit/web/image_inventory.py)
+// ---------------------------------------------------------------------------
+
+/** A question asked of the report's images. An image is in one or two groups. */
+export type ImageGroup = "with_text" | "missing_alt" | "with_alt";
+
+/** One verdict on an image's alt text, worst first. */
+export type AltVerdict = "needs_alt" | "needs_better" | "not_checked" | "good";
+
+/** What decided the verdict: the page code, the text match, or the local model. */
+export type AltVerdictSource = "page_code" | "text_match" | "local_model";
+
+export interface ImageGroupCounts {
+  total: number;
+  good: number;
+  needs_better: number;
+  needs_alt: number;
+  not_checked: number;
+}
+
+export interface ReportImage {
+  image_id: number;
+  content_hash: string;
+  mime: string | null;
+  image_url: string;
+  has_svg_text: boolean;
+  groups: ImageGroup[];
+  page_count: number;
+  sample_page_id: number | null;
+  sample_page_url: string | null;
+  /** null: no alt attribute. "": alt="" (marked decorative). */
+  alt_text: string | null;
+  alt_text_variants: number;
+  has_text: boolean;
+  image_text: string | null;
+  verdict: AltVerdict;
+  verdict_source: AltVerdictSource | null;
+  verdict_reason: string;
+  suggestion: string | null;
+  suggestion_model: string | null;
+  can_check: boolean;
+  finding_id: number | null;
+}
+
+export interface ReportImagesResponse {
+  scan_id: number;
+  group: ImageGroup;
+  verdict: AltVerdict | null;
+  q: string;
+  counts: Record<ImageGroup, ImageGroupCounts>;
+  total: number;
+  limit: number;
+  offset: number;
+  rows: ReportImage[];
+  /** Whether a local model is set up to check alt text. */
+  check_available: boolean;
+}
+
+export interface ReportImagesFilter {
+  group: ImageGroup;
+  verdict: AltVerdict | "";
+  q: string;
+  limit: number;
+  offset: number;
 }

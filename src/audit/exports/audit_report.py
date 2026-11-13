@@ -52,6 +52,8 @@ from audit.exports.collector import ExportA11yFinding, ExportFinding, ExportScan
 from audit.exports.interaction_coverage import InteractionCoverage
 from audit.labels import CLICK_THROUGH, CLICK_THROUGH_STATES_LABEL, REVIEW_LANE_LABELS
 from audit.web import issues as issues_mod
+from audit.web.screen_reader_checks import ScreenReaderCheck, check_for
+from audit.web.screen_reader_checks import plain_text as sr_plain_text
 
 # The framework caps the executive summary at 8 sentences. The renderer
 # enforces this as a soft contract, it just doesn't emit more.
@@ -300,6 +302,9 @@ class AuditCard:
     needs_human_review: bool
     note: str | None
     finding_ids: list[int]
+    # Shared Mac and Windows steps (rules/screen_reader_checks.yaml), printed
+    # under the manual check, as the issue guidance shows them.
+    screen_reader_check: ScreenReaderCheck | None = None
 
 
 @dataclass(frozen=True)
@@ -361,7 +366,9 @@ def _bucket_rows_into_cards(
                 )
             )
 
-        if row.review_lane == "expert_review":
+        # A browser measurement is shown by default on the Issues page, but a
+        # report still states it only once a person has confirmed it.
+        if row.review_lane in {"measured", "expert_review"}:
             # ``in_progress`` is the current persisted decision that the expert
             # confirmed a barrier and remediation is still open. It belongs in
             # the substantive worklist; ``new`` and ``reviewing`` remain review
@@ -1261,6 +1268,15 @@ def _render_card(idx: int, card: AuditCard) -> list[str]:
         lines.append("")
         if card.verify_manual:
             lines.append(f"- **Manual:** {_strip_html(card.verify_manual).strip()}")
+        if card.screen_reader_check:
+            for platform in card.screen_reader_check.platforms:
+                intro = f" {sr_plain_text(platform.intro).strip()}" if platform.intro else ""
+                lines.append(f"  - **{platform.name}:**{intro}")
+                if platform.link_url:
+                    link_text = platform.link_text or platform.link_url
+                    lines.append(f"    [{link_text}]({platform.link_url})")
+                for i, step in enumerate(platform.steps, start=1):
+                    lines.append(f"    {i}. {sr_plain_text(step)}")
         if card.verify_automated:
             lines.append(f"- **Automated:** {_strip_html(card.verify_automated).strip()}")
         if card.acceptance:
@@ -1409,6 +1425,7 @@ def _card_from_row(
         needs_human_review=(row.pipeline == "alfa") or not row.fix_steps,
         note=row.help_url,
         finding_ids=list(row.finding_ids),
+        screen_reader_check=check_for(meta.get("screen_reader_check")),
     )
 
 

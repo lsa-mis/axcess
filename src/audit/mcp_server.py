@@ -8,6 +8,7 @@ safe data boundary is testable now and remains local by default.
 from __future__ import annotations
 
 import sqlite3
+from dataclasses import asdict
 from typing import Any, cast
 
 from audit import coverage_matrix, evaluation
@@ -102,6 +103,9 @@ def get_report_issue_detail(
         "fix_steps": detail.fix_steps,
         "verify_manual": detail.verify_manual,
         "verify_automated": detail.verify_automated,
+        "screen_reader_check": (
+            asdict(detail.screen_reader_check) if detail.screen_reader_check else None
+        ),
         "acceptance": detail.acceptance,
         "pages": [
             {

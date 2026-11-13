@@ -55,7 +55,11 @@ async def test_panel_says_what_each_download_delivers(
         )
     # The seeded scan's expert review is unfinished.
     await expect(panel).to_contain_text("each file is marked DRAFT")
-    await expect(panel).to_contain_text("even if the table has filters on")
+    # The seeded report's two issue types are Not sure and For information,
+    # which the table holds back when it opens; the export still has them.
+    await expect(panel).to_contain_text(
+        "Includes all 2 issue types and every status, not only the 0 the table shows now."
+    )
     await expect(panel).to_contain_text("never prove")
 
     # Scoped to the panel: the rest of the page has its own axe coverage.

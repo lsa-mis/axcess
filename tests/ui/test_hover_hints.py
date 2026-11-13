@@ -15,6 +15,8 @@ from typing import Any
 
 import pytest
 
+from .conftest import ALL_HOW_SURE
+
 pytestmark = [pytest.mark.ui, pytest.mark.asyncio(loop_scope="module")]
 
 playwright_async = pytest.importorskip("playwright.async_api")
@@ -25,9 +27,13 @@ LANE_HELP = {
         "same result every time. Look at each occurrence on the page, fix it, test the fix, then "
         "scan again to see if it is still found."
     ),
+    "Measured": (
+        "The browser measured this on the page. No AI was used. A measurement can still miss "
+        "how a person uses the page, so check each occurrence before you report it."
+    ),
     "Not sure": (
         "Axcess found a possible problem, but it cannot be certain. This happens with checks "
-        "such as the AI review, the browser checks, or a rule check that cannot decide. A "
+        "such as the AI review, the image text check, or a rule check that cannot decide. A "
         "person must decide whether it is a real problem before you report it."
     ),
     "For information": (
@@ -71,7 +77,9 @@ async def test_issue_tags_headers_and_bands_explain_themselves(
     base, scan_id = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
     try:
-        await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+        await page.goto(
+            f"{base}/app/scans/{scan_id}/issues?{ALL_HOW_SURE}", wait_until="networkidle"
+        )
         table = page.get_by_role("table", name="Accessibility issue types")
         body = table.locator("tbody")
 
@@ -84,7 +92,7 @@ async def test_issue_tags_headers_and_bands_explain_themselves(
         headers = {
             "How sure": (
                 "How sure Axcess is that this issue type is a real problem: "
-                "Mostly sure, Not sure, or For information."
+                "Mostly sure, Measured, Not sure, or For information."
             ),
             "Where it shows": (
                 "Where this issue type shows up: at page load, after clicking, or in an image."
@@ -170,14 +178,16 @@ async def test_keyboard_focus_keeps_the_hint_as_the_description(
         "localStorage.setItem('axcess.preferences', JSON.stringify({hints: 'always'}))"
     )
     try:
-        await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+        await page.goto(
+            f"{base}/app/scans/{scan_id}/issues?{ALL_HOW_SURE}", wait_until="networkidle"
+        )
         table = page.get_by_role("table", name="Accessibility issue types")
         button = table.get_by_role("columnheader", name="How sure", exact=False).get_by_role(
             "button"
         )
         hint = (
             "How sure Axcess is that this issue type is a real problem: "
-            "Mostly sure, Not sure, or For information."
+            "Mostly sure, Measured, Not sure, or For information."
         )
         await button.focus()
         await playwright_async.expect(page.get_by_text(hint, exact=True)).to_be_visible()
@@ -201,14 +211,16 @@ async def test_hovering_keeps_the_hint_as_the_description(
         "localStorage.setItem('axcess.preferences', JSON.stringify({hints: 'always'}))"
     )
     try:
-        await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+        await page.goto(
+            f"{base}/app/scans/{scan_id}/issues?{ALL_HOW_SURE}", wait_until="networkidle"
+        )
         table = page.get_by_role("table", name="Accessibility issue types")
         button = table.get_by_role("columnheader", name="How sure", exact=False).get_by_role(
             "button"
         )
         hint = (
             "How sure Axcess is that this issue type is a real problem: "
-            "Mostly sure, Not sure, or For information."
+            "Mostly sure, Measured, Not sure, or For information."
         )
         await button.hover()
         await playwright_async.expect(page.get_by_text(hint, exact=True)).to_be_visible()

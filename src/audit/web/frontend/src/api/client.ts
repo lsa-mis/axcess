@@ -20,6 +20,9 @@ import type {
   ExportFormat,
   ExportOptions,
   FindingDetail,
+  ReportImage,
+  ReportImagesFilter,
+  ReportImagesResponse,
   FindingsFilter,
   FindingsPage,
   FindingStatus,
@@ -409,6 +412,24 @@ export const api = {
     if (filter.q) params.set("q", filter.q);
     return request<FindingsPage>(`/api/scans/${scanId}/findings?${params}`);
   },
+  /** One page of one group of the report's images (the Images tab). */
+  listReportImages: (scanId: number, filter: ReportImagesFilter) => {
+    const params = new URLSearchParams();
+    params.set("group", filter.group);
+    if (filter.verdict) params.set("verdict", filter.verdict);
+    if (filter.q) params.set("q", filter.q);
+    params.set("limit", String(filter.limit));
+    params.set("offset", String(filter.offset));
+    return request<ReportImagesResponse>(`/api/scans/${scanId}/images?${params}`);
+  },
+  /**
+   * Ask the local model about one image's alt text. A person's explicit
+   * request; the server saves the answer and returns the image's new row.
+   */
+  checkImageAlt: (scanId: number, imageId: number) =>
+    request<ReportImage>(`/api/scans/${scanId}/images/${imageId}/alt-check`, {
+      method: "POST",
+    }),
   getFinding: (id: number) => request<FindingDetail>(`/api/findings/${id}`),
   setStatus: (id: number, status: FindingStatus, rationale?: string) =>
     request<{ status: FindingStatus }>(`/api/findings/${id}/status`, {
@@ -551,7 +572,7 @@ export const api = {
       responsibility?: string;
       abilities?: AbilityLabel | "";
       status?: FindingStatus | "";
-      review_lane?: "likely_barrier" | "expert_review" | "informational" | "" | (string & {});
+      review_lane?: "likely_barrier" | "measured" | "expert_review" | "informational" | "" | (string & {});
       finding_type?: FindingType | "" | (string & {});
       q?: string;
       sort?: string;

@@ -314,7 +314,7 @@ These issue types *were* detected but every finding in them has already been tri
 These results are preserved for transparency but are not included in the remediation scorecard. They are AI-assisted or ambiguous review leads, informational/pass evidence, or best-practice observations with no criterion mapping. An expert decision is required before a review lead can be described as a barrier.
 
 - **The page has no main heading (h1)** (`page-has-heading-one`), 1 finding(s) on 1 page; **Mostly sure / high confidence**. The rule check (axe) found the page code breaks this rule.
-- **Keyboard focus may be stuck on one element** (`keyboard-trap-stuck`), 1 finding(s) on 1 page; **Not sure / medium confidence**. Pressing Tab and pressing Shift+Tab both left focus on the same element. Check by hand whether another key, such as Escape, moves focus out.
+- **Keyboard focus may be stuck on one element** (`keyboard-trap-stuck`), 1 finding(s) on 1 page; **Measured / medium confidence**. Pressing Tab and pressing Shift+Tab both left focus on the same element. Check by hand whether another key, such as Escape, moves focus out.
 - **Images with important text have no alt text** (`essential_missing`), 1 finding(s) on 1 page; **Not sure / medium confidence**. Text recognition (OCR) and a vision model found text in this image. Check what the image is for and whether its alt text says the same.
 - **Link text may not say where the link goes** (`2.4.4`), 1 finding(s) on 1 page; **Not sure / medium confidence**. The AI review (a language model on this computer) judged this. Check it on the page before you report it.
 

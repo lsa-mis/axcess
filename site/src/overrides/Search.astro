@@ -9,6 +9,18 @@
  * block was rejected because it misses the case where scripts are allowed
  * but fail to load; the ax-js class (overrides/ThemeProvider.astro) catches
  * both.
+ *
+ * The search box gets a visible label, "Search this site", above it.
+ * Pagefind draws the box with only a placeholder and a title, both "Search",
+ * so it had no real name: axe's label-title-only rule flagged it, and the
+ * placeholder disappears as soon as someone types (SC 3.3.2 Labels or
+ * Instructions, Level A; SC 1.3.1 Info and Relationships, Level A). A
+ * <label for> is native HTML, so it names the box without ARIA and can be
+ * selected to focus it. Rejected: an aria-label, which sighted people never
+ * see, and aria-labelledby on the dialog's "Search" name, which is also not
+ * visible. The title is removed because it only repeated the label.
+ * Pagefind builds the box after the page loads, so the script waits for it.
+ * "Search this site" is Pagefind's own wording for the search form.
  */
 import Default from "@astrojs/starlight/components/Search.astro";
 import { url } from "../lib/site";
@@ -17,7 +29,41 @@ import { url } from "../lib/site";
 <Default {...Astro.props} />
 <a class="ax-nojs all-pages" href={url("/all-pages/")}>All pages</a>
 
+<script>
+  const results = document.getElementById("starlight__search");
+  const addLabel = (): boolean => {
+    const input = results?.querySelector<HTMLInputElement>(".pagefind-ui__search-input");
+    if (!input) return false;
+    if (input.id === "ax-search-input") return true;
+    input.id = "ax-search-input";
+    input.removeAttribute("title");
+    const label = document.createElement("label");
+    label.htmlFor = input.id;
+    label.className = "ax-search-label";
+    label.textContent = "Search this site";
+    // Before the form, not inside it: Pagefind places its magnifier icon
+    // against the top of the form, so a label inside would push the icon
+    // off the box.
+    input.closest("form")?.before(label);
+    return true;
+  };
+  if (results && !addLabel()) {
+    const watch = new MutationObserver(() => {
+      if (addLabel()) watch.disconnect();
+    });
+    watch.observe(results, { childList: true, subtree: true });
+  }
+</script>
+
 <style>
+  /* Global: the script creates the label, so Astro's scoped class never
+     reaches it. */
+  :global(.ax-search-label) {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--ax-fg);
+    font-weight: 600;
+  }
   .all-pages {
     align-items: center;
     min-height: var(--ax-target);

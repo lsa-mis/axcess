@@ -72,11 +72,23 @@ FINDING_TYPE_HELP: dict[FindingType, str] = {
 # Review lanes: how much confidence an issue's evidence carries.
 # --------------------------------------------------------------------------
 
-ReviewLane = Literal["likely_barrier", "expert_review", "informational"]
-REVIEW_LANES: tuple[ReviewLane, ...] = ("likely_barrier", "expert_review", "informational")
+ReviewLane = Literal["likely_barrier", "measured", "expert_review", "informational"]
+REVIEW_LANES: tuple[ReviewLane, ...] = (
+    "likely_barrier",
+    "measured",
+    "expert_review",
+    "informational",
+)
+# What the Issues page shows when it opens: the rule checks and the browser
+# measurements. Results a model judged (AI review, image text), a rule check
+# that could not decide, and records kept only for information are one click
+# away, never removed. The API itself still returns every level unless asked;
+# this is the screen's default, and the counts beside "Issue types" follow it.
+DEFAULT_REVIEW_LANES: tuple[ReviewLane, ...] = ("likely_barrier", "measured")
 
 REVIEW_LANE_LABELS: dict[ReviewLane, str] = {
     "likely_barrier": "Mostly sure",
+    "measured": "Measured",
     "expert_review": "Not sure",
     "informational": "For information",
 }
@@ -87,9 +99,13 @@ REVIEW_LANE_HELP: dict[ReviewLane, str] = {
         "the same result every time. Look at each occurrence on the page, fix it, test the fix, "
         "then scan again to see if it is still found."
     ),
+    "measured": (
+        "The browser measured this on the page. No AI was used. A measurement can still "
+        "miss how a person uses the page, so check each occurrence before you report it."
+    ),
     "expert_review": (
         "Axcess found a possible problem, but it cannot be certain. This happens with "
-        "checks such as the AI review, the browser checks, or a rule check that cannot "
+        "checks such as the AI review, the image text check, or a rule check that cannot "
         "decide. A person must decide whether it is a real problem before you report it."
     ),
     "informational": (

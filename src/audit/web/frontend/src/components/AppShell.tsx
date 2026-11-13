@@ -830,6 +830,7 @@ function routeTitle(pathname: string): string {
     [/^\/scans\/\d+\/issues\/[^/]+\/pages\/?$/, "Pages with this issue type"],
     [/^\/scans\/\d+\/issues\/[^/]+\/?$/, "Issue evidence"],
     [/^\/scans\/\d+\/issues\/?$/, "Accessibility issues"],
+    [/^\/scans\/\d+\/images\/?$/, "Images and alt text"],
     [/^\/scans\/\d+\/findings\/grouped\/?$/, "Images, grouped by issue type"],
     [/^\/scans\/\d+\/findings\/?$/, "Images"],
     [/^\/scans\/\d+\/a11y\/by-rule\/?$/, "Rule check issues by rule"],

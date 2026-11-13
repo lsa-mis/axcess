@@ -132,6 +132,7 @@ def _screens(scan_id: int, page_id: int) -> list[str]:
         f"/scans/{scan_id}/pages/{page_id}",
         f"/scans/{scan_id}/pages/{page_id}/inspect?issue=axe:{RULE}",
         f"/scans/{scan_id}/findings",
+        f"/scans/{scan_id}/images",
         f"/scans/{scan_id}/a11y",
         f"/scans/{scan_id}/a11y/by-rule",
         "/tracking",

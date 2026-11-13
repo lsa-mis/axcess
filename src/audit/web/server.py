@@ -100,7 +100,7 @@ from audit.wcag_version import (
     is_wcag_version,
     stored_wcag_version,
 )
-from audit.web import local_sign_in
+from audit.web import image_inventory, local_sign_in
 from audit.web.comparison import (
     MAX_PAGE_SIZE,
     Category,
@@ -2227,7 +2227,7 @@ def create_app(
         """JSON form of the unified Issues list, used by the SPA."""
         from dataclasses import asdict
 
-        from audit.labels import FINDING_TYPES
+        from audit.labels import FINDING_TYPES, REVIEW_LANES
         from audit.web import issues as issues_mod
 
         with get_conn() as conn:
@@ -2247,11 +2247,7 @@ def create_app(
                 # Comma-separated like ``conformance``; a single value reads
                 # as before, and an unknown one is ignored rather than
                 # emptying the table.
-                review_lane=[
-                    lane
-                    for lane in _split_csv(review_lane)
-                    if lane in {"likely_barrier", "expert_review", "informational"}
-                ],
+                review_lane=[lane for lane in _split_csv(review_lane) if lane in REVIEW_LANES],
                 finding_type=[kind for kind in _split_csv(finding_type) if kind in FINDING_TYPES],
                 sort=sort,
             )
@@ -2270,6 +2266,10 @@ def create_app(
                     ),
                 },
                 "total_unfiltered": len(unfiltered),
+                # What the Issues page shows when it opens (Mostly sure and
+                # Measured) and what it leaves one click away. The totals
+                # above still describe every row.
+                "default_view_counts": issues_mod.default_view_counts(unfiltered),
             }
         )
 
@@ -2413,6 +2413,140 @@ def create_app(
                 conn, scan_id, status=status if status else None
             )
         return JSONResponse({"coverage": cov, "groups": groups})
+
+    # The report's Images tab: every image the scan saw, in three groups, with
+    # a verdict on its alt text (audit/web/image_inventory.py). Asking the
+    # local model about one image is a separate POST a person makes with a
+    # button; nothing here calls a model on its own.
+    def _default_alt_checker_factory(client: httpx.AsyncClient) -> Any:
+        from audit.analyzer.vlm.alt_check import OllamaAltChecker
+
+        return OllamaAltChecker(
+            client,
+            model=settings.alt_check_model.strip(),
+            base_url=settings.ollama_base_url,
+            timeout_s=settings.alt_check_timeout_s,
+        )
+
+    # None when no model is set: the tab then says the check is off. Tests
+    # replace this with a stub.
+    app.state.alt_checker_factory = (
+        _default_alt_checker_factory if settings.alt_check_model.strip() else None
+    )
+
+    @app.get("/api/scans/{scan_id:int}/images")
+    def api_scan_images(
+        scan_id: int,
+        group: str = Query(default="with_text"),
+        verdict: str = Query(default=""),
+        q: str = Query(default="", max_length=200),
+        limit: int = Query(default=25, ge=1, le=image_inventory.MAX_LIMIT),
+        offset: int = Query(default=0, ge=0, le=1_000_000),
+    ) -> JSONResponse:
+        """One page of one group of the report's images, worst verdict first."""
+        if group not in image_inventory.GROUPS:
+            raise HTTPException(status_code=400, detail="Unknown image group")
+        if verdict and verdict not in image_inventory.VERDICTS:
+            raise HTTPException(status_code=400, detail="Unknown alt text verdict")
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            result = image_inventory.list_report_images(
+                conn,
+                scan_id,
+                group=group,
+                verdict=verdict or None,
+                q=q,
+                limit=limit,
+                offset=offset,
+                check_available=app.state.alt_checker_factory is not None,
+            )
+        return JSONResponse(result.model_dump())
+
+    @app.post("/api/scans/{scan_id:int}/images/{image_id:int}/alt-check")
+    async def api_check_image_alt(scan_id: int, image_id: int) -> JSONResponse:
+        """Ask the local model about one image's alt text, keep and return its answer.
+
+        A person's explicit request from the Images tab. Refused for a scan
+        that is not complete, for a protected scan (its images do not leave
+        the protected store), and when no model is set. A timeout or an
+        unusable answer saves nothing and says so; the tab keeps working.
+        """
+        from audit.analyzer.vlm.alt_check import AltCheckInput, OllamaError
+
+        with get_conn() as conn:
+            scan = _load_scan_or_404(conn, scan_id)
+            _require_completed_scan(scan)
+            target = image_inventory.check_target(conn, scan_id, image_id)
+        if _protected_scan_owner(resolved_db, scan_id) is not None:
+            raise HTTPException(
+                status_code=403,
+                detail="Images in a protected report are not sent to a model.",
+            )
+        if target is None:
+            raise HTTPException(status_code=404, detail="This image is not in this report")
+        factory = app.state.alt_checker_factory
+        if factory is None:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "No local model is set up to check alt text. "
+                    "Ask the person who runs Axcess to set one."
+                ),
+            )
+        if not target.can_check:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "The model cannot look at this image: it is drawn in the page code (SVG) "
+                    "or was not saved. Check its alt text by hand."
+                ),
+            )
+        full = blob_store.path_for(str(target.blob_path)).resolve()
+        try:
+            full.relative_to(blob_store.root.resolve())
+            image_bytes = full.read_bytes()
+        except (ValueError, OSError) as exc:
+            raise HTTPException(
+                status_code=422, detail="The saved copy of this image is missing."
+            ) from exc
+        given = AltCheckInput(
+            alt_text=target.alt_text,
+            image_text=target.image_text,
+            context_snippet=target.context_snippet,
+        )
+        try:
+            async with httpx.AsyncClient() as client:
+                checker = factory(client)
+                answer = await asyncio.wait_for(
+                    checker.check(image_bytes, given),
+                    timeout=settings.alt_check_timeout_s,
+                )
+        except TimeoutError as exc:
+            raise HTTPException(
+                status_code=504,
+                detail="The local model took too long to answer. Try again later.",
+            ) from exc
+        except (OllamaError, httpx.HTTPError) as exc:
+            log.warning("alt_check.failed", scan_id=scan_id, image_id=image_id, error=str(exc))
+            raise HTTPException(
+                status_code=502,
+                detail="The local model did not give a usable answer. Nothing was saved.",
+            ) from exc
+        with get_conn() as conn:
+            image_inventory.save_check(
+                conn,
+                scan_id=scan_id,
+                image_id=image_id,
+                verdict=answer.verdict,
+                reason=answer.reason,
+                suggestion=answer.suggestion,
+                model=answer.model,
+                prompt_version=answer.prompt_version,
+            )
+            row = image_inventory.get_report_image(conn, scan_id, image_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="This image is not in this report")
+        return JSONResponse(row.model_dump())
 
     @app.post("/api/findings/{finding_id:int}/status")
     async def api_set_finding_status(

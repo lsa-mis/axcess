@@ -44,9 +44,10 @@ from typing import Any, Literal
 import yaml
 
 from audit.analyzer.alfa_evidence import humanize_target
-from audit.labels import FINDING_TYPES, FindingType
+from audit.labels import DEFAULT_REVIEW_LANES, FINDING_TYPES, FindingType
 from audit.wcag_version import WcagVersion, stored_wcag_version
 from audit.web import a11y_queries, image_findings_queries
+from audit.web.screen_reader_checks import ScreenReaderCheck, check_for
 
 # Conformance label shown in the table's badge column.
 #   A   = WCAG Level A (legal floor in most jurisdictions)
@@ -68,8 +69,40 @@ AbilityLabel = str  # vision | cognition | motor | hearing
 # only as informational evidence.  Keeping the lane on every row prevents UI,
 # MCP, and export renderers from silently turning review leads into WCAG
 # failures.
-ReviewLane = Literal["likely_barrier", "expert_review", "informational"]
+#
+# ``measured`` sits between the two (2026-11-10): a browser check that
+# measured the page with no model.  It is shown by default beside the rule
+# checks, but it is still not a finding a report may state without a person:
+# exports and export readiness treat it exactly as ``expert_review``.
+ReviewLane = Literal["likely_barrier", "measured", "expert_review", "informational"]
 EvidenceConfidence = Literal["high", "medium", "low"]
+
+
+# The only rules that may be ``measured``.  The level is given per rule, not
+# per check: ``visual`` holds both measured playback and a vision model's
+# reading-order judgment, and only the first belongs here.  A rule that is
+# not listed stays ``expert_review``, so a new or model-assisted rule can
+# never be shown by default by accident (tests/unit/test_issue_sureness.py).
+#
+# Taken back out on 2026-11-12, after a live check of a real report found
+# both results false: ``focus-not-obscured`` (the probe focuses with scrolling
+# turned off, so the answer depends on where an earlier check left the page)
+# and ``responsive-text-clipped`` (it flagged a visually hidden status line,
+# 1 px on purpose).  ``responsive-text-spacing-clipped`` followed on
+# 2026-11-13: it uses the same cut-off-text detector, so it shared that flaw.
+# The detector was fixed on 2026-11-12 to skip text hidden on purpose, but the
+# fix has not been checked on a real site.  All three stay ``expert_review``
+# until the probes are shown to be right; putting them back is a decision,
+# not a cleanup.
+_MEASURED_RULES: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("keyboard", "keyboard-trap-stuck"),
+        ("responsive", "responsive-reflow-overflow"),
+        ("focus", "focus-order-positive-tabindex"),
+        ("visual", "visual-motion-no-pause"),
+        ("visual", "visual-autoplay-audio-no-control"),
+    }
+)
 
 
 def _alfa_criterion_name(help_text: Any) -> str | None:
@@ -168,6 +201,10 @@ class IssueDetail:
     verify_automated: str | None
     acceptance: str | None
     help_url: str | None  # axe rule docs deep-link (None for image issues)
+    # Numbered screen reader steps for each computer (Mac, Windows), when the
+    # card names a shared check (rules/screen_reader_checks.yaml). They go
+    # with verify_manual, which says what you should find.
+    screen_reader_check: ScreenReaderCheck | None = None
 
 
 @dataclass(frozen=True)
@@ -495,6 +532,7 @@ def detail_for_row(
         ),
         acceptance=meta.get("acceptance") or row.acceptance,
         help_url=help_url,
+        screen_reader_check=check_for(meta.get("screen_reader_check")),
     )
 
 
@@ -710,10 +748,28 @@ def abilities_breakdown(rows: list[IssueRow]) -> dict[str, int]:
 
 def review_lane_breakdown(rows: list[IssueRow]) -> dict[str, int]:
     """Count evidence groups without implying every group is a barrier."""
-    out = {"likely_barrier": 0, "expert_review": 0, "informational": 0}
+    out = {"likely_barrier": 0, "measured": 0, "expert_review": 0, "informational": 0}
     for row in rows:
         out[row.review_lane] = out.get(row.review_lane, 0) + 1
     return out
+
+
+def default_view_counts(rows: list[IssueRow]) -> dict[str, int]:
+    """What the Issues page shows when it opens, and what it leaves hidden.
+
+    ``rows`` is the whole report.  Shown are the levels in
+    ``audit.labels.DEFAULT_REVIEW_LANES``; everything else is hidden until the
+    reader asks for it.  The numbers above the table and on the Reports list
+    come from here, so they count what the table shows.
+    """
+    shown = [row for row in rows if row.review_lane in DEFAULT_REVIEW_LANES]
+    return {
+        "issue_types": len(shown),
+        "occurrences": sum(row.occurrence_count for row in shown),
+        "hidden_issue_types": len(rows) - len(shown),
+        "hidden_occurrences": sum(row.occurrence_count for row in rows)
+        - sum(row.occurrence_count for row in shown),
+    }
 
 
 def finding_type_breakdown(rows: list[IssueRow]) -> dict[str, int]:
@@ -1070,6 +1126,11 @@ def _axe_issue_rows(
             evidence_confidence = "high"
             high_confidence_occurrences = len(reported)
             evidence_summary = "The rule check (axe) found the page code breaks this rule."
+        # A browser measurement, with no model: shown by default, one level
+        # under the rule checks.  Never raises a legacy record, which the
+        # branches above already set to ``informational``.
+        if review_lane == "expert_review" and (pipeline, raw_rule_id) in _MEASURED_RULES:
+            review_lane = "measured"
         description = meta.get("what_happening") or alfa_description
         # ``revealed_by`` names the control Click-Through had to operate;
         # NULL means the element was there when the page loaded.
@@ -1439,7 +1500,12 @@ def _humanize_image_title(classification: str, adequacy: str) -> str:
 # the score orders rows within a lane, never across lanes. A high-scoring
 # informational row above a real barrier is the priority order contradicting
 # the review lane, and the lane is what a reviewer acts on.
-_LANE_RANK: dict[str, int] = {"likely_barrier": 0, "expert_review": 1, "informational": 2}
+_LANE_RANK: dict[str, int] = {
+    "likely_barrier": 0,
+    "measured": 1,
+    "expert_review": 2,
+    "informational": 3,
+}
 
 
 def _sort_rows(rows: list[IssueRow], sort: str) -> list[IssueRow]:

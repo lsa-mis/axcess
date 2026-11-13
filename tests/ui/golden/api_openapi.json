@@ -1428,6 +1428,86 @@
         }
       }
     },
+    "/api/scans/{scan_id}/images": {
+      "get": {
+        "summary": "Api Scan Images",
+        "description": "One page of one group of the report's images, worst verdict first.",
+        "operationId": "api_scan_images_api_scans__scan_id__images_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "group",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "string", "default": "with_text", "title": "Group"}
+          },
+          {
+            "name": "verdict",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "string", "default": "", "title": "Verdict"}
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "string", "maxLength": 200, "default": "", "title": "Q"}
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "integer", "maximum": 50, "minimum": 1, "default": 25, "title": "Limit"}
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "integer", "maximum": 1000000, "minimum": 0, "default": 0, "title": "Offset"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/images/{image_id}/alt-check": {
+      "post": {
+        "summary": "Api Check Image Alt",
+        "description": "Ask the local model about one image's alt text, keep and return its answer.\n\nA person's explicit request from the Images tab. Refused for a scan\nthat is not complete, for a protected scan (its images do not leave\nthe protected store), and when no model is set. A timeout or an\nunusable answer saves nothing and says so; the tab keeps working.",
+        "operationId": "api_check_image_alt_api_scans__scan_id__images__image_id__alt_check_post",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Image Id"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
     "/api/findings/{finding_id}/status": {
       "post": {
         "summary": "Api Set Finding Status",

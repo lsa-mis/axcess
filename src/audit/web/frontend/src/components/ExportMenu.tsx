@@ -112,8 +112,9 @@ export default function ExportMenu({
   site?: string;
   pageCount?: number;
   issueGroups?: number;
-  /** Issue types (rows) the table shows now; pass it only while a filter or a
-   *  search narrows the table. */
+  /** Issue types (rows) the table shows now; pass it only while the table
+   *  shows fewer than all of them (a filter, a search, or the default view
+   *  that holds back Not sure and For information). */
   shownIssueGroups?: number;
 }) {
   const [open, setOpen] = useState(false);
@@ -273,7 +274,7 @@ export default function ExportMenu({
   const scopeNote =
     shownIssueGroups !== undefined && issueGroups !== undefined && shownIssueGroups < issueGroups
     ? `Includes all ${plural(issueGroups, "issue type", "issue types")} and every status, ` +
-      `not only the ${shownIssueGroups.toLocaleString()} your filters show.`
+      `not only the ${shownIssueGroups.toLocaleString()} the table shows now.`
     : "Includes every issue type and every status in this report, even if the table has filters on.";
 
   return (

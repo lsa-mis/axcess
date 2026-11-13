@@ -1,13 +1,22 @@
 """Integration tests for the responsive/zoom/text-spacing probe.
 
 Real Playwright against hand-built fixtures in
-``tests/fixtures/site/responsive/``. Four fixtures, two classes:
+``tests/fixtures/site/responsive/``, in two classes:
 
-  * Negative (must produce zero findings): ``clean.html`` — the
-    false-positive guard for all three checks.
+  * Negative (must produce zero findings):
+    - ``clean.html`` — the false-positive guard for all three checks.
+    - ``sr_only_status.html`` — text hidden from sight on purpose (the
+      ``.sr-only`` pattern and its relatives). It paints no pixel, so there
+      is nothing to cut off.
+    - ``always_clipped.html`` — visible text cut off at every size. Zoom
+      and spacing do not cause it, so it is not their finding.
+    - ``zoom_clipped_then_removed.html`` — a message that is gone before
+      the comparison can be made.
   * Positive (each fires exactly its named check):
     - ``reflow_overflow.html``  → ``responsive-reflow-overflow``  (SC 1.4.10)
     - ``zoom_clipped.html``     → ``responsive-text-clipped``      (SC 1.4.4)
+    - ``zoom_clipped_among_hidden.html`` → ``responsive-text-clipped``, on
+      the two visible elements only, with hidden text first in the page.
     - ``spacing_clipped.html``  → ``responsive-text-spacing-clipped`` (SC 1.4.12)
 
 Isolation matters as much as detection: each positive fixture is built
@@ -81,6 +90,60 @@ async def test_probe_restores_viewport(page) -> None:  # type: ignore[no-untyped
     assert size == {"width": 1440, "height": 900}, f"viewport left at {size}"
 
 
+async def test_text_hidden_on_purpose_is_not_reported(page) -> None:  # type: ignore[no-untyped-def]
+    """Screen-reader-only text is not "clipped": none of it is ever painted.
+
+    The reported-in-error case was ``div.sr-only`` with ``role="status"``,
+    stored as "content 262px in a 1px box". The fixture has that element,
+    the ``clip-path: inset(50%)`` variant, an off-screen 1px box, a closed
+    panel and text at ``opacity: 0``.
+    """
+    await page.goto(_file_url("sr_only_status.html"))
+    # The fixture must still hold what the old check tripped on.
+    box = await page.evaluate(
+        """() => {
+          const el = document.querySelector('div.sr-only[role=status]');
+          return [el.clientWidth, el.scrollWidth > el.clientWidth + 4];
+        }"""
+    )
+    assert box == [1, True], f"fixture no longer has the 1px box with wider text: {box}"
+    findings = await ResponsiveProbe().run(page)
+    assert findings == [], "hidden text reported as cut off: " + ", ".join(
+        f"{f.rule_id} on {f.target_selector}" for f in findings
+    )
+
+
+async def test_text_cut_off_at_every_size_is_not_a_zoom_or_spacing_finding(page) -> None:  # type: ignore[no-untyped-def]
+    """Both checks compare with the normal condition before they report.
+
+    SC 1.4.4 is about content lost by resizing and SC 1.4.12 about content
+    lost by the spacing. A box that cuts its text off at 1440px exactly as
+    it does at 640px, with or without the spacing, is neither.
+    """
+    await page.goto(_file_url("always_clipped.html"))
+    cut_off_at_normal_size = await page.evaluate(
+        """() => ['fixed-box', 'short-box'].map((id) => {
+          const el = document.getElementById(id);
+          return el.scrollWidth > el.clientWidth + 4 || el.scrollHeight > el.clientHeight + 4;
+        })"""
+    )
+    assert cut_off_at_normal_size == [True, True], "fixture boxes no longer cut off their text"
+    findings = await ResponsiveProbe().run(page)
+    assert findings == [], "reported text that zoom and spacing did not cut off: " + ", ".join(
+        f"{f.rule_id} on {f.target_selector}" for f in findings
+    )
+
+
+async def test_message_removed_before_the_comparison_is_not_reported(page) -> None:  # type: ignore[no-untyped-def]
+    """An element that is gone cannot be compared, and must not break the run."""
+    await page.goto(_file_url("zoom_clipped_then_removed.html"))
+    findings = await ResponsiveProbe().run(page)
+    assert await page.evaluate("document.getElementById('passing-message')") is None, (
+        "fixture did not remove its message, so the test covered nothing"
+    )
+    assert findings == []
+
+
 # --------------------------------------------------------------------
 # Positive cases — one named rule each, others quiet.
 # --------------------------------------------------------------------
@@ -120,6 +183,31 @@ async def test_detects_text_clipping_at_zoom_proxy(page) -> None:  # type: ignor
     assert all(f.criterion_sc == "1.4.4" for f in clipped)
 
 
+async def test_detects_real_clipping_on_a_page_with_hidden_text(page) -> None:  # type: ignore[no-untyped-def]
+    """Visible text cut off at 640px is reported; hidden text beside it is not.
+
+    Six pieces of screen-reader-only text come first in the page and the
+    check reports at most five elements, so counting hidden text would
+    crowd out both real problems.
+    """
+    await page.goto(_file_url("zoom_clipped_among_hidden.html"))
+    findings = await ResponsiveProbe().run(page)
+    assert {f.rule_id for f in findings} == {RULE_TEXT_CLIPPED}, [
+        f"{f.rule_id} on {f.target_selector}" for f in findings
+    ]
+    # #vw-box loses the end of its line; #squeezed is squeezed to nothing
+    # and loses all of it. Both show their text at the normal viewport.
+    assert [f.target_selector for f in findings] == ["p#vw-box", "p#squeezed"]
+    for finding in findings:
+        assert finding.criterion_sc == "1.4.4"
+        assert "clipped horizontally" in finding.failure_summary
+        # The stored words carry the comparison that makes it a zoom finding.
+        assert (
+            "At the normal 1440px-wide viewport this element does not cut off its text"
+            in finding.failure_summary
+        )
+
+
 async def test_detects_clipping_under_text_spacing_override(page) -> None:  # type: ignore[no-untyped-def]
     """A height-locked overflow-hidden box → spacing-clipped, only."""
     await page.goto(_file_url("spacing_clipped.html"))
@@ -133,6 +221,12 @@ async def test_detects_clipping_under_text_spacing_override(page) -> None:  # ty
     assert RULE_REFLOW not in rules
     assert RULE_TEXT_CLIPPED not in rules
     assert all(f.criterion_sc == "1.4.12" for f in clipped)
+    assert all(
+        "Without the override this element does not cut off its text" in f.failure_summary
+        for f in clipped
+    )
+    # The override sheet is gone once the check is done.
+    assert await page.evaluate("document.querySelectorAll('style').length") == 1
 
 
 # --------------------------------------------------------------------

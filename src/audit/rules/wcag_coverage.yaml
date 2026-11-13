@@ -64,13 +64,16 @@ criteria:
   - sc: "1.2.2"
     name: "Captions (Prerecorded)"
     level: A
-    method: manual
-    pipelines: []
-    confidence: n/a
-    automated_check: ""
+    method: partial
+    pipelines: [axe]
+    confidence: low
+    automated_check: >-
+      axe flags <video> elements with no captions track (video-caption). It
+      checks only that a track is present, not that captions exist or are right.
     manual_check: >-
-      Play each video and confirm synchronized, accurate captions. Auto-caption
-      diffing (Whisper) is on the roadmap.
+      Play each video and confirm synchronized, accurate captions, including
+      captions burned into the video or provided by an embedded player.
+      Auto-caption diffing (Whisper) is on the roadmap.
 
   - sc: "1.2.3"
     name: "Audio Description or Media Alternative (Prerecorded)"
@@ -181,12 +184,13 @@ criteria:
     name: "Audio Control"
     level: A
     method: partial
-    pipelines: [visual]
+    pipelines: [axe, visual]
     confidence: medium
     automated_check: >-
       The visual probe measures actual playback advancement and flags audible
       audio longer than three seconds when no native or explicitly associated
-      custom control is detected. Autoplay markup alone is not flagged.
+      custom control is detected. axe separately flags autoplaying audio or
+      video markup that lacks controls or a short duration (no-autoplay-audio).
     manual_check: >-
       Confirm every audible autoplay source can be paused, stopped, or volume
       controlled independently; test custom controls and browser autoplay policy.
@@ -321,12 +325,15 @@ criteria:
   - sc: "2.2.1"
     name: "Timing Adjustable"
     level: A
-    method: manual
-    pipelines: []
-    confidence: n/a
-    automated_check: ""
+    method: partial
+    pipelines: [axe]
+    confidence: low
+    automated_check: >-
+      axe flags a timed <meta http-equiv="refresh"> redirect or reload
+      (meta-refresh). Script-driven time limits are not detected.
     manual_check: >-
-      For any time limit, confirm it can be turned off, adjusted, or extended.
+      For any time limit (session timeouts, timed forms, auto-advancing
+      content), confirm it can be turned off, adjusted, or extended.
 
   - sc: "2.2.2"
     name: "Pause, Stop, Hide"
@@ -431,12 +438,13 @@ criteria:
   - sc: "2.5.3"
     name: "Label in Name"
     level: A
-    method: partial
-    pipelines: [axe]
-    confidence: medium
-    automated_check: >-
-      axe flags controls whose accessible name doesn't contain the visible label
-      text (label-content-name-mismatch).
+    method: manual
+    pipelines: []
+    confidence: n/a
+    # axe-core's label-content-name-mismatch rule is tagged experimental, and
+    # axe excludes experimental rules from tag-filtered runs, so Axcess never
+    # runs it. Re-check if axe promotes the rule or Axcess opts into it.
+    automated_check: ""
     manual_check: >-
       Confirm the visible text is fully contained in the accessible name for
       voice-control users.
@@ -480,11 +488,12 @@ criteria:
   - sc: "2.4.7"
     name: "Focus Visible"
     level: AA
-    method: partial
-    pipelines: [axe]
-    confidence: low
-    automated_check: >-
-      axe has limited checks for suppressed focus indicators.
+    method: manual
+    pipelines: []
+    confidence: n/a
+    # axe-core 4.10.2 has no rule tagged wcag247, so no axe evidence exists.
+    # The focus probe covers 2.4.11 obscured focus, not indicator visibility.
+    automated_check: ""
     manual_check: >-
       Tab the whole page and confirm a clearly visible focus indicator on every
       interactive element, largely manual.
@@ -695,11 +704,11 @@ criteria:
   - sc: "4.1.3"
     name: "Status Messages"
     level: AA
-    method: partial
-    pipelines: [axe]
-    confidence: low
-    automated_check: >-
-      axe checks for some live-region / role=status markup.
+    method: manual
+    pipelines: []
+    confidence: n/a
+    # axe-core 4.10.2 has no rule tagged wcag413, so no axe evidence exists.
+    automated_check: ""
     manual_check: >-
       Confirm dynamic updates (added-to-cart, validation, search counts) are
       actually announced, needs screen-reader testing.

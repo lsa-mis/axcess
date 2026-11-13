@@ -26,7 +26,13 @@ import pytest
 from audit.exports.audit_report import load_report_rules
 
 from ._paging import all_pages_text
-from ._seed_evidence import SCREENSHOT_ISSUE_KEY, add_screenshot_finding
+from ._seed_evidence import (
+    LANDMARK_ISSUE_KEY,
+    SCREENSHOT_ISSUE_KEY,
+    add_landmark_finding,
+    add_screenshot_finding,
+)
+from .conftest import ALL_HOW_SURE
 
 # One browser per module (tests/ui/conftest.py), so the tests run on the
 # module's event loop. Each ``new_page`` call still opens its own context.
@@ -490,7 +496,8 @@ async def test_issue_table_fits_the_default_desktop_width(
     """
     base, scan_id = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
-    await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+    # Every "How sure" value shown, so the table has its widest rows.
+    await page.goto(f"{base}/app/scans/{scan_id}/issues?{ALL_HOW_SURE}", wait_until="networkidle")
     issues = page.get_by_role("table", name="Accessibility issue types")
     scroller = page.get_by_role("region", name="Issues table")
     # Who fixes it is hidden for now (HIDDEN_ISSUE_FIELDS), so Pages stands in.
@@ -574,7 +581,8 @@ async def test_informational_evidence_is_read_only_and_not_barrier_language(
             else None
         ),
     )
-    await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+    # For information rows are held back when the table opens; show them.
+    await page.goto(f"{base}/app/scans/{scan_id}/issues?{ALL_HOW_SURE}", wait_until="networkidle")
     issues = page.get_by_role("table", name="Accessibility issue types")
     logo_title = load_report_rules()["image_findings"]["logo_adequate"]["title"]
     row_link = issues.get_by_role("rowheader").get_by_role("link", name=logo_title, exact=False)
@@ -666,7 +674,7 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     ).to_be_visible()
     workspace = page.get_by_role("navigation", name="Report views")
     await playwright_async.expect(workspace.get_by_role("link")).to_have_text(
-        ["Issues", "Compare reports"]
+        ["Issues", "Images", "Compare reports"]
     )
     await playwright_async.expect(
         workspace.get_by_role("link", name="Issues", exact=True)
@@ -727,8 +735,16 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     ledger = page.get_by_role("region", name="What was checked")
     await playwright_async.expect(ledger).to_be_hidden()
     # Under the table since user testing (2026-10-28), not between it and
-    # the numbers; the summary numbers carry no line under them.
-    table_box = await page.get_by_role("region", name="Issues table").bounding_box()
+    # the numbers. The seeded report has no Mostly sure or Measured issue
+    # type, so the table opens empty and says so: the note over it counts
+    # the two it holds back, and each problem number carries that count.
+    hidden = page.get_by_role("note", name="Hidden issue types")
+    await playwright_async.expect(hidden).to_contain_text("2 issue types are hidden")
+    await playwright_async.expect(summary.get_by_text("Plus 2 hidden", exact=True)).to_be_visible()
+    await playwright_async.expect(
+        page.get_by_text("Axcess found no issue types marked Mostly sure or Measured.", exact=False)
+    ).to_be_visible()
+    table_box = await hidden.bounding_box()
     coverage_box = await coverage.bounding_box()
     assert table_box and coverage_box and coverage_box["y"] > table_box["y"], (
         table_box,
@@ -1586,3 +1602,65 @@ async def test_instance_screenshots_describe_the_outline_and_pass_axe(
         assert not violations, _render_violations(violations)
     finally:
         await page.context.close()
+
+
+@pytest.mark.parametrize("width", [1280, 320])
+async def test_landmark_guidance_gives_mac_and_windows_steps(
+    live_server: tuple[str, int],
+    seeded_db: tuple[Path, Path, int],
+    new_page: Any,
+    width: int,
+) -> None:
+    """A landmark issue's guidance shows numbered VoiceOver and NVDA steps.
+
+    Both computers' steps are visible at once, each under its own heading as
+    a numbered list, keys spelled out; the dialog passes axe and, at 320 px,
+    nothing in it scrolls sideways (SC 1.4.10).
+    """
+    base, scan_id = live_server
+    db_path, _, _ = seeded_db
+    add_landmark_finding(db_path, scan_id)
+    page = await new_page(viewport={"width": width, "height": 900})
+    await page.goto(
+        f"{base}/app/scans/{scan_id}/issues/{LANDMARK_ISSUE_KEY.replace(':', '%3A')}",
+        wait_until="networkidle",
+    )
+    # Keyboard only: Tab to the guidance button and open it with Enter.
+    guidance = page.get_by_role("button", name="Issue guidance", exact=True)
+    await guidance.focus()
+    await page.keyboard.press("Enter")
+    dialog = page.get_by_role("dialog", name="Issue guidance")
+    await playwright_async.expect(dialog).to_be_visible()
+    await playwright_async.expect(
+        dialog.get_by_role("heading", name="Check the landmarks with a screen reader")
+    ).to_be_visible()
+    mac = dialog.get_by_role("region", name="Mac, with VoiceOver")
+    windows = dialog.get_by_role("region", name="Windows, with NVDA")
+    await playwright_async.expect(mac.get_by_role("listitem")).to_have_count(5)
+    await playwright_async.expect(windows.get_by_role("listitem")).to_have_count(5)
+    await playwright_async.expect(mac.get_by_role("listitem").first).to_contain_text(
+        "Turn VoiceOver on: press Command + F5."
+    )
+    await playwright_async.expect(mac.get_by_role("listitem").nth(2)).to_contain_text(
+        'Press Right Arrow until you hear "Landmarks".'
+    )
+    await playwright_async.expect(windows.get_by_role("listitem").nth(1)).to_contain_text(
+        "press NVDA key + F7"
+    )
+    await playwright_async.expect(
+        windows.get_by_role(
+            "link", name=re.compile(r"^Get NVDA from NV Access\s*, opens in a new tab$")
+        )
+    ).to_have_attribute("href", "https://www.nvaccess.org/download/")
+    # No raw {Key} markup reaches the screen.
+    assert "{" not in await dialog.inner_text()
+    violations = await _run_axe(page)
+    assert not violations, _render_violations(violations)
+    if width == 320:
+        overflow = await dialog.evaluate(
+            "el => [...el.querySelectorAll('section')].filter("
+            "s => s.scrollWidth > s.clientWidth + 1).length"
+        )
+        assert overflow == 0
+    await page.keyboard.press("Escape")
+    await playwright_async.expect(guidance).to_be_focused()

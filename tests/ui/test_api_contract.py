@@ -77,6 +77,10 @@ _ENDPOINTS: tuple[tuple[str, str], ...] = (
         "GET /api/scans/{scan_id}/issues/{issue_key} (alfa issue)",
         "/api/scans/{scan}/issues/{alfa_issue}",
     ),
+    (
+        "GET /api/scans/{scan_id}/issues/{issue_key} (landmark issue)",
+        "/api/scans/{scan}/issues/axe%3Aregion",
+    ),
     ("GET /api/scans/{scan_id}/findings", "/api/scans/{scan}/findings"),
     (
         "GET /api/scans/{scan_id}/findings?page=0 (validation error)",
@@ -99,6 +103,13 @@ _ENDPOINTS: tuple[tuple[str, str], ...] = (
     ("GET /api/scans/{scan_id}/evaluation (not saved)", "/api/scans/{baseline}/evaluation"),
     ("GET /api/scans/{scan_id}/manual-checks", "/api/scans/{scan}/manual-checks"),
     ("GET /api/scans/{scan_id}/comparison", "/api/scans/{scan}/comparison"),
+    # Image groups only: the first rows of the unfiltered list are axe and
+    # Alfa groups, so the image group with a "reviewing" status sits past
+    # the skeleton's sample there.
+    (
+        "GET /api/scans/{scan_id}/comparison (image groups)",
+        "/api/scans/{scan}/comparison?pipeline=image",
+    ),
     ("GET /api/scans/{scan_id}/history", "/api/scans/{scan}/history"),
     (
         "GET /api/scans/{scan_id}/diff?compare_to={baseline_id}",
@@ -421,6 +432,25 @@ def _add_a11y_evidence(conn: sqlite3.Connection, blob_dir: Path, scan_id: int) -
         screenshot_hash=screenshot_hash,
         revealed_by="Opened the Menu button",
         revealed_state_key="menu-open",
+    )
+    # Content outside a landmark: its card names the shared screen reader
+    # steps, so the issue detail carries ``screen_reader_check``.
+    repo.upsert_axe_violation(
+        conn,
+        page_id=home,
+        scan_id=scan_id,
+        rule_id="region",
+        # A best practice: axe maps it to no WCAG criterion.
+        wcag_sc=None,
+        wcag_scs=None,
+        wcag_level=None,
+        impact="moderate",
+        help="All page content should be contained by landmarks",
+        help_url="https://dequeuniversity.com/rules/axe/4.10/region",
+        target_selector="div.promo",
+        failure_summary="Put this content inside a landmark.",
+        html_snippet='<div class="promo">',
+        target_hash="api-contract-region",
     )
     repo.upsert_alfa_finding(
         conn,
