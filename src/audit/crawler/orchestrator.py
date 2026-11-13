@@ -130,6 +130,14 @@ class CrawlConfig:
     concurrency_per_host: int = 2
     workers: int = 4
     user_agent: str = "axcess/0.1 (+local accessibility audit)"
+    # The name robots.txt rules are matched against. None means
+    # ``user_agent``. Set to Axcess's own name when the scan sends a
+    # browser's name instead (``audit.crawler.user_agent``), so choosing
+    # "Chrome" never changes which robots.txt rules apply.
+    robots_user_agent: str | None = None
+    # Which entry of New scan's browser-name list was chosen; None when the
+    # scan kept Axcess's own name or was not started from that form.
+    user_agent_choice: str | None = None
     request_timeout_s: float = 30.0
     # OCR, disable with ``ocr_enabled=False`` or by passing ``--skip-ocr`` on the CLI.
     ocr_enabled: bool = True
@@ -495,7 +503,7 @@ async def run_crawl(
 
     owned_client = http_client is None
     client = http_client or _default_client(config)
-    robots = RobotsChecker(client, user_agent=config.user_agent)
+    robots = RobotsChecker(client, user_agent=config.robots_user_agent or config.user_agent)
     fetcher = StaticFetcher(client)
     blob_store = BlobStore(get_settings().blob_dir)
     downloader = image_downloader or ImageDownloader(client, blob_store)
@@ -867,6 +875,14 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             "ignore_robots": config.ignore_robots,
             "concurrency_per_host": config.concurrency_per_host,
             "user_agent": config.user_agent,
+            # Only when New scan's list chose it, so "Edit settings and retry"
+            # can choose it again. Older rows, and scans that kept Axcess's
+            # own name, omit it.
+            **(
+                {"user_agent_choice": config.user_agent_choice}
+                if config.user_agent_choice is not None
+                else {}
+            ),
             # Pipeline switches, drives the "methods used" UI row.
             "js_eager": config.js_eager,
             "browser_headless": config.browser_headless,

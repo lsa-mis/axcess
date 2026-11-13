@@ -7,12 +7,19 @@ reads them back into the fields the form posts.
 
 It is an allow-list, not a copy. Only the form's own settings are read, one
 named key at a time, and nothing else in ``config_json`` can reach the
-response: not the user agent, not the post-sign-in landing URL
+response: not the user agent string, not the post-sign-in landing URL
 (``start_url``, which can carry single-use sign-in codes), and not anything a
 later change might add. The address has any ``user:password@`` removed.
 Login scans never store a password, cookie or session in the first place;
 the authorization and image-storage confirmations are not settings and are
 never returned, so the person gives them again for the new run.
+
+The browser name (user agent) comes back as the *choice* only: which entry
+of the form's list was picked. The form fills in that entry's current
+string, so a scan run again as "Chrome on Windows" sends today's Chrome. A
+name the person typed (``custom``) is never returned, because a typed name
+can be a secret: some sites let scanners past their firewall by an agreed
+user agent. The form asks for it again.
 
 The limits the public create endpoint enforces live here too, next to the
 form fields they bound, so the form and the server agree on one range.
@@ -30,6 +37,7 @@ from urllib.parse import urlsplit, urlunsplit
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from audit.crawler.search import SearchConfig
+from audit.crawler.user_agent import DEFAULT_CHOICE, is_choice, user_agent_problem
 from audit.wcag_version import WcagVersion, stored_wcag_version
 
 # Inclusive bounds for a public scan's two limits. The login endpoint's
@@ -81,6 +89,12 @@ class ScanFormSettings(BaseModel):
     skip_rendered_storage: bool
     axe_level: Literal["A", "AA", "AAA"]
     wcag_version: WcagVersion
+    # Which browser name the scan sends (``audit.crawler.user_agent``):
+    # "axcess" for Axcess's own, an entry of the form's list, or "custom".
+    user_agent_choice: str = DEFAULT_CHOICE
+    # The string for "custom". Always empty in a snapshot (see the module
+    # docstring); the form fills in a listed entry's string itself.
+    user_agent: str = ""
 
 
 class ScanSettingsSnapshot(BaseModel):
@@ -152,6 +166,11 @@ def _search(config: Mapping[str, Any]) -> SearchConfig | None:
         return None
 
 
+def _user_agent_choice(config: Mapping[str, Any]) -> str:
+    choice = config.get("user_agent_choice")
+    return choice if isinstance(choice, str) and is_choice(choice) else DEFAULT_CHOICE
+
+
 def snapshot_from_config(
     *, scan_id: int, seed_url: str, config_json: str | bytes | None
 ) -> ScanSettingsSnapshot:
@@ -198,6 +217,7 @@ def snapshot_from_config(
         skip_rendered_storage=not _flag(config, "store_rendered_html", default=True),
         axe_level=axe_level,
         wcag_version=stored_wcag_version(config),
+        user_agent_choice=_user_agent_choice(config),
     )
     return ScanSettingsSnapshot(scan_id=scan_id, mode=_mode(config), settings=settings)
 
@@ -228,3 +248,19 @@ def limit_refusal(body: Mapping[str, Any]) -> tuple[str, str] | None:
         if not MIN_LIMIT <= value <= maximum:
             return field, f"{label} must be from {MIN_LIMIT} to {maximum:,}."
     return None
+
+
+def user_agent_refusal(body: Mapping[str, Any]) -> tuple[str, str] | None:
+    """``(field, message)`` for a browser name the scan cannot send, else None.
+
+    No choice, or Axcess's own, needs no string: the server's name is sent
+    and any ``user_agent`` alongside is ignored. Any other choice must come
+    with the string to send.
+    """
+    choice = body.get("user_agent_choice")
+    if choice is None or choice == DEFAULT_CHOICE:
+        return None
+    if not is_choice(choice):
+        return "user_agent_choice", "Choose a browser name from the list."
+    message = user_agent_problem(body.get("user_agent"))
+    return None if message is None else ("user_agent", message)
