@@ -5,9 +5,11 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
+import httpx
 import pytest
 
 from audit.db import linked_files as store
+from audit.linked_files.fetch import fetch_file
 
 MIGRATION = Path(__file__).parents[2] / "src/audit/db/migrations/0039_linked_files"
 
@@ -173,3 +175,43 @@ def test_could_not_check_always_has_a_reason(tmp_db: sqlite3.Connection) -> None
         "could_not_check",
         "not_checked",
     )
+
+
+def _client(handler: httpx.MockTransport) -> httpx.AsyncClient:
+    return httpx.AsyncClient(transport=handler)
+
+
+async def test_a_file_over_the_limit_is_not_held() -> None:
+    def answer(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=b"%PDF-" + b"x" * 5000)
+
+    async with _client(httpx.MockTransport(answer)) as client:
+        result = await fetch_file(client, "https://a.test/big.pdf", max_bytes=1000)
+    assert (result.outcome, result.body) == ("too_large", b"")
+
+
+async def test_a_declared_length_over_the_limit_is_refused_before_reading() -> None:
+    def answer(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers={"Content-Length": "999999999"}, content=b"%PDF-")
+
+    async with _client(httpx.MockTransport(answer)) as client:
+        result = await fetch_file(client, "https://a.test/big.pdf", max_bytes=1000)
+    assert result.outcome == "too_large"
+
+
+async def test_errors_are_reported_not_raised() -> None:
+    def gone(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(410)
+
+    def down(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("refused", request=request)
+
+    def slow(request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("slow", request=request)
+
+    async with _client(httpx.MockTransport(gone)) as client:
+        assert (await fetch_file(client, "https://a.test/x.pdf")).outcome == "http_error"
+    async with _client(httpx.MockTransport(down)) as client:
+        assert (await fetch_file(client, "https://a.test/x.pdf")).outcome == "broken_link"
+    async with _client(httpx.MockTransport(slow)) as client:
+        assert (await fetch_file(client, "https://a.test/x.pdf")).outcome == "timed_out"
