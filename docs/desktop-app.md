@@ -44,8 +44,10 @@ React workbench in a sandboxed Electron window.
   profile on macOS. Axcess talks to it through a private connection, a UNIX
   socket file in its data folder. Before starting, Axcess checks that
   outside connections are blocked; if that check fails, AI does not start.
-  On Windows, the private AI service cannot be isolated yet, so AI does not
-  start there; saved results still work. Downloads run outside the sandbox.
+  On Windows, it runs in an AppContainer with no network permission, started
+  by a small sandbox program that comes with the app (Windows 10 version 1809
+  or later; on older versions AI does not start, and saved results still
+  work). Downloads run outside the sandbox.
   See
   [Set up AI features](ai-suggestions.md#set-up-ai-features-in-the-desktop-app).
 - The service tries a graphics chip build first: Metal on Apple Silicon

@@ -197,7 +197,7 @@ internet access.
 | --- | --- |
 | Linux | Bubblewrap (`bwrap`) runs the service with no network. Bubblewrap must be installed. Without it, AI does not start. |
 | macOS | A deny-by-default `sandbox-exec` profile allows only the AI program, the models, a scratch folder, the system libraries, the Mac graphics driver (Metal), and the Python needed for the isolation check. Networking is limited to this computer (loopback). |
-| Windows | The private AI service cannot be isolated yet, so AI does not start. Saved results still work. |
+| Windows | A Windows AppContainer (the stricter "less privileged" kind) with no network permission, started by Axcess's small sandbox program (`axcess-ai-launcher.exe`). The service can read only the AI program and the models, and write only its scratch folder. Needs Windows 10 version 1809 or later; otherwise AI does not start. Saved results still work. Axcess reaches each model through a local port that accepts only the Axcess program itself. |
 
 - Axcess talks to the service through a private connection: a UNIX socket
   file in `ai/scratch`, in its data folder.

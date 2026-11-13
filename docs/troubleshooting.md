@@ -117,9 +117,10 @@ and continues without those checks.
   your AI setup was saved by an older version, which used a private copy of
   Ollama. Choose a size and select **Download and set up**. When the download
   finishes, Axcess deletes the old private Ollama files.
-- **AI could not be isolated**: the service stays stopped. On Windows, the
-  private AI service cannot be isolated yet, so AI does not start. On Linux,
-  install Bubblewrap (`bwrap`); without it, AI does not start. Do not disable
+- **AI could not be isolated**: the service stays stopped. On Windows, AI
+  needs Windows 10 version 1809 or later, and a copy of Axcess that includes
+  its sandbox program (`axcess-ai-launcher.exe`). On Linux, install
+  Bubblewrap (`bwrap`); without it, AI does not start. Do not disable
   the isolation check or expose a service to the internet to get past this
   error.
 - **Isolation check failed**: check the application log. Axcess requires proof

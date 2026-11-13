@@ -64,8 +64,7 @@ The preview does not yet carry the signatures macOS and Windows look for
 then run a small scan. Optional [AI checks](./docs/glossary.md#local-ai-model)
 need AI models that the app downloads only when you choose a size in
 **Settings > AI features**. They run on your computer, in a private AI service
-with no internet access. On Windows, that service cannot be kept apart from
-the internet yet, so AI does not start there. Everything else works without AI. Release notes and
+with no internet access. Everything else works without AI. Release notes and
 earlier builds are on the
 [releases page](https://github.com/lsa-mis/axcess/releases).
 

@@ -231,6 +231,39 @@ Axcess backend
     Never fall back to "no sandbox". Which fallbacks to ship is a product
     decision (see open questions).
 
+## Results on GitHub's windows-2022 runner (2026-11-13)
+
+Built and run by `.github/workflows/ai-sandbox.yml` (Windows job):
+`desktop/ai-launcher/axcess_ai_launcher.c`, the smoke test
+`desktop/ai-launcher/smoke.ps1`, and
+`tests/integration/test_windows_launcher_live.py`. No model was loaded; the
+runner has no GPU.
+
+- **Open question 2, answered: yes.** The official b12284 Windows
+  `llama-server.exe` listens on AF_UNIX: its log says
+  `listening on unix://D:\a\_temp\axl\scratch\llama.sock`.
+- **Open question 1, answered: yes.** A socket made inside the LPAC is
+  reachable from a normal process outside it (the launcher's check, and
+  `serve` relaying 10 sequential and 4 concurrent requests).
+- **Open question 4, answered:** inside the LPAC, Windows refuses even to
+  *create* a TCP socket: `socket()` fails with 10013 (WSAEACCES). The check
+  accepts that as an OS denial.
+- **Python shim or bridge (open question 6): the bridge.** The launcher
+  relays each socket to a 127.0.0.1 port that closes any connection not
+  owned by the Axcess process (checked with GetExtendedTcpTable); `curl.exe`
+  from the same user was reset. Python reaches the server through it with
+  httpx (`ModelRoutingTransport`).
+- **Needed beyond the design:** the `registryRead` capability on every
+  start, not only for the GPU: without it `WSAStartup` fails inside the
+  LPAC, because Winsock reads its settings from the registry. And the child
+  environment must contain `LOCALAPPDATA` and `USERPROFILE`, or
+  `CreateProcessW` fails with 203 (ERROR_ENVVAR_NOT_FOUND); Windows rewrites
+  them to the container's own folder.
+- `--gpu` (adds `lpacPnpNotifications`) starts and passes the check; whether
+  Vulkan finds a real graphics card inside the LPAC is **not yet tested**
+  (open question 3).
+- Not yet run: a real model on Windows, and a packaged Windows build.
+
 ## Open questions
 
 1. **Does AF_UNIX work across the AppContainer boundary?** Test: socket

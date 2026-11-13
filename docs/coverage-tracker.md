@@ -185,8 +185,7 @@ currently published.
 Optional AI models are not bundled or downloaded silently. The desktop app
 includes the AI program (llama.cpp) and downloads the AI models only after the
 person chooses a size in **Settings > AI features**. It runs them in its own
-private AI service, sandboxed with no internet access; on Windows that service
-cannot be isolated yet, so AI does not start there. Web and server installs
+private AI service, sandboxed with no internet access. Web and server installs
 use an Ollama or llama.cpp server that the administrator runs, on the same
 computer by default.
 

@@ -180,9 +180,12 @@ Built 2026-11-12 (Linux and macOS; Windows still refuses to start AI):
   resolve its own path) and running programs inside Python's install folder
   (a framework Python starts `Python.app`). Not yet run on a Mac with a
   model loaded on Metal.
+- Windows built 2026-11-13: `desktop/ai-launcher` (AppContainer launcher)
+  and `ai/windows_launcher.py`; one server per model behind launcher ports
+  that accept only the Axcess process. Checked on GitHub's windows-2022
+  runner without a model; results in `windows-ai-sandbox.md`.
 - Desktop test build 43304128432: all three platforms bundle llama.cpp
-  b12284 and pass `verify-resources`. The Windows build includes it, but AI
-  still refuses to start on Windows.
+  b12284 and pass `verify-resources`. 
 - Checked in a desktop-mode server with the bundled-program layout: setup
   through the API, background start at launch (about 10 s), AI off and on,
   no service left after Axcess is killed, and the fix-suggestion evals

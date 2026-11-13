@@ -179,10 +179,11 @@ import { REPO, url } from "../lib/site";
       <p>
         In the desktop app, the models run in a private AI service: the AI program (llama.cpp) that comes with the
         app. It runs in a sandbox that the operating system keeps away from the internet (Bubblewrap on Linux,
-        <code>sandbox-exec</code> on macOS). Axcess talks to it through
+        <code>sandbox-exec</code> on macOS, an AppContainer with no network permission on Windows). Axcess talks to it
+        through
         a private connection, a file in its data folder (a UNIX socket). Before the service starts, Axcess checks
-        that outside connections are blocked. If that check fails, AI does not start. On Windows, the service cannot
-        be kept apart from the internet yet, so AI does not start there.
+        that outside connections are blocked. If that check fails, AI does not start. On Windows, Axcess reaches it
+        through a local port that accepts only the Axcess program itself.
       </p>
       <p>
         If you run Axcess from source code or on a server, it uses an Ollama or llama.cpp server that you run.

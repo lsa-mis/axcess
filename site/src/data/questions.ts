@@ -87,12 +87,12 @@ export const QUESTIONS: Question[] = [
   // AI is optional: semantic_enabled and vlm_enabled default to false
   // (src/audit/web/scan_settings.py). The desktop app bundles Chromium and
   // Tesseract (docs/desktop-app.md). Its private AI service and the
-  // Windows limit: src/audit/ai/runtime.py and sandbox.py. AI results are
+  // sandboxes: src/audit/ai/runtime.py, sandbox.py and windows_launcher.py. AI results are
   // never Mostly sure (docs/glossary.md "Local AI model").
   {
     id: "ai",
     q: "Do I need AI to use it?",
-    a: "No. Most checks need only a browser and software that reads text in images (OCR), and the desktop app includes both. AI review is optional, and so is the AI step of the Image text check. They use local AI models that the desktop app downloads only when you choose a size in Settings. The models run on your computer, in a private AI service with no internet access. On Windows, that service cannot be kept apart from the internet yet, so AI does not start there. Their results are never marked Mostly sure.",
+    a: "No. Most checks need only a browser and software that reads text in images (OCR), and the desktop app includes both. AI review is optional, and so is the AI step of the Image text check. They use local AI models that the desktop app downloads only when you choose a size in Settings. The models run on your computer, in a private AI service with no internet access. Their results are never marked Mostly sure.",
     links: [{ href: "/docs/glossary/#local-ai-model", text: "Local AI model, in the glossary" }],
   },
   // Update check: desktop/src/updates.cjs, desktop/src/main.cjs:508
