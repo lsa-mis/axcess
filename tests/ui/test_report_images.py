@@ -14,6 +14,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -185,6 +186,24 @@ def test_check_saves_and_returns_the_row(app_and_ids: Any) -> None:
     listed = client.get(f"/api/scans/{scan_id}/images?group=with_alt").json()
     assert listed["check_available"] is True
     assert next(r for r in listed["rows"] if r["image_id"] == photo)["suggestion"]
+
+
+def test_check_ignores_proxy_settings(app_and_ids: Any, monkeypatch: pytest.MonkeyPatch) -> None:
+    # A proxy in the environment would send the image and page text to
+    # another computer even though the model address is loopback.
+    monkeypatch.setenv("HTTP_PROXY", "http://proxy.example.com:3128")
+    monkeypatch.setenv("ALL_PROXY", "http://proxy.example.com:3128")
+    client, scan_id, photo, _ = app_and_ids
+    seen: list[httpx.AsyncClient] = []
+
+    def factory(http: httpx.AsyncClient) -> _Stub:
+        seen.append(http)
+        return _Stub()
+
+    client.app.state.alt_checker_factory = factory
+    response = client.post(f"/api/scans/{scan_id}/images/{photo}/alt-check")
+    assert response.status_code == 200, response.text
+    assert seen and seen[0].trust_env is False
 
 
 def test_check_refuses_image_from_another_scan(app_and_ids: Any) -> None:

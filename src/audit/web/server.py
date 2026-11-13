@@ -2966,7 +2966,10 @@ def create_app(
             context_snippet=target.context_snippet,
         )
         try:
-            async with httpx.AsyncClient() as client:
+            # trust_env=False: proxy settings in the environment
+            # (HTTP_PROXY, ALL_PROXY) must not route the image and page text
+            # through another computer; the address is loopback only.
+            async with httpx.AsyncClient(trust_env=False) as client:
                 checker = factory(client)
                 answer = await asyncio.wait_for(
                     checker.check(image_bytes, given),
