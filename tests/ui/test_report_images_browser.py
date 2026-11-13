@@ -133,7 +133,9 @@ async def test_images_tab_works_by_keyboard_alone(
         await page.reload()
         await page.evaluate(
             """() => {
-              Object.defineProperty(navigator, "clipboard", { configurable: true, value: undefined });
+              Object.defineProperty(
+                navigator, "clipboard", { configurable: true, value: undefined }
+              );
               document.addEventListener("copy", () => {
                 window.__copied = document.activeElement && document.activeElement.value;
               });

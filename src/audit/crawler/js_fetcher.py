@@ -26,11 +26,13 @@ from PIL import Image, ImageDraw
 
 from audit.analyzer.axe import AxeAnalyzer, AxeViolation, Level
 from audit.analyzer.focus import FocusFinding, FocusProbe
+from audit.analyzer.forms import ErrorIdentificationProbe, FormFinding
 from audit.analyzer.interaction import (
     InteractionProbe,
     InteractionResult,
 )
 from audit.analyzer.keyboard import KeyboardProbe, KeyboardTrap
+from audit.analyzer.markup import MarkupFinding, MarkupProbe
 from audit.analyzer.responsive import ResponsiveFinding, ResponsiveProbe
 from audit.analyzer.visual import VisualFinding, VisualProbe
 from audit.crawler import live_progress
@@ -50,6 +52,58 @@ log = get_logger(__name__)
 _DEFAULT_VIEWPORT: ViewportSize = {"width": 1440, "height": 900}
 _NAV_TIMEOUT_MS = 30_000
 _IDLE_TIMEOUT_MS = 10_000
+# After ``networkidle``, wait until no page code (DOM) has been added,
+# removed or rewritten for ``_SETTLE_QUIET_MS`` and no framework "cloak"
+# attribute is left, for at most ``_SETTLE_MAX_MS``. Network quiet is not
+# render quiet: Alpine fills ``x-text``/``x-model`` and removes ``x-cloak``
+# when it starts, and Vue and AngularJS do the same with ``v-cloak`` and
+# ``ng-cloak``; a timer or a framework's next tick can still be changing the
+# page when the network has gone quiet. axe and the saved copy both read the
+# page after this, so they see the same settled page. Attribute changes do
+# not count: carousels and animations rewrite ``style`` and ``class``
+# forever, and waiting for them would cost the cap on every page.
+_SETTLE_QUIET_MS = 200
+_SETTLE_MAX_MS = 2_000
+_SETTLE_JS = """
+async ({ quietMs, maxMs }) => {
+  const root = document.documentElement;
+  if (!root) return "no-document";
+  const cloaked = () =>
+    document.querySelector("[x-cloak], [v-cloak], [ng-cloak], .ng-cloak") !== null;
+  const start = performance.now();
+  let last = start;
+  const observer = new MutationObserver(() => { last = performance.now(); });
+  observer.observe(root, { childList: true, subtree: true, characterData: true });
+  try {
+    for (;;) {
+      const now = performance.now();
+      if (now - start >= maxMs) return "timeout";
+      if (now - last >= quietMs && !cloaked()) return "settled";
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  } finally {
+    observer.disconnect();
+  }
+}
+"""
+
+
+async def settle_dom(
+    page: Page, *, quiet_ms: int = _SETTLE_QUIET_MS, max_ms: int = _SETTLE_MAX_MS
+) -> str:
+    """Wait, bounded, for the page code to stop changing. Never raises.
+
+    Returns ``"settled"``, ``"timeout"`` (still changing at ``max_ms``; the
+    scan goes on with the page as it is) or ``"error"`` (the page navigated
+    or closed while waiting).
+    """
+    try:
+        result = await page.evaluate(_SETTLE_JS, {"quietMs": quiet_ms, "maxMs": max_ms})
+    except Exception:
+        return "error"
+    return str(result)
+
+
 # Per-page cap on outlined element screenshots. Each capture costs a
 # scroll + a screenshot (~50-150 ms); capping the count bounds the
 # crawl-time and storage cost on pathological findings-dense pages. One
@@ -171,8 +225,10 @@ class JsFetcher:
         keyboard_probe: KeyboardProbe | None = None,
         responsive_probe: ResponsiveProbe | None = None,
         focus_probe: FocusProbe | None = None,
+        markup_probe: MarkupProbe | None = None,
         visual_probe: VisualProbe | None = None,
         interaction_probe: InteractionProbe | None = None,
+        form_error_probe: ErrorIdentificationProbe | None = None,
         capture_screenshots: bool = False,
         shared_context: BrowserContext | None = None,
         shared_pages: tuple[Page, ...] = (),
@@ -203,6 +259,10 @@ class JsFetcher:
         # geometry at the normal viewport) but after axe/keyboard. It only
         # focuses elements + reads layout, no lasting DOM mutation.
         self._focus_probe = focus_probe
+        # Page code check. Runs right after axe and before anything that
+        # presses keys or clicks, so it reads the page code as it loaded.
+        # Read-only: it changes nothing on the page.
+        self._markup_probe = markup_probe
         # SC 1.3.2 visual probe. Screenshots the page, must run before the
         # responsive probe resizes the viewport. No-op without a vision model.
         self._visual_probe = visual_probe
@@ -213,6 +273,12 @@ class JsFetcher:
         # an opened menu. Off unless explicitly attached, it is the most
         # expensive pass here (one axe run per revealed state).
         self._interaction_probe = interaction_probe
+        # SC 3.3.1 form error check. Runs LAST of all, after the screenshots
+        # and site search: it presses each form's submit control and loads
+        # the page again between forms, so nothing may read the page after
+        # it. Off unless attached, and never in a sign-in scan's private
+        # context.
+        self._form_error_probe = form_error_probe
         # When set, capture an outlined screenshot of each live-page
         # finding's element before the context closes (see ``_capture_element``).
         self._capture_screenshots = capture_screenshots
@@ -324,6 +390,8 @@ class JsFetcher:
             # we still want the rendered HTML in that case.
             with contextlib.suppress(Exception):
                 await page.wait_for_load_state("networkidle", timeout=self._idle_timeout_ms)
+            # Then for the frameworks to finish filling the page in.
+            await settle_dom(page)
             if self._max_rendered_html_chars is not None:
                 # Transfer only a scalar bound check to Python before asking
                 # Playwright to serialize the full DOM. This prevents an
@@ -373,9 +441,27 @@ class JsFetcher:
                 and "text/html" in headers.get("content-type", "text/html")
             ):
                 with live_progress.check("axe"):
+                    # "Needs review" results too (axe's incomplete), stored
+                    # as cant_tell and shown as Not sure: dropping them hid
+                    # every element axe could not decide on.
                     axe_violations = await self._axe_analyzer.run(
-                        page, level=self._axe_level, version=self._wcag_version
+                        page,
+                        level=self._axe_level,
+                        version=self._wcag_version,
+                        include_incomplete=True,
                     )
+            # Page code check, right after axe and on the same quiet page.
+            # It only reads, and never raises (each rule is isolated).
+            markup_findings: list[MarkupFinding] = []
+            markup_check_ran = False
+            if (
+                self._markup_probe is not None
+                and 200 <= status < 300
+                and "text/html" in headers.get("content-type", "text/html")
+            ):
+                with live_progress.check("markup"):
+                    markup_findings = await self._markup_probe.run(page)
+                markup_check_ran = True
             # Keyboard probe (SC 2.1.2) runs *after* axe because it
             # presses keys and alters focus, axe needs a quiet DOM.
             # Same gating as axe (success page, HTML content). Probe
@@ -447,7 +533,17 @@ class JsFetcher:
                 and "text/html" in headers.get("content-type", "text/html")
             ):
                 with live_progress.check("responsive"):
-                    responsive_findings = await self._responsive_probe.run(page)
+                    # Photographed inside the probe, while each failure holds:
+                    # the pass below runs after the page is restored, when
+                    # the element shows whole.
+                    responsive_findings = await self._responsive_probe.run(
+                        page,
+                        shot=(
+                            (lambda p, sel: self._capture_element(p, sel, center=True))
+                            if self._capture_screenshots
+                            else None
+                        ),
+                    )
 
             # Per-finding element screenshots, captured LAST, after every
             # probe has produced its findings but before the context closes
@@ -458,12 +554,16 @@ class JsFetcher:
             # revealed them. The loop below cannot retake these and must not
             # overwrite them.
             screenshots: dict[str, bytes] = dict(interaction.screenshots)
+            for finding in responsive_findings:
+                if finding.screenshot:
+                    screenshots[finding.target_hash] = finding.screenshot
             if self._capture_screenshots:
                 try:
                     all_findings: list[Any] = [
                         *axe_violations,
                         *keyboard_traps,
                         *focus_findings,
+                        *markup_findings,
                         *visual_findings,
                         *responsive_findings,
                         # Revealed findings whose element outlived the sweep --
@@ -505,6 +605,38 @@ class JsFetcher:
                     baseline=(*axe_violations, *(item.violation for item in interaction.findings)),
                 )
 
+            form_findings: tuple[FormFinding, ...] = ()
+            form_screenshots: dict[str, tuple[bytes | None, bytes | None]] = {}
+            form_check_ran = False
+            form_outcomes: dict[str, int] = {}
+            if (
+                self._form_error_probe is not None
+                and not self._private_context
+                and 200 <= status < 300
+                and "text/html" in headers.get("content-type", "text/html")
+            ):
+                # The form, outlined, before and after its submit press, when
+                # the scan keeps screenshots; centred, so the picture has the
+                # form's surroundings.
+                form_results = await self._form_error_probe.run(
+                    page,
+                    capture=(
+                        (lambda p, selector: self._capture_element(p, selector, center=True))
+                        if self._capture_screenshots
+                        else None
+                    ),
+                )
+                form_check_ran = True
+                for r in form_results:
+                    form_outcomes[r.outcome] = form_outcomes.get(r.outcome, 0) + 1
+                failed = [r for r in form_results if r.outcome == "fail"]
+                form_findings = tuple(FormFinding.from_result(r) for r in failed)
+                form_screenshots = {
+                    finding.target_hash: (r.before_png, r.after_png)
+                    for finding, r in zip(form_findings, failed, strict=True)
+                    if r.before_png or r.after_png
+                }
+
             return FetchResult(
                 url=final_url,
                 status_code=status,
@@ -515,6 +647,8 @@ class JsFetcher:
                 keyboard_traps=tuple(keyboard_traps),
                 responsive_findings=tuple(responsive_findings),
                 focus_findings=tuple(focus_findings),
+                markup_findings=tuple(markup_findings),
+                markup_check_ran=markup_check_ran,
                 visual_findings=tuple(visual_findings),
                 interaction_findings=interaction.findings,
                 interaction_states=interaction.states,
@@ -536,6 +670,10 @@ class JsFetcher:
                 screenshots=screenshots,
                 styles=styles,
                 frames=frames,
+                form_findings=form_findings,
+                form_screenshots=form_screenshots,
+                form_check_ran=form_check_ran,
+                form_outcomes=form_outcomes,
             )
         finally:
             # A shared authenticated context belongs to the companion, which

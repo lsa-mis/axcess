@@ -17,7 +17,11 @@ from audit.exports.collector import ExportScan
 # A consumer that treats every finding as reachable on load will report
 # click-revealed barriers as unreproducible, so the field is additive but
 # meaningful, hence a version bump rather than a silent column.
-SCHEMA_VERSION = 4
+#
+# Version 5 adds ``scan.axe_core_version``: the axe-core release whose rules
+# produced the axe findings (null for an older report or a scan without
+# axe), so a finding's ``rule_id`` can be read against the right rule set.
+SCHEMA_VERSION = 5
 
 
 def render_json(scan: ExportScan, *, indent: int | None = 2) -> str:
@@ -53,6 +57,7 @@ def to_payload(scan: ExportScan) -> dict[str, Any]:
             "alfa_failed_total": scan.alfa_failed_total,
             "alfa_cant_tell_total": scan.alfa_cant_tell_total,
             "by_wcag_level": dict(scan.by_wcag_level),
+            "axe_core_version": scan.axe_core_version,
         },
         # Image-of-text findings (WCAG 1.4.5 pipeline), unchanged shape.
         "findings": [finding.to_dict() for finding in scan.findings],

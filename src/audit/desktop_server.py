@@ -175,6 +175,9 @@ async def verify_runtime() -> dict[str, str]:
         "rules": package_dir / "rules",
         "alfa_runner": package_dir / "alfa_runner" / "runner.mjs",
         "alfa_modules": package_dir / "alfa_runner" / "node_modules" / "@siteimprove" / "alfa-act",
+        # Read as text by audit.exports.fix_brief when the application is
+        # imported; named here so a build that leaves it out says which file.
+        "fix_brief_check_script": package_dir / "exports" / "axcess_check.py",
     }
     missing = [name for name, path in required_assets.items() if not path.exists()]
     if missing:
@@ -263,6 +266,11 @@ def main(argv: list[str] | None = None) -> None:
     if args.verify_runtime:
         settings = get_settings()
         settings.ensure_dirs()
+        # Record a fresh-install choice before migrations create the database.
+        # An existing database marks an upgrade, including installs with no scans.
+        from audit.ai.state import initialize_preferences
+
+        initialize_preferences(settings, existing_install=settings.db_path.exists())
         apply_desktop_migrations(settings.db_path)
         print(json.dumps(asyncio.run(verify_runtime()), sort_keys=True))
         return

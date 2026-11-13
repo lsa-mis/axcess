@@ -24,19 +24,29 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 from support.export_render import (
+    EXPORT_EXTENSIONS,
     EXPORT_FORMATS,
     UI_BASE,
     export_filename,
     render_export,
 )
-from support.rich_scan import database_path, seed_rich_scan, write_evidence_blobs
+from support.rich_scan import (
+    database_path,
+    seed_rich_reviews,
+    seed_rich_scan,
+    write_evidence_blobs,
+)
 from support.xlsx_fingerprint import fingerprint_diff, fingerprint_xlsx
 
 from audit.web.server import create_app
 
 
 def _without_generated_line(text: str) -> str:
-    return "\n".join(line for line in text.split("\n") if not line.startswith("_Generated "))
+    return "\n".join(
+        line
+        for line in text.split("\n")
+        if not line.startswith(("_Generated ", "_Made by Axcess on "))
+    )
 
 
 @pytest.mark.parametrize("export_format", EXPORT_FORMATS)
@@ -48,6 +58,7 @@ def test_harness_matches_the_route_download(
 ) -> None:
     monkeypatch.delenv("AUDIT_ACCESS_TOKEN", raising=False)
     scan_id = seed_rich_scan(tmp_db)
+    seed_rich_reviews(tmp_db, scan_id)
     tmp_db.commit()
     blobs = write_evidence_blobs(tmp_path / "blobs")
     client = TestClient(
@@ -59,21 +70,31 @@ def test_harness_matches_the_route_download(
     )
     assert response.status_code == 200, response.text
     assert response.headers["X-Axcess-Export-State"] == "draft"
-    filename = export_filename(f"scan_{scan_id}", export_format, draft=True)
+    # The fix brief is always the redacted copy, and named so.
+    stem = f"scan_{scan_id}" + ("_DRAFT_REDACTED" if export_format == "brief" else "")
+    filename = (
+        f"{stem}.{EXPORT_EXTENSIONS[export_format]}"
+        if export_format == "brief"
+        else export_filename(stem, export_format, draft=True)
+    )
     assert response.headers["Content-Disposition"] == f'attachment; filename="{filename}"'
 
     harness = render_export(tmp_db, scan_id, export_format, draft=True, blob_store=blobs)
-    if export_format == "xlsx":
+    if export_format in {"xlsx", "its"}:
         assert isinstance(harness, bytes)
         served = fingerprint_xlsx(response.content)
-        # The route's evidence embedding is in play, not just the harness's.
-        assert sum(len(sheet["images"]) for sheet in served["sheets"]) == 2
+        if export_format == "xlsx":
+            # The route's evidence embedding is in play, not just the harness's.
+            assert sum(len(sheet["images"]) for sheet in served["sheets"]) == 2
         diff = fingerprint_diff(fingerprint_xlsx(harness), served, labels=("harness", "route"))
         assert not diff, "\n".join(diff)
         return
     assert isinstance(harness, str)
     served_text = response.content.decode("utf-8")
-    if export_format in {"markdown", "audit"}:
+    if export_format == "brief":
+        assert served_text.count("\n_Made by Axcess on ") == 1
+        assert _without_generated_line(served_text) == _without_generated_line(harness)
+    elif export_format in {"markdown", "audit"}:
         assert served_text.count("\n_Generated ") == 1
         assert _without_generated_line(served_text) == _without_generated_line(harness)
     else:

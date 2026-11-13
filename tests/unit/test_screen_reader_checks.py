@@ -29,6 +29,7 @@ EXPECTED = {
     ("axe_rules", "heading-order"): "headings",
     ("semantic_criteria", "2.4.6"): "headings",
     ("alfa_rules", "sia-r64"): "headings",
+    ("markup_rules", "markup-styled-as-heading"): "headings",
     ("axe_rules", "link-name"): "links",
     ("axe_rules", "identical-links-same-purpose"): "links",
     ("semantic_criteria", "2.4.4"): "links",

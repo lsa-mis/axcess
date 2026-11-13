@@ -35,7 +35,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from audit import coverage_matrix, evaluation
+from audit import coverage_matrix, evaluation, occurrence_reviews
 from audit.blob_store import BlobStore
 from audit.crawler import live_progress
 from audit.db import repo
@@ -80,6 +80,11 @@ _ENDPOINTS: tuple[tuple[str, str], ...] = (
     (
         "GET /api/scans/{scan_id}/issues/{issue_key} (landmark issue)",
         "/api/scans/{scan}/issues/axe%3Aregion",
+    ),
+    # The form error check's issue: its pages carry the before screenshots.
+    (
+        "GET /api/scans/{scan_id}/issues/{issue_key} (form error issue)",
+        "/api/scans/{scan}/issues/{forms_issue}",
     ),
     ("GET /api/scans/{scan_id}/findings", "/api/scans/{scan}/findings"),
     (
@@ -129,8 +134,11 @@ _ENDPOINTS: tuple[tuple[str, str], ...] = (
 )
 
 # Enough elements to merge the variants a list mixes (e.g. axe and image
-# issue rows) without letting a long list dominate the run time.
-_LIST_SAMPLE = 5
+# issue rows) without letting a long list dominate the run time. Six since
+# the merge of UX-Nov-6 (2026-11-13): a page's evidence list gained a landmark
+# row and a form error row ahead of the seeded Alfa row, whose evidence fields
+# the golden pins.
+_LIST_SAMPLE = 6
 _ABSENT = "absent"
 _SCALAR_NAMES: tuple[tuple[type, str], ...] = (
     # bool before int: ``True`` is an ``int`` too.
@@ -163,6 +171,10 @@ _UNPINNED_PATHS: dict[tuple[str, str], str] = {
         )
         for field in ("criteria", "estimated_total", "share")
     },
+    ("GET /api/scans/{scan_id}/issues/{issue_key}", "body.row.also_wcag"): (
+        "The detail is read for the first axe issue type, which maps to one criterion; "
+        "the issues list pins the same IssueRow field from the seeded link-name row."
+    ),
     ("GET /api/capabilities/local-analysis", "body.semantic.ready_models"): _OFFLINE_OLLAMA,
     ("GET /api/capabilities/local-analysis", "body.vision.installed_size_bytes"): _OFFLINE_OLLAMA,
     ("GET /api/sites", "body[].most_recent.rule_checks"): _OTHER_SITE_SCAN,
@@ -484,6 +496,31 @@ def _add_a11y_evidence(conn: sqlite3.Connection, blob_dir: Path, scan_id: int) -
             {"diagnostics": ["Background image sizing is not supported."]}
         ),
     )
+    # A form error check occurrence, with its form before and after the press
+    # (``before_screenshot_hash``, migration 0035), so the issue's pages carry
+    # a populated ``before_screenshot_hashes`` beside the other rows' nulls.
+    after_hash, _ = BlobStore(blob_dir).store(_pixel_png(color=(255, 0, 0)), "image/png")
+    repo.upsert_keyboard_finding(
+        conn,
+        page_id=home,
+        scan_id=scan_id,
+        rule_id="form-error-not-described",
+        wcag_sc="3.3.1",
+        wcag_scs="3.3.1",
+        wcag_level="A",
+        impact="serious",
+        help="Form shows an error without describing it in text",
+        help_url="https://www.w3.org/WAI/WCAG22/Understanding/error-identification.html",
+        target_selector="form#contact",
+        failure_summary="Fields marked in error: Name.",
+        html_snippet='<form id="contact">',
+        target_hash="api-contract-form",
+        criterion_sc="3.3.1",
+        pipeline="forms",
+        screenshot_hash=after_hash,
+        before_screenshot_hash=screenshot_hash,
+        revealed_by="Send message",
+    )
 
 
 # The home page as the scan read it: its images at the positions the shared
@@ -626,6 +663,31 @@ def _add_scan_states(conn: sqlite3.Connection) -> dict[str, int]:
     return {"running": running, "blocked": blocked, "failed": failed}
 
 
+def _add_occurrence_reviews(conn: sqlite3.Connection, scan_id: int) -> None:
+    """A person's review on every occurrence, so the inspector's review shape is pinned."""
+    for page_id in _page_ids(conn, scan_id):
+        findings = [
+            int(row[0])
+            for row in conn.execute(
+                "SELECT id FROM page_a11y_findings WHERE page_id = ?", (page_id,)
+            )
+        ]
+        images = [
+            int(row[0])
+            for row in conn.execute("SELECT id FROM page_images WHERE page_id = ?", (page_id,))
+        ]
+        if findings or images:
+            occurrence_reviews.save_review(
+                conn,
+                scan_id=scan_id,
+                page_id=page_id,
+                a11y_finding_ids=findings,
+                page_image_ids=images,
+                decision="report",
+                notes="Contract review.",
+            )
+
+
 def _add_contract_evidence(db_path: Path, blob_dir: Path, scan_id: int) -> dict[str, Any]:
     """Extend the shared seed until the SPA-facing fields have typed values.
 
@@ -635,6 +697,30 @@ def _add_contract_evidence(db_path: Path, blob_dir: Path, scan_id: int) -> dict[
     try:
         baseline = _add_report_history(conn, blob_dir, scan_id)
         _add_a11y_evidence(conn, blob_dir, scan_id)
+        # A rule that maps to two criteria, as axe tags link-name (2.4.4 and
+        # 4.1.2), so an issue row's ``also_wcag`` carries a value.
+        repo.upsert_axe_violation(
+            conn,
+            page_id=_page_ids(conn, scan_id)[0],
+            scan_id=scan_id,
+            rule_id="link-name",
+            wcag_sc="2.4.4",
+            wcag_scs="2.4.4,4.1.2",
+            wcag_level="A",
+            impact="minor",
+            help="Links must have discernible text",
+            help_url="https://dequeuniversity.com/rules/axe/4.10/link-name",
+            target_selector="#contract-icon-link",
+            failure_summary="Fix the missing link name.",
+            html_snippet='<a id="contract-icon-link" href="/x"></a>',
+            target_hash="api-contract-link-name",
+        )
+        # Not "new", so the comparison's status shapes keep both keys.
+        conn.execute(
+            "UPDATE page_a11y_findings SET status = 'reviewing' "
+            "WHERE target_hash = 'api-contract-link-name'"
+        )
+        conn.commit()
         # The scan's page counters, as a crawl writes them, so a scan's
         # ``rule_checks`` lists both checks rather than an empty list.
         conn.execute(
@@ -644,6 +730,7 @@ def _add_contract_evidence(db_path: Path, blob_dir: Path, scan_id: int) -> dict[
         conn.commit()
         _add_saved_copy(conn, scan_id)
         _add_expert_review(conn, scan_id)
+        _add_occurrence_reviews(conn, scan_id)
         states = _add_scan_states(conn)
         missing = conn.execute("SELECT MAX(id) + 1 AS id FROM scans").fetchone()
         ids = {
@@ -729,7 +816,7 @@ def test_read_endpoint_shapes_match_golden(
 ) -> None:
     db_path, blob_dir, scan_id = seeded_db
     ids = _add_contract_evidence(db_path, blob_dir, scan_id)
-    for pipeline in ("axe", "image", "alfa"):
+    for pipeline in ("axe", "image", "alfa", "forms"):
         ids[f"{pipeline}_issue"] = _first_issue_key(client, scan_id, pipeline)
 
     # A scan running in this process records each page's checks in memory

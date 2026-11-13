@@ -195,6 +195,8 @@ export interface ScanMethodCoverage {
     | "keyboard"
     | "responsive"
     | "interaction"
+    | "forms"
+    | "markup"
     | "search";
   label: string;
   /** Kept for compatibility: means selected/configured, not completed. */
@@ -287,6 +289,8 @@ export interface ScopePreview {
 }
 
 export interface LocalAnalysisCapability {
+  /** Desktop's saved AI choice; absent on shared-server installs. */
+  ai_enabled?: boolean;
   ocr: {
     available: boolean;
     engine: string;
@@ -365,8 +369,17 @@ export interface NewScanPayload {
   skip_semantic: boolean;
   /** Skip the deterministic focus-obscured browser probe. */
   skip_focus: boolean;
+  /** Skip the page code check, which reads the rendered page code after axe.
+   *  On unless chosen off; the server treats a missing value as on. */
+  skip_markup: boolean;
   /** Skip motion and vision-assisted visual probes. */
   skip_visual: boolean;
+  /** Skip the form error check (WCAG 3.3.1). Off unless chosen. */
+  skip_forms: boolean;
+  /** Let that check send a form to the site when every field is empty, and
+   *  judge the page the site sends back. Off unless chosen; counts only
+   *  when the check is on. */
+  send_empty_forms: boolean;
   /**
    * Do not persist each page's rendered HTML snapshot. Keeps the report
    * database smaller; the Page inspector then re-renders the live page on
@@ -707,7 +720,9 @@ export type DetectionPipeline =
   | "keyboard"
   | "responsive"
   | "focus"
-  | "visual";
+  | "visual"
+  | "forms"
+  | "markup";
 
 export interface A11yRuleSummary {
   rule_id: string;
@@ -813,6 +828,11 @@ export type EvidenceConfidence = "high" | "medium" | "low";
 /** Which family of checks produced an issue's evidence (labels: lib/labels.ts). */
 export type FindingType = "wcag" | "click_through" | "alt_text";
 
+export interface WcagRef {
+  sc: string;
+  name: string | null;
+}
+
 export interface IssueRow {
   pipeline: DetectionPipeline;
   issue_key: string;
@@ -856,6 +876,9 @@ export interface IssueRow {
   finding_types: FindingType[];
   /** How many of occurrence_count only appeared after a control was used. */
   click_through_occurrence_count: number;
+  /** Every other WCAG criterion the rule maps to, after wcag_sc (link-name:
+   *  2.4.4, also 4.1.2). name is null where Axcess does not know the title. */
+  also_wcag: WcagRef[];
 }
 
 export interface IssueLocation {
@@ -875,6 +898,9 @@ export interface IssueLocation {
   /** Captured outerHTML of the flagged element, shown as escaped source in
    *  the inline inspector, never executed. Null when none was recorded. */
   html_snippet: string | null;
+  /** For an image issue type, the image file's address as the crawler saved
+   *  it; `target` is then a description, not a locator. Null for DOM rules. */
+  image_url: string | null;
 }
 
 export interface IssuePage {
@@ -885,6 +911,15 @@ export interface IssuePage {
   status_summary: Record<string, number>;
   /** Marked scan-time screenshots, one for each locatable captured instance. */
   screenshot_hashes: string[];
+  /** Beside each of `screenshot_hashes`, in the same order, the picture from
+   *  before the problem showed, or null. Only the form error check has one:
+   *  the form before its submit press (the screenshot is after it). */
+  before_screenshot_hashes: (string | null)[];
+  /** How many of `occurrence_count` a person has checked in the page
+   *  inspector (a problem to report, or a repeat). */
+  checked_count: number;
+  /** Of those, how many are "a problem to report". */
+  reported_count: number;
 }
 
 export interface IssueDetail {
@@ -1266,6 +1301,73 @@ export interface ManualChecksResponse {
   checks: ManualCheck[];
 }
 
+/** How one visited page loaded (`pages_queries.load_result`). */
+export type PageLoadResult = "loaded" | "error_status" | "not_loaded";
+
+/** Sort keys `GET /api/scans/{id}/pages` accepts (`pages_queries.PageSort`). */
+export type ScanPagesSort =
+  | "load_desc"
+  | "load_asc"
+  | "url_asc"
+  | "url_desc"
+  | "occurrences_desc"
+  | "occurrences_asc"
+  | "images_desc"
+  | "images_asc"
+  | "states_desc"
+  | "states_asc";
+
+/** One page a report visited (`pages_queries.ScanPageRow`). */
+export interface ScanPageRow {
+  page_id: number;
+  url: string;
+  title: string | null;
+  /** The HTTP status the server answered with; null when the fetch failed. */
+  status_code: number | null;
+  load_result: PageLoadResult;
+  /** Every occurrence stored on this page, as its Page details lists them. */
+  occurrence_count: number;
+  /** Images found on this page, as its Page details lists them. */
+  image_count: number;
+  /** Page states opened by clicking on this page. */
+  page_state_count: number;
+}
+
+/** `GET /api/scans/{id}/pages` (`pages_queries.ScanPagesResponse`). */
+export interface ScanPagesResponse {
+  scan_id: number;
+  /** Every page the scan recorded, whatever the limit and offset. */
+  total: number;
+  /** Pages whose fetch failed, across the whole report. */
+  not_loaded_count: number;
+  /** Pages that answered with an error status (400 or above), across the report. */
+  error_status_count: number;
+  limit: number;
+  offset: number;
+  sort: ScanPagesSort;
+  pages: ScanPageRow[];
+}
+
+/** What a person decided about an occurrence: a problem to report, or a
+ *  repeat of one already reported. Null means not checked yet. */
+export type ReviewDecision = "report" | "repeat";
+/** A person's review of one occurrence, made in the page inspector. */
+export interface OccurrenceReview {
+  decision: ReviewDecision | null;
+  /** Issue notes, as stored: trimmed, with email addresses, phone numbers
+   *  and sign-in tokens removed. */
+  notes: string;
+  updated_at: string;
+}
+/** ``PUT /api/scans/{id}/pages/{page}/review``: every occurrence on one element. */
+export interface OccurrenceReviewRequest {
+  a11y_finding_ids: number[];
+  page_image_ids: number[];
+  decision: ReviewDecision | null;
+  /** Null sets the decision only, keeping each occurrence's notes. */
+  notes: string | null;
+}
+
 export interface PageEvidence {
   page: {
     id: number;
@@ -1306,6 +1408,8 @@ export interface PageEvidence {
     /** For an AI review finding, the element it is about, named the way a
      *  browser can count it (the 3rd of 12 `a`). Null when not worked out. */
     element_place: ElementPlace | null;
+    /** A person's review of this occurrence; null until one is saved. */
+    review: OccurrenceReview | null;
   }>;
   image_occurrences: Array<{
     occurrence_id: number;
@@ -1328,6 +1432,8 @@ export interface PageEvidence {
     /** In a <noscript> or <template> element, which the saved copy on
      *  screen does not show (usually a lazy-loaded image's backup copy). */
     hidden_in_copy: boolean;
+    /** A person's review of this image on this page; null until one is saved. */
+    review: OccurrenceReview | null;
   }>;
 }
 
@@ -1550,10 +1656,12 @@ export interface SiteHistory {
 }
 
 /** A file the report's Export panel offers (``export_options.PANEL_FORMATS``). */
-export type ExportFormat = "xlsx" | "audit" | "csv" | "json";
+/** The Export panel's files. ``its`` is the U-M ITS technical review and
+ *  ``brief`` the fix brief for a coding agent. */
+export type ExportFormat = "xlsx" | "its" | "audit" | "brief" | "csv" | "json";
 export interface ExportFormatOption {
   format: ExportFormat;
-  /** The downloaded file's name, ``_DRAFT`` marker included. */
+  /** The downloaded file's name, ``_DRAFT`` and ``_REDACTED`` markers included. */
   filename: string;
   /** Bytes of the file as the download route renders it now. */
   size_bytes: number;
@@ -1564,6 +1672,9 @@ export interface ExportOptions {
   /** Every file downloads as a labeled draft: expert review is unfinished. */
   draft: boolean;
   evaluation_status: string;
+  /** The files described are redacted copies: likely private details are
+   *  replaced with "[redacted]". Names and sizes are for those copies. */
+  redacted: boolean;
   formats: ExportFormatOption[];
 }
 
@@ -1632,4 +1743,174 @@ export interface ReportImagesFilter {
   q: string;
   limit: number;
   offset: number;
+}
+
+/* ---------------------------------------------------------------------------
+ * AI fix suggestions (src/audit/suggest/models.py). Mirrors the Pydantic
+ * models; keep the two in step.
+ * ------------------------------------------------------------------------- */
+
+export type SuggestionOccurrenceKind = "a11y" | "image";
+export type SuggestionStatus = "queued" | "running" | "ready" | "failed" | "cancelled";
+export type SuggestionAudience = "developer" | "editor";
+export type SuggestionCheckOutcome = "passed" | "still_fails" | "not_checked";
+export type SuggestionConfidence = "likely" | "guess";
+export type SuggestionFeedback = "helpful" | "not_helpful";
+export type SuggestionErrorCode =
+  | "model_unavailable"
+  | "model_missing"
+  | "timeout"
+  | "bad_answer"
+  | "no_change"
+  | "restarted"
+  | "occurrence_gone"
+  | "internal";
+export type SuggestionAvailabilityReason =
+  | "ready"
+  | "turned_off"
+  | "database_update_needed"
+  | "model_unavailable"
+  | "model_missing";
+
+export interface SuggestionCodeOption {
+  kind: "minimal" | "matches_pattern";
+  label: string;
+  after_html: string;
+  css: string | null;
+  check_outcome: SuggestionCheckOutcome;
+}
+
+export interface SuggestionResult {
+  version?: 1 | 2;
+  summary: string;
+  developer:
+    | { explanation: string; after_html: string | null; css: string | null }
+    | { change_sentence: string; options: SuggestionCodeOption[] };
+  editor: {
+    steps: string[];
+    paste_text: Array<{ label: string; value: string }>;
+    needs_developer: boolean;
+  };
+  /** From the scan's stored evidence, never from the model. */
+  before_html: string | null;
+  confidence: SuggestionConfidence;
+  needs_manual_check: boolean;
+  manual_check_reason: string | null;
+  check_rule_id: string | null;
+  /** Saved rule guidance, never a model-generated link. */
+  help_url?: string | null;
+}
+
+export interface SuggestionRecord {
+  id: number;
+  scan_id: number;
+  page_id: number;
+  occurrence_kind: SuggestionOccurrenceKind;
+  occurrence_id: number;
+  status: SuggestionStatus;
+  audience_default: SuggestionAudience;
+  text_model: string;
+  vision_model: string | null;
+  result: SuggestionResult | null;
+  check_outcome: SuggestionCheckOutcome | null;
+  error_code: SuggestionErrorCode | null;
+  error_detail: string | null;
+  feedback: SuggestionFeedback | null;
+  created_at: string;
+  finished_at: string | null;
+  /** 1 = next to run. Null once it is no longer waiting. */
+  queue_position: number | null;
+}
+
+export interface SuggestionAvailability {
+  enabled: boolean;
+  reason: SuggestionAvailabilityReason;
+  text_model: string;
+  vision_model: string;
+  missing_models: string[];
+  queue_length: number;
+  scan_running: boolean;
+}
+
+/** Desktop AI setup (`/api/ai/*`). Only the desktop app serves these. */
+export type AiTierId = "small" | "standard" | "large";
+export type AiInstallState = "idle" | "running" | "paused" | "failed" | "done";
+export type AiInstallStep = "program" | "starting" | "text_model" | "vision_model" | "finishing";
+
+export interface AiModelInfo {
+  tag: string;
+  size_bytes: number;
+  licence: string;
+}
+
+export interface AiTierPlan {
+  id: AiTierId;
+  label: string;
+  min_memory_gb: number;
+  text: AiModelInfo;
+  vision: AiModelInfo;
+  models_bytes: number;
+  download_bytes: number;
+  fits: boolean;
+}
+
+export interface AiInstallStatus {
+  state: AiInstallState;
+  tier: AiTierId | null;
+  step: AiInstallStep | null;
+  step_done_bytes: number;
+  step_total_bytes: number;
+  done_bytes: number;
+  total_bytes: number;
+  error: string | null;
+}
+
+export interface AiSetup {
+  source: "system" | "private";
+  base_url: string;
+  tier: AiTierId;
+  text_model: string;
+  vision_model: string;
+  ollama_version: string | null;
+}
+
+export interface AiPlan {
+  preferences: AiPreferences;
+  hardware: {
+    memory_bytes: number;
+    free_disk_bytes: number;
+    accelerator: "apple" | "nvidia" | "amd" | "none";
+  };
+  program: {
+    version: string;
+    licence: string;
+    release_url: string;
+    download_bytes: number;
+    available_for_this_computer: boolean;
+    system_version: string | null;
+  };
+  tiers: AiTierPlan[];
+  recommended: AiTierId | null;
+  current: AiSetup | null;
+  install: AiInstallStatus;
+}
+
+export interface AiPreferences {
+  enabled: boolean;
+  choice_recorded: boolean;
+}
+
+/** Private desktop AI service. No download happens when it is started. */
+export type AiRuntimeStartState = "started" | "already_running" | "model_missing" | "not_isolated" | "system_ollama_not_managed" | "ai_off" | "not_desktop" | "busy";
+export interface AiRuntimeStartResponse {
+  state: AiRuntimeStartState;
+  isolated: boolean;
+  reason: string | null;
+  download_bytes: number | null;
+  tier: AiTierId | null;
+}
+export interface AiRuntimeStatus {
+  running: boolean;
+  isolated: boolean;
+  reason: string | null;
 }

@@ -6,6 +6,7 @@ import { ChevronRight, ExternalLink, Info } from "lucide-react";
 import { api } from "../api/client";
 import {
   Card,
+  ElementCode,
   EmptyState,
   LinkButton,
   PageHeader,
@@ -34,7 +35,7 @@ import {
 import { ActiveFilters, FilterMenu, activeFilterItems, type FilterGroup } from "../components/table/FilterMenu";
 import { requestStatusRationale } from "../statusDecision";
 import { useScanQuery } from "../hooks/useScanQuery";
-import { CHECK_LABEL, REVIEW_TYPE_LABEL, STATUS_LABEL, STATUS_OPTION_LABEL } from "../lib/terms";
+import { CHECK_LABEL, OPENS_NEW_WINDOW, REVIEW_TYPE_LABEL, STATUS_LABEL, STATUS_OPTION_LABEL } from "../lib/terms";
 
 const STATUS_OPTIONS: FindingStatus[] = [
   "new",
@@ -301,7 +302,7 @@ function SCGroupCard({ scanId, group }: { scanId: number; group: A11ySCGroup }) 
                     be told apart (SC 2.4.9 Link Purpose (Link Only), Level
                     AAA; WCAG technique C7). The rule ID is the one shown on
                     the card. */}
-                <span className="sr-only">, {r.rule_id} (opens in a new tab)</span>
+                <span className="sr-only">, {r.rule_id} ({OPENS_NEW_WINDOW})</span>
               </a>
             )}
           </li>
@@ -421,7 +422,7 @@ function DrillDownView({
                   <ColumnHeader>Check</ColumnHeader>
                   <ColumnHeader>Impact</ColumnHeader>
                   <ColumnHeader>Page</ColumnHeader>
-                  <ColumnHeader>Element locator (CSS selector)</ColumnHeader>
+                  <ColumnHeader>Element code (HTML)</ColumnHeader>
                   <ColumnHeader>Status</ColumnHeader>
                 </tr>
               </TableHead>
@@ -442,7 +443,7 @@ function DrillDownView({
                     </Cell>
                     <Cell className="text-xs text-fg-muted">
                       {CHECK_LABEL[f.pipeline] ?? f.pipeline}
-                      {f.pipeline === "alfa" && f.engine_outcome === "cant_tell" && (
+                      {f.engine_outcome === "cant_tell" && (
                         <span className="mt-1 block">{REVIEW_TYPE_LABEL.expert_review}</span>
                       )}
                     </Cell>
@@ -458,6 +459,7 @@ function DrillDownView({
                         pageUrl={f.page_url}
                         pageTitle={f.page_title}
                         selector={f.target_selector}
+                        occurrenceId={f.id}
                         snippet={f.html_snippet}
                         origin="Rule check issues by WCAG criterion"
                         context={f.rule_id}
@@ -465,21 +467,8 @@ function DrillDownView({
                       />
                     </Cell>
                     <Cell>
-                      <code className="block break-all font-mono text-2xs text-fg">
-                        {(f.target_display || f.target_selector).length > 90
-                          ? `${(f.target_display || f.target_selector).slice(0, 90)}…`
-                          : (f.target_display || f.target_selector)}
-                      </code>
-                      {f.html_snippet && (
-                        <details className="mt-1">
-                          <summary className="cursor-pointer text-2xs text-fg-muted">
-                            Show element code (HTML)
-                          </summary>
-                          <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-xs bg-surface-muted p-2 text-2xs">
-                            {f.html_snippet}
-                          </pre>
-                        </details>
-                      )}
+                      {/* The code, not the locator: why, ElementCode in components/ui.tsx. */}
+                      <ElementCode snippet={f.html_snippet} />
                       <AlfaEvidenceNote evidence={f} />
                       <Link className="report-link inline-flex min-h-target items-center text-xs" to={pageEvidencePath({ scanId, pageId: f.page_id, origin: "Rule check issues by WCAG criterion", backTo: `/scans/${scanId}/a11y?wcag_sc=${wcagSc}`, hash: `#finding-${f.id}` })}>Open the evidence for this occurrence</Link>
                       {f.failure_summary && (

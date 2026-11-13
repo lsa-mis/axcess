@@ -68,7 +68,9 @@ _NAMES = {
 
 # Named terms the interface capitalizes wherever they appear, as whole
 # phrases, so "Delete Page" still fails while "the Page inspector" passes.
-# Each is one name from docs/plain-language.md's terms table or lib/.
+# Each is one name from docs/plain-language.md's terms table or lib/, or a
+# product name of more than one word, which has to be matched whole: "Code"
+# alone in ``_NAMES`` would let "Copy Code" pass.
 _PHRASES = (
     "Mostly sure",  # issue type, lib/terms.ts
     "Measured",  # issue type, lib/terms.ts
@@ -78,6 +80,11 @@ _PHRASES = (
     "Rule check",  # check name: Rule check (axe), Rule check (Alfa)
     "Page inspector",  # the tool's name
     "Click-Through",  # the feature's one name, lib/labels.ts CLICK_THROUGH
+    # The organization and team the ITS technical review export is for
+    # (ExportMenu.tsx); both are proper names.
+    "University of Michigan Information and Technology Services",
+    "Accessibility Team",
+    "Claude Code",  # product name, in the fix brief's export hints, lib/terms.ts
 )
 
 _WORD = re.compile("[A-Za-z][A-Za-z'\u2019-]*")
@@ -124,6 +131,8 @@ def test_the_check_catches_title_case() -> None:
     assert title_case_words("Export to Excel. Open the PDF") == []
     assert title_case_words("Open example.com") == []
     assert title_case_words("Open the Page inspector") == []
+    assert title_case_words("Paste into Claude Code or another agent") == []
+    assert title_case_words("Copy Code") == ["Code"]
     assert title_case_words("Delete Page") == ["Page"]
     assert title_case_words("Search everything (Cmd+K)") == []
 
@@ -202,6 +211,7 @@ async def _labels_on(new_page: Any, url: str, *, open_groups: bool = False) -> l
         "/app/scans/new",
         "/app/scans/{scan_id}",
         "/app/scans/{scan_id}/issues",
+        "/app/scans/{scan_id}/pages",
         "/app/scans/{scan_id}/compare",
         "/app/scans/{scan_id}/compare/changes",
         "/app/tracking",

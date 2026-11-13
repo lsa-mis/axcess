@@ -4,23 +4,69 @@ import { createElement, forwardRef, useEffect, useId, useRef, useState } from "r
 import { Check, ChevronDown, ChevronRight, ScanEye } from "lucide-react";
 import { Link } from "react-router";
 import { cn } from "../lib/cn";
-import type { Severity, FindingStatus, ScanStatus } from "../api/types";
-import { SCAN_STATUS_LABEL, STATUS_HELP, STATUS_LABEL } from "../lib/terms";
+import type { Severity, FindingStatus, ReviewDecision, ScanStatus } from "../api/types";
+import {
+  OPENS_NEW_WINDOW,
+  REVIEW_DECISION_HELP,
+  REVIEW_DECISION_LABEL,
+  SCAN_STATUS_LABEL,
+  STATUS_HELP,
+  STATUS_LABEL,
+} from "../lib/terms";
 
 /** Severity chip, pairs color + text, so the signal isn't color-only. */
 export function SeverityChip({ value }: { value: Severity }) {
   return <span className={cn("sev-chip", `sev-chip--${value}`)}>{value}</span>;
 }
 
+/** The neutral chip that workflow states share: one look for every state a
+ * person sets, so none of them reads as more urgent than another. */
+const WORKFLOW_CHIP =
+  "inline-flex items-center rounded-xs border border-border bg-surface-muted px-2 py-0.5 text-2xs font-medium text-fg-muted";
+
 /** Status chip that uses neutral surfaces, we DON'T color-code status,
  * because status is intentionally user-workflow, not severity. */
 export function StatusChip({ value }: { value: FindingStatus }) {
   return (
-    <span
-      title={STATUS_HELP[value]}
-      className="inline-flex items-center rounded-xs border border-border bg-surface-muted px-2 py-0.5 text-2xs font-medium text-fg-muted"
-    >
+    <span title={STATUS_HELP[value]} className={WORKFLOW_CHIP}>
       {STATUS_LABEL[value] ?? value.replace(/_/g, " ")}
+    </span>
+  );
+}
+
+/**
+ * What a person decided about an element in the page inspector, as a chip.
+ * The same neutral chip as StatusChip, for the same reason: it is a
+ * person's workflow decision, not a severity, so its three values look
+ * alike and differ by their words alone (the words carry the meaning, never
+ * colour, SC 1.4.1 Use of Color, Level A).
+ */
+export function ReviewDecisionChip({ value }: { value: ReviewDecision | null }) {
+  const key = value ?? "none";
+  return (
+    <span title={REVIEW_DECISION_HELP[key] || undefined} className={WORKFLOW_CHIP}>
+      {REVIEW_DECISION_LABEL[key]}
+    </span>
+  );
+}
+
+/**
+ * How far a person has got checking a page's occurrences in the page
+ * inspector: "Not checked yet", "3 of 19 checked" or "All checked". The
+ * same neutral chip as StatusChip and ReviewDecisionChip: it is a person's
+ * progress, not a severity, so it is not colour-coded. "All checked" adds a
+ * check mark, so a finished page stands out by shape, not only by words,
+ * and in forced colors too (the icon is drawn in the text colour). The
+ * words say the count, so "partly checked" says how much is left.
+ */
+export function CheckedChip({ checked, total }: { checked: number; total: number }) {
+  const done = total > 0 && checked >= total;
+  return (
+    // Its words may wrap, as the Status column's chips beside it do, so the
+    // pages table still fits a 1280 px screen.
+    <span className={cn(WORKFLOW_CHIP, "gap-1")}>
+      {done && <Check className="h-3 w-3 shrink-0" aria-hidden />}
+      {checked <= 0 ? "Not checked yet" : done ? "All checked" : `${checked} of ${total} checked`}
     </span>
   );
 }
@@ -401,7 +447,8 @@ export function DownloadLink({
  * browser, which is why the href must be http(s).
  *
  * Pass ``aria-label`` whenever the visible text is hidden at small
- * widths, and say "opens in a new tab" in it, the new window is a
+ * widths, and include ``OPENS_NEW_WINDOW`` from lib/terms in it ("opens in
+ * a new tab", or "opens in your web browser" in the desktop app), the new window is a
  * change of context the user should hear about before they activate it
  * (WCAG 3.2.5).
  */
@@ -1148,7 +1195,6 @@ export function PageLink({
   pageTitle,
   showUrlBelow = true,
   selector = null,
-  elementName = null,
   occurrenceId = null,
   snippet = null,
   issue = null,
@@ -1167,8 +1213,6 @@ export function PageLink({
   showUrlBelow?: boolean;
   /** Target selector to outline on the inspected page (when known directly). */
   selector?: string | null;
-  /** A short readable name for the element (target_display), when known. */
-  elementName?: string | null;
   /** The occurrence's ID, where a view lists occurrences (see below). */
   occurrenceId?: number | null;
   /** Exact element markup (html_snippet), the most reliable locator. */
@@ -1193,16 +1237,17 @@ export function PageLink({
   // Screen-reader-only context, so each link names where it goes by itself:
   // one view lists many occurrences, and the same words ("Open live page",
   // a page title) led to different pages or elements (SC 2.4.9 Link Purpose
-  // (Link Only), Level AAA; WCAG technique C7; October 2026 AAA audit). The
-  // element is its short display name where the view has one, else the last
-  // two steps of its locator, kept short (see shortLocator). Short names can
-  // still match: two elements whose locators end in the same two steps, or
-  // repeated elements with the same tag and attributes. So a view of
-  // occurrences also gives the occurrence's ID, which is unique and is the
-  // name the page's evidence uses for it ("Occurrence 1234"; found by
-  // review). The word was "issue" from 2026-10-26 to 2026-10-28
-  // (docs/plain-language.md, "Why "occurrence" and "issue type"").
-  const element = elementName || selector ? shortLocator(elementName || selector || "") : null;
+  // (Link Only), Level AAA; WCAG technique C7; October 2026 AAA audit). A
+  // view of occurrences gives the occurrence's ID, which is unique and is
+  // the name the page's evidence uses for it ("Occurrence 1234"). The word
+  // was "issue" from 2026-10-26 to 2026-10-28 (docs/plain-language.md, "Why
+  // "occurrence" and "issue type"").
+  //
+  // It named the element by the last two steps of its element locator (CSS
+  // selector) too, until the developer removed locators from every screen
+  // (2026-11-10): the element's code says what it is, and a locator such as
+  // "div:nth-of-type(4) > div > header" told a reader nothing. The ID alone
+  // keeps each link unique.
 
   // Build the inspector URL with whatever orientation/selector context the
   // caller can offer. The params are kept sparse so the route stays legible.
@@ -1241,7 +1286,7 @@ export function PageLink({
           <ScanEye className="mt-0.5 h-5 w-5 shrink-0 text-fg-subtle" aria-hidden />
           <span className="break-words">{display}</span>
           <span className="sr-only">
-            , opens in the page inspector{element ? ` at ${element}` : ""}
+            , opens in the page inspector
             {occurrenceId != null ? `, occurrence ${occurrenceId}` : ""}
           </span>
         </Link>
@@ -1258,7 +1303,7 @@ export function PageLink({
           <span aria-hidden className="text-2xs">
             ↗
           </span>
-          <span className="sr-only">opens in a new tab</span>
+          <span className="sr-only">{OPENS_NEW_WINDOW}</span>
         </a>
       )}
       {showUrlBelow && pageTitle && (
@@ -1331,7 +1376,7 @@ export function PageActionLinks({
     >
       <a href={pageUrl} target="_blank" rel="noopener noreferrer" className={link}>
         Open live page ↗
-        <span className="sr-only"> of {display} (opens in a new tab)</span>
+        <span className="sr-only"> of {display} ({OPENS_NEW_WINDOW})</span>
       </a>
       {scanId != null && (
         <>
@@ -1382,17 +1427,37 @@ export function relativeTime(iso: string | null): string {
 }
 
 /**
- * The last two steps of an element locator, each kept short, to name an
- * element. Two, not one: the same button repeated under different headings
- * (a "copy link" icon on every heading) shares its last step, and the step
- * above it is what tells them apart.
+ * One occurrence's element code (HTML), shown where the element locator
+ * (CSS selector) used to be.
+ *
+ * The developer removed locators from every screen (2026-11-10): a locator
+ * such as "div:nth-of-type(4) > div > header" says nothing to a reader, and
+ * the code beside it already said what the element is. The locator is still
+ * stored, because the page inspector uses it to find and outline the
+ * element, and still exported (CSV, JSON, Excel) for developers. Considered:
+ * a readable label beside the locator ("Button 'Menu' in the site header");
+ * set aside for removing the locator outright.
+ *
+ * The code is shown, not behind a "Show element code" disclosure as it was:
+ * with the locator gone, it is the only thing in the cell that says which
+ * element this is. It wraps rather than scrolls, so no part of it needs a
+ * scroll area that a keyboard cannot reach (SC 2.1.1 Keyboard, Level A) or
+ * sideways scrolling at 320 px (SC 1.4.10 Reflow, Level AA). A check that
+ * saved no code says so in words, so an empty cell is never read as missing
+ * data (SC 1.3.1 Info and Relationships, Level A, in spirit).
  */
-export function shortLocator(selector: string): string {
-  const steps = selector
-    .split(">")
-    .map((step) => step.trim())
-    .filter(Boolean)
-    .slice(-2)
-    .map((step) => (step.length > 32 ? `${step.slice(0, 31)}…` : step));
-  return steps.join(" > ") || selector;
+export function ElementCode({ snippet, className }: { snippet: string | null | undefined; className?: string }) {
+  if (!snippet?.trim()) {
+    return <p className={cn("text-xs text-fg-muted", className)}>No element code was saved for this occurrence.</p>;
+  }
+  return (
+    <pre
+      className={cn(
+        "whitespace-pre-wrap break-all rounded-xs border border-border bg-surface-muted p-2 font-mono text-2xs leading-relaxed text-fg",
+        className,
+      )}
+    >
+      {snippet}
+    </pre>
+  );
 }

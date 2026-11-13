@@ -1,0 +1,12 @@
+-- 0035 — a second screenshot per finding: the page before the problem showed.
+--
+-- The form error check (WCAG 3.3.1) presses each form's submit control
+-- once, with nothing typed. Its finding keeps two screenshots of the form:
+-- before the press and after it, so a reviewer confirming a Not sure result
+-- can see what the press changed. The after picture is screenshot_hash, as
+-- for every other finding, so every view that already shows a finding's
+-- screenshot shows it; this column holds the before picture. A plain
+-- nullable TEXT column, like 0008's: NULL for every finding that has no
+-- before state (all the other checks, and form findings captured without
+-- screenshots).
+ALTER TABLE page_a11y_findings ADD COLUMN before_screenshot_hash TEXT;

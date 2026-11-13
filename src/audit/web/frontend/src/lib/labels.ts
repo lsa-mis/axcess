@@ -17,7 +17,7 @@
  * copy said "DOM states", "interaction states", "Click-Through states" and
  * "views opened by clicking"; those should not reach a reader.
  */
-import type { FindingType, ReviewLane } from "../api/types";
+import type { FindingType, ReviewLane, WcagRef } from "../api/types";
 import { REVIEW_TYPE_LABEL } from "./terms";
 
 export const CLICK_THROUGH = "Click-Through";
@@ -123,7 +123,7 @@ export const ISSUE_COLUMN_HELP = {
   "How sure": "How sure Axcess is that this issue type is a real problem: Mostly sure, Measured, Not sure, or For information.",
   "Where it shows": "Where this issue type shows up: at page load, after clicking, or in an image.",
   Priority:
-    "High, Medium, or Low, from the impact rating of this issue type and how many pages it is on. Issue types from the rule check (Alfa) have no rating, so they count as the lowest. A serious issue type on one page can still be Low. Issue types marked For information show Does not apply.",
+    "High, Medium, or Low, from the impact rating of this issue type. More pages and more occurrences raise it. Not sure lowers it, because a person must confirm it first. Issue types from the rule check (Alfa) have no rating, so they start at the lowest. Issue types marked For information show Does not apply.",
   "Affected pages":
     "Pages with at least one occurrence of this issue type. An element repeated on many pages, such as a shared menu, counts only on the first page it was found on. An image counts on every page it appears on.",
   "Issue occurrences":
@@ -142,21 +142,71 @@ export const RULE_CHECK_HELP =
   "Which rule checks tested pages in this scan: axe (axe-core, made by Deque), Alfa (made by Siteimprove), or both.";
 
 /**
- * What each priority band means. Priority is the impact rating's weight
- * (critical 4 to minor 1; none, as for Rule check (Alfa), counts as 1) times
- * ln(1 + pages), pages where a shared element repeats included, with High at
- * 6 and Medium at 3 (``_priority`` in src/audit/web/issues.py). The table's
- * recommended order groups by "How sure" first, so a band ranks the kinds of
- * issue in one "How sure" group. The hints said "issues of the same type"
- * until 2026-10-26; "type" was the old name of "How sure", and a row is now
- * an issue type (docs/plain-language.md, "Why "occurrence" and "issue type"").
+ * What each priority band means. Priority starts from the impact rating
+ * (critical 6, serious 4, moderate 2.5, minor 1; none, as for Rule check
+ * (Alfa), counts as minor), adds ln(pages) up to 3 (pages where a shared
+ * element repeats included) and 0.25 x ln(occurrences) up to 1, then scales
+ * by how sure Axcess is (Mostly sure x1, Not sure x0.55, For information
+ * x0.25). High is 6 or more and Medium 3 or more (``_priority`` in
+ * src/audit/web/issues.py). So a critical problem is High on 1 page, a
+ * serious one is High from 8 pages, and Not sure is never High.
+ *
+ * Until 2026-11-06 the score was the weight times ln(1 + pages): a critical
+ * problem on 1 page was Low while a Not sure zoom lead on 10 pages was High,
+ * so Priority contradicted the Impact column and the "How sure" value.
+ * Rejected: keeping spread first and warning in the Low hint ("Low can still
+ * be serious"). A label that needs a warning to be read correctly is the
+ * wrong label (W3C COGA "Making Content Usable",
+ * https://www.w3.org/TR/coga-usable/, paraphrased: make content clear and
+ * do not make people work out what it means).
+ *
+ * The table's recommended order groups by "How sure" first, so a band ranks
+ * the kinds of issue in one "How sure" group. The examples are exact for the
+ * formula; keep them in step with ``test_priority_bands``.
  */
 export const PRIORITY_HELP = {
-  High: "Look at these first among issue types with the same How sure value: a high impact rating on many pages, such as a critical problem on 4 or more pages or a moderate one on 20 or more (pages a shared element repeats on count too).",
+  High: "Look at these first among issue types with the same How sure value. For example: a critical problem, even on 1 page, or a serious one on 8 or more pages. Not sure issue types are never High, because a person must confirm them first.",
   Medium:
-    "Look at these after the High ones with the same How sure value. Priority combines the impact rating with how many pages have it.",
-  Low: "Look at these last among issue types with the same How sure value. Low can still be serious: a critical problem on 1 page is Low, so open it before you skip it.",
+    "Look at these after the High ones with the same How sure value. For example: a serious problem on 1 page, or a moderate one on 2 or more pages. More pages and more occurrences raise the priority, and pages a shared element repeats on count too.",
+  Low: "Look at these last among issue types with the same How sure value. For example: a minor problem, or a moderate one on 1 page. Low can still matter, so open it before you skip it.",
 } as const;
+
+/**
+ * "1 at page load, 7 after clicking": where an issue type's occurrences were
+ * found, for the issue page's Issue occurrences tile. Empty when none needed
+ * a click, since then every one was there at page load and the Where it
+ * shows tag already says so.
+ *
+ * The developer chose this (2026-11-10) over a count inside the Issues
+ * table's "At page load" and "After clicking" tags: the table keeps its
+ * narrow stacked tags (see FindingTypeCell in routes/Issues.tsx), and the
+ * split is on the page a reader opens to compare Axcess with a tool such as
+ * WAVE, which checks the page with its menus closed and so finds fewer. The
+ * words are the tags' own, lower-cased, so one thing keeps one name (W3C
+ * COGA "Making Content Usable", https://www.w3.org/TR/coga-usable/; WCAG 2.2
+ * SC 3.2.4 Consistent Identification, Level AA).
+ */
+export function whereFoundText(occurrences: number, afterClicking: number): string {
+  if (afterClicking <= 0) return "";
+  const atLoad = Math.max(0, occurrences - afterClicking);
+  return `${atLoad.toLocaleString()} ${FINDING_TYPE_LABELS.wcag.toLowerCase()}, ${afterClicking.toLocaleString()} ${FINDING_TYPE_LABELS.click_through.toLowerCase()}`;
+}
+
+/**
+ * The other criteria an issue type maps to, as "also 4.1.2 Name, Role,
+ * Value": one axe rule can fail more than one criterion (link-name fails
+ * 2.4.4 and 4.1.2), and naming only the first under-reports what a fix must
+ * meet. The first criterion keeps its place and its level badge, so sorting
+ * and the badge mean what they did; "also" says the rest are extra, not a
+ * replacement. Rejected: one badge per criterion (a row of badges reads as a
+ * list of separate issue types) and a joined "2.4.4, 4.1.2" (it hides which
+ * one the level badge belongs to). Names show when Axcess knows them.
+ */
+export function alsoWcagText(refs: readonly WcagRef[], withNames: boolean): string {
+  if (refs.length === 0) return "";
+  const parts = refs.map((ref) => (withNames && ref.name ? `${ref.sc} ${ref.name}` : ref.sc));
+  return `also ${parts.join(", ")}`;
+}
 
 export const isReviewLane = (value: string): value is ReviewLane =>
   (REVIEW_LANES as readonly string[]).includes(value);

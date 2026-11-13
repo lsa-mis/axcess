@@ -8,26 +8,34 @@ again. If a word is missing or unclear, please open an issue on GitHub.
 
 The Issues table's **How sure** column puts every [issue type](#issue-type)
 in one of these four groups: how sure Axcess is that it is a real problem.
-The table opens showing [Mostly sure](#mostly-sure) and [Measured](#measured).
-[Not sure](#not-sure) and [For information](#for-information) are hidden until
-you select **Show hidden issue types** over the table, or check them under
-**How sure** in the **Filter issues** menu. A line over the table says how many
-are hidden. Exports always include every group.
+The table opens showing every group. A line over the table counts each one and
+says what [Not sure](#not-sure) and [For information](#for-information) mean;
+**Show only Mostly sure and Measured** there, or the **How sure** boxes in the
+**Filter issues** menu, narrow the table. Exports always include every group.
 
 ### Mostly sure
 
-A result where a [rule engine](#rule-engine) ([axe-core](#axe-core) or
-[Siteimprove Alfa](#siteimprove-alfa)) failed a fixed, machine-testable rule,
-such as an image with no [alt text](#alt-text). These rules give the same result
-every time, so these are the most certain results. Start here: check that the
-rule applies to that part of the page, fix it, test the fix, then
-[rescan](#rescan-comparison) to see if it is still found.
+A result Axcess is close to certain about. It comes from one of two places:
+
+- a [rule engine](#rule-engine) ([axe-core](#axe-core) or
+  [Siteimprove Alfa](#siteimprove-alfa)) failed a fixed, machine-testable
+  rule, such as an image with no [alt text](#alt-text). These rules give the
+  same result every time.
+- the [form error check](#form-error-check) saw a clear failure: after the
+  press, a field was marked in error, or a general error message appeared,
+  and no text named the field and said what was wrong.
+- the [page code check](#page-code-check) read a fact from the page code,
+  such as a form field whose only name is its placeholder text.
+
+Start here: check that the result applies to that part of the page, fix it,
+test the fix, then [rescan](#rescan-comparison) to see if it is still found.
 
 - Good to know: some Mostly sure issues are [best practices](#best-practice),
   not WCAG failures. The Issues table's WCAG column shows Best practice for
   these.
-- Why "mostly": a fixed rule can still be wrong about a page, so check each one
-  (see [Zero false positive goal](#zero-false-positive-goal)).
+- Why "mostly": a fixed rule or a clear-looking form error can still be wrong
+  about a page, so check each one (see
+  [Zero false positive goal](#zero-false-positive-goal)).
 - Called "Barrier" in earlier versions of Axcess.
 
 ### Measured
@@ -60,14 +68,16 @@ confirm before you report it. Open the page and check the item
 yourself. If it is a real problem, record that in its [status](#status) and fix
 it; if not, mark it as a [false positive](#false-positive) with a short note.
 
-- Found by: image text whose [alt text](#alt-text) is missing or does not
-  match, a [local AI model](#local-ai-model) (such as for link text, headings,
-  form labels, or reading order), a [Siteimprove Alfa](#siteimprove-alfa)
-  "cannot tell" result, or three browser checks: text cut off at 200% zoom,
-  text cut off with wider text spacing, and a focused control hidden behind a
-  sticky bar.
-- Hidden when the Issues table opens. Select **Show hidden issue types** to
-  see them.
+- Found by: the reading-order check, the three browser checks that are not
+  yet trusted (text cut off at 200% zoom, text cut off with wider text
+  spacing, and a focused control hidden behind a sticky bar), the
+  [form error check](#form-error-check) when its result is unclear, image
+  text whose [alt text](#alt-text) is missing or does not match, a
+  [local AI model](#local-ai-model) (such as for link text, headings, or form
+  labels), an [axe-core](#axe-core) "needs review" result, a
+  [Siteimprove Alfa](#siteimprove-alfa) "cannot tell" result, or the
+  [page code check](#page-code-check)'s guess that text styled like a heading
+  should be one.
 - Called "Needs review" in earlier versions of Axcess.
 
 ### For information
@@ -76,7 +86,9 @@ A record kept so you can see what was checked, not a problem to fix. You do not
 need to act on it, and it should not be reported as an issue.
 
 - Examples: text in an image whose [alt text](#alt-text) already says the same
-  words, and results from older checks that are no longer considered reliable.
+  words, a link whose `title` repeats its own text (found by the
+  [page code check](#page-code-check)), and results from older checks that
+  are no longer considered reliable.
 - Called "Informational" in earlier versions of Axcess.
 
 ## Issues and findings
@@ -166,8 +178,9 @@ field.
 The text that finds one [element](#element) in the page code. The rule check
 (axe) and the browser checks record it as a CSS selector, such as
 `main > h2`. The rule check (Alfa) records it as an XPath, a path from the top
-of the page, such as `/html[1]/body[1]/main[1]/h2[1]`. The page inspector names
-which one it shows and can copy it.
+of the page, such as `/html[1]/body[1]/main[1]/h2[1]`. The app does not show
+it: each occurrence shows its element code (HTML) instead. The CSV, JSON and
+Excel exports keep it, for developers.
 
 ## Severity and priority
 
@@ -181,9 +194,10 @@ Moderate.
 
 ### Priority
 
-A High, Medium, or Low label in the Issues table that combines
-[impact](#impact) with how many pages an issue type touches. Because it rewards
-spread, a severe problem on a single page shows as Low, so check its impact too.
+A High, Medium, or Low label in the Issues table. It starts from the
+[impact](#impact) rating, so a critical problem is High even on one page. More
+pages and more occurrences raise it. Not sure lowers it, so a Not sure issue
+type is never High: a person must confirm it first.
 
 ### Status
 
@@ -192,6 +206,29 @@ Accepted risk (a known problem your team chose not to fix for now), or Not a
 problem (a [false positive](#false-positive)). The last four need a short
 reason. The Excel workbook uses Not Started for New, Resolved for Fixed, and
 Not an Issue for Not a problem.
+
+### Checked by a person
+
+A person's choice about an element in the page inspector, under **Your review
+of this element**:
+
+- **Not checked yet**: no one has decided. This is where every element starts.
+- **Checked: a problem to report**: a person looked at it, and it is a real
+  problem.
+- **Checked: a repeat of one already reported**: a real problem, but the same
+  as one already reported, such as the same menu on another page. Which
+  elements are repeats is the person's call; Axcess does not decide it.
+
+It is separate from the [status](#status): In progress means a fix is planned,
+which is a different decision. The **Pages with this issue** table counts it
+for each page: Not checked yet, 2 of 6 checked, or All checked.
+
+### Issue notes
+
+What a person writes about one element in the page inspector, for the vendor:
+where the problem is, what is wrong, and what to fix. The name matches the
+Issue notes column of the ITS technical review. Email addresses, phone numbers
+and sign-in tokens are removed when the notes are saved.
 
 ## WCAG terms
 
@@ -370,7 +407,10 @@ Axcess runs [axe-core](#axe-core) by default and can also run, or instead run,
 ### axe-core
 
 The open-source rule engine from Deque Systems. By default, Axcess runs a
-bundled copy on every [rendered page](#rendered-page).
+bundled copy on every [rendered page](#rendered-page). When axe-core cannot
+decide a result by itself, such as the contrast of text over an image, it
+reports "needs review", and Axcess puts that result [Not sure](#not-sure), as
+its own issue type ending ", a person must decide".
 
 ### Siteimprove Alfa
 
@@ -391,7 +431,9 @@ A check that measures how a page behaves in a real browser, such as resizing it
 to phone width or pressing Tab through it. Most of its results are marked
 [Measured](#measured). Four are marked [Not sure](#not-sure): the
 reading-order check, because a vision model judges it, and the three checks
-named under [Measured](#measured) that are not yet trusted.
+named under [Measured](#measured) that are not yet trusted. The
+[form error check](#form-error-check)'s clear failures are
+[Mostly sure](#mostly-sure), and its unclear ones Not sure.
 
 ### Motion check
 
@@ -400,12 +442,66 @@ video or scrolling marquee text with no way to pause it (WCAG 1.4.2 and 2.2.2).
 Its results are marked [Measured](#measured), and in the app it runs only
 when you turn on **Check motion and animation**.
 
+### Form error check
+
+A check for forms that show an error without saying in words what is wrong
+([error identification](#error-identification), WCAG 3.3.1). It presses each
+form's submit button once, with nothing typed. By default it stops the form
+from being sent, so a form that only the site's server checks is counted as
+could not judge. On New scan you can choose instead to let it send a form to
+the site when every field is empty, and check the page the site sends back:
+use that only on a site you own or a test site, because the site may still
+act on an empty form, for example by emailing a blank message to someone. It
+never presses sign-in, payment, search or delete forms, and it checks only a
+form's first step. Each result comes with a picture of the form before and
+after the press. A clear failure is marked [Mostly sure](#mostly-sure): a
+field marked in error, or a general error message, and no text that names the
+field and says what is wrong. An unclear one is marked [Not sure](#not-sure),
+as "Form may show an error without describing it in text": for example a
+"Required" hint that only turns red, or a message only screen readers get.
+Reports made before 5 November 2026 mark every result Not sure. In the app it is on by
+default for public websites (**Check that forms describe their errors**,
+under **Checks** on New scan) and never runs in a sign-in scan.
+
+### Page code check
+
+A check that reads each page's code (the [rendered page](#rendered-page)'s
+DOM) for problems the [axe-core](#axe-core) rule check does not look for. It
+runs right after axe-core, reads the page only as it loaded (not after
+clicking), and changes nothing on the page. Each problem it finds is its own
+[issue type](#issue-type), and each one says how sure Axcess is. It is on by
+default (**Check the page code for problems the rule check misses**, under
+**Checks** on New scan), and it also runs in a sign-in scan made in the app.
+It looks for:
+
+- a form field whose only name is its placeholder text, the hint inside the
+  field that disappears when someone types (WCAG 3.3.2). Marked
+  [Mostly sure](#mostly-sure).
+- a label whose `for` value matches no field, so the label is tied to
+  nothing (WCAG 1.3.1). Marked [Mostly sure](#mostly-sure).
+- a `title` on a link, button or field that repeats its visible text, so
+  some screen readers read the words twice. A [best practice](#best-practice),
+  not a WCAG failure. Marked [For information](#for-information).
+- a short line of text that is bold or large, on its own line, with more
+  content after it, but that is not marked up as a heading (WCAG 1.3.1). This
+  is a guess from the text's style, so it is marked [Not sure](#not-sure),
+  and at most 20 are reported a page.
+
 ### Local AI model
 
 An optional AI model that reads text (a language model) or looks at images (a
 vision model), running on your own computer through a free program called
-Ollama. Axcess never installs one for you, and AI results
+Ollama. Axcess installs one only in the desktop app, from **Settings > AI
+features**, after you choose a size (Small, Standard or Large). AI results
 are never marked [Mostly sure](#mostly-sure) or [Measured](#measured).
+
+### AI features
+
+Optional model-based suggestions and checks that run on this computer.
+You can choose them when the desktop app first opens or in **Settings > AI
+features**. Turning AI off keeps downloaded models and saved results, but
+stops new model calls and Axcess's private Ollama. It does not stop an Ollama
+you started yourself. Regular checks and [OCR](#ocr) still work.
 
 ### OCR
 
@@ -454,6 +550,13 @@ A control that has [keyboard focus](#keyboard-focus) should not be completely
 hidden behind something else on the page, such as a sticky header that stays
 on screen while you scroll (WCAG 2.4.11).
 
+### Error identification
+
+When a form finds a mistake, such as an empty required field, it should say
+in words which field is wrong and what is wrong (WCAG 3.3.1). A field that only
+turns red, or a message drawn as a picture, tells nothing to someone who cannot
+see the colour or who uses a [screen reader](#screen-reader).
+
 ### Target size
 
 Buttons and links should be at least 24 by 24 CSS pixels, or have enough space
@@ -482,11 +585,42 @@ side by side and links to it. No longer found means only that the later scan did
 find that issue type again. It is not proof of a fix, so check the page
 yourself before you mark its occurrences Fixed.
 
+### AI suggestion
+
+A fix that the local AI model suggests for one [occurrence](#occurrence),
+when you press **Suggest a fix (AI)** on a page's details. It has a view for
+developers (element code before and after) and a view for content editors
+(steps and text to paste). It is written on this computer and can be wrong,
+so check it before you use it. It is off unless an administrator turns it
+on. See [AI fix suggestions](./ai-suggestions.md).
+
 ### Draft export
 
 An export downloaded from the app before expert review is finished. The app
 marks it DRAFT in the file name and inside the file; command-line exports are
 not marked.
+
+### Redacted copy
+
+An export downloaded with **Remove private details (redact)** turned on in
+the **Export report** menu. Axcess replaces likely private details in the file
+with "[redacted]": form field values, email addresses, phone numbers, card and
+ID numbers, and secret codes (tokens) in web addresses and page code. Element
+locators, check names, WCAG criteria and page addresses stay, so a developer
+can still find and fix each problem. The file name ends in `_REDACTED`, and a
+notice inside the file says the same.
+
+Redaction is best effort. It can miss names and other private text, and it
+does not change text inside images, so screenshots are left out. It changes
+only the download: the report in Axcess keeps everything. Check the file
+before you share it.
+
+Element locators (CSS selectors) are kept whole, so that each still finds its
+element. A locator that quotes a value from the page, such as
+`input[data-owner="jane@example.com"]`, therefore still shows that value. The
+same value is replaced everywhere else in the file. The fix brief for a coding
+agent is the exception: it redacts inside locators too, and tells the agent
+when a locator is no longer exact.
 
 ### Configured search
 

@@ -157,7 +157,13 @@ const config: Config = {
         // squeezed values such as the Inspector's element locator. In em,
         // not ch: ch is the width of a zero, which is wide in Atkinson
         // Hyperlegible, so a 70ch cap still let lines reach 97 characters.
-        measure: "35em",
+        // 32em, not 35em: 35em held average text to about 75 characters, but
+        // text with many narrow letters (i, l, t) reached 84 on Settings, the
+        // Rule checks page and the Inspector. 32em keeps those under 80.
+        // Rejected: a narrower cap on just those paragraphs, because one
+        // reading width everywhere is the point of the token (SC 3.2.4
+        // Consistent Identification, Level AA, and the repo's reuse rule).
+        measure: "32em",
       },
       borderRadius: {
         "2xs": "5px",

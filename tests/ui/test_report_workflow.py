@@ -516,15 +516,19 @@ async def test_finding_anchor_waits_for_scan_metadata(
     )
     await page.goto(f"{base}/app/scans/{scan_id}/pages/1#finding-77", wait_until="networkidle")
     await playwright_async.expect(page.locator("#finding-77")).to_be_focused()
-    # The finding's evidence says what is missing and where the element is.
-    # (These checks rode on the old Verify changes link to this page; Compare
-    # scans links to the issue instead, so they live here now.)
+    # The finding's evidence says what is missing, and shows the element's
+    # code where its locator used to be. This Alfa record saved no code, so
+    # it says so, and its locator-based description ("Text in the first
+    # paragraph") is gone with the locators (2026-11-10, ElementCode in
+    # components/ui.tsx). (These checks rode on the old Verify changes link
+    # to this page; Compare scans links to the issue instead.)
     await playwright_async.expect(
         page.get_by_text("Some details are missing.", exact=True)
     ).to_be_visible()
     await playwright_async.expect(
-        page.get_by_text("Text in the first paragraph", exact=False)
+        page.get_by_text("No element code was saved for this occurrence.", exact=True)
     ).to_be_visible()
+    await playwright_async.expect(page.get_by_text("Text in the first paragraph")).to_have_count(0)
     violations = await _run_axe(page)
     assert not violations, _render_violations(violations)
 
@@ -1699,3 +1703,44 @@ async def test_every_table_has_lines_between_its_columns(
         assert len(shadows) > 2, shadows
         # Every cell but the last draws its line on its right.
         assert all("inset" in shadow for shadow in shadows[:-1]), (path, shadows)
+
+
+async def test_issue_page_says_how_many_occurrences_were_found_after_clicking(
+    live_server: tuple[str, int], new_page: Any
+) -> None:
+    """The Issue occurrences tile splits the count: "1 at page load, 7 after clicking".
+
+    WAVE checks a page with its menus closed, so an issue type Click-Through
+    found mostly in opened menus reads higher in Axcess. The split says why.
+    The table keeps its tags without counts (the developer's choice,
+    2026-11-10). With nothing found after clicking, no split shows.
+    """
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    row = (await (await page.request.get(f"{base}/api/scans/{scan_id}/issues")).json())["rows"][0]
+    key = quote(row["issue_key"], safe="")
+    detail = await (await page.request.get(f"{base}/api/scans/{scan_id}/issues/{key}")).json()
+    tile = page.locator("dl > div").filter(
+        has=page.locator("dt", has_text=re.compile(r"^Issue occurrences$"))
+    )
+
+    async def show(after_clicking: int) -> str:
+        body = {
+            **detail,
+            "row": {
+                **detail["row"],
+                "occurrence_count": 8,
+                "click_through_occurrence_count": after_clicking,
+            },
+        }
+
+        async def fulfil(route: Any) -> None:
+            await route.fulfill(json=body)
+
+        await page.unroute("**/api/scans/*/issues/**")
+        await page.route(f"**/api/scans/{scan_id}/issues/{key}*", fulfil)
+        await page.goto(f"{base}/app/scans/{scan_id}/issues/{key}", wait_until="networkidle")
+        return re.sub(r"\s+", " ", await tile.inner_text()).strip()
+
+    assert "1 at page load, 7 after clicking" in await show(7)
+    assert "after clicking" not in await show(0)

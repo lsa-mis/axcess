@@ -8,6 +8,10 @@ React workbench in a sandboxed Electron window.
 ## User experience
 
 - Opening Axcess prepares the local database and opens the workbench.
+- On a fresh installation, Axcess first offers **Set up AI features** or
+  **Continue without AI**. The choice is inside the app, not in the Mac disk
+  image installer. Neither choice starts a download. Skipping leaves all
+  model-based features off and keeps regular checks available.
 - Scan evidence is stored in the operating system's application-data folder,
   never inside the installed application.
 - Closing Axcess stops its private backend process.
@@ -21,8 +25,32 @@ React workbench in a sandboxed Electron window.
   packages, Tesseract executable, and English OCR language data. Users do not
   need Python, Node.js, Chromium, or Tesseract installed separately.
 - Ollama and its optional local language/vision models are not silently
-  installed or downloaded. Model-assisted checks remain optional and clearly
-  report when a separately configured loopback Ollama service is unavailable.
+  installed or downloaded. **Settings > AI features** (on because
+  `desktopEnvironment` sets `AUDIT_DESKTOP=1`) checks memory, disk and
+  graphics chip, suggests a size, and downloads a pinned, checksum-verified
+  Ollama and the models only after the person selects **Download and set up**.
+  It always installs a private copy, not an Ollama already on port 11434.
+  **Start AI service** starts that private copy without downloading anything.
+  On macOS it uses a deny-by-default OS sandbox and a checked loopback-only
+  connection. The service cannot reach the internet; downloads run separately.
+  The sandbox allows only the Mac graphics driver and shader compiler, so
+  models still run on the graphics chip (Metal).
+  Windows and systems without supported isolation refuse to start AI. Linux
+  network namespaces are supported by the command builder, but starting stays
+  blocked until Axcess has a private connection bridge to that namespace. See
+  [Set up AI features](ai-suggestions.md#set-up-ai-features-in-the-desktop-app).
+  Model-assisted scan checks stay off for each new scan and clearly report
+  when Ollama is unavailable.
+- **Settings > AI features** has **Turn AI off** and **Turn AI on**.
+  Off stops Axcess's private Ollama, blocks new model calls, and keeps the
+  downloaded files and saved results. It never stops an Ollama you started
+  yourself. Turning AI on reuses kept models; new scan AI checks still need
+  a separate choice for each scan. Finish or stop a scan, finish or cancel
+  waiting answers, and pause a download before changing the setting.
+  Existing installations keep their setup without repeating the welcome.
+  The saved desktop choice takes precedence over `AUDIT_SUGGESTIONS_ENABLED`.
+  See
+  [AI fix suggestions](ai-suggestions.md).
 
 Typical data locations are:
 

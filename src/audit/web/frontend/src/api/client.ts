@@ -15,9 +15,13 @@ import type {
   ManualChecksResponse,
   ManualOutcome,
   PageEvidence,
+  ScanPagesResponse,
+  ScanPagesSort,
   PageInspection,
   DiffReport,
   ExportFormat,
+  OccurrenceReview,
+  OccurrenceReviewRequest,
   ExportOptions,
   FindingDetail,
   ReportImage,
@@ -50,6 +54,14 @@ import type {
   ScanSummary,
   SiteGroup,
   ScopePreview,
+  AiInstallStatus,
+  AiPlan,
+  AiPreferences,
+  AiTierId,
+  SuggestionAvailability,
+  SuggestionFeedback,
+  SuggestionOccurrenceKind,
+  SuggestionRecord,
   TrackingData,
   CoverageChecks,
   CoverageFound,
@@ -180,8 +192,9 @@ function dispositionFilename(header: string | null): string | null {
 async function downloadExport(
   scanId: number,
   format: ExportFormat,
-): Promise<{ filename: string; sizeBytes: number; draft: boolean }> {
-  const res = await fetch(exportUrl(scanId, format, true), {
+  redact = false,
+): Promise<{ filename: string; sizeBytes: number; draft: boolean; redacted: boolean }> {
+  const res = await fetch(exportUrl(scanId, format, true, redact), {
     credentials: "same-origin",
     cache: "no-store",
   });
@@ -197,7 +210,31 @@ async function downloadExport(
     filename,
     sizeBytes: blob.size,
     draft: res.headers.get("X-Axcess-Export-State") === "draft",
+    redacted: res.headers.get("X-Axcess-Export-Redaction") !== null,
   };
+}
+
+/**
+ * One report export's text, for the clipboard rather than a file.
+ *
+ * Same URL and refusals as ``downloadExport`` (a running, failed or deleted
+ * scan is refused with the server's own message), so copying a file and
+ * downloading it can never disagree about what the file holds.
+ */
+async function fetchExportText(
+  scanId: number,
+  format: ExportFormat,
+  redact = false,
+): Promise<string> {
+  const res = await fetch(exportUrl(scanId, format, true, redact), {
+    credentials: "same-origin",
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new ApiError(res.status, apiErrorMessage(res.status, body));
+  }
+  return res.text();
 }
 
 /** The comparison API's row cap (``comparison.MAX_PAGE_SIZE``). Issue groups
@@ -253,6 +290,12 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(payload),
     }),
+  /** Save a person's review of the occurrences on one element of a page. */
+  saveOccurrenceReview: (scanId: number, pageId: number, payload: OccurrenceReviewRequest) =>
+    request<OccurrenceReview>(`/api/scans/${scanId}/pages/${pageId}/review`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
   getManualChecks: (scanId: number) =>
     request<ManualChecksResponse>(`/api/scans/${scanId}/manual-checks`),
   updateManualCheck: (
@@ -273,8 +316,68 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  /** One page of the pages a report visited; `limit` is at most 200. */
+  listScanPages: (
+    scanId: number,
+    { limit, offset, sort }: { limit: number; offset: number; sort: ScanPagesSort },
+  ) => {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      offset: String(offset),
+      sort,
+    });
+    return request<ScanPagesResponse>(`/api/scans/${scanId}/pages?${params}`);
+  },
   getPageEvidence: (scanId: number, pageId: number) =>
     request<PageEvidence>(`/api/scans/${scanId}/pages/${pageId}`),
+  /** Desktop only: this computer, the AI sizes it can run, and the current setup. 404 elsewhere. */
+  startAiRuntime,
+  getAiRuntime,
+  getAiPlan: () => request<AiPlan>("/api/ai/plan", { cache: "no-store" }),
+  getAiPreferences: () => request<AiPreferences>("/api/ai/preferences", { cache: "no-store" }),
+  setAiEnabled: (enabled: boolean) =>
+    request<AiPreferences>("/api/ai/preferences", {
+      method: "PUT",
+      body: JSON.stringify({ enabled }),
+    }),
+  getAiInstall: () => request<AiInstallStatus>("/api/ai/install", { cache: "no-store" }),
+  /** Start or resume downloading the AI program and models for one size. */
+  installAi: (tier: AiTierId) =>
+    request<AiInstallStatus>("/api/ai/install", {
+      method: "POST",
+      body: JSON.stringify({ tier }),
+    }),
+  pauseAiInstall: () => request<AiInstallStatus>("/api/ai/install", { method: "DELETE" }),
+  /** Turn AI features off and delete what Axcess downloaded. */
+  removeAi: () => request<void>("/api/ai", { method: "DELETE" }),
+  /** Whether AI fix suggestions are turned on and their local model is ready. */
+  getSuggestionStatus: () =>
+    request<SuggestionAvailability>("/api/suggestions/status", { cache: "no-store" }),
+  /** Queue an AI fix suggestion for one occurrence. Nothing leaves this computer. */
+  requestSuggestion: (scanId: number, kind: SuggestionOccurrenceKind, occurrenceId: number) =>
+    request<SuggestionRecord>(`/api/scans/${scanId}/suggestions`, {
+      method: "POST",
+      body: JSON.stringify({ occurrence_kind: kind, occurrence_id: occurrenceId }),
+    }),
+  /** The newest suggestion for one occurrence, or null when there is none. */
+  getLatestSuggestion: (scanId: number, kind: SuggestionOccurrenceKind, occurrenceId: number) =>
+    request<SuggestionRecord | null>(
+      `/api/scans/${scanId}/occurrences/${kind}/${occurrenceId}/suggestion`,
+      { cache: "no-store" },
+    ),
+  cancelSuggestion: (scanId: number, suggestionId: number) =>
+    request<SuggestionRecord>(`/api/scans/${scanId}/suggestions/${suggestionId}/cancel`, {
+      method: "POST",
+    }),
+  setSuggestionFeedback: (
+    scanId: number,
+    suggestionId: number,
+    feedback: SuggestionFeedback | null,
+  ) =>
+    request<SuggestionRecord>(`/api/scans/${scanId}/suggestions/${suggestionId}/feedback`, {
+      method: "POST",
+      body: JSON.stringify({ feedback }),
+    }),
   /**
    * Rendered page + DOM for the Page/DOM inspector. Serves the rendered
    * document persisted at scan time when present; otherwise re-renders the
@@ -379,8 +482,10 @@ export const api = {
   /** Explicit, identity-protected download of the minimal redacted summary. */
   downloadProtectedRedactedExport,
   /** Name, size and draft state of each file the Export panel offers. */
-  getExportOptions: (scanId: number) => request<ExportOptions>(`/api/scans/${scanId}/exports`),
+  getExportOptions: (scanId: number, redact = false) =>
+    request<ExportOptions>(`/api/scans/${scanId}/exports${redact ? "?redact=true" : ""}`),
   downloadExport,
+  fetchExportText,
   cancelScan: (id: number) =>
     request<{ ok: boolean }>(`/api/scans/${id}/cancel`, { method: "POST" }),
   /**
@@ -634,6 +739,32 @@ async function downloadImagesZip(scanId: number): Promise<{ filename: string; si
 /** Download URL for the Images tab's ZIP: pictures in folders by group and verdict, and a sheet. */
 export const imagesZipUrl = (scanId: number): string => `/api/scans/${scanId}/images/export.zip`;
 
-/** Download URL for a scan export; incomplete reports require explicit draft acknowledgement. */
-export const exportUrl = (scanId: number, format: string, acknowledgedDraft = false): string =>
-  `/api/scans/${scanId}/export/${format}${acknowledgedDraft ? "?draft=acknowledged" : ""}`;
+/**
+ * Download URL for a scan export; incomplete reports require explicit draft
+ * acknowledgement. ``redact`` asks for the redacted copy, with likely private
+ * details replaced by "[redacted]" (best effort, export only).
+ */
+export const exportUrl = (
+  scanId: number,
+  format: string,
+  acknowledgedDraft = false,
+  redact = false,
+): string => {
+  const params = new URLSearchParams();
+  if (acknowledgedDraft) params.set("draft", "acknowledged");
+  if (redact) params.set("redact", "true");
+  const query = params.toString();
+  return `/api/scans/${scanId}/export/${format}${query ? `?${query}` : ""}`;
+};
+
+/** Start only Axcess's private, isolated service after a deliberate button press. */
+export function startAiRuntime(): Promise<import("./types").AiRuntimeStartResponse> {
+  return request("/api/ai/runtime/start", {
+    method: "POST",
+    body: JSON.stringify({ confirm: true }),
+  });
+}
+
+export function getAiRuntime(): Promise<import("./types").AiRuntimeStatus> {
+  return request("/api/ai/runtime", { cache: "no-store" });
+}

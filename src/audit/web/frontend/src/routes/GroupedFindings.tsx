@@ -35,7 +35,7 @@ import {
 import { ActiveFilters, FilterMenu, activeFilterItems, type FilterGroup } from "../components/table/FilterMenu";
 import { requestStatusRationale } from "../statusDecision";
 import { useScanQuery } from "../hooks/useScanQuery";
-import { STATUS_LABEL, STATUS_OPTION_LABEL } from "../lib/terms";
+import { OPENS_NEW_WINDOW, STATUS_LABEL, STATUS_OPTION_LABEL } from "../lib/terms";
 
 const STATUS_OPTIONS: FindingStatus[] = [
   "new",
@@ -556,7 +556,7 @@ function FindingRow({
                     ? `…${occ.page_url.slice(-60)}`
                     : occ.page_url}
                   <span aria-hidden> ↗</span>
-                  <span className="sr-only">opens in a new tab</span>
+                  <span className="sr-only">{OPENS_NEW_WINDOW}</span>
                 </a>
                 {/* The page's evidence in this report. It pointed at
                     `/pages/:id`, an address the app never had, so it

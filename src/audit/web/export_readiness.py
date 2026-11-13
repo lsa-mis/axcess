@@ -137,11 +137,18 @@ def public_export_filename(
     scan_id: int,
     extension: str,
     readiness: PublicExportReadiness,
+    *,
+    redacted: bool = False,
 ) -> str:
-    """Return a stable final filename or an unmistakable draft filename."""
+    """Return a stable final filename, marked when it is a draft or redacted.
+
+    ``_REDACTED`` in the name tells a recipient, before opening the file,
+    that it is the hand-off copy and not the full evidence.
+    """
 
     draft_marker = "_DRAFT" if readiness.is_draft else ""
-    return f"scan_{scan_id}{draft_marker}.{extension}"
+    redaction_marker = "_REDACTED" if redacted else ""
+    return f"scan_{scan_id}{draft_marker}{redaction_marker}.{extension}"
 
 
 def label_draft_export(
@@ -152,7 +159,7 @@ def label_draft_export(
 ) -> str | bytes:
     """Add an in-artifact draft notice where the format supports it safely.
 
-    Markdown, JSON, XLSX, and CSV can carry a prominent notice without making
+    Markdown, JSON, XLSX (both workbooks), and CSV can carry a prominent notice without making
     the artifact invalid. Draft CSVs gain one additive state column, keeping a
     rectangular, standards-compliant file that importers can explicitly map
     or ignore.
@@ -161,7 +168,7 @@ def label_draft_export(
     if not readiness.is_draft:
         return rendered
     status_label = readiness.evaluation_status.replace("_", " ")
-    if export_format in {"markdown", "audit"}:
+    if export_format in {"markdown", "audit", "brief"}:
         if not isinstance(rendered, str):
             raise TypeError("Markdown exports must be text")
         notice = (
@@ -185,7 +192,7 @@ def label_draft_export(
             **payload,
         }
         return json.dumps(labeled, indent=2, sort_keys=True, ensure_ascii=False)
-    if export_format == "xlsx":
+    if export_format in {"xlsx", "its"}:
         if not isinstance(rendered, bytes):
             raise TypeError("XLSX exports must be bytes")
         return _label_draft_workbook(rendered, status_label=status_label)

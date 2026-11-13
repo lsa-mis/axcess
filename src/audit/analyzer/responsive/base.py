@@ -11,7 +11,7 @@ finding by the probe rather than fixed at the class level.
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 # Rule ids, narrow, grep-able, and prefixed so `issues.py` can route
@@ -44,6 +44,12 @@ class ResponsiveFinding:
     html_snippet: str
     help: str
     wcag_level: str = "AA"
+    #: The element photographed while the failure held: at the 320px or
+    #: 640px viewport, or with the spacing stylesheet applied. A picture
+    #: taken after the probe restores the page shows the element whole,
+    #: which is evidence against the finding. Not stored in the row; the
+    #: fetcher files it as the occurrence's screenshot.
+    screenshot: bytes | None = field(default=None, compare=False, repr=False)
 
     @property
     def help_url(self) -> str:

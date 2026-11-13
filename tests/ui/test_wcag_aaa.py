@@ -129,6 +129,7 @@ def _screens(scan_id: int, page_id: int) -> list[str]:
         f"/scans/{scan_id}/issues",
         f"/scans/{scan_id}/issues/axe:{RULE}",
         f"/scans/{scan_id}/issues/axe:{RULE}/pages",
+        f"/scans/{scan_id}/pages",
         f"/scans/{scan_id}/pages/{page_id}",
         f"/scans/{scan_id}/pages/{page_id}/inspect?issue=axe:{RULE}",
         f"/scans/{scan_id}/findings",
@@ -326,8 +327,8 @@ async def test_reading_width_never_cuts_a_band_short(
     live_server: tuple[str, int], new_page: Any, report: tuple[int, int]
 ) -> None:
     """The reading width (SC 1.4.8) sits on the text, not on a band or box
-    around it, and the values in the Inspector's facts about the flagged
-    element (such as its element locator) get the row's width."""
+    around it. (It also checked the widths in the Inspector's facts about
+    the flagged element; that table was removed on 2026-11-10.)"""
     base, _ = live_server
     scan_id, page_id = report
     cut = []
@@ -336,15 +337,6 @@ async def test_reading_width_never_cuts_a_band_short(
         cut += [f"{path}: {t}" for t in await page.evaluate(_CAPPED_BANDS)]
         await page.context.close()
     assert not cut, "\n".join(cut)
-    page = await _open(new_page, base, f"/scans/{scan_id}/pages/{page_id}/inspect?issue=axe:{RULE}")
-    await page.locator("main dl dd").first.wait_for()
-    shares = await page.evaluate(
-        """() => [...document.querySelectorAll('main dl dd')].map(
-          (dd) => dd.getBoundingClientRect().width / dd.closest('dl').getBoundingClientRect().width
-        )"""
-    )
-    assert shares and min(shares) > 0.6, shares
-    await page.context.close()
 
 
 async def test_page_link_icon_sits_beside_its_first_line(

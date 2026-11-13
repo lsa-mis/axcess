@@ -362,6 +362,30 @@ _DOM_HASH_JS = """
 _DIGITS = re.compile(r"\d+")
 
 
+_UNNAMED_NOUN = {"a": "link", "button": "button", "input": "control", "summary": "summary"}
+
+
+def _control_label(control: dict[str, Any]) -> str:
+    """What "After clicking ..." names: the control's accessible name.
+
+    A control with no name used to read as its bare tag, ``<button>``, so
+    every unnamed icon button on a page said "After clicking “<button>”"
+    and nobody could tell which one to click to reproduce the issue. It now
+    reads "button with no name (button.menu-toggle)": the plain words first
+    and the element locator (CSS selector) after, in parentheses, as
+    docs/plain-language.md asks. The locator is the control's id or first
+    two classes (``shape``), the same one repeat sampling groups by.
+    """
+    if control.get("label"):
+        return str(control["label"])
+    tag = str(control.get("tag") or "element")
+    noun = _UNNAMED_NOUN.get(tag, "element")
+    shape = str(control.get("shape") or tag).rstrip(".")
+    if shape == tag:
+        return f"{noun} with no name (<{tag}>)"
+    return f"{noun} with no name ({shape})"
+
+
 def _shape_of(control: dict[str, Any], pinned: str) -> str:
     """Group key for repeat sampling: one calendar is one shape."""
     signature = _signature(control.get("shape", control["selector"]))
@@ -615,8 +639,14 @@ class InteractionProbe:
                 # spend its timeout.
                 if not await element.is_visible():
                     continue
+                # With "needs review" results, as every re-run below asks for
+                # them: a frame's load-time cant_tell rows would otherwise all
+                # look revealed by the first click inside it.
                 budget.seen_hashes.update(
-                    v.target_hash for v in await self.axe.run(frame, self.level, self.version)
+                    v.target_hash
+                    for v in await self.axe.run(
+                        frame, self.level, self.version, include_incomplete=True
+                    )
                 )
             except Exception as exc:
                 log.debug("interaction.frame_skipped", error_type=type(exc).__name__)
@@ -839,7 +869,7 @@ class InteractionProbe:
         Each candidate is attempted once; failed attempts remain bounded.
         """
         selector = control["selector"]
-        label = control["label"] or f"<{control['tag']}>"
+        label = _control_label(control)
         try:
             locator = await self._resolve_control(page, control)
             if locator is None and path:
@@ -933,9 +963,7 @@ class InteractionProbe:
                     budget,
                     state_key=state_key,
                     label=label,
-                    path_labels=tuple(
-                        item["label"] or f"<{item['tag']}>" for item in (*path, control)
-                    ),
+                    path_labels=tuple(_control_label(item) for item in (*path, control)),
                 )
             log.info(
                 "interaction.clicked",
@@ -1068,7 +1096,7 @@ class InteractionProbe:
     ) -> None:
         """Run axe on the current state and keep only unseen violations."""
         try:
-            violations = await self.axe.run(page, self.level, self.version)
+            violations = await self.axe.run(page, self.level, self.version, include_incomplete=True)
         except Exception as exc:
             log.debug("interaction.axe_failed", error_type=type(exc).__name__)
             return

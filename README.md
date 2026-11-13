@@ -68,7 +68,7 @@ without it. Release notes and earlier builds are on the
 
 ## Read your report
 
-![Diagram of the three report groups in the How sure column. Mostly sure holds rule-engine failures from axe-core and Siteimprove Alfa, including problems found after clicking or after a configured search; confirm them on the page, fix, and rescan. Not sure holds browser checks, the keyboard trap check, motion checks, text in images whose alt text is missing or does not match, AI checks, and Alfa "cannot tell" results; a person tests and records a decision. For information holds images whose alt text already matches and older records kept for history; no action is needed.](./docs/images/diagrams/report-groups.png)
+![Diagram of the three report groups in the How sure column. Mostly sure holds rule-engine failures from axe-core and Siteimprove Alfa, including problems found after clicking or after a configured search, and clear form errors, where a field is marked in error with no text that says what is wrong; confirm them on the page, fix, and rescan. Not sure holds browser checks, the keyboard trap check, form errors that are unclear, motion checks, text in images whose alt text is missing or does not match, AI checks, and Alfa "cannot tell" results; a person tests and records a decision. For information holds images whose alt text already matches and older records kept for history; no action is needed.](./docs/images/diagrams/report-groups.png)
 
 Terms in the diagram: [alt text](./docs/glossary.md#alt-text), [configured search](./docs/glossary.md#configured-search),
 [browser checks](./docs/glossary.md#browser-check), [motion checks](./docs/glossary.md#motion-check),

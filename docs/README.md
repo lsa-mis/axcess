@@ -25,6 +25,8 @@ Then use these guides:
 - [Glossary](./glossary.md): plain-language definitions of report terms.
 - [Reading your report](./reading-your-report.md): a walkthrough of a report
   and its exports.
+- [AI fix suggestions](./ai-suggestions.md): turn on local AI suggestions for
+  fixing an occurrence, and what they do with your data.
 - [Troubleshooting](./troubleshooting.md): fixes for scans that stop at one
   page, crawl too much or too little, or run slowly.
 - [Hosting for a small team](./hosting.md): run Axcess on an always-on machine

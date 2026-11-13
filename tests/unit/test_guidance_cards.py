@@ -82,12 +82,6 @@ def _axe_rules_a_scan_runs() -> dict[str, list[str]]:
     return rules
 
 
-# axe tags these best practice only, yet Axcess files them under a WCAG
-# criterion (Focus Order; Info and Relationships). Whether to keep that is an
-# open product decision: moving them changes how the issues are counted.
-FILED_UNDER_WCAG_BY_AXCESS = {"tabindex": "2.4.3", "heading-order": "1.3.1"}
-
-
 def test_every_axe_rule_a_scan_runs_has_a_card() -> None:
     rules = _axe_rules_a_scan_runs()
     assert len(rules) > 80, "the axe bundle was not read"
@@ -100,9 +94,12 @@ def test_every_axe_rule_a_scan_runs_has_a_card() -> None:
             # A card never re-files an issue under another criterion.
             assert card.get("wcag_sc") in (None, primary), rule_id
             assert card.get("wcag_level") in (None, level), rule_id
-        elif rule_id in FILED_UNDER_WCAG_BY_AXCESS:
-            assert card.get("wcag_sc") == FILED_UNDER_WCAG_BY_AXCESS[rule_id], rule_id
         else:
+            # axe tags it best practice only, so it shows as Best practice:
+            # a card never files it under a criterion axe does not name.
+            # tabindex (2.4.3) and heading-order (1.3.1) were, until
+            # 2026-11-06; their text still says which criterion a person
+            # would judge them by.
             assert "wcag_sc" not in card and "wcag_level" not in card, rule_id
 
 
@@ -130,6 +127,22 @@ def test_every_ai_review_criterion_has_a_card() -> None:
     ]
     assert criteria
     assert sorted(set(criteria) - set(_cards()["semantic_criteria"])) == []
+
+
+def test_every_page_code_rule_has_its_own_card() -> None:
+    """A page code rule's card matches the rule: its criterion and level, or
+    no wcag_* fields for a best practice (so the issue shows Best practice)."""
+    from audit.analyzer.markup import RULES
+
+    cards = _cards()["markup_rules"]
+    assert sorted(set(RULES) ^ set(cards)) == []
+    for rule_id, rule in RULES.items():
+        card = cards[rule_id]
+        assert card["title"] == rule.title, rule_id
+        if rule.criterion_sc:
+            assert (card["wcag_sc"], card["wcag_level"]) == (rule.criterion_sc, rule.wcag_level)
+        else:
+            assert not {"wcag_sc", "wcag_name", "wcag_level"} & set(card), rule_id
 
 
 def test_every_image_group_has_a_card() -> None:

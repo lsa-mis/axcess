@@ -18,6 +18,7 @@ from audit.crawler.orchestrator import CrawlConfig, CrawlSummary, run_crawl
 from audit.db.schema import connect
 from audit.exports.collector import collect_scan
 from audit.exports.csv_export import render_csv
+from audit.exports.its_review import render_its_review
 from audit.exports.jira_export import render_jira_csv
 from audit.exports.json_export import render_json
 from audit.exports.markdown_report import render_markdown
@@ -414,6 +415,17 @@ def crawl(
             ),
         ),
     ] = False,
+    skip_markup: Annotated[
+        bool,
+        typer.Option(
+            "--skip-markup",
+            help=(
+                "Skip the page code check (fields named only by a placeholder, "
+                "labels tied to no field, titles that repeat the text, text "
+                "styled as a heading)."
+            ),
+        ),
+    ] = False,
     skip_visual: Annotated[
         bool,
         typer.Option(
@@ -545,6 +557,7 @@ def crawl(
             keyboard_probe_max_focusable=keyboard_max_focusable,
             responsive_checks_enabled=not skip_responsive,
             focus_checks_enabled=not skip_focus,
+            markup_checks_enabled=not skip_markup,
             visual_checks_enabled=not skip_visual,
             interaction_checks_enabled=not skip_interaction,
             capture_screenshots=not skip_screenshots,
@@ -622,6 +635,9 @@ def _render_summary(conn, summary: CrawlSummary) -> None:  # type: ignore[no-unt
     if summary.focus_pages_probed:
         table.add_row("Pages focus-probed (SC 2.4.11)", str(summary.focus_pages_probed))
         table.add_row("Focus-obscured findings total", str(summary.focus_findings_total))
+    if summary.markup_pages_checked:
+        table.add_row("Pages checked by the page code check", str(summary.markup_pages_checked))
+        table.add_row("Page code check findings total", str(summary.markup_findings_total))
     if summary.visual_pages_probed:
         table.add_row("Pages visually probed (SC 1.3.2)", str(summary.visual_pages_probed))
         table.add_row("Visual-sequence findings total", str(summary.visual_findings_total))
@@ -690,13 +706,14 @@ def synthesize(
         conn.close()
 
 
-_EXPORT_FORMATS = ("csv", "json", "jira", "markdown", "xlsx")
+_EXPORT_FORMATS = ("csv", "json", "jira", "markdown", "xlsx", "its")
 _EXPORT_EXT = {
     "csv": "csv",
     "json": "json",
     "jira": "jira.csv",
     "markdown": "md",
     "xlsx": "xlsx",
+    "its": "its.xlsx",
 }
 
 
@@ -708,7 +725,7 @@ def export(
     ] = None,
     fmt: Annotated[
         str,
-        typer.Option("--format", "-f", help="csv | json | jira | markdown | xlsx"),
+        typer.Option("--format", "-f", help="csv | json | jira | markdown | xlsx | its"),
     ] = "csv",
     output: Annotated[
         Path | None,
@@ -762,6 +779,9 @@ def export(
             # xlsx builds its issue table live from the open connection;
             # the blob store lets it embed per-finding evidence screenshots.
             rendered = render_xlsx(scan, conn=conn, blob_store=BlobStore(get_settings().blob_dir))
+        elif fmt_lower == "its":
+            # The U-M ITS Accessibility Team's template, filled in.
+            rendered = render_its_review(scan, conn=conn)
         else:
             rendered = {
                 "csv": render_csv,

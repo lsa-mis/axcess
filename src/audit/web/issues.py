@@ -44,10 +44,15 @@ from typing import Any, Literal
 import yaml
 
 from audit.analyzer.alfa_evidence import humanize_target
+from audit.analyzer.forms import base as forms_base
+from audit.analyzer.markup import base as markup_base
 from audit.labels import DEFAULT_REVIEW_LANES, FINDING_TYPES, FindingType
+from audit.logging import get_logger
 from audit.wcag_version import WcagVersion, stored_wcag_version
 from audit.web import a11y_queries, image_findings_queries
 from audit.web.screen_reader_checks import ScreenReaderCheck, check_for
+
+log = get_logger(__name__)
 
 # Conformance label shown in the table's badge column.
 #   A   = WCAG Level A (legal floor in most jurisdictions)
@@ -129,21 +134,6 @@ def _alfa_diagnostics(findings: list[dict[str, Any]], *, limit: int = 2) -> list
     return diagnostics
 
 
-# Severity to priority weight. Used for sorting and for the "Priority"
-# column. Multiplied by log(1 + page_count) to give multi-page issues
-# more weight, one fix on 800 pages beats one fix on 1 page even if
-# the per-page severity is identical.
-_SEVERITY_WEIGHT = {
-    "critical": 4.0,
-    "serious": 3.0,
-    "moderate": 2.0,
-    "minor": 1.0,
-    # Image-finding severities get the same scale (mapped through their
-    # framework labels: critical/major/minor/info → critical/serious/moderate/minor).
-    "major": 3.0,
-    "info": 1.0,
-}
-
 # Effort tier → Difficulty label, in the Siteimprove vocabulary.
 # Beginner is "any editor can do this in <15 min"; Expert is structural.
 _EFFORT_TO_DIFFICULTY = {
@@ -176,6 +166,20 @@ class IssuePage:
     # at scan time (empty when none were captured). The Excel export reads
     # these to embed visual evidence next to each issue.
     screenshot_hashes: tuple[str, ...] = ()
+    # Beside each of ``screenshot_hashes``, in the same order, the picture
+    # from before the problem showed, or None: only the form error check has
+    # one (its form before the submit press; the after picture is the
+    # screenshot). Same length as ``screenshot_hashes``.
+    before_screenshot_hashes: tuple[str | None, ...] = ()
+    # How many of ``occurrence_count`` a person has checked in the page
+    # inspector: decided "a problem to report" or "a repeat of one already
+    # reported" (``audit.occurrence_reviews``). Counted over the same
+    # occurrences as ``occurrence_count``, so "3 of 19 checked" adds up.
+    checked_count: int = 0
+    # Of those, how many a person decided are "a problem to report". The
+    # inspector offers "Mark … as repeats" only once an issue has one: a
+    # repeat is a repeat of one already reported.
+    reported_count: int = 0
 
 
 @dataclass(frozen=True)
@@ -208,6 +212,40 @@ class IssueDetail:
 
 
 @dataclass(frozen=True)
+class WcagRef:
+    """One more WCAG success criterion an issue type maps to.
+
+    ``name`` is the criterion's title where Axcess knows it (the Level A and
+    AA criteria in ``wcag_coverage.yaml``), else None.
+    """
+
+    sc: str
+    name: str | None
+
+
+def _also_wcag(wcag_scs: Any, primary: str | None) -> tuple[WcagRef, ...]:
+    """The criteria after the primary one, from the stored CSV of all of them.
+
+    One axe rule can fail more than one criterion: ``link-name`` maps to
+    2.4.4 Link Purpose and 4.1.2 Name, Role, Value. The table and the issue
+    page name every one; ``wcag_sc`` stays the primary for sorting, filters
+    and exports.
+    """
+    if not primary or not wcag_scs:
+        return ()
+    from audit import coverage_matrix
+
+    out: list[WcagRef] = []
+    for sc in str(wcag_scs).split(","):
+        sc = sc.strip()
+        if not sc or sc == primary or any(ref.sc == sc for ref in out):
+            continue
+        criterion = coverage_matrix.by_sc(sc)
+        out.append(WcagRef(sc=sc, name=criterion.name if criterion else None))
+    return tuple(out)
+
+
+@dataclass(frozen=True)
 class IssueLocation:
     """One bounded, scan-scoped location sample for the unified table."""
 
@@ -230,6 +268,12 @@ class IssueLocation:
     # location" an inspector shows. Rendered as escaped source, never
     # executed, so it is evidence of what the markup was at scan time.
     html_snippet: str | None = None
+    # For an image issue type: the image file's address as the crawler saved
+    # it (canonical, so it can differ from the page's own ``src`` text). An
+    # image location's ``target`` is a description ("Image occurrence 2"),
+    # not an element locator, so this is what lets someone search the
+    # site's code for the image. None for DOM rule locations.
+    image_url: str | None = None
 
 
 @dataclass(frozen=True)
@@ -300,6 +344,8 @@ class IssueRow:
     # how many of ``occurrence_count`` are the second kind.
     finding_types: tuple[FindingType, ...] = ("wcag",)
     click_through_occurrence_count: int = 0
+    # Every other criterion the rule maps to, after ``wcag_sc``.
+    also_wcag: tuple[WcagRef, ...] = ()
 
 
 def list_issues(
@@ -314,6 +360,7 @@ def list_issues(
     review_lane: str | Sequence[str] | None = None,
     finding_type: str | Sequence[str] | None = None,
     sort: str = "priority_desc",
+    open_locations_first: bool = False,
 ) -> list[IssueRow]:
     """Build the unified issues list with optional filters.
 
@@ -343,14 +390,26 @@ def list_issues(
     Filters applied AFTER the query (the underlying grouping queries
     are scan-wide already; filtering in Python keeps the row-building
     logic in one place).
+
+    ``open_locations_first`` changes only which three places each row's
+    ``locations`` sample shows: places whose occurrence is still open (New,
+    Reviewing, In progress) come before closed ones. The fix brief asks for
+    it, so a coding agent is never shown only places that are already fixed.
+    The Issues view keeps the default, the first places found.
     """
     rules = _load_rules()
 
     rows: list[IssueRow] = []
     rows.extend(
-        _axe_issue_rows(conn, scan_id, rules, wcag_version=_scan_wcag_version(conn, scan_id))
+        _axe_issue_rows(
+            conn,
+            scan_id,
+            rules,
+            wcag_version=_scan_wcag_version(conn, scan_id),
+            open_locations_first=open_locations_first,
+        )
     )
-    rows.extend(_image_issue_rows(conn, scan_id, rules))
+    rows.extend(_image_issue_rows(conn, scan_id, rules, open_locations_first=open_locations_first))
 
     return filter_and_sort(
         rows,
@@ -410,6 +469,48 @@ def filter_and_sort(
     return _sort_rows(rows, sort)
 
 
+#: The suffix on an axe issue key whose occurrences axe could not decide
+#: ("needs review", axe's ``incomplete``): ``axe:color-contrast:cant_tell``.
+#: An axe failure keeps the bare ``axe:<rule>`` key it always had.
+AXE_CANT_TELL_SUFFIX = ":cant_tell"
+
+#: The words a "could not decide" title ends with, the same as an Alfa
+#: cantTell issue's, so one idea has one phrase in the report.
+_CANT_TELL_TITLE_SUFFIX = ", a person must decide"
+
+
+def axe_rule_id(issue_key: str) -> str:
+    """The axe rule id an ``axe:`` issue key names, without its outcome."""
+    return issue_key.removeprefix("axe:").removesuffix(AXE_CANT_TELL_SUFFIX)
+
+
+def _axe_cant_tell_card(card: dict[str, Any], fallback_title: str | None) -> dict[str, Any]:
+    """An axe rule's card, reworded for occurrences axe could not decide.
+
+    The card's "what is happening" text says the rule failed ("the contrast
+    ... is too low"), which axe did not find. That text is replaced, and a
+    first fix step says to check by hand before fixing. The rest of the card
+    (criterion, who it affects, why it matters, how to fix) still applies.
+    """
+    base = str(card.get("title") or fallback_title or "Rule check (axe)")
+    title = base if base.endswith(_CANT_TELL_TITLE_SUFFIX) else f"{base}{_CANT_TELL_TITLE_SUFFIX}"
+    steps = [str(step) for step in card.get("fix_steps") or []]
+    return {
+        **card,
+        "title": title,
+        "what_happening": (
+            "The rule check (axe) could not decide whether these elements meet the "
+            "rule, so it did not report them as failures. Each occurrence says why, "
+            "for example text over a background image whose colors axe cannot measure."
+        ),
+        "fix_steps": [
+            "Check each element on the page by hand. If it meets the rule, record "
+            "that it is not a problem. If it does not, fix it as the next steps say.",
+            *steps,
+        ],
+    }
+
+
 def get_issue_detail(
     conn: sqlite3.Connection,
     scan_id: int,
@@ -421,6 +522,7 @@ def get_issue_detail(
 
     ``issue_key`` shape:
       * ``axe:<rule_id>`` , e.g. ``axe:color-contrast``
+      * ``axe:<rule_id>:cant_tell``, what axe could not decide ("needs review")
       * ``alfa:<rule_id>:<outcome>``, explicit ``failed`` / ``cant_tell`` subgroup
       * ``image:<classification>_<adequacy>``, e.g. ``image:essential_missing``
 
@@ -490,7 +592,7 @@ def detail_for_row(
     # one last look at the grouped data.
     help_url: str | None = meta.get("help_url") or row.help_url
     if row.pipeline == "axe" and not help_url:
-        rule_id = row.issue_key.removeprefix("axe:")
+        rule_id = axe_rule_id(row.issue_key)
         groups = a11y_queries.grouped_by_rule(conn, scan_id)
         match = next((g for g in groups if g["rule_id"] == rule_id), None)
         if match:
@@ -545,16 +647,24 @@ def rule_meta_for(row: IssueRow, rules: dict[str, Any]) -> dict[str, Any]:
     # The yaml-loaded dicts are typed as `Any` at this depth, coerce
     # via `dict(...)` so mypy sees a concrete dict[str, Any] return.
     if row.pipeline == "axe":
-        rule_id = row.issue_key.removeprefix("axe:")
+        rule_id = axe_rule_id(row.issue_key)
         meta = rules.get("axe_rules", {}).get(rule_id, {})
-        return dict(meta) if isinstance(meta, dict) else {}
+        card = dict(meta) if isinstance(meta, dict) else {}
+        if row.issue_key.endswith(AXE_CANT_TELL_SUFFIX):
+            return _axe_cant_tell_card(card, row.title)
+        return card
     if row.pipeline == "semantic":
         # `semantic:<sc>` → look up the SC in the semantic_criteria
         # YAML block we added in Phase 9.1.
         sc = row.issue_key.removeprefix("semantic:")
         meta = rules.get("semantic_criteria", {}).get(sc, {})
         return dict(meta) if isinstance(meta, dict) else {}
-    if row.pipeline in ("keyboard", "responsive", "focus", "visual"):
+    if row.pipeline == "markup":
+        # One card per page code rule: two of its rules share WCAG 1.3.1 and
+        # one has no criterion, so a card keyed by criterion cannot tell them
+        # apart.
+        return _markup_card(rules, row.issue_key.removeprefix("markup:"))
+    if row.pipeline in ("keyboard", "responsive", "focus", "visual", "forms"):
         # Dynamic-probe rows are carded by SC (one YAML card covers
         # several rule_ids, e.g. all three keyboard-trap shapes).
         # Check semantic_criteria first (where 2.1.2 and the responsive
@@ -571,6 +681,12 @@ def rule_meta_for(row: IssueRow, rules: dict[str, Any]) -> dict[str, Any]:
     image_key = row.issue_key.removeprefix("image:")
     meta = rules.get("image_findings", {}).get(image_key, {})
     return dict(meta) if isinstance(meta, dict) else {}
+
+
+def _markup_card(rules: dict[str, Any], rule_id: str) -> dict[str, Any]:
+    """A page code rule's card from ``markup_rules``, or {} for an unknown rule."""
+    card = rules.get("markup_rules", {}).get(rule_id, {})
+    return dict(card) if isinstance(card, dict) else {}
 
 
 # Card fields an Alfa issue does not take: it keeps its own title and the
@@ -617,6 +733,8 @@ def _pages_for_issue(
         "responsive",
         "focus",
         "visual",
+        "forms",
+        "markup",
         "protected_image",
     ):
         # Every DOM pipeline lives in page_a11y_findings. The row's
@@ -634,7 +752,13 @@ def _pages_for_issue(
                    p.title AS page_title,
                    COUNT(*) AS occurrence_count,
                    GROUP_CONCAT(a.status) AS statuses,
-                   GROUP_CONCAT(a.screenshot_hash) AS screenshot_hashes
+                   -- "after:before" per finding with a screenshot, so the two
+                   -- lists stay paired; GROUP_CONCAT skips the NULLs.
+                   GROUP_CONCAT(
+                       CASE WHEN a.screenshot_hash IS NOT NULL
+                            THEN a.screenshot_hash || ':' || COALESCE(a.before_screenshot_hash, '')
+                       END
+                   ) AS screenshot_pairs
               FROM page_a11y_findings a
               JOIN pages p ON p.id = a.page_id
              WHERE a.scan_id = ?
@@ -670,6 +794,7 @@ def _pages_for_issue(
             (*row.finding_ids, scan_id),
         ).fetchall()
 
+    checked = _checked_counts(conn, scan_id, row)
     out: list[IssuePage] = []
     for r in rows:
         statuses = (r["statuses"] or "").split(",")
@@ -684,8 +809,10 @@ def _pages_for_issue(
         # sqlite3.Row's `in` iterates values, not keys, so we must check
         # `.keys()` explicitly (the image query lacks this column).
         row_keys = r.keys()
-        raw_shots = r["screenshot_hashes"] if "screenshot_hashes" in row_keys else None
-        shots = tuple(h for h in (raw_shots or "").split(",") if h and h != "None")
+        raw_shots = r["screenshot_pairs"] if "screenshot_pairs" in row_keys else None
+        pairs = [pair.partition(":") for pair in (raw_shots or "").split(",") if pair]
+        shots = tuple(after for after, _, _before in pairs if after and after != "None")
+        befores = tuple((before or None) for after, _, before in pairs if after and after != "None")
         out.append(
             IssuePage(
                 page_id=int(r["page_id"]),
@@ -694,9 +821,56 @@ def _pages_for_issue(
                 occurrence_count=int(r["occurrence_count"]),
                 status_summary=counts,
                 screenshot_hashes=shots,
+                before_screenshot_hashes=befores,
+                checked_count=checked.get(int(r["page_id"]), (0, 0))[0],
+                reported_count=checked.get(int(r["page_id"]), (0, 0))[1],
             )
         )
     return out
+
+
+def _checked_counts(
+    conn: sqlite3.Connection, scan_id: int, row: IssueRow
+) -> dict[int, tuple[int, int]]:
+    """Per page, how many of this issue's occurrences a person has checked,
+    and how many of those they reported: ``page_id -> (checked, reported)``.
+
+    The occurrences are the ones ``_pages_for_issue`` counts: the row's
+    finding ids for a DOM pipeline, and each placement of the row's images
+    on a page for the image pipeline (the unit the inspector reviews). A
+    database whose review table is missing or out of date counts none, so
+    the pages table still loads.
+    """
+    if not row.finding_ids:
+        return {}
+    ids = json.dumps(list(row.finding_ids))
+    if row.pipeline == "image":
+        sql = """
+            SELECT pi.page_id, COUNT(*), SUM(r.decision = 'report')
+              FROM occurrence_reviews r
+              JOIN page_images pi ON pi.id = r.page_image_id
+              JOIN findings f ON f.image_id = pi.image_id AND f.scan_id = r.scan_id
+             WHERE r.scan_id = ? AND r.decision IS NOT NULL
+               AND f.id IN (SELECT value FROM json_each(?))
+             GROUP BY pi.page_id
+        """
+    else:
+        sql = """
+            SELECT a.page_id, COUNT(*), SUM(r.decision = 'report')
+              FROM occurrence_reviews r
+              JOIN page_a11y_findings a ON a.id = r.a11y_finding_id
+             WHERE r.scan_id = ? AND r.decision IS NOT NULL
+               AND a.id IN (SELECT value FROM json_each(?))
+             GROUP BY a.page_id
+        """
+    try:
+        return {
+            int(page_id): (int(checked), int(reported or 0))
+            for page_id, checked, reported in conn.execute(sql, (scan_id, ids))
+        }
+    except sqlite3.OperationalError as exc:
+        log.warning("issues.checked_counts_unreadable", error=str(exc))
+        return {}
 
 
 def _sort_pages(pages: list[IssuePage], sort: str) -> list[IssuePage]:
@@ -840,6 +1014,7 @@ def _axe_issue_rows(
     rules: dict[str, Any],
     *,
     wcag_version: WcagVersion,
+    open_locations_first: bool = False,
 ) -> list[IssueRow]:
     """One row per ``rule_id`` group from the page_a11y_findings table.
 
@@ -888,13 +1063,15 @@ def _axe_issue_rows(
             # merely because a third-party rule id happens to collide; an
             # Alfa rule has its own card, for guidance only.
             meta = _alfa_guidance(rules, raw_rule_id)
+        elif pipeline == "markup":
+            meta = _markup_card(rules, raw_rule_id)
         else:
             meta = axe_rules_meta.get(raw_rule_id, {})
             # A browser check's card is keyed by its criterion. An axe rule
             # with no card of its own borrows nothing: another criterion's
             # card is about a different check (the AI review's 3.3.2 card,
             # say) and would misdescribe the rule check (axe).
-            if not meta and pipeline in ("keyboard", "responsive", "focus", "visual"):
+            if not meta and pipeline in ("keyboard", "responsive", "focus", "visual", "forms"):
                 sc_from_db = g.get("wcag_sc")
                 if sc_from_db:
                     meta = axe_rules_meta.get(sc_from_db, {}) or semantic_meta.get(sc_from_db, {})
@@ -928,6 +1105,9 @@ def _axe_issue_rows(
         review_lane: ReviewLane = "expert_review"
         evidence_confidence: EvidenceConfidence = "medium"
         evidence_summary = "A check found this, but a person must confirm it on the page."
+        # A title that wins over the guidance card's, which is chosen by WCAG
+        # criterion and so cannot tell two rules of one criterion apart.
+        own_title: str | None = None
         high_confidence_occurrences = 0
         if pipeline == "semantic":
             sc = raw_rule_id.removeprefix("semantic:")
@@ -1009,6 +1189,53 @@ def _axe_issue_rows(
                 "Found by moving keyboard focus through the page in a browser. Check it "
                 "by hand, including after you open menus and dialogs."
             )
+        elif pipeline == "forms":
+            issue_key = f"{pipeline}:{raw_rule_id}"
+            default_title = forms_base.TITLE_NOT_DESCRIBED
+            evidence_summary = (
+                "Found by pressing the form's submit button once, with nothing typed, while "
+                "Axcess stopped the form from being sent. Check by hand that each error "
+                "names its field in text."
+            )
+            # How sure (the developer's decision, 2026-11-05;
+            # docs/internal/form-error-check.md): a clear failure is Mostly sure,
+            # one with an undecided sign Not sure. The old rule, from reports made
+            # before the split, keeps Not sure, so an old report reads as it did.
+            if raw_rule_id == forms_base.RULE_CLEAR:
+                review_lane = "likely_barrier"
+                evidence_confidence = "high"
+                high_confidence_occurrences = len(reported)
+                evidence_summary = (
+                    "Found by pressing the form's submit button once, with nothing typed. The "
+                    "form marked a field in error, or showed a general error message, and no "
+                    "text names the field and says what is wrong. Check it on the page."
+                )
+            elif raw_rule_id == forms_base.RULE_UNCLEAR:
+                own_title = forms_base.TITLE_UNCLEAR
+                evidence_summary = (
+                    "Found by pressing the form's submit button once, with nothing typed. The "
+                    "page did something an expert has yet to decide counts as describing the "
+                    "error, such as a 'Required' hint turning red or text only screen readers "
+                    "get. A person checks it."
+                )
+        elif pipeline == "markup":
+            issue_key = f"{pipeline}:{raw_rule_id}"
+            # How sure, and what the evidence is, come from the rule itself
+            # (``audit.analyzer.markup.base.RULES``), so each rule decides its
+            # own lane in one place. A rule this version does not know keeps
+            # the cautious default: Not sure.
+            markup_rule = markup_base.rule_for(raw_rule_id)
+            default_title = markup_rule.title if markup_rule else f"Page code: {raw_rule_id}"
+            evidence_summary = (
+                "The page code check found this by reading the page code (DOM). "
+                "Check it on the page."
+            )
+            if markup_rule is not None:
+                review_lane = markup_rule.review_lane
+                evidence_confidence = markup_rule.evidence_confidence
+                evidence_summary = markup_rule.evidence_summary
+                if review_lane == "likely_barrier":
+                    high_confidence_occurrences = len(reported)
         elif pipeline == "visual":
             issue_key = f"{pipeline}:{raw_rule_id}"
             if legacy_visual_motion_observation:
@@ -1119,6 +1346,18 @@ def _axe_issue_rows(
                     "ACT outcome is resolved."
                 ),
             )
+        elif g.get("outcome_group") == "cant_tell":
+            # axe's "needs review" (incomplete): axe could not decide, so the
+            # row stays Not sure at medium confidence, like an Alfa cantTell,
+            # and never shares a key, count or bulk action with a failure.
+            issue_key = f"axe:{raw_rule_id}{AXE_CANT_TELL_SUFFIX}"
+            meta = _axe_cant_tell_card(meta, g.get("help"))
+            default_title = str(meta["title"])
+            evidence_summary = (
+                f"The rule check (axe) could not decide on {len(reported)} "
+                f"occurrence{'' if len(reported) == 1 else 's'}. That is not a failure. "
+                "Check the element on the page."
+            )
         else:
             issue_key = f"axe:{raw_rule_id}"
             default_title = f"axe rule: {raw_rule_id}"
@@ -1142,7 +1381,8 @@ def _axe_issue_rows(
             IssueRow(
                 pipeline=pipeline,
                 issue_key=issue_key,
-                title=meta.get("title")
+                title=own_title
+                or meta.get("title")
                 or (
                     default_title
                     if pipeline in {"alfa", "protected_image", "visual"}
@@ -1156,6 +1396,11 @@ def _axe_issue_rows(
                 wcag_sc=wcag_sc,
                 wcag_name=meta.get("wcag_name")
                 or (_alfa_criterion_name(g.get("help")) if pipeline == "alfa" else None),
+                also_wcag=(
+                    _also_wcag(g.get("wcag_scs"), wcag_sc)
+                    if wcag_sc and wcag_sc == g.get("wcag_sc")
+                    else ()
+                ),
                 responsibility=(meta.get("owner") or "dev"),
                 abilities_affected=tuple(meta.get("abilities_affected") or []),
                 difficulty=_EFFORT_TO_DIFFICULTY.get(meta.get("effort", ""), "Unknown"),
@@ -1163,7 +1408,12 @@ def _axe_issue_rows(
                 page_count=len(reported_pages),
                 # Priority measures reach: a shared component that fails on
                 # every page is more urgent, not less, for being one element.
-                priority=_priority(impact, len(reported_pages | repeat_pages)),
+                priority=_priority(
+                    impact,
+                    len(reported_pages | repeat_pages),
+                    len(reported),
+                    evidence_confidence,
+                ),
                 impact=impact,
                 status_summary=reported_statuses,
                 # Deep-link to the dedicated Issue Detail view (the
@@ -1196,7 +1446,10 @@ def _axe_issue_rows(
                 fix_steps=tuple(meta.get("fix_steps") or alfa_fix_steps),
                 acceptance=meta.get("acceptance"),
                 help_url=meta.get("help_url") or g.get("help_url") or None,
-                locations=_a11y_location_samples(reported, scan_id=scan_id),
+                locations=_a11y_location_samples(
+                    _open_first(reported) if open_locations_first else reported,
+                    scan_id=scan_id,
+                ),
                 repeat_finding_ids=tuple(int(f["id"]) for f in repeats),
                 repeat_page_count=len(repeat_pages),
                 finding_types=_dom_finding_types(pipeline, len(reported), click_through),
@@ -1285,6 +1538,8 @@ def _image_issue_rows(
     conn: sqlite3.Connection,
     scan_id: int,
     rules: dict[str, Any],
+    *,
+    open_locations_first: bool = False,
 ) -> list[IssueRow]:
     """One row per ``(classification, alt_adequacy)`` group."""
     groups = image_findings_queries.grouped_by_remediation(conn, scan_id)
@@ -1346,7 +1601,12 @@ def _image_issue_rows(
                 difficulty=_EFFORT_TO_DIFFICULTY.get(meta.get("effort", ""), "Unknown"),
                 occurrence_count=g.get("occurrence_count", g["finding_count"]),
                 page_count=len(page_ids),
-                priority=_priority(worst_severity, len(page_ids)),
+                priority=_priority(
+                    worst_severity,
+                    len(page_ids),
+                    int(g.get("occurrence_count", g["finding_count"])),
+                    evidence_confidence,
+                ),
                 impact=worst_severity,
                 status_summary=status_summary,
                 # Deep-link to the dedicated Issue Detail view, same
@@ -1362,7 +1622,10 @@ def _image_issue_rows(
                 fix_steps=tuple(meta.get("fix_steps") or ()),
                 acceptance=meta.get("acceptance"),
                 help_url=meta.get("help_url"),
-                locations=_image_location_samples(findings, scan_id=scan_id),
+                locations=_image_location_samples(
+                    _open_first(findings) if open_locations_first else findings,
+                    scan_id=scan_id,
+                ),
                 finding_types=("alt_text",),
             )
         )
@@ -1372,6 +1635,16 @@ def _image_issue_rows(
 # --------------------------------------------------------------------------
 # Helpers.
 # --------------------------------------------------------------------------
+
+
+#: Occurrence statuses that still need work.
+_OPEN_STATUSES = frozenset({"new", "reviewing", "in_progress"})
+
+
+def _open_first(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The same findings, open ones first, each half in its original order."""
+
+    return sorted(findings, key=lambda finding: str(finding.get("status")) not in _OPEN_STATUSES)
 
 
 def _a11y_location_samples(
@@ -1448,6 +1721,7 @@ def _image_location_samples(
                     target=f"Image occurrence {position + 1} ({placement})",
                     context=" · ".join(context_parts)[:300] or None,
                     evidence_url=f"/scans/{scan_id}/pages/{page_id}",
+                    image_url=str(finding["image_url"]) if finding.get("image_url") else None,
                 )
             )
             if len(samples) >= limit:
@@ -1464,18 +1738,53 @@ def _conformance_label(wcag_level: str | None) -> ConformanceLabel:
 _CONFORMANCE_RANK = {"A": 0, "AA": 1, "AAA": 2, "BP": 3}
 
 
-def _priority(impact: str | None, page_count: int) -> float:
-    """Severity weight x log(1 + pages_affected). Cheap and honest.
+# Priority starts from the impact rating, so the Priority column agrees with
+# the Impact column; reach and occurrence count only adjust it, and how sure
+# Axcess is scales it last. The old formula (weight x ln(1 + pages)) rated a
+# critical problem on one page Low (2.77) and an unconfirmed serious lead on
+# ten pages High (7.19): spread outweighed both the impact rating and the
+# evidence. Bands stay High >= 6 and Medium >= 3 (priorityTier in the UI).
+_PRIORITY_BASE = {
+    "critical": 6.0,  # High on its own, on a single page
+    "serious": 4.0,  # Medium; High from about 8 pages
+    "moderate": 2.5,  # Low on one page; Medium from 2 pages
+    "minor": 1.0,
+    # Image-finding severities on the same scale.
+    "major": 4.0,
+    "info": 1.0,
+}
+_PRIORITY_REACH_CAP = 3.0  # ln(pages); reached at about 20 pages
+_PRIORITY_OCCURRENCE_WEIGHT = 0.25
+_PRIORITY_OCCURRENCE_CAP = 1.0
+# "Not sure" (medium) can reach Medium but never High: the maximum raw score
+# is 6 + 3 + 1 = 10, and 10 x 0.55 = 5.5. "For information" (low) stays Low:
+# 10 x 0.25 = 2.5. A lead a person has not confirmed must not outrank a
+# confirmed barrier of the same impact.
+_PRIORITY_CONFIDENCE_FACTOR = {"high": 1.0, "medium": 0.55, "low": 0.25}
 
-    The weight is the same scale we use everywhere else
-    (4 critical → 1 minor). Multiplying by ``log(1 + page_count)`` gives
-    spread credit without letting one rule with thousands of pages
-    drown out a critical-but-narrow issue.
+
+def _priority(
+    impact: str | None,
+    page_count: int,
+    occurrence_count: int = 1,
+    confidence: str = "high",
+) -> float:
+    """Impact first, adjusted by reach and occurrences, scaled by confidence.
+
+    ``base(impact) + min(3, ln(pages)) + min(1, 0.25 x ln(occurrences))``,
+    times 1.0 / 0.55 / 0.25 for high / medium / low evidence confidence.
+    A rating Axcess does not know (Alfa has none) counts as minor.
     """
     import math
 
-    weight = _SEVERITY_WEIGHT.get(impact or "", 1.0)
-    return round(weight * math.log1p(page_count), 3)
+    base = _PRIORITY_BASE.get(impact or "", 1.0)
+    reach = min(_PRIORITY_REACH_CAP, math.log(max(1, page_count)))
+    occurrences = min(
+        _PRIORITY_OCCURRENCE_CAP,
+        _PRIORITY_OCCURRENCE_WEIGHT * math.log(max(1, occurrence_count)),
+    )
+    factor = _PRIORITY_CONFIDENCE_FACTOR.get(confidence, 1.0)
+    return round((base + reach + occurrences) * factor, 3)
 
 
 def _humanize_image_title(classification: str, adequacy: str) -> str:
@@ -1549,10 +1858,13 @@ def _load_rules() -> dict[str, Any]:
 
 # Re-export.
 __all__ = [
+    "AXE_CANT_TELL_SUFFIX",
     "IssueDetail",
     "IssuePage",
     "IssueRow",
+    "WcagRef",
     "abilities_breakdown",
+    "axe_rule_id",
     "conformance_breakdown",
     "detail_for_row",
     "filter_and_sort",

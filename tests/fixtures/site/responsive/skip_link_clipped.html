@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skip link clipped while focused fixture (SC 1.4.4)</title>
+  <style>
+    /* A skip link that appears on focus but in a fixed 120px box with
+       overflow hidden, so a sighted keyboard user sees it cut off. It is
+       hidden until focused, so only the focus pass can find it. */
+    body { margin: 0; font-family: sans-serif; }
+    main { padding: 1rem; max-width: 60ch; }
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border-width: 0;
+    }
+    .skip:focus {
+      position: absolute; top: 0; left: 0; width: 120px; height: auto;
+      margin: 0; clip: auto; overflow: hidden; white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+  <a id="skip" class="sr-only skip" href="#main">Skip to main content and the search results</a>
+  <main id="main">
+    <h1>A skip link that stays cut off</h1>
+    <p>Everything else on the page wraps normally.</p>
+  </main>
+</body>
+</html>

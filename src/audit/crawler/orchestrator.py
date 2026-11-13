@@ -34,9 +34,10 @@ from audit.analyzer.alfa import (
     chromium_executable_path,
 )
 from audit.analyzer.alfa import availability as alfa_availability
-from audit.analyzer.axe import AxeAnalyzer, AxeViolation
+from audit.analyzer.axe import AxeAnalyzer, AxeViolation, bundled_axe_version
 from audit.analyzer.axe import Level as AxeLevel
 from audit.analyzer.focus import FocusFinding, FocusProbe
+from audit.analyzer.forms import ErrorIdentificationProbe, FormFinding
 from audit.analyzer.interaction import (
     DEFAULT_BLOCKED_LABELS,
     InteractionProbe,
@@ -44,6 +45,7 @@ from audit.analyzer.interaction import (
     StateCapture,
 )
 from audit.analyzer.keyboard import KeyboardProbe, KeyboardTrap
+from audit.analyzer.markup import MarkupFinding, MarkupProbe
 from audit.analyzer.ocr.pool import OcrPool
 from audit.analyzer.responsive import ResponsiveFinding, ResponsiveProbe
 from audit.analyzer.visual import VisualFinding, VisualProbe
@@ -251,6 +253,10 @@ class CrawlConfig:
         "1.2.1",  # Audio-only (prerecorded) transcript presence
     )
     semantic_concurrency: int = 1
+    # One text model for every semantic check, chosen by the desktop AI
+    # setup for this computer's size. ``None`` keeps the per-criterion
+    # picks in ``analyzer_models.yaml``.
+    semantic_model: str | None = None
     # SC 2.1.2 keyboard-exit probe. Default ON, but intentionally partial:
     # only repeated bidirectional exit failure on the same observable element
     # becomes a review lead. Cost is bounded (≤ max_focusable*2+4 forward
@@ -270,6 +276,23 @@ class CrawlConfig:
     # (focuses each element, checks for a sticky/fixed overlay over its
     # centre); no model. Default on; disable with ``--skip-focus``.
     focus_checks_enabled: bool = True
+    # Page code check: deterministic questions about the rendered page code
+    # that axe-core does not ask (a field named only by its placeholder, a
+    # label tied to no field, a title that repeats the text, text styled as
+    # a heading). Reads the page right after axe and changes nothing; no
+    # model. Default on; disable with ``--skip-markup``.
+    markup_checks_enabled: bool = True
+    # SC 3.3.1 Error Identification, form error check. Presses each form's
+    # submit control once, empty, inside the network guard, and reports a
+    # form that detects an error without describing it in text. Off by
+    # default until it is validated on real forms
+    # (docs/internal/form-error-check.md); public scans only.
+    form_error_checks_enabled: bool = False
+    # Let that check send a form to the site when every field it can see is
+    # empty, and judge the page the site sends back. Off unless the person
+    # starting the scan chose it; public scans only. Without it, a form the
+    # site checks only on its server is "not checked".
+    form_send_empty_forms: bool = False
     # SC 1.3.2 Meaningful Sequence, visual (VLM) probe. Screenshots the page
     # and asks a local vision model whether the visual reading order matches
     # the DOM order. Needs Ollama + a vision model; no-ops cleanly without
@@ -370,6 +393,9 @@ class CrawlSummary:
     responsive_findings_total: int = 0
     focus_pages_probed: int = 0
     focus_findings_total: int = 0
+    markup_pages_checked: int = 0
+    markup_findings_total: int = 0
+    form_error_findings_total: int = 0
     visual_pages_probed: int = 0
     visual_findings_total: int = 0
     interaction_pages_probed: int = 0
@@ -537,6 +563,17 @@ async def run_crawl(
     focus_probe: FocusProbe | None = None
     if config.focus_checks_enabled:
         focus_probe = FocusProbe()
+    # Page code check, default on. Read-only and stateless.
+    markup_probe: MarkupProbe | None = None
+    if config.markup_checks_enabled:
+        markup_probe = MarkupProbe()
+    # SC 3.3.1 form error check, off by default. One per crawl, so a form
+    # repeated on every page (a footer sign-up) is checked once.
+    form_error_probe = (
+        ErrorIdentificationProbe(send_empty=config.form_send_empty_forms)
+        if config.form_error_checks_enabled
+        else None
+    )
     # Visual pipeline probe. SC 2.2.2 (motion) is deterministic and always
     # runs; SC 1.3.2 (meaningful sequence) needs a vision model, so we attach
     # the provider only when one is reachable (else that check no-ops).
@@ -581,8 +618,10 @@ async def run_crawl(
             keyboard_probe=keyboard_probe,
             responsive_probe=responsive_probe,
             focus_probe=focus_probe,
+            markup_probe=markup_probe,
             visual_probe=visual_probe,
             interaction_probe=interaction_probe,
+            form_error_probe=form_error_probe,
             capture_screenshots=config.capture_screenshots,
             headless=config.browser_headless,
             search_explorer=build_search_explorer(config, axe_analyzer),
@@ -837,6 +876,8 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             "vlm_enabled": config.vlm_enabled,
             "axe_enabled": config.axe_enabled,
             "axe_level": config.axe_level,
+            # Which axe-core rule set the scan ran. Absent from older reports.
+            "axe_core_version": bundled_axe_version() if config.axe_enabled else None,
             # Stored as given; readers go through ``stored_wcag_version``.
             "wcag_version": config.wcag_version,
             "alfa_enabled": config.alfa_enabled,
@@ -846,12 +887,18 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             "keyboard_probe_enabled": config.keyboard_probe_enabled,
             "responsive_checks_enabled": config.responsive_checks_enabled,
             "focus_checks_enabled": config.focus_checks_enabled,
+            "markup_checks_enabled": config.markup_checks_enabled,
+            "form_error_checks_enabled": config.form_error_checks_enabled,
+            "form_send_empty_forms": config.form_send_empty_forms,
             "visual_checks_enabled": config.visual_checks_enabled,
             "interaction_checks_enabled": config.interaction_checks_enabled,
             # 1: scan-level probed/states counters are persisted.
             # 2: adds the per-page scan_interaction_runs ledger, so a
             # report may state controls operated and the bounds hit.
             "interaction_coverage_version": 2,
+            # 1: the form error check's scan counts are kept (migration 0036),
+            # so a zero is a count, not a missing record.
+            "form_check_coverage_version": 1,
             "interaction_safety_version": 1,
             "interaction_max_clicks": config.interaction_max_clicks,
             "interaction_max_repeated": config.interaction_max_repeated,
@@ -950,8 +997,10 @@ class _LazyJs:
         keyboard_probe: KeyboardProbe | None = None,
         responsive_probe: ResponsiveProbe | None = None,
         focus_probe: FocusProbe | None = None,
+        markup_probe: MarkupProbe | None = None,
         visual_probe: VisualProbe | None = None,
         interaction_probe: InteractionProbe | None = None,
+        form_error_probe: ErrorIdentificationProbe | None = None,
         capture_screenshots: bool = False,
         headless: bool = True,
         search_explorer: SearchExplorer | None = None,
@@ -966,8 +1015,10 @@ class _LazyJs:
         self._keyboard_probe = keyboard_probe
         self._responsive_probe = responsive_probe
         self._focus_probe = focus_probe
+        self._markup_probe = markup_probe
         self._visual_probe = visual_probe
         self._interaction_probe = interaction_probe
+        self._form_error_probe = form_error_probe
         self._capture_screenshots = capture_screenshots
         self._headless = headless
         self._search_explorer = search_explorer
@@ -983,8 +1034,10 @@ class _LazyJs:
                 keyboard_probe=self._keyboard_probe,
                 responsive_probe=self._responsive_probe,
                 focus_probe=self._focus_probe,
+                markup_probe=self._markup_probe,
                 visual_probe=self._visual_probe,
                 interaction_probe=self._interaction_probe,
+                form_error_probe=self._form_error_probe,
                 capture_screenshots=self._capture_screenshots,
                 headless=self._headless,
                 search_explorer=self._search_explorer,
@@ -1144,17 +1197,17 @@ async def _build_semantic_analyzers(
     from audit.analyzer.semantic.ollama_text import OllamaTextProvider
     from audit.analyzer.semantic.registry import build_analyzers
 
-    default_pick = get_pick(None, kind="text")
+    default_model = config.semantic_model or get_pick(None, kind="text").primary
     provider = OllamaTextProvider(
         client,
-        model=default_pick.primary,
+        model=default_model,
         base_url=config.vlm_base_url,
         concurrency=config.semantic_concurrency,
     )
     if not await provider.healthy():
         log.warning(
             "semantic.unavailable",
-            model=default_pick.primary,
+            model=default_model,
             base_url=config.vlm_base_url,
             hint=(
                 "Ollama daemon not running or model not pulled; "
@@ -1163,7 +1216,9 @@ async def _build_semantic_analyzers(
         )
         return None, []
 
-    analyzers = build_analyzers(config.semantic_criteria, provider)
+    analyzers = build_analyzers(
+        config.semantic_criteria, provider, model_override=config.semantic_model
+    )
     if not analyzers:
         log.warning(
             "semantic.no_registered_analyzers",
@@ -1213,6 +1268,8 @@ def _tracked_checks(ctx: _WorkerContext) -> list[str]:
     if ctx.js is not None:
         if config.axe_enabled:
             checks.append("axe")
+        if config.markup_checks_enabled:
+            checks.append("markup")
         if config.keyboard_probe_enabled:
             checks.append("keyboard")
         if config.responsive_checks_enabled:
@@ -1484,6 +1541,27 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
                 page_id=page_id,
                 findings=result.focus_findings,
                 screenshots=result.screenshots,
+            )
+
+        # Page code check. Rows tagged ``pipeline='markup'``; the page is
+        # counted only when the check ran on it.
+        if render_mode == "js" and ctx.config.markup_checks_enabled and result.markup_check_ran:
+            _persist_markup(
+                ctx,
+                page_id=page_id,
+                findings=result.markup_findings,
+                screenshots=result.screenshots,
+            )
+
+        # SC 3.3.1 form error check. Rows tagged ``pipeline='forms'``.
+        if render_mode == "js" and ctx.config.form_error_checks_enabled:
+            _persist_form_errors(
+                ctx,
+                page_id=page_id,
+                findings=result.form_findings,
+                screenshots=result.form_screenshots,
+                ran=result.form_check_ran,
+                outcomes=result.form_outcomes,
             )
 
         # SC 1.3.2 visual probe. Rows tagged ``pipeline='visual'``.
@@ -1864,7 +1942,11 @@ def _store_screenshot(
     Returns its content hash, or ``None`` when there's no screenshot for
     this finding or the store write fails.
     """
-    png = screenshots.get(target_hash)
+    return _store_png(ctx, screenshots.get(target_hash), target_hash)
+
+
+def _store_png(ctx: _WorkerContext, png: bytes | None, target_hash: str) -> str | None:
+    """Persist one screenshot's PNG bytes; its content hash, or ``None``."""
     if not png:
         return None
     try:
@@ -1938,6 +2020,7 @@ def _persist_axe(
                 html_snippet=v.html_snippet,
                 target_hash=v.target_hash,
                 screenshot_hash=_store_screenshot(ctx, v.target_hash, screenshots),
+                engine_outcome=v.outcome,
             )
         except sqlite3.Error as exc:
             # One bad row must not kill the rest of the page's findings.
@@ -1947,14 +2030,17 @@ def _persist_axe(
                 page_id=page_id,
                 error=str(exc),
             )
+    # The scan's violation total counts failures only. A "needs review"
+    # result is not a violation; it reaches the report as a Not sure issue.
+    failed = sum(1 for v in violations if v.outcome == "failed")
     repo.increment_scan_axe_counters(
         ctx.conn,
         scan_id=ctx.scan_id,
         pages_delta=1,
-        violations_delta=len(violations),
+        violations_delta=failed,
     )
     ctx.summary.axe_pages_scanned += 1
-    ctx.summary.axe_violations_total += len(violations)
+    ctx.summary.axe_violations_total += failed
 
 
 @_batched_writes
@@ -2032,6 +2118,7 @@ def _persist_interaction(
                 screenshot_hash=_store_screenshot(ctx, v.target_hash, screenshots),
                 revealed_by=revealed.revealed_by,
                 revealed_state_key=revealed.state_key or None,
+                engine_outcome=v.outcome,
             )
         except sqlite3.Error as exc:
             log.warning(
@@ -2045,16 +2132,18 @@ def _persist_interaction(
     # counter claims. pages_delta stays 0: the page was already counted as
     # axe-scanned by the load-state pass, and counting it twice would make
     # "pages scanned" exceed the number of pages.
+    # Failures only, as at load: a "needs review" result is not a violation.
+    failed = sum(1 for revealed in findings if revealed.violation.outcome == "failed")
     repo.increment_scan_axe_counters(
         ctx.conn,
         scan_id=ctx.scan_id,
         pages_delta=0,
-        violations_delta=len(findings),
+        violations_delta=failed,
     )
     # Mirrored into the in-memory summary so the CLI table and the DB
     # cannot disagree, with the interaction-specific counters kept
     # alongside so the report can still say how much clicking bought.
-    ctx.summary.axe_violations_total += len(findings)
+    ctx.summary.axe_violations_total += failed
     ctx.summary.interaction_pages_probed += int(count_page)
     ctx.summary.interaction_findings_total += len(findings)
     # States reached, not findings produced: a clean revealed state is still
@@ -2230,6 +2319,82 @@ def _persist_focus(
             )
     ctx.summary.focus_pages_probed += 1
     ctx.summary.focus_findings_total += len(findings)
+
+
+@_batched_writes
+def _persist_markup(
+    ctx: _WorkerContext,
+    *,
+    page_id: int,
+    findings: tuple[MarkupFinding, ...],
+    screenshots: Mapping[str, bytes],
+) -> None:
+    """Write page code check findings and count the page (migration 0038).
+
+    Counted even when nothing was found, so the report can say how many
+    pages the check ran on.
+    """
+    for f in findings:
+        try:
+            repo.upsert_markup_finding(
+                ctx.conn,
+                page_id=page_id,
+                scan_id=ctx.scan_id,
+                screenshot_hash=_store_screenshot(ctx, f.target_hash, screenshots),
+                **f.to_repo_kwargs(),
+            )
+        except sqlite3.Error as exc:
+            log.warning(
+                "markup.persist_failed",
+                rule_id=f.rule_id,
+                page_id=page_id,
+                error=str(exc),
+            )
+    repo.increment_scan_method_coverage(ctx.conn, scan_id=ctx.scan_id, method="markup")
+    ctx.summary.markup_pages_checked += 1
+    ctx.summary.markup_findings_total += len(findings)
+
+
+@_batched_writes
+def _persist_form_errors(
+    ctx: _WorkerContext,
+    *,
+    page_id: int,
+    findings: tuple[FormFinding, ...],
+    screenshots: Mapping[str, tuple[bytes | None, bytes | None]] | None = None,
+    ran: bool = False,
+    outcomes: Mapping[str, int] | None = None,
+) -> None:
+    """Write the form error check's findings (SC 3.3.1), each with its form's
+    screenshots before and after the press when the scan took them: the
+    after picture as the finding's screenshot, the before one beside it."""
+    for f in findings:
+        before, after = (screenshots or {}).get(f.target_hash, (None, None))
+        try:
+            repo.upsert_keyboard_finding(
+                ctx.conn,
+                page_id=page_id,
+                scan_id=ctx.scan_id,
+                screenshot_hash=_store_png(ctx, after, f.target_hash),
+                before_screenshot_hash=_store_png(ctx, before, f.target_hash),
+                **f.to_repo_kwargs(),
+            )
+        except sqlite3.Error as exc:
+            log.warning("forms.persist_failed", page_id=page_id, error=str(exc))
+    ctx.summary.form_error_findings_total += len(findings)
+    if ran:
+        counts = dict(outcomes or {})
+        skipped = counts.pop("skipped", 0)
+        try:
+            repo.record_form_check(
+                ctx.conn,
+                scan_id=ctx.scan_id,
+                pressed=sum(counts.values()),
+                skipped=skipped,
+                not_checked=counts.get("not_checked", 0),
+            )
+        except sqlite3.Error as exc:
+            log.warning("forms.count_failed", page_id=page_id, error=str(exc))
 
 
 @_batched_writes

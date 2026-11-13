@@ -65,7 +65,10 @@ const SETTING_KEYS = [
   "skip_responsive",
   "skip_semantic",
   "skip_focus",
+  "skip_markup",
   "skip_visual",
+  "skip_forms",
+  "send_empty_forms",
   "skip_rendered_storage",
   "axe_level",
   "wcag_version",
@@ -94,7 +97,21 @@ export const PUBLIC_DEFAULTS: ScanSettings = {
   skip_responsive: false,
   skip_semantic: true,
   skip_focus: false,
+  // On by default: it only reads the page code, after the rule check.
+  skip_markup: false,
   skip_visual: true,
+  // On for public websites (2026-11-02, the developer's decision, after the
+  // safety review): it presses submit buttons, with nothing typed, and
+  // nothing leaves the page meanwhile (the guard's strict mode and the socket
+  // hold, docs/internal/form-error-check.md). A clear failure is Mostly
+  // sure and an unclear one Not sure (2026-11-05, the developer's decision);
+  // it is not yet validated on real forms. Never in a sign-in scan
+  // (LOGIN_POLICY below).
+  skip_forms: false,
+  // Sending an empty form to the site is never a default: the site may act
+  // on it (a blank message emailed to someone). Chosen per scan, on a site
+  // the person owns or a test site.
+  send_empty_forms: false,
   skip_rendered_storage: false,
   axe_level: "AA",
   // The current U-M standard. 2.2 is a deliberate choice, and marks the
@@ -164,7 +181,14 @@ export const LOGIN_POLICY: ScanPolicy = {
     // them, so they stay at their defaults and are dropped at submit.
     skip_semantic: true,
     skip_focus: false,
+    // Always on in a signed-in scan (the server runs it); it only reads the
+    // page, so it is as safe there as the rule check.
+    skip_markup: false,
     skip_visual: true,
+    // Never in a signed-in session: pressing submit there could act as the
+    // person signed in, even with requests blocked.
+    skip_forms: true,
+    send_empty_forms: false,
   },
   fixedNote: FIXED_NOTE_LOGIN,
   urlLabel: URL_COPY.login.label,
@@ -304,6 +328,8 @@ export type SwitchKey =
   | "click_through"
   | "keyboard"
   | "focus"
+  | "markup"
+  | "forms"
   | "responsive"
   | "skip_rendered_storage"
   | "ocr"
@@ -320,6 +346,8 @@ const SWITCH_FIELDS: Record<SwitchKey, { field: keyof ScanSettings; inverted: bo
   click_through: { field: "skip_interaction", inverted: true },
   keyboard: { field: "skip_keyboard", inverted: true },
   focus: { field: "skip_focus", inverted: true },
+  markup: { field: "skip_markup", inverted: true },
+  forms: { field: "skip_forms", inverted: true },
   responsive: { field: "skip_responsive", inverted: true },
   skip_rendered_storage: { field: "skip_rendered_storage", inverted: false },
   ocr: { field: "skip_ocr", inverted: true },
@@ -373,6 +401,8 @@ export type CheckItem = { key: SwitchKey; group: CheckGroup; label: string; on: 
 const CHECKS: ReadonlyArray<{ key: SwitchKey; group: CheckGroup; label: string; needsBrowser?: true }> = [
   { key: "keyboard", group: "checks", label: "Keyboard traps", needsBrowser: true },
   { key: "focus", group: "checks", label: "Focus visibility", needsBrowser: true },
+  { key: "markup", group: "checks", label: "Page code", needsBrowser: true },
+  { key: "forms", group: "checks", label: "Form errors", needsBrowser: true },
   { key: "responsive", group: "checks", label: "Responsive & zoom", needsBrowser: true },
   { key: "ocr", group: "localAi", label: "Image text (OCR)" },
   { key: "vision", group: "localAi", label: "Vision model" },
@@ -411,7 +441,16 @@ export function checkCount(
  * everything else.
  */
 export function quickRetrySettings(url: string, wcagVersion: ScanSettings["wcag_version"]): ScanSettings {
-  return { ...PUBLIC_DEFAULTS, url, wcag_version: wcagVersion, skip_interaction: true };
+  // Click-Through and the form error check off: both press controls, and
+  // this retry is meant to finish fast and show whether the site scans.
+  return {
+    ...PUBLIC_DEFAULTS,
+    url,
+    wcag_version: wcagVersion,
+    skip_interaction: true,
+    skip_forms: true,
+    send_empty_forms: false,
+  };
 }
 
 /**

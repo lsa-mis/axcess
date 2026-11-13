@@ -14,12 +14,12 @@ import { api } from "../api/client";
 import {
   Button,
   Card,
+  ElementCode,
   EmptyState,
   LinkButton,
   PageHeader,
   PageLink,
   pageEvidencePath,
-  shortLocator,
   Select,
   StatCard,
 } from "../components/ui";
@@ -43,7 +43,7 @@ import {
 import { ActiveFilters, FilterMenu, activeFilterItems, type FilterGroup } from "../components/table/FilterMenu";
 import { requestStatusRationale } from "../statusDecision";
 import { useScanQuery } from "../hooks/useScanQuery";
-import { CHECK_LABEL, REVIEW_TYPE_LABEL, STATUS_LABEL, STATUS_OPTION_LABEL } from "../lib/terms";
+import { CHECK_LABEL, OPENS_NEW_WINDOW, REVIEW_TYPE_LABEL, STATUS_LABEL, STATUS_OPTION_LABEL } from "../lib/terms";
 
 const STATUS_OPTIONS: FindingStatus[] = [
   "new",
@@ -297,7 +297,7 @@ function RuleGroupCard({
                         {/* Which rule, so the link names its destination by
                             itself (SC 2.4.9 Link Purpose (Link Only), Level
                             AAA; WCAG technique C7). */}
-                        <span className="sr-only">, {group.rule_id} (opens in a new tab)</span>
+                        <span className="sr-only">, {group.rule_id} ({OPENS_NEW_WINDOW})</span>
                       </a>
                     </>
                   )}
@@ -313,12 +313,19 @@ function RuleGroupCard({
               .map(([k, v]) => `${STATUS_LABEL[k as FindingStatus] ?? k} (${v})`)
               .join(" · ") || "None"}
           </div>
-          {group.pipeline === "alfa" && group.engine_outcomes.cant_tell > 0 && (
+          {group.engine_outcomes.cant_tell > 0 && (
             <p className="mb-2 text-xs text-fg-muted">
               <strong className="text-fg">{REVIEW_TYPE_LABEL.expert_review}:</strong> For{" "}
               {group.engine_outcomes.cant_tell} occurrence
-              {group.engine_outcomes.cant_tell === 1 ? "" : "s"}, Alfa could not
-              tell (<code>cantTell</code>) if the rule passed. A person needs to
+              {group.engine_outcomes.cant_tell === 1 ? "" : "s"},{" "}
+              {group.pipeline === "alfa" ? (
+                <>
+                  Alfa could not tell (<code>cantTell</code>)
+                </>
+              ) : (
+                <>axe could not tell (axe calls it &ldquo;needs review&rdquo;)</>
+              )}{" "}
+              if the rule passed. A person needs to
               check {group.engine_outcomes.cant_tell === 1 ? "it" : "them"}.{" "}
               {group.engine_outcomes.cant_tell === 1 ? "It does" : "They do"} not
               show that the page fails WCAG.
@@ -339,7 +346,7 @@ function RuleGroupCard({
               <TableHead>
                 <tr>
                   <ColumnHeader>Page</ColumnHeader>
-                  <ColumnHeader>Element locator (CSS selector)</ColumnHeader>
+                  <ColumnHeader>Element code (HTML)</ColumnHeader>
                   <ColumnHeader>Status</ColumnHeader>
                 </tr>
               </TableHead>
@@ -383,7 +390,6 @@ function FindingRow({
           pageUrl={finding.page_url}
           pageTitle={finding.page_title}
           selector={finding.target_selector}
-          elementName={finding.target_display}
           occurrenceId={finding.id}
           snippet={finding.html_snippet}
           origin="Rule check issues by rule"
@@ -392,31 +398,18 @@ function FindingRow({
         />
       </Cell>
       <Cell>
-        <code className="block break-all font-mono text-2xs text-fg">
-          {(finding.target_display || finding.target_selector).length > 90
-            ? `${(finding.target_display || finding.target_selector).slice(0, 90)}…`
-            : (finding.target_display || finding.target_selector)}
-        </code>
-        {finding.html_snippet && (
-          <details className="mt-1">
-            <summary className="flex min-h-target cursor-pointer items-center text-2xs text-fg-muted">
-              Show element code (HTML)
-            </summary>
-            <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-xs bg-surface-muted p-2 text-2xs">
-              {finding.html_snippet}
-            </pre>
-          </details>
-        )}
+        {/* The code, not the locator: why, ElementCode in components/ui.tsx. */}
+        <ElementCode snippet={finding.html_snippet} />
         <AlfaEvidenceNote evidence={finding} />
         <Link className="report-link inline-flex min-h-target items-center text-xs" to={pageEvidencePath({ scanId, pageId: finding.page_id, origin: "Rule check issues by rule", backTo: `/scans/${scanId}/a11y/by-rule`, hash: `#finding-${finding.id}` })}>
           Open the evidence for this occurrence
-          {/* Which occurrence, by page, element and ID, for the same reason
-              as PageLink's context (SC 2.4.9 Link Purpose (Link Only), Level
-              AAA; WCAG technique C7). The ID is what makes it unique: two
-              elements' short locators can match. */}
+          {/* Which occurrence, by page and ID, for the same reason as
+              PageLink's context (SC 2.4.9 Link Purpose (Link Only), Level
+              AAA; WCAG technique C7). The ID makes it unique. It named the
+              element by its locator too, until locators left the screens
+              (see ElementCode in components/ui.tsx). */}
           <span className="sr-only">
-            {" "}on {finding.page_title?.trim() || finding.page_url}, at{" "}
-            {shortLocator(finding.target_display || finding.target_selector)}, occurrence {finding.id}
+            {" "}on {finding.page_title?.trim() || finding.page_url}, occurrence {finding.id}
           </span>
         </Link>
         {finding.failure_summary && (

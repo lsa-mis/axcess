@@ -36,6 +36,7 @@ import { CHECK_LABEL } from "../lib/terms";
 const CHECK_NAME: Record<string, string> = {
   axe: CHECK_LABEL.axe,
   alfa: CHECK_LABEL.alfa,
+  markup: CHECK_LABEL.markup,
   keyboard: CHECK_LABEL.keyboard,
   responsive: CHECK_LABEL.responsive,
   interaction: CLICK_THROUGH,

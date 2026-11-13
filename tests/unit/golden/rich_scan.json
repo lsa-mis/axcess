@@ -2213,6 +2213,7 @@
     "alfa_cant_tell_total": 1,
     "alfa_failed_total": 1,
     "alfa_pages_scanned": 2,
+    "axe_core_version": null,
     "axe_pages_scanned": 5,
     "axe_violations_total": 74,
     "by_severity": {
@@ -2236,5 +2237,5 @@
     "started_at": "2026-04-22T12:00:00",
     "status": "completed"
   },
-  "schema_version": 4
+  "schema_version": 5
 }

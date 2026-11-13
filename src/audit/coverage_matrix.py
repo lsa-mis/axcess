@@ -28,6 +28,7 @@ _MATRIX_FILE = "wcag_coverage.yaml"
 METHODS: tuple[str, ...] = ("automated", "partial", "ai-assisted", "manual")
 PIPELINES: tuple[str, ...] = (
     "axe",
+    "markup",
     "keyboard",
     "responsive",
     "focus",

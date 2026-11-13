@@ -142,6 +142,9 @@ class ExportScan:
     # The WCAG version that level was read against. A scan stored before
     # the setting existed ran 2.2 (see ``audit.wcag_version``).
     wcag_version: WcagVersion = LEGACY_WCAG_VERSION
+    # The axe-core version the scan ran, from its stored config. None for a
+    # report made before Axcess recorded it, or a scan that ran no axe.
+    axe_core_version: str | None = None
 
 
 def collect_scan(
@@ -165,10 +168,13 @@ def collect_scan(
     # Pull the conformance target out of the stored config (best-effort —
     # an unparseable / missing config falls back to the default "AA").
     axe_level = "AA"
+    axe_core_version: str | None = None
     try:
         cfg = json.loads(scan_row["config_json"] or "{}")
         if isinstance(cfg, dict) and str(cfg.get("axe_level", "")).upper() in {"A", "AA", "AAA"}:
             axe_level = str(cfg["axe_level"]).upper()
+        if isinstance(cfg, dict) and isinstance(cfg.get("axe_core_version"), str):
+            axe_core_version = cfg["axe_core_version"][:40] or None
     except (json.JSONDecodeError, TypeError):
         pass
     wcag_version = stored_wcag_version(scan_row["config_json"])
@@ -209,6 +215,7 @@ def collect_scan(
         by_wcag_level=by_wcag_level,
         axe_level=axe_level,
         wcag_version=wcag_version,
+        axe_core_version=axe_core_version,
     )
 
 

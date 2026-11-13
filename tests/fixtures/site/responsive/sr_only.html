@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Visually hidden text fixture (SC 1.4.4, 1.4.12 false-positive guard)</title>
+  <style>
+    /* Text hidden on purpose for screen readers. Each element below is
+       "clipped" by design (1px box, overflow hidden), so the zoom and text
+       spacing checks must stay quiet on all of them. */
+    body { margin: 0; font-family: sans-serif; }
+    main { padding: 1rem; max-width: 60ch; }
+    /* Tailwind's sr-only, and its focus:not-sr-only for the skip link. */
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border-width: 0;
+    }
+    .skip:focus {
+      position: static; width: auto; height: auto; margin: 0;
+      overflow: visible; clip: auto; white-space: normal;
+    }
+    /* The modern pattern: clip-path instead of clip. */
+    .visually-hidden {
+      position: absolute; width: 1px; height: 1px; overflow: hidden;
+      clip-path: inset(50%); white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+  <a class="sr-only skip" href="#main">Skip to main content and the search results</a>
+  <main id="main">
+    <h1>Hidden text that is hidden on purpose</h1>
+    <p><a href="/report.pdf">Annual report <span class="sr-only">(opens a PDF in a new tab)</span></a></p>
+    <form>
+      <label class="visually-hidden" for="q">Search the whole site for pages and documents</label>
+      <input id="q" type="search">
+    </form>
+    <div class="sr-only"><span>Live results are announced here when they change</span></div>
+  </main>
+</body>
+</html>

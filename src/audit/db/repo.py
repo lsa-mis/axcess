@@ -743,8 +743,13 @@ def upsert_axe_violation(
     screenshot_hash: str | None = None,
     revealed_by: str | None = None,
     revealed_state_key: str | None = None,
+    engine_outcome: str = "failed",
 ) -> int:
     """Idempotent upsert on ``(page_id, rule_id, target_hash)``.
+
+    ``engine_outcome`` is ``cant_tell`` for axe's "needs review" results. It
+    is part of ``target_hash`` (``AxeViolation.target_hash``), so a conflict
+    is always the same outcome and the update leaves it alone.
 
     Re-running a crawl against the same site updates rule metadata and
     snippet text (axe may have refined its wording between runs) but
@@ -758,9 +763,9 @@ def upsert_axe_violation(
             page_id, scan_id, rule_id, wcag_sc, wcag_scs, wcag_level,
             impact, help, help_url, target_selector, failure_summary,
             html_snippet, target_hash, screenshot_hash, revealed_by,
-            revealed_state_key
+            revealed_state_key, engine_outcome
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(page_id, rule_id, target_hash) DO UPDATE SET
             scan_id = excluded.scan_id,
             wcag_sc = excluded.wcag_sc,
@@ -799,6 +804,7 @@ def upsert_axe_violation(
             screenshot_hash,
             revealed_by,
             revealed_state_key,
+            engine_outcome,
         ),
     )
     row = conn.execute(
@@ -824,9 +830,11 @@ def upsert_keyboard_finding(
     failure_summary: str,
     html_snippet: str,
     target_hash: str,
-    criterion_sc: str,
+    criterion_sc: str | None,
     pipeline: str = "keyboard",
     screenshot_hash: str | None = None,
+    revealed_by: str | None = None,
+    before_screenshot_hash: str | None = None,
 ) -> int:
     """Idempotent upsert for a keyboard-trap probe finding.
 
@@ -839,15 +847,25 @@ def upsert_keyboard_finding(
     a future audit of "which call sites write keyboard findings" is
     a single grep instead of a "find all upsert_axe_violation
     callers and check their pipeline arg" exercise.
+
+    ``revealed_by`` names the control that had to be pressed before the
+    problem existed (the form error check's submit control), so the report
+    says "After clicking" rather than "At page load". The probes that check
+    the page as it loads leave it empty.
+
+    ``before_screenshot_hash`` is the picture from before that press, beside
+    ``screenshot_hash``, the picture after it (migration 0035). Only the
+    form error check has a before state; the other probes leave it empty.
     """
     conn.execute(
         """
         INSERT INTO page_a11y_findings (
             page_id, scan_id, rule_id, wcag_sc, wcag_scs, wcag_level,
             impact, help, help_url, target_selector, failure_summary,
-            html_snippet, target_hash, pipeline, criterion_sc, screenshot_hash
+            html_snippet, target_hash, pipeline, criterion_sc, screenshot_hash,
+            revealed_by, before_screenshot_hash
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(page_id, rule_id, target_hash) DO UPDATE SET
             scan_id = excluded.scan_id,
             wcag_sc = excluded.wcag_sc,
@@ -861,6 +879,9 @@ def upsert_keyboard_finding(
             html_snippet = excluded.html_snippet,
             criterion_sc = excluded.criterion_sc,
             screenshot_hash = excluded.screenshot_hash,
+            before_screenshot_hash = excluded.before_screenshot_hash,
+            -- First write wins, as for the rule check's revealed rows.
+            revealed_by = COALESCE(page_a11y_findings.revealed_by, excluded.revealed_by),
             updated_at = CURRENT_TIMESTAMP
         """,
         (
@@ -880,6 +901,8 @@ def upsert_keyboard_finding(
             pipeline,
             criterion_sc,
             screenshot_hash,
+            revealed_by,
+            before_screenshot_hash,
         ),
     )
     row = conn.execute(
@@ -1009,6 +1032,53 @@ def upsert_visual_finding(
 
     Same row format as the other dynamic-probe pipelines, delegates to the
     pipeline-parameterized :func:`upsert_keyboard_finding`.
+    """
+    return upsert_keyboard_finding(
+        conn,
+        page_id=page_id,
+        scan_id=scan_id,
+        rule_id=rule_id,
+        wcag_sc=wcag_sc,
+        wcag_scs=wcag_scs,
+        wcag_level=wcag_level,
+        impact=impact,
+        help=help,
+        help_url=help_url,
+        target_selector=target_selector,
+        failure_summary=failure_summary,
+        html_snippet=html_snippet,
+        target_hash=target_hash,
+        criterion_sc=criterion_sc,
+        pipeline=pipeline,
+        screenshot_hash=screenshot_hash,
+    )
+
+
+def upsert_markup_finding(
+    conn: sqlite3.Connection,
+    *,
+    page_id: int,
+    scan_id: int,
+    rule_id: str,
+    wcag_sc: str | None,
+    wcag_scs: str | None,
+    wcag_level: str | None,
+    impact: str | None,
+    help: str,
+    help_url: str,
+    target_selector: str,
+    failure_summary: str,
+    html_snippet: str,
+    target_hash: str,
+    criterion_sc: str | None,
+    pipeline: str = "markup",
+    screenshot_hash: str | None = None,
+) -> int:
+    """Idempotent upsert for a page code check finding (``pipeline='markup'``).
+
+    Same row format as the other browser checks, delegates to the
+    pipeline-parameterized :func:`upsert_keyboard_finding`. ``wcag_sc`` and
+    ``criterion_sc`` are None for a best-practice rule.
     """
     return upsert_keyboard_finding(
         conn,
@@ -1194,7 +1264,7 @@ def increment_scan_method_coverage(
     conn: sqlite3.Connection,
     *,
     scan_id: int,
-    method: Literal["semantic", "keyboard", "responsive"],
+    method: Literal["semantic", "keyboard", "responsive", "markup"],
     pages_delta: int = 1,
 ) -> None:
     """Record pages actually evaluated by a non-engine scan method.
@@ -1211,11 +1281,42 @@ def increment_scan_method_coverage(
         "semantic": "semantic_pages_analyzed",
         "keyboard": "keyboard_pages_probed",
         "responsive": "responsive_pages_probed",
+        # Migration 0038: pages the page code check ran on.
+        "markup": "markup_pages_checked",
     }
     column = columns[method]
     conn.execute(
         f"UPDATE scans SET {column} = {column} + ? WHERE id = ?",  # noqa: S608
         (pages_delta, scan_id),
+    )
+
+
+def record_form_check(
+    conn: sqlite3.Connection,
+    *,
+    scan_id: int,
+    pressed: int,
+    skipped: int,
+    not_checked: int,
+) -> None:
+    """Count one page the form error check ran on, and what it did there.
+
+    ``pressed`` counts the forms whose submit control was pressed,
+    ``not_checked`` the pressed ones with no verdict, ``skipped`` the ones
+    never pressed (migration 0036). Called once per page the check ran on,
+    including a page with no forms, so the report can say how many pages
+    were checked.
+    """
+    conn.execute(
+        """
+        UPDATE scans
+           SET forms_pages_checked = forms_pages_checked + 1,
+               forms_pressed = forms_pressed + ?,
+               forms_skipped = forms_skipped + ?,
+               forms_not_checked = forms_not_checked + ?
+         WHERE id = ?
+        """,
+        (pressed, skipped, not_checked, scan_id),
     )
 
 

@@ -58,6 +58,21 @@ export const GROUPS = {
 } as const;
 
 /** Switch copy, keyed by the positive setting name used in `scanPolicy.ts`. */
+/** The form error check's three answers (ChecksGroup). The group's name is
+ *  SWITCHES.forms.label, so the rail and the report keep one name for it. */
+export const FORMS_CHOICE = {
+  off: { label: "Don’t check forms" },
+  page: {
+    label: "Check forms, and stop them from being sent",
+    hint: "Nothing reaches the site. A form that only the site’s server checks is counted as could not judge.",
+  },
+  send: {
+    label: "Check forms, and send empty ones to this site",
+    hint: "Use only on a site you own or a test site. Axcess sends a form only when every field is empty, then checks the page the site sends back. The site may still act on it, for example by emailing a blank message to someone.",
+  },
+  needsBrowser: "Needs a browser. Turn off Fast scan to use it.",
+} as const;
+
 export const SWITCHES = {
   whole_host: {
     label: "Scan the whole website",
@@ -89,6 +104,15 @@ export const SWITCHES = {
     label: "Check that keyboard focus is never hidden",
     hint:
       "Finds the focus outline (the box that shows where the keyboard is) hidden behind sticky headers or footers. WCAG 2.4.11 is new in WCAG 2.2. A WCAG 2.1 scan reports it as Best practice.",
+  },
+  markup: {
+    label: "Check the page code for problems the rule check misses",
+    hint: "Reads each page’s code (HTML) for problems the rule check (axe) does not look for, such as a field named only by its placeholder text. It only reads the page and changes nothing.",
+  },
+  forms: {
+    label: "Check that forms describe their errors",
+    hint:
+      "Presses each form’s submit button once, with nothing typed. Finds forms that mark a field in error without saying in words what is wrong (WCAG 3.3.1). Never presses sign-in, payment, delete or search forms. Adds about 1–2 seconds per form.",
   },
   responsive: {
     label: "Check narrow screens and zoom",
@@ -314,7 +338,7 @@ export const RETRY = {
   quick: "Scan again with faster settings",
   quickPending: "Starting the scan again…",
   quickHint:
-    `Scans the same address again right away, with the default settings. It does not open menus or pop-up windows (${CLICK_THROUGH}), so it finishes sooner. That shows quickly whether Axcess can scan the site. It keeps only this scan’s address and its Web Content Accessibility Guidelines (WCAG) version.`,
+    `Scans the same address again right away, with the default settings. It does not open menus or pop-up windows (${CLICK_THROUGH}) or press form buttons, so it finishes sooner. That shows quickly whether Axcess can scan the site. It keeps only this scan’s address and its Web Content Accessibility Guidelines (WCAG) version.`,
 } as const;
 
 export const SUMMARY = {
@@ -362,6 +386,8 @@ export const RAIL_LABELS = {
   click_through: `Opens menus and pop-up windows (${CLICK_THROUGH})`,
   keyboard: CHECK_LABEL.keyboard,
   focus: CHECK_LABEL.focus,
+  markup: CHECK_LABEL.markup,
+  forms: CHECK_LABEL.forms,
   responsive: CHECK_LABEL.responsive,
   ocr: CHECK_LABEL.image,
   vision: "Vision model review",

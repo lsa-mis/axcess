@@ -14,7 +14,7 @@ from typing import Any
 
 import pytest
 
-from ._inspector_case import BOX_RECT, DOC, fact, open_inspector, seed, settled
+from ._inspector_case import BOX_RECT, DOC, box_note, element_status, open_inspector, seed, settled
 
 pytestmark = [pytest.mark.ui, pytest.mark.asyncio(loop_scope="module")]
 
@@ -58,13 +58,13 @@ async def test_the_whole_page_gets_no_box(
     page = await open_inspector(new_page, base, scan_id, page_id, "html-has-lang")
     try:
         await playwright_async.expect(page.get_by_text("1 flagged element")).to_be_visible()
-        await playwright_async.expect(fact(page, "What it is")).to_have_text(kind)
+        await playwright_async.expect(element_status(page)).to_contain_text(kind)
         await settled(page)
         assert await page.evaluate(_NO_BOX)
         # The frame was not scrolled to the middle of the page.
         assert await page.evaluate(f"{DOC}.defaultView.scrollY") == 0
-        await playwright_async.expect(fact(page, "Where the box is")).to_have_text(
-            "No box, because it is the whole page. Nothing is dimmed."
+        await playwright_async.expect(box_note(page)).to_contain_text(
+            "Where the box is: No box, because it is the whole page. Nothing is dimmed."
         )
         # The line under the saved copy does not describe a box that is not there.
         await playwright_async.expect(
@@ -72,7 +72,8 @@ async def test_the_whole_page_gets_no_box(
         ).to_have_count(0)
         await playwright_async.expect(
             page.get_by_text(
-                "No box marks the flagged element. The table above the saved copy says why."
+                "No box marks the flagged element. Where the box is: No box, because it "
+                "is the whole page. Nothing is dimmed."
             )
         ).to_be_visible()
     finally:

@@ -239,6 +239,7 @@ STATIC_PATHS = (
     "/app/scans/{scan_id}/issues",
     "/app/scans/{scan_id}/images",
     "/app/scans/{scan_id}/images?group=with_alt",
+    "/app/scans/{scan_id}/pages",
     "/app/scans/{scan_id}/compare",
     "/app/scans/{scan_id}/compare/changes",
     "/app/scans/{scan_id}/a11y/by-rule",

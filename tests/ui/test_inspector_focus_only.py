@@ -21,7 +21,15 @@ from typing import Any
 
 import pytest
 
-from ._inspector_case import BOX_RECT, DOC, fact, open_inspector, rect_of, seed, settled
+from ._inspector_case import (
+    BOX_RECT,
+    DOC,
+    box_note,
+    open_inspector,
+    rect_of,
+    seed,
+    settled,
+)
 
 pytestmark = [pytest.mark.ui, pytest.mark.asyncio(loop_scope="module")]
 
@@ -71,7 +79,8 @@ async def test_a_skip_link_is_shown_where_it_appears_with_focus(
         await page.wait_for_function(_BOX_ON_LINK)
         await settled(page)
         assert await page.evaluate(_BOX_ON_LINK)
-        await playwright_async.expect(fact(page, "Where the box is")).to_have_text(
+        await playwright_async.expect(box_note(page)).to_contain_text(
+            "Where the box is: "
             "It shows only when it has keyboard focus. The box is where it shows then."
         )
         # Page load did not move the reader's focus into the saved copy.
@@ -129,8 +138,8 @@ async def test_an_element_focus_does_not_bring_on_screen_gets_no_box(
     )
     page = await open_inspector(new_page, base, scan_id, page_id, "skip-link")
     try:
-        await playwright_async.expect(fact(page, "Where the box is")).to_have_text(
-            "No box. It is off the screen in this saved copy."
+        await playwright_async.expect(box_note(page)).to_contain_text(
+            "Where the box is: No box. It is off the screen in this saved copy."
         )
         await settled(page)
         assert await page.evaluate(f"({BOX_RECT})()") is None
@@ -169,7 +178,8 @@ async def test_a_link_whose_focused_look_cannot_be_read_is_said_to_be_off_screen
     )
     page = await open_inspector(new_page, base, scan_id, page_id, "skip-link")
     try:
-        await playwright_async.expect(fact(page, "Where the box is")).to_have_text(
+        await playwright_async.expect(box_note(page)).to_contain_text(
+            "Where the box is: "
             "No box. It is off the screen in this saved copy. Pages often place a link "
             "there and show it only when it has keyboard focus."
         )

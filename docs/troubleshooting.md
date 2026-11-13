@@ -79,25 +79,63 @@ open the window again on the page you were on.
 
 ## The local AI checks aren't running
 
-A [local AI model](./glossary.md#local-ai-model) runs through Ollama, which
-you install separately.
+A [local AI model](./glossary.md#local-ai-model) runs through Ollama. In the
+desktop app, **Settings > AI features** can install Ollama and the models for
+you. Otherwise you install it separately.
 
 - **Is the switch on?** For a public website, the AI switches under Advanced
   settings, **Local AI**, are off by default. **Read text inside images
   (OCR)** is on and needs no AI model. When a switch can't be used, the form
   says why, for example "Ollama is not running on this computer."
-- **Is Ollama running?** `curl -s http://localhost:11434/api/tags` should
-  return JSON.
-- **Is the model installed?** The form names any missing model, and for the
-  default vision model it shows the command: `ollama pull qwen3-vl:2b-instruct`.
-  Install a model with `ollama pull <model>`. On a source install,
-  `AUDIT_VLM_MODEL` picks a different vision model.
+- **Is Ollama running?** In the desktop app, select **Start AI service** in
+  Settings. For a separate source install, `curl -s http://localhost:11434/api/tags`
+  should return JSON.
+- **Is the model installed?** In the desktop app, choose a size in **AI features**
+  and confirm the size-labelled download. Do not use `ollama pull` with its
+  private service. On a separate source install, install a model with
+  `ollama pull <model>`. `AUDIT_VLM_MODEL` picks a different image model.
 - **Want the AI checks off?** Leave the switches off. On the command line they
   are on by default, so pass `--skip-vlm --skip-semantic --skip-visual`. Image
   findings are still created from OCR text and the alt text comparison.
 
 If Ollama can't be reached when a scan starts, Axcess logs a warning and
 continues without those checks.
+
+## AI features setup in the desktop app stopped or failed
+
+- **AI service is not running**: select **Start AI service** in Settings. This
+  starts only Axcess's private copy. It never starts or stops your own Ollama.
+- **Private models are missing**: choose a size in **AI features**. Check the
+  download size, then select **Download and set up**. Starting the service
+  never downloads files without that separate choice.
+- **AI could not be isolated**: the service stays stopped. Windows and systems
+  without the required sandbox are not supported. Linux startup also stays
+  blocked until a private connection bridge is available. Do not disable the
+  isolation check or expose a service to the internet to get past this error.
+- **Isolation check failed**: check the application log. Axcess requires proof
+  that the OS blocks outside connections; a timeout does not count. Reports
+  and saved suggestions remain readable.
+- **Your own Ollama is not managed**: Axcess leaves it alone. Select a private
+  download for isolated AI. Never run `ollama pull` against Axcess's service.
+
+- **AI features are off**: open **Settings > AI features** and select
+  **Turn AI on** to reuse kept models, or choose a size and download if you
+  have not set AI up yet. The setting stays off after a restart.
+- **Cannot change the setting**: finish or stop the scan, finish or cancel
+  waiting AI answers, or pause the download. A canceled answer may still
+  have a model request finishing; wait for it before trying again.
+- **Saved AI settings could not be read**: AI stays off and report browsing
+  still works. Check the application log and the saved `ai/preferences.json`
+  file. Do not delete your models or scan evidence to fix a settings file.
+- **"Not enough free disk space"**: free up space or choose a smaller size.
+  The page shows how much each size downloads.
+- **The download stopped or was paused**: select **Resume download**. It
+  carries on from where it stopped. After an error, select **Try again**.
+- **"The Ollama download did not match its published checksum"**: the file
+  was changed or damaged on the way. Axcess deletes it and does not run it.
+  Try again later.
+- **Ollama did not start**: read `ai/ollama.log` in the Axcess data folder.
+- **Start over**: select **Remove AI features**, then download again.
 
 ## Compare reports has nothing to compare, or shows a surprise
 

@@ -43,9 +43,12 @@ readers; this page tells contributors which words to use.
     opens when you click it".
 11. **Sentence case** for everything. No "please", no double negatives.
     Buttons and controls too: "Start a scan", not "Start A Scan". Names
-    keep their capitals ("Axcess", "Excel"), and so do the named terms in
-    the table below ("Mostly sure", "Not sure", "Best practice",
-    "Click-Through"). One exception: the logo beside the brand mark,
+    keep their capitals ("Axcess", "Excel", "Claude Code"), and so do the
+    named terms in the table below ("Mostly sure", "Not sure", "Best practice",
+    "Click-Through"). The ITS technical review export names the team it is
+    for, and that name keeps its capitals too: "University of Michigan
+    Information and Technology Services (ITS) Accessibility Team". One
+    exception: the logo beside the brand mark,
     top left, spells it "axcess", in lowercase, as a logo; text everywhere
     else writes "Axcess".
     Two tests enforce this: `tests/ui/test_control_label_case.py` reads
@@ -70,10 +73,12 @@ Use the word in the first column, and never the words in the last.
 | image | One image the image text check looked at: "Image #12". | finding (for an image) |
 | Needs alt text / Needs better alt text / Good alt text / Not checked yet | The alt text verdicts on the Images tab. "Needs alt text" when there is none (or `alt=""` on an image with text); "Needs better alt text" when there is some and it falls short. Not "Adequate" for an image the scan could not judge. | bad alt text, adequate, inadequate, partial, missing (as a verdict) |
 | Images with text / Images without alt text / Images with alt text | The Images tab's three groups. An image is in "Images with text" and one of the other two. | image of text (as a group name), alt missing |
-| Mostly sure / Measured / Not sure / For information | The four "How sure" values, in the Issues table's "How sure" column: how sure Axcess is that an issue type is a real problem. Measured is a browser check that used no AI and is trusted to be shown by default (docs/glossary.md, "Measured", lists which). An Alfa "cannot tell" result is Not sure. The Issues table opens showing Mostly sure and Measured; the rest is "hidden" until the reader shows it. | Barrier, Needs review, Informational, likely barrier, likely problem, possible problem, needs confirmation, review lead, lead, expert decision, cantTell, "Type" (for this column) |
+| Mostly sure / Measured / Not sure / For information | The four "How sure" values, in the Issues table's "How sure" column: how sure Axcess is that an issue type is a real problem. Measured is a browser check that used no AI and is trusted to be shown by default (docs/glossary.md, "Measured", lists which). An Alfa "cannot tell" result is Not sure; a clear form error is Mostly sure, an unclear one Not sure. The Issues table opens showing every issue type, with a note over it that says what Not sure and For information mean. | Barrier, Needs review, Informational, likely barrier, likely problem, possible problem, needs confirmation, review lead, lead, expert decision, cantTell, "Type" (for this column) |
 | At page load / After clicking / In an image | The values of the Issues table's "Where it shows" column: where an issue type shows up. "At page load" and "After clicking" match the page state names. | Found by, Found (as the header), WCAG (as a value), Click-Through (as a value; it stays the feature's name), Alt Text (as a value), finding type |
 | Critical / Serious / Moderate / Minor | An issue type's impact rating: how badly the problem affects people (glossary "Impact"). | critical, serious (lower case, as raw values), severity (for this rating) |
 | status | Where an occurrence stands in review. Values: New, Reviewing, In progress, Fixed, Accepted risk, Not a problem (false positive). | triage status, review status, remediated, raw values like `in_progress` |
+| Checked by a person | A person's choice about an element in the page inspector. Values: Not checked yet; Checked: a problem to report; Checked: a repeat of one already reported. Separate from status. | confirmed, verified, validated, approved, human-checked, triaged, redundant, duplicate |
+| Issue notes | What a person writes about one element for the vendor. Matches the ITS technical review's column. | comment, annotation, remarks, rationale (for these notes) |
 | check | One way Axcess tests pages. See the check names below. | engine, pipeline, probe, method, detector, source |
 | page state | How a page looked at one moment: "At page load" or "After clicking Menu". | DOM state, interaction state, captured state |
 | saved copy | The copy of a page the scan stored. | capture, stored capture, stored render, loaded DOM |
@@ -88,11 +93,15 @@ Use the word in the first column, and never the words in the last.
 | what was checked | Which checks ran and which pages and states a report covers. | coverage, method coverage |
 | Product roadmap | The page listing planned checks. | coverage tracking, coverage and tracking |
 | element code (HTML) | The code of one flagged element. | snippet, outerHTML, markup |
+| AI suggestion | A fix the local AI model suggests for one occurrence, on request. It can be wrong; a person checks it. | AI fix, AI remediation, recommendation, auto-fix |
+| AI features | The optional local AI program (Ollama) and models the desktop app can download, in one of three sizes: Small, Standard, Large. | AI pack, AI bundle, AI dependencies, tier |
+| Image model | The local AI model that looks at pictures. | vision model, VLM (outside developer notes) |
 | element locator (CSS selector) | The text that finds an element in the page code. | selector (alone) |
 | element locator (XPath) | The path that finds an element in the page code, as the rule check (Alfa) records it. | selector, path (alone) |
 | panel | One of the two reports on Compare reports, each in its own frame: "Go back in the report #24 panel". Never "left" or "right": on a narrow screen the panels are one above the other. | pane, side, left, right |
 | What changed | The page that lists what is new, still found and no longer found between two reports. | Compare reports (for this page), diff, verify changes |
 | Does not apply | A table cell with no value for this row. | n/a |
+| remove private details (redact) | Replace likely private details in a download with "[redacted]". The choice is "Remove private details (redact)"; the file is a "redacted copy". | sanitize, scrub, anonymize, mask, PII |
 
 ### Why "occurrence" and "issue type"
 
@@ -193,6 +202,8 @@ issue type is a real problem? Each word was chosen against these alternatives.
 | Keyboard | Keyboard check |
 | Responsive and zoom | Zoom and layout check |
 | Focus | Focus check |
+| Form errors (WCAG 3.3.1) | Form error check |
+| Page code (rendered DOM questions axe-core does not ask) | Page code check |
 | Visual order, motion, and autoplay | Motion and reading-order check |
 | Semantic (local language model) | AI review |
 | Image text (OCR and vision model) | Image text check |
@@ -203,4 +214,5 @@ Name the tool only when it matters to the reader, and in parentheses.
 
 "Axcess", "WCAG" after it is spelled out, "screen reader", "keyboard",
 "alt text" (explain once as "the text a screen reader reads for an image"),
-"screenshot", "export", "Excel", "Markdown", "CSV", "JSON".
+"screenshot", "export", "Excel", "Markdown", "CSV", "JSON", "Claude Code"
+(a product name, in the hints for the fix brief export).

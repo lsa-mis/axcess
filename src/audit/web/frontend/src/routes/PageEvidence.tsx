@@ -4,12 +4,13 @@ import { Crosshair, ExternalLink, ImageOff, ScanEye } from "lucide-react";
 import { useLocation, useParams } from "react-router";
 import { ApiError, api, blobUrl } from "../api/client";
 import AlfaEvidenceNote from "../components/AlfaEvidenceNote";
+import FixSuggestion, { SuggestionsBlockedNote } from "../components/FixSuggestion";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
-import { Card, StatusChip } from "../components/ui";
+import { Card, ElementCode, StatusChip } from "../components/ui";
 import { httpStatusLabel, renderModeLabel } from "../lib/pageLabels";
 import { findingLocation } from "../lib/findingLocation";
-import type { DetectionPipeline, PageEvidence } from "../api/types";
-import { CHECK_LABEL, REVIEW_TYPE_LABEL } from "../lib/terms";
+import type { DetectionPipeline, PageEvidence, SuggestionAvailability } from "../api/types";
+import { OPENS_NEW_WINDOW, CHECK_LABEL, REVIEW_TYPE_LABEL } from "../lib/terms";
 import { useScanQuery } from "../hooks/useScanQuery";
 
 /** One row of a page's accessibility evidence. */
@@ -35,6 +36,15 @@ export default function PageEvidenceRoute() {
     queryKey: ["page-evidence", scan, page],
     queryFn: () => api.getPageEvidence(scan, page),
     enabled: Number.isFinite(scan) && Number.isFinite(page),
+  });
+  // AI fix suggestions are off unless an administrator turns them on. When
+  // the status cannot load, the feature stays hidden and the rest of the
+  // page works as before.
+  const { data: suggestionStatus } = useQuery({
+    queryKey: ["suggestion-status"],
+    queryFn: api.getSuggestionStatus,
+    retry: false,
+    staleTime: 30_000,
   });
 
   useEffect(() => {
@@ -74,6 +84,22 @@ export default function PageEvidenceRoute() {
   // Only group when a click actually revealed something: on a page where
   // nothing was, a lone "At page load" heading would divide nothing.
   const groups = findings.some((f) => f.revealed_by) ? groupByRevealingControl(findings) : null;
+
+  // Suggestions need a finished, unprotected report: a protected report's
+  // evidence is encrypted and must not reach a model, and a running scan's
+  // evidence is not final. The server refuses both too; hiding the button
+  // here means nobody is offered something that will be refused.
+  // Saved answers remain readable with AI off. FixSuggestion hides only
+  // new-request controls, not the saved answer (COGA: avoid loss of context,
+  // https://www.w3.org/TR/coga-usable/, paraphrased).
+  const suggestionsApply =
+    scanData.status === "completed" && !scanData.protection && suggestionStatus !== undefined;
+  const suggestions: SuggestionAvailability | null =
+    suggestionsApply ? suggestionStatus : null;
+  const suggestionsBlocked =
+    suggestionsApply && !suggestionStatus.enabled
+      ? suggestionStatus
+      : null;
 
   return (
     <>
@@ -121,6 +147,8 @@ export default function PageEvidenceRoute() {
         </Card>
       )}
 
+      {suggestionsBlocked && <SuggestionsBlockedNote status={suggestionsBlocked} />}
+
       <section className="mb-6">
         <h2 className="mb-2.5 text-base font-semibold text-fg">
           {findings.length === 0 ? "Accessibility checks" : "Issue occurrences"}
@@ -134,7 +162,13 @@ export default function PageEvidenceRoute() {
         ) : groups === null ? (
           <div className="space-y-3">
             {findings.map((finding) => (
-              <FindingCard key={finding.id} finding={finding} pageUrl={data.page.url_normalized} />
+              <FindingCard
+                key={finding.id}
+                finding={finding}
+                pageUrl={data.page.url_normalized}
+                scanId={scan}
+                suggestions={suggestions}
+              />
             ))}
           </div>
         ) : (
@@ -153,6 +187,8 @@ export default function PageEvidenceRoute() {
                       key={finding.id}
                       finding={finding}
                       pageUrl={data.page.url_normalized}
+                      scanId={scan}
+                      suggestions={suggestions}
                     />
                   ))}
                 </div>
@@ -191,7 +227,7 @@ export default function PageEvidenceRoute() {
                         a file name (found by review). */}
                     <span className="sr-only">
                       , image {imageIndex + 1} of {data.image_occurrences.length},{" "}
-                      {imageFileName(image.src_url_canonical)}, opens in a new tab
+                      {imageFileName(image.src_url_canonical)}, {OPENS_NEW_WINDOW}
                     </span>
                   </a>
                   <AltChip alt={image.alt_text} />
@@ -218,6 +254,15 @@ export default function PageEvidenceRoute() {
                     <span className="font-semibold text-fg">What the local AI model saw:</span>{" "}
                     {image.vlm_rationale}
                   </p>
+                )}
+                {/* Only an image the scan flagged has an issue to fix. */}
+                {suggestions && image.issue_key && (
+                  <FixSuggestion
+                    scanId={scan}
+                    kind="image"
+                    occurrenceId={image.occurrence_id}
+                    availability={suggestions}
+                  />
                 )}
               </Card>
             ))}
@@ -253,11 +298,16 @@ export default function PageEvidenceRoute() {
 function FindingCard({
   finding,
   pageUrl,
+  scanId,
+  suggestions,
 }: {
   finding: PageEvidenceFinding;
   pageUrl: string;
+  scanId: number;
+  /** Null when AI fix suggestions are off or cannot be used for this report. */
+  suggestions: SuggestionAvailability | null;
 }) {
-  const location = findingLocation(pageUrl, finding.target_selector, finding.target_display);
+  const location = findingLocation(pageUrl, finding.target_selector);
   const cantTell = finding.engine_outcome === "cant_tell";
 
   return (
@@ -273,8 +323,11 @@ function FindingCard({
           <p className="mt-1 text-xs text-fg-muted">
             {finding.wcag_sc ? `WCAG ${finding.wcag_sc}` : "Best practice"} ·{" "}
             {sourceLabel(finding.pipeline)}
-            {finding.pipeline === "alfa" &&
-              ` · ${cantTell ? `${REVIEW_TYPE_LABEL.expert_review}: the rule check could not decide` : "failed a standard test rule (ACT rule)"}`}
+            {/* "Could not decide" for either rule check: axe's "needs
+                review" is stored as the same cant_tell outcome as Alfa's. */}
+            {cantTell
+              ? ` · ${REVIEW_TYPE_LABEL.expert_review}: the rule check could not decide`
+              : finding.pipeline === "alfa" && " · failed a standard test rule (ACT rule)"}
           </p>
         </div>
         <StatusChip value={finding.status} />
@@ -285,16 +338,23 @@ function FindingCard({
       )}
       <AlfaEvidenceNote evidence={finding} />
 
+      {/* The element's code where its locator was: why, ElementCode in
+          components/ui.tsx. A rule check (Alfa) result about a piece of
+          text, which has no element code, quotes the text instead. */}
       <p className="mt-3 text-2xs font-semibold text-fg-subtle">
-        Where on the page
+        {location.text && !finding.html_snippet ? "Text on the page" : "Element code (HTML)"}
       </p>
-      <p className="mt-1 break-words text-sm text-fg">{location.label}</p>
+      {location.text && !finding.html_snippet ? (
+        <p className="mt-1 break-words text-sm text-fg">“{location.text}”</p>
+      ) : (
+        <ElementCode snippet={finding.html_snippet} className="mt-1" />
+      )}
 
-      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
-        {/* A text fragment scrolls the live page to this exact wording and
-            highlights it, the only "show me" available for findings that
-            have no screenshot, which is every Alfa result. */}
-        {location.deepLink && (
+      {/* A text fragment scrolls the live page to this exact wording and
+          highlights it, the only "show me" available for findings that
+          have no screenshot, which is every Alfa result. */}
+      {location.deepLink && (
+        <p className="mt-2">
           <a
             href={location.deepLink}
             target="_blank"
@@ -303,18 +363,10 @@ function FindingCard({
           >
             <Crosshair className="h-4 w-4" aria-hidden />
             Show me on the live page
-            <span className="sr-only">, opens in a new tab and scrolls to this text</span>
+            <span className="sr-only">, {OPENS_NEW_WINDOW} and scrolls to this text</span>
           </a>
-        )}
-        <details className="text-xs">
-          <summary className="min-h-target cursor-pointer content-center text-fg-muted">
-            Element locator (CSS selector), for developers
-          </summary>
-          <code className="mt-1 block max-w-full overflow-x-auto rounded-2xs border border-border bg-surface-muted px-2 py-1 text-xs text-fg">
-            {location.raw}
-          </code>
-        </details>
-      </div>
+        </p>
+      )}
 
       {finding.screenshot_hash ? (
         <figure className="mt-3">
@@ -338,6 +390,17 @@ function FindingCard({
             ? "No screenshot: the rule check (Alfa) runs in a separate browser that Axcess cannot take pictures of."
             : "Axcess did not take a screenshot of this occurrence."}
         </p>
+      )}
+
+      {/* Last in the card: the suggestion is built from the evidence above,
+          so it reads after it (SC 1.3.2 Meaningful Sequence, Level A). */}
+      {suggestions && (
+        <FixSuggestion
+          scanId={scanId}
+          kind="a11y"
+          occurrenceId={finding.id}
+          availability={suggestions}
+        />
       )}
     </Card>
   );

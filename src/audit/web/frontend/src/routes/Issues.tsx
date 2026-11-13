@@ -1,4 +1,4 @@
-import { memo, useMemo, useRef, type ReactNode, type Ref } from "react";
+import { Fragment, memo, useMemo, useRef, type ReactNode, type Ref } from "react";
 import { Link, useLocation, useParams, useSearchParams } from "react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
@@ -932,11 +932,28 @@ const IssueTableRow = memo(function IssueTableRow({
       <Cell className={cell}>{CHECK_LABEL[row.pipeline] ?? row.pipeline}</Cell>
       <Cell className={cn(cell, "whitespace-nowrap")}>
         {row.wcag_sc ? (
-          <span className="inline-flex items-center gap-1.5">
-            <span className="tabular-nums">{row.wcag_sc}</span>
-            <ConformanceBadge level={row.conformance} />
-            {row.wcag_name && <span className="sr-only">{row.wcag_name}</span>}
-          </span>
+          <>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="tabular-nums">{row.wcag_sc}</span>
+              <ConformanceBadge level={row.conformance} />
+              {row.wcag_name && <span className="sr-only">{row.wcag_name}</span>}
+            </span>
+            {/* The rule's other criteria under the first, numbers on screen
+                and names for a screen reader, as the first criterion's
+                name is. Why "also": alsoWcagText in lib/labels.ts. */}
+            {row.also_wcag.length > 0 && (
+              <span className="mt-0.5 block text-xs tabular-nums text-fg-muted">
+                also{" "}
+                {row.also_wcag.map((ref, index) => (
+                  <Fragment key={ref.sc}>
+                    {index > 0 && ", "}
+                    {ref.sc}
+                    {ref.name && <span className="sr-only"> {ref.name}</span>}
+                  </Fragment>
+                ))}
+              </span>
+            )}
+          </>
         ) : (
           <span className="text-fg-muted">Best practice</span>
         )}
@@ -1120,8 +1137,8 @@ function IssueGlossary() {
             help: FINDING_TYPE_HELP[key],
           }))}
         />
-        {/* The bands' limits, such as a critical problem on one page showing
-            as Low, in words everyone can reach, not only in a hover hint. */}
+        {/* The bands' meaning, such as Not sure never being High, in words
+            everyone can reach, not only in a hover hint. */}
         <GlossaryList
           heading={`${COLUMN_LABEL.Priority}: which issue types to look at first`}
           items={(["High", "Medium", "Low"] as const).map((key) => ({
@@ -1213,7 +1230,7 @@ function columnHint(column: SortColumn): string | undefined {
   return label in ISSUE_COLUMN_HELP ? ISSUE_COLUMN_HELP[label as keyof typeof ISSUE_COLUMN_HELP] : undefined;
 }
 
-/** A plain-English band for the priority score (severity × log1p(pages)). */
+/** A plain-English band for the priority score (``_priority`` in src/audit/web/issues.py). */
 function priorityTier(priority: number): "High" | "Medium" | "Low" {
   if (priority >= 6) return "High";
   if (priority >= 3) return "Medium";

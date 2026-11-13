@@ -19,7 +19,7 @@ import secrets
 import shutil
 import sqlite3
 import threading
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
 from time import perf_counter
@@ -50,13 +50,18 @@ from pydantic import (
 from starlette.background import BackgroundTask
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from audit import __version__, coverage_matrix, evaluation
+from audit import __version__, coverage_matrix, evaluation, occurrence_reviews
+from audit.ai.manager import AIManager
+from audit.ai.state import AIConfig, ai_enabled, initialize_preferences
+from audit.ai.state import effective_settings as effective_ai_settings
+from audit.ai.state import semantic_model as ai_semantic_model
 from audit.analyzer.alfa import AlfaAnalyzer, AlfaResult, chromium_executable_path
 from audit.analyzer.alfa import availability as alfa_availability
 from audit.analyzer.axe import AxeAnalyzer
 from audit.analyzer.focus import FocusProbe
 from audit.analyzer.interaction import DEFAULT_BLOCKED_LABELS, InteractionProbe
 from audit.analyzer.keyboard import KeyboardProbe
+from audit.analyzer.markup import MarkupProbe
 from audit.analyzer.model_registry import get_pick
 from audit.analyzer.responsive import ResponsiveProbe
 from audit.analyzer.semantic.registry import supported_criteria
@@ -68,11 +73,14 @@ from audit.crawler.search import SearchConfig, search_url_allowed
 from audit.db import repo
 from audit.db.schema import connect
 from audit.exports.audit_report import render_audit_report
-from audit.exports.collector import ExportScan, collect_scan
+from audit.exports.collector import DEFAULT_UI_BASE, ExportScan, collect_scan
 from audit.exports.csv_export import render_csv
+from audit.exports.fix_brief import render_fix_brief
+from audit.exports.its_review import render_its_review
 from audit.exports.jira_export import render_jira_csv
 from audit.exports.json_export import render_json
 from audit.exports.markdown_report import render_markdown
+from audit.exports.redaction import redact_export, scan_locators
 from audit.exports.xlsx_export import render_xlsx
 from audit.labels import (
     CLICK_THROUGH,
@@ -92,6 +100,20 @@ from audit.protected.repository import (
 )
 from audit.protected.session import ManualAuthenticationSession
 from audit.protected.vaults import resolve_configured_protected_vault
+from audit.suggest import repo as suggestion_repo
+from audit.suggest import service as suggest_service
+from audit.suggest.models import (
+    FeedbackUpdate,
+    OccurrenceKind,
+    SuggestionAvailability,
+    SuggestionCreate,
+    SuggestionRecord,
+)
+from audit.suggest.provider import OllamaSuggestionProvider
+from audit.suggest.provider import Provider as SuggestionProvider
+from audit.suggest.queue import SuggestionWorker
+from audit.suggest.verify import AxeFragmentVerifier
+from audit.suggest.verify import Verifier as SuggestionVerifier
 from audit.synthesizer.diff import compute_diff
 from audit.wcag_version import (
     DEFAULT_WCAG_VERSION,
@@ -100,7 +122,8 @@ from audit.wcag_version import (
     is_wcag_version,
     stored_wcag_version,
 )
-from audit.web import image_inventory, local_sign_in
+from audit.web import image_inventory, local_sign_in, pages_queries
+from audit.web.ai_api import build_ai_router
 from audit.web.comparison import (
     MAX_PAGE_SIZE,
     Category,
@@ -130,6 +153,7 @@ from audit.web.local_sign_in import (
     SignInInProgressError,
     SignInRegistry,
 )
+from audit.web.pages_queries import ScanPagesResponse
 from audit.web.protected_api import build_protected_router
 from audit.web.protected_auth import (
     require_protected_identity,
@@ -159,6 +183,33 @@ _SEVERITY_OPTIONS = ("critical", "major", "minor", "info")
 _DESTRUCTIVE_TRANSITIONS = {"accepted_risk", "false_positive", "remediated"}
 _PAGE_SIZE = 50
 _CONTENT_HASH_RE = re.compile(r"^[0-9a-f]{64}$")
+
+
+class OccurrenceReviewRequest(BaseModel):
+    """A person's review of the occurrences on one circled element."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    a11y_finding_ids: list[int] = Field(
+        default_factory=list, max_length=occurrence_reviews.MAX_OCCURRENCES_PER_SAVE
+    )
+    page_image_ids: list[int] = Field(
+        default_factory=list, max_length=occurrence_reviews.MAX_OCCURRENCES_PER_SAVE
+    )
+    #: None: not checked yet. "report": checked, a problem to report.
+    #: "repeat": checked, a repeat of one already reported.
+    decision: occurrence_reviews.Decision | None
+    #: Leave out (or null) to set the decision only and keep each
+    #: occurrence's notes, as "Mark … as repeats" does.
+    notes: str | None = Field(default=None, max_length=occurrence_reviews.MAX_NOTES_LENGTH)
+
+
+class OccurrenceReviewResponse(BaseModel):
+    """The review as stored: notes are trimmed and redacted."""
+
+    decision: occurrence_reviews.Decision | None
+    notes: str
+    updated_at: str
 
 
 class LocalLoginScanRequest(BaseModel):
@@ -496,13 +547,18 @@ _EXPORT_RENDERERS: dict[str, Any] = {
     "json": render_json,
     "jira": render_jira_csv,
     "markdown": render_markdown,
-    # `audit` and `xlsx` are rendered via a special-case branch in the route
-    # handler because they need the live `conn` (not just the collector
+    # `audit`, `xlsx` and `its` are rendered via a special-case branch in the
+    # route handler because they need the live `conn` (not just the collector
     # result) to build their issue tables. The entries here exist only so
     # the format-validation check (`fmt in _EXPORT_RENDERERS`) accepts them;
     # the values are unused for those formats.
     "audit": render_audit_report,
     "xlsx": render_xlsx,
+    # The U-M ITS Accessibility Team's Technical Review template, filled in.
+    "its": render_its_review,
+    # The coding-agent fix brief also needs the live `conn` (it reads the
+    # issue list), so it has its own branch in `render_public_export`.
+    "brief": render_fix_brief,
 }
 _EXPORT_MEDIA_TYPES = {
     "csv": "text/csv; charset=utf-8",
@@ -511,6 +567,8 @@ _EXPORT_MEDIA_TYPES = {
     "markdown": "text/markdown; charset=utf-8",
     "audit": "text/markdown; charset=utf-8",
     "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "its": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "brief": "text/markdown; charset=utf-8",
 }
 _EXPORT_EXTENSIONS = {
     "csv": "csv",
@@ -519,7 +577,16 @@ _EXPORT_EXTENSIONS = {
     "markdown": "md",
     "audit": "audit.md",
     "xlsx": "xlsx",
+    "its": "its.xlsx",
+    "brief": "fix-brief.md",
 }
+#: Formats that are always redacted, whatever the ``redact`` query asks: the
+#: fix brief is made to be handed to a coding agent, so it never carries the
+#: unredacted evidence.
+_ALWAYS_REDACTED_FORMATS = frozenset({"brief"})
+#: Formats only a completed report can be exported as. A brief of a running,
+#: failed or stopped scan would send an agent to fix a partial list.
+_COMPLETED_ONLY_FORMATS = frozenset({"brief"})
 
 _BASE_DIR = Path(__file__).resolve().parent
 _FRONTEND_DIST = _BASE_DIR / "frontend" / "dist"
@@ -680,9 +747,18 @@ def create_app(
     blob_dir: Path | None = None,
     *,
     protected_vault: ProtectedVault | None = None,
+    suggestion_provider: SuggestionProvider | None = None,
+    suggestion_verifier: SuggestionVerifier | None = None,
 ) -> FastAPI:
     """Build the FastAPI app. Accepts overrides so tests can point at tmp paths."""
-    settings = get_settings()
+    base_settings = get_settings()
+    initialize_preferences(
+        base_settings, existing_install=(db_path or base_settings.db_path).exists()
+    )
+    # The desktop AI setup (if any) chooses the Ollama address and models.
+    # ``settings`` is rebound when that setup changes, so every route below
+    # reads the current choice.
+    settings = effective_ai_settings(base_settings)
     resolved_db = db_path or settings.db_path
     slow_request_ms = settings.slow_request_ms
     resolved_blob = blob_dir or settings.blob_dir
@@ -906,6 +982,149 @@ def create_app(
         with contextlib.suppress(asyncio.CancelledError):
             await retention_task
         retention_task = None
+
+    # AI fix suggestions: one background worker, started only when an
+    # administrator has turned the feature on. With it off, nothing talks
+    # to the model and no task runs.
+    suggestion_state: dict[str, Any] = {"worker": None, "provider": suggestion_provider}
+
+    async def _start_worker() -> None:
+        if not settings.suggestions_enabled:
+            return
+        provider = suggestion_state["provider"]
+        if provider is None:
+            client = httpx.AsyncClient()
+            suggestion_state["client"] = client
+            provider = OllamaSuggestionProvider(
+                client,
+                base_url=settings.ollama_base_url,
+                timeout_s=settings.suggestion_timeout_s,
+            )
+            suggestion_state["provider"] = provider
+        worker = SuggestionWorker(
+            db_path=resolved_db,
+            blob_dir=resolved_blob,
+            provider=provider,
+            verifier=suggestion_verifier or AxeFragmentVerifier(),
+            text_model=settings.suggestion_text_model,
+            vision_model=settings.suggestion_vision_model,
+            timeout_s=settings.suggestion_timeout_s,
+        )
+        suggestion_state["worker"] = worker
+        worker.start()
+
+    async def _stop_worker() -> None:
+        worker = suggestion_state.get("worker")
+        if worker is not None:
+            await worker.stop()
+            suggestion_state["worker"] = None
+        client = suggestion_state.pop("client", None)
+        if client is not None:
+            await client.aclose()
+            suggestion_state["provider"] = suggestion_provider
+
+    @app.on_event("startup")
+    async def _start_suggestion_worker() -> None:
+        await _start_worker()
+
+    @app.on_event("shutdown")
+    async def _stop_suggestion_worker() -> None:
+        await _stop_worker()
+
+    # Desktop AI setup. Only the desktop app has it: a server install keeps
+    # the AI settings its administrator chose in the environment.
+    ai_state: dict[str, Any] = {"manager": None, "loop": None}
+    ai_mutation_lock = asyncio.Lock()
+
+    def _ai_busy_reason() -> str | None:
+        task = crawl_state.get("task")
+        if isinstance(task, asyncio.Task) and not task.done():
+            return "Finish or stop the current scan before changing AI settings."
+        worker = suggestion_state.get("worker")
+        if worker is not None and worker.busy:
+            return "Wait for the current AI answer to finish before changing AI settings."
+        with get_conn() as conn:
+            if suggestion_repo.table_exists(conn) and suggestion_repo.queue_length(conn):
+                return "Finish or cancel waiting AI answers before changing AI settings."
+            if conn.execute("SELECT 1 FROM scans WHERE status = 'running' LIMIT 1").fetchone():
+                return "Finish or stop the current scan before changing AI settings."
+            if (
+                _protected_scan_table_exists(conn)
+                and conn.execute(
+                    "SELECT 1 FROM protected_scans WHERE protection_status = 'running' "
+                    "OR (run_lease_id IS NOT NULL "
+                    "AND julianday(run_lease_expires_at) > julianday('now')) LIMIT 1"
+                ).fetchone()
+            ):
+                return "Finish or stop the protected scan before changing AI settings."
+        return None
+
+    async def _apply_ai_setup() -> None:
+        nonlocal settings
+        previous = settings
+        next_settings = effective_ai_settings(base_settings)
+        try:
+            await _stop_worker()
+            settings = next_settings
+            await _start_worker()
+        except (Exception, asyncio.CancelledError):
+            # Do not leave a half-applied setting after a worker failure or
+            # an expired settings request. The caller rolls back the file.
+            settings = previous
+            await _stop_worker()
+            await _start_worker()
+            raise
+
+    def _ai_changed(_config: AIConfig | None) -> None:
+        # Called from the setup thread; the worker lives on the event loop.
+        loop = ai_state["loop"]
+        if loop is not None and loop.is_running():
+            # This callback runs in a thread. Do not report an updated choice
+            # before the event loop has applied it and replaced the worker.
+            change = asyncio.run_coroutine_threadsafe(_apply_ai_setup(), loop)
+            try:
+                change.result(timeout=30)
+            except TimeoutError:
+                change.cancel()
+                raise
+
+    if base_settings.desktop:
+        ai_state["manager"] = AIManager(base_settings, _ai_changed, busy_reason=_ai_busy_reason)
+
+    async def _serialize_desktop_ai_changes(request: Request, call_next):  # type: ignore[no-untyped-def]
+        # Serialize admission, not the scan itself: a setting cannot change
+        # between checking a request and queueing its model/crawl work.
+        related = request.url.path.startswith(
+            ("/api/ai", "/api/scans", "/api/local-login-scans", "/api/protected", "/api/agents")
+        )
+        releases_work = request.url.path.startswith("/api/agents/") and request.url.path.endswith(
+            "/work"
+        )
+        if (
+            base_settings.desktop
+            and related
+            and (request.method in {"POST", "PUT", "DELETE"} or releases_work)
+        ):
+            async with ai_mutation_lock:
+                return await call_next(request)
+        return await call_next(request)
+
+    async def _start_ai_runtime() -> None:
+        ai_state["loop"] = asyncio.get_running_loop()
+        manager = ai_state["manager"]
+        if manager is not None:
+            await asyncio.to_thread(manager.startup)
+
+    async def _stop_ai_runtime() -> None:
+        manager = ai_state["manager"]
+        if manager is not None:
+            await asyncio.to_thread(manager.shutdown)
+
+    if ai_state["manager"] is not None:
+        app.middleware("http")(_serialize_desktop_ai_changes)
+        app.router.add_event_handler("startup", _start_ai_runtime)
+        app.router.add_event_handler("shutdown", _stop_ai_runtime)
+        app.include_router(build_ai_router(ai_state["manager"]), prefix="/api")
 
     @app.middleware("http")
     async def _require_protected_scan_access(request: Request, call_next):  # type: ignore[no-untyped-def]
@@ -1185,6 +1404,37 @@ def create_app(
         request and returns only model names/sizes already present locally.
         """
 
+        if settings.desktop and not ai_enabled(settings):
+            reason = "AI features are off. Turn them on in Settings > AI features."
+            chosen = ai_semantic_model(settings)
+            return JSONResponse(
+                {
+                    "ai_enabled": False,
+                    "ocr": {
+                        "available": shutil.which("tesseract") is not None,
+                        "engine": "Tesseract 5",
+                        "language": settings.ocr_language,
+                        "max_workers": settings.ocr_max_workers,
+                        "bundled_in_desktop": bool(shutil.which("tesseract")),
+                    },
+                    "ollama": {"reachable": False},
+                    "vision": {
+                        "available": False,
+                        "model": settings.vlm_model,
+                        "installed_size_bytes": None,
+                        "reason": reason,
+                    },
+                    "semantic": {
+                        "available": False,
+                        "models": [chosen] if chosen else [],
+                        "ready_models": [],
+                        "missing_models": [],
+                        "checks_per_page": len(supported_criteria()),
+                        "reason": reason,
+                    },
+                }
+            )
+
         installed: dict[str, int] = {}
         ollama_reachable = False
         try:
@@ -1211,12 +1461,18 @@ def create_app(
 
         vision_model = settings.vlm_model
         vision_size = installed_size(vision_model)
-        semantic_models = sorted({get_pick(sc).primary for sc in supported_criteria()})
+        chosen_semantic = ai_semantic_model(settings)
+        semantic_models = (
+            [chosen_semantic]
+            if chosen_semantic
+            else sorted({get_pick(sc).primary for sc in supported_criteria()})
+        )
         semantic_ready = [model for model in semantic_models if installed_size(model) is not None]
         semantic_missing = [model for model in semantic_models if model not in semantic_ready]
 
         return JSONResponse(
             {
+                **({"ai_enabled": True} if settings.desktop else {}),
                 "ocr": {
                     "available": shutil.which("tesseract") is not None,
                     "engine": "Tesseract 5",
@@ -1404,6 +1660,9 @@ def create_app(
         """
 
         _require_local_login_request(request, mutation=True)
+        # AI features off (desktop setting): no image analysis by a model.
+        if not ai_enabled(settings) and not body.skip_vlm:
+            raise HTTPException(409, "AI features are off. Turn them on in Settings > AI features.")
         await _refresh_sign_in()
         existing = sign_ins.current()
         if existing is not None:
@@ -1476,6 +1735,9 @@ def create_app(
             keyboard_probe_enabled=not body.skip_keyboard,
             responsive_checks_enabled=not body.skip_responsive,
             focus_checks_enabled=True,
+            # Reads the page code and changes nothing, so it is as safe
+            # behind a sign-in as the rule check (axe).
+            markup_checks_enabled=True,
             visual_checks_enabled=False,
             # A marked element screenshot is what makes a finding reviewable
             # without re-running the sign-in, so an authenticated scan needs
@@ -1696,6 +1958,14 @@ def create_app(
         request: Request, body: Annotated[dict[str, Any], Body()]
     ) -> JSONResponse:
         """Kick off a crawl. Body mirrors the new-scan form fields."""
+        desktop_ai_off = settings.desktop and not ai_enabled(settings)
+        if desktop_ai_off and any(
+            key in body and not bool(body[key]) for key in ("skip_vlm", "skip_semantic")
+        ):
+            return JSONResponse(
+                {"error": "AI features are off. Turn them on in Settings > AI features."},
+                status_code=409,
+            )
         url = str(body.get("url") or "").strip()
         validation_error = _validate_seed_url(url)
         if validation_error is not None:
@@ -1794,7 +2064,7 @@ def create_app(
             "whole_host": bool(body.get("whole_host")),
             "ignore_robots": bool(body.get("ignore_robots")),
             "skip_ocr": bool(body.get("skip_ocr")),
-            "skip_vlm": bool(body.get("skip_vlm")),
+            "skip_vlm": bool(body.get("skip_vlm", desktop_ai_off)),
             # Render-every-page is the default; `static_only` is the
             # opt-out fast path. (`js_eager` accepted for older callers.)
             "static_only": static_only,
@@ -1804,9 +2074,17 @@ def create_app(
             "skip_interaction": bool(body.get("skip_interaction")),
             "skip_keyboard": bool(body.get("skip_keyboard")),
             "skip_responsive": bool(body.get("skip_responsive")),
-            "skip_semantic": bool(body.get("skip_semantic")),
+            "skip_semantic": bool(body.get("skip_semantic", desktop_ai_off)),
             "skip_focus": bool(body.get("skip_focus")),
+            # On unless asked off, like the other checks that only read.
+            "skip_markup": bool(body.get("skip_markup")),
             "skip_visual": bool(body.get("skip_visual")),
+            # Off unless asked for: an older client that sends nothing never
+            # starts the form error check, which presses submit buttons.
+            "skip_forms": bool(body.get("skip_forms", True)),
+            # Off unless asked for, and never on its own: sending an empty
+            # form to the site needs the check itself on.
+            "send_empty_forms": bool(body.get("send_empty_forms", False)),
             "skip_rendered_storage": bool(body.get("skip_rendered_storage")),
             "axe_level": str(body.get("axe_level", "AA")),
             "wcag_version": wcag_version,
@@ -2063,6 +2341,20 @@ def create_app(
                 raise HTTPException(status_code=400, detail=str(exc)) from exc
         return JSONResponse(jsonable_encoder(payload), status_code=201)
 
+    @app.get("/api/scans/{scan_id:int}/pages", response_model=ScanPagesResponse)
+    def api_scan_pages(
+        scan_id: int,
+        limit: int = Query(default=pages_queries.DEFAULT_LIMIT, ge=1, le=pages_queries.MAX_LIMIT),
+        offset: int = Query(default=0, ge=0),
+        sort: pages_queries.PageSort = pages_queries.DEFAULT_SORT,
+    ) -> ScanPagesResponse:
+        """Every page this report visited, one bounded page of rows at a time."""
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            return pages_queries.list_scan_pages(
+                conn, scan_id, limit=limit, offset=offset, sort=sort
+            )
+
     @app.get("/api/scans/{scan_id:int}/pages/{page_id:int}")
     def api_page_evidence(scan_id: int, page_id: int) -> JSONResponse:
         """Return page evidence only when the page belongs to this report."""
@@ -2072,6 +2364,144 @@ def create_app(
         if payload is None:
             raise HTTPException(status_code=404, detail="Page is not part of this report")
         return JSONResponse(jsonable_encoder(payload))
+
+    @app.put(
+        "/api/scans/{scan_id:int}/pages/{page_id:int}/review",
+        response_model=OccurrenceReviewResponse,
+    )
+    def api_save_occurrence_review(
+        scan_id: int, page_id: int, body: OccurrenceReviewRequest
+    ) -> OccurrenceReviewResponse:
+        """Save a person's review of the occurrences on one element of this page.
+
+        Any report can be reviewed, finished or not. A protected report is
+        refused: its ordinary tables keep only opaque aliases, and notes
+        about its pages would be the plaintext evidence they keep out.
+        """
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            if _get_protected_scan_compat(conn, scan_id=scan_id) is not None:
+                raise HTTPException(
+                    status_code=403, detail="Reviews are not kept for protected reports."
+                )
+            try:
+                saved = occurrence_reviews.save_review(
+                    conn,
+                    scan_id=scan_id,
+                    page_id=page_id,
+                    a11y_finding_ids=body.a11y_finding_ids,
+                    page_image_ids=body.page_image_ids,
+                    decision=body.decision,
+                    notes=body.notes,
+                )
+            except occurrence_reviews.ReviewScopeError as exc:
+                raise HTTPException(status_code=404, detail=str(exc)) from exc
+            except occurrence_reviews.ReviewError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            except sqlite3.OperationalError as exc:
+                if "occurrence_reviews" not in str(exc) and "decision" not in str(exc):
+                    raise
+                raise HTTPException(
+                    status_code=503,
+                    detail="Database migrations are incomplete. Restart Axcess, or run "
+                    "`make migrate`, and try again.",
+                ) from exc
+        return OccurrenceReviewResponse(
+            decision=saved.decision, notes=saved.notes, updated_at=saved.updated_at
+        )
+
+    def _suggestion_call(fn: Callable[[], SuggestionRecord]) -> SuggestionRecord:
+        try:
+            return fn()
+        except suggest_service.SuggestionRefusedError as exc:
+            raise HTTPException(status_code=exc.status, detail=exc.message) from exc
+
+    def _is_protected(conn: sqlite3.Connection, scan_id: int) -> bool:
+        return _get_protected_scan_compat(conn, scan_id=scan_id) is not None
+
+    @app.get("/api/suggestions/status")
+    async def api_suggestion_status() -> SuggestionAvailability:
+        """Whether AI fix suggestions can be used now, and why not if not."""
+        conn = get_conn()
+        try:
+            task = crawl_state.get("task")
+            running = isinstance(task, asyncio.Task) and not task.done()
+            return await suggest_service.availability(
+                conn, settings, suggestion_state["provider"], scan_running=running
+            )
+        finally:
+            conn.close()
+
+    @app.post("/api/scans/{scan_id:int}/suggestions", status_code=202)
+    def api_create_suggestion(scan_id: int, body: SuggestionCreate) -> SuggestionRecord:
+        """Queue an AI fix suggestion for one occurrence in this report."""
+        with get_conn() as conn:
+            protected = _is_protected(conn, scan_id)
+            record = _suggestion_call(
+                lambda: suggest_service.create(
+                    conn, settings, scan_id=scan_id, body=body, is_protected=protected
+                )
+            )
+        worker = suggestion_state.get("worker")
+        if worker is not None:
+            worker.wake()
+        return record
+
+    @app.get("/api/scans/{scan_id:int}/suggestions/{suggestion_id:int}")
+    def api_get_suggestion(scan_id: int, suggestion_id: int) -> SuggestionRecord:
+        with get_conn() as conn:
+            protected = _is_protected(conn, scan_id)
+            return _suggestion_call(
+                lambda: suggest_service.get(
+                    conn, scan_id=scan_id, suggestion_id=suggestion_id, is_protected=protected
+                )
+            )
+
+    @app.get(
+        "/api/scans/{scan_id:int}/occurrences/{occurrence_kind}/{occurrence_id:int}/suggestion"
+    )
+    def api_latest_suggestion(
+        scan_id: int, occurrence_kind: OccurrenceKind, occurrence_id: int
+    ) -> SuggestionRecord | None:
+        """The newest suggestion for one occurrence, or null if none yet."""
+        with get_conn() as conn:
+            protected = _is_protected(conn, scan_id)
+            try:
+                return suggest_service.latest(
+                    conn,
+                    scan_id=scan_id,
+                    occurrence_kind=occurrence_kind,
+                    occurrence_id=occurrence_id,
+                    is_protected=protected,
+                )
+            except suggest_service.SuggestionRefusedError as exc:
+                raise HTTPException(status_code=exc.status, detail=exc.message) from exc
+
+    @app.post("/api/scans/{scan_id:int}/suggestions/{suggestion_id:int}/cancel")
+    def api_cancel_suggestion(scan_id: int, suggestion_id: int) -> SuggestionRecord:
+        with get_conn() as conn:
+            protected = _is_protected(conn, scan_id)
+            return _suggestion_call(
+                lambda: suggest_service.cancel(
+                    conn, scan_id=scan_id, suggestion_id=suggestion_id, is_protected=protected
+                )
+            )
+
+    @app.post("/api/scans/{scan_id:int}/suggestions/{suggestion_id:int}/feedback")
+    def api_suggestion_feedback(
+        scan_id: int, suggestion_id: int, body: FeedbackUpdate
+    ) -> SuggestionRecord:
+        with get_conn() as conn:
+            protected = _is_protected(conn, scan_id)
+            return _suggestion_call(
+                lambda: suggest_service.set_feedback(
+                    conn,
+                    scan_id=scan_id,
+                    suggestion_id=suggestion_id,
+                    body=body,
+                    is_protected=protected,
+                )
+            )
 
     @app.get("/api/scans/{scan_id:int}/pages/{page_id:int}/inspect")
     async def api_page_inspect(
@@ -2970,26 +3400,66 @@ def create_app(
         scan: ExportScan,
         fmt: str,
         readiness: PublicExportReadiness,
+        *,
+        redact: bool = False,
+        ui_base_url: str = DEFAULT_UI_BASE,
     ) -> str | bytes:
-        """Render one export format and apply its draft labeling."""
+        """Render one export format, redact it if asked, then label drafts."""
         # The audit-report renderer needs the live connection so it
         # can call the grouping helpers. The other renderers operate
         # on the pre-collected `scan` only.
         rendered: str | bytes
         if fmt == "audit":
-            rendered = render_audit_report(scan, conn=conn)
+            # ``redact`` here and for the workbook: these two write sentences
+            # from element code ("text area containing ..."), so they read a
+            # redacted copy of the evidence. The pass below cannot find a
+            # form value once it is part of a sentence.
+            rendered = render_audit_report(scan, conn=conn, redact=redact)
         elif fmt == "xlsx":
             # Pass the blob store so the Issues Overview sheet can embed
-            # each finding's marked location screenshot as evidence.
-            rendered = render_xlsx(scan, conn=conn, blob_store=blob_store)
+            # each finding's marked location screenshot as evidence. A
+            # redacted workbook gets none: text in a screenshot cannot be
+            # redacted, so the pictures are never put in.
+            rendered = render_xlsx(
+                scan, conn=conn, blob_store=None if redact else blob_store, redact=redact
+            )
+        elif fmt == "its":
+            # The ITS team's own template. A redacted copy goes through the
+            # same workbook pass as the issue workbook, below.
+            rendered = render_its_review(scan, conn=conn)
+        elif fmt == "brief":
+            # Redacted while it is built (scanned values only), so it skips
+            # the whole-file pass below.
+            rendered = render_fix_brief(scan, conn=conn, ui_base_url=ui_base_url)
         else:
             rendered = _EXPORT_RENDERERS[fmt](scan)
+        if redact and fmt not in _ALWAYS_REDACTED_FORMATS:
+            # Redaction runs on the finished file, never on stored evidence:
+            # the report in the app keeps everything (export-only scope).
+            # The scan's element locators are kept whole, so each still
+            # finds its element; the notice in the file says so.
+            rendered = redact_export(
+                rendered, export_format=fmt, locators=scan_locators(scan.a11y_findings)
+            )
         return label_draft_export(rendered, export_format=fmt, readiness=readiness)
 
     # The Export panel asks this before offering its downloads, so each
     # choice can say how big the file is and whether it will be a draft.
     @app.get("/api/scans/{scan_id:int}/exports", response_model=ExportOptions)
-    def export_options(request: Request, scan_id: int) -> ExportOptions:
+    def export_options(
+        request: Request,
+        scan_id: int,
+        redact: Annotated[
+            bool,
+            Query(
+                description=(
+                    "Set to true for a redacted copy: likely private details "
+                    "(form values, email addresses, phone numbers, card and ID "
+                    "numbers, tokens) are replaced with [redacted]. Best effort."
+                )
+            ),
+        ] = False,
+    ) -> ExportOptions:
         """Name, size and draft state of each file the Export panel offers.
 
         Each file is rendered exactly as the download route renders it, with
@@ -3001,11 +3471,25 @@ def create_app(
             scan = collect_public_export_scan(conn, scan_id, request)
             readiness = assess_public_export_readiness(conn, scan_id, draft_acknowledged=True)
 
+            base_url = str(request.base_url).rstrip("/")
+
             def render(fmt: PanelFormat) -> str | bytes:
-                return render_public_export(conn, scan, fmt, readiness)
+                return render_public_export(
+                    conn, scan, fmt, readiness, redact=redact, ui_base_url=base_url
+                )
 
             return build_export_options(
-                scan_id, readiness, extensions=_EXPORT_EXTENSIONS, render=render
+                scan_id,
+                readiness,
+                extensions=_EXPORT_EXTENSIONS,
+                render=render,
+                redacted=redact,
+                always_redacted=_ALWAYS_REDACTED_FORMATS,
+                # A report that is not complete has no brief to measure; the
+                # panel shows the file without a size, and choosing it says why.
+                unavailable=(
+                    _COMPLETED_ONLY_FORMATS if scan.status != "completed" else frozenset()
+                ),
             )
 
     # The SPA's Export panel downloads from this ``/api/*`` route with
@@ -3025,13 +3509,34 @@ def create_app(
                 )
             ),
         ] = None,
+        redact: Annotated[
+            bool,
+            Query(
+                description=(
+                    "Set to true for a redacted copy: likely private details "
+                    "(form values, email addresses, phone numbers, card and ID "
+                    "numbers, tokens) are replaced with [redacted]. Best effort."
+                )
+            ),
+        ] = False,
     ) -> Response:
-        """Download a scan export as CSV / JSON / Jira CSV / Markdown / Audit."""
+        """Download a scan export: CSV, JSON, Jira CSV, Markdown, Audit, Excel or fix brief."""
         fmt_lower = fmt.lower()
         if fmt_lower not in _EXPORT_RENDERERS:
             raise HTTPException(status_code=400, detail="Unknown export format")
         with get_conn() as conn:
             scan = collect_public_export_scan(conn, scan_id, request)
+            if fmt_lower in _COMPLETED_ONLY_FORMATS and scan.status != "completed":
+                # Refused before the readiness check, as a deleted scan is
+                # refused before it: there is no complete report to export.
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        f"Report #{scan_id} is not complete (the scan is {scan.status}). "
+                        "A fix brief can only be made from a completed scan. Wait for "
+                        "the scan to finish, or start a new scan."
+                    ),
+                )
             try:
                 readiness = assess_public_export_readiness(
                     conn,
@@ -3040,13 +3545,23 @@ def create_app(
                 )
             except IncompleteEvaluationExportError as exc:
                 raise HTTPException(status_code=409, detail=str(exc)) from exc
-            rendered = render_public_export(conn, scan, fmt_lower, readiness)
+            rendered = render_public_export(
+                conn,
+                scan,
+                fmt_lower,
+                readiness,
+                redact=redact,
+                ui_base_url=str(request.base_url).rstrip("/"),
+            )
+        redacted = redact or fmt_lower in _ALWAYS_REDACTED_FORMATS
         media = _EXPORT_MEDIA_TYPES[fmt_lower]
         ext = _EXPORT_EXTENSIONS[fmt_lower]
-        filename = public_export_filename(scan_id, ext, readiness)
+        filename = public_export_filename(scan_id, ext, readiness, redacted=redacted)
         headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
         if readiness.is_draft:
             headers["X-Axcess-Export-State"] = "draft"
+        if redacted:
+            headers["X-Axcess-Export-Redaction"] = "best-effort"
         return Response(
             content=rendered,
             media_type=media,
@@ -3086,6 +3601,8 @@ def create_app(
             mime = row["mime"] or "application/octet-stream"
         else:
             # Per-finding screenshots live in the same content-addressed store
+            # (the after picture in `screenshot_hash`, and for the form error
+            # check the before picture in `before_screenshot_hash`, 0035)
             # but have no `images` row: the crawler captures them from the live
             # element, they are not image content extracted from the page. This
             # lookup used to consider `images` only, so every marked screenshot
@@ -3097,7 +3614,7 @@ def create_app(
                         SELECT 1
                           FROM page_a11y_findings f
                           JOIN pages p ON p.id = f.page_id
-                         WHERE f.screenshot_hash = ?
+                         WHERE (f.screenshot_hash = ? OR f.before_screenshot_hash = ?)
                            AND NOT EXISTS (
                                SELECT 1
                                  FROM protected_scans ps
@@ -3105,7 +3622,7 @@ def create_app(
                            )
                          LIMIT 1
                         """,
-                        (content_hash,),
+                        (content_hash, content_hash),
                     ).fetchone()
                 else:
                     shot = conn.execute(
@@ -3113,10 +3630,10 @@ def create_app(
                         SELECT 1
                           FROM page_a11y_findings f
                           JOIN pages p ON p.id = f.page_id
-                         WHERE f.screenshot_hash = ?
+                         WHERE (f.screenshot_hash = ? OR f.before_screenshot_hash = ?)
                          LIMIT 1
                         """,
-                        (content_hash,),
+                        (content_hash, content_hash),
                     ).fetchone()
             if shot is None:
                 raise HTTPException(status_code=404, detail="Blob not found")
@@ -3600,11 +4117,12 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
         ocr_max_workers=settings.ocr_max_workers,
         ocr_min_confidence=settings.ocr_min_confidence,
         ocr_min_word_count=settings.ocr_min_word_count,
-        vlm_enabled=not bool(form["skip_vlm"]),
+        vlm_enabled=not bool(form["skip_vlm"]) and ai_enabled(settings),
         vlm_model=settings.vlm_model,
         vlm_base_url=settings.ollama_base_url,
         vlm_prompt_name=settings.vlm_prompt_name,
         vlm_concurrency=settings.vlm_concurrency,
+        semantic_model=ai_semantic_model(settings),
         # Render-every-page is the default (audit mode). `static_only`
         # is the opt-out fast path, HTML checkboxes can't post
         # "unchecked", so the form field is the inversion.
@@ -3626,11 +4144,15 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
         # the wiring to the runner lands in Phase 9.1, for now this
         # just plumbs the flag through so the web form has the same
         # surface as the CLI's `--skip-semantic`.
-        semantic_enabled=not bool(form.get("skip_semantic")),
+        semantic_enabled=not bool(form.get("skip_semantic")) and ai_enabled(settings),
         keyboard_probe_enabled=not bool(form.get("skip_keyboard")),
         responsive_checks_enabled=not bool(form.get("skip_responsive")),
         focus_checks_enabled=not bool(form.get("skip_focus")),
+        markup_checks_enabled=not bool(form.get("skip_markup")),
         visual_checks_enabled=not bool(form.get("skip_visual")),
+        form_error_checks_enabled=not bool(form.get("skip_forms", True)),
+        form_send_empty_forms=not bool(form.get("skip_forms", True))
+        and bool(form.get("send_empty_forms", False)),
         store_rendered_html=not bool(form.get("skip_rendered_storage")),
     )
 
@@ -3833,6 +4355,9 @@ async def _run_local_login_background(
                 else None
             ),
             focus_probe=FocusProbe(suppress_diagnostics=True),
+            markup_probe=(
+                MarkupProbe(suppress_diagnostics=True) if config.markup_checks_enabled else None
+            ),
             interaction_probe=login_interaction,
             # Follow the scan's own setting rather than hardcoding it off.
             # This fetcher is built here instead of by the orchestrator, so
@@ -4340,6 +4865,8 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
     alfa_ran_counters = int(scan.get("alfa_pages_scanned") or 0) > 0
     interaction_pages = int(scan.get("interaction_pages_probed") or 0)
     interaction_states = int(scan.get("interaction_states_total") or 0)
+    forms_pages = int(scan.get("forms_pages_checked") or 0)
+    markup_pages = int(scan.get("markup_pages_checked") or 0)
     coverage_version = int(cfg.get("method_coverage_version") or 0)
     scan_status = str(scan.get("status") or "")
     page_count = int(scan.get("page_count") or 0)
@@ -4404,6 +4931,26 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
             "caveat": (
                 "A failed rule is not proof the page fails WCAG, and a person "
                 'reviews each "cannot tell".'
+            ),
+        },
+        {
+            "key": "markup",
+            "label": "Page code check",
+            # Scans before migration 0038 never ran it and stored no setting.
+            "enabled": (flag("markup_checks_enabled", default=False) and rendered)
+            or markup_pages > 0,
+            "checked_count": markup_pages,
+            "total_count": coverage["rendered_pages"],
+            "unit": "page",
+            "verb": "checked",
+            "description": (
+                "Reads each page's code for problems the rule check (axe) misses, such as "
+                "a field named only by its placeholder text."
+            ),
+            # One sentence, as every limit in this table.
+            "caveat": (
+                "It reads each page only as it loads, not after clicking, and a person "
+                "checks its guesses about text that looks like a heading."
             ),
         },
         {
@@ -4485,6 +5032,37 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
                 else "It skips risky actions and may not reach every control."
             ),
         },
+        {
+            "key": "forms",
+            "label": "Form error check",
+            # Off unless the scan turned it on (New scan does, by default, for
+            # public websites); never in a sign-in scan.
+            "enabled": flag("form_error_checks_enabled", default=False) and rendered,
+            "checked_count": forms_pages,
+            "total_count": coverage["rendered_pages"],
+            "unit": "page",
+            "verb": "checked",
+            # Scans before migration 0036 kept no counts: their zero says
+            # nothing, so they say coverage was not recorded.
+            "coverage_known": forms_pages > 0
+            or int(cfg.get("form_check_coverage_version") or 0) >= 1,
+            "description": (
+                "Presses each form's submit button once, with nothing typed, and checks "
+                "that the form says in words what is wrong."
+                + (
+                    " This scan let it send a form to the site when every field was "
+                    "empty, and check the page the site sent back."
+                    if flag("form_send_empty_forms", default=False)
+                    else ""
+                )
+            ),
+            # One sentence, as every limit in this table. Which forms it never
+            # presses is the safety rule (analyzer/forms/base.skip_reason).
+            "caveat": (
+                "It never presses sign-in, payment, search or delete forms, checks only "
+                "the first step of a form, and a person confirms each result."
+            ),
+        },
     ]
 
     for method in method_specs:
@@ -4496,6 +5074,8 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
             )
         elif method["key"] == "interaction" and method["state"] == "not_run":
             method["result"] = "Selected, but no page checks were recorded"
+        elif method["key"] == "forms" and forms_pages > 0:
+            method["result"] = "; ".join([str(method["result"]), *_form_clauses(scan)])
         elif (
             method["key"] == "search" and method["enabled"] and coverage.get("search_attention", 0)
         ):
@@ -4505,6 +5085,34 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
                 "search stopped early or found no results. Check the search settings and limits."
             )
     return method_specs
+
+
+def _form_clauses(scan: dict[str, Any]) -> list[str]:
+    """What the form error check did with the forms it found, in counts.
+
+    "2 pages checked" holds for a page whose every form was skipped as a
+    sign-in form, and for one whose every form was pressed. These clauses
+    separate the two, each from a recorded count (migration 0036).
+    """
+
+    def plural(count: int, unit: str) -> str:
+        return f"{count} {unit}" if count == 1 else f"{count} {unit}s"
+
+    pressed = int(scan.get("forms_pressed") or 0)
+    skipped = int(scan.get("forms_skipped") or 0)
+    not_checked = int(scan.get("forms_not_checked") or 0)
+    clauses = [f"{plural(pressed, 'form')} pressed"]
+    if skipped:
+        clauses.append(
+            f"{plural(skipped, 'form')} not pressed, such as sign-in, payment or search forms"
+        )
+    if not_checked:
+        one = not_checked == 1
+        clauses.append(
+            f"{plural(not_checked, 'form')} tried to send {'itself' if one else 'themselves'}, "
+            f"so Axcess could not judge {'it' if one else 'them'}"
+        )
+    return clauses
 
 
 def _interaction_clauses(states: int, coverage: dict[str, int]) -> list[str]:

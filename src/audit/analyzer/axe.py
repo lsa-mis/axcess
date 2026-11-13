@@ -41,8 +41,10 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 from collections.abc import Iterator
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -197,6 +199,34 @@ def _sc_sort_key(sc: str) -> tuple[int, int, int]:
         return (99, 99, 99)
 
 
+_VERSION_BANNER = re.compile(r"axe v(\d+\.\d+\.\d+)")
+
+
+@lru_cache(maxsize=4)
+def bundled_axe_version(path: Path = DEFAULT_AXE_BUNDLE) -> str | None:
+    """The axe-core version of the bundle a scan runs, from its banner.
+
+    ``axe.min.js`` opens with ``/*! axe v4.10.2 ...``. Recorded with each
+    scan, so a report says which rule set produced it and two reports can
+    be compared across tools and over time. None when the file is missing
+    or has no banner; a scan never fails over it.
+    """
+    try:
+        with path.open(encoding="utf-8") as handle:
+            head = handle.read(200)
+    except OSError:
+        return None
+    match = _VERSION_BANNER.search(head)
+    return match.group(1) if match else None
+
+
+#: What axe decided about one node. ``failed`` is a violation; ``cant_tell``
+#: is axe's "incomplete" result ("needs review"), where axe could not decide,
+#: for example a text colour over a background image. The word matches the
+#: ``engine_outcome`` column Alfa already fills with the same two values.
+AxeOutcome = Literal["failed", "cant_tell"]
+
+
 @dataclass(slots=True, frozen=True)
 class AxeViolation:
     """One axe rule failure against one DOM node.
@@ -217,16 +247,27 @@ class AxeViolation:
     target_selector: str
     failure_summary: str
     html_snippet: str
+    # Default "failed" so every existing caller and fixture means what it did.
+    outcome: AxeOutcome = "failed"
 
     @property
     def target_hash(self) -> str:
-        """Stable hash for the (rule, target, snippet) tuple, dedupe key."""
+        """Stable hash for the (rule, target, snippet) tuple, dedupe key.
+
+        A ``cant_tell`` result adds its outcome, so it never shares a row with
+        a failure of the same element: the database dedupes on
+        ``(page_id, rule_id, target_hash)``, and a menu opened by Click-Through
+        can turn a load-time "needs review" into a real failure. A failure's
+        hash is unchanged, so earlier scans still compare row for row.
+        """
         h = hashlib.sha256()
         h.update(self.rule_id.encode("utf-8", errors="replace"))
         h.update(b"\x00")
         h.update(self.target_selector.encode("utf-8", errors="replace"))
         h.update(b"\x00")
         h.update(self.html_snippet.encode("utf-8", errors="replace"))
+        if self.outcome == "cant_tell":
+            h.update(b"\x00cant_tell")
         return h.hexdigest()
 
 
@@ -260,8 +301,16 @@ class AxeAnalyzer:
         page: Page | Frame,
         level: Level = "AA",
         version: WcagVersion = LEGACY_WCAG_VERSION,
+        *,
+        include_incomplete: bool = False,
     ) -> list[AxeViolation]:
         """Inject axe into ``page`` (or one of its frames) and return the flattened violations.
+
+        ``include_incomplete`` also returns axe's "incomplete" results (what
+        axe's own tools call "needs review") with ``outcome="cant_tell"``.
+        Axe could not decide on those, so they are leads for a person, never
+        failures. Off by default: callers that only compare failures (the
+        frame and search baselines) keep doing so.
 
         ``level`` controls the tag pack: ``"AA"`` (default) catches every
         rule axe knows for Level A or AA, plus axe's ``best-practice`` set.
@@ -307,18 +356,22 @@ class AxeAnalyzer:
                 log.warning("axe-core installation failed on page: %s", exc)
             return []
         tags = tags_for_level(level, version)
-        # axe.run returns the full result object; we only keep `violations`.
-        # The `runOnly: {type: 'tag', values: tags}` filter is what gives
-        # us the WCAG-tagged subset of axe's rule set.
+        # axe.run returns the full result object; we keep `violations`, and
+        # `incomplete` when asked. `passes` and `inapplicable` stay in the
+        # page. The `runOnly: {type: 'tag', values: tags}` filter is what
+        # gives us the WCAG-tagged subset of axe's rule set.
         try:
-            raw: list[dict[str, Any]] = await page.evaluate(
-                """async (tags) => {
+            raw: dict[str, list[dict[str, Any]]] = await page.evaluate(
+                """async ([tags, withIncomplete]) => {
                     const r = await window.axe.run(document, {
                         runOnly: { type: 'tag', values: tags },
                     });
-                    return r.violations;
+                    return {
+                        violations: r.violations,
+                        incomplete: withIncomplete ? r.incomplete : [],
+                    };
                 }""",
-                tags,
+                [tags, include_incomplete],
             )
         except Exception as exc:
             # Don't kill the crawl on an axe failure, log and return empty.
@@ -327,10 +380,14 @@ class AxeAnalyzer:
             else:
                 log.warning("axe.run failed on page: %s", exc)
             return []
-        return list(_flatten(raw))
+        found = list(_flatten(raw.get("violations") or []))
+        found.extend(_flatten(raw.get("incomplete") or [], outcome="cant_tell"))
+        return found
 
 
-def _flatten(raw_violations: list[dict[str, Any]]) -> Iterator[AxeViolation]:
+def _flatten(
+    raw_violations: list[dict[str, Any]], *, outcome: AxeOutcome = "failed"
+) -> Iterator[AxeViolation]:
     """Expand axe's per-rule grouping into one row per (rule, node)."""
     for v in raw_violations:
         rule_id = str(v.get("id", "?"))
@@ -361,6 +418,7 @@ def _flatten(raw_violations: list[dict[str, Any]]) -> Iterator[AxeViolation]:
                 target_selector=target_selector,
                 failure_summary=failure_summary,
                 html_snippet=html_snippet,
+                outcome=outcome,
             )
 
 
