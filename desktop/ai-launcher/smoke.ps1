@@ -190,6 +190,9 @@ try {
     }
     Write-Host "All launcher smoke checks passed."
     Show-Log
+    # Explicit: the runner exits with the last native exit code otherwise,
+    # which is curl.exe's expected refusal from check c.
+    exit 0
 } catch {
     Write-Host "FAILED: $_"
     Show-Log
