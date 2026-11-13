@@ -122,7 +122,7 @@ from audit.wcag_version import (
     is_wcag_version,
     stored_wcag_version,
 )
-from audit.web import local_sign_in, pages_queries
+from audit.web import linked_files_queries, local_sign_in, pages_queries
 from audit.web.ai_api import build_ai_router
 from audit.web.comparison import (
     MAX_PAGE_SIZE,
@@ -144,6 +144,7 @@ from audit.web.export_readiness import (
     label_draft_export,
     public_export_filename,
 )
+from audit.web.linked_files_queries import ScanDocumentsResponse
 from audit.web.local_sign_in import (
     SIGN_IN_KEEP_MINUTES,
     EndedReason,
@@ -2351,6 +2352,21 @@ def create_app(
             _load_scan_or_404(conn, scan_id)
             return pages_queries.list_scan_pages(
                 conn, scan_id, limit=limit, offset=offset, sort=sort
+            )
+
+    @app.get("/api/scans/{scan_id:int}/documents", response_model=ScanDocumentsResponse)
+    def api_scan_documents(
+        scan_id: int,
+        limit: int = Query(
+            default=linked_files_queries.DEFAULT_LIMIT, ge=1, le=linked_files_queries.MAX_LIMIT
+        ),
+        offset: int = Query(default=0, ge=0),
+    ) -> ScanDocumentsResponse:
+        """The files this report's pages link to (the Documents tab), in report order."""
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            return linked_files_queries.list_scan_documents(
+                conn, scan_id, limit=limit, offset=offset
             )
 
     @app.get("/api/scans/{scan_id:int}/pages/{page_id:int}")

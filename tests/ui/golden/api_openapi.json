@@ -1079,6 +1079,43 @@
         }
       }
     },
+    "/api/scans/{scan_id}/documents": {
+      "get": {
+        "summary": "Api Scan Documents",
+        "description": "The files this report's pages link to (the Documents tab), in report order.",
+        "operationId": "api_scan_documents_api_scans__scan_id__documents_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "integer", "maximum": 200, "minimum": 1, "default": 50, "title": "Limit"}
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "integer", "minimum": 0, "default": 0, "title": "Offset"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ScanDocumentsResponse"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
     "/api/scans/{scan_id}/pages/{page_id}": {
       "get": {
         "summary": "Api Page Evidence",
@@ -2481,6 +2518,127 @@
         "required": ["id", "started_at", "finished_at", "groups", "occurrences"],
         "title": "HistoryPoint"
       },
+      "LinkedFileCounts": {
+        "properties": {
+          "mostly_sure": {"type": "integer", "title": "Mostly Sure", "default": 0},
+          "not_sure": {"type": "integer", "title": "Not Sure", "default": 0},
+          "could_not_check": {"type": "integer", "title": "Could Not Check", "default": 0}
+        },
+        "type": "object",
+        "title": "LinkedFileCounts",
+        "description": "Files per status, across the whole report."
+      },
+      "LinkedFileRef": {
+        "properties": {
+          "page_id": {"type": "integer", "title": "Page Id"},
+          "page_url": {"type": "string", "title": "Page Url"},
+          "page_title": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Page Title"},
+          "how": {
+            "type": "string",
+            "enum": ["link", "revealed_link", "iframe", "object", "embed"],
+            "title": "How"
+          },
+          "link_text": {"type": "string", "title": "Link Text"},
+          "revealed_by": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Revealed By"}
+        },
+        "type": "object",
+        "required": ["page_id", "page_url", "page_title", "how", "link_text", "revealed_by"],
+        "title": "LinkedFileRef",
+        "description": "One place a page of this report reaches the file."
+      },
+      "LinkedFileRow": {
+        "properties": {
+          "file_id": {"type": "integer", "title": "File Id"},
+          "url": {"type": "string", "title": "Url"},
+          "name": {"type": "string", "title": "Name"},
+          "file_type": {
+            "type": "string",
+            "enum": [
+              "pdf",
+              "docx",
+              "doc",
+              "pptx",
+              "ppt",
+              "xlsx",
+              "xls",
+              "odt",
+              "odp",
+              "ods",
+              "rtf",
+              "google_doc",
+              "google_sheet",
+              "google_slides",
+              "google_drive"
+            ],
+            "title": "File Type"
+          },
+          "off_site": {"type": "boolean", "title": "Off Site"},
+          "status": {
+            "type": "string",
+            "enum": ["mostly_sure", "not_sure", "could_not_check"],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "type_not_checked_yet",
+                  "old_format",
+                  "google_file",
+                  "broken_link",
+                  "http_error",
+                  "password",
+                  "too_large",
+                  "timed_out",
+                  "not_a_pdf",
+                  "damaged",
+                  "robots",
+                  "blocked",
+                  "limit",
+                  "not_checked"
+                ]
+              },
+              {"type": "null"}
+            ],
+            "title": "Reason"
+          },
+          "failed_checks": {
+            "items": {
+              "type": "string",
+              "enum": ["not_tagged", "no_text", "blocks_assistive_tech", "no_title", "no_language"]
+            },
+            "type": "array",
+            "title": "Failed Checks"
+          },
+          "http_status": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "Http Status"},
+          "is_form": {"anyOf": [{"type": "boolean"}, {"type": "null"}], "title": "Is Form"},
+          "page_count": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "Page Count"},
+          "referring_page_count": {"type": "integer", "title": "Referring Page Count"},
+          "refs": {
+            "items": {"$ref": "#/components/schemas/LinkedFileRef"},
+            "type": "array",
+            "title": "Refs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file_id",
+          "url",
+          "name",
+          "file_type",
+          "off_site",
+          "status",
+          "reason",
+          "failed_checks",
+          "http_status",
+          "is_form",
+          "page_count",
+          "referring_page_count",
+          "refs"
+        ],
+        "title": "LinkedFileRow"
+      },
       "LocalLoginScanRequest": {
         "properties": {
           "seed_url": {"type": "string", "maxLength": 2048, "minLength": 12, "title": "Seed Url"},
@@ -2808,6 +2966,24 @@
         "type": "object",
         "required": ["id", "seed_url", "started_at"],
         "title": "ReportIdentity"
+      },
+      "ScanDocumentsResponse": {
+        "properties": {
+          "scan_id": {"type": "integer", "title": "Scan Id"},
+          "recorded": {"type": "boolean", "title": "Recorded"},
+          "total": {"type": "integer", "title": "Total"},
+          "counts": {"$ref": "#/components/schemas/LinkedFileCounts"},
+          "limit": {"type": "integer", "title": "Limit"},
+          "offset": {"type": "integer", "title": "Offset"},
+          "files": {
+            "items": {"$ref": "#/components/schemas/LinkedFileRow"},
+            "type": "array",
+            "title": "Files"
+          }
+        },
+        "type": "object",
+        "required": ["scan_id", "recorded", "total", "counts", "limit", "offset", "files"],
+        "title": "ScanDocumentsResponse"
       },
       "ScanFormSettings": {
         "properties": {
