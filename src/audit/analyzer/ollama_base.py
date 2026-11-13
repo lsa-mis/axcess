@@ -54,8 +54,10 @@ def is_cloud_model(name: str) -> bool:
     the computer unless an administrator chooses a remote address
     (AGENTS.md, "Context construction and privacy").
     """
-    _, _, tag = name.strip().lower().rpartition(":")
-    return tag == "cloud" or tag.endswith("-cloud")
+    # No colon means the default tag (":latest"), a local model, even when
+    # the name itself ends in "-cloud".
+    _, colon, tag = name.strip().lower().rpartition(":")
+    return bool(colon) and (tag == "cloud" or tag.endswith("-cloud"))
 
 
 def prompt_content_version(prompt_text: str) -> str:

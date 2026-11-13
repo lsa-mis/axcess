@@ -31,6 +31,10 @@ CLOUD = "gpt-oss:120b-cloud"
         ("llava", False),
         # "cloud" in the model's name, not its tag, is a local model.
         ("cloudy-vision:7b", False),
+        # No tag means ":latest", a local model, even if the name ends in -cloud.
+        ("campus-cloud", False),
+        ("campus-cloud:latest", False),
+        ("campus-cloud:7b-cloud", True),
     ],
 )
 def test_is_cloud_model(name: str, cloud: bool) -> None:
