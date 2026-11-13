@@ -31,6 +31,33 @@ on_module_loop = pytest.mark.asyncio(loop_scope="module")
 
 HOME = "http://example.com/"
 ABOUT = "http://example.com/about"
+# The two closed notes under the table, with Issues' titles.
+CHECKED = "What was checked"
+LABELS = 'What "Mostly sure", "Not sure" and the other labels mean'
+CAVEAT = (
+    "Results for an expert to review. They do not prove that the files meet "
+    "accessibility standards."
+)
+
+
+async def _open_notes(page: Any) -> None:
+    from playwright.async_api import expect
+
+    for name in (CHECKED, LABELS):
+        button = page.get_by_role("button", name=name, exact=True)
+        await button.click()
+        await expect(button).to_have_attribute("aria-expanded", "true")
+
+
+async def _title_fits_beside_its_fact(page: Any) -> None:
+    """The closed "What was checked" row's fact leaves its title room: at
+    most two lines, not one word a line."""
+    title = page.get_by_role("button", name=CHECKED, exact=True).locator("span")
+    lines = await title.evaluate(
+        "(el) => Math.round(el.getBoundingClientRect().height"
+        " / parseFloat(getComputedStyle(el).lineHeight))"
+    )
+    assert lines <= 2, lines
 
 
 def _file(
@@ -313,6 +340,69 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
     table_box = await table.bounding_box()
     assert numbers_box and table_box
     assert numbers_box["y"] + numbers_box["height"] <= table_box["y"], (numbers_box, table_box)
+    # Nothing to read between the numbers and the table: no caveat, key or
+    # order line there, as on Issues. The order is in the caption.
+    await expect(page.get_by_text(CAVEAT)).to_be_hidden()
+    await expect(page.get_by_text(re.compile(r"recommended order", re.I))).to_have_count(0)
+    await expect(table).to_have_accessible_name(
+        f"Documents linked from report #{scan_id}, "
+        "Mostly sure first, then Not sure, then Could not check"
+    )
+
+    # Under the table, Issues' two closed notes, in Issues' order; the
+    # closed "What was checked" row shows its one fact.
+    checked = page.get_by_role("button", name=CHECKED, exact=True)
+    labels = page.get_by_role("button", name=LABELS, exact=True)
+    for button in (checked, labels):
+        await expect(button).to_have_attribute("aria-expanded", "false")
+    checked_box = await checked.bounding_box()
+    labels_box = await labels.bounding_box()
+    assert checked_box and labels_box
+    assert table_box["y"] + table_box["height"] <= checked_box["y"] < labels_box["y"]
+    await expect(page.get_by_text("Only PDFs checked", exact=True)).to_be_visible()
+
+    # Opened by keyboard, "What was checked" holds the caveat, what is
+    # listed, the privacy fact and the limits, each said once.
+    await checked.focus()
+    await page.keyboard.press("Enter")
+    panel = page.get_by_role("region", name=CHECKED)
+    for text in (
+        CAVEAT,
+        "Axcess checks only the PDF files.",
+        "To check a PDF, Axcess downloaded it to this computer once. It kept the results, "
+        "not the file.",
+        "The list can miss files.",
+        "Some reports do not look for documents",
+    ):
+        await expect(panel.get_by_text(text, exact=False)).to_be_visible()
+        await expect(page.get_by_text(text, exact=False)).to_have_count(1)
+    # The labels note: what is counted, the How sure values as the table's
+    # tags, and the order as its own section, as Issues explains Priority.
+    await labels.focus()
+    await page.keyboard.press("Enter")
+    glossary = page.get_by_role("region", name=LABELS)
+    await expect(glossary.get_by_role("heading", level=3)).to_have_text(
+        [
+            "The numbers: what is counted",
+            "How sure: how sure Axcess is that a file has accessibility problems",
+            "The order: which files to look at first",
+        ]
+    )
+    await expect(glossary.get_by_role("term")).to_have_text(
+        [
+            "Document",
+            "Mostly sure",
+            "Not sure",
+            "Could not check",
+            "1. How sure",
+            "2. Pages that link to it",
+            "3. A form to fill in",
+            "4. How serious the problem is",
+        ]
+    )
+    await expect(glossary).to_contain_text(
+        "Mostly sure first, then Not sure, then Could not check."
+    )
     names = [
         "permit-form.pdf",
         "no-title.pdf",
@@ -387,6 +477,9 @@ async def test_the_populated_tab_passes_axe(
     )
     await page.goto(f"{base}/app/scans/{scan_id}/documents", wait_until="networkidle")
     await page.get_by_role("table").wait_for()
+    await _title_fits_beside_its_fact(page)
+    # The notes open, so axe and the reflow check reach their text too.
+    await _open_notes(page)
     for tags in (_AXE_TAGS_AA, None):
         violations = await _run_axe(page, tags)
         assert not violations, f"{theme} {width}px:\n{_render_violations(violations)}"
@@ -394,6 +487,74 @@ async def test_the_populated_tab_passes_axe(
     assert await page.evaluate(
         "document.documentElement.scrollWidth <= document.documentElement.clientWidth"
     )
+
+
+@on_module_loop
+@pytest.mark.parametrize("width", [1280, 320])
+async def test_a_report_that_did_not_look_says_so_once(
+    seeded_db: tuple[Path, Path, int], live_server: tuple[str, int], new_page: Any, width: int
+) -> None:
+    """The empty table says it and points to the note, which says why; the
+    sentence is never shown twice, and there are no numbers to show."""
+    from playwright.async_api import expect
+
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": width, "height": 800})
+    await page.goto(f"{base}/app/scans/{scan_id}/documents", wait_until="networkidle")
+    message = page.get_by_text(
+        "This report did not look for documents. See why in “What was checked”, below this table."
+    )
+    await expect(message).to_be_visible()
+    await expect(page.get_by_text("Not looked for", exact=True)).to_be_visible()
+    await _title_fits_beside_its_fact(page)
+    await expect(
+        page.get_by_role("term").filter(has_text=re.compile(r"^Documents?$"))
+    ).to_have_count(0)
+    await _open_notes(page)
+    await expect(page.get_by_text("This report did not look for documents")).to_have_count(1)
+    await expect(page.get_by_role("region", name=CHECKED)).to_contain_text(
+        "Some reports do not look for documents: reports made before Axcess could find "
+        "documents, and scans that sign in to a site."
+    )
+    for tags in (_AXE_TAGS_AA, None):
+        violations = await _run_axe(page, tags)
+        assert not violations, f"{width}px:\n{_render_violations(violations)}"
+    assert await page.evaluate(_TEXT_LAYOUT) == {"long": [], "tight": []}
+    assert await page.evaluate(
+        "document.documentElement.scrollWidth <= document.documentElement.clientWidth"
+    )
+
+
+@on_module_loop
+async def test_a_report_that_found_none_says_what_that_does_not_mean(
+    seeded_db: tuple[Path, Path, int], live_server: tuple[str, int], new_page: Any
+) -> None:
+    """As Issues' empty table does: no rows is not a clean result."""
+    from playwright.async_api import expect
+
+    db_path, _, scan_id = seeded_db
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            "UPDATE scans SET config_json = json_set(config_json, '$.linked_files_enabled', "
+            "json('true')) WHERE id = ?",
+            (scan_id,),
+        )
+    base, _ = live_server
+    page = await new_page(viewport={"width": 1280, "height": 800})
+    await page.goto(f"{base}/app/scans/{scan_id}/documents", wait_until="networkidle")
+    await expect(
+        page.get_by_text(
+            "The scan found no links to documents on the pages it visited. That does not mean "
+            "the site has none, because the list can miss files. See “What was checked”, below "
+            "this table."
+        )
+    ).to_be_visible()
+    numbers = page.locator("main dl").filter(
+        has=page.get_by_role("term").filter(has_text=re.compile(r"^Documents$"))
+    )
+    await expect(numbers.get_by_role("definition")).to_have_text(["0", "0", "0", "0"])
+    await expect(page.get_by_text("Only PDFs checked", exact=True)).to_be_visible()
+    assert await page.evaluate(_TEXT_LAYOUT) == {"long": [], "tight": []}
 
 
 @on_module_loop
@@ -406,6 +567,7 @@ async def test_the_populated_tab_meets_the_aaa_checks(
     page = await new_page(viewport={"width": 1280, "height": 720})
     await page.goto(f"{base}/app/scans/{scan_id}/documents", wait_until="networkidle")
     await page.get_by_role("table").wait_for()
+    await _open_notes(page)
     assert await page.evaluate(_SMALL_TARGETS) == []
     assert await page.evaluate(_SHARED_NAMES) == []
     layout = await page.evaluate(_TEXT_LAYOUT)

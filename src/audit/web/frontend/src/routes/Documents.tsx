@@ -6,7 +6,13 @@ import type { LinkedFileRef, LinkedFileRow, LinkedFileStatus } from "../api/type
 import BreakableUrl from "../components/BreakableUrl";
 import HowSureTag from "../components/HowSureTag";
 import ReportHeader from "../components/ReportHeader";
-import { SummaryNumbers, SummaryStat } from "../components/ReportSummary";
+import {
+  GlossaryList,
+  ReportNote,
+  ReportNotes,
+  SummaryNumbers,
+  SummaryStat,
+} from "../components/ReportSummary";
 import { TablePagination } from "../components/TablePagination";
 import {
   Cell,
@@ -18,7 +24,6 @@ import {
   TableEmpty,
   TableHead,
   TableRegion,
-  TableStatus,
 } from "../components/table/Table";
 import { Card, EmptyState, LinkButton, PageLink } from "../components/ui";
 import { useTablePageSize } from "../hooks/usePreferences";
@@ -38,7 +43,7 @@ export const DOCUMENTS_VIEW = "Documents";
 
 const STATUSES: readonly LinkedFileStatus[] = ["mostly_sure", "not_sure", "could_not_check"];
 
-/** The fixed order, in words, for the line above the table and its caption. */
+/** The fixed order, in words, for the table's caption and the labels note's order section. */
 const ORDER_WORDS = "Mostly sure first, then Not sure, then Could not check";
 
 function plural(count: number, one: string, many: string): string {
@@ -51,13 +56,25 @@ function plural(count: number, one: string, many: string): string {
  * where each is linked from, and what the PDF checks found. A web editor
  * opens it to decide which file to fix first.
  *
- * The header and the numbers over the table are Issues' (routes/Issues.tsx),
- * the tab beside it. The rest is laid out as Pages visited
- * (routes/PagesVisited.tsx): the same short paragraphs before the table, the
- * same table parts, paging and page links. One pattern for one kind of list (SC
- * 3.2.4 Consistent Identification, Level AA; W3C COGA, "Making Content
- * Usable", https://www.w3.org/TR/coga-usable/, paraphrased: the same pattern
- * for the same kind of thing).
+ * Laid out as Issues (routes/Issues.tsx), the tab beside it, so a reader who
+ * knows Issues finds each thing in the same place and form here: the header
+ * with nothing under the heading, the row of summary numbers, the table, then
+ * under it the closed notes, "What was checked" and "What … the other labels
+ * mean". Nothing to read stands between the numbers and the table. The same
+ * table parts, paging and page links as every report list. Rejected: the
+ * layout of Pages visited, which this tab first copied, with the caveat and
+ * several always-open paragraphs and a key before the table; beside Issues it
+ * put the same kinds of fact in other places and other forms. One pattern for
+ * one kind of thing (SC 3.2.4 Consistent Identification, Level AA; W3C COGA,
+ * "Making Content Usable", https://www.w3.org/TR/coga-usable/, paraphrased:
+ * the same pattern and the same words for the same thing).
+ *
+ * The caveat (results for an expert to review, not proof that the files meet
+ * accessibility standards) is where Issues says it: in the empty table's
+ * message, and here also as the first paragraph of "What was checked". Issues
+ * dropped the caveat from under its heading on 2026-09-26 and has shown
+ * nothing there since 2026-10-30 (the developer's request); Documents
+ * follows it, the developer's choice on 2026-11-13.
  *
  * One file per row. The file names the row (its row header, `th
  * scope="row"`, technique H63) and opens the file itself in a new tab, as
@@ -68,12 +85,12 @@ function plural(count: number, one: string, many: string): string {
  * that link to it.
  *
  * "How sure" uses the Issues table's tag (components/HowSureTag.tsx) and the
- * same words for the same meaning; the key above the table says what each
- * value means in text, because the tag's hover hint is not available to
- * everyone (SC 1.4.13 Content on Hover or Focus, Level AA, and SC 3.3.2
- * Labels or Instructions, Level A, in spirit). A Not sure row says in its own
- * words what a person must still check, as the developer asked, so it can
- * never be read as a pass.
+ * same words for the same meaning. What each value means is said in text in
+ * the labels note under the table, as on Issues, because the tag's hover hint
+ * is not available to everyone (SC 1.4.13 Content on Hover or Focus, Level
+ * AA, and SC 3.3.2 Labels or Instructions, Level A, in spirit). A Not sure
+ * row says in its own words what a person must still check, as the
+ * developer asked, so it can never be read as a pass.
  *
  * The order is fixed and there are no sort buttons: the order is the answer
  * to "what do I fix first", worked out on the server
@@ -83,6 +100,10 @@ function plural(count: number, one: string, many: string): string {
  * does; there is no hidden score. Rejected: sort buttons per column, which
  * would let the list lose its recommended order with nothing on screen to
  * get it back; and a single 0 to 100 score, which the developer ruled out.
+ * The order is explained in the labels note, as its own section, the way
+ * Issues explains Priority. No line over the table says it: Issues shows
+ * that line only while its table is sorted or filtered, and this one never
+ * is. The table's caption still says the order to a screen reader.
  *
  * Each referring page is a page link that opens the page inspector, as
  * everywhere a page is named (PageLink, actions off as in Pages visited),
@@ -204,57 +225,6 @@ export default function DocumentsRoute() {
         </SummaryNumbers>
       )}
 
-      {/* What the list is and what it leaves out, before the table, in short
-          paragraphs, one idea each (W3C COGA, "Making Content Usable": one
-          idea per chunk), about 72 characters wide (52ch), as on Pages
-          visited. The caveat comes first: a list with "Not sure" beside a
-          file could be read as a pass. Then what is listed and what is
-          checked, the key to the three values, the order, what Axcess
-          downloaded (a privacy fact, never dropped: AGENTS.md, Interface
-          language rule 4), and what the list can miss. */}
-      <div className="mb-5 max-w-[52ch] space-y-2 text-sm leading-6 text-fg-muted">
-        <p>
-          Results for an expert to review. They do not prove that the files meet accessibility
-          standards.
-        </p>
-        {!data.recorded && (
-          <p>
-            This report did not look for documents. Reports made before Axcess could find
-            documents, and scans that sign in to a site, do not look for them. A new scan of
-            the site that does not sign in lists its documents.
-          </p>
-        )}
-        <p>
-          This list shows the files that the scanned pages link to or show inside the page: PDF,
-          Word, Excel, PowerPoint, OpenDocument, Rich Text Format (RTF) and Google files. Axcess
-          checks only the PDF files.
-        </p>
-        <dl className="space-y-2">
-          {STATUSES.map((status) => (
-            <div key={status}>
-              <dt className="inline">
-                <HowSureTag label={LINKED_FILE_STATUS_LABEL[status]} quiet={status === "could_not_check"} />
-              </dt>{" "}
-              <dd className="inline">{LINKED_FILE_STATUS_HELP[status]}</dd>
-            </div>
-          ))}
-        </dl>
-        <p>
-          Files come in this order: {ORDER_WORDS}. Within each, files linked from more pages come
-          first, then files with a form to fill in, then files with more serious problems.
-        </p>
-        <p>
-          To check a PDF, Axcess downloaded it to this computer once. It kept the results, not
-          the file. For a file on another site, Axcess opened that one file and did not scan the
-          site.
-        </p>
-        <p>
-          The list can miss files. A link that appears only after pressing a button is found only
-          if the scan pressed it, and the scan does not press buttons that may download, buy or
-          delete something.
-        </p>
-      </div>
-
       <Card>
         {pages > 1 && (
           <TableBar
@@ -273,17 +243,23 @@ export default function DocumentsRoute() {
             }
           />
         )}
+        {/* An empty table says what it means and points down to the note
+            that says why, as Issues' does ("That does not mean the site
+            meets WCAG… See “What was checked”, below this table."): an empty
+            list must never read as a clean result. */}
         {!data.recorded ? (
-          // One sentence: the empty line runs the card's full width, so a
-          // longer message ran past 80 characters a line (SC 1.4.8 Visual
-          // Presentation, Level AAA). Why, and what to do, is the paragraph
-          // above, in the narrow column.
-          <TableEmpty>This report did not look for documents.</TableEmpty>
+          <TableEmpty>
+            This report did not look for documents. See why in “What was checked”, below this
+            table.
+          </TableEmpty>
         ) : data.total === 0 ? (
-          <TableEmpty>The scan found no links to documents on the pages it visited.</TableEmpty>
+          <TableEmpty>
+            The scan found no links to documents on the pages it visited. That does not mean the
+            site has none, because the list can miss files. See “What was checked”, below this
+            table.
+          </TableEmpty>
         ) : (
           <>
-            <TableStatus>In recommended order: {ORDER_WORDS}.</TableStatus>
             <TableRegion label="Documents table" busy={filesQuery.isPlaceholderData}>
               <Table caption={`Documents linked from report #${scan.id}, ${ORDER_WORDS}`}>
                 <TableHead>
@@ -311,7 +287,147 @@ export default function DocumentsRoute() {
           </>
         )}
       </Card>
+
+      {/* Under the table, as on Issues: the table follows the numbers with
+          nothing to step over, and what explains it waits in closed rows
+          (ReportNotes; see ReportCoverageNote for why Issues moved them
+          there). The same two rows, in the same order, with the same
+          titles. */}
+      <ReportNotes className="mt-8">
+        <DocumentsCoverageNote recorded={data.recorded} />
+        <DocumentsGlossary />
+      </ReportNotes>
     </>
+  );
+}
+
+/**
+ * "What was checked" for the Documents tab: the same row, title and place as
+ * Issues' (ReportCoverageNote), holding what this list covers and what it
+ * cannot show. Issues' row holds the table of checks; Documents has one check,
+ * so its row holds short paragraphs, one idea each, about 72 characters wide
+ * (52ch; SC 1.4.8 Visual Presentation, Level AAA; W3C COGA, "Making Content
+ * Usable": one idea per chunk).
+ *
+ * In this order: the caveat, first, because a list with "Not sure" beside a
+ * file could be read as a pass; which files are listed and that only PDFs
+ * are checked; what Axcess downloaded and kept (a privacy fact); what the
+ * list can miss; and why a report may not have looked for documents. Never
+ * drop the privacy or limitation facts to make the row shorter (AGENTS.md,
+ * Interface language rule 4).
+ *
+ * The closed row shows one fact on its right, as Issues' shows "6 of 7
+ * checks ran": "Only PDFs checked", the limit a reader most needs beside the
+ * numbers; or, for a report that did not look, "Not looked for", under the
+ * empty table that says so in full. No longer than Issues' 17 characters:
+ * "Only PDF files are checked" squeezed the title to one word a line at
+ * 320px.
+ */
+function DocumentsCoverageNote({ recorded }: { recorded: boolean }) {
+  return (
+    <ReportNote
+      id="report-coverage"
+      title="What was checked"
+      meta={recorded ? "Only PDFs checked" : "Not looked for"}
+    >
+      <div className="max-w-[52ch] space-y-2 text-sm leading-6 text-fg-muted">
+        <p>
+          Results for an expert to review. They do not prove that the files meet accessibility
+          standards.
+        </p>
+        <p>
+          This list shows the files that the scanned pages link to or show inside the page: PDF,
+          Word, Excel, PowerPoint, OpenDocument, Rich Text Format (RTF) and Google files. Axcess
+          checks only the PDF files.
+        </p>
+        <p>
+          To check a PDF, Axcess downloaded it to this computer once. It kept the results, not
+          the file. For a file on another site, Axcess opened that one file and did not scan the
+          site.
+        </p>
+        <p>
+          The list can miss files. A link that appears only after pressing a button is found only
+          if the scan pressed it, and the scan does not press buttons that may download, buy or
+          delete something.
+        </p>
+        <p>
+          Some reports do not look for documents: reports made before Axcess could find
+          documents, and scans that sign in to a site. A new scan of the site that does not sign
+          in lists its documents.
+        </p>
+      </div>
+    </ReportNote>
+  );
+}
+
+/**
+ * What the counts, the How sure values and the order mean, closed until
+ * asked for: Issues' labels note (IssueGlossary in routes/Issues.tsx), with
+ * the same title pattern, place, grid and parts (ReportNote, GlossaryList),
+ * so the two tabs explain their labels the same way (SC 3.2.4 Consistent
+ * Identification, Level AA).
+ *
+ * The sections follow Issues': what is counted first, then the How sure
+ * values, each the same tag the table draws, then the order, as its own
+ * section, the way Issues explains Priority ("which issue types to look at
+ * first"). The tags carry the same sentences as hover hints, but a hint
+ * reaches only a mouse: this list is how keyboard and touch users, and anyone
+ * who turned hints off, read them (SC 1.4.13 Content on Hover or Focus, Level
+ * AA). The order's steps are the server's (audit/web/linked_files_queries.py);
+ * change them together.
+ */
+function DocumentsGlossary() {
+  return (
+    <ReportNote
+      id="report-labels"
+      title={`What "${LINKED_FILE_STATUS_LABEL.mostly_sure}", "${LINKED_FILE_STATUS_LABEL.not_sure}" and the other labels mean`}
+    >
+      <div className="grid max-w-5xl gap-x-10 gap-y-4 text-sm leading-relaxed text-fg-muted md:grid-cols-2 xl:grid-cols-3">
+        <GlossaryList
+          heading="The numbers: what is counted"
+          items={[
+            {
+              key: "document",
+              term: <span className="font-semibold text-fg">Document</span>,
+              help: "One file that a scanned page links to or shows inside the page. A file linked from many pages counts once. Each is one row in the Documents table.",
+            },
+          ]}
+        />
+        <GlossaryList
+          heading="How sure: how sure Axcess is that a file has accessibility problems"
+          items={STATUSES.map((status) => ({
+            key: status,
+            term: <HowSureTag label={LINKED_FILE_STATUS_LABEL[status]} quiet={status === "could_not_check"} />,
+            help: LINKED_FILE_STATUS_HELP[status],
+          }))}
+        />
+        <GlossaryList
+          heading="The order: which files to look at first"
+          items={[
+            {
+              key: "status",
+              term: <span className="font-semibold text-fg">1. How sure</span>,
+              help: `${ORDER_WORDS}.`,
+            },
+            {
+              key: "pages",
+              term: <span className="font-semibold text-fg">2. Pages that link to it</span>,
+              help: "Within each How sure value, files linked from more pages come first.",
+            },
+            {
+              key: "form",
+              term: <span className="font-semibold text-fg">3. A form to fill in</span>,
+              help: "Then files with a form to fill in.",
+            },
+            {
+              key: "serious",
+              term: <span className="font-semibold text-fg">4. How serious the problem is</span>,
+              help: "Then files with more serious problems. A file that is not tagged, has no text a screen reader can read, or stops screen readers in its security settings comes before one with only no title or no language set.",
+            },
+          ]}
+        />
+      </div>
+    </ReportNote>
   );
 }
 
