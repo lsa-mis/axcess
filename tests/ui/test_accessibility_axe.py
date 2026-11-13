@@ -783,16 +783,13 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     ledger = page.get_by_role("region", name="What was checked")
     await playwright_async.expect(ledger).to_be_hidden()
     # Under the table since user testing (2026-10-28), not between it and
-    # the numbers. The seeded report has no Mostly sure or Measured issue
-    # type, so the table opens empty and says so: the note over it counts
-    # the two it holds back, and each problem number carries that count.
-    hidden = page.get_by_role("note", name="Hidden issue types")
-    await playwright_async.expect(hidden).to_contain_text("2 issue types are hidden")
-    await playwright_async.expect(summary.get_by_text("Plus 2 hidden", exact=True)).to_be_visible()
-    await playwright_async.expect(
-        page.get_by_text("Axcess found no issue types marked Mostly sure or Measured.", exact=False)
-    ).to_be_visible()
-    table_box = await hidden.bounding_box()
+    # the numbers. The seeded report has only Not sure and For information
+    # issue types; the table opens on every issue type (2026-11-13), so it
+    # shows both, and the note over it says what they mean.
+    note = page.get_by_role("note", name="Issue types shown")
+    await playwright_async.expect(note).to_contain_text("Showing every issue type")
+    await playwright_async.expect(summary.get_by_text("hidden", exact=False)).to_have_count(0)
+    table_box = await note.bounding_box()
     coverage_box = await coverage.bounding_box()
     assert table_box and coverage_box and coverage_box["y"] > table_box["y"], (
         table_box,

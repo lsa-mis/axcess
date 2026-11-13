@@ -316,10 +316,15 @@ export default function ImagesRoute() {
             : "Loading images…"}
         </TableStatus>
         {data && !data.check_available && (
-          <p className="max-w-measure border-b border-border px-4 py-2 text-sm text-fg-muted">
-            The local AI check is off, so no alt text can be suggested here. The person who runs
-            Axcess can turn it on by choosing a local model.
-          </p>
+          // The line under the note spans the table; only the text is held to
+          // a reading width (SC 1.4.8 Visual Presentation, Level AAA), so the
+          // line is not cut short where the text ends.
+          <div className="border-b border-border px-4 py-2">
+            <p className="max-w-measure text-sm text-fg-muted">
+              The local AI check is off, so no alt text can be suggested here. The person who runs
+              Axcess can turn it on by choosing a local model.
+            </p>
+          </div>
         )}
         {data && data.rows.length === 0 ? (
           <TableEmpty>No images match. Clear the filter or shorten your search.</TableEmpty>

@@ -109,9 +109,10 @@ async def test_swipe_over_a_wide_table_scrolls_it_instead(
         .click()
     )
     await page.wait_for_url(f"**/app/scans/{scan_id}/issues")
-    # The table has rows to scroll only once the held-back ones are shown.
-    await page.get_by_role("button", name="Show hidden issue types", exact=True).click()
-    await page.wait_for_url("**type=likely_barrier*")
+    # The table opens on every issue type, so it has rows to scroll.
+    await playwright_async.expect(
+        page.get_by_role("table").locator("tbody tr").first
+    ).to_be_visible()
     issues_url = page.url
 
     region = page.get_by_role("region", name="Issues table")
