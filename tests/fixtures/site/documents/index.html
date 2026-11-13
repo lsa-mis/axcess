@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Documents fixture</title>
+</head>
+<body>
+  <!-- Every way a page reaches a linked file, for the Documents tab
+       (tests/integration/test_linked_files_crawl.py asserts the exact set).
+       __OFF_SITE__ is replaced by the test server with the same server
+       under another host name (localhost instead of 127.0.0.1), so one
+       link goes to another host. -->
+  <main>
+    <h1>Documents</h1>
+
+    <h2>Plain links</h2>
+    <ul>
+      <li><a href="files/clean.pdf">Annual report 2026 (PDF)</a></li>
+      <li><a href="files/untagged.pdf">Untagged leaflet (PDF)</a></li>
+      <li><a href="files/encrypted.pdf">Locked handbook (PDF)</a></li>
+      <li><a href="files/password.pdf">Board minutes (PDF)</a></li>
+      <li><a href="files/missing.pdf">Old newsletter (PDF)</a></li>
+      <li><a href="files/report.docx">Committee report (Word)</a></li>
+      <li><a href="files/budget.xls">Budget 2003 (Excel)</a></li>
+      <!-- No extension: only the server's Content-Type says it is a PDF. -->
+      <li><a href="download?id=7">Price list</a></li>
+      <li><a href="__OFF_SITE__/documents/files/offsite.pdf">Partner guide (PDF)</a></li>
+      <li><a href="https://docs.google.com/document/d/1AxcessFixture/edit">Meeting notes (Google Docs)</a></li>
+      <li><a href="more.html">More documents</a></li>
+    </ul>
+
+    <h2>Shown inside the page</h2>
+    <iframe title="Course map" src="files/scanned.pdf" width="300" height="200"></iframe>
+    <object data="files/no-title.pdf" type="application/pdf" aria-label="Floor plan" width="300" height="200">Floor plan (PDF)</object>
+    <embed src="files/no-language.pdf" type="application/pdf" title="Price sheet" width="300" height="200">
+
+    <h2>Shown after a click</h2>
+    <!-- The link does not exist until the button is pressed. Neither its
+         name nor its id says "download": the interaction probe never
+         presses a control whose name or attributes have "download" in
+         them (DEFAULT_BLOCKED_LABELS). -->
+    <button type="button" id="more-files">Show more files</button>
+    <div id="extra-files"></div>
+  </main>
+  <script>
+    document.getElementById('more-files').addEventListener('click', function () {
+      var link = document.createElement('a');
+      link.href = 'files/revealed.pdf';
+      link.textContent = 'Extra forms (PDF)';
+      document.getElementById('extra-files').appendChild(link);
+    });
+  </script>
+</body>
+</html>
