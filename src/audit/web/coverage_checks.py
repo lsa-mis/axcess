@@ -176,7 +176,14 @@ PLAIN: dict[str, tuple[str, str]] = {
     "3.2.3": ("", "Repeated menus stay in the same order."),
     "3.2.4": ("", "Things that do the same job have the same name."),
     "3.2.6": ("", "Help is in the same place on every page."),
-    "3.3.1": ("", "Form errors are described in words."),
+    # The form error check runs here but is not yet proved on enough real
+    # forms to count (AGENTS.md, "Building a check: real pages first"), so
+    # the criterion stays "You check" and says what the check does.
+    "3.3.1": (
+        "A trial check sends each form empty and flags fields marked in error"
+        " with no words saying what is wrong. Not yet proven, so it does not count.",
+        "Form errors are described in words.",
+    ),
     "3.3.2": (
         "Checks fields have labels. AI judges unclear labels.",
         "AI leads, and real form submissions.",

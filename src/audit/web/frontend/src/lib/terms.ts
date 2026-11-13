@@ -303,7 +303,9 @@ export const CHECK_METHOD_BLURB: Record<CheckMethod, string> = {
   automated: "Tests it on every page. You still confirm the result.",
   partial: "Finds some problems. You test the rest.",
   "ai-assisted": "Points to possible problems. You decide.",
-  manual: "Axcess can't test these.",
+  // "No proven check", not "can't test": a trial check may run but not count
+  // yet (3.3.1's form error check).
+  manual: "No proven check yet. You test these.",
   not_needed: "Removed in WCAG 2.2. Today's HTML always meets it.",
 };
 

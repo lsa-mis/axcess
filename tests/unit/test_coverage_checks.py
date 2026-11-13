@@ -18,8 +18,20 @@ def test_every_criterion_has_plain_wording() -> None:
     for sc, (does, you) in checks.PLAIN.items():
         assert you, sc
         method = next(c.method for c in coverage_matrix.load_matrix() if c.sc == sc)
-        # A criterion Axcess does not check says nothing about what it does.
-        assert bool(does) == (method != "manual"), sc
+        # A criterion Axcess does not check says nothing about what it does,
+        # unless a trial check runs there and says it does not count yet.
+        if method == "manual" and sc not in _TRIAL_CHECKS:
+            assert not does, sc
+        elif method != "manual":
+            assert does, sc
+    for sc in _TRIAL_CHECKS:
+        does, _ = checks.PLAIN[sc]
+        assert "does not count" in does, sc
+
+
+#: Criteria marked "You check" where a check runs but is not yet proved on
+#: real pages: the form error check for 3.3.1.
+_TRIAL_CHECKS = {"3.3.1"}
 
 
 def test_wcag_21_has_50_criteria_with_4_1_1_marked_not_needed() -> None:
