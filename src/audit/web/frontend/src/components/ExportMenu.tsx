@@ -10,6 +10,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle, Check, ChevronDown, Copy, Download, Loader2 } from "lucide-react";
 import { ApiError, api, exportUrl } from "../api/client";
+import { copyText } from "../lib/clipboard";
 import type { ExportFormat } from "../api/types";
 import { cn } from "../lib/cn";
 import {
@@ -375,7 +376,12 @@ export default function ExportMenu({
         const blob = text.then((markdown) => new Blob([markdown], { type: "text/plain" }));
         await navigator.clipboard.write([new ClipboardItem({ "text/plain": blob })]);
       } else {
-        await navigator.clipboard.writeText(await text);
+        // No ClipboardItem, or no clipboard API at all (plain http on a
+        // network address): the shared helper falls back to the older copy
+        // method (lib/clipboard.ts). It runs after the fetch, so a browser
+        // that has let the click's permission lapse can still refuse; the
+        // message below then says to download the file.
+        if (!(await copyText(await text))) throw new Error("copy refused");
       }
       setCopyState({ kind: "done" });
       setAnnouncement(COPY_FIX_BRIEF_DONE);
