@@ -112,6 +112,7 @@ from audit.web.comparison import (
     previous_scan_id,
     site_history,
 )
+from audit.web.coverage_checks import CoverageChecksResponse, coverage_checks
 from audit.web.coverage_status import ROADMAP, SHIPPED, roadmap_counts
 from audit.web.export_options import ExportOptions, PanelFormat, build_export_options
 from audit.web.export_readiness import (
@@ -121,6 +122,7 @@ from audit.web.export_readiness import (
     label_draft_export,
     public_export_filename,
 )
+from audit.web.issue_share import IssueShareError, IssueShareResponse, issue_share
 from audit.web.local_sign_in import (
     SIGN_IN_KEEP_MINUTES,
     EndedReason,
@@ -2892,6 +2894,30 @@ def create_app(
                 },
             }
         )
+
+    @app.get("/api/coverage/checks", response_model=CoverageChecksResponse)
+    def api_coverage_checks(
+        wcag_version: Annotated[WcagVersion, Query(alias="version")] = DEFAULT_WCAG_VERSION,
+    ) -> CoverageChecksResponse:
+        """What Axcess checks for each WCAG criterion, built from its own code.
+
+        Describes Axcess, not a scan, so it holds no report data
+        (audit/web/coverage_checks.py).
+        """
+        return coverage_checks(wcag_version)
+
+    @app.get("/api/coverage/found", response_model=IssueShareResponse)
+    def api_coverage_found(scan_id: int | None = Query(default=None, ge=1)) -> IssueShareResponse:
+        """What Axcess found, counted on request from this computer's completed reports.
+
+        Across the most recent completed reports, or one of them. Nothing is
+        sent anywhere (audit/web/issue_share.py).
+        """
+        with get_conn() as conn:
+            try:
+                return issue_share(conn, scan_id)
+            except IssueShareError as exc:
+                raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
 
     @app.get("/", include_in_schema=False)
     def root() -> RedirectResponse:

@@ -1432,6 +1432,200 @@
       ]
     }
   },
+  "GET /api/coverage/checks": {
+    "status": 200,
+    "content_type": "application/json",
+    "body": {
+      "axe_version": "string",
+      "common_problems": [{"label": "string", "rule": "string", "sc": "string", "share_of_sites": "number"}],
+      "common_source_url": "string",
+      "criteria": [
+        {
+          "apg": [{"title": "string", "url": "string"}],
+          "checks": ["string"],
+          "confidence": "string",
+          "does": "string",
+          "guideline": "string",
+          "level": "string",
+          "method": "string",
+          "name": "string",
+          "principle": "string",
+          "rules": [{"description": "string", "help": "string", "id": "string", "url": "string"}],
+          "sc": "string",
+          "study": {
+            "anyOf": [
+              "null",
+              {
+                "checks": ["string"],
+                "other_checks": "number",
+                "rule_check": "number",
+                "sc": "string",
+                "share": "number"
+              }
+            ]
+          },
+          "technical": "string",
+          "understanding_url": "string",
+          "you": "string"
+        }
+      ],
+      "other_checks_hit_rate": "number",
+      "scan_default_version": "string",
+      "study": [
+        {
+          "checks": ["string"],
+          "other_checks": "number",
+          "rule_check": "number",
+          "sc": "string",
+          "share": "number"
+        }
+      ],
+      "study_source_url": "string",
+      "wcag_version": "string"
+    }
+  },
+  "GET /api/coverage/checks (WCAG 2.2)": {
+    "status": 200,
+    "content_type": "application/json",
+    "body": {
+      "axe_version": "string",
+      "common_problems": [{"label": "string", "rule": "string", "sc": "string", "share_of_sites": "number"}],
+      "common_source_url": "string",
+      "criteria": [
+        {
+          "apg": [{"title": "string", "url": "string"}],
+          "checks": ["string"],
+          "confidence": "string",
+          "does": "string",
+          "guideline": "string",
+          "level": "string",
+          "method": "string",
+          "name": "string",
+          "principle": "string",
+          "rules": [{"description": "string", "help": "string", "id": "string", "url": "string"}],
+          "sc": "string",
+          "study": {
+            "anyOf": [
+              "null",
+              {
+                "checks": ["string"],
+                "other_checks": "number",
+                "rule_check": "number",
+                "sc": "string",
+                "share": "number"
+              }
+            ]
+          },
+          "technical": "string",
+          "understanding_url": "string",
+          "you": "string"
+        }
+      ],
+      "other_checks_hit_rate": "number",
+      "scan_default_version": "string",
+      "study": [
+        {
+          "checks": ["string"],
+          "other_checks": "number",
+          "rule_check": "number",
+          "sc": "string",
+          "share": "number"
+        }
+      ],
+      "study_source_url": "string",
+      "wcag_version": "string"
+    }
+  },
+  "GET /api/coverage/found": {
+    "status": 200,
+    "content_type": "application/json",
+    "body": {
+      "axe_rules": [
+        {
+          "category": "string",
+          "click_through": "integer",
+          "criteria": ["string"],
+          "help": "string",
+          "loaded": "integer",
+          "rule_id": "string"
+        }
+      ],
+      "estimate": {
+        "available": "boolean",
+        "axe_sample": "integer",
+        "criteria": [],
+        "estimated_total": "null",
+        "found": "integer",
+        "min_sample": "integer",
+        "share": "null",
+        "source_title": "string",
+        "source_url": "string"
+      },
+      "found_by_criterion": [{"count": "integer", "sc": "string"}],
+      "layers": {
+        "excluded_not_a_problem": "integer",
+        "excluded_records": "integer",
+        "layers": [{"count": "integer", "layer": "string", "share": "number"}],
+        "total": "integer"
+      },
+      "manual_review": {
+        "evaluations": "integer",
+        "failed": "integer",
+        "found": "integer",
+        "scans": [{"failed": "integer", "found": "integer", "scan_id": "integer", "seed_url": "string"}],
+        "share": "number"
+      },
+      "scan_id": "null",
+      "scans": [{"finished_at": "string", "id": "integer", "seed_url": "string"}],
+      "scans_completed": "integer",
+      "scans_included": "integer"
+    }
+  },
+  "GET /api/coverage/found (one report)": {
+    "status": 200,
+    "content_type": "application/json",
+    "body": {
+      "axe_rules": [
+        {
+          "category": "string",
+          "click_through": "integer",
+          "criteria": ["string"],
+          "help": "string",
+          "loaded": "integer",
+          "rule_id": "string"
+        }
+      ],
+      "estimate": {
+        "available": "boolean",
+        "axe_sample": "integer",
+        "criteria": [],
+        "estimated_total": "null",
+        "found": "integer",
+        "min_sample": "integer",
+        "share": "null",
+        "source_title": "string",
+        "source_url": "string"
+      },
+      "found_by_criterion": [{"count": "integer", "sc": "string"}],
+      "layers": {
+        "excluded_not_a_problem": "integer",
+        "excluded_records": "integer",
+        "layers": [{"count": "integer", "layer": "string", "share": "number"}],
+        "total": "integer"
+      },
+      "manual_review": {
+        "evaluations": "integer",
+        "failed": "integer",
+        "found": "integer",
+        "scans": [{"failed": "integer", "found": "integer", "scan_id": "integer", "seed_url": "string"}],
+        "share": "number"
+      },
+      "scan_id": "integer",
+      "scans": [{"finished_at": "string", "id": "integer", "seed_url": "string"}],
+      "scans_completed": "integer",
+      "scans_included": "integer"
+    }
+  },
   "GET /api/scope-preview (empty)": {
     "status": 200,
     "content_type": "application/json",

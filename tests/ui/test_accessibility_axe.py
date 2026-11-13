@@ -188,6 +188,52 @@ async def test_tracking_page_has_no_axe_violations(
     await _axe_clean(new_page, base, "/app/tracking")
 
 
+async def test_coverage_pages_have_no_axe_violations(
+    live_server: tuple[str, int], new_page: Any
+) -> None:
+    base, _ = live_server
+    await _axe_clean(new_page, base, "/app/coverage")
+    await _axe_clean(new_page, base, "/app/coverage?type=partial&criterion=1.4.3")
+    await _axe_clean(new_page, base, "/app/coverage/found")
+
+
+async def test_coverage_works_by_keyboard_alone(
+    live_server: tuple[str, int], new_page: Any
+) -> None:
+    """Tab reaches a filter button, Enter filters the map, and a square opens its details."""
+    base, _ = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(f"{base}/app/coverage", wait_until="networkidle")
+    partly = page.get_by_role("button", name=re.compile(r"^Show only Axcess partly checks"))
+    for _ in range(60):
+        await page.keyboard.press("Tab")
+        if await partly.evaluate("(button) => button === document.activeElement"):
+            break
+    else:
+        pytest.fail("Tab never reached the Axcess partly checks filter button")
+    await page.keyboard.press("Enter")
+    await playwright_async.expect(partly).to_have_attribute("aria-pressed", "true")
+    await playwright_async.expect(
+        page.get_by_role("status").filter(has_text="Showing 15 of 50: Axcess partly checks")
+    ).to_be_visible()
+
+    square = page.get_by_role("button", name=re.compile(r"^1\.4\.3\b.*Contrast \(Minimum\)"))
+    await square.focus()
+    await page.keyboard.press("Enter")
+    await playwright_async.expect(square).to_have_attribute("aria-pressed", "true")
+    await playwright_async.expect(
+        page.get_by_role("heading", name="1.4.3 Contrast (Minimum)")
+    ).to_be_visible()
+    # Focus stays on the square; the status line names what opened.
+    assert await square.evaluate("(button) => button === document.activeElement")
+
+    details = page.get_by_role("button", name="Details for developers")
+    await details.focus()
+    await page.keyboard.press("Enter")
+    await playwright_async.expect(details).to_have_attribute("aria-expanded", "true")
+    await playwright_async.expect(page.get_by_text("color-contrast", exact=True)).to_be_visible()
+
+
 async def test_about_page_has_no_axe_violations(
     live_server: tuple[str, int], new_page: Any
 ) -> None:
@@ -1048,6 +1094,8 @@ async def test_every_spa_route_has_an_accurate_document_title(
         (f"/app/scans/{scan_id}/compare/changes", "What changed"),
         ("/app/findings/1", "Image details"),
         ("/app/tracking", "Product roadmap"),
+        ("/app/coverage", "What Axcess checks"),
+        ("/app/coverage/found", "What Axcess found"),
         ("/app/about", "About"),
         ("/app/not-a-real-route", "Page not found"),
     ]

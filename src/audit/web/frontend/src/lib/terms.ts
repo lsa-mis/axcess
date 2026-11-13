@@ -1,4 +1,4 @@
-import type { AltVerdict, AltVerdictSource, AxeImpact, DetectionPipeline, ImageGroup, FindingStatus, ReviewLane, RuleCheck, ScanStatus } from "../api/types";
+import type { AltVerdict, AltVerdictSource, AxeImpact, CheckMethod, DetectionPipeline, FoundLayer, StudyCheck, ImageGroup, FindingStatus, ReviewLane, RuleCheck, ScanStatus } from "../api/types";
 
 /**
  * The words the interface uses for shared values, in one place.
@@ -155,4 +155,75 @@ export const ALT_VERDICT_SOURCE_LABEL: Record<AltVerdictSource, string> = {
   page_code: "From the page code",
   text_match: "Compared with the text in the image",
   local_model: "Local AI model: check before you rely on it",
+};
+
+/**
+ * How Axcess checks a WCAG criterion (Coverage page), said as what it means
+ * for the person testing. The technical name follows in CHECK_METHOD_TECH, in
+ * smaller text, for developers (docs/plain-language.md rule 3).
+ */
+export const CHECK_METHOD_LABEL: Record<CheckMethod, string> = {
+  automated: "Axcess checks",
+  partial: "Axcess partly checks",
+  "ai-assisted": "AI gives hints",
+  manual: "You check",
+  not_needed: "No longer needed",
+};
+
+export const CHECK_METHOD_TECH: Record<CheckMethod, string> = {
+  automated: "Automated",
+  partial: "Partly automated",
+  "ai-assisted": "AI-assisted",
+  manual: "Manual only",
+  not_needed: "4.1.1 Parsing",
+};
+
+export const CHECK_METHOD_BLURB: Record<CheckMethod, string> = {
+  automated: "A full test. Review what it finds.",
+  partial: "Finds some problems. You test the rest.",
+  "ai-assisted": "Points to possible problems. You decide.",
+  manual: "Axcess can't test these.",
+  not_needed: "Removed in WCAG 2.2. Today's HTML always meets it.",
+};
+
+/** Where an occurrence came from, for the Coverage page's count by check. */
+export const FOUND_LAYER_LABEL: Record<FoundLayer, string> = {
+  axe_loaded: "Rule check (axe), page as loaded",
+  axe_click_through: "Rule check (axe), after Click-Through",
+  alfa: "Rule check (Alfa)",
+  probes: "Keyboard, zoom, focus and motion checks",
+  image: "Image text check",
+  semantic: "AI review",
+};
+
+/** The checks a study row credits beyond the rule check (Coverage page). */
+export const STUDY_CHECK_LABEL: Record<StudyCheck, string> = {
+  click_through: "Click-Through",
+  image: CHECK_LABEL.image,
+  focus: CHECK_LABEL.focus,
+  keyboard: CHECK_LABEL.keyboard,
+  visual: CHECK_LABEL.visual,
+  semantic: CHECK_LABEL.semantic,
+  responsive: CHECK_LABEL.responsive,
+};
+
+/**
+ * axe-core's own kinds of problem (its ``cat.*`` rule tags), in plain words.
+ * An unknown kind falls back to "Other" where it is read.
+ */
+export const AXE_CATEGORY_LABEL: Record<string, string> = {
+  color: "Colour and contrast",
+  "name-role-value": "Names, roles and values",
+  aria: "ARIA attributes and roles",
+  forms: "Forms",
+  "text-alternatives": "Text alternatives",
+  structure: "Page structure",
+  semantics: "Headings and landmarks",
+  keyboard: "Keyboard",
+  language: "Language",
+  tables: "Tables",
+  parsing: "Page code errors",
+  "time-and-media": "Time and media",
+  "sensory-and-visual-cues": "Size, zoom and visual cues",
+  other: "Other",
 };

@@ -245,6 +245,8 @@ STATIC_PATHS = (
     "/app/scans/{scan_id}/findings",
     "/app/scans/{scan_id}/findings/grouped",
     "/app/tracking",
+    "/app/coverage",
+    "/app/coverage/found",
     "/app/about",
     "/app/settings",
     "/app/no-such-page",

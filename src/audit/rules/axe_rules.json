@@ -1,0 +1,1312 @@
+{
+ "axe_version": "4.10.2",
+ "rules": [
+  {
+   "id": "accesskeys",
+   "help": "accesskey attribute value should be unique",
+   "description": "Ensure every accesskey attribute value is unique",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/accesskeys",
+   "category": "keyboard",
+   "criteria": [],
+   "tags": [
+    "best-practice"
+   ]
+  },
+  {
+   "id": "area-alt",
+   "help": "Active <area> elements must have alternative text",
+   "description": "Ensure <area> elements of image maps have alternative text",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/area-alt",
+   "category": "text-alternatives",
+   "criteria": [
+    "2.4.4",
+    "4.1.2"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "aria-allowed-attr",
+   "help": "Elements must only use supported ARIA attributes",
+   "description": "Ensure an element's role supports its ARIA attributes",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/aria-allowed-attr",
+   "category": "aria",
+   "criteria": [
+    "4.1.2"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "aria-allowed-role",
+   "help": "ARIA role should be appropriate for the element",
+   "description": "Ensure role attribute has an appropriate value for the element",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/aria-allowed-role",
+   "category": "aria",
+   "criteria": [],
+   "tags": [
+    "best-practice"
+   ]
+  },
+  {
+   "id": "aria-braille-equivalent",
+   "help": "aria-braille attributes must have a non-braille equivalent",
+   "description": "Ensure aria-braillelabel and aria-brailleroledescription have a non-braille equivalent",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/aria-braille-equivalent",
+   "category": "aria",
+   "criteria": [
+    "4.1.2"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "aria-command-name",
+   "help": "ARIA commands must have an accessible name",
+   "description": "Ensure every ARIA button, link and menuitem has an accessible name",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/aria-command-name",
+   "category": "aria",
+   "criteria": [
+    "4.1.2"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "aria-conditional-attr",
+   "help": "ARIA attributes must be used as specified for the element's role",
+   "description": "Ensure ARIA attributes are used as described in the specification of the element's role",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/aria-conditional-attr",
+   "category": "aria",
+   "criteria": [
+    "4.1.2"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "aria-deprecated-role",
+   "help": "Deprecated ARIA roles must not be used",
+   "description": "Ensure elements do not use deprecated roles",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/aria-deprecated-role",
+   "category": "aria",
+   "criteria": [
+    "4.1.2"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "aria-dialog-name",
+   "help": "ARIA dialog and alertdialog nodes should have an accessible name",
+   "description": "Ensure every ARIA dialog and alertdialog node has an accessible name",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/aria-dialog-name",
+   "category": "aria",
+   "criteria": [],
+   "tags": [
+    "best-practice"
+   ]
+  },
+  {
+   "id": "aria-hidden-body",
+   "help": "aria-hidden=\"true\" must not be present on the document body",
+   "description": "Ensure aria-hidden=\"true\" is not present on the document body.",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/aria-hidden-body",
+   "category": "aria",
+   "criteria": [
+    "1.3.1",
+    "4.1.2"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "aria-hidden-focus",
+   "help": "ARIA hidden element must not be focusable or contain focusable elements",
+   "description": "Ensure aria-hidden elements are not focusable nor contain focusable elements",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/aria-hidden-focus",
+   "category": "name-role-value",
+   "criteria": [
+    "4.1.2"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "aria-input-field-name",
+   "help": "ARIA input fields must have an accessible name",
+   "description": "Ensure every ARIA input field has an accessible name",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/aria-input-field-name",
+   "category": "aria",
+   "criteria": [
+    "4.1.2"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "aria-meter-name",
+   "help": "ARIA meter nodes must have an accessible name",
+   "description": "Ensure every ARIA meter node has an accessible name",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/aria-meter-name",
+   "category": "aria",
+   "criteria": [
+    "1.1.1"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "aria-progressbar-name",
+   "help": "ARIA progressbar nodes must have an accessible name",
+   "description": "Ensure every ARIA progressbar node has an accessible name",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/aria-progressbar-name",
+   "category": "aria",
+   "criteria": [
+    "1.1.1"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "aria-prohibited-attr",
+   "help": "Elements must only use permitted ARIA attributes",
+   "description": "Ensure ARIA attributes are not prohibited for an element's role",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/aria-prohibited-attr",
+   "category": "aria",
+   "criteria": [
+    "4.1.2"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "aria-required-attr",
+   "help": "Required ARIA attributes must be provided",
+   "description": "Ensure elements with ARIA roles have all required ARIA attributes",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/aria-required-attr",
+   "category": "aria",
+   "criteria": [
+    "4.1.2"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "aria-required-children",
+   "help": "Certain ARIA roles must contain particular children",
+   "description": "Ensure elements with an ARIA role that require child roles contain them",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/aria-required-children",
+   "category": "aria",
+   "criteria": [
+    "1.3.1"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "aria-required-parent",
+   "help": "Certain ARIA roles must be contained by particular parents",
+   "description": "Ensure elements with an ARIA role that require parent roles are contained by them",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/aria-required-parent",
+   "category": "aria",
+   "criteria": [
+    "1.3.1"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "aria-roledescription",
+   "help": "aria-roledescription must be on elements with a semantic role",
+   "description": "Ensure aria-roledescription is only used on elements with an implicit or explicit role",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/aria-roledescription",
+   "category": "aria",
+   "criteria": [
+    "4.1.2"
+   ],
+   "tags": [
+    "wcag2a",
+    "deprecated"
+   ]
+  },
+  {
+   "id": "aria-roles",
+   "help": "ARIA roles used must conform to valid values",
+   "description": "Ensure all elements with a role attribute use a valid value",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/aria-roles",
+   "category": "aria",
+   "criteria": [
+    "4.1.2"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "aria-text",
+   "help": "\"role=text\" should have no focusable descendants",
+   "description": "Ensure role=\"text\" is used on elements with no focusable descendants",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/aria-text",
+   "category": "aria",
+   "criteria": [],
+   "tags": [
+    "best-practice"
+   ]
+  },
+  {
+   "id": "aria-toggle-field-name",
+   "help": "ARIA toggle fields must have an accessible name",
+   "description": "Ensure every ARIA toggle field has an accessible name",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/aria-toggle-field-name",
+   "category": "aria",
+   "criteria": [
+    "4.1.2"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "aria-tooltip-name",
+   "help": "ARIA tooltip nodes must have an accessible name",
+   "description": "Ensure every ARIA tooltip node has an accessible name",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/aria-tooltip-name",
+   "category": "aria",
+   "criteria": [
+    "4.1.2"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "aria-treeitem-name",
+   "help": "ARIA treeitem nodes should have an accessible name",
+   "description": "Ensure every ARIA treeitem node has an accessible name",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/aria-treeitem-name",
+   "category": "aria",
+   "criteria": [],
+   "tags": [
+    "best-practice"
+   ]
+  },
+  {
+   "id": "aria-valid-attr",
+   "help": "ARIA attributes must conform to valid names",
+   "description": "Ensure attributes that begin with aria- are valid ARIA attributes",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/aria-valid-attr",
+   "category": "aria",
+   "criteria": [
+    "4.1.2"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "aria-valid-attr-value",
+   "help": "ARIA attributes must conform to valid values",
+   "description": "Ensure all ARIA attributes have valid values",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/aria-valid-attr-value",
+   "category": "aria",
+   "criteria": [
+    "4.1.2"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "audio-caption",
+   "help": "<audio> elements must have a captions track",
+   "description": "Ensure <audio> elements have captions",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/audio-caption",
+   "category": "time-and-media",
+   "criteria": [
+    "1.2.1"
+   ],
+   "tags": [
+    "wcag2a",
+    "deprecated"
+   ]
+  },
+  {
+   "id": "autocomplete-valid",
+   "help": "autocomplete attribute must be used correctly",
+   "description": "Ensure the autocomplete attribute is correct and suitable for the form field",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/autocomplete-valid",
+   "category": "forms",
+   "criteria": [
+    "1.3.5"
+   ],
+   "tags": [
+    "wcag21aa"
+   ]
+  },
+  {
+   "id": "avoid-inline-spacing",
+   "help": "Inline text spacing must be adjustable with custom stylesheets",
+   "description": "Ensure that text spacing set through style attributes can be adjusted with custom stylesheets",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/avoid-inline-spacing",
+   "category": "structure",
+   "criteria": [
+    "1.4.12"
+   ],
+   "tags": [
+    "wcag21aa"
+   ]
+  },
+  {
+   "id": "blink",
+   "help": "<blink> elements are deprecated and must not be used",
+   "description": "Ensure <blink> elements are not used",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/blink",
+   "category": "time-and-media",
+   "criteria": [
+    "2.2.2"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "button-name",
+   "help": "Buttons must have discernible text",
+   "description": "Ensure buttons have discernible text",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/button-name",
+   "category": "name-role-value",
+   "criteria": [
+    "4.1.2"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "bypass",
+   "help": "Page must have means to bypass repeated blocks",
+   "description": "Ensure each page has at least one mechanism for a user to bypass navigation and jump straight to the content",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/bypass",
+   "category": "keyboard",
+   "criteria": [
+    "2.4.1"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "color-contrast",
+   "help": "Elements must meet minimum color contrast ratio thresholds",
+   "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/color-contrast",
+   "category": "color",
+   "criteria": [
+    "1.4.3"
+   ],
+   "tags": [
+    "wcag2aa"
+   ]
+  },
+  {
+   "id": "color-contrast-enhanced",
+   "help": "Elements must meet enhanced color contrast ratio thresholds",
+   "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AAA enhanced contrast ratio thresholds",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/color-contrast-enhanced",
+   "category": "color",
+   "criteria": [
+    "1.4.6"
+   ],
+   "tags": [
+    "wcag2aaa"
+   ]
+  },
+  {
+   "id": "css-orientation-lock",
+   "help": "CSS Media queries must not lock display orientation",
+   "description": "Ensure content is not locked to any specific display orientation, and the content is operable in all display orientations",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/css-orientation-lock",
+   "category": "structure",
+   "criteria": [
+    "1.3.4"
+   ],
+   "tags": [
+    "wcag21aa",
+    "experimental"
+   ]
+  },
+  {
+   "id": "definition-list",
+   "help": "<dl> elements must only directly contain properly-ordered <dt> and <dd> groups, <script>, <template> or <div> elements",
+   "description": "Ensure <dl> elements are structured correctly",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/definition-list",
+   "category": "structure",
+   "criteria": [
+    "1.3.1"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "dlitem",
+   "help": "<dt> and <dd> elements must be contained by a <dl>",
+   "description": "Ensure <dt> and <dd> elements are contained by a <dl>",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/dlitem",
+   "category": "structure",
+   "criteria": [
+    "1.3.1"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "document-title",
+   "help": "Documents must have <title> element to aid in navigation",
+   "description": "Ensure each HTML document contains a non-empty <title> element",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/document-title",
+   "category": "text-alternatives",
+   "criteria": [
+    "2.4.2"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "duplicate-id",
+   "help": "id attribute value must be unique",
+   "description": "Ensure every id attribute value is unique",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/duplicate-id",
+   "category": "parsing",
+   "criteria": [
+    "4.1.1"
+   ],
+   "tags": [
+    "deprecated"
+   ]
+  },
+  {
+   "id": "duplicate-id-active",
+   "help": "IDs of active elements must be unique",
+   "description": "Ensure every id attribute value of active elements is unique",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/duplicate-id-active",
+   "category": "parsing",
+   "criteria": [
+    "4.1.1"
+   ],
+   "tags": [
+    "deprecated"
+   ]
+  },
+  {
+   "id": "duplicate-id-aria",
+   "help": "IDs used in ARIA and labels must be unique",
+   "description": "Ensure every id attribute value used in ARIA and in labels is unique",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/duplicate-id-aria",
+   "category": "parsing",
+   "criteria": [
+    "4.1.2"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "empty-heading",
+   "help": "Headings should not be empty",
+   "description": "Ensure headings have discernible text",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/empty-heading",
+   "category": "name-role-value",
+   "criteria": [],
+   "tags": [
+    "best-practice"
+   ]
+  },
+  {
+   "id": "empty-table-header",
+   "help": "Table header text should not be empty",
+   "description": "Ensure table headers have discernible text",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/empty-table-header",
+   "category": "name-role-value",
+   "criteria": [],
+   "tags": [
+    "best-practice"
+   ]
+  },
+  {
+   "id": "focus-order-semantics",
+   "help": "Elements in the focus order should have an appropriate role",
+   "description": "Ensure elements in the focus order have a role appropriate for interactive content",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/focus-order-semantics",
+   "category": "keyboard",
+   "criteria": [],
+   "tags": [
+    "best-practice",
+    "experimental"
+   ]
+  },
+  {
+   "id": "form-field-multiple-labels",
+   "help": "Form field must not have multiple label elements",
+   "description": "Ensure form field does not have multiple label elements",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/form-field-multiple-labels",
+   "category": "forms",
+   "criteria": [
+    "3.3.2"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "frame-focusable-content",
+   "help": "Frames with focusable content must not have tabindex=-1",
+   "description": "Ensure <frame> and <iframe> elements with focusable content do not have tabindex=-1",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/frame-focusable-content",
+   "category": "keyboard",
+   "criteria": [
+    "2.1.1"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "frame-tested",
+   "help": "Frames should be tested with axe-core",
+   "description": "Ensure <iframe> and <frame> elements contain the axe-core script",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/frame-tested",
+   "category": "structure",
+   "criteria": [],
+   "tags": [
+    "best-practice"
+   ]
+  },
+  {
+   "id": "frame-title",
+   "help": "Frames must have an accessible name",
+   "description": "Ensure <iframe> and <frame> elements have an accessible name",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/frame-title",
+   "category": "text-alternatives",
+   "criteria": [
+    "4.1.2"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "frame-title-unique",
+   "help": "Frames must have a unique title attribute",
+   "description": "Ensure <iframe> and <frame> elements contain a unique title attribute",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/frame-title-unique",
+   "category": "text-alternatives",
+   "criteria": [
+    "4.1.2"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "heading-order",
+   "help": "Heading levels should only increase by one",
+   "description": "Ensure the order of headings is semantically correct",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/heading-order",
+   "category": "semantics",
+   "criteria": [],
+   "tags": [
+    "best-practice"
+   ]
+  },
+  {
+   "id": "hidden-content",
+   "help": "Hidden content on the page should be analyzed",
+   "description": "Informs users about hidden content.",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/hidden-content",
+   "category": "structure",
+   "criteria": [],
+   "tags": [
+    "best-practice",
+    "experimental"
+   ]
+  },
+  {
+   "id": "html-has-lang",
+   "help": "<html> element must have a lang attribute",
+   "description": "Ensure every HTML document has a lang attribute",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/html-has-lang",
+   "category": "language",
+   "criteria": [
+    "3.1.1"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "html-lang-valid",
+   "help": "<html> element must have a valid value for the lang attribute",
+   "description": "Ensure the lang attribute of the <html> element has a valid value",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/html-lang-valid",
+   "category": "language",
+   "criteria": [
+    "3.1.1"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "html-xml-lang-mismatch",
+   "help": "HTML elements with lang and xml:lang must have the same base language",
+   "description": "Ensure that HTML elements with both valid lang and xml:lang attributes agree on the base language of the page",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/html-xml-lang-mismatch",
+   "category": "language",
+   "criteria": [
+    "3.1.1"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "identical-links-same-purpose",
+   "help": "Links with the same name must have a similar purpose",
+   "description": "Ensure that links with the same accessible name serve a similar purpose",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/identical-links-same-purpose",
+   "category": "semantics",
+   "criteria": [
+    "2.4.9"
+   ],
+   "tags": [
+    "wcag2aaa"
+   ]
+  },
+  {
+   "id": "image-alt",
+   "help": "Images must have alternative text",
+   "description": "Ensure <img> elements have alternative text or a role of none or presentation",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/image-alt",
+   "category": "text-alternatives",
+   "criteria": [
+    "1.1.1"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "image-redundant-alt",
+   "help": "Alternative text of images should not be repeated as text",
+   "description": "Ensure image alternative is not repeated as text",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/image-redundant-alt",
+   "category": "text-alternatives",
+   "criteria": [],
+   "tags": [
+    "best-practice"
+   ]
+  },
+  {
+   "id": "input-button-name",
+   "help": "Input buttons must have discernible text",
+   "description": "Ensure input buttons have discernible text",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/input-button-name",
+   "category": "name-role-value",
+   "criteria": [
+    "4.1.2"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "input-image-alt",
+   "help": "Image buttons must have alternative text",
+   "description": "Ensure <input type=\"image\"> elements have alternative text",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/input-image-alt",
+   "category": "text-alternatives",
+   "criteria": [
+    "1.1.1",
+    "4.1.2"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "label",
+   "help": "Form elements must have labels",
+   "description": "Ensure every form element has a label",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/label",
+   "category": "forms",
+   "criteria": [
+    "4.1.2"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "label-content-name-mismatch",
+   "help": "Elements must have their visible text as part of their accessible name",
+   "description": "Ensure that elements labelled through their content must have their visible text as part of their accessible name",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/label-content-name-mismatch",
+   "category": "semantics",
+   "criteria": [
+    "2.5.3"
+   ],
+   "tags": [
+    "wcag21a",
+    "experimental"
+   ]
+  },
+  {
+   "id": "label-title-only",
+   "help": "Form elements should have a visible label",
+   "description": "Ensure that every form element has a visible label and is not solely labeled using hidden labels, or the title or aria-describedby attributes",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/label-title-only",
+   "category": "forms",
+   "criteria": [],
+   "tags": [
+    "best-practice"
+   ]
+  },
+  {
+   "id": "landmark-banner-is-top-level",
+   "help": "Banner landmark should not be contained in another landmark",
+   "description": "Ensure the banner landmark is at top level",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/landmark-banner-is-top-level",
+   "category": "semantics",
+   "criteria": [],
+   "tags": [
+    "best-practice"
+   ]
+  },
+  {
+   "id": "landmark-complementary-is-top-level",
+   "help": "Aside should not be contained in another landmark",
+   "description": "Ensure the complementary landmark or aside is at top level",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/landmark-complementary-is-top-level",
+   "category": "semantics",
+   "criteria": [],
+   "tags": [
+    "best-practice"
+   ]
+  },
+  {
+   "id": "landmark-contentinfo-is-top-level",
+   "help": "Contentinfo landmark should not be contained in another landmark",
+   "description": "Ensure the contentinfo landmark is at top level",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/landmark-contentinfo-is-top-level",
+   "category": "semantics",
+   "criteria": [],
+   "tags": [
+    "best-practice"
+   ]
+  },
+  {
+   "id": "landmark-main-is-top-level",
+   "help": "Main landmark should not be contained in another landmark",
+   "description": "Ensure the main landmark is at top level",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/landmark-main-is-top-level",
+   "category": "semantics",
+   "criteria": [],
+   "tags": [
+    "best-practice"
+   ]
+  },
+  {
+   "id": "landmark-no-duplicate-banner",
+   "help": "Document should not have more than one banner landmark",
+   "description": "Ensure the document has at most one banner landmark",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/landmark-no-duplicate-banner",
+   "category": "semantics",
+   "criteria": [],
+   "tags": [
+    "best-practice"
+   ]
+  },
+  {
+   "id": "landmark-no-duplicate-contentinfo",
+   "help": "Document should not have more than one contentinfo landmark",
+   "description": "Ensure the document has at most one contentinfo landmark",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/landmark-no-duplicate-contentinfo",
+   "category": "semantics",
+   "criteria": [],
+   "tags": [
+    "best-practice"
+   ]
+  },
+  {
+   "id": "landmark-no-duplicate-main",
+   "help": "Document should not have more than one main landmark",
+   "description": "Ensure the document has at most one main landmark",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/landmark-no-duplicate-main",
+   "category": "semantics",
+   "criteria": [],
+   "tags": [
+    "best-practice"
+   ]
+  },
+  {
+   "id": "landmark-one-main",
+   "help": "Document should have one main landmark",
+   "description": "Ensure the document has a main landmark",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/landmark-one-main",
+   "category": "semantics",
+   "criteria": [],
+   "tags": [
+    "best-practice"
+   ]
+  },
+  {
+   "id": "landmark-unique",
+   "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+   "description": "Ensure landmarks are unique",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/landmark-unique",
+   "category": "semantics",
+   "criteria": [],
+   "tags": [
+    "best-practice"
+   ]
+  },
+  {
+   "id": "link-in-text-block",
+   "help": "Links must be distinguishable without relying on color",
+   "description": "Ensure links are distinguished from surrounding text in a way that does not rely on color",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/link-in-text-block",
+   "category": "color",
+   "criteria": [
+    "1.4.1"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "link-name",
+   "help": "Links must have discernible text",
+   "description": "Ensure links have discernible text",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/link-name",
+   "category": "name-role-value",
+   "criteria": [
+    "2.4.4",
+    "4.1.2"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "list",
+   "help": "<ul> and <ol> must only directly contain <li>, <script> or <template> elements",
+   "description": "Ensure that lists are structured correctly",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/list",
+   "category": "structure",
+   "criteria": [
+    "1.3.1"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "listitem",
+   "help": "<li> elements must be contained in a <ul> or <ol>",
+   "description": "Ensure <li> elements are used semantically",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/listitem",
+   "category": "structure",
+   "criteria": [
+    "1.3.1"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "marquee",
+   "help": "<marquee> elements are deprecated and must not be used",
+   "description": "Ensure <marquee> elements are not used",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/marquee",
+   "category": "parsing",
+   "criteria": [
+    "2.2.2"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "meta-refresh",
+   "help": "Delayed refresh under 20 hours must not be used",
+   "description": "Ensure <meta http-equiv=\"refresh\"> is not used for delayed refresh",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/meta-refresh",
+   "category": "time-and-media",
+   "criteria": [
+    "2.2.1"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "meta-refresh-no-exceptions",
+   "help": "Delayed refresh must not be used",
+   "description": "Ensure <meta http-equiv=\"refresh\"> is not used for delayed refresh",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/meta-refresh-no-exceptions",
+   "category": "time-and-media",
+   "criteria": [
+    "2.2.4",
+    "3.2.5"
+   ],
+   "tags": [
+    "wcag2aaa"
+   ]
+  },
+  {
+   "id": "meta-viewport",
+   "help": "Zooming and scaling must not be disabled",
+   "description": "Ensure <meta name=\"viewport\"> does not disable text scaling and zooming",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/meta-viewport",
+   "category": "sensory-and-visual-cues",
+   "criteria": [
+    "1.4.4"
+   ],
+   "tags": [
+    "wcag2aa"
+   ]
+  },
+  {
+   "id": "meta-viewport-large",
+   "help": "Users should be able to zoom and scale the text up to 500%",
+   "description": "Ensure <meta name=\"viewport\"> can scale a significant amount",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/meta-viewport-large",
+   "category": "sensory-and-visual-cues",
+   "criteria": [],
+   "tags": [
+    "best-practice"
+   ]
+  },
+  {
+   "id": "nested-interactive",
+   "help": "Interactive controls must not be nested",
+   "description": "Ensure interactive controls are not nested as they are not always announced by screen readers or can cause focus problems for assistive technologies",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/nested-interactive",
+   "category": "keyboard",
+   "criteria": [
+    "4.1.2"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "no-autoplay-audio",
+   "help": "<video> or <audio> elements must not play automatically",
+   "description": "Ensure <video> or <audio> elements do not autoplay audio for more than 3 seconds without a control mechanism to stop or mute the audio",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/no-autoplay-audio",
+   "category": "time-and-media",
+   "criteria": [
+    "1.4.2"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "object-alt",
+   "help": "<object> elements must have alternative text",
+   "description": "Ensure <object> elements have alternative text",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/object-alt",
+   "category": "text-alternatives",
+   "criteria": [
+    "1.1.1"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "p-as-heading",
+   "help": "Styled <p> elements must not be used as headings",
+   "description": "Ensure bold, italic text and font-size is not used to style <p> elements as a heading",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/p-as-heading",
+   "category": "semantics",
+   "criteria": [
+    "1.3.1"
+   ],
+   "tags": [
+    "wcag2a",
+    "experimental"
+   ]
+  },
+  {
+   "id": "page-has-heading-one",
+   "help": "Page should contain a level-one heading",
+   "description": "Ensure that the page, or at least one of its frames contains a level-one heading",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/page-has-heading-one",
+   "category": "semantics",
+   "criteria": [],
+   "tags": [
+    "best-practice"
+   ]
+  },
+  {
+   "id": "presentation-role-conflict",
+   "help": "Ensure elements marked as presentational are consistently ignored",
+   "description": "Elements marked as presentational should not have global ARIA or tabindex to ensure all screen readers ignore them",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/presentation-role-conflict",
+   "category": "aria",
+   "criteria": [],
+   "tags": [
+    "best-practice"
+   ]
+  },
+  {
+   "id": "region",
+   "help": "All page content should be contained by landmarks",
+   "description": "Ensure all page content is contained by landmarks",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/region",
+   "category": "keyboard",
+   "criteria": [],
+   "tags": [
+    "best-practice"
+   ]
+  },
+  {
+   "id": "role-img-alt",
+   "help": "[role=\"img\"] elements must have an alternative text",
+   "description": "Ensure [role=\"img\"] elements have alternative text",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/role-img-alt",
+   "category": "text-alternatives",
+   "criteria": [
+    "1.1.1"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "scope-attr-valid",
+   "help": "scope attribute should be used correctly",
+   "description": "Ensure the scope attribute is used correctly on tables",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/scope-attr-valid",
+   "category": "tables",
+   "criteria": [],
+   "tags": [
+    "best-practice"
+   ]
+  },
+  {
+   "id": "scrollable-region-focusable",
+   "help": "Scrollable region must have keyboard access",
+   "description": "Ensure elements that have scrollable content are accessible by keyboard",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/scrollable-region-focusable",
+   "category": "keyboard",
+   "criteria": [
+    "2.1.1",
+    "2.1.3"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "select-name",
+   "help": "Select element must have an accessible name",
+   "description": "Ensure select element has an accessible name",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/select-name",
+   "category": "forms",
+   "criteria": [
+    "4.1.2"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "server-side-image-map",
+   "help": "Server-side image maps must not be used",
+   "description": "Ensure that server-side image maps are not used",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/server-side-image-map",
+   "category": "text-alternatives",
+   "criteria": [
+    "2.1.1"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "skip-link",
+   "help": "The skip-link target should exist and be focusable",
+   "description": "Ensure all skip links have a focusable target",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/skip-link",
+   "category": "keyboard",
+   "criteria": [],
+   "tags": [
+    "best-practice"
+   ]
+  },
+  {
+   "id": "summary-name",
+   "help": "Summary elements must have discernible text",
+   "description": "Ensure summary elements have discernible text",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/summary-name",
+   "category": "name-role-value",
+   "criteria": [
+    "4.1.2"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "svg-img-alt",
+   "help": "<svg> elements with an img role must have an alternative text",
+   "description": "Ensure <svg> elements with an img, graphics-document or graphics-symbol role have an accessible text",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/svg-img-alt",
+   "category": "text-alternatives",
+   "criteria": [
+    "1.1.1"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "tabindex",
+   "help": "Elements should not have tabindex greater than zero",
+   "description": "Ensure tabindex attribute values are not greater than 0",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/tabindex",
+   "category": "keyboard",
+   "criteria": [],
+   "tags": [
+    "best-practice"
+   ]
+  },
+  {
+   "id": "table-duplicate-name",
+   "help": "Tables should not have the same summary and caption",
+   "description": "Ensure the <caption> element does not contain the same text as the summary attribute",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/table-duplicate-name",
+   "category": "tables",
+   "criteria": [],
+   "tags": [
+    "best-practice"
+   ]
+  },
+  {
+   "id": "table-fake-caption",
+   "help": "Data or header cells must not be used to give caption to a data table.",
+   "description": "Ensure that tables with a caption use the <caption> element.",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/table-fake-caption",
+   "category": "tables",
+   "criteria": [
+    "1.3.1"
+   ],
+   "tags": [
+    "experimental",
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "target-size",
+   "help": "All touch targets must be 24px large, or leave sufficient space",
+   "description": "Ensure touch targets have sufficient size and space",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/target-size",
+   "category": "sensory-and-visual-cues",
+   "criteria": [
+    "2.5.8"
+   ],
+   "tags": [
+    "wcag22aa"
+   ]
+  },
+  {
+   "id": "td-has-header",
+   "help": "Non-empty <td> elements in larger <table> must have an associated table header",
+   "description": "Ensure that each non-empty data cell in a <table> larger than 3 by 3  has one or more table headers",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/td-has-header",
+   "category": "tables",
+   "criteria": [
+    "1.3.1"
+   ],
+   "tags": [
+    "experimental",
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "td-headers-attr",
+   "help": "Table cells that use the headers attribute must only refer to cells in the same table",
+   "description": "Ensure that each cell in a table that uses the headers attribute refers only to other cells in that table",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/td-headers-attr",
+   "category": "tables",
+   "criteria": [
+    "1.3.1"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "th-has-data-cells",
+   "help": "Table headers in a data table must refer to data cells",
+   "description": "Ensure that <th> elements and elements with role=columnheader/rowheader have data cells they describe",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/th-has-data-cells",
+   "category": "tables",
+   "criteria": [
+    "1.3.1"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  },
+  {
+   "id": "valid-lang",
+   "help": "lang attribute must have a valid value",
+   "description": "Ensure lang attributes have valid values",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/valid-lang",
+   "category": "language",
+   "criteria": [
+    "3.1.2"
+   ],
+   "tags": [
+    "wcag2aa"
+   ]
+  },
+  {
+   "id": "video-caption",
+   "help": "<video> elements must have captions",
+   "description": "Ensure <video> elements have captions",
+   "help_url": "https://dequeuniversity.com/rules/axe/4.10/video-caption",
+   "category": "text-alternatives",
+   "criteria": [
+    "1.2.2"
+   ],
+   "tags": [
+    "wcag2a"
+   ]
+  }
+ ]
+}

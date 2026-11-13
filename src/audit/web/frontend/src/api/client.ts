@@ -51,6 +51,9 @@ import type {
   SiteGroup,
   ScopePreview,
   TrackingData,
+  CoverageChecks,
+  CoverageFound,
+  WcagVersion,
 } from "./types";
 
 /**
@@ -594,6 +597,15 @@ export const api = {
    * drift from the code.
    */
   getTracking: () => request<TrackingData>("/api/tracking"),
+  /** What Axcess checks for each WCAG criterion, built from its own code. */
+  getCoverageChecks: (version: WcagVersion) =>
+    request<CoverageChecks>(`/api/coverage/checks?version=${encodeURIComponent(version)}`),
+  /**
+   * What Axcess found, counted on request from this computer's completed
+   * reports: across the most recent ones, or one report.
+   */
+  getCoverageFound: (scanId?: number) =>
+    request<CoverageFound>(scanId ? `/api/coverage/found?scan_id=${scanId}` : "/api/coverage/found"),
 };
 
 /** Direct URL (bypass fetch) for image blobs, used in <img src=…>. */

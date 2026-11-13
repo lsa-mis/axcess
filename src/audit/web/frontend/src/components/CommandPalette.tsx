@@ -5,7 +5,7 @@ import { Check, CornerDownLeft, Search } from "lucide-react";
 import { api } from "../api/client";
 import { siteLabel } from "./ReportCrumb";
 import { cn } from "../lib/cn";
-import { CHECK_LABEL, SCAN_STATUS_LABEL } from "../lib/terms";
+import { CHECK_LABEL, CHECK_METHOD_LABEL, SCAN_STATUS_LABEL } from "../lib/terms";
 import { ALL_SETTINGS } from "../lib/settingsCatalog";
 import type { Preferences } from "../lib/preferences";
 import { setPreference, usePreferences } from "../hooks/usePreferences";
@@ -27,6 +27,8 @@ type Item = {
  * Settings page, which the same query also finds, has them all.
  */
 const MAX_SETTINGS = 4;
+/** WCAG criteria shown for one query. */
+const MAX_CRITERIA = 6;
 
 /**
  * Every place the sidebar links to, plus the New scan action. Keep in step
@@ -41,6 +43,27 @@ const MAX_SETTINGS = 4;
 const PLACES: ReadonlyArray<{ id: string; label: string; to: string; terms?: readonly string[] }> = [
   { id: "nav-reports", label: "Reports", to: "/scans" },
   { id: "nav-new", label: "New scan", to: "/scans/new" },
+  {
+    id: "nav-coverage",
+    label: "Coverage: What Axcess checks",
+    to: "/coverage",
+    terms: [
+      "WCAG criteria",
+      "How Axcess tests a page",
+      "Share of real problems Axcess finds",
+      "Most common website problems",
+      "Rule check (axe) rules",
+      "APG",
+      "Understanding WCAG",
+      "WCAG version",
+    ],
+  },
+  {
+    id: "nav-coverage-found",
+    label: "Coverage: What Axcess found",
+    to: "/coverage/found",
+    terms: ["Which check found each occurrence", "Estimated share of all issues", "Criteria that failed a manual review"],
+  },
   {
     id: "nav-about",
     label: "About Axcess",
@@ -87,6 +110,14 @@ export default function CommandPalette({
     queryKey: ["scans"],
     queryFn: () => api.listScans(),
     enabled: open,
+  });
+  // WCAG criteria, so typing "contrast" or "1.4.3" opens that criterion on
+  // Coverage. WCAG 2.1, the version scans use; only fetched while Search is open.
+  const criteriaQuery = useQuery({
+    queryKey: ["coverage-checks", "2.1"],
+    queryFn: () => api.getCoverageChecks("2.1"),
+    enabled: open,
+    staleTime: Infinity,
   });
   const issuesQuery = useQuery({
     queryKey: ["issues", scanId],
@@ -170,6 +201,23 @@ export default function CommandPalette({
       }
     }
 
+    // Criteria only for a real query, at most MAX_CRITERIA, so an empty
+    // Search still opens on places and reports.
+    if (q) {
+      const criteria = (criteriaQuery.data?.criteria ?? []).filter((c) =>
+        `${c.sc} ${c.name}`.toLowerCase().includes(q),
+      );
+      for (const c of criteria.slice(0, MAX_CRITERIA)) {
+        out.push({
+          id: `criterion-${c.sc}`,
+          group: "WCAG criteria",
+          label: `${c.sc} ${c.name}`,
+          sublabel: `How Axcess checks it: ${CHECK_METHOD_LABEL[c.method]}`,
+          to: `/coverage?criterion=${c.sc}`,
+        });
+      }
+    }
+
     if (scanId) {
       for (const i of issuesQuery.data?.rows ?? []) {
         const hay = `${i.title} ${i.issue_key} ${i.wcag_sc ?? ""} ${i.wcag_name ?? ""}`.toLowerCase();
@@ -185,7 +233,7 @@ export default function CommandPalette({
       }
     }
     return out;
-  }, [query, scansQuery.data, issuesQuery.data, scanId, prefs]);
+  }, [query, scansQuery.data, criteriaQuery.data, issuesQuery.data, scanId, prefs]);
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "ArrowDown") {

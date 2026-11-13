@@ -46,6 +46,7 @@ const FindingDetailRoute = lazy(() => import("./routes/FindingDetail"));
 const CompareReportsRoute = lazy(() => import("./routes/CompareReports"));
 const WhatChangedRoute = lazy(() => import("./routes/Compare"));
 const TrackingRoute = lazy(() => import("./routes/Tracking"));
+const CoverageRoute = lazy(() => import("./routes/Coverage"));
 const PageEvidenceRoute = lazy(() => import("./routes/PageEvidence"));
 const InspectorRoute = lazy(() => import("./routes/Inspector"));
 const AboutRoute = lazy(() => import("./routes/About"));
@@ -104,6 +105,8 @@ export default function App() {
         <Route path="/scans/:scanId/diff" element={<LegacyDiffRedirect />} />
         <Route path="/findings/:findingId" element={<FindingDetailRoute />} />
         <Route path="/tracking" element={<TrackingRoute />} />
+        <Route path="/coverage" element={<CoverageRoute view="checks" />} />
+        <Route path="/coverage/found" element={<CoverageRoute view="found" />} />
         <Route path="/about" element={<AboutRoute />} />
         <Route path="/settings" element={<SettingsRoute />} />
         <Route path="*" element={<NotFoundRoute />} />

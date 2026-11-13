@@ -119,6 +119,10 @@ _ENDPOINTS: tuple[tuple[str, str], ...] = (
     ("GET /api/capabilities/local-analysis", "/api/capabilities/local-analysis"),
     ("GET /api/capabilities/protected-scans", "/api/capabilities/protected-scans"),
     ("GET /api/tracking", "/api/tracking"),
+    ("GET /api/coverage/checks", "/api/coverage/checks"),
+    ("GET /api/coverage/checks (WCAG 2.2)", "/api/coverage/checks?version=2.2"),
+    ("GET /api/coverage/found", "/api/coverage/found"),
+    ("GET /api/coverage/found (one report)", "/api/coverage/found?scan_id={scan}"),
     ("GET /api/scope-preview (empty)", "/api/scope-preview"),
     ("GET /api/scope-preview (valid url)", "/api/scope-preview?url=https://example.com/docs"),
     ("GET /api/scope-preview (invalid url)", "/api/scope-preview?url=ftp://example.com/"),
@@ -151,6 +155,14 @@ _OTHER_SITE_SCAN = (
     "same ScanSummary field is pinned through body[].scans[].rule_checks."
 )
 _UNPINNED_PATHS: dict[tuple[str, str], str] = {
+    **{
+        ("GET /api/coverage/found", f"body.estimate.{field}"): (
+            "The seed has fewer rule check occurrences than the estimate's sample gate "
+            "(issue_share.MIN_ESTIMATE_SAMPLE); tests/unit/test_issue_share.py pins the "
+            "estimate's values."
+        )
+        for field in ("criteria", "estimated_total", "share")
+    },
     ("GET /api/capabilities/local-analysis", "body.semantic.ready_models"): _OFFLINE_OLLAMA,
     ("GET /api/capabilities/local-analysis", "body.vision.installed_size_bytes"): _OFFLINE_OLLAMA,
     ("GET /api/sites", "body[].most_recent.rule_checks"): _OTHER_SITE_SCAN,

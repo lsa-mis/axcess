@@ -466,7 +466,8 @@ export function Disclosure({
 }: {
   id: string;
   title: string;
-  headingLevel?: 2 | 3;
+  /** 4 for a disclosure inside a level 3 section (Coverage's criterion panel). */
+  headingLevel?: 2 | 3 | 4;
   defaultOpen?: boolean;
   /**
    * Controlled mode, for a parent that must open the panel itself (a form

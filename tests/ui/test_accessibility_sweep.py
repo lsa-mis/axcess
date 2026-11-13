@@ -46,6 +46,8 @@ _ROUTES = [
     "/app/scans/{scan_id}/protected/issues",
     "/app/findings/1",
     "/app/tracking",
+    "/app/coverage",
+    "/app/coverage/found",
     "/app/about",
     "/app/settings",
     "/app/not-a-real-route",

@@ -256,6 +256,17 @@ What a scan actually checked: which pages it tested, which checks ran, and how
 many [page states](#page-state) it reached. The report shows this under **What
 was checked**, above the Issues table.
 
+### Coverage page
+
+The page at the bottom of the sidebar that answers two questions in two parts.
+**What Axcess checks** is built from Axcess's own code and is the same for
+every site: for each WCAG criterion, whether Axcess checks it, partly checks
+it, gives AI hints, or leaves it to you, plus an estimate from a published
+study of how many real problems Axcess finds. **What Axcess found** counts the
+[occurrences](#occurrence) in the completed reports on this computer, after
+each scan. Neither part shows that a site meets WCAG. Not to be confused with
+[scan coverage](#scan-coverage), which is what one scan checked.
+
 ### Crawl
 
 How a scan moves through a site: Axcess starts at the address you give,

@@ -697,6 +697,26 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/coverage/checks",
+        "methods": ["GET"],
+        "name": "api_coverage_checks",
+        "async": false,
+        "params": {"query": ["version"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/coverage/found",
+        "methods": ["GET"],
+        "name": "api_coverage_found",
+        "async": false,
+        "params": {"query": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/",
         "methods": ["GET"],
         "name": "root",
@@ -1493,6 +1513,26 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/coverage/checks",
+        "methods": ["GET"],
+        "name": "api_coverage_checks",
+        "async": false,
+        "params": {"query": ["version"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/coverage/found",
+        "methods": ["GET"],
+        "name": "api_coverage_found",
+        "async": false,
+        "params": {"query": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/",
         "methods": ["GET"],
         "name": "root",
@@ -2270,6 +2310,26 @@
         "name": "api_tracking",
         "async": false,
         "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/coverage/checks",
+        "methods": ["GET"],
+        "name": "api_coverage_checks",
+        "async": false,
+        "params": {"query": ["version"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/coverage/found",
+        "methods": ["GET"],
+        "name": "api_coverage_found",
+        "async": false,
+        "params": {"query": ["scan_id"]},
         "request_param": null,
         "background_tasks_param": null
       },
@@ -3065,6 +3125,26 @@
         "name": "api_tracking",
         "async": false,
         "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/coverage/checks",
+        "methods": ["GET"],
+        "name": "api_coverage_checks",
+        "async": false,
+        "params": {"query": ["version"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/coverage/found",
+        "methods": ["GET"],
+        "name": "api_coverage_found",
+        "async": false,
+        "params": {"query": ["scan_id"]},
         "request_param": null,
         "background_tasks_param": null
       },

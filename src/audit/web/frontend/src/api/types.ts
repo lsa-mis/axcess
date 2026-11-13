@@ -1095,6 +1095,128 @@ export interface TrackingData {
   coverage: CoverageData;
 }
 
+// --- Coverage (/api/coverage/checks, /api/coverage/found) -------------
+// Mirrors src/audit/web/coverage_checks.py and src/audit/web/issue_share.py.
+
+/** How Axcess checks a criterion; "not_needed" is 4.1.1 Parsing in WCAG 2.1. */
+export type CheckMethod = "automated" | "partial" | "ai-assisted" | "manual" | "not_needed";
+
+/** The other checks a study row credits; "click_through" is axe-core after Click-Through. */
+export type StudyCheck = "click_through" | "image" | "focus" | "keyboard" | "visual" | "semantic" | "responsive";
+
+export interface StudyFigures {
+  sc: string; // WCAG number, or "other"
+  share: number; // of all problems, 0-1 (4.1.1 left out)
+  rule_check: number; // of this criterion's problems, the share axe-core finds
+  other_checks: number; // the share Axcess's other checks add (an estimate)
+  checks: StudyCheck[];
+}
+
+export interface AxeRuleInfo {
+  id: string;
+  help: string;
+  description: string;
+  url: string;
+}
+
+export interface Guidance {
+  title: string;
+  url: string;
+}
+
+export interface CheckCriterion {
+  sc: string;
+  name: string;
+  understanding_url: string;
+  apg: Guidance[];
+  level: string;
+  principle: string;
+  guideline: string;
+  method: CheckMethod;
+  checks: DetectionPipeline[];
+  rules: AxeRuleInfo[];
+  confidence: string;
+  does: string;
+  you: string;
+  technical: string;
+  study: StudyFigures | null;
+}
+
+export interface CommonProblem {
+  label: string;
+  share_of_sites: number;
+  rule: string;
+  sc: string;
+}
+
+export interface CoverageChecks {
+  wcag_version: WcagVersion;
+  scan_default_version: WcagVersion;
+  axe_version: string;
+  criteria: CheckCriterion[];
+  study: StudyFigures[];
+  study_source_url: string;
+  other_checks_hit_rate: number;
+  common_problems: CommonProblem[];
+  common_source_url: string;
+}
+
+export type FoundLayer = "axe_loaded" | "axe_click_through" | "alfa" | "probes" | "image" | "semantic";
+
+export interface CoverageScanOption {
+  id: number;
+  seed_url: string;
+  finished_at: string | null;
+}
+
+export interface CoverageFound {
+  scan_id: number | null;
+  scans: CoverageScanOption[];
+  scans_included: number;
+  scans_completed: number;
+  layers: {
+    total: number;
+    layers: { layer: FoundLayer; count: number; share: number | null }[];
+    excluded_not_a_problem: number;
+    excluded_records: number;
+  };
+  axe_rules: {
+    rule_id: string;
+    help: string;
+    category: string;
+    criteria: string[];
+    loaded: number;
+    click_through: number;
+  }[];
+  found_by_criterion: { sc: string; count: number }[];
+  estimate: {
+    available: boolean;
+    axe_sample: number;
+    min_sample: number;
+    found: number;
+    estimated_total: number | null;
+    share: number | null;
+    criteria: {
+      sc: string;
+      deque_share: number;
+      axe_rate: number;
+      axe_found: number;
+      found: number;
+      estimated_total: number;
+      method: "axe_rate" | "issue_share";
+    }[];
+    source_title: string;
+    source_url: string;
+  };
+  manual_review: {
+    evaluations: number;
+    failed: number;
+    found: number;
+    share: number | null;
+    scans: { scan_id: number; seed_url: string; failed: number; found: number }[];
+  };
+}
+
 // --- Expert evaluation workbench --------------------------------------
 
 export type EvaluationStatus = "draft" | "in_progress" | "completed";
