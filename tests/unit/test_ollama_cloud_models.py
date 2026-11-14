@@ -149,6 +149,14 @@ async def test_sign_in_scan_ai_refuses_a_cloud_model_under_a_local_name() -> Non
         httpx.Response(200, text="not json"),
         httpx.Response(200, json={"unexpected": True}),
         httpx.Response(200, json=["not", "an", "object"]),
+        # Malformed entries inside the list.
+        httpx.Response(200, json={"models": [None]}),
+        httpx.Response(200, json={"models": [{"remote_host": "https://ollama.com:443"}]}),
+        httpx.Response(200, json={"models": [{"name": ""}]}),
+        httpx.Response(200, json={"models": [{"name": 7}]}),
+        # Well formed, but the model is not in the list.
+        httpx.Response(200, json={"models": [{"name": "other:1b"}]}),
+        httpx.Response(200, json={"models": []}),
     ],
 )
 @pytest.mark.asyncio

@@ -66,14 +66,15 @@ def _names(name: str) -> set[str]:
     return {name, f"{name}:latest"} if ":" not in name else {name}
 
 
-async def remote_model_names(client: httpx.AsyncClient, tags_url: str) -> set[str] | None:
-    """Names of the models the daemon runs elsewhere, from ``/api/tags``.
+async def model_list(client: httpx.AsyncClient, tags_url: str) -> tuple[set[str], set[str]] | None:
+    """``(local, remote)`` model names from the daemon's ``/api/tags``.
 
     Ollama lists ``remote_host`` and ``remote_model`` only for a model that
     runs on another host (https://docs.ollama.com/api/tags). That catches a
     cloud model copied to a local-looking name (``ollama cp``), which
     :func:`is_cloud_model` cannot see. ``None`` when the list cannot be read
-    or is not the shape Ollama documents: then no model is known to be local.
+    or any entry is not the shape Ollama documents (an object with a name):
+    then no model is known to be local.
     """
     try:
         resp = await client.get(tags_url, timeout=5.0)
@@ -85,27 +86,38 @@ async def remote_model_names(client: httpx.AsyncClient, tags_url: str) -> set[st
     models = data.get("models") if isinstance(data, dict) else None
     if not isinstance(models, list):
         return None
-    out: set[str] = set()
+    local: set[str] = set()
+    remote: set[str] = set()
     for entry in models:
-        if isinstance(entry, dict) and (entry.get("remote_host") or entry.get("remote_model")):
-            out.update(str(entry[key]) for key in ("name", "model") if entry.get(key))
-    return out
+        if not isinstance(entry, dict):
+            return None
+        names = {entry[key] for key in ("name", "model") if isinstance(entry.get(key), str)}
+        names = {name for name in names if name.strip()}
+        if not names:
+            return None
+        (remote if entry.get("remote_host") or entry.get("remote_model") else local).update(names)
+    return local, remote
 
 
 async def why_not_local(client: httpx.AsyncClient, tags_url: str, model: str) -> str | None:
     """Why ``model`` may not run on this computer, or ``None`` when it does.
 
     Fails closed: a model is local only when its tag is not a cloud tag and
-    the daemon's own list was read and does not mark it remote. Every caller
-    refuses to send anything when this returns a reason.
+    the daemon's own list was read, is well formed, and lists the model
+    without marking it remote. Every caller refuses to send anything when
+    this returns a reason.
     """
     if is_cloud_model(model):
         return f"{model} is an Ollama cloud model, which runs off this computer."
-    remote = await remote_model_names(client, tags_url)
-    if remote is None:
+    listed = await model_list(client, tags_url)
+    if listed is None:
         return f"Axcess could not confirm that {model} runs on this computer."
-    if _names(model) & remote:
+    local, remote = listed
+    names = _names(model)
+    if names & remote:
         return f"{model} is an Ollama cloud model, which runs off this computer."
+    if not names & local:
+        return f"Axcess could not confirm that {model} runs on this computer."
     return None
 
 
