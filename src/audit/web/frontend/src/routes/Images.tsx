@@ -5,7 +5,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { api, blobUrl, ApiError } from "../api/client";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import Tabs from "../components/Tabs";
-import { TablePagination } from "../components/TablePagination";
+import { PagedTable } from "../components/TablePagination";
 import {
   Cell,
   ColumnHeader,
@@ -279,37 +279,44 @@ export default function ImagesRoute() {
       </p>
 
       <Card id="report-images-table">
-        <TableBar
-          pager={
-            data && (
-              <TablePagination
-                label={IMAGE_GROUP_LABEL[group]}
-                noun="images"
-                page={page}
-                pages={pages}
-                total={data.total}
-                pageSize={PAGE_SIZE}
-                pagerId={PAGER_ID}
-                disabled={imagesQuery.isFetching}
-                setPage={(next) => update({ page: String(next) }, false)}
-              />
-            )
+        {/* PagedTable draws the pager over the table and again under its last
+            row, as on every paged table (components/TablePagination.tsx). The
+            search and filter bar is drawn whether or not there is a pager, so
+            a filter that emptied the table stays there to undo. */}
+        <PagedTable
+          pagination={
+            data && {
+              label: IMAGE_GROUP_LABEL[group],
+              noun: "images",
+              page,
+              pages,
+              total: data.total,
+              pageSize: PAGE_SIZE,
+              pagerId: PAGER_ID,
+              disabled: imagesQuery.isFetching,
+              setPage: (next: number) => update({ page: String(next) }, false),
+            }
           }
-          footer={<ActiveFilters items={activeFilterItems(filters)} onClear={() => update({ verdict: "" })} />}
+          top={(pager) => (
+            <TableBar
+              pager={pager}
+              footer={<ActiveFilters items={activeFilterItems(filters)} onClear={() => update({ verdict: "" })} />}
+            >
+              <TableSearch
+                label="Search images"
+                placeholder="Alt text, text in the image, or page address"
+                value={q}
+                onChange={(value) => update({ q: value })}
+              />
+              <FilterMenu
+                label="Filter images"
+                groups={filters}
+                onChange={(key, value) => update({ [key]: value })}
+                onReset={() => update({ verdict: "" })}
+              />
+            </TableBar>
+          )}
         >
-          <TableSearch
-            label="Search images"
-            placeholder="Alt text, text in the image, or page address"
-            value={q}
-            onChange={(value) => update({ q: value })}
-          />
-          <FilterMenu
-            label="Filter images"
-            groups={filters}
-            onChange={(key, value) => update({ [key]: value })}
-            onReset={() => update({ verdict: "" })}
-          />
-        </TableBar>
         <TableStatus>
           {data
             ? `${plural(data.total, "image", "images")}, the ones that need alt text first.`
@@ -362,6 +369,7 @@ export default function ImagesRoute() {
             </Table>
           </TableRegion>
         )}
+        </PagedTable>
       </Card>
       <ImageViewer image={viewing} onClose={() => setViewing(null)} />
     </>

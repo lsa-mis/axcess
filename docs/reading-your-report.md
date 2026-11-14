@@ -111,7 +111,8 @@ with this issue**), on the **Saved copy** tab.
 
 When the rest of the elements are repeats, such as the same menu again,
 report the first one, step through the others with the arrow buttons, then
-choose **Mark 9 not checked as repeats** (the number is how many). Every
+choose **Mark 9 elements not checked yet as repeats** (the number is how
+many). Every
 flagged element in the page state on screen with no review yet becomes
 **Checked: a repeat of one already reported**, in one press. Elements
 already checked, and every note, are left as they are. It is offered once

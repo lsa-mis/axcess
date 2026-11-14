@@ -29,7 +29,7 @@ import type {
   A11yRuleGroupFinding,
   FindingStatus,
 } from "../api/types";
-import { TablePagination, usePagedRows } from "../components/TablePagination";
+import { PagedTable, usePagedRows } from "../components/TablePagination";
 import {
   Cell,
   ColumnHeader,
@@ -338,32 +338,30 @@ function RuleGroupCard({
             ruleId={group.rule_id}
           />
 
-          {paged.pages > 1 && (
-            <TableBar pager={<TablePagination label={`${group.rule_id} occurrences`} noun="occurrences" {...paged} />} />
-          )}
-          <TableRegion label={`${group.rule_id} occurrences table`}>
-            <Table caption={`${group.rule_id} occurrences`}>
-              <TableHead>
-                <tr>
-                  <ColumnHeader>Page</ColumnHeader>
-                  <ColumnHeader>Element code (HTML)</ColumnHeader>
-                  <ColumnHeader>Status</ColumnHeader>
-                </tr>
-              </TableHead>
-              <tbody>
-                {paged.pageRows.map((f, index) => (
-                  <FindingRow
-                    key={f.id}
-                    finding={f}
-                    index={(paged.page - 1) * paged.pageSize + index}
-                    scanId={scanId}
-                    ruleId={group.rule_id}
-                  />
-                ))}
-              </tbody>
-            </Table>
-          </TableRegion>
-          <TablePagination label={`${group.rule_id} occurrences`} noun="occurrences" place="end" {...paged} />
+          <PagedTable pagination={{ label: `${group.rule_id} occurrences`, noun: "occurrences", ...paged }}>
+            <TableRegion label={`${group.rule_id} occurrences table`}>
+              <Table caption={`${group.rule_id} occurrences`}>
+                <TableHead>
+                  <tr>
+                    <ColumnHeader>Page</ColumnHeader>
+                    <ColumnHeader>Element code (HTML)</ColumnHeader>
+                    <ColumnHeader>Status</ColumnHeader>
+                  </tr>
+                </TableHead>
+                <tbody>
+                  {paged.pageRows.map((f, index) => (
+                    <FindingRow
+                      key={f.id}
+                      finding={f}
+                      index={(paged.page - 1) * paged.pageSize + index}
+                      scanId={scanId}
+                      ruleId={group.rule_id}
+                    />
+                  ))}
+                </tbody>
+              </Table>
+            </TableRegion>
+          </PagedTable>
         </div>
       )}
     </Card>
