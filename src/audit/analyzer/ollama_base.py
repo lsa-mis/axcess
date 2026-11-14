@@ -198,18 +198,19 @@ class OllamaBase:
         aren't 408/429, exhausted retries, malformed Ollama envelope).
         """
         model = str(payload.get("model") or self._model)
-        # Checked before every request, not cached: a model can be replaced
-        # by a cloud copy under the same name (``ollama cp``) while a scan
-        # runs. Reading the local list takes milliseconds; a model call takes
-        # seconds.
-        reason = await why_not_local(self._client, f"{self._base_url}/api/tags", model)
-        if reason is not None:
-            raise OllamaError(f"{reason} Choose a local model.")
         url = f"{self._base_url}/api/generate"
         backoff = 1.0
         last_error: Exception | None = None
         async with self._sem:
             for attempt in range(1, self._max_attempts + 1):
+                # Checked right before each send, retries included, and after
+                # waiting for the semaphore: a model can be replaced by a
+                # cloud copy under the same name (``ollama cp``) at any time.
+                # Reading the local list takes milliseconds; a model call
+                # takes seconds.
+                reason = await why_not_local(self._client, f"{self._base_url}/api/tags", model)
+                if reason is not None:
+                    raise OllamaError(f"{reason} Choose a local model.")
                 try:
                     resp = await self._client.post(url, json=payload, timeout=self._timeout)
                 except httpx.HTTPError as exc:

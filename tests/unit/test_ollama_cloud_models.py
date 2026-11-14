@@ -225,3 +225,34 @@ async def test_a_model_replaced_by_a_cloud_copy_is_refused_on_the_next_call() ->
         with pytest.raises(OllamaError, match="cloud model"):
             await provider._post_with_retries({"model": "llava:7b", "prompt": "page two"})
     assert len(calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_model_replaced_between_retries_is_refused_on_the_retry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The first send fails with a 503; the model is swapped for a cloud copy
+    # before the retry, which reads the list again and sends nothing more.
+    monkeypatch.setattr("audit.analyzer.ollama_base.asyncio.sleep", _no_wait)
+    sends: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/tags":
+            entry: dict[str, str] = {"name": "llava:7b"}
+            if sends:
+                entry |= {"remote_host": "https://ollama.com:443", "remote_model": "gpt-oss:120b"}
+            return httpx.Response(200, json={"models": [entry]})
+        sends.append(request)
+        return httpx.Response(503)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        provider = OllamaTextProvider(
+            client, model="llava:7b", base_url="http://127.0.0.1:11434", max_attempts=3
+        )
+        with pytest.raises(OllamaError, match="cloud model"):
+            await provider._post_with_retries({"model": "llava:7b", "prompt": "page text"})
+    assert len(sends) == 1
+
+
+async def _no_wait(_seconds: float) -> None:
+    return None
