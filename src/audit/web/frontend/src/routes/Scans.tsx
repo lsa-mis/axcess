@@ -20,7 +20,7 @@ import {
 import { withoutUserinfo } from "../components/ReportCrumb";
 import { cn } from "../lib/cn";
 import { RULE_CHECK_HELP } from "../lib/labels";
-import { ruleChecksText } from "../lib/terms";
+import { isReport, ruleChecksText } from "../lib/terms";
 import { liveSearchParams } from "../lib/liveSearchParams";
 import { useRememberedParams } from "../hooks/useRememberedParams";
 import { TablePagination, usePagedRows } from "../components/TablePagination";
@@ -59,10 +59,13 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  * same key "compare to previous report" uses, and the server does the
  * grouping so the two can never disagree.
  *
- * A row shows one scan: the site's most recent *completed* run, the only
- * one whose numbers stand for the site. Interrupted, failed and running
- * scans never reach the row; they are listed, with every other scan, when
- * the site is expanded.
+ * A row shows one scan: the site's most recent report, any scan that ended
+ * with pages saved, however it ended. A stopped scan is not set aside: one
+ * stopped after 100 pages covers more of the site than one that completed
+ * at a 10-page limit (the developer's decision, 2026-11-14). Its status
+ * ("Stopped") and its report's pages found and visited say how far it got.
+ * A running scan, and one that saved no page, are listed with every other
+ * scan when the site is expanded.
  *
  * Expanding a site lists all of its scans, each a link to its report, with
  * the per-report actions (Compare with, Delete) the flat list used to carry.
@@ -82,8 +85,8 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  * - The caption (technique H39, the table's accessible name) says where a
  *   site row's numbers come from. A sentence over the table said it too,
  *   and was removed after user testing (2026-10-28): testers read it as
- *   noise, and "2 scans, 1 completed" under each site name already shows
- *   that a row is one scan of several. A visible caption was not the
+ *   noise, and "2 scans" under each site name already shows that a row is
+ *   one scan of several. A visible caption was not the
  *   answer either: it scrolls sideways with the table and was cut off at
  *   320 pixels (WCAG 2.2 SC 1.4.10 Reflow, Level AA).
  * - No visible "Sorted by" line. The sorted header already shows the order
@@ -131,7 +134,7 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  *   read "Complete" on nearly every row was noise to testers; the
  *   exception is what needs the eye (W3C COGA, "Making Content Usable":
  *   only what helps the task).
- * - Columns: the site that names the row, when its latest completed scan
+ * - Columns: the site that names the row, when its latest report
  *   finished, its Issue types, Issue occurrences and Pages, the Rule
  *   check it ran, then Actions. Issue types counts the rows of that
  *   report's Issues table; Issue occurrences counts every place a problem
@@ -177,11 +180,10 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  * - A site's scan rows fill the same Issue types and Issue occurrences columns,
  *   so a site's past scans can be compared by the same numbers. They are
  *   fetched when the scans are shown (one request per
- *   completed scan, `/api/scans/{id}/issue-counts`), not with the site
+ *   report, `/api/scans/{id}/issue-counts`), not with the site
  *   list, because counting builds the issue list and the site list is
- *   fetched every few seconds while a scan runs. A scan that did not
- *   finish says "Not counted": its counts would be partial, and the site
- *   row uses only completed scans for the same reason.
+ *   fetched every few seconds while a scan runs. A scan that saved no page
+ *   (or is still running) says "Not counted": there is nothing to count yet.
  * - Column order: Actions stays last, the usual place for a row's
  *   actions: the row is read (by eye or, cell by cell, by a screen reader)
  *   as "this site, as of then, with these results", and only then offers
@@ -204,13 +206,13 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  *   two-dimensional layout, and its Understanding document names data
  *   tables as such content (paraphrased). The Site column is sticky, so a
  *   row keeps its name while the table scrolls.
- * - Comparing starts from a scan row: each completed scan row of an open
+ * - Comparing starts from a scan row: each report row of an open
  *   site has "Compare with", beside "Delete" (ScanRow).
  *   The developer chose this place (2026-10-29), so any report can be
  *   compared with any other of its site in one step, without opening a
  *   report first; a "Compare reports" link on the site row was built the
  *   day before and dropped. "Compare with" opens a short list of the
- *   site's other completed reports, "Report #20" and so on; each opens
+ *   site's other reports, "Report #20" and so on; each opens
  *   Compare reports for the pair, side by side (routes/CompareReports.tsx):
  *   the newer report in the address, so in the first panel, and the older
  *   as `compare_to`, in the second. Always that order, so the same pair has
@@ -219,10 +221,10 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  *   src/audit/web/comparison.py). It is a
  *   button that shows links, not a select that goes somewhere when a value
  *   is chosen (SC 3.2.2 On Input, Level A); LinkMenu says how it opens and
- *   closes. It shows only on a completed scan with at least one other
- *   completed scan in the site: a disabled control would be one that does
- *   nothing. The site's completed scans are its public ones (sites.py),
- *   the ones the comparison accepts.
+ *   closes. It shows only on a report with at least one other report of
+ *   the site: a disabled control would be one that does nothing. A site's
+ *   reports are its public scans that saved pages (sites.py), the ones the
+ *   comparison accepts.
  *   A row "Actions" dropdown holding the two links was built first and
  *   removed (Oct 2026): it put opening a report, this screen's main task,
  *   one click further away and hid "Scan again" until opened (W3C COGA:
@@ -242,7 +244,8 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  *   contains the text that is presented visually"), then screen-reader-only
  *   text that names the site (technique C7), not an `aria-label`, so the
  *   words are real text (AGENTS.md, Interface language rule 8).
- * - A site with no completed scan has nothing to open, so it shows only
+ * - A site with no report (no scan that completed or saved a page) has
+ *   nothing to open, so it shows only
  *   "Scan again", from its latest scan.
  */
 type SortKey = "site" | "completed" | "pages" | "issues" | "kinds" | "checks";
@@ -282,16 +285,16 @@ export function siteLabel(siteUrl: string): string {
 
 /** The sortable value; null sorts last in either direction. */
 function sortValue(site: SiteGroup, key: SortKey): number | string | null {
-  const completed = site.most_recent_completed;
+  const completed = site.most_recent_report;
   switch (key) {
     case "site":
       return siteLabel(site.site_url).toLowerCase();
     case "pages":
       return completed ? completed.page_count : null;
     case "issues":
-      return site.most_recent_completed_occurrence_count;
+      return site.most_recent_report_occurrence_count;
     case "kinds":
-      return site.most_recent_completed_issue_count;
+      return site.most_recent_report_issue_count;
     case "checks":
       return completed?.rule_checks ? ruleChecksText(completed.rule_checks).toLowerCase() : null;
     case "completed":
@@ -503,7 +506,7 @@ export default function ScansRoute() {
             <Table
               ruled
               className="min-w-[48rem]"
-              caption="Public reports by site. A site’s row shows its most recent completed scan. Open a site to list each of its scans under it."
+              caption="Public reports by site. A site’s row shows its most recent report. Open a site to list each of its scans under it."
             >
               <TableHead>
                 {/* One header row (H63): see the comment on this route. */}
@@ -651,10 +654,11 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
   onToggle: (siteUrl: string) => void;
 }) {
   const label = siteLabel(site.site_url);
-  const completed = site.most_recent_completed;
+  const completed = site.most_recent_report;
   const scanRowId = (scan: ScanSummary) => `${rowId}-scan-${scan.id}`;
-  // Newest first, as the scan rows are: what "Compare with" offers.
-  const completedScans = site.scans.filter((scan) => scan.status === "completed");
+  // Newest first, as the scan rows are: what "Compare with" offers. Every
+  // report, however its scan ended (isReport).
+  const reportScans = site.scans.filter(isReport);
   return (
     <>
       {/* An open site takes the shaded stripe whatever its place, so its
@@ -687,9 +691,9 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
                 <BreakableUrl text={label} />
               </span>
               {/* All the site's scans, here rather than in a column: every
-                  column is about the latest completed scan (one header row). */}
+                  column is about the latest report (one header row). */}
               <span className="block text-xs text-fg-muted">
-                {`${site.scan_count.toLocaleString()} ${site.scan_count === 1 ? "scan" : "scans"}, ${site.completed_count.toLocaleString()} completed`}
+                {`${site.scan_count.toLocaleString()} ${site.scan_count === 1 ? "scan" : "scans"}`}
               </span>
             </span>
           </button>
@@ -703,10 +707,10 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
               {relativeTime(completed.finished_at ?? completed.started_at)}
             </Cell>
             <Cell numeric className="text-fg">
-              {(site.most_recent_completed_issue_count ?? 0).toLocaleString()}
+              {(site.most_recent_report_issue_count ?? 0).toLocaleString()}
             </Cell>
             <Cell numeric className="text-fg">
-              {(site.most_recent_completed_occurrence_count ?? 0).toLocaleString()}
+              {(site.most_recent_report_occurrence_count ?? 0).toLocaleString()}
             </Cell>
             <Cell numeric className="text-fg">
               {completed.page_count.toLocaleString()}
@@ -721,7 +725,7 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
                   className="report-link inline-flex min-h-target items-center px-1 font-semibold"
                 >
                   Open latest scan
-                  <span className="sr-only"> of {label}, the most recent completed scan</span>
+                  <span className="sr-only"> of {label}, the most recent report</span>
                 </Link>
                 <ScanAgainLink scanId={completed.id} site={label} look="link" />
               </div>
@@ -730,7 +734,7 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
         ) : (
           <>
             <Cell colSpan={5} className="text-fg-muted">
-              No completed scan yet. Expand the site to open its other scans.
+              No report yet. Expand the site to open its other scans.
             </Cell>
             <Cell className="whitespace-nowrap">
               <ScanAgainLink scanId={site.most_recent.id} site={label} look="link" />
@@ -744,7 +748,7 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
             key={scan.id}
             id={scanRowId(scan)}
             scan={scan}
-            completedScans={completedScans}
+            reportScans={reportScans}
             first={position === 0}
             last={position === site.scans.length - 1}
           />
@@ -805,23 +809,22 @@ function scanCardCell({ first, last, edge }: { first: boolean; last: boolean; ed
 function ScanRow({
   id,
   scan,
-  completedScans,
+  reportScans,
   first,
   last,
 }: {
   id: string;
   scan: ScanSummary;
-  /** The site's completed scans, newest first. */
-  completedScans: readonly ScanSummary[];
+  /** The site's reports (scans that saved pages), newest first. */
+  reportScans: readonly ScanSummary[];
   first: boolean;
   last: boolean;
 }) {
   const piece = (edge?: "start" | "end") => scanCardCell({ first, last, edge });
-  // "Compare with" on a completed scan, with every other completed scan of
-  // the site: see "Comparing starts from a scan row" in the comment on this
-  // route.
+  // "Compare with" on a report, with every other report of the site: see
+  // "Comparing starts from a scan row" in the comment on this route.
   const others =
-    scan.status === "completed" ? completedScans.filter((other) => other.id !== scan.id) : [];
+    isReport(scan) ? reportScans.filter((other) => other.id !== scan.id) : [];
   return (
     // The open site's shade, and no rule above: it reads as part of the site row.
     <tr id={id} className={OPEN_SITE_SHADE}>
@@ -832,10 +835,10 @@ function ScanRow({
           correction, 2026-10-29). The rows read as the site's own (W3C
           COGA, "Making Content Usable": group related content).
 
-          "Report #N" is the one way into a scan's report. A completed scan
-          goes straight to its Issues page; any other goes to its scan page,
-          which says why it did not finish and offers "Review what the scan
-          found" when pages were saved (ScanDetail). An "All issues" link
+          "Report #N" is the one way into a scan's report. A scan that saved
+          pages goes straight to its Issues page, however it ended; any other
+          goes to its scan page, which shows progress or says why nothing was
+          saved (ScanDetail). An "All issues" link
           sat in Actions until user testing (2026-10-29): for a completed
           scan it opened the same page as this link, two controls for one
           job (W3C COGA, "Making Content Usable": one way to do one thing).
@@ -849,7 +852,7 @@ function ScanRow({
         className={cn("whitespace-nowrap py-1 pl-[6.25rem] text-xs font-normal tabular-nums text-fg-muted", piece("start"))}
       >
         <Link
-          to={scan.status === "completed" ? `/scans/${scan.id}/issues` : `/scans/${scan.id}`}
+          to={isReport(scan) ? `/scans/${scan.id}/issues` : `/scans/${scan.id}`}
           className="report-link inline-flex min-h-target items-center px-1 font-semibold"
           title={withoutUserinfo(scan.seed_url)}
         >
@@ -926,18 +929,18 @@ function RuleChecksCell({ scan, className }: { scan: ScanSummary; className?: st
 /**
  * Occurrences and Issue types for one scan row of an open site, fetched
  * when the rows are shown (see "A site's scan rows" in the comment on this
- * route). Only a completed scan is counted; the others say "Not counted",
- * since the status beside their report number already says why. While a count loads,
+ * route). Every scan that saved pages is counted, however it ended; the
+ * others say "Not counted", since there is nothing to count yet. While a count loads,
  * the cells say "Counting" rather than showing an empty cell or a 0, which
  * would read as a result.
  */
 function ScanCountCells({ scan, className }: { scan: ScanSummary; className?: string }) {
-  const completed = scan.status === "completed";
+  const completed = isReport(scan);
   const counts = useQuery({
     queryKey: ["scans", "issue-counts", scan.id],
     queryFn: () => api.getScanIssueCounts(scan.id),
     enabled: completed,
-    // A completed report's counts change only if its evidence is rebuilt.
+    // An ended report's counts change only if its evidence is rebuilt.
     staleTime: 5 * 60 * 1000,
   });
   if (!completed || counts.isError) {

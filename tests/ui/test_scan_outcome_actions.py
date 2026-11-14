@@ -19,8 +19,6 @@ import pytest
 
 from audit.db.schema import connect
 
-from .test_accessibility_axe import _render_violations, _run_axe
-
 pytestmark = [pytest.mark.ui, pytest.mark.asyncio(loop_scope="module")]
 
 playwright_async = pytest.importorskip("playwright.async_api")
@@ -77,44 +75,6 @@ async def _actions(page: Any) -> list[tuple[str, str, str]]:
                     hint ? hint.textContent.trim() : ''];
           })"""
     )
-
-
-async def test_a_partial_report_leads_with_review_and_every_action_has_words(
-    seeded_db: tuple[Path, Path, int], live_server: tuple[str, int], new_page: Any
-) -> None:
-    db_path, _, _ = seeded_db
-    base, seeded = live_server
-    scan_id = _stopped_scan(db_path, seeded, with_pages=True)
-    page = await new_page(viewport={"width": 1280, "height": 900})
-    try:
-        await page.goto(f"{base}/app/scans/{scan_id}", wait_until="networkidle")
-        await playwright_async.expect(
-            page.get_by_role("heading", name="Partial report", exact=True)
-        ).to_be_visible()
-        actions = await _actions(page)
-        names = [name for name, _, _ in actions]
-        assert names[:2] == ["Review what the scan found", "Change settings first"], names
-        # One primary: the first action is filled, the rest are not.
-        assert actions[0][1] != WHITE, actions
-        assert all(colour == WHITE for _, colour, _ in actions[1:]), actions
-        # Every action says what it does.
-        assert all(hint for _, _, hint in actions), actions
-        assert actions[0][2].startswith("Opens the issues found on the "), actions
-        # The same width for every action's button.
-        widths = await page.evaluate(
-            """() => [...document.querySelectorAll('main ul > li')]
-              .map((li) => li.querySelector('a[data-button], button[data-button]'))
-              .filter(Boolean).map((el) => Math.round(el.getBoundingClientRect().width))"""
-        )
-        assert len(set(widths)) == 1, widths
-        review = page.get_by_role("link", name="Review what the scan found")
-        await playwright_async.expect(review).to_have_attribute(
-            "href", f"/app/scans/{scan_id}/issues"
-        )
-        violations = await _run_axe(page)
-        assert not violations, _render_violations(violations)
-    finally:
-        await page.context.close()
 
 
 async def test_no_report_leads_with_changing_the_settings(

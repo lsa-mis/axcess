@@ -450,17 +450,11 @@ async def test_cancel_wins_over_late_answer(
     assert done["result"] is None
 
 
-def test_refuses_unfinished_and_protected(seeded_db: tuple[Path, Path, int], enabled: None) -> None:
+def test_refuses_an_unknown_report(seeded_db: tuple[Path, Path, int], enabled: None) -> None:
     db_path, _, scan_id = seeded_db
     finding = _add_finding(db_path, scan_id)
-    conn = connect(db_path)
-    try:
-        conn.execute("UPDATE scans SET status = 'running' WHERE id = ?", (scan_id,))
-    finally:
-        conn.close()
     client = _client(seeded_db)
     body = {"occurrence_kind": "a11y", "occurrence_id": finding}
-    assert client.post(f"/api/scans/{scan_id}/suggestions", json=body).status_code == 409
     assert client.post("/api/scans/99999/suggestions", json=body).status_code == 404
 
 

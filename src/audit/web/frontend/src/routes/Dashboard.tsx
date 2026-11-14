@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, PlusCircle, ServerCrash } from "lucide-react";
 import { api } from "../api/client";
 import { siteLabel } from "../components/ReportCrumb";
-import { REVIEW_TYPE_LABEL } from "../lib/terms";
+import { REVIEW_TYPE_LABEL, isReport } from "../lib/terms";
 import {
   Card,
   EmptyState,
@@ -34,7 +34,8 @@ export default function DashboardRoute() {
   });
 
   const scans = data ?? [];
-  const completed = scans.filter((s) => s.status === "completed");
+  // Every report, however its scan ended (isReport).
+  const completed = scans.filter(isReport);
   const running = scans.find((s) => s.status === "running");
   const latest = completed[0];
 
@@ -57,7 +58,7 @@ export default function DashboardRoute() {
         subtitle={
           completed.length === 0
             ? "Scan a site, look at what the scan found, and make a report of what to fix."
-            : `${completed.length} completed report${completed.length === 1 ? "" : "s"} · results for an expert to review, not proof that a site meets accessibility rules.`
+            : `${completed.length} report${completed.length === 1 ? "" : "s"} · results for an expert to review, not proof that a site meets accessibility rules.`
         }
       />
 
@@ -167,7 +168,7 @@ export default function DashboardRoute() {
             hint="Newest report · not an accessibility score"
           />
           <StatCard
-            label="Completed reports"
+            label="Reports"
             value={isLoading ? "Loading" : completed.length}
             hint="All time"
           />

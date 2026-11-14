@@ -73,6 +73,7 @@ from audit.crawler.search import SearchConfig, search_url_allowed
 from audit.crawler.tab_pool import TabPool
 from audit.crawler.user_agent import chosen_user_agent
 from audit.db import repo
+from audit.db.reports import record_pages_found, scan_coverage
 from audit.db.schema import connect
 from audit.exports.audit_report import render_audit_report
 from audit.exports.collector import DEFAULT_UI_BASE, ExportScan, collect_scan
@@ -588,9 +589,6 @@ _EXPORT_EXTENSIONS = {
 #: fix brief is made to be handed to a coding agent, so it never carries the
 #: unredacted evidence.
 _ALWAYS_REDACTED_FORMATS = frozenset({"brief"})
-#: Formats only a completed report can be exported as. A brief of a running,
-#: failed or stopped scan would send an agent to fix a partial list.
-_COMPLETED_ONLY_FORMATS = frozenset({"brief"})
 
 _BASE_DIR = Path(__file__).resolve().parent
 _FRONTEND_DIST = _BASE_DIR / "frontend" / "dist"
@@ -1299,7 +1297,7 @@ def create_app(
 
     @app.get("/api/scans/{scan_id:int}/issue-counts")
     def api_scan_issue_counts(scan_id: int) -> JSONResponse:
-        """One completed report's two issue counts, for the Reports list.
+        """One report's two issue counts, for the Reports list.
 
         Fetched when a site's list of scans is opened, not with ``/api/sites``:
         counting means building the issue list, and the site list is fetched
@@ -1308,12 +1306,7 @@ def create_app(
         from audit.web import sites
 
         with get_conn() as conn:
-            scan = _load_scan_or_404(conn, scan_id)
-            if scan["status"] != "completed":
-                raise HTTPException(
-                    status_code=409,
-                    detail="Issues are counted only for a scan that finished.",
-                )
+            _load_scan_or_404(conn, scan_id)
             counts = sites.report_counts(conn, scan_id)
         return JSONResponse(counts.model_dump())
 
@@ -1333,11 +1326,16 @@ def create_app(
             blocked = _detect_blocked_scan(conn, scan_id, scan)
             progress = _scan_progress(conn, scan_id) if scan["status"] == "running" else None
             method_coverage = _scan_method_coverage(conn, scan_id)
+            coverage = scan_coverage(conn, scan, page_count=int(scan.get("page_count") or 0))
         payload: dict[str, Any] = {
             **_scan_row_to_summary(scan),
             "error_count": int(scan.get("error_count") or 0),
             "by_severity": {level: int(breakdown.get(level, 0)) for level in _SEVERITY_OPTIONS},
             "previous_scan_id": prev,
+            # How much of the site this scan covered, as facts: pages found,
+            # pages visited, the limits chosen and how it ended. This replaces
+            # the old "partial report" label for a stopped scan.
+            "coverage": coverage.model_dump(),
             "blocked": blocked,
             "progress": progress,
             # Axe counters denormalized on scans for cheap reads. The SPA
@@ -2071,7 +2069,7 @@ def create_app(
         form = {
             "url": url,
             "search": search,
-            "max_pages": None if all_pages else int(body.get("max_pages") or 2500),
+            "max_pages": None if all_pages else int(body.get("max_pages") or 5000),
             "max_depth": int(body.get("max_depth") or 10),
             "rps": float(body.get("rps") or 2.0),
             "workers": int(body.get("workers") or 8),
@@ -2145,6 +2143,9 @@ def create_app(
                     "WHERE id = ?",
                     (scan_id, scan_id),
                 )
+                # Before the queue is emptied: the waiting addresses are part
+                # of "pages found", the report's own measure of coverage.
+                record_pages_found(conn, scan_id)
                 # Both states, for every scan. A leased job is one a worker
                 # had checked out when the stop arrived; leaving it behind
                 # meant the lease expired, the work became available again,
@@ -2261,9 +2262,8 @@ def create_app(
     def api_put_evaluation(scan_id: int, body: EvaluationUpdate) -> JSONResponse:
         """Persist the human-authored evaluation context for a completed scan."""
         with get_conn() as conn:
-            scan = _load_scan_or_404(conn, scan_id)
+            _load_scan_or_404(conn, scan_id)
             _deny_legacy_protected_review(conn, scan_id)
-            _require_completed_scan(scan)
             existing = evaluation.get_evaluation(conn, scan_id)
             changes = body.model_dump(exclude_none=True)
             values = {
@@ -2313,9 +2313,8 @@ def create_app(
         scan_id: int, criterion_sc: str, body: ManualCheckUpdate
     ) -> JSONResponse:
         with get_conn() as conn:
-            scan = _load_scan_or_404(conn, scan_id)
+            _load_scan_or_404(conn, scan_id)
             _deny_legacy_protected_review(conn, scan_id)
-            _require_completed_scan(scan)
             try:
                 payload = evaluation.update_manual_check(
                     conn,
@@ -2342,9 +2341,8 @@ def create_app(
         scan_id: int, criterion_sc: str, body: ManualEvidenceCreate
     ) -> JSONResponse:
         with get_conn() as conn:
-            scan = _load_scan_or_404(conn, scan_id)
+            _load_scan_or_404(conn, scan_id)
             _deny_legacy_protected_review(conn, scan_id)
-            _require_completed_scan(scan)
             try:
                 payload = evaluation.add_manual_evidence(
                     conn,
@@ -3303,11 +3301,6 @@ def create_app(
                 render=render,
                 redacted=redact,
                 always_redacted=_ALWAYS_REDACTED_FORMATS,
-                # A report that is not complete has no brief to measure; the
-                # panel shows the file without a size, and choosing it says why.
-                unavailable=(
-                    _COMPLETED_ONLY_FORMATS if scan.status != "completed" else frozenset()
-                ),
             )
 
     # The SPA's Export panel downloads from this ``/api/*`` route with
@@ -3344,17 +3337,6 @@ def create_app(
             raise HTTPException(status_code=400, detail="Unknown export format")
         with get_conn() as conn:
             scan = collect_public_export_scan(conn, scan_id, request)
-            if fmt_lower in _COMPLETED_ONLY_FORMATS and scan.status != "completed":
-                # Refused before the readiness check, as a deleted scan is
-                # refused before it: there is no complete report to export.
-                raise HTTPException(
-                    status_code=409,
-                    detail=(
-                        f"Report #{scan_id} is not complete (the scan is {scan.status}). "
-                        "A fix brief can only be made from a completed scan. Wait for "
-                        "the scan to finish, or start a new scan."
-                    ),
-                )
             try:
                 readiness = assess_public_export_readiness(
                     conn,
@@ -3495,12 +3477,21 @@ def _sweep_stale_running_scans(db_path: Path) -> int:
                  WHERE run_lease_id IS NOT NULL OR protection_status = 'running'
                 """
             )
-        cur = conn.execute(
-            "UPDATE scans SET status = 'interrupted', "
-            "finished_at = COALESCE(finished_at, CURRENT_TIMESTAMP) "
-            "WHERE status = 'running'"
-        )
-        swept = int(cur.rowcount or 0)
+        stale = [
+            int(row["id"]) for row in conn.execute("SELECT id FROM scans WHERE status = 'running'")
+        ]
+        # The page count and pages found go with the status, as Stop writes
+        # them: an interrupted scan that saved pages is a report.
+        for scan_id in stale:
+            conn.execute(
+                "UPDATE scans SET status = 'interrupted', "
+                "finished_at = COALESCE(finished_at, CURRENT_TIMESTAMP), "
+                "page_count = (SELECT COUNT(*) FROM pages WHERE scan_id = scans.id) "
+                "WHERE id = ?",
+                (scan_id,),
+            )
+            record_pages_found(conn, scan_id)
+        swept = len(stale)
         if swept:
             log.info("web.sweep_stale_scans", count=swept)
         return swept
@@ -4058,15 +4049,22 @@ async def _run_background_crawl(db_path: Path, config: CrawlConfig) -> None:
         # leave the up-front scan row looking "running" forever: that makes a
         # failed startup indistinguishable from a very slow first page.
         log.warning("web.crawl_failed", seed=config.seed_url, error=str(exc))
-        conn.execute(
-            "UPDATE scans SET status = 'failed', finished_at = CURRENT_TIMESTAMP, "
-            "failure_reason = ? "
-            "WHERE id = ("
+        row = conn.execute(
             "SELECT id FROM scans WHERE seed_url = ? AND status = 'running' "
-            "ORDER BY id DESC LIMIT 1"
-            ")",
-            (str(exc)[:1000], _canonical_scan_seed(config.seed_url)),
-        )
+            "ORDER BY id DESC LIMIT 1",
+            (_canonical_scan_seed(config.seed_url),),
+        ).fetchone()
+        if row is not None:
+            # The page count goes with the status: a failed scan that saved
+            # pages is a report (audit.db.reports), and it says how far it got.
+            conn.execute(
+                "UPDATE scans SET status = 'failed', finished_at = CURRENT_TIMESTAMP, "
+                "failure_reason = ?, "
+                "page_count = (SELECT COUNT(*) FROM pages WHERE scan_id = scans.id) "
+                "WHERE id = ?",
+                (str(exc)[:1000], int(row["id"])),
+            )
+            record_pages_found(conn, int(row["id"]))
     finally:
         conn.close()
 
@@ -4678,8 +4676,6 @@ def _detect_blocked_scan(
     Returns ``{'status_code': int | None, 'title': str | None, 'seed_url': str}``
     when a warning should be shown, or ``None`` to render normally.
     """
-    if scan.get("status") != "completed":
-        return None
     page_count = int(scan.get("page_count") or 0)
     if page_count == 0:
         return None
@@ -5134,15 +5130,6 @@ def _load_scan_or_404(conn: sqlite3.Connection, scan_id: int) -> dict[str, Any]:
     if row is None:
         raise HTTPException(status_code=404, detail="Scan not found")
     return dict(row)
-
-
-def _require_completed_scan(scan: dict[str, Any]) -> None:
-    """Guard review writes: a live crawl cannot be a stable evaluation."""
-    if scan["status"] != "completed":
-        raise HTTPException(
-            status_code=409,
-            detail="Expert review can begin after this scan completes.",
-        )
 
 
 def _severity_breakdown(conn: sqlite3.Connection, scan_id: int) -> dict[str, int]:

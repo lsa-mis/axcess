@@ -246,7 +246,7 @@ async def test_summary_rail_follows_the_switches_and_resets(
     await playwright_async.expect(
         summary.get_by_role("heading", name="What this scan will do")
     ).to_be_focused()
-    await playwright_async.expect(pages).to_have_value("2500")
+    await playwright_async.expect(pages).to_have_value("5000")
     await playwright_async.expect(keyboard).to_be_checked()
 
 
@@ -848,7 +848,7 @@ async def test_failed_scan_explains_both_retries(
     assert posted[-1]["skip_interaction"] is True
     assert posted[-1]["skip_forms"] is True
     assert posted[-1]["send_empty_forms"] is False
-    assert posted[-1]["max_pages"] == 2500
+    assert posted[-1]["max_pages"] == 5000
 
 
 async def test_the_form_error_check_is_on_for_public_websites_and_absent_when_signed_in(

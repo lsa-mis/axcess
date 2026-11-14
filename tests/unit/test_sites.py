@@ -39,10 +39,11 @@ def test_groups_by_normalized_scope_most_recent_site_first(tmp_db: sqlite3.Conne
     assert [g.site_url for g in groups] == ["https://a.example/", "https://b.example/docs/"]
     assert [s.id for s in groups[0].scans] == [4, 1]
     assert [s.id for s in groups[1].scans] == [3, 2]
-    assert (groups[0].scan_count, groups[0].completed_count) == (2, 1)
+    # A stopped scan that saved pages is a report like a completed one.
+    assert (groups[0].scan_count, groups[0].report_count) == (2, 2)
 
 
-def test_headline_scan_is_most_recent_completed_not_most_recent(
+def test_headline_scan_is_most_recent_report_not_most_recent(
     tmp_db: sqlite3.Connection,
 ) -> None:
     [group] = group_scans(
@@ -50,30 +51,32 @@ def test_headline_scan_is_most_recent_completed_not_most_recent(
         [
             _summary(1, "https://a.example/", "completed", pages=40),
             _summary(2, "https://a.example/", "interrupted", pages=3),
-            _summary(3, "https://a.example/", "running", pages=1),
+            # A running scan's stored page_count stays 0 until it ends.
+            _summary(3, "https://a.example/", "running", pages=0),
         ],
     )
     assert group.most_recent.id == 3
-    assert group.most_recent_completed is not None
-    assert group.most_recent_completed.id == 1
-    assert group.most_recent_completed.page_count == 40
+    # The stopped scan is the latest report: how it ended does not set it aside.
+    assert group.most_recent_report is not None
+    assert group.most_recent_report.id == 2
+    assert group.most_recent_report.page_count == 3
     # No findings were stored for the seeded scan, so zero issue groups.
-    assert group.most_recent_completed_issue_count == 0
-    assert group.most_recent_completed_occurrence_count == 0
+    assert group.most_recent_report_issue_count == 0
+    assert group.most_recent_report_occurrence_count == 0
 
 
-def test_site_without_a_completed_scan_has_no_headline(tmp_db: sqlite3.Connection) -> None:
+def test_site_whose_scans_saved_no_page_has_no_headline(tmp_db: sqlite3.Connection) -> None:
     [group] = group_scans(
         tmp_db,
         [
-            _summary(1, "https://a.example/", "failed"),
-            _summary(2, "https://a.example/", "interrupted"),
+            _summary(1, "https://a.example/", "failed", pages=0),
+            _summary(2, "https://a.example/", "interrupted", pages=0),
         ],
     )
-    assert group.completed_count == 0
-    assert group.most_recent_completed is None
-    assert group.most_recent_completed_issue_count is None
-    assert group.most_recent_completed_occurrence_count is None
+    assert group.report_count == 0
+    assert group.most_recent_report is None
+    assert group.most_recent_report_issue_count is None
+    assert group.most_recent_report_occurrence_count is None
 
 
 def test_empty_input(tmp_db: sqlite3.Connection) -> None:
@@ -110,10 +113,8 @@ def test_a_completed_reports_issue_count_is_reused_until_its_evidence_changes(
     [first] = group_scans(tmp_db, summaries)
     [again] = group_scans(tmp_db, summaries)
     assert calls == [scan_id]
-    assert again.most_recent_completed_issue_count == first.most_recent_completed_issue_count
-    assert (
-        again.most_recent_completed_occurrence_count == first.most_recent_completed_occurrence_count
-    )
+    assert again.most_recent_report_issue_count == first.most_recent_report_issue_count
+    assert again.most_recent_report_occurrence_count == first.most_recent_report_occurrence_count
 
     # Changed evidence (``audit synthesize`` can rewrite a completed report's
     # image findings) is counted again.
@@ -130,9 +131,9 @@ def test_counts_match_the_issues_page_totals(tmp_db: sqlite3.Connection) -> None
     scan_id = seed_rich_scan(tmp_db)
     [group] = group_scans(tmp_db, [_summary(scan_id, "https://a.example/", "completed")])
     rows = sites.issues.list_issues(tmp_db, scan_id)
-    assert group.most_recent_completed_issue_count == len(rows)
-    assert group.most_recent_completed_occurrence_count == sum(r.occurrence_count for r in rows)
-    assert group.most_recent_completed_occurrence_count > group.most_recent_completed_issue_count
+    assert group.most_recent_report_issue_count == len(rows)
+    assert group.most_recent_report_occurrence_count == sum(r.occurrence_count for r in rows)
+    assert group.most_recent_report_occurrence_count > group.most_recent_report_issue_count
 
 
 def test_report_counts_reads_only_the_report_asked_for(tmp_db: sqlite3.Connection) -> None:
