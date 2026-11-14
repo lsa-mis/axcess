@@ -71,7 +71,7 @@ async def test_fix_suggestions_refuse_a_cloud_model() -> None:
         provider = OllamaSuggestionProvider(client, base_url="http://127.0.0.1:11434", timeout_s=30)
         with pytest.raises(SuggestionError) as raised:
             await provider.generate("evidence", model=CLOUD, image=None)
-    assert raised.value.code == "model_unavailable"
+    assert raised.value.code == "model_not_local"
     assert calls == []
 
 

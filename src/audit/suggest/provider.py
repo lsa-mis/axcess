@@ -192,7 +192,7 @@ class OllamaSuggestionProvider:
         # this computer (audit.analyzer.ollama_base.is_cloud_model).
         reason = await why_not_local(self._client, f"{self._base_url}/api/tags", model)
         if reason is not None:
-            raise SuggestionError("model_unavailable", reason)
+            raise SuggestionError("model_not_local", reason)
         payload: dict[str, object] = {
             "model": model,
             "prompt": prompt,

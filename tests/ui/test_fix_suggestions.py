@@ -352,8 +352,13 @@ def test_image_occurrence_defaults_to_editor(
     assert resp.json()["audience_default"] in ("editor", "developer")
 
 
+# Not installed, or refused because it may run off this computer (an Ollama
+# cloud model): either way the text model answers from the image's facts.
+@pytest.mark.parametrize("refusal", ["model_missing", "model_not_local"])
 async def test_vision_falls_back_to_text_model(
-    seeded_db: tuple[Path, Path, int], enabled: None
+    seeded_db: tuple[Path, Path, int],
+    enabled: None,
+    refusal: str,
 ) -> None:
     db_path, _, scan_id = seeded_db
     conn = connect(db_path)
@@ -373,7 +378,7 @@ async def test_vision_falls_back_to_text_model(
         async def generate(self, prompt: str, *, model: str, image: bytes | None) -> str:
             self.models.append(model)
             if model == "qwen2.5vl:7b":
-                raise SuggestionError("model_missing", model)
+                raise SuggestionError(refusal, model)  # type: ignore[arg-type]
             assert image is None
             return self.answer
 

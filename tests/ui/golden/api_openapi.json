@@ -3548,6 +3548,7 @@
                 "enum": [
                   "model_unavailable",
                   "model_missing",
+                  "model_not_local",
                   "timeout",
                   "bad_answer",
                   "no_change",

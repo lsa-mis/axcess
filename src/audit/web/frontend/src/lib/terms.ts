@@ -448,6 +448,10 @@ export const AI_TIER_LABEL: Record<AiTierId, string> = {
 export const SUGGESTION_ERROR_LABEL: Record<SuggestionErrorCode, string> = {
   model_unavailable: "The local AI service (Ollama) is not running. Start it, then try again.",
   model_missing: "The AI model is not installed in Ollama. Install it with ollama pull, then try again.",
+  // A cloud model, or one Ollama's model list cannot confirm is on this
+  // computer. Says nothing was sent, because that is the privacy fact.
+  model_not_local:
+    "The AI model may run off this computer, so Axcess sent nothing. Choose a model installed on this computer in Settings.",
   timeout: "The AI model took too long to answer. Try again when the computer is less busy.",
   no_change: "The AI did not suggest a real change to the code, even when asked twice, so nothing is shown. A bigger AI model in Settings may do better. You can also fix it by hand with the rule guidance.",
   bad_answer: "The AI wrote an answer Axcess could not show safely, even when asked twice, so nothing is shown. A bigger AI model in Settings may do better. You can also fix it by hand with the rule guidance.",

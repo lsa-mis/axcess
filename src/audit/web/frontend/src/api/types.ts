@@ -1794,6 +1794,7 @@ export type SuggestionFeedback = "helpful" | "not_helpful";
 export type SuggestionErrorCode =
   | "model_unavailable"
   | "model_missing"
+  | "model_not_local"
   | "timeout"
   | "bad_answer"
   | "no_change"

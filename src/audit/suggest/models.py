@@ -19,6 +19,9 @@ AvailabilityReason = Literal[
 ErrorCode = Literal[
     "model_unavailable",
     "model_missing",
+    # The model may run off this computer (an Ollama cloud model, or one the
+    # model list cannot confirm is local), so nothing was sent.
+    "model_not_local",
     "timeout",
     "bad_answer",
     "no_change",
