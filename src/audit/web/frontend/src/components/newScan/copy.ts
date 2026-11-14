@@ -111,7 +111,7 @@ export const SWITCHES = {
   },
   documents: {
     label: "Check the documents the pages link to",
-    hint: "Lists the PDF, Word, Excel and other files the pages link to, in the report’s Documents tab, and checks each PDF after the last page. Axcess downloads each PDF once to this computer (up to 200, each up to 10 MB), also from other sites, and keeps the result, not the file."
+    hint: "Lists the PDF, Word, Excel and other files the pages link to, in the report’s Documents tab, and checks each PDF during the scan. Axcess downloads each PDF once to this computer (up to 200, each up to 10 MB), also from other sites, and keeps the result, not the file."
   },
   forms: {
     label: "Check that forms describe their errors",

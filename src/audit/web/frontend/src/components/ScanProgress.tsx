@@ -33,13 +33,19 @@ import { checkedPercent, formatScanEta } from "../lib/scanProgress";
 import { CHECK_LABEL } from "../lib/terms";
 
 /**
- * The document check's column: "Document links", what it does on each page
- * (finds the links to PDF, Word and other files). Not "Document check":
- * the PDFs are downloaded and checked once, after the last page, so "Done"
- * under a check's name would claim a page's files were checked when only
- * their links were found. The line over the table says when they are checked.
+ * The document check's column, by the check's own name (the glossary's
+ * "Document check", the New scan summary's too). On each page it finds the
+ * links to PDF, Word and other files and checks the PDFs among them that
+ * no earlier page had checked, except a PDF on this site that pages link
+ * to: the scan opens that one as it opens a page, and checks it in its own
+ * row (audit/linked_files/tracker.py, check_page). So "Done" means the
+ * page's documents are found and each of its PDFs is checked or has a row
+ * of its own. It was "Document links" while PDFs on other sites were
+ * checked only after the last page (until 2026-11-14), when "Done" under a
+ * check's name would have claimed more than was done. The line over the
+ * table says both.
  */
-const DOCUMENT_LINKS_COLUMN = "Document links";
+const DOCUMENT_CHECK_COLUMN = "Document check";
 
 /** Each check a page goes through, by its interface name, keyed as the API keys methods. */
 const CHECK_NAME: Record<string, string> = {
@@ -51,7 +57,7 @@ const CHECK_NAME: Record<string, string> = {
   interaction: CLICK_THROUGH,
   image: CHECK_LABEL.image,
   semantic: CHECK_LABEL.semantic,
-  documents: DOCUMENT_LINKS_COLUMN,
+  documents: DOCUMENT_CHECK_COLUMN,
 };
 
 
@@ -472,11 +478,11 @@ function PagesTable({
         </h2>
         <p className="mt-1 text-sm text-fg-muted">
           The pages being checked now, the latest finished, and the next few waiting.
-          {/* What the Document links column does not mean: its "Done" is
-              the links found, and the files are checked later (see
-              DOCUMENT_LINKS_COLUMN). */}
+          {/* What the Document check column does on a page, and why a page
+              that links only to PDFs checked before is quick (see
+              DOCUMENT_CHECK_COLUMN). */}
           {tracked && documents && (
-            <> {DOCUMENT_LINKS_COLUMN} finds the links to documents on each page. Axcess checks the PDFs after the last page.</>
+            <> {DOCUMENT_CHECK_COLUMN} finds the documents each page links to and checks its PDFs, each PDF once. A PDF on this site that a page links to is checked in its own row.</>
           )}
           {!tracked && rows.length > 0 && (
             <> Each check&rsquo;s progress on a page is not available for this scan, so each page shows its status only.</>

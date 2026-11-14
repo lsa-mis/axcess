@@ -899,15 +899,16 @@ async def test_running_scan_shows_factual_pipeline_progress(
                 "Rule check (axe)",
                 "Rule check (Alfa)",
                 "Keyboard check",
-                "Document links",
+                "Document check",
             ]
         )
         # The document check's column finds links; the line over the table
-        # says the files themselves are checked after the last page.
+        # says each PDF is checked once, and where a PDF on this site is.
         await playwright_async.expect(
             page.get_by_text(
-                "Document links finds the links to documents on each page. "
-                "Axcess checks the PDFs after the last page.",
+                "Document check finds the documents each page links to and checks "
+                "its PDFs, each PDF once. A PDF on this site that a page links to "
+                "is checked in its own row.",
                 exact=False,
             )
         ).to_be_visible()

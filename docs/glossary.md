@@ -437,9 +437,11 @@ The check behind the report's **Documents** tab. While the scan runs, Axcess
 records every PDF, Word, Excel, PowerPoint, OpenDocument, RTF and Google file
 the scanned pages link to or show inside the page (in a frame, object or
 embed), including links that appear only after a click, and files on other
-sites. At the end it downloads each PDF once (at most 10 MB, at most 200
+sites. During the scan it downloads each PDF once (at most 10 MB, at most 200
 downloads a scan), checks it on your computer with no AI, and keeps only the
-result. In code these are called *linked files*, because in the crawler a
+result: a PDF on another site, or one shown inside a page, with the page that
+links to it; a PDF on this site when the scan opens it, as it opens a page. A
+scan stopped part way keeps the results for the PDFs it reached. In code these are called *linked files*, because in the crawler a
 "document" means a web page.
 
 A PDF is marked [Mostly sure](#mostly-sure) when it fails one of these:
@@ -457,8 +459,10 @@ its reading order, alt text and table headers. Every other file, and any PDF
 Axcess could not open, is "Could not check", with the reason. It is on by
 default for every scan that does not sign in (**Check the documents the pages
 link to**, under Checks on the New scan page), and a sign-in scan never runs
-it. While a scan runs, the scanning page's **Document links** column shows it
-finding each page's document links; the PDFs are checked after the last page.
+it. While a scan runs, the scanning page's **Document check** column shows it
+on each page: the page's document links are found and its PDFs are checked,
+each PDF once; a PDF on this site that a page links to is checked in its own
+row.
 
 ### Local AI model
 
