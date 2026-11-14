@@ -2,7 +2,7 @@ import { memo, useMemo } from "react";
 import { Link } from "react-router";
 import type { ComparisonChange, ComparisonRow } from "../../api/types";
 import ConformanceBadge from "../ConformanceBadge";
-import { TablePagination, usePagedRows } from "../TablePagination";
+import { PagedTable, usePagedRows } from "../TablePagination";
 import { withReturnTrail } from "../ui";
 import { cn } from "../../lib/cn";
 import {
@@ -213,63 +213,68 @@ export default function ComparedIssuesTable({
 
   return (
     <>
-      <TableBar
-        pager={<TablePagination label="Compared issues" noun="issue types" {...paged} />}
-        footer={<ActiveFilters items={filtered} onClear={onClearFilters} />}
+      <PagedTable
+        pagination={{ label: "Compared issues", noun: "issue types", ...paged }}
+        top={(pager) => (
+          <TableBar
+            pager={pager}
+            footer={<ActiveFilters items={filtered} onClear={onClearFilters} />}
+          >
+            <TableSearch label="Search issues" value={q} onChange={onQuery} />
+            <FilterMenu
+              label="Filter issues"
+              groups={groups}
+              onChange={(key, value) => {
+                if (key === "change") onChange(parseChanges(value));
+              }}
+              onReset={() => onChange("")}
+            />
+          </TableBar>
+        )}
       >
-        <TableSearch label="Search issues" value={q} onChange={onQuery} />
-        <FilterMenu
-          label="Filter issues"
-          groups={groups}
-          onChange={(key, value) => {
-            if (key === "change") onChange(parseChanges(value));
-          }}
-          onReset={() => onChange("")}
-        />
-      </TableBar>
-      <TableStatus>
-        {describeSort(sort)}. {rows.length} of {counts.all} {counts.all === 1 ? "issue type" : "issue types"} shown.
-      </TableStatus>
-      {rows.length === 0 ? (
-        <TableEmpty>
-          {counts.all === 0
-            ? "Neither scan found any issues."
-            : "No issue types match. Clear the filters to see them all."}
-        </TableEmpty>
-      ) : (
-        <TableRegion label="Compared issues">
-          <Table caption={`Issues in report #${baselineId} and report #${currentId}. ${describeSort(sort)}.`}>
-            <TableHead>
-              <tr>
-                {COLUMNS.map((column) => (
-                  <SortHeader
-                    key={column}
-                    column={column}
-                    kind={SORT_KINDS[column]}
-                    chip={column === "Change" ? changeChip : undefined}
-                    {...sortProps}
-                  >
-                    {headerText(column, baselineId, currentId)}
-                  </SortHeader>
+        <TableStatus>
+          {describeSort(sort)}. {rows.length} of {counts.all} {counts.all === 1 ? "issue type" : "issue types"} shown.
+        </TableStatus>
+        {rows.length === 0 ? (
+          <TableEmpty>
+            {counts.all === 0
+              ? "Neither scan found any issues."
+              : "No issue types match. Clear the filters to see them all."}
+          </TableEmpty>
+        ) : (
+          <TableRegion label="Compared issues">
+            <Table caption={`Issues in report #${baselineId} and report #${currentId}. ${describeSort(sort)}.`}>
+              <TableHead>
+                <tr>
+                  {COLUMNS.map((column) => (
+                    <SortHeader
+                      key={column}
+                      column={column}
+                      kind={SORT_KINDS[column]}
+                      chip={column === "Change" ? changeChip : undefined}
+                      {...sortProps}
+                    >
+                      {headerText(column, baselineId, currentId)}
+                    </SortHeader>
+                  ))}
+                </tr>
+              </TableHead>
+              <tbody>
+                {paged.pageRows.map((row, index) => (
+                  <ComparedRow
+                    key={row.key}
+                    row={row}
+                    index={(paged.page - 1) * paged.pageSize + index}
+                    scale={scale}
+                    backTo={backTo}
+                    caveat={rowCaveats}
+                  />
                 ))}
-              </tr>
-            </TableHead>
-            <tbody>
-              {paged.pageRows.map((row, index) => (
-                <ComparedRow
-                  key={row.key}
-                  row={row}
-                  index={(paged.page - 1) * paged.pageSize + index}
-                  scale={scale}
-                  backTo={backTo}
-                  caveat={rowCaveats}
-                />
-              ))}
-            </tbody>
-          </Table>
-        </TableRegion>
-      )}
-      <TablePagination label="Compared issues" noun="issue types" place="end" {...paged} />
+              </tbody>
+            </Table>
+          </TableRegion>
+        )}
+      </PagedTable>
     </>
   );
 }
