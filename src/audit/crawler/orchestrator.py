@@ -681,14 +681,26 @@ async def run_crawl(
     )
 
     interrupted = False
+    if ctx.linked_files is not None:
+        # Each page checks the PDFs it links to (check_page), with the
+        # crawl's own client, rate limit and robots rules.
+        ctx.linked_files.attach_downloads(
+            client=client,
+            limiter=limiter,
+            robots=robots,
+            ignore_robots=config.ignore_robots,
+            blocked_url_patterns=config.blocked_url_patterns,
+            excluded_scopes=config.excluded_scopes,
+        )
     try:
         try:
             async with asyncio.TaskGroup() as tg:
                 for _ in range(config.workers):
                     tg.create_task(_worker(ctx))
-            # After the last page and before synthesis: download and check
-            # the PDFs the crawl did not fetch itself. Inside this block so
-            # a stop during it is an interrupted scan like any other.
+            # After the last page and before synthesis: anything still
+            # waiting (each page already checked the PDFs it links to). Inside
+            # this block so a stop during it is an interrupted scan like any
+            # other.
             if ctx.linked_files is not None:
                 await ctx.linked_files.check_pending(
                     client=client,
@@ -1335,8 +1347,8 @@ def _tracked_checks(ctx: _WorkerContext) -> list[str]:
         checks.append("image")
     if ctx.semantic_analyzers:
         checks.append("semantic")
-    # Finding the page's document links; the PDFs are checked after the
-    # last page, so this column never claims a file was checked.
+    # The document check: each page's document links, and the PDFs among
+    # them not checked yet, checked with the page.
     if ctx.linked_files is not None:
         checks.append("documents")
     return checks
@@ -1706,8 +1718,9 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
     # Before the depth and page limits: a page at the last depth still links
     # to files, and its files are checked even though its pages are not.
     if ctx.linked_files is not None and page_id is not None:
-        # "documents" on the progress page: finding this page's document
-        # links. The PDFs themselves are checked once, after the last page.
+        # "documents" on the progress page (Document check): this page's
+        # document links found, and the PDFs among them that no earlier page
+        # had checked, downloaded and checked now.
         with live_progress.check("documents"):
             ctx.linked_files.record_page(
                 page_id=page_id,
@@ -1715,6 +1728,7 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
                 body=result.body,
                 revealed=result.revealed_links,
             )
+            await ctx.linked_files.check_page(page_id)
     if depth >= ctx.config.max_depth:
         return
     if _page_limit_reached(ctx):

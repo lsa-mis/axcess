@@ -171,6 +171,36 @@ def pending_files(conn: sqlite3.Connection, scan_id: int) -> list[tuple[int, str
     ]
 
 
+def pending_files_for_page(
+    conn: sqlite3.Connection, scan_id: int, page_id: int
+) -> list[tuple[int, str, bool]]:
+    """Every file ``page_id`` reaches that is still waiting, oldest first:
+    ``(id, url, linked)``, where ``linked`` is True when any page of the scan
+    reaches it by an ordinary link (one the crawl may follow), not only by a
+    frame, object or embed."""
+    return [
+        (int(row[0]), str(row[1]), bool(row[2]))
+        for row in conn.execute(
+            """
+            SELECT f.id, f.url,
+                   EXISTS (
+                       SELECT 1 FROM linked_file_refs l
+                        WHERE l.file_id = f.id AND l.scan_id = f.scan_id
+                          AND l.how IN ('link', 'revealed_link')
+                   )
+              FROM linked_files f
+             WHERE f.scan_id = ? AND f.status = 'pending'
+               AND EXISTS (
+                   SELECT 1 FROM linked_file_refs r
+                    WHERE r.file_id = f.id AND r.scan_id = f.scan_id AND r.page_id = ?
+               )
+             ORDER BY f.id
+            """,
+            (scan_id, page_id),
+        )
+    ]
+
+
 def content_type_files(conn: sqlite3.Connection, scan_id: int) -> dict[str, int]:
     """Files found by their server's Content-Type: ``url -> id``.
 

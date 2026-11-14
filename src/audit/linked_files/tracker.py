@@ -1,4 +1,4 @@
-"""Record a crawl's linked files as it runs, and check the PDFs at the end.
+"""Record a crawl's linked files as it runs, and check each PDF as it is found.
 
 One :class:`LinkedFileTracker` per crawl. The orchestrator calls it at three
 points, and nothing else in the crawl changes:
@@ -15,12 +15,29 @@ points, and nothing else in the crawl changes:
     memory (``_candidates``) and become its references now. If it is a PDF
     the crawler fetched without a browser, the PDF is checked from that same
     response, so the site is not asked for it twice.
-``check_pending``
-    After the last page: every PDF not yet checked is downloaded once and
-    checked. That covers PDFs on other hosts (Google Drive, Box, a partner's
-    site), which the crawl never visits, and PDFs past the page or depth
-    limit. One file per address, robots.txt and the crawl's rate limit
+``check_page``
+    Right after ``record_page``, as part of the same page: every PDF that
+    page reaches and the crawl will not fetch itself is downloaded once and
+    checked: a PDF on another host (Google Drive, Box, a partner's site),
+    which the crawl never visits, and one shown in a frame, object or embed,
+    which the crawl does not follow. A PDF linked from many pages is
+    downloaded with the first of them; the others find it checked. A PDF in
+    the crawl's scope that some page links to by an ordinary link is left
+    to the crawl, which fetches it as it fetches a page and checks it from
+    that response (``record_response``): checking it here too would ask the
+    site for it twice. (If a page found later links by an ordinary link to
+    a PDF already checked from a frame, the crawl still fetches it: one
+    extra request, in that case only.) One file per address, robots.txt and the crawl's rate limit
     honoured, links from the file never followed.
+``check_pending``
+    After the last page: anything still waiting, such as a PDF in scope
+    past the page or depth limit, which the crawl never reached.
+
+PDFs on other hosts are checked with the page, not at the end, since
+2026-11-14 (the developer's choice): a scan stopped part way then keeps
+their results for the pages it reached, as it already kept the results of
+the in-scope PDFs it had fetched. The same files are downloaded either way,
+each once, under the same limits.
 
 The held references are in memory only. A crawl stopped and resumed keeps
 every file and reference already written, but loses the not-yet-matched
@@ -31,10 +48,11 @@ Content-Type after a resume can list fewer pages than link to it.
 from __future__ import annotations
 
 import asyncio
+import functools
 import hashlib
 import sqlite3
 from collections.abc import Sequence
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 import httpx
@@ -55,6 +73,18 @@ if TYPE_CHECKING:
     from audit.crawler.url_policy import HostScope
 
 log = get_logger(__name__)
+
+
+@dataclass(frozen=True)
+class _Downloads:
+    """How the tracker downloads a PDF: the crawl's client, limits and rules."""
+
+    client: httpx.AsyncClient
+    limiter: HostLimiter
+    robots: RobotsChecker
+    ignore_robots: bool
+    blocked_url_patterns: tuple[str, ...]
+    excluded_scopes: tuple[str, ...]
 
 #: PDFs downloaded by ``check_pending`` per scan. The ones the crawler
 #: fetched itself are checked from its response and do not count.
@@ -87,6 +117,33 @@ class LinkedFileTracker:
         self._candidates: dict[str, list[tuple[int, FoundLink]]] = {}
         self._held = 0
         self.full = False
+        self._downloads: _Downloads | None = None
+        # Shared by check_page and check_pending: the download cap counts
+        # across the whole scan, and a file being checked for one page is
+        # awaited, not downloaded again, by another.
+        self._started = 0
+        self._semaphore = asyncio.Semaphore(DOWNLOAD_CONCURRENCY)
+        self._in_flight: dict[int, asyncio.Task[None]] = {}
+
+    def attach_downloads(
+        self,
+        *,
+        client: httpx.AsyncClient,
+        limiter: HostLimiter,
+        robots: RobotsChecker,
+        ignore_robots: bool,
+        blocked_url_patterns: Sequence[str],
+        excluded_scopes: Sequence[str],
+    ) -> None:
+        """What ``check_page`` downloads with: the crawl's own client and limits."""
+        self._downloads = _Downloads(
+            client=client,
+            limiter=limiter,
+            robots=robots,
+            ignore_robots=ignore_robots,
+            blocked_url_patterns=tuple(blocked_url_patterns),
+            excluded_scopes=tuple(excluded_scopes),
+        )
 
     # -- while the crawl runs ---------------------------------------------
 
@@ -232,6 +289,34 @@ class LinkedFileTracker:
 
     # -- after the last page ----------------------------------------------
 
+    async def check_page(self, page_id: int) -> None:
+        """Download and check the PDFs on other hosts ``page_id`` links to, not checked yet.
+
+        Part of the page: the progress page's "Document check" is done when
+        this returns. A PDF inside the crawl's scope is left to the crawl
+        (see the module docstring). Bounded and never raises; does nothing
+        before ``attach_downloads``.
+        """
+        if self._downloads is None:
+            return
+        try:
+            pending = [
+                (file_id, url)
+                for file_id, url, linked in store.pending_files_for_page(
+                    self._conn, self._scan_id, page_id
+                )
+                if not (
+                    linked
+                    and url_policy.is_in_scope(
+                        url, self._scope, allow_subdomains=self._allow_subdomains
+                    )
+                )
+            ]
+        except sqlite3.Error as exc:
+            log.warning("linked_files.page_check_failed", error_type=type(exc).__name__)
+            return
+        await self._check_all(pending, self._downloads)
+
     async def check_pending(
         self,
         *,
@@ -243,38 +328,62 @@ class LinkedFileTracker:
         excluded_scopes: Sequence[str],
     ) -> None:
         """Download and check every PDF still waiting. Bounded; never raises."""
+        downloads = self._downloads or _Downloads(
+            client=client,
+            limiter=limiter,
+            robots=robots,
+            ignore_robots=ignore_robots,
+            blocked_url_patterns=tuple(blocked_url_patterns),
+            excluded_scopes=tuple(excluded_scopes),
+        )
         pending = store.pending_files(self._conn, self._scan_id)
-        semaphore = asyncio.Semaphore(DOWNLOAD_CONCURRENCY)
-
-        async def one(file_id: int, url: str, index: int) -> None:
-            if index >= MAX_DOWNLOADS:
-                self._store(file_id, store.CheckResult("could_not_check", "limit"))
-                return
-            if url_policy.is_blocked(url, blocked_url_patterns) or url_policy.is_excluded(
-                url, excluded_scopes
-            ):
-                self._store(file_id, store.CheckResult("could_not_check", "blocked"))
-                return
-            async with semaphore:
-                if not ignore_robots and not await robots.allowed(url):
-                    self._store(file_id, store.CheckResult("could_not_check", "robots"))
-                    return
-                async with limiter.throttle(url):
-                    fetched = await fetch_file(client, url)
-                await self._check_fetched(file_id, fetched)
-
         if pending:
             log.info("linked_files.checking", files=len(pending))
         try:
-            async with asyncio.TaskGroup() as group:
-                for index, (file_id, url) in enumerate(pending):
-                    group.create_task(one(file_id, url, index))
-        except* (sqlite3.Error, ValueError) as exc:
-            log.warning("linked_files.check_failed", error_type=type(exc.exceptions[0]).__name__)
+            await self._check_all(pending, downloads)
         finally:
             # A stop or a fault leaves nothing silently pending: the report
             # says the scan stopped before the file was checked.
             store.mark_unchecked(self._conn, self._scan_id)
+
+    async def _check_all(self, pending: Sequence[tuple[int, str]], downloads: _Downloads) -> None:
+        tasks: list[asyncio.Task[None]] = []
+        for file_id, url in pending:
+            task = self._in_flight.get(file_id)
+            if task is None:
+                task = asyncio.ensure_future(self._check_one(file_id, url, downloads))
+                self._in_flight[file_id] = task
+                task.add_done_callback(functools.partial(self._done, file_id))
+            tasks.append(task)
+        if not tasks:
+            return
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        for result in results:
+            if isinstance(result, asyncio.CancelledError):
+                raise result
+            if isinstance(result, (sqlite3.Error, ValueError)):
+                log.warning("linked_files.check_failed", error_type=type(result).__name__)
+
+    def _done(self, file_id: int, _task: asyncio.Task[None]) -> None:
+        self._in_flight.pop(file_id, None)
+
+    async def _check_one(self, file_id: int, url: str, downloads: _Downloads) -> None:
+        if self._started >= MAX_DOWNLOADS:
+            self._store(file_id, store.CheckResult("could_not_check", "limit"))
+            return
+        if url_policy.is_blocked(url, downloads.blocked_url_patterns) or url_policy.is_excluded(
+            url, downloads.excluded_scopes
+        ):
+            self._store(file_id, store.CheckResult("could_not_check", "blocked"))
+            return
+        self._started += 1
+        async with self._semaphore:
+            if not downloads.ignore_robots and not await downloads.robots.allowed(url):
+                self._store(file_id, store.CheckResult("could_not_check", "robots"))
+                return
+            async with downloads.limiter.throttle(url):
+                fetched = await fetch_file(downloads.client, url)
+            await self._check_fetched(file_id, fetched)
 
     # -- shared -----------------------------------------------------------
 

@@ -308,7 +308,7 @@ def _record_marks(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, str]]:
 def test_each_page_is_marked_for_the_progress_pages_document_column(
     tmp_db: sqlite3.Connection, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The scanning page's "Document links" column: each page's link
+    """The scanning page's "Document check" column: each page's link
     finding runs, then is done; with the check off it is never marked."""
     monkeypatch.setenv("AUDIT_BLOB_DIR", str(tmp_path / "blobs"))
     marks = _record_marks(monkeypatch)
@@ -323,3 +323,35 @@ def test_each_page_is_marked_for_the_progress_pages_document_column(
             tmp_db, base, _LocalOnly(), linked_files_enabled=False, interaction_checks_enabled=False
         )
     assert not [key for key, _ in marks if key == "documents"]
+
+
+def test_each_pdf_is_checked_with_the_page_not_only_at_the_end(
+    tmp_db: sqlite3.Connection, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With the end-of-scan pass turned off, every PDF the pages link to is
+    still checked: each page checks its own PDFs. So a scan stopped part
+    way keeps the results for the pages it reached."""
+    from audit.linked_files.tracker import LinkedFileTracker
+
+    monkeypatch.setenv("AUDIT_BLOB_DIR", str(tmp_path / "blobs"))
+
+    async def no_end_pass(self: Any, **_kwargs: Any) -> None:
+        return None
+
+    monkeypatch.setattr(LinkedFileTracker, "check_pending", no_end_pass)
+    transport = _LocalOnly()
+    with _serve() as (base, _port, _requests):
+        scan_id = _crawl(tmp_db, base, transport)
+    statuses = dict(
+        tmp_db.execute(
+            "SELECT url, status FROM linked_files WHERE scan_id = ? AND file_type = 'pdf'",
+            (scan_id,),
+        ).fetchall()
+    )
+    assert statuses
+    assert "pending" not in statuses.values(), statuses
+    # Each PDF downloaded once by the crawl's own client, however many pages
+    # link to it. (The browser also loads a PDF shown in a frame when it
+    # draws the page; that is the page, not the document check.)
+    downloads = [url for url in transport.asked if url.endswith(".pdf")]
+    assert downloads and len(downloads) == len(set(downloads)), downloads
