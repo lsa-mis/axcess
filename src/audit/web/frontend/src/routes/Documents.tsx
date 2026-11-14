@@ -131,7 +131,10 @@ export function documentPath(scanId: number, fileId: number): string {
  * same kind of place.
  *
  * Paged by the server (Settings > Rows per page), with the page in the URL
- * so Back and reload return to the same rows. A table wider than the screen
+ * so Back and reload return to the same rows. The pager is over the table
+ * and again under its last row, as on every paged table (TablePagination,
+ * place="end"); the copy under the table was missing here until
+ * 2026-11-14. A table wider than the screen
  * scrolls sideways in its own named region, never the page (TableRegion; SC
  * 1.4.10 Reflow, Level AA, allows this for a data table).
  */
@@ -215,6 +218,17 @@ export default function DocumentsRoute() {
       { replace: true },
     );
   const shownPage = Math.min(page, pages);
+  const pagerProps = {
+    label: DOCUMENTS_VIEW,
+    noun: "documents",
+    page: shownPage,
+    pages,
+    total,
+    setPage,
+    pageSize,
+    pagerId: "pager-documents",
+    disabled: filesQuery.isPlaceholderData,
+  };
 
   return (
     <>
@@ -255,23 +269,7 @@ export default function DocumentsRoute() {
       )}
 
       <Card>
-        {pages > 1 && (
-          <TableBar
-            pager={
-              <TablePagination
-                label={DOCUMENTS_VIEW}
-                noun="documents"
-                page={shownPage}
-                pages={pages}
-                total={total}
-                setPage={setPage}
-                pageSize={pageSize}
-                pagerId="pager-documents"
-                disabled={filesQuery.isPlaceholderData}
-              />
-            }
-          />
-        )}
+        {pages > 1 && <TableBar pager={<TablePagination {...pagerProps} />} />}
         {/* An empty table says what it means and points down to the note
             that says why, as Issues' does ("That does not mean the site
             meets WCAG… See “What was checked”, below this table."): an empty
@@ -314,6 +312,9 @@ export default function DocumentsRoute() {
                 </tbody>
               </Table>
             </TableRegion>
+            {/* The same pager again under the last row, as on every paged
+                table (TablePagination, place="end"). */}
+            <TablePagination {...pagerProps} place="end" />
           </>
         )}
       </Card>

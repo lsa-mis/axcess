@@ -921,3 +921,44 @@ async def test_the_inspector_says_why_a_revealed_link_is_not_marked(
         await expect(page.get_by_text("issue type has no element")).to_have_count(0)
     finally:
         await page.context.close()
+
+
+@on_module_loop
+async def test_a_long_list_has_the_pager_under_the_table_too(
+    documents: int,
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """Past one page, the pager is over the table and again under its last
+    row, as on every paged table; a page turn from the bottom moves focus
+    to the top pager, where the new rows start."""
+    from playwright.async_api import expect
+
+    with sqlite3.connect(seeded_db[0]) as conn:
+        home = _page_id(conn, documents, HOME)
+        for n in range(8):
+            _file(
+                conn,
+                documents,
+                f"http://example.com/files/extra-{n:02d}.pdf",
+                "pdf",
+                store.CheckResult("not_sure", http_status=200),
+                [(home, "link", f"Extra {n}", None)],
+            )
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(f"{base}/app/scans/{scan_id}/documents", wait_until="networkidle")
+    top = page.get_by_role("navigation", name="Documents: page controls", exact=True)
+    end = page.get_by_role(
+        "navigation", name="Documents: page controls under the table", exact=True
+    )
+    await expect(top).to_be_visible()
+    await expect(end).to_be_visible()
+    table_box = await page.get_by_role("table").bounding_box()
+    end_box = await end.bounding_box()
+    assert table_box and end_box
+    assert end_box["y"] >= table_box["y"] + table_box["height"], (table_box, end_box)
+    await end.get_by_role("button", name="Next page of documents").click()
+    await expect(top.get_by_role("status")).to_contain_text("Page 2 of 2")
+    await expect(top).to_be_focused()
