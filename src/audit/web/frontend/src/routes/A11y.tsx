@@ -20,7 +20,7 @@ import type {
   A11ySCGroup,
   FindingStatus,
 } from "../api/types";
-import { TablePagination, usePagedRows } from "../components/TablePagination";
+import { PagedTable, usePagedRows } from "../components/TablePagination";
 import {
   Cell,
   ColumnHeader,
@@ -376,121 +376,126 @@ function DrillDownView({
           and its bar stay up when nothing matches, so the filter that
           emptied the table is still there to undo. */}
       <Card>
-        <TableBar
-          pager={<TablePagination label="Occurrences" noun="occurrences" {...paged} />}
-          footer={<ActiveFilters items={activeFilterItems(filters)} onClear={() => onStatusFilterChange("")} />}
-        >
-          <FilterMenu
-          label="Filter issues"
-            groups={filters}
-            onChange={(_key, value) => onStatusFilterChange(value as FindingStatus | "")}
-            onReset={() => onStatusFilterChange("")}
-          />
-        </TableBar>
-        <TableStatus>
-          {loading
-            ? "Loading…"
-            : `${drill.length.toLocaleString()} ${drill.length === 1 ? "occurrence" : "occurrences"}, most serious impact first.`}
-        </TableStatus>
-        {loading ? null : drill.length === 0 ? (
-          <TableEmpty>
-            No occurrences
-            {status && (
-              <>
-                {" "}
-                have the status <strong>{STATUS_LABEL[status]}</strong>.{" "}
-                {/* eslint-disable-next-line react/forbid-elements -- Convert: a text-link styled button; needs a link variant on Button */}
-                <button
-                  type="button"
-                  onClick={() => onStatusFilterChange("")}
-                  className="text-umich-blue underline underline-offset-2"
-                >
-                  Show all statuses
-                </button>
-              </>
-            )}
-            {!status && <> for this WCAG criterion.</>}
-          </TableEmpty>
-        ) : (
-          <TableRegion label="Rule check occurrences table">
-            <Table
-              caption={`Rule check occurrences for ${wcagSc ? `WCAG ${wcagSc}` : "best practice"}, most serious impact first`}
+        <PagedTable
+          pagination={{ label: "Occurrences", noun: "occurrences", ...paged }}
+          top={(pager) => (
+            <TableBar
+              pager={pager}
+              footer={<ActiveFilters items={activeFilterItems(filters)} onClear={() => onStatusFilterChange("")} />}
             >
-              <TableHead>
-                <tr>
-                  <ColumnHeader>Rule</ColumnHeader>
-                  <ColumnHeader>Check</ColumnHeader>
-                  <ColumnHeader>Impact</ColumnHeader>
-                  <ColumnHeader>Page</ColumnHeader>
-                  <ColumnHeader>Element code (HTML)</ColumnHeader>
-                  <ColumnHeader>Status</ColumnHeader>
-                </tr>
-              </TableHead>
-              <tbody>
-                {paged.pageRows.map((f, index) => (
-                  <Row key={f.id} index={(paged.page - 1) * paged.pageSize + index}>
-                    <Cell>
-                      <code className="font-mono text-xs text-fg">
-                        {f.rule_id}
-                      </code>
-                      {f.help && (
-                        <div className="mt-1 text-xs text-fg-muted">
-                          {f.help.length > 140
-                            ? `${f.help.slice(0, 140)}…`
-                            : f.help}
-                        </div>
-                      )}
-                    </Cell>
-                    <Cell className="text-xs text-fg-muted">
-                      {CHECK_LABEL[f.pipeline] ?? f.pipeline}
-                      {f.engine_outcome === "cant_tell" && (
-                        <span className="mt-1 block">{REVIEW_TYPE_LABEL.expert_review}</span>
-                      )}
-                    </Cell>
-                    <Cell>
-                      {f.impact ? <ImpactChip value={f.impact} /> : (
-                        <span className="text-fg-muted">Does not apply</span>
-                      )}
-                    </Cell>
-                    <Cell className="max-w-xs">
-                      <PageLink
-                        pageId={f.page_id}
-                        scanId={scanId}
-                        pageUrl={f.page_url}
-                        pageTitle={f.page_title}
-                        selector={f.target_selector}
-                        occurrenceId={f.id}
-                        snippet={f.html_snippet}
-                        origin="Rule check issues by WCAG criterion"
-                        context={f.rule_id}
-                        backTo={`/scans/${scanId}/a11y?wcag_sc=${wcagSc}`}
-                      />
-                    </Cell>
-                    <Cell>
-                      {/* The code, not the locator: why, ElementCode in components/ui.tsx. */}
-                      <ElementCode snippet={f.html_snippet} />
-                      <AlfaEvidenceNote evidence={f} />
-                      <Link className="report-link inline-flex min-h-target items-center text-xs" to={pageEvidencePath({ scanId, pageId: f.page_id, origin: "Rule check issues by WCAG criterion", backTo: `/scans/${scanId}/a11y?wcag_sc=${wcagSc}`, hash: `#finding-${f.id}` })}>Open the evidence for this occurrence</Link>
-                      {f.failure_summary && (
-                        <div className="mt-1 text-2xs text-fg-muted">
-                          {f.failure_summary}
-                        </div>
-                      )}
-                    </Cell>
-                    <Cell>
-                      <StatusCell
-                        scanId={scanId}
-                        findingId={f.id}
-                        current={f.status}
-                      />
-                    </Cell>
-                  </Row>
-                ))}
-              </tbody>
-            </Table>
-          </TableRegion>
-        )}
-        <TablePagination label="Occurrences" noun="occurrences" place="end" {...paged} />
+              <FilterMenu
+              label="Filter issues"
+                groups={filters}
+                onChange={(_key, value) => onStatusFilterChange(value as FindingStatus | "")}
+                onReset={() => onStatusFilterChange("")}
+              />
+            </TableBar>
+          )}
+        >
+          <TableStatus>
+            {loading
+              ? "Loading…"
+              : `${drill.length.toLocaleString()} ${drill.length === 1 ? "occurrence" : "occurrences"}, most serious impact first.`}
+          </TableStatus>
+          {loading ? null : drill.length === 0 ? (
+            <TableEmpty>
+              No occurrences
+              {status && (
+                <>
+                  {" "}
+                  have the status <strong>{STATUS_LABEL[status]}</strong>.{" "}
+                  {/* eslint-disable-next-line react/forbid-elements -- Convert: a text-link styled button; needs a link variant on Button */}
+                  <button
+                    type="button"
+                    onClick={() => onStatusFilterChange("")}
+                    className="text-umich-blue underline underline-offset-2"
+                  >
+                    Show all statuses
+                  </button>
+                </>
+              )}
+              {!status && <> for this WCAG criterion.</>}
+            </TableEmpty>
+          ) : (
+            <TableRegion label="Rule check occurrences table">
+              <Table
+                caption={`Rule check occurrences for ${wcagSc ? `WCAG ${wcagSc}` : "best practice"}, most serious impact first`}
+              >
+                <TableHead>
+                  <tr>
+                    <ColumnHeader>Rule</ColumnHeader>
+                    <ColumnHeader>Check</ColumnHeader>
+                    <ColumnHeader>Impact</ColumnHeader>
+                    <ColumnHeader>Page</ColumnHeader>
+                    <ColumnHeader>Element code (HTML)</ColumnHeader>
+                    <ColumnHeader>Status</ColumnHeader>
+                  </tr>
+                </TableHead>
+                <tbody>
+                  {paged.pageRows.map((f, index) => (
+                    <Row key={f.id} index={(paged.page - 1) * paged.pageSize + index}>
+                      <Cell>
+                        <code className="font-mono text-xs text-fg">
+                          {f.rule_id}
+                        </code>
+                        {f.help && (
+                          <div className="mt-1 text-xs text-fg-muted">
+                            {f.help.length > 140
+                              ? `${f.help.slice(0, 140)}…`
+                              : f.help}
+                          </div>
+                        )}
+                      </Cell>
+                      <Cell className="text-xs text-fg-muted">
+                        {CHECK_LABEL[f.pipeline] ?? f.pipeline}
+                        {f.engine_outcome === "cant_tell" && (
+                          <span className="mt-1 block">{REVIEW_TYPE_LABEL.expert_review}</span>
+                        )}
+                      </Cell>
+                      <Cell>
+                        {f.impact ? <ImpactChip value={f.impact} /> : (
+                          <span className="text-fg-muted">Does not apply</span>
+                        )}
+                      </Cell>
+                      <Cell className="max-w-xs">
+                        <PageLink
+                          pageId={f.page_id}
+                          scanId={scanId}
+                          pageUrl={f.page_url}
+                          pageTitle={f.page_title}
+                          selector={f.target_selector}
+                          occurrenceId={f.id}
+                          snippet={f.html_snippet}
+                          origin="Rule check issues by WCAG criterion"
+                          context={f.rule_id}
+                          backTo={`/scans/${scanId}/a11y?wcag_sc=${wcagSc}`}
+                        />
+                      </Cell>
+                      <Cell>
+                        {/* The code, not the locator: why, ElementCode in components/ui.tsx. */}
+                        <ElementCode snippet={f.html_snippet} />
+                        <AlfaEvidenceNote evidence={f} />
+                        <Link className="report-link inline-flex min-h-target items-center text-xs" to={pageEvidencePath({ scanId, pageId: f.page_id, origin: "Rule check issues by WCAG criterion", backTo: `/scans/${scanId}/a11y?wcag_sc=${wcagSc}`, hash: `#finding-${f.id}` })}>Open the evidence for this occurrence</Link>
+                        {f.failure_summary && (
+                          <div className="mt-1 text-2xs text-fg-muted">
+                            {f.failure_summary}
+                          </div>
+                        )}
+                      </Cell>
+                      <Cell>
+                        <StatusCell
+                          scanId={scanId}
+                          findingId={f.id}
+                          current={f.status}
+                        />
+                      </Cell>
+                    </Row>
+                  ))}
+                </tbody>
+              </Table>
+            </TableRegion>
+          )}
+        </PagedTable>
       </Card>
     </>
   );
