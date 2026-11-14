@@ -223,7 +223,8 @@ class LocalLoginScanRequest(BaseModel):
     max_pages: int = Field(default=2500, ge=1, le=2500)
     max_depth: int = Field(default=10, ge=1, le=20)
     rps: float = Field(default=1.0, ge=0.1, le=5.0)
-    # Signed-in tabs. Each tab after the first holds a copy of the sign-in;
+    # "Pages at once (workers)": one signed-in tab per worker. Each tab after
+    # the first holds a copy of the sign-in;
     # a copy the site signs out sends the scan back to one tab
     # (audit.crawler.tab_pool), so more tabs cost speed at worst, not pages.
     workers: int = Field(default=4, ge=1, le=8)
@@ -4259,13 +4260,14 @@ def tab_fallback_note(tabs: int) -> str:
     limit a reader needs: pages already done in another tab were each
     checked for a sign-in page when they loaded, not at every moment after.
     """
+    # Says pages, not tabs: the form calls the setting "Pages at once
+    # (workers)", and the tabs are how that works, not what the person chose.
     return (
-        f"Axcess started this sign-in scan with {tabs} tabs, each with a copy of "
-        "your sign-in. Partway through, the site signed out one of the copies: a "
-        "page showed a sign-in page in that tab but the real page in the first tab. "
-        "Axcess scanned that page again in the first tab, closed the other tabs, "
-        "and scanned the rest of the site one page at a time. Every page was "
-        "checked for a sign-in page when it loaded."
+        f"Axcess started this sign-in scan working on {tabs} pages at once. "
+        "Partway through, the site signed out part of the scan: a page showed a "
+        "sign-in page, but the real page when Axcess loaded it again. Axcess "
+        "kept the real page and scanned the rest of the site one page at a time, "
+        "which is slower. Every page was checked for a sign-in page when it loaded."
     )
 
 

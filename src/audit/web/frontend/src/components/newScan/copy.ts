@@ -202,10 +202,12 @@ export const NUMBERS = {
     label: "Pages at once (workers)",
     hint: "How many pages this computer works on at the same time. On a fast computer, such as an M4 Pro, start at 8 and go up to 32.",
   },
+  // A sign-in scan's own hint for the same "Pages at once (workers)"
+  // field: its numbers differ, and it has one limit the public scan does
+  // not (the site can sign out part of the scan).
   workers_login: {
-    label: "Signed-in tabs",
     hint:
-      "How many tabs the temporary signed-in browser uses at once. More tabs finish sooner but put more load on the site. Axcess recommends 4. The maximum is 8. If the site signs a tab out, Axcess goes back to one tab and says so in the report.",
+      "How many pages this computer works on at the same time. Higher is faster but puts more load on the site. Axcess recommends 4. The maximum is 8. If the site signs out part of the scan, Axcess goes back to one page at a time and says so in the report.",
   },
 } as const;
 

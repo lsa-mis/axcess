@@ -484,8 +484,9 @@ How it works:
    closed, the kept copy is used. With "Show the scanning browser window",
    the scan reuses the signed-in tabs instead, or a visible window reopened
    from the kept copy.
-   The scan gets one signed-in tab per worker ("Signed-in tabs", 4 by
-   default, at most 8). Cookies, local storage and IndexedDB are shared by
+   The scan gets one signed-in tab per worker ("Pages at once (workers)",
+   the same field and name as on the public form: 4 by default, at most 8
+   here; the interface never says "tabs"). Cookies, local storage and IndexedDB are shared by
    every tab; sessionStorage belongs to one tab, so each tab after the first
    is seeded with an in-memory copy of the first tab's. A copy can go stale
    when the site issues a new token, and its pages then load as the sign-in

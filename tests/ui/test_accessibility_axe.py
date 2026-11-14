@@ -1459,7 +1459,7 @@ async def test_login_scan_is_visible_and_explains_login_before_crawl(
     dom_discovery = page.get_by_role("switch", name=re.compile(r"^Open menus, tabs"))
     await playwright_async.expect(dom_discovery).to_be_checked()
 
-    workers = page.get_by_role("spinbutton", name="Signed-in tabs")
+    workers = page.get_by_role("spinbutton", name="Pages at once (workers)")
     await playwright_async.expect(workers).to_be_enabled()
     await playwright_async.expect(workers).to_have_value("4")
     await playwright_async.expect(workers).to_have_attribute("max", "8")
