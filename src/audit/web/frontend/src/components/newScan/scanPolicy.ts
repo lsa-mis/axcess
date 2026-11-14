@@ -87,7 +87,10 @@ const SETTING_KEYS = [
 
 export const PUBLIC_DEFAULTS: ScanSettings = {
   url: "",
-  max_pages: 2500,
+  // 5,000 pages unless the person chooses otherwise (2026-11-14, the
+  // developer's decision). It was 2,500. A scan that reaches the limit says
+  // so in its report, with the pages it found, so the limit is never hidden.
+  max_pages: 5000,
   all_pages: false,
   max_depth: 10,
   rps: 2.0,
@@ -136,6 +139,8 @@ export const PUBLIC_DEFAULTS: ScanSettings = {
 /** The login form's own defaults, on the shared shape. */
 export const LOGIN_DEFAULTS: ScanSettings = {
   ...PUBLIC_DEFAULTS,
+  // A signed-in scan keeps its own lower cap (LOGIN_POLICY.caps below).
+  max_pages: 2500,
   rps: 1,
   // One signed-in tab per worker; a tab the site signs out sends the scan
   // back to one tab (audit.crawler.tab_pool), so 4 costs speed at worst.

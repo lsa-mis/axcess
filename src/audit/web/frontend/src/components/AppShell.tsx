@@ -839,8 +839,8 @@ function routeTitle(pathname: string): string {
     [/^\/scans\/\d+\/compare\/?$/, "Compare reports"],
     [/^\/scans\/\d+\/compare\/changes\/?$/, "What changed"],
     [/^\/scans\/\d+\/documents\/?$/, "Documents"],
-    // Only running and failed scans render here; a completed report
-    // redirects to its issue table.
+    // Only running scans and scans that saved no page render here; a scan
+    // with saved pages redirects to its issue table, however it ended.
     [/^\/scans\/\d+\/?$/, "Scan status"],
     [/^\/findings\/\d+\/?$/, "Image details"],
     [/^\/tracking\/?$/, "Product roadmap"],

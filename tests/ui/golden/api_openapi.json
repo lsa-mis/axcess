@@ -602,7 +602,7 @@
     "/api/scans/{scan_id}/issue-counts": {
       "get": {
         "summary": "Api Scan Issue Counts",
-        "description": "One completed report's two issue counts, for the Reports list.\n\nFetched when a site's list of scans is opened, not with ``/api/sites``:\ncounting means building the issue list, and the site list is fetched\nevery few seconds while a scan runs.",
+        "description": "One report's two issue counts, for the Reports list.\n\nFetched when a site's list of scans is opened, not with ``/api/sites``:\ncounting means building the issue list, and the site list is fetched\nevery few seconds while a scan runs.",
         "operationId": "api_scan_issue_counts_api_scans__scan_id__issue_counts_get",
         "parameters": [
           {
@@ -2659,7 +2659,7 @@
           },
           "max_depth": {"type": "integer", "maximum": 20.0, "minimum": 1.0, "title": "Max Depth", "default": 10},
           "rps": {"type": "number", "maximum": 5.0, "minimum": 0.1, "title": "Rps", "default": 1.0},
-          "workers": {"type": "integer", "maximum": 4.0, "minimum": 1.0, "title": "Workers", "default": 2},
+          "workers": {"type": "integer", "maximum": 8.0, "minimum": 1.0, "title": "Workers", "default": 4},
           "show_browser": {"type": "boolean", "title": "Show Browser", "default": false},
           "whole_host": {"type": "boolean", "title": "Whole Host", "default": false},
           "scan_engine": {
@@ -3013,7 +3013,9 @@
           "send_empty_forms": {"type": "boolean", "title": "Send Empty Forms", "default": false},
           "skip_rendered_storage": {"type": "boolean", "title": "Skip Rendered Storage"},
           "axe_level": {"type": "string", "enum": ["A", "AA", "AAA"], "title": "Axe Level"},
-          "wcag_version": {"type": "string", "enum": ["2.1", "2.2"], "title": "Wcag Version"}
+          "wcag_version": {"type": "string", "enum": ["2.1", "2.2"], "title": "Wcag Version"},
+          "user_agent_choice": {"type": "string", "title": "User Agent Choice", "default": "axcess"},
+          "user_agent": {"type": "string", "title": "User Agent", "default": ""}
         },
         "additionalProperties": false,
         "type": "object",
@@ -3197,7 +3199,7 @@
         "type": "object",
         "required": ["site_url", "total", "scans"],
         "title": "SiteHistory",
-        "description": "Completed public reports of one site, oldest first, for the trend."
+        "description": "Public reports of one site, oldest first, for the trend."
       },
       "Snapshot": {
         "properties": {

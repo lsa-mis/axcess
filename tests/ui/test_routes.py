@@ -1690,26 +1690,6 @@ def test_export_fix_brief_draft_needs_the_same_acknowledgement(
     assert redacted.text.count("REDACTED COPY") == 1
 
 
-@pytest.mark.parametrize("status", ["running", "failed", "interrupted"])
-def test_export_fix_brief_refuses_a_scan_that_is_not_complete(
-    client: TestClient, seeded_db: tuple[object, object, int], status: str
-) -> None:
-    db_path, _, scan_id = seeded_db
-    conn = connect(Path(str(db_path)))
-    try:
-        conn.execute("UPDATE scans SET status = ? WHERE id = ?", (status, scan_id))
-        conn.commit()
-    finally:
-        conn.close()
-    resp = client.get(f"/api/scans/{scan_id}/export/brief", params={"draft": "acknowledged"})
-    assert resp.status_code == 409
-    assert "only be made from a completed scan" in resp.json()["detail"]
-    # The Export panel's sizes leave the brief out instead of failing.
-    options = client.get(f"/api/scans/{scan_id}/exports")
-    assert options.status_code == 200
-    assert "brief" not in {entry["format"] for entry in options.json()["formats"]}
-
-
 def test_export_fix_brief_of_a_deleted_or_unknown_scan_returns_404(
     client: TestClient, seeded_db: tuple[object, object, int]
 ) -> None:

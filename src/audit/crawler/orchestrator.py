@@ -68,6 +68,7 @@ from audit.crawler.search import SearchConfig, SearchExplorer, search_url_allowe
 from audit.crawler.style_snapshot import SheetRef, StoredStyles, StyleSnapshot
 from audit.crawler.url_policy import HostScope
 from audit.db import queue, repo
+from audit.db.reports import record_pages_found
 from audit.db.schema import write_batch
 from audit.extractor.downloader import ImageDownloader, ImageDownloaderProtocol
 from audit.extractor.pipeline import OcrConfig, VlmConfig, process_page
@@ -708,15 +709,13 @@ async def run_crawl(
             summary.notes.append("crawl interrupted")
         elif summary.status == "running":
             summary.status = "completed"
-        if (
-            summary.status == "completed"
-            and config.synthesize_enabled
-            and summary.pages_fetched > 0
-        ):
+        # Every scan that saved pages gets its report finished, however it
+        # ended. Synthesis is idempotent, so a crawl resumed later redoes it.
+        if config.synthesize_enabled and summary.pages_fetched > 0:
             try:
                 prior = config.compare_to
                 if prior is None:
-                    prior = _previous_completed_scan(conn, normalized_seed, scan_id)
+                    prior = _previous_report_scan(conn, normalized_seed, scan_id)
                 synth = synthesize_findings(conn, scan_id=scan_id, compare_to=prior)
                 summary.findings_written = synth.findings_written
                 summary.findings_by_severity = synth.by_severity
@@ -2577,10 +2576,14 @@ def _persist_semantic(
         ctx.summary.semantic_findings_total += written
 
 
-def _previous_completed_scan(
+def _previous_report_scan(
     conn: sqlite3.Connection, seed_url: str, current_scan_id: int
 ) -> int | None:
-    """Most-recent completed scan of the same logical site, excluding ``current``.
+    """Most-recent report of the same logical site, excluding ``current``.
+
+    A completed scan, or any scan that ended with saved pages, however it
+    ended. ``page_count`` stays 0 until a scan ends, so a running scan is
+    never picked.
 
     Matching uses :func:`audit.crawler.url_policy.compare_key`, which drops
     ports on loopback hosts so a dev-server port change doesn't hide the
@@ -2590,7 +2593,7 @@ def _previous_completed_scan(
     rows = conn.execute(
         """
         SELECT id, seed_url FROM scans
-         WHERE status = 'completed' AND id <> ?
+         WHERE (status = 'completed' OR page_count > 0) AND id <> ?
          ORDER BY id DESC
         """,
         (current_scan_id,),
@@ -2618,3 +2621,4 @@ def _finalize_scan(conn: sqlite3.Connection, scan_id: int, summary: CrawlSummary
         """,
         (summary.status, int(page_count), summary.errors, scan_id),
     )
+    record_pages_found(conn, scan_id)

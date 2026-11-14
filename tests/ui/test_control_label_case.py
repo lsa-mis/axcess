@@ -41,6 +41,7 @@ _NAMES = {
     "Tesseract",
     "Windows",
     "Mac",
+    "Android",
     "GitHub",
     "Google",
     "Siteimprove",

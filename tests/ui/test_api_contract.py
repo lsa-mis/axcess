@@ -152,7 +152,7 @@ _UNPINNED_PATHS: dict[tuple[str, str], str] = {
     ("GET /api/capabilities/local-analysis", "body.semantic.ready_models"): _OFFLINE_OLLAMA,
     ("GET /api/capabilities/local-analysis", "body.vision.installed_size_bytes"): _OFFLINE_OLLAMA,
     ("GET /api/sites", "body[].most_recent.rule_checks"): _OTHER_SITE_SCAN,
-    ("GET /api/sites", "body[].most_recent_completed.rule_checks"): _OTHER_SITE_SCAN,
+    ("GET /api/sites", "body[].most_recent_report.rule_checks"): _OTHER_SITE_SCAN,
     ("GET /api/scans/{scan_id}/diff", "body.new[].previous_finding_id"): _NEW_PAIR,
     ("GET /api/scans/{scan_id}/diff", "body.new[].previous_severity"): _NEW_PAIR,
     ("GET /api/scans/{scan_id}/diff", "body.new[].previous_status"): _NEW_PAIR,
@@ -680,6 +680,13 @@ def _add_contract_evidence(db_path: Path, blob_dir: Path, scan_id: int) -> dict[
         # ``rule_checks`` lists both checks rather than an empty list.
         conn.execute(
             "UPDATE scans SET axe_pages_scanned = 2, alfa_pages_scanned = 1 WHERE id = ?",
+            (scan_id,),
+        )
+        # The limits a scan was given and Axcess's note on how it ran, so
+        # the report's coverage facts carry values rather than nulls.
+        conn.execute(
+            "UPDATE scans SET scan_note = 'One tab.', config_json = json_set("
+            "COALESCE(config_json, '{}'), '$.max_pages', 5000, '$.max_depth', 10) WHERE id = ?",
             (scan_id,),
         )
         conn.commit()
