@@ -447,16 +447,38 @@ class LinkedFileTracker:
             )
             return
         body = fetched.body
+        digest = hashlib.sha256(body).hexdigest()
         downloaded = store.CheckResult(
             "could_not_check",
             "not_a_pdf",
             http_status=fetched.http_status,
             content_type=fetched.content_type,
             byte_size=len(body),
-            sha256=hashlib.sha256(body).hexdigest(),
+            sha256=digest,
         )
         if not looks_like_pdf(body):
             self._store(file_id, downloaded)
+            return
+        # The same bytes at another address, already checked: the same
+        # result, without reading the file again. The link stays the file's
+        # identity (one row per address); the hash only spots copies, which
+        # the Documents tab then marks "Same file as …". The download still
+        # happened: a hash needs the bytes.
+        copy = store.checked_copy(
+            self._conn, scan_id=self._scan_id, sha256=digest, file_id=file_id
+        )
+        if copy is not None:
+            self._store(
+                file_id,
+                replace(
+                    downloaded,
+                    status=copy.status,
+                    reason=None,
+                    failed_checks=copy.failed_checks,
+                    is_form=copy.is_form,
+                    page_count=copy.page_count,
+                ),
+            )
             return
         try:
             result: PdfCheck = await asyncio.wait_for(

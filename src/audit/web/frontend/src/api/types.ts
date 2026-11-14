@@ -1299,6 +1299,9 @@ export interface LinkedFileRow {
   page_count: number | null;
   /** Distinct pages of the report that reach the file; the pages are on its own page. */
   referring_page_count: number;
+  /** The first file at another address with the same bytes, whose result
+   *  this one shares; null when it has no earlier copy. */
+  same_as?: { file_id: number; name: string } | null;
 }
 
 /** One way a page reaches a file (`linked_files_queries.DocumentRefWay`). */

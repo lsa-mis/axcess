@@ -63,6 +63,11 @@ export const PAGES_COLUMN = "Pages it appears on";
  */
 export const HOSTED_COLUMN = "Hosted on";
 
+/** One document's own page, where its facts and every page it appears on are listed. */
+export function documentPath(scanId: number, fileId: number): string {
+  return `/scans/${scanId}/documents/${fileId}`;
+}
+
 /** The host of a file's address ("hr.umich.edu"), or null for one that does not parse. */
 export function hostOf(url: string): string | null {
   try {
@@ -102,6 +107,24 @@ export function ResultTag({ status }: { status: LinkedFileRow["status"] }) {
  * the rest hidden, which takes the problems out of the table.
  */
 export function Found({ row }: { row: LinkedFileRow }) {
+  return (
+    <>
+      <FoundResult row={row} />
+      {/* A copy of another file in the list (the same bytes at another
+          address): its result is that file's, and one fix fixes both, so
+          the row says which. Words only, not a link: the row's one link is
+          its name (one way to do one thing; W3C COGA, "Making Content
+          Usable"); the document's own page links to the first copy. */}
+      {row.same_as && (
+        <p className="mt-1 text-2xs text-fg-muted">
+          Same file as <span data-scanned-content>{row.same_as.name}</span>
+        </p>
+      )}
+    </>
+  );
+}
+
+function FoundResult({ row }: { row: LinkedFileRow }) {
   if (row.status === "mostly_sure") {
     return (
       <ul className="space-y-1">

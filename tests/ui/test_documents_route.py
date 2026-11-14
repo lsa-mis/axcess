@@ -1093,3 +1093,44 @@ async def test_filter_documents_narrows_the_list_and_says_how(
     await expect(
         page.get_by_text("No documents match these filters. Clear a filter to see more results.")
     ).to_be_visible()
+
+
+@on_module_loop
+async def test_a_copy_says_which_file_it_is_the_same_as(
+    documents: int,
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """Two addresses with the same bytes stay two rows; the later one says
+    it is the same file as the first, in words in the table and with a link
+    on its own page."""
+    from playwright.async_api import expect
+
+    with sqlite3.connect(seeded_db[0]) as conn:
+        conn.execute(
+            "UPDATE linked_files SET sha256 = 'abc' WHERE scan_id = ? AND url IN (?, ?)",
+            (
+                documents,
+                "http://example.com/files/no-title.pdf",
+                "http://example.com/files/permit-form.pdf",
+            ),
+        )
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(f"{base}/app/scans/{scan_id}/documents", wait_until="networkidle")
+    rows = page.get_by_role("table").locator("tbody tr")
+    # no-title.pdf was recorded first, so permit-form.pdf is its copy.
+    await expect(rows.nth(0)).to_contain_text("Same file as no-title.pdf")
+    await expect(rows.nth(1)).not_to_contain_text("Same file as")
+    await expect(rows.nth(0).get_by_role("link")).to_have_count(1)
+    await rows.nth(0).get_by_role("link").click()
+    await page.wait_for_url(re.compile(r"/documents/\d+"))
+    first = page.get_by_role("link", name="no-title.pdf", exact=True)
+    await expect(first).to_be_visible()
+    await expect(
+        page.get_by_text("The results below are that file\u2019s.", exact=False)
+    ).to_be_visible()
+    await first.click()
+    await expect(page.get_by_role("heading", level=1)).to_have_text("no-title.pdf")
+    await expect(page.get_by_text("Same file as")).to_have_count(0)

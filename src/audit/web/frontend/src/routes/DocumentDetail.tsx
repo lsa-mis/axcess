@@ -12,6 +12,7 @@ import {
   RESULT_COLUMN,
   ResultTag,
   SiteCell,
+  documentPath,
 } from "../components/DocumentParts";
 import { FactTile } from "../components/IssueEvidence";
 import ReportHeader from "../components/ReportHeader";
@@ -184,7 +185,7 @@ export default function DocumentDetailRoute() {
         <div className="flex flex-wrap items-baseline justify-between gap-3 rounded-t-[7px] border-b border-border bg-surface-muted px-4 py-3">
           <h2 className="text-base font-semibold">What Axcess found</h2>
         </div>
-        <ChecksTable row={row} />
+        <ChecksTable row={row} scanId={scan.id} />
       </Card>
 
       <Card className="mt-8">
@@ -228,7 +229,7 @@ export default function DocumentDetailRoute() {
  * found no problem; a file Axcess could not check has no table, only why.
  * The same table parts as every table here, so it looks and reads the same.
  */
-function ChecksTable({ row }: { row: LinkedFileRow }) {
+function ChecksTable({ row, scanId }: { row: LinkedFileRow; scanId: number }) {
   if (row.status === "could_not_check") {
     return (
       <div className="max-w-prose px-4 py-3 text-sm leading-6">
@@ -238,6 +239,22 @@ function ChecksTable({ row }: { row: LinkedFileRow }) {
   }
   return (
     <>
+      {/* A copy: the same bytes as an earlier file in the list, at another
+          address. Axcess did not read it again; the checks below are that
+          file's, so the line says so and links to it (the link's words are
+          the place it goes, the file's name; plain-language rule 8). */}
+      {row.same_as && (
+        <p className="max-w-prose px-4 pt-3 text-sm leading-6">
+          Same file as{" "}
+          <Link
+            to={documentPath(scanId, row.same_as.file_id)}
+            className="font-semibold text-umich-blue underline underline-offset-2"
+          >
+            <span data-scanned-content>{row.same_as.name}</span>
+          </Link>
+          , at another address. The results below are that file&rsquo;s.
+        </p>
+      )}
       {row.status === "not_sure" && (
         <p className="max-w-prose px-4 py-3 text-sm leading-6">{LINKED_FILE_STATUS_HELP.not_sure}</p>
       )}

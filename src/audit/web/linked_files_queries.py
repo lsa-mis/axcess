@@ -61,6 +61,13 @@ class LinkedFileRef(BaseModel):
     revealed_by: str | None
 
 
+class SameFile(BaseModel):
+    """The first file of the report with the same bytes as this one."""
+
+    file_id: int
+    name: str
+
+
 class LinkedFileRow(BaseModel):
     file_id: int
     url: str
@@ -77,6 +84,10 @@ class LinkedFileRow(BaseModel):
     #: Distinct pages of this report that reach the file. The pages
     #: themselves are on the file's own page (``get_scan_document``).
     referring_page_count: int
+    #: The first file at another address with the same bytes (by SHA-256),
+    #: whose result this one shares; None for a file with no earlier copy.
+    #: The address stays each file's identity: copies are separate rows.
+    same_as: SameFile | None = None
 
 
 class LinkedFileCounts(BaseModel):
@@ -206,13 +217,22 @@ def _file_rows(
     ).fetchall()
 
     first_texts = _first_link_texts(conn, scan_id, file_id)
+    copies = _first_copies(conn, scan_id)
+    copy_ids = {copies[int(row[0])] for row in rows if int(row[0]) in copies}
+    copy_names = _names(conn, scan_id, copy_ids)
     files = []
     for row in rows:
+        first = copies.get(int(row[0]))
         files.append(
             LinkedFileRow(
                 file_id=int(row[0]),
                 url=str(row[1]),
                 name=display_name(str(row[1]), first_texts.get(int(row[0]))),
+                same_as=(
+                    SameFile(file_id=first, name=copy_names[first])
+                    if first is not None and first in copy_names
+                    else None
+                ),
                 file_type=row[2],
                 off_site=bool(row[3]),
                 status=row[4],
@@ -225,6 +245,34 @@ def _file_rows(
             )
         )
     return files
+
+
+def _first_copies(conn: sqlite3.Connection, scan_id: int) -> dict[int, int]:
+    """Each file that has an earlier file with the same bytes: ``id -> first id``."""
+    first: dict[str, int] = {}
+    out: dict[int, int] = {}
+    for file_id, digest in conn.execute(
+        "SELECT id, sha256 FROM linked_files WHERE scan_id = ? AND sha256 IS NOT NULL ORDER BY id",
+        (scan_id,),
+    ):
+        if digest in first:
+            out[int(file_id)] = first[digest]
+        else:
+            first[str(digest)] = int(file_id)
+    return out
+
+
+def _names(conn: sqlite3.Connection, scan_id: int, file_ids: set[int]) -> dict[int, str]:
+    """The names of ``file_ids`` of ``scan_id``, as the list shows them."""
+    out: dict[int, str] = {}
+    for file_id in file_ids:
+        row = conn.execute(
+            "SELECT url FROM linked_files WHERE id = ? AND scan_id = ?", (file_id, scan_id)
+        ).fetchone()
+        if row is not None:
+            texts = _first_link_texts(conn, scan_id, file_id)
+            out[file_id] = display_name(str(row[0]), texts.get(file_id))
+    return out
 
 
 def _first_link_texts(

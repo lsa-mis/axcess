@@ -11,6 +11,7 @@ import {
   ResultTag,
   SiteCell,
   TypeCell,
+  documentPath,
   hostOf,
 } from "../components/DocumentParts";
 import HowSureTag from "../components/HowSureTag";
@@ -201,10 +202,6 @@ function describeSort(sort: DocumentsSort | null): string {
 /** The fixed order, in words, for the table's caption and the labels note's order section. */
 const ORDER_WORDS = "Mostly sure first, then Not sure, then Could not check";
 
-/** One document's own page, where its facts and every page it appears on are listed. */
-export function documentPath(scanId: number, fileId: number): string {
-  return `/scans/${scanId}/documents/${fileId}`;
-}
 
 /**
  * The files a report's pages link to (``/scans/:id/documents``), the report's

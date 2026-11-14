@@ -153,6 +153,31 @@ def set_result(
         raise ValueError("Linked file is not part of this scan")
 
 
+def checked_copy(
+    conn: sqlite3.Connection, *, scan_id: int, sha256: str, file_id: int
+) -> CheckResult | None:
+    """The result of another file of ``scan_id`` with the same bytes, already checked.
+
+    Only a finished check (Mostly sure or Not sure) is reused: a file the
+    same bytes could not be checked for timed out or failed for a reason
+    that may not repeat, so its copy is checked on its own.
+    """
+    row = conn.execute(
+        "SELECT status, failed_checks, is_form, page_count FROM linked_files "
+        "WHERE scan_id = ? AND sha256 = ? AND id != ? "
+        "AND status IN ('mostly_sure', 'not_sure') ORDER BY id LIMIT 1",
+        (scan_id, sha256, file_id),
+    ).fetchone()
+    if row is None:
+        return None
+    return CheckResult(
+        status=row[0],
+        failed_checks=tuple(json.loads(row[1] or "[]")),
+        is_form=None if row[2] is None else bool(row[2]),
+        page_count=row[3],
+    )
+
+
 def file_status(conn: sqlite3.Connection, *, scan_id: int, file_id: int) -> str | None:
     row = conn.execute(
         "SELECT status FROM linked_files WHERE id = ? AND scan_id = ?", (file_id, scan_id)

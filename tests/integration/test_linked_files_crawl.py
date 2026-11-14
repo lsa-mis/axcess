@@ -368,3 +368,39 @@ def test_each_pdf_is_checked_with_the_page_not_only_at_the_end(
     # draws the page; that is the page, not the document check.)
     downloads = [url for url in transport.asked if url.endswith(".pdf")]
     assert downloads and len(downloads) == len(set(downloads)), downloads
+
+
+def test_a_copy_at_another_address_shares_the_first_files_result(
+    tmp_db: sqlite3.Connection, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ "/documents/download?id=7" serves the same bytes as clean.pdf. Each
+    address stays its own file (the link is the identity); the later one is
+    marked as the same file as the first, with the first one's result, and
+    the PDF is read once."""
+    from audit.linked_files import tracker as tracker_module
+    from audit.web.linked_files_queries import list_scan_documents
+
+    monkeypatch.setenv("AUDIT_BLOB_DIR", str(tmp_path / "blobs"))
+    reads = 0
+    real = tracker_module.check_pdf
+
+    def counted(data: bytes) -> Any:
+        nonlocal reads
+        if data == (FILES / "clean.pdf").read_bytes():
+            reads += 1
+        return real(data)
+
+    monkeypatch.setattr(tracker_module, "check_pdf", counted)
+    with _serve() as (base, _port, _requests):
+        scan_id = _crawl(tmp_db, base, _LocalOnly())
+    files = {
+        f.url.removeprefix(base): f for f in list_scan_documents(tmp_db, scan_id, limit=200).files
+    }
+    clean = files["/documents/files/clean.pdf"]
+    download = files["/documents/download?id=7"]
+    first, copy = sorted((clean, download), key=lambda f: f.file_id)
+    assert first.same_as is None
+    assert copy.same_as is not None and copy.same_as.file_id == first.file_id
+    assert copy.same_as.name == first.name
+    assert (copy.status, copy.failed_checks) == (first.status, first.failed_checks)
+    assert reads == 1
