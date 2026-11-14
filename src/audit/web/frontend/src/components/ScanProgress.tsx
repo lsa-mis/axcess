@@ -36,16 +36,15 @@ import { CHECK_LABEL } from "../lib/terms";
  * The document check's column, by the check's own name (the glossary's
  * "Document check", the New scan summary's too). On each page it finds the
  * links to PDF, Word and other files and checks the PDFs among them that
- * no earlier page had checked, except a PDF on this site that pages link
- * to: the scan opens that one as it opens a page, and checks it in its own
- * row (audit/linked_files/tracker.py, queue_page). So "Done" means the
- * page's documents are found and each of its PDFs is checked or has a row
- * of its own. The page does not wait for its PDFs: its row can read
- * "Checked" while this column still reads "Checking", and the line over
- * the table says so, so the two are not read as a contradiction. It was "Document links" while PDFs on other sites were
+ * no earlier page had checked (audit/linked_files/tracker.py, queue_page).
+ * So "Done" means the page's documents are found and each of its PDFs is
+ * checked. A PDF is never a row of its own: the scan does not open a
+ * document link as a page. The page does not wait for its PDFs: its row
+ * can read "Checked" while this column still reads "Checking", and the
+ * line over the table says so, so the two are not read as a
+ * contradiction. It was "Document links" while PDFs on other sites were
  * checked only after the last page (until 2026-11-14), when "Done" under a
- * check's name would have claimed more than was done. The line over the
- * table says both.
+ * check's name would have claimed more than was done.
  */
 const DOCUMENT_CHECK_COLUMN = "Document check";
 
@@ -484,7 +483,7 @@ function PagesTable({
               that links only to PDFs checked before is quick (see
               DOCUMENT_CHECK_COLUMN). */}
           {tracked && documents && (
-            <> {DOCUMENT_CHECK_COLUMN} finds the documents each page links to and checks its PDFs, each PDF once. A PDF on this site that a page links to is checked in its own row. The next page starts while a page&rsquo;s PDFs download, so a page marked Checked can still show Checking under {DOCUMENT_CHECK_COLUMN}.</>
+            <> {DOCUMENT_CHECK_COLUMN} finds the documents each page links to and checks its PDFs, each PDF once. The next page starts while a page&rsquo;s PDFs download, so a page marked Checked can still show Checking under {DOCUMENT_CHECK_COLUMN}.</>
           )}
           {!tracked && rows.length > 0 && (
             <> Each check&rsquo;s progress on a page is not available for this scan, so each page shows its status only.</>

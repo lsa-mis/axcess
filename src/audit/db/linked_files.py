@@ -198,27 +198,15 @@ def pending_files(conn: sqlite3.Connection, scan_id: int) -> list[tuple[int, str
 
 def pending_files_for_page(
     conn: sqlite3.Connection, scan_id: int, page_id: int
-) -> list[tuple[int, str, bool]]:
-    """Every file ``page_id`` reaches that is still waiting, oldest first:
-    ``(id, url, linked)``, where ``linked`` is True when any page of the scan
-    reaches it by an ordinary link (one the crawl may follow), not only by a
-    frame, object or embed."""
+) -> list[tuple[int, str]]:
+    """``(id, url)`` of every file ``page_id`` reaches that is still waiting, oldest first."""
     return [
-        (int(row[0]), str(row[1]), bool(row[2]))
+        (int(row[0]), str(row[1]))
         for row in conn.execute(
             """
-            SELECT f.id, f.url,
-                   EXISTS (
-                       SELECT 1 FROM linked_file_refs l
-                        WHERE l.file_id = f.id AND l.scan_id = f.scan_id
-                          AND l.how IN ('link', 'revealed_link')
-                   )
-              FROM linked_files f
-             WHERE f.scan_id = ? AND f.status = 'pending'
-               AND EXISTS (
-                   SELECT 1 FROM linked_file_refs r
-                    WHERE r.file_id = f.id AND r.scan_id = f.scan_id AND r.page_id = ?
-               )
+            SELECT DISTINCT f.id, f.url FROM linked_files f
+              JOIN linked_file_refs r ON r.file_id = f.id AND r.scan_id = f.scan_id
+             WHERE f.scan_id = ? AND r.page_id = ? AND f.status = 'pending'
              ORDER BY f.id
             """,
             (scan_id, page_id),

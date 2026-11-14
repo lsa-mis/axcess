@@ -368,6 +368,14 @@ def test_each_pdf_is_checked_with_the_page_not_only_at_the_end(
     # draws the page; that is the page, not the document check.)
     downloads = [url for url in transport.asked if url.endswith(".pdf")]
     assert downloads and len(downloads) == len(set(downloads)), downloads
+    # A link whose address names a document is not a page: the crawl never
+    # fetches it, so it takes no slot of the page cap and no line in Pages
+    # visited; the document check downloads it instead.
+    as_pages = tmp_db.execute(
+        "SELECT url_normalized FROM pages WHERE scan_id = ? AND url_normalized LIKE '%.pdf'",
+        (scan_id,),
+    ).fetchall()
+    assert as_pages == []
 
 
 def test_a_copy_at_another_address_shares_the_first_files_result(

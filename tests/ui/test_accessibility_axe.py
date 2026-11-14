@@ -903,12 +903,11 @@ async def test_running_scan_shows_factual_pipeline_progress(
             ]
         )
         # The document check's column finds links; the line over the table
-        # says each PDF is checked once, and where a PDF on this site is.
+        # says each PDF is checked once, and that pages do not wait for them.
         await playwright_async.expect(
             page.get_by_text(
                 "Document check finds the documents each page links to and checks "
-                "its PDFs, each PDF once. A PDF on this site that a page links to "
-                "is checked in its own row. The next page starts while a page\u2019s "
+                "its PDFs, each PDF once. The next page starts while a page\u2019s "
                 "PDFs download, so a page marked Checked can still show Checking "
                 "under Document check.",
                 exact=False,

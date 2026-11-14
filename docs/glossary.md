@@ -439,9 +439,10 @@ the scanned pages link to or show inside the page (in a frame, object or
 embed), including links that appear only after a click, and files on other
 sites. During the scan it downloads each PDF once (at most 10 MB, at most 200
 downloads a scan), checks it on your computer with no AI, and keeps only the
-result: a PDF on another site, or one shown inside a page, with the page that
-links to it; a PDF on this site when the scan opens it, as it opens a page. A
-scan stopped part way keeps the results for the PDFs it reached. In code these are called *linked files*, because in the crawler a
+result, in the background while the scan goes on to the next page. A link to
+a document is never visited as a page, so documents take no part of the page
+limit and do not appear in Pages visited. A scan stopped part way keeps the
+results for the PDFs it reached. In code these are called *linked files*, because in the crawler a
 "document" means a web page.
 
 A PDF is marked [Mostly sure](#mostly-sure) when it fails one of these:

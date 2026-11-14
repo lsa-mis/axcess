@@ -72,6 +72,7 @@ from audit.db.reports import record_pages_found
 from audit.db.schema import write_batch
 from audit.extractor.downloader import ImageDownloader, ImageDownloaderProtocol
 from audit.extractor.pipeline import OcrConfig, VlmConfig, process_page
+from audit.linked_files import formats as linked_file_formats
 from audit.linked_files.tracker import LinkedFileTracker
 from audit.logging import get_logger
 from audit.synthesizer.findings import synthesize_findings
@@ -1888,6 +1889,17 @@ def _enqueue_children(
         if normalized in seen:
             continue
         seen.add(normalized)
+        # A link whose address names a document (a .pdf, .docx, a Google
+        # file) is not a page: the crawl does not fetch it. The document
+        # check (when on) downloads and checks it in the background, and it
+        # never takes a slot of the page cap or a line in Pages visited
+        # (2026-11-14, the developer's decision: a 50-page cap means 50 web
+        # pages). With the document check off, it is not downloaded at all.
+        # An address with no extension that answers with a file's
+        # Content-Type is still fetched, and recognised then.
+        if linked_file_formats.classify_url(normalized) is not None:
+            log.debug("crawl.link_refused", url=normalized, source=base_url, reason="document")
+            continue
         if not url_policy.is_in_scope(
             normalized, ctx.scope, allow_subdomains=ctx.config.allow_subdomains
         ):

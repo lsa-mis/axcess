@@ -32,28 +32,26 @@ has `workers` page workers; the document check has its own downloads
 (`DOWNLOAD_CONCURRENCY` at a time). After a page is read:
 
 1. `record_page` stores the page's document links (fast, no network).
-2. `queue_page` queues the PDFs this page reaches that the crawl will not
-   fetch itself, and returns at once. The page's worker goes on to the next
+2. `queue_page` queues the PDFs this page reaches that are not checked
+   yet, and returns at once. The page's worker goes on to the next
    page; the downloads work through the queued PDFs of earlier pages in the
    background.
 3. After the last page, `check_pending` first waits for the queued
    downloads (`drain`), then checks anything still waiting (for example a
-   PDF on the site past the page or depth limit).
+   file found by its Content-Type after its pages were recorded).
 4. A stop or a failure cancels the queued downloads (`cancel_background`);
    the files not finished are reported as not checked.
 
-Which PDFs a page queues:
-
-| PDF | Checked |
-| --- | --- |
-| On another site (Google Drive, Box, a partner's site) | Queued by the page that links to it. The crawl never visits other sites. |
-| Shown in a frame, object or embed | Queued by the page. The crawl follows only ordinary links. |
-| On the site, reached by an ordinary link | By the crawl, which fetches it as it fetches a page and checks it from that response (`record_response`). Queuing it too would ask the site for it twice. |
-| Anything left | At the end (`check_pending`). |
-
-One rare case asks twice: a PDF on the site shown in a frame on one page and
-found later as an ordinary link on another. Avoiding it would mean the crawl
-skipping that fetch, which changes what "Pages visited" counts.
+**A document link is never a page.** The crawl does not queue a link whose
+address names a document (`.pdf`, `.docx`, a Google file;
+`formats.classify_url`, checked in `_enqueue_children`). So documents take
+no slot of the page cap and no line in Pages visited (a 50-page cap means
+50 web pages; the developer's decision, 2026-11-14), the site is asked for
+each PDF once, by the document check, and with the document check off they
+are not downloaded at all. An address with no extension that answers with a
+file's Content-Type is still fetched by the crawl and recognised then
+(`record_response`), and a file being read is awaited by a copy that
+arrives at the same time, so the bytes are read once.
 
 All downloads share the crawl's HTTP client, its per-host rate limit and its
 robots.txt rules, and the scan-wide cap (`MAX_DOWNLOADS`, 200; each file at
@@ -67,6 +65,16 @@ The progress table's **Document check** column (`live_progress` key
 when that page's queued PDFs are checked (`live_progress.later`). Because
 the page does not wait, its row can read "Checked" while this column still
 reads "Checking"; the line over the table says so.
+
+## Measured cost (hr.umich.edu, 50-page cap, the real app)
+
+Before document links stopped being queued as pages, PDFs on the site
+reached by ordinary links were left to the crawl, which with a 50-page cap
+never reached them, so all 111 waited for the pass after the last page: 55
+s, which is the site's rate limit (2 requests a second) for 111 downloads,
+on top of about 119 s with the check off. The page crawl itself was not
+slower with the check on. See the commit that made the change for the
+numbers after it.
 
 ## Why it is built this way
 

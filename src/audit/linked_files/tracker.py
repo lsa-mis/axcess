@@ -16,44 +16,37 @@ points, and nothing else in the crawl changes:
     the crawler fetched without a browser, the PDF is checked from that same
     response, so the site is not asked for it twice.
 ``queue_page``
-    Right after ``record_page``: every PDF that page reaches and the crawl
-    will not fetch itself is queued to be downloaded once and checked, in
-    the background. The page does not wait: its worker goes on to the next
-    page while the downloads (``DOWNLOAD_CONCURRENCY`` at a time) work
-    through the PDFs of the pages before it, so a page with many new PDFs
-    never holds up the crawl (the developer's request, 2026-11-14). The PDFs
-    queued are: a PDF on another host (Google Drive, Box, a partner's site),
-    which the crawl never visits, and one shown in a frame, object or embed,
-    which the crawl does not follow. A PDF linked from many pages is
-    downloaded with the first of them; the others find it checked. A PDF in
-    the crawl's scope that some page links to by an ordinary link is left
-    to the crawl, which fetches it as it fetches a page and checks it from
-    that response (``record_response``): checking it here too would ask the
-    site for it twice. (If a page found later links by an ordinary link to
-    a PDF already checked from a frame, the crawl still fetches it: one
-    extra request, in that case only.) One file per address, robots.txt and the crawl's rate limit
-    honoured, links from the file never followed.
+    Right after ``record_page``: every PDF that page reaches and that is not
+    checked yet is queued to be downloaded once and checked, in the
+    background. The page does not wait: its worker goes on to the next page
+    while the downloads (``DOWNLOAD_CONCURRENCY`` at a time) work through
+    the PDFs of the pages before it, so a page with many new PDFs never
+    holds up the crawl (the developer's request, 2026-11-14). That covers
+    every PDF a page reaches: on the site or on another host (Google Drive,
+    Box, a partner's site), by a link, a link that appears after a click, or
+    a frame, object or embed. The crawl does not fetch a link whose address
+    names a document (``_enqueue_children`` in the orchestrator), so the site
+    is asked for each PDF once, here. A PDF linked from many pages is
+    downloaded with the first of them; the others find it checked. One file
+    per address, robots.txt and the crawl's rate limit honoured, links from
+    the file never followed.
 ``check_pending``
     After the last page: first the queued downloads still running
-    (``drain``), then anything still waiting, such as a PDF in scope past
-    the page or depth limit, which the crawl never reached. A stop cancels
+    (``drain``), then anything still waiting, such as a file found by its
+    Content-Type after its pages were recorded. A stop cancels
     the queued downloads (``cancel_background``).
 
-PDFs on other hosts are checked with the page, not at the end, since
-2026-11-14 (the developer's choice): a scan stopped part way then keeps
-their results for the pages it reached, as it already kept the results of
-the in-scope PDFs it had fetched. The same files are downloaded either way,
-each once, under the same limits.
-
-The held references are in memory only. A crawl stopped and resumed keeps
-every file and reference already written, but loses the not-yet-matched
-references of pages fetched before the stop, so a file found by
-Content-Type after a resume can list fewer pages than link to it.
+Downloading during the crawl, not after it (2026-11-14): measured on
+hr.umich.edu with a 50-page cap, PDFs left to a pass after the last page
+added 55 s, all of it the site's rate limit (2 requests a second), while
+the rate limit had room to spare during the page crawl. In the background
+the downloads use that room.
 """
 
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import functools
 import hashlib
 import sqlite3
@@ -91,6 +84,7 @@ class _Downloads:
     ignore_robots: bool
     blocked_url_patterns: tuple[str, ...]
     excluded_scopes: tuple[str, ...]
+
 
 #: PDFs downloaded by ``check_pending`` per scan. The ones the crawler
 #: fetched itself are checked from its response and do not count.
@@ -132,6 +126,8 @@ class LinkedFileTracker:
         self._in_flight: dict[int, asyncio.Task[None]] = {}
         # One task per page whose PDFs are being checked; see queue_page.
         self._background: set[asyncio.Task[None]] = set()
+        # PDFs being read now, by SHA-256, so a copy waits for the first read.
+        self._reading: dict[str, asyncio.Future[None]] = {}
 
     def attach_downloads(
         self,
@@ -298,30 +294,17 @@ class LinkedFileTracker:
     # -- after the last page ----------------------------------------------
 
     def queue_page(self, page_id: int, done: Callable[[bool], None] | None = None) -> None:
-        """Start checking the PDFs ``page_id`` reaches that the crawl will not fetch itself.
+        """Start checking the PDFs ``page_id`` reaches that are not checked yet.
 
         Returns at once: the checks run in the background, and ``done`` is
         called with True when they end (False if they fail or are stopped),
-        for the progress page's "Document check". A PDF inside the crawl's
-        scope that some page links to is left to the crawl (see the module
-        docstring). Never raises; before ``attach_downloads`` it only calls
-        ``done``.
+        for the progress page's "Document check". Never raises; before
+        ``attach_downloads`` it only calls ``done``.
         """
         downloads = self._downloads
         try:
             pending = (
-                [
-                    (file_id, url)
-                    for file_id, url, linked in store.pending_files_for_page(
-                        self._conn, self._scan_id, page_id
-                    )
-                    if not (
-                        linked
-                        and url_policy.is_in_scope(
-                            url, self._scope, allow_subdomains=self._allow_subdomains
-                        )
-                    )
-                ]
+                store.pending_files_for_page(self._conn, self._scan_id, page_id)
                 if downloads is not None
                 else []
             )
@@ -464,9 +447,14 @@ class LinkedFileTracker:
         # identity (one row per address); the hash only spots copies, which
         # the Documents tab then marks "Same file as …". The download still
         # happened: a hash needs the bytes.
-        copy = store.checked_copy(
-            self._conn, scan_id=self._scan_id, sha256=digest, file_id=file_id
-        )
+        # A copy being read right now (its download finished first, at
+        # another address): wait for that read, then reuse its result, so
+        # the bytes are read once even when two copies arrive together.
+        other = self._reading.get(digest)
+        if other is not None:
+            with contextlib.suppress(Exception):
+                await asyncio.shield(other)
+        copy = store.checked_copy(self._conn, scan_id=self._scan_id, sha256=digest, file_id=file_id)
         if copy is not None:
             self._store(
                 file_id,
@@ -480,27 +468,35 @@ class LinkedFileTracker:
                 ),
             )
             return
+        mine: asyncio.Future[None] = asyncio.get_running_loop().create_future()
+        self._reading[digest] = mine
         try:
-            result: PdfCheck = await asyncio.wait_for(
-                asyncio.to_thread(check_pdf, body), timeout=CHECK_TIMEOUT_S
-            )
-        except TimeoutError:
-            self._store(file_id, replace(downloaded, reason="timed_out"))
-            return
-        if result.outcome == "checked":
-            self._store(
-                file_id,
-                replace(
-                    downloaded,
-                    status="mostly_sure" if result.failed else "not_sure",
-                    reason=None,
-                    failed_checks=result.failed,
-                    is_form=result.is_form,
-                    page_count=result.page_count,
-                ),
-            )
-            return
-        self._store(file_id, replace(downloaded, reason=_CHECK_REASON[result.outcome]))
+            try:
+                result: PdfCheck = await asyncio.wait_for(
+                    asyncio.to_thread(check_pdf, body), timeout=CHECK_TIMEOUT_S
+                )
+            except TimeoutError:
+                self._store(file_id, replace(downloaded, reason="timed_out"))
+                return
+            if result.outcome == "checked":
+                self._store(
+                    file_id,
+                    replace(
+                        downloaded,
+                        status="mostly_sure" if result.failed else "not_sure",
+                        reason=None,
+                        failed_checks=result.failed,
+                        is_form=result.is_form,
+                        page_count=result.page_count,
+                    ),
+                )
+                return
+            self._store(file_id, replace(downloaded, reason=_CHECK_REASON[result.outcome]))
+        finally:
+            if self._reading.get(digest) is mine:
+                del self._reading[digest]
+            if not mine.done():
+                mine.set_result(None)
 
     def _store(self, file_id: int, result: store.CheckResult) -> None:
         store.set_result(self._conn, scan_id=self._scan_id, file_id=file_id, result=result)
