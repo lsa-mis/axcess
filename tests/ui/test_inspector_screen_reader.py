@@ -2,11 +2,10 @@
 
 The box and label over the saved copy are drawn for the eye and hidden from
 screen readers, so the inspector gives the same thing in words and a way
-in. After each step, the stepper's status says what the element is. Tab
-into the saved copy starts on the element itself, which then has "Flagged
-element N of M" as its description, and Escape goes back to where the reader
-was; the frame's name says both. A click in the copy is left where it
-landed. The label also stays inside the frame for an element at the very top
+in. After each step, the stepper's status says what the element is.
+"Go to element" moves focus onto the element itself,
+which then has "Flagged element N of M" as its description, and Escape comes
+back. The label also stays inside the frame for an element at the very top
 or side of the page, where it used to be cut off.
 """
 
@@ -54,41 +53,11 @@ def page_id(seeded_db: tuple[Path, Path, int]) -> int:
     return seed(db_path, scan_id, CAPTURE, RULE, FINDINGS)
 
 
-# A flagged heading the page hides, then a link: Tab cannot stop on the
-# heading, so the copy's tab order starts at the top as the page has it.
-HIDDEN_CAPTURE = (
-    "<!doctype html><html><head><title>Reader fixture</title></head>"
-    "<body><h5 id='gone' style='display:none'>Gone</h5>"
-    "<a id='first' href='#main'>First link</a><main id='main'><p>Text.</p></main>"
-    "</body></html>"
-)
-HIDDEN_FINDINGS = [("#gone", '<h5 id="gone" style="display:none">Gone</h5>')]
-
-
 async def _inspector(new_page: Any, base: str, scan_id: int, page_id: int) -> Any:
     page = await open_inspector(new_page, base, scan_id, page_id, RULE)
-    await page.get_by_role("button", name="Next element").wait_for()
+    await page.get_by_role("button", name="Go to element").wait_for()
     await settled(page)
     return page
-
-
-def _frame(page: Any) -> Any:
-    return page.locator('iframe[title^="Saved copy"]')
-
-
-async def _tab_into_copy(page: Any) -> str:
-    """From the toolbar, press Tab until focus is inside the saved copy.
-
-    Returns the text of the last control outside the copy that had focus,
-    where Escape should go back to.
-    """
-    await page.get_by_role("button", name="Hide highlights").focus()
-    for _ in range(20):
-        last = await page.evaluate("() => document.activeElement.textContent")
-        await page.keyboard.press("Tab")
-        if await page.evaluate("() => document.activeElement.tagName === 'IFRAME'"):
-            return str(last)
-    raise AssertionError("Tab never reached the saved copy")
 
 
 def _status(page: Any) -> Any:
@@ -111,93 +80,38 @@ async def test_each_step_says_what_the_element_is(
     await page.context.close()
 
 
-async def test_tab_starts_on_the_element_and_escape_goes_back(
+async def test_go_to_moves_focus_onto_the_element_and_escape_comes_back(
     live_server: tuple[str, int], new_page: Any, seeded_db: tuple[Path, Path, int], page_id: int
 ) -> None:
     base, _ = live_server
     page = await _inspector(new_page, base, seeded_db[2], page_id)
-    assert not await page.get_by_role("button", name="Go to element").count()
-    await playwright_async.expect(_frame(page)).to_have_attribute(
-        "title",
-        re.compile(
-            r"^Saved copy: .+\. Tab starts on the flagged element\. "
-            r"Press Escape to go back to where you were\.$"
-        ),
+    go = page.get_by_role("button", name="Go to element")
+    await playwright_async.expect(go).to_have_accessible_description(
+        "Go to element moves keyboard focus to it. Press Escape to come back."
     )
-    last = await _tab_into_copy(page)
+    await go.focus()
+    await page.keyboard.press("Enter")
     copy = page.frame_locator('iframe[title^="Saved copy"]')
     heading = copy.locator("#status")
     await playwright_async.expect(heading).to_be_focused()
     await playwright_async.expect(heading).to_have_accessible_description("Flagged element 1 of 2")
-    # The tab start, and only on the element the reader is on.
-    assert await heading.get_attribute("tabindex") == "1"
+    # The heading is reached from here only, not by Tab.
+    assert await heading.get_attribute("tabindex") == "-1"
     await page.keyboard.press("Escape")
-    assert await page.evaluate("() => document.activeElement.tagName") != "IFRAME"
-    assert await page.evaluate("() => document.activeElement.textContent") == last
-    await page.context.close()
-
-
-async def test_the_tab_start_moves_with_the_reader(
-    live_server: tuple[str, int], new_page: Any, seeded_db: tuple[Path, Path, int], page_id: int
-) -> None:
-    """Next element moves the tab start, and gives the last element back the
-    tab index the page gave it (none)."""
-    base, _ = live_server
-    page = await _inspector(new_page, base, seeded_db[2], page_id)
-    copy = page.frame_locator('iframe[title^="Saved copy"]')
-    await page.get_by_role("button", name="Next element").click()
-    await playwright_async.expect(copy.locator("#skip")).to_have_attribute("tabindex", "1")
-    assert await copy.locator("#status").get_attribute("tabindex") is None
-    await _tab_into_copy(page)
-    await playwright_async.expect(copy.locator("#skip")).to_be_focused()
-    await page.context.close()
-
-
-async def test_a_click_in_the_copy_stays_where_it_landed(
-    live_server: tuple[str, int], new_page: Any, seeded_db: tuple[Path, Path, int], page_id: int
-) -> None:
-    """Nothing moves focus when it enters the copy: a click elsewhere in the
-    copy does not land on the flagged element (SC 3.2.1 On Focus)."""
-    base, _ = live_server
-    page = await _inspector(new_page, base, seeded_db[2], page_id)
-    copy = page.frame_locator('iframe[title^="Saved copy"]')
-    await copy.locator("main p").click()
-    focused = await page.evaluate(f"() => {DOC}.activeElement.id")
-    assert focused != "status"
-    await page.context.close()
-
-
-async def test_a_hidden_element_is_not_promised_as_the_tab_start(
-    live_server: tuple[str, int], new_page: Any, seeded_db: tuple[Path, Path, int]
-) -> None:
-    db_path, _, scan_id = seeded_db
-    hidden_page = seed(db_path, scan_id, HIDDEN_CAPTURE, RULE, HIDDEN_FINDINGS)
-    base, _ = live_server
-    page = await open_inspector(new_page, base, scan_id, hidden_page, RULE)
-    await page.get_by_role("button", name="Show element").wait_for()
-    await settled(page)
-    frame = _frame(page)
-    await playwright_async.expect(frame).to_have_attribute(
-        "title", re.compile(r"Press Escape to go back to where you were\.$")
-    )
-    assert "Tab starts" not in (await frame.get_attribute("title") or "")
-    await _tab_into_copy(page)
-    await playwright_async.expect(
-        page.frame_locator('iframe[title^="Saved copy"]').locator("#first")
-    ).to_be_focused()
+    await playwright_async.expect(go).to_be_focused()
     await page.context.close()
 
 
 @pytest.mark.parametrize("size", [(1280, 500), (320, 640)], ids=["short window", "phone"])
-async def test_tab_brings_the_element_into_view(
+async def test_go_to_brings_the_element_into_view(
     live_server: tuple[str, int],
     new_page: Any,
     seeded_db: tuple[Path, Path, int],
     page_id: int,
     size: tuple[int, int],
 ) -> None:
-    """On a short window the saved copy starts below the screen; after Tab
-    lands on the element, it is fully on screen, below the sticky top bar."""
+    """On a short window the saved copy starts below the screen; after "Go
+    to", the focused element is fully on screen, below the sticky top bar."""
     base, _ = live_server
     width, height = size
     page = await new_page(viewport={"width": width, "height": height})
@@ -205,9 +119,9 @@ async def test_tab_brings_the_element_into_view(
         f"{base}/app/scans/{seeded_db[2]}/pages/{page_id}/inspect?issue=axe:{RULE}",
         wait_until="networkidle",
     )
-    await page.get_by_role("button", name="Next element").wait_for()
-    await settled(page)
-    await _tab_into_copy(page)
+    go = page.get_by_role("button", name="Go to element")
+    await go.focus()
+    await page.keyboard.press("Enter")
     await playwright_async.expect(
         page.frame_locator('iframe[title^="Saved copy"]').locator("#status")
     ).to_be_focused()
@@ -239,6 +153,8 @@ async def test_only_the_current_element_is_described(
         f"() => {DOC}.querySelectorAll('[aria-describedby~=\"axcess-flagged-note\"]').length"
     )
     assert described == 1
+    await page.get_by_role("button", name="Go to element").click()
+    await playwright_async.expect(copy.locator("#skip")).to_be_focused()
     await page.context.close()
 
 

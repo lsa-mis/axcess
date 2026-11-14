@@ -1,43 +1,40 @@
+import type { RefObject } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "./ui";
 import { cn } from "../lib/cn";
 
 /**
  * Every control for finding the flagged elements of one page, in one group:
- * the count saying where the reader is, and "Previous element" and "Next
- * element" through them in page order. One control for both views of a
- * page, the saved copy (Inspector) and its page code (DomSource), so they
- * cannot drift apart. One element gets "Show element" in place of Previous
- * and Next.
+ * the count saying where the reader is, "Previous element" and "Next
+ * element" through them in page order, and, in the saved copy, "Go to
+ * element". One control for both views of a page, the saved copy
+ * (Inspector) and its page code (DomSource), so they cannot drift apart.
+ * One element gets "Show element" in place of Previous and Next.
  *
- * The buttons move the highlight and keep focus on the button, so the
- * reader can press again and again; a screen reader hears each element in
- * the status.
+ * Two kinds of move, two kinds of button. Previous, Next and Show element
+ * move the highlight and keep focus on the button, so the reader can press
+ * again and again; a screen reader hears each element in the status. "Go to
+ * element" moves keyboard focus onto the element itself, inside the copy,
+ * where a screen reader reads it in its place on the page, and Escape comes
+ * back to it (see the Inspector). They sit together because they answer one
+ * question, where is the element; the Go to button used to sit under the
+ * facts table, far from the stepper, and read as a second way to do the same
+ * thing (W3C COGA, "Making Content Usable",
+ * https://www.w3.org/TR/coga-usable/: group related controls).
  *
- * Getting keyboard focus onto the element itself, in the saved copy, is not
- * a button here. Tab into the copy starts on the element the reader is on
- * (``tabStartAt`` in lib/highlightTargets), where a screen reader reads it
- * in its place on the page, and Escape goes back (see the Inspector). This
- * replaced a "Go to element" button and a line explaining it, which the
- * developer removed on 2026-11-14 to make the toolbar shorter.
- * - Done by tab order (``tabindex="1"`` on the element), not by moving focus
- *   when it enters the copy. That alternative was rejected: a click into the
- *   copy would have focus pulled away from where it landed, and a change
- *   caused by focus is what SC 3.2.1 On Focus (Level A) rules out.
- * - Lost with the button, and accepted: a screen reader reading with the
- *   arrow keys moves no focus, so it meets the copy from its top, as it did
- *   before without the button; Tab after the element goes to the top of the
- *   copy, not on from it (SC 2.4.3 Focus Order, Level A, is kept: the rest
- *   of the copy keeps the page's own order); and there is no visible line
- *   that says Tab starts there. The frame's name says it, for the screen
- *   reader users it matters most to.
- * - Also rejected: Next moving focus into the copy. Every step would take
- *   two keys (Next, then Escape back), and focus would leave the toolbar
- *   each time.
+ * Rejected, at the developer's suggestion: (1) dropping Go to and landing on
+ * the flagged element whenever focus enters the copy. A click into the copy
+ * fires the same focus, so a mouse user would have focus pulled away from
+ * where they clicked; a screen reader reading with the arrow keys moves no
+ * focus, so it would not happen for the readers it is for; nothing on screen
+ * would say it happens; and Tab would start part way down a page (SC 2.4.3
+ * Focus Order, Level A; the idea behind SC 3.2.1 On Focus, Level A). (2)
+ * Next moving focus into the copy: every step would take two keys (Next,
+ * then Escape back), and focus would leave the toolbar each time.
  *
  * The buttons say what they do in their own words, verb or place and
- * object: "Previous element", "Next element", "Show element" (repo rule:
- * Interface language rule 8). Those words are the whole
+ * object: "Previous element", "Next element", "Show element", "Go to
+ * element" (repo rule: Interface language rule 8). Those words are the whole
  * accessible name, with no aria-label: the first version showed "Previous"
  * and named it "Previous flagged element" in an aria-label, which the rule
  * forbids and which a sighted reader never saw. The group's name, "Flagged
@@ -72,6 +69,7 @@ export default function FlaggedStepper({
   index,
   onGo,
   detail,
+  goTo,
   className,
 }: {
   /** How many flagged elements the page has. */
@@ -82,6 +80,8 @@ export default function FlaggedStepper({
   onGo: (next: number) => void;
   /** What the current element is, heard after the count; not shown. */
   detail?: string;
+  /** "Go to element", where the view can move focus onto it (the saved copy). */
+  goTo?: { onClick: () => void; ref: RefObject<HTMLButtonElement | null>; hintId: string };
   className?: string;
 }) {
   const many = count > 1;
@@ -124,6 +124,19 @@ export default function FlaggedStepper({
         ) : (
           <Button type="button" variant="secondary" size="sm" className="min-h-target" onClick={() => onGo(0)}>
             Show element
+          </Button>
+        )}
+        {goTo && (
+          <Button
+            ref={goTo.ref}
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="min-h-target"
+            aria-describedby={goTo.hintId}
+            onClick={goTo.onClick}
+          >
+            Go to element
           </Button>
         )}
       </span>
