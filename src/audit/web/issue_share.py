@@ -72,6 +72,11 @@ _PIPELINE_LAYER: dict[str, Layer] = {
     "responsive": "probes",
     "focus": "probes",
     "visual": "probes",
+    # Browser checks with no AI, like the four above: the form error check
+    # and the page code check. Left out, their occurrences were counted as
+    # history records.
+    "forms": "probes",
+    "markup": "probes",
     "image": "image",
     "protected_image": "image",
     "semantic": "semantic",

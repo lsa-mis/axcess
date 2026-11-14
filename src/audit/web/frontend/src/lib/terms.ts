@@ -343,7 +343,7 @@ export const FOUND_LAYER_LABEL: Record<FoundLayer, string> = {
   axe_loaded: "Rule check (axe), page as loaded",
   axe_click_through: "Rule check (axe), after Click-Through",
   alfa: "Rule check (Alfa)",
-  probes: "Keyboard, zoom, focus and motion checks",
+  probes: "Browser checks: keyboard, zoom, focus, motion, forms and page code",
   image: "Image text check",
   semantic: "AI review",
 };

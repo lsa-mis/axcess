@@ -109,6 +109,57 @@ def _layer(result: share.IssueShareResponse, layer: str) -> int:
     return next(row.count for row in result.layers.layers if row.layer == layer)
 
 
+def test_form_error_and_page_code_checks_count_as_browser_checks(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    scan = _scan(tmp_db)
+    page = _page(tmp_db, scan)
+    _finding(
+        tmp_db,
+        scan,
+        page,
+        rule="form-error-identification",
+        sc="3.3.1",
+        level="A",
+        pipeline="forms",
+        n=1,
+    )
+    _finding(
+        tmp_db,
+        scan,
+        page,
+        rule="markup-placeholder-only",
+        sc="3.3.2",
+        level="A",
+        pipeline="markup",
+        n=2,
+    )
+
+    result = share.issue_share(tmp_db)
+
+    assert _layer(result, "probes") == 2
+    found = {row.sc: row.count for row in result.found_by_criterion}
+    assert found == {"3.3.1": 1, "3.3.2": 1}
+
+
+def test_every_check_that_stores_occurrences_has_a_layer() -> None:
+    # A check missing here is counted as a history record, not as found.
+    stored = {
+        "axe",
+        "alfa",
+        "keyboard",
+        "responsive",
+        "focus",
+        "visual",
+        "forms",
+        "markup",
+        "semantic",
+        "image",
+        "protected_image",
+    }
+    assert stored <= set(share._PIPELINE_LAYER)
+
+
 def test_empty_database_has_no_figures(tmp_db: sqlite3.Connection) -> None:
     result = share.issue_share(tmp_db)
     assert result.scans == []
