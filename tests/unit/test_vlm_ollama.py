@@ -21,6 +21,21 @@ from audit.analyzer.vlm.ollama import (
     prompt_version,
 )
 
+
+@pytest.fixture(autouse=True)
+def _no_remote_models(monkeypatch: pytest.MonkeyPatch) -> None:
+    """These tests mock only /api/generate; the daemon lists no remote models.
+
+    The /api/tags read that refuses a cloud model is tested in
+    tests/unit/test_ollama_cloud_models.py.
+    """
+
+    async def none(*_args: object) -> set[str]:
+        return set()
+
+    monkeypatch.setattr("audit.analyzer.ollama_base.remote_model_names", none)
+
+
 BASE = "http://ollama-test.local"
 MODEL = "qwen3-vl:2b-instruct"
 

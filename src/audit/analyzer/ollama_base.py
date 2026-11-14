@@ -60,6 +60,40 @@ def is_cloud_model(name: str) -> bool:
     return bool(colon) and (tag == "cloud" or tag.endswith("-cloud"))
 
 
+def _names(name: str) -> set[str]:
+    """A model's name as Ollama may list it: with no tag it is ``:latest``."""
+    name = name.strip()
+    return {name, f"{name}:latest"} if ":" not in name else {name}
+
+
+async def remote_model_names(client: httpx.AsyncClient, tags_url: str) -> set[str]:
+    """Names of the models the daemon runs elsewhere, from ``/api/tags``.
+
+    Ollama lists ``remote_host`` and ``remote_model`` only for a model that
+    runs on another host (https://docs.ollama.com/api/tags). That catches a
+    cloud model copied to a local-looking name (``ollama cp``), which
+    :func:`is_cloud_model` cannot see. Empty when the list cannot be read;
+    the model call itself then fails.
+    """
+    try:
+        resp = await client.get(tags_url, timeout=5.0)
+        data = resp.json() if resp.status_code == 200 else {}
+    except (httpx.HTTPError, json.JSONDecodeError):
+        return set()
+    out: set[str] = set()
+    for entry in data.get("models", []) if isinstance(data, dict) else []:
+        if isinstance(entry, dict) and (entry.get("remote_host") or entry.get("remote_model")):
+            out.update(str(entry[key]) for key in ("name", "model") if entry.get(key))
+    return out
+
+
+async def runs_off_this_computer(client: httpx.AsyncClient, tags_url: str, model: str) -> bool:
+    """True for a cloud model, by its tag or by the daemon's own list."""
+    if is_cloud_model(model):
+        return True
+    return bool(_names(model) & await remote_model_names(client, tags_url))
+
+
 def prompt_content_version(prompt_text: str) -> str:
     """Short content hash used as a ``prompt_version`` tag.
 
@@ -100,6 +134,9 @@ class OllamaBase:
         # settable attribute. A read-only property here would break
         # LSP / structural-subtyping compatibility with that protocol.
         self.model_version = model
+        # Models already confirmed to run on this computer (one /api/tags
+        # read per model, not per request).
+        self._local_models: set[str] = set()
 
     @property
     def model(self) -> str:
@@ -137,11 +174,13 @@ class OllamaBase:
         aren't 408/429, exhausted retries, malformed Ollama envelope).
         """
         model = str(payload.get("model") or self._model)
-        if is_cloud_model(model):
-            raise OllamaError(
-                f"{model} is an Ollama cloud model, which runs off this computer. "
-                "Choose a local model."
-            )
+        if model not in self._local_models:
+            if await runs_off_this_computer(self._client, f"{self._base_url}/api/tags", model):
+                raise OllamaError(
+                    f"{model} is an Ollama cloud model, which runs off this computer. "
+                    "Choose a local model."
+                )
+            self._local_models.add(model)
         url = f"{self._base_url}/api/generate"
         backoff = 1.0
         last_error: Exception | None = None

@@ -78,3 +78,65 @@ async def test_sign_in_scan_ai_refuses_a_cloud_model() -> None:
     ) as local:
         assert await local.assess_image(bytearray(b"signed-in page image")) is None
     assert calls == []
+
+
+# A cloud model copied to a local-looking name (``ollama cp
+# gpt-oss:120b-cloud campus-model``) has no "cloud" tag. Ollama's own model
+# list still marks it with remote_host and remote_model.
+ALIAS = "campus-model"
+
+
+def _daemon(calls: list[httpx.Request]) -> httpx.MockTransport:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/tags":
+            return httpx.Response(
+                200,
+                json={
+                    "models": [
+                        {
+                            "name": f"{ALIAS}:latest",
+                            "model": f"{ALIAS}:latest",
+                            "remote_model": "gpt-oss:120b",
+                            "remote_host": "https://ollama.com:443",
+                        },
+                        {"name": "llava:7b", "model": "llava:7b"},
+                    ]
+                },
+            )
+        calls.append(request)
+        return httpx.Response(200, json={"response": "{}"})
+
+    return httpx.MockTransport(handler)
+
+
+@pytest.mark.asyncio
+async def test_scan_analysis_refuses_a_cloud_model_under_a_local_name() -> None:
+    calls: list[httpx.Request] = []
+    async with httpx.AsyncClient(transport=_daemon(calls)) as client:
+        provider = OllamaTextProvider(client, model=ALIAS, base_url="http://127.0.0.1:11434")
+        with pytest.raises(OllamaError, match="cloud model"):
+            await provider._post_with_retries({"model": ALIAS, "prompt": "page text"})
+        # A local model on the same daemon still works.
+        local = OllamaTextProvider(client, model="llava:7b", base_url="http://127.0.0.1:11434")
+        await local._post_with_retries({"model": "llava:7b", "prompt": "page text"})
+    assert len(calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_fix_suggestions_refuse_a_cloud_model_under_a_local_name() -> None:
+    calls: list[httpx.Request] = []
+    async with httpx.AsyncClient(transport=_daemon(calls)) as client:
+        provider = OllamaSuggestionProvider(client, base_url="http://127.0.0.1:11434", timeout_s=30)
+        with pytest.raises(SuggestionError):
+            await provider.generate("evidence", model=ALIAS, image=None)
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_sign_in_scan_ai_refuses_a_cloud_model_under_a_local_name() -> None:
+    calls: list[httpx.Request] = []
+    async with protected_local_ai.ProtectedLocalOllama(
+        base_url="http://127.0.0.1:11434", model=ALIAS, transport=_daemon(calls)
+    ) as local:
+        assert await local.assess_image(bytearray(b"signed-in page image")) is None
+    assert calls == []

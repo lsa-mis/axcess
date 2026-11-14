@@ -32,6 +32,21 @@ from audit.analyzer.semantic.base import AnalysisContext, SemanticFinding
 from audit.analyzer.semantic.extractor import LinkRecord, extract_links
 from audit.analyzer.semantic.ollama_text import OllamaTextProvider
 
+
+@pytest.fixture(autouse=True)
+def _no_remote_models(monkeypatch: pytest.MonkeyPatch) -> None:
+    """These tests mock only /api/generate; the daemon lists no remote models.
+
+    The /api/tags read that refuses a cloud model is tested in
+    tests/unit/test_ollama_cloud_models.py.
+    """
+
+    async def none(*_args: object) -> set[str]:
+        return set()
+
+    monkeypatch.setattr("audit.analyzer.ollama_base.remote_model_names", none)
+
+
 BASE = "http://ollama-test.local"
 MODEL = "qwen2.5:7b-instruct"
 
