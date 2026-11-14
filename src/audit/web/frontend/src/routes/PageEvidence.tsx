@@ -96,8 +96,9 @@ export default function PageEvidenceRoute() {
     !scanData.protection && suggestionStatus !== undefined;
   const suggestions: SuggestionAvailability | null =
     suggestionsApply ? suggestionStatus : null;
+  // AI turned off is not "blocked": nothing is said (SuggestionsBlockedNote).
   const suggestionsBlocked =
-    suggestionsApply && !suggestionStatus.enabled
+    suggestionsApply && !suggestionStatus.enabled && suggestionStatus.reason !== "turned_off"
       ? suggestionStatus
       : null;
 

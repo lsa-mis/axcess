@@ -276,8 +276,6 @@ export default function IssuesRoute() {
         scan={scan}
         issueGroups={defaultCounts?.issue_types ?? data.total_unfiltered}
         occurrences={defaultCounts?.occurrences ?? data.occurrence_counts.all_evidence}
-        hiddenIssueGroups={defaultCounts?.hidden_issue_types ?? 0}
-        hiddenOccurrences={defaultCounts?.hidden_occurrences ?? 0}
       />
 
       {/* Filtering changed the table silently: the visible count updated,

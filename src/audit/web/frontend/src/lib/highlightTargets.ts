@@ -337,8 +337,8 @@ const NOTE_ID = "axcess-flagged-note";
  * readers (``aria-hidden``): they are boxes over the page, not part of it.
  * So the element the reader is on also gets a description (aria-describedby)
  * pointing at one hidden note, "Flagged element 2 of 5", which a screen
- * reader says when focus lands on it (Tab into the copy starts there,
- * ``tabStartAt``). Its own description,
+ * reader says when focus lands on it (keyboard focus entering the copy
+ * goes there, ``focusInCopy``). Its own description,
  * if it has one, is kept and comes after. Only the current element carries
  * it: the note is moved, not copied, at every step. Rejected: text written
  * into the page beside the element, which a screen reader would also read
@@ -370,56 +370,36 @@ export function noteCurrent(doc: Document, el: Element | null, text: string): vo
   el.setAttribute("aria-describedby", [NOTE_ID, ...own].join(" "));
 }
 
-/** On the element Tab starts on: the ``tabindex`` it had before, "" for none. */
-const TAB_START = "data-axcess-tab-start";
-
 /**
- * Make ``el`` the first stop for Tab in the saved copy, or (null) put the
- * copy's tab order back as the page had it.
- *
- * Tab into the copy then lands on the flagged element the reader is on, not
- * on the page's first link, so a keyboard or screen reader user reaches it
- * in one key and hears it in its place on the page, with its "Flagged
- * element 2 of 5" description (``noteCurrent``). This is done by tab order
- * (``tabindex="1"``, the lowest positive value, which comes before every 0
- * and unset one), not by moving focus when it enters the copy: nothing
- * redirects focus, so a click in the copy stays where it was clicked, and
- * nothing changes because something got focus (SC 3.2.1 On Focus, Level A).
- * It replaced the "Go to element" button, which did the same in a click
- * (the developer's decision, 2026-11-14).
- *
- * Costs, accepted with that decision: Tab after the element goes to the top
- * of the copy, not on from the element; a page with its own
- * ``tabindex="1"`` mixes its stops with this one, in page order; and a
- * screen reader reading with the arrow keys, which moves no focus, still
- * meets the copy from its top. Only one element holds the start at a time,
- * and the ``tabindex`` it had is put back when the reader moves on.
- *
- * True when the start was set on an element that can take focus. False for
- * none, for the whole page, and for an element the copy hides, disables or
- * makes inert, which Tab skips; Tab then starts at the top of the copy.
+ * Whether keyboard focus can land on ``el`` in the saved copy: not the whole
+ * page, and not an element the copy hides, disables or makes inert.
  */
-export function tabStartAt(doc: Document, el: Element | null): boolean {
-  for (const other of Array.from(doc.querySelectorAll(`[${TAB_START}]`))) {
-    const was = other.getAttribute(TAB_START) ?? "";
-    if (was) other.setAttribute("tabindex", was);
-    else other.removeAttribute("tabindex");
-    other.removeAttribute(TAB_START);
-  }
+export function canFocusInCopy(el: Element | null): boolean {
   if (!el || isWholePage(el)) return false;
-  el.setAttribute(TAB_START, el.getAttribute("tabindex") ?? "");
-  el.setAttribute("tabindex", "1");
-  return canTakeFocus(el);
-}
-
-/** Whether Tab can stop on ``el`` once it has a tab index. */
-function canTakeFocus(el: Element): boolean {
   if (el.closest("[inert]") || el.matches(":disabled")) return false;
   // Checked by its method, not instanceof: the element belongs to the
   // frame's window, whose Element is not this one.
   const visible = el as Element & { checkVisibility?: (options?: { visibilityProperty?: boolean }) => boolean };
   if (typeof visible.checkVisibility === "function") return visible.checkVisibility({ visibilityProperty: true });
   return el.getClientRects().length > 0;
+}
+
+/**
+ * Move keyboard (and screen reader) focus onto ``el`` in the saved copy,
+ * when focus enters the copy by keyboard (see the Inspector's
+ * ``onFrameLoad``). Most flagged elements, such as a heading or an image,
+ * cannot take focus, so they get ``tabindex="-1"``: focusable from here,
+ * still skipped by Tab, so the page's own tab order is not changed. True
+ * when focus landed on it; false for the whole page, and for an element
+ * the copy hides, which cannot take focus at all.
+ */
+export function focusInCopy(el: Element): boolean {
+  // Checked by its focus method, not instanceof, as above.
+  const target = el as HTMLElement;
+  if (!canFocusInCopy(el) || typeof target.focus !== "function") return false;
+  if (target.tabIndex < 0 && !el.hasAttribute("tabindex")) el.setAttribute("tabindex", "-1");
+  target.focus({ preventScroll: true });
+  return el.ownerDocument.activeElement === el;
 }
 
 function isWholePage(el: Element): boolean {

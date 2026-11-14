@@ -91,6 +91,37 @@ import { Button, Card, ExternalLinkButton, LinkButton, relativeTime } from "./ui
  * rule passing on the suggested code, because that is all it is: it does not
  * show the page meets WCAG.
  */
+const suggestionKey = (scanId: number, kind: SuggestionOccurrenceKind, occurrenceId: number) => [
+  "suggestion",
+  scanId,
+  kind,
+  occurrenceId,
+];
+
+/**
+ * The latest suggestion for one occurrence, saved or still being written.
+ * ``FixSuggestion`` reads it, and so does a screen that has to know whether
+ * there is a saved answer to show at all (the Page inspector, which hides
+ * its suggestion panel when AI is off and there is none). Both use this one
+ * cache entry, so asking twice makes one request.
+ */
+export function useSavedSuggestion(
+  scanId: number,
+  kind: SuggestionOccurrenceKind,
+  occurrenceId: number,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: suggestionKey(scanId, kind, occurrenceId),
+    queryFn: () => api.getLatestSuggestion(scanId, kind, occurrenceId),
+    enabled,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === "queued" || status === "running" ? 3000 : false;
+    },
+  });
+}
+
 export default function FixSuggestion({
   scanId,
   kind,
@@ -118,16 +149,9 @@ export default function FixSuggestion({
   const sectionRef = useRef<HTMLElement>(null);
   const leadRef = useRef<HTMLParagraphElement>(null);
   const lastStatus = useRef<SuggestionRecord["status"] | null>(null);
-  const queryKey = ["suggestion", scanId, kind, occurrenceId];
+  const queryKey = suggestionKey(scanId, kind, occurrenceId);
 
-  const { data: record, error: loadError } = useQuery({
-    queryKey,
-    queryFn: () => api.getLatestSuggestion(scanId, kind, occurrenceId),
-    refetchInterval: (query) => {
-      const status = query.state.data?.status;
-      return status === "queued" || status === "running" ? 3000 : false;
-    },
-  });
+  const { data: record, error: loadError } = useSavedSuggestion(scanId, kind, occurrenceId);
 
   const settle = (next: SuggestionRecord) => {
     queryClient.setQueryData(queryKey, next);
@@ -667,6 +691,14 @@ function CopyButton({ value, name }: { value: string; name: string }) {
  * Said once for the screen, not beside every occurrence: the setting is on
  * but the model cannot run, so each button would only fail the same way.
  * One note says why and who can fix it.
+ *
+ * Not shown when AI features are turned off (the developer's decision,
+ * 2026-11-14). That is a choice the person made, not a fault, so a box
+ * saying so beside every page's evidence was noise; the AI features page
+ * in Settings is where it is turned back on. The callers leave this note
+ * out for ``turned_off``. Saved suggestions stay readable either way:
+ * ``FixSuggestion`` still shows a saved answer and hides only the controls
+ * that ask for a new one.
  */
 export function SuggestionsBlockedNote({
   status,
@@ -699,17 +731,8 @@ export function SuggestionsBlockedNote({
   // (max-w-measure, 32em: under 80 characters a line; SC 1.4.8 Visual
   // Presentation, Level AAA). The note is a box as wide as the page, so
   // without it a line ran to 108 characters.
-  // Turning AI off never hides saved answers; only request actions disappear.
   // The note links to the one settings page (WCAG 2.2 SC 3.2.4 Consistent
   // Identification, Level AA), not a second local toggle.
-  if (status.reason === "turned_off") {
-    return <Card className={`${className} p-4 text-sm text-fg-muted`}>
-      <p className="max-w-measure">{aiSetup
-        ? "AI features are off. Saved suggestions are still available. Turn AI on in Settings → AI features to ask for a new suggestion."
-        : "AI suggestions are off. Saved suggestions are still available. An administrator can turn new suggestions on."}</p>
-      {setupLink}
-    </Card>;
-  }
   if (status.reason === "model_missing") {
     return (
       <Card className={`${className} p-4 text-sm text-fg-muted`}>

@@ -15,22 +15,32 @@ import { cn } from "../lib/cn";
  * the status.
  *
  * Getting keyboard focus onto the element itself, in the saved copy, is not
- * a button here. Tab into the copy starts on the element the reader is on
- * (``tabStartAt`` in lib/highlightTargets), where a screen reader reads it
- * in its place on the page, and Escape goes back (see the Inspector). This
- * replaced a "Go to element" button and a line explaining it, which the
- * developer removed on 2026-11-14 to make the toolbar shorter.
- * - Done by tab order (``tabindex="1"`` on the element), not by moving focus
- *   when it enters the copy. That alternative was rejected: a click into the
- *   copy would have focus pulled away from where it landed, and a change
- *   caused by focus is what SC 3.2.1 On Focus (Level A) rules out.
+ * a button here. Keyboard focus coming into the copy from the app (Tab or
+ * Shift+Tab) goes straight on to the element the reader is on (the
+ * Inspector's ``onFrameLoad``), where a screen reader reads it in its place
+ * on the page, and Escape goes back. This replaced a "Go to element" button
+ * and a line explaining it, which the developer removed on 2026-11-14 to
+ * make the toolbar shorter.
+ * - Moving focus on the way in was chosen by the developer over the other
+ *   option offered, making the element the copy's first Tab stop
+ *   (tabindex="1"), which was built first and reverted. Moving focus lets
+ *   Tab go on from the element in the page's own order, which suits a
+ *   reader checking the order around it; the first-stop version sent Tab
+ *   from the element back to the top of the copy.
+ * - Risk accepted with that choice: focus arriving at the page's first
+ *   stop is moved on, and WCAG counts a change of focus as a change of
+ *   context, which SC 3.2.1 On Focus (Level A) says receiving focus must
+ *   not cause. This screen is the auditor's own viewer, not the audited
+ *   page, and the move is said in the frame's name before it happens, but
+ *   that is a reading of the criterion, not an exception in it.
+ * - Kept narrow so it surprises no one else: a click or tap in the copy is
+ *   never moved; focus coming back after switching apps is not moved;
+ *   nothing moves when the element cannot take focus.
  * - Lost with the button, and accepted: a screen reader reading with the
  *   arrow keys moves no focus, so it meets the copy from its top, as it did
- *   before without the button; Tab after the element goes to the top of the
- *   copy, not on from it (SC 2.4.3 Focus Order, Level A, is kept: the rest
- *   of the copy keeps the page's own order); and there is no visible line
- *   that says Tab starts there. The frame's name says it, for the screen
- *   reader users it matters most to.
+ *   before without the button; and no visible line says where focus goes.
+ *   The frame's name says it, for the screen reader users it matters most
+ *   to; a sighted keyboard user sees the focus ring inside the numbered box.
  * - Also rejected: Next moving focus into the copy. Every step would take
  *   two keys (Next, then Escape back), and focus would leave the toolbar
  *   each time.
