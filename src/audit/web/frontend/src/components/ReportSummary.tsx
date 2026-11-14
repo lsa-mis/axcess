@@ -24,37 +24,27 @@ function endText(coverage: ScanDetail["coverage"]): string {
 }
 
 /**
- * One number in the summary strip: the value large, what it counts under it,
- * and one or two short lines of explanation. The label is the ``dt`` and the
- * value and each line its ``dd``s, so a screen reader reads "Pages visited,
- * 46, Plus 120 page states opened by clicking"; CSS order puts the number
- * first on screen. A line with ``flag`` set is coloured
- * because it needs attention (pages that could not be loaded); its words say
- * so too, so the colour is never the only signal (SC 1.4.1 Use of Color,
- * Level A).
+ * One number in the summary strip: the value large and what it counts under
+ * it. The label is the ``dt`` and the value its ``dd``, so a screen reader
+ * reads "Pages visited, 7 of 60 found"; CSS order puts the number first on
+ * screen.
  *
- * ``link`` adds one link as the last ``dd``, after the lines, to the list
- * the number counts ("List the pages visited"). It is a text link, not a
- * button or a tile: the stat itself stays plain text and only the words
- * that go somewhere look like a link (W3C COGA: make controls look like
- * controls). Its target is 44px tall (SC 2.5.5 Target Size (Enhanced),
- * Level AAA; a link alone on its line is not inside a sentence, so the
- * inline exception does not cover it), and a negative margin as tall as
- * the extra height takes it back out of the layout, so the line keeps the
- * 4px spacing of the lines above it and the group stays one unit (see the
- * spacing rule in ReportSummary).
+ * ``outOf`` says what the number is out of, smaller and beside it in the same
+ * ``dd`` ("7 of 60 found"), so the two numbers read as one fact and nobody
+ * adds them. The same "X of Y" shape as "6 of 7 checks ran" in "What was
+ * checked" and "7 of 60 pages found so far" while a scan runs (SC 3.2.4
+ * Consistent Identification, Level AA; W3C COGA, "Making Content Usable":
+ * the same pattern for the same kind of thing).
  */
 export function SummaryStat({
   label,
   value,
-  details = [],
-  link,
+  outOf,
   className,
 }: {
   label: string;
   value: number;
-  details?: { text: string; flag?: boolean }[];
-  link?: { to: string; text: string };
+  outOf?: string;
   className?: string;
 }) {
   return (
@@ -62,25 +52,84 @@ export function SummaryStat({
       <dt className="order-2 text-sm font-semibold text-fg">{label}</dt>
       <dd className="order-1 mb-1 text-3xl font-semibold leading-none tabular-nums text-umich-blue">
         {value.toLocaleString()}
+        {outOf && <span className="text-base font-semibold leading-none text-fg-muted"> {outOf}</span>}
       </dd>
-      {details.map(({ text, flag = false }) => (
-        <dd key={text} className={cn("order-3 text-xs", flag ? "text-sev-major" : "text-fg-muted")}>
+    </div>
+  );
+}
+
+/**
+ * How the scan ran, as one line of short facts under the numbers: how it
+ * ended, its page limit, the page states it opened, the pages it could not
+ * load, and the link to the list of pages.
+ *
+ * Why a line under the numbers (the developer chose it, 2026-11-14, over a
+ * framed card beside "Pages visited" and over a fourth number for pages
+ * found): these facts used to stack under "Pages visited", five lines tall
+ * beside two numbers standing alone, and they are about the whole scan, not
+ * only its page count. A card beside the number would break the no-frame rule
+ * below (a frame competes with the number and looks clickable), and a fourth
+ * number for pages found invites adding it to pages visited. A row of run
+ * details under the results is how Lighthouse shows how its run was made
+ * (paraphrased from memory, not checked against a current report).
+ *
+ * A list (``ul``), so a screen reader hears how many facts there are and
+ * each one alone. Space separates them, not drawn lines or dots: the strip's
+ * rule is no dividers. Each fact shows only when it tells the reader
+ * something, except the page states, which stay at zero because zero is a
+ * limitation the reader needs (Interface language rule 4). "3 pages could
+ * not be loaded" is coloured because it needs attention, and says so in
+ * words too (SC 1.4.1 Use of Color, Level A).
+ *
+ * "List the pages visited" is last, after the facts it is about, in reading
+ * and keyboard order (SC 2.4.3 Focus Order, Level A). It is a text link with
+ * a 44px target (SC 2.5.5 Target Size (Enhanced), Level AAA); a negative
+ * margin as tall as the extra height keeps the line's spacing.
+ */
+function ScanFacts({ scan }: { scan: ScanDetail }) {
+  const { coverage } = scan;
+  const facts: { text: string; flag?: boolean }[] = [
+    { text: endText(coverage) },
+    // The limit is already in the words when the scan stopped at it.
+    ...(coverage.ended === "page_limit"
+      ? []
+      : [
+          {
+            text: `${NUMBERS.max_pages.label}: ${
+              coverage.page_limit != null ? coverage.page_limit.toLocaleString() : "no limit"
+            }`,
+          },
+        ]),
+    {
+      text:
+        (scan.dom_state_count ?? 0) > 0
+          ? `Plus ${clickThroughStates(scan.dom_state_count)}`
+          : `No ${CLICK_THROUGH_STATES}`,
+    },
+    ...(scan.error_count > 0
+      ? [{ text: `${pages(scan.error_count)} could not be loaded`, flag: true }]
+      : []),
+  ];
+  return (
+    <ul className="mb-8 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
+      {facts.map(({ text, flag = false }) => (
+        <li key={text} className={flag ? "text-sev-major" : "text-fg-muted"}>
           {text}
-        </dd>
+        </li>
       ))}
-      {link && (
-        <dd className="order-4 text-xs">
+      {scan.page_count > 0 && (
+        <li>
           <Link
-            to={link.to}
+            to={`/scans/${scan.id}/pages`}
             // The margin is half of (target height - line height), whatever
             // Settings > Target size makes the target.
-            className="-my-[calc((var(--target,44px)_-_1.3125rem)/2)] inline-flex min-h-target items-center font-semibold text-umich-blue underline underline-offset-2"
+            className="-my-[calc((var(--target,44px)_-_1.25rem)/2)] inline-flex min-h-target items-center font-semibold text-umich-blue underline underline-offset-2"
           >
-            {link.text}
+            List the pages visited
           </Link>
-        </dd>
+        </li>
       )}
-    </div>
+    </ul>
   );
 }
 
@@ -140,9 +189,9 @@ export function ReportSummary({
           each number counts is still said in words everyone can reach:
           "What the labels mean" under the table defines an issue type and an
           occurrence, and the Issue occurrences column's hint does too (SC 3.1.3
-          Unusual Words, Level AAA). "Pages visited" keeps its lines: they
-          are facts (page states reached, pages that failed), not
-          definitions.
+          Unusual Words, Level AAA). How the scan ran is said in facts
+          (page states reached, pages that failed, how it ended) on the line
+          under the numbers (ScanFacts), not definitions.
 
           On 2026-10-30 the developer renamed them again, everywhere: "issue
           type" for a row (it was "kind of issue") and "Issue occurrences" for
@@ -165,19 +214,25 @@ export function ReportSummary({
           since, and the Jira export's "Issue Type" is Jira's own field
           (always "Bug"), which a reader sees only inside Jira.
 
-          The page states opened by clicking are a line under the pages, not a
-          fourth number: they say how much was scanned, like the pages, not
+          The page states opened by clicking are a fact on the line under the
+          numbers, not a fourth number: they say how much was scanned, like the pages, not
           what was found, and a big number of their own read as a result. The
           line stays, because pages alone understate a site whose content
           mostly appears only after a control is used, and a limitation is
           never dropped to save space (Interface language rule 4).
 
-          A line shows only when it tells the reader something: "3 pages
+          A fact shows only when it tells the reader something: "3 pages
           could not be loaded" when pages failed, and nothing when none did.
           The developer's rule: hide what the reader does not need. An
           "Every page loaded" line was dropped for that reason. The page
-          states line stays even at zero ("No page states opened by
+          states fact stays even at zero ("No page states opened by
           clicking"), because zero is a limitation the reader does need.
+
+          "Pages visited" says what it is out of: "7 of 60 found" (2026-11-14).
+          A stopped scan used to be a "Partial report" while one that
+          completed at a 10-page limit read as whole; the developer asked for
+          coverage as facts instead. The found count is left out when it was
+          not recorded (a scan stopped before migration 0040).
 
           "Pages visited", not "Pages checked": the count is every page the
           scan recorded, including pages that could not be loaded or answered
@@ -187,7 +242,7 @@ export function ReportSummary({
           coworker read as accessibility errors (glossary: "Pages not
           reached").
 
-          "List the pages visited" is the last line under "Pages visited"
+          "List the pages visited" is the last item of the facts line
           (2026-11-06, backlog: readers could not tell a clean result from
           missing coverage, because the number did not say which pages it
           counted or which of them failed). It opens the list of every page
@@ -197,8 +252,8 @@ export function ReportSummary({
           number that can be clicked, and it would be read as "46, link"
           with no verb (docs/plain-language.md rule 8: a verb and an object;
           SC 2.4.4 Link Purpose (In Context), Level A). It shows only when
-          there is at least one page to list, by the same rule as the lines
-          above it. Keyboard order is the reading order: the link comes
+          there is at least one page to list, by the same rule as the facts
+          before it. Keyboard order is the reading order: the link comes
           after the facts it is about (SC 2.4.3 Focus Order, Level A).
 
           No panel, border, fill or dividers, the same rule as StatCard
@@ -217,14 +272,17 @@ export function ReportSummary({
           (proximity), so the space outside the group is clearly larger than
           the space inside it: 32px above (with the header's margin) and
           below it, 48px between columns on a wide screen (32px on a narrow
-          one) and 32px between rows, against 8px from a number to its name
-          and 4px between the lines under "Pages visited", which read as one
-          unit. Three
+          one) and 32px between rows, against 8px from a number to its name,
+          and 24px down to the facts line (ScanFacts), which belongs to the
+          numbers. Three
           across from 640px; below that the two problem numbers (Issue types
           and Issue occurrences) share a row, as the pair they are, and the
           pages take the row under them, so nothing is squeezed at 320px (SC
           1.4.10 Reflow, Level AA). */}
-      <SummaryNumbers>
+      {/* mb-6, not the shared row's mb-5: 24px down to the facts line
+          (ScanFacts), which belongs to the numbers. Views with no facts line
+          (Documents) keep the shared spacing to their table. */}
+      <SummaryNumbers className="mb-6">
         <SummaryStat label={issueGroups === 1 ? "Issue type" : "Issue types"} value={issueGroups} />
         <SummaryStat
           label={occurrences === 1 ? "Issue occurrence" : "Issue occurrences"}
@@ -233,44 +291,15 @@ export function ReportSummary({
         <SummaryStat
           label="Pages visited"
           value={scan.page_count}
-          className="col-span-2 sm:col-span-1"
-          details={[
-            // How far the scan got, as facts, where a stopped scan used to
-            // be called a "partial report" and one that completed at a
-            // 10-page limit read as whole (the developer's decision,
-            // 2026-11-14). Pages found first, under the pages visited, so
-            // the two numbers read as one fact ("46 pages visited, out of
-            // 340 pages found"); then how the scan ended, in words, never
-            // colour alone (SC 1.4.1 Use of Color, Level A). Limits and the
-            // reason for a failure are under "How this scan ran".
-            ...(scan.coverage.pages_found != null
-              ? [{ text: `Out of ${pages(scan.coverage.pages_found)} found` }]
-              : []),
-            { text: endText(scan.coverage) },
-            {
-              text:
-                (scan.dom_state_count ?? 0) > 0
-                  ? `Plus ${clickThroughStates(scan.dom_state_count)}`
-                  : `No ${CLICK_THROUGH_STATES}`,
-            },
-            ...(scan.error_count > 0
-              ? [
-                  {
-                    text: `${scan.error_count.toLocaleString()} ${
-                      scan.error_count === 1 ? "page" : "pages"
-                    } could not be loaded`,
-                    flag: true,
-                  },
-                ]
-              : []),
-          ]}
-          link={
-            scan.page_count > 0
-              ? { to: `/scans/${scan.id}/pages`, text: "List the pages visited" }
+          outOf={
+            scan.coverage.pages_found != null
+              ? `of ${scan.coverage.pages_found.toLocaleString()} found`
               : undefined
           }
+          className="col-span-2 sm:col-span-1"
         />
       </SummaryNumbers>
+      <ScanFacts scan={scan} />
     </>
   );
 }
@@ -376,8 +405,8 @@ export function ReportScanNote({ scan }: { scan: ScanDetail }) {
       <p className="mt-3 max-w-prose text-sm text-fg-muted">
         A page is found when the scan finds a link to it. The scan stops looking for new pages when it reaches its
         maximum pages, when it is stopped, or when it fails, and it does not follow links deeper than its maximum
-        link depth. The site may have more pages than it found. &ldquo;Stopped before the end&rdquo; means someone
-        pressed Stop or Axcess closed while the scan ran.
+        link depth. The site may have more pages than it found. &ldquo;Stopped before the scan finished&rdquo; means
+        someone pressed Stop or Axcess closed while the scan ran.
       </p>
     </ReportNote>
   );

@@ -2,12 +2,13 @@
 
 The box and label over the saved copy are drawn for the eye and hidden from
 screen readers, so the inspector gives the same thing in words and a way
-in. After each step, the stepper's status says what the element is. Tab
-into the saved copy starts on the element itself, which then has "Flagged
-element N of M" as its description, and Escape goes back to where the reader
-was; the frame's name says both. A click in the copy is left where it
-landed. The label also stays inside the frame for an element at the very top
-or side of the page, where it used to be cut off.
+in. After each step, the stepper's status says what the element is.
+Keyboard focus coming into the saved copy goes on to the element itself,
+which then has "Flagged element N of M" as its description; Tab goes on from
+it in the page's order, and Escape goes back to where the reader was. The
+frame's name says both. A click in the copy is left where it landed. The
+label also stays inside the frame for an element at the very top or side of
+the page, where it used to be cut off.
 """
 
 from __future__ import annotations
@@ -54,8 +55,8 @@ def page_id(seeded_db: tuple[Path, Path, int]) -> int:
     return seed(db_path, scan_id, CAPTURE, RULE, FINDINGS)
 
 
-# A flagged heading the page hides, then a link: Tab cannot stop on the
-# heading, so the copy's tab order starts at the top as the page has it.
+# A flagged heading the page hides, then a link: focus cannot land on the
+# heading, so focus coming in stays where Tab put it, on the first link.
 HIDDEN_CAPTURE = (
     "<!doctype html><html><head><title>Reader fixture</title></head>"
     "<body><h5 id='gone' style='display:none'>Gone</h5>"
@@ -111,7 +112,7 @@ async def test_each_step_says_what_the_element_is(
     await page.context.close()
 
 
-async def test_tab_starts_on_the_element_and_escape_goes_back(
+async def test_tab_into_the_copy_goes_to_the_element_and_escape_goes_back(
     live_server: tuple[str, int], new_page: Any, seeded_db: tuple[Path, Path, int], page_id: int
 ) -> None:
     base, _ = live_server
@@ -120,7 +121,7 @@ async def test_tab_starts_on_the_element_and_escape_goes_back(
     await playwright_async.expect(_frame(page)).to_have_attribute(
         "title",
         re.compile(
-            r"^Saved copy: .+\. Tab starts on the flagged element\. "
+            r"^Saved copy: .+\. Tab into it goes to the flagged element\. "
             r"Press Escape to go back to where you were\.$"
         ),
     )
@@ -129,45 +130,83 @@ async def test_tab_starts_on_the_element_and_escape_goes_back(
     heading = copy.locator("#status")
     await playwright_async.expect(heading).to_be_focused()
     await playwright_async.expect(heading).to_have_accessible_description("Flagged element 1 of 2")
-    # The tab start, and only on the element the reader is on.
-    assert await heading.get_attribute("tabindex") == "1"
+    # Focusable from the move only: the page's own tab order is unchanged.
+    assert await heading.get_attribute("tabindex") == "-1"
     await page.keyboard.press("Escape")
     assert await page.evaluate("() => document.activeElement.tagName") != "IFRAME"
     assert await page.evaluate("() => document.activeElement.textContent") == last
     await page.context.close()
 
 
-async def test_the_tab_start_moves_with_the_reader(
+async def test_focus_follows_the_reader_and_tab_goes_on_in_page_order(
     live_server: tuple[str, int], new_page: Any, seeded_db: tuple[Path, Path, int], page_id: int
 ) -> None:
-    """Next element moves the tab start, and gives the last element back the
-    tab index the page gave it (none)."""
+    """After Next element, focus coming in lands on the new element; from
+    the first, Tab goes on to the next stop in the page's own order."""
     base, _ = live_server
     page = await _inspector(new_page, base, seeded_db[2], page_id)
     copy = page.frame_locator('iframe[title^="Saved copy"]')
+    await _tab_into_copy(page)
+    await playwright_async.expect(copy.locator("#status")).to_be_focused()
+    await page.keyboard.press("Tab")
+    await playwright_async.expect(copy.locator("#skip")).to_be_focused()
+    await page.keyboard.press("Escape")
     await page.get_by_role("button", name="Next element").click()
-    await playwright_async.expect(copy.locator("#skip")).to_have_attribute("tabindex", "1")
-    assert await copy.locator("#status").get_attribute("tabindex") is None
     await _tab_into_copy(page)
     await playwright_async.expect(copy.locator("#skip")).to_be_focused()
+    # A link takes focus already, so it is given no tab index.
+    assert await copy.locator("#skip").get_attribute("tabindex") is None
+    await page.context.close()
+
+
+# A flagged heading between two links, to check both directions of Tab.
+MIDDLE_CAPTURE = (
+    "<!doctype html><html><head><title>Reader fixture</title></head>"
+    "<body><a id='before' href='#a'>Before</a>"
+    "<h2 id='middle'>Middle</h2>"
+    "<a id='after' href='#b'>After</a></body></html>"
+)
+MIDDLE_FINDINGS = [("#middle", '<h2 id="middle">Middle</h2>')]
+
+
+async def test_tab_and_shift_tab_go_on_from_the_element_in_page_order(
+    live_server: tuple[str, int], new_page: Any, seeded_db: tuple[Path, Path, int]
+) -> None:
+    """From the flagged element, Tab goes to the stop after it on the page,
+    and Shift+Tab to the stop before it, not to the top of the copy."""
+    db_path, _, scan_id = seeded_db
+    middle_page = seed(db_path, scan_id, MIDDLE_CAPTURE, RULE, MIDDLE_FINDINGS)
+    base, _ = live_server
+    page = await open_inspector(new_page, base, scan_id, middle_page, RULE)
+    await page.get_by_role("button", name="Show element").wait_for()
+    await settled(page)
+    copy = page.frame_locator('iframe[title^="Saved copy"]')
+    await _tab_into_copy(page)
+    await playwright_async.expect(copy.locator("#middle")).to_be_focused()
+    await page.keyboard.press("Tab")
+    await playwright_async.expect(copy.locator("#after")).to_be_focused()
+    await page.keyboard.press("Escape")
+    await _tab_into_copy(page)
+    await playwright_async.expect(copy.locator("#middle")).to_be_focused()
+    await page.keyboard.press("Shift+Tab")
+    await playwright_async.expect(copy.locator("#before")).to_be_focused()
     await page.context.close()
 
 
 async def test_a_click_in_the_copy_stays_where_it_landed(
     live_server: tuple[str, int], new_page: Any, seeded_db: tuple[Path, Path, int], page_id: int
 ) -> None:
-    """Nothing moves focus when it enters the copy: a click elsewhere in the
-    copy does not land on the flagged element (SC 3.2.1 On Focus)."""
+    """A click on another link in the copy keeps focus on that link: only
+    keyboard focus coming in is moved to the flagged element."""
     base, _ = live_server
     page = await _inspector(new_page, base, seeded_db[2], page_id)
     copy = page.frame_locator('iframe[title^="Saved copy"]')
-    await copy.locator("main p").click()
-    focused = await page.evaluate(f"() => {DOC}.activeElement.id")
-    assert focused != "status"
+    await copy.locator("#skip").click()
+    await playwright_async.expect(copy.locator("#skip")).to_be_focused()
     await page.context.close()
 
 
-async def test_a_hidden_element_is_not_promised_as_the_tab_start(
+async def test_a_hidden_element_is_not_promised(
     live_server: tuple[str, int], new_page: Any, seeded_db: tuple[Path, Path, int]
 ) -> None:
     db_path, _, scan_id = seeded_db
@@ -180,7 +219,7 @@ async def test_a_hidden_element_is_not_promised_as_the_tab_start(
     await playwright_async.expect(frame).to_have_attribute(
         "title", re.compile(r"Press Escape to go back to where you were\.$")
     )
-    assert "Tab starts" not in (await frame.get_attribute("title") or "")
+    assert "flagged element" not in (await frame.get_attribute("title") or "")
     await _tab_into_copy(page)
     await playwright_async.expect(
         page.frame_locator('iframe[title^="Saved copy"]').locator("#first")
@@ -196,7 +235,7 @@ async def test_tab_brings_the_element_into_view(
     page_id: int,
     size: tuple[int, int],
 ) -> None:
-    """On a short window the saved copy starts below the screen; after Tab
+    """On a short window the saved copy starts below the screen; after focus
     lands on the element, it is fully on screen, below the sticky top bar."""
     base, _ = live_server
     width, height = size
