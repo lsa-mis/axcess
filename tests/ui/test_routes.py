@@ -1839,7 +1839,9 @@ async def test_login_handoff_starts_the_crawl_where_sign_in_landed(
             assert not headless
 
         def create_shared_js_fetcher(self, **kwargs):  # type: ignore[no-untyped-def]
-            return SimpleNamespace()
+            # The handoff reads the fetcher's tab pool (one signed-in tab per
+            # worker); None means no pool, as for one worker.
+            return SimpleNamespace(tab_pool=None)
 
         async def close(self):  # type: ignore[no-untyped-def]
             return None
