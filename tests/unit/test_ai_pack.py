@@ -194,6 +194,9 @@ def test_install_keeps_system_ollama_separate_and_saves_private_setup(tmp_path: 
     )
     manager.runtime.download = lambda *a: None
     manager.runtime.start = lambda *a, **kw: "http://127.0.0.1:50123"
+    # The real isolation check refuses Linux, where the private AI service is
+    # not supported (CI's runners); this test is about the install flow.
+    manager.runtime.require_isolation = lambda: None
     manager.installer.pull = fake_pull
     manager.installer.find_system = lambda: "0.33.0"
     plan = manager.plan()
@@ -229,6 +232,8 @@ def test_install_failure_is_reported_in_plain_words(tmp_path: Path) -> None:
         pull=failing_pull,
     )
     installer.runtime.download = lambda *a: None
+    # As above: the isolation check refuses Linux; this test is about the error.
+    installer.runtime.require_isolation = lambda: None
     installer.start(load_catalog().tier("small"))
     installer._thread.join(5)  # type: ignore[union-attr]
     assert installer.status.state == "failed"
