@@ -43,6 +43,7 @@ import {
   ReportCoverageNote,
   ReportNote,
   ReportNotes,
+  ReportScanNote,
   ReportSummary,
 } from "../components/ReportSummary";
 import { cn } from "../lib/cn";
@@ -362,6 +363,7 @@ export default function IssuesRoute() {
           limit in view, is on ReportCoverageNote. */}
       <ReportNotes className="mt-8">
         {isComplete && <ReportCoverageNote scan={scan} rows={summaryRows} />}
+        {isComplete && <ReportScanNote scan={scan} />}
         <IssueGlossary />
       </ReportNotes>
 

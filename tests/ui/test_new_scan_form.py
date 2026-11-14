@@ -797,7 +797,7 @@ async def test_a_login_scan_restarts_on_its_tab_with_confirmations_unticked(
         page.get_by_role("spinbutton", name="Maximum pages")
     ).to_have_value("40")
     await playwright_async.expect(
-        page.get_by_role("spinbutton", name="Signed-in tabs")
+        page.get_by_role("spinbutton", name="Pages at once (workers)")
     ).to_have_value("3")
     assert "sso-ticket-value" not in await page.content()
 

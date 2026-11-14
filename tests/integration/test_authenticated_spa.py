@@ -272,7 +272,9 @@ async def test_login_traverses_nested_spa_routes_with_session_intact(
                     for s in json.loads(row["sheets_json"])
                 )
                 assert "rgb(1, 2, 3)" in css and "rgb(4, 5, 6)" in css, row["state_key"]
-            assert len(pages) == (1 if tab_session else 2)
+            # One tab per worker either way; a sessionStorage sign-in gets a
+            # copy in the second tab, and the crawl above was signed in.
+            assert len(pages) == 2
         finally:
             await session.close()
             await browser.close()
@@ -345,13 +347,14 @@ async def test_login_tab_closure_does_not_close_the_authenticated_scan_tab(
             landed_url = session.enter_scan_mode()
             if headless_handoff:
                 pages = await session.switch_to_headless(2)
-                assert len(pages) == 1
+                assert len(pages) == 2
                 assert expected.is_closed(), "the sign-in window was left open"
             else:
                 pages = await session.prepare_background_scan_pages(2)
                 await session.discard_manual_auth_page()
-                assert pages == (expected,)
+                assert pages[0] is expected and len(pages) == 2
                 assert not expected.is_closed(), "sign-in cleanup closed the scanner's tab"
+                assert not pages[1].is_closed(), "sign-in cleanup closed a copied tab"
 
             fetcher = session.create_shared_js_fetcher(shared_pages=pages)
             summary = await run_crawl(

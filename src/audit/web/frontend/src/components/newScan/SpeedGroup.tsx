@@ -70,8 +70,18 @@ export default function SpeedGroup({ settings, update, policy, errors, fieldIds 
           onChange={(value) => update({ rps: value })}
           inputClassName="w-36"
         />
+        {/* One name on both forms, "Pages at once (workers)": to the person
+            it is the same choice, how many pages are worked on at the same
+            time. A sign-in scan does that with signed-in browser tabs and a
+            public scan with a fresh window per page, but that is how it
+            works, not what the person decides. It used to be "Signed-in
+            tabs" here, a second name for one setting (W3C COGA, "Making
+            Content Usable": use the same word for the same thing,
+            paraphrased; https://www.w3.org/TR/coga-usable/; and SC 3.2.4
+            Consistent Identification, Level AA). The hint differs, because
+            the numbers and the sign-out limit do. */}
         <NumberField
-          label={login ? NUMBERS.workers_login.label : NUMBERS.workers.label}
+          label={NUMBERS.workers.label}
           hint={login ? NUMBERS.workers_login.hint : NUMBERS.workers.hint}
           value={settings.workers}
           min={1}
