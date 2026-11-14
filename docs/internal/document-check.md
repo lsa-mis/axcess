@@ -80,11 +80,11 @@ two runs each): off 101 s and 93 s, on 132 s and 115 s, so about 26 s
 (27%) more with the check on. The pass after the last page is gone (at
 most 13 s of downloads still running), but the page crawl is slower by
 about as much: a 50-page scan of hr.umich.edu makes about 57 page requests
-and 110 PDF downloads, at least 83 s of requests at the site's 2 a
+and 110 PDF downloads, at least 83 s of requests at the crawl's 2 a
 second, while the page crawl alone takes about 95 s, so pages and PDFs
-now share an almost full rate limit and the site's 2 connections (a PDF
-holds one for its whole transfer). The rate limit is the floor; what is
-left to gain is letting page requests go ahead of PDF downloads.
+now share an almost full rate limit. The per-host connection limit is not
+the bottleneck: the app sets it to the worker count (8 by default), and at
+most 4 downloads run at once. The rate limit is the floor.
 
 ## Why it is built this way
 
