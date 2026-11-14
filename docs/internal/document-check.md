@@ -73,8 +73,18 @@ reached by ordinary links were left to the crawl, which with a 50-page cap
 never reached them, so all 111 waited for the pass after the last page: 55
 s, which is the site's rate limit (2 requests a second) for 111 downloads,
 on top of about 119 s with the check off. The page crawl itself was not
-slower with the check on. See the commit that made the change for the
-numbers after it.
+slower with the check on.
+
+After document links stopped being pages (same site, settings and method,
+two runs each): off 101 s and 93 s, on 132 s and 115 s, so about 26 s
+(27%) more with the check on. The pass after the last page is gone (at
+most 13 s of downloads still running), but the page crawl is slower by
+about as much: a 50-page scan of hr.umich.edu makes about 57 page requests
+and 110 PDF downloads, at least 83 s of requests at the site's 2 a
+second, while the page crawl alone takes about 95 s, so pages and PDFs
+now share an almost full rate limit and the site's 2 connections (a PDF
+holds one for its whole transfer). The rate limit is the floor; what is
+left to gain is letting page requests go ahead of PDF downloads.
 
 ## Why it is built this way
 
