@@ -46,7 +46,13 @@ function copyWithSelection(text: string): boolean {
   box.style.top = "0";
   box.style.left = "-9999px";
   box.style.opacity = "0";
-  document.body.appendChild(box);
+  // Beside the control that has focus, not at the end of the page: focusing
+  // the box must stay inside whatever menu or dialog holds that control. The
+  // Export menu closes when focus moves outside it, so a box at the end of
+  // the page closed the menu mid-copy, dropped its status message, and left
+  // keyboard focus on a control that was no longer shown (SC 2.4.3 Focus
+  // Order, Level A; SC 2.4.7 Focus Visible, Level AA).
+  (active?.parentElement ?? document.body).appendChild(box);
 
   let ok = false;
   try {

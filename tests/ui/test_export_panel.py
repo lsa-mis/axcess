@@ -304,6 +304,51 @@ async def test_copy_fix_brief_puts_its_markdown_on_the_clipboard(
     await expect(csv).to_be_focused()
 
 
+# Plain http on a network address: no clipboard API, no ClipboardItem. The
+# older copy command is wrapped so the test can read what it copied.
+_PLAIN_HTTP = """
+Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
+delete window.ClipboardItem;
+window.__copied = null;
+const realExec = document.execCommand.bind(document);
+document.execCommand = (command, ...rest) => {
+  if (command === "copy") {
+    const box = document.activeElement;
+    window.__copied = box && "value" in box ? box.value : null;
+    return true;
+  }
+  return realExec(command, ...rest);
+};
+"""
+
+
+async def test_copy_fix_brief_without_a_clipboard_api_keeps_the_menu_open(
+    live_server: tuple[str, int], new_page: Any
+) -> None:
+    """On plain http the fallback copy keeps focus, and the menu, where they were.
+
+    The hidden text box it copies from used to sit at the end of the page, so
+    focusing it closed the Export menu mid-copy and left keyboard focus on a
+    button that was no longer shown.
+    """
+    base, scan_id = live_server
+    page = await new_page()
+    await page.add_init_script(_PLAIN_HTTP)
+    await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+    await page.get_by_role("button", name="Export").click()
+    panel = page.get_by_role("group", name=f"Export Report #{scan_id}")
+    copy = panel.get_by_role("button", name="Copy fix brief", exact=True)
+    await copy.focus()
+    await page.keyboard.press("Enter")
+
+    done = "Copied the fix brief. Paste it into your coding agent."
+    await expect(page.get_by_role("status").filter(has_text="Copied")).to_have_text(done)
+    await expect(panel).to_be_visible()
+    await expect(copy).to_be_focused()
+    copied = await page.evaluate("window.__copied")
+    assert copied and f"# Fix brief for a coding agent: Report #{scan_id}" in copied
+
+
 async def test_a_refused_copy_is_reported_in_words(
     live_server: tuple[str, int], new_page: Any
 ) -> None:
