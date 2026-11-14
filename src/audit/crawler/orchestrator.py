@@ -1335,6 +1335,10 @@ def _tracked_checks(ctx: _WorkerContext) -> list[str]:
         checks.append("image")
     if ctx.semantic_analyzers:
         checks.append("semantic")
+    # Finding the page's document links; the PDFs are checked after the
+    # last page, so this column never claims a file was checked.
+    if ctx.linked_files is not None:
+        checks.append("documents")
     return checks
 
 
@@ -1702,12 +1706,15 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
     # Before the depth and page limits: a page at the last depth still links
     # to files, and its files are checked even though its pages are not.
     if ctx.linked_files is not None and page_id is not None:
-        ctx.linked_files.record_page(
-            page_id=page_id,
-            base_url=result.url,
-            body=result.body,
-            revealed=result.revealed_links,
-        )
+        # "documents" on the progress page: finding this page's document
+        # links. The PDFs themselves are checked once, after the last page.
+        with live_progress.check("documents"):
+            ctx.linked_files.record_page(
+                page_id=page_id,
+                base_url=result.url,
+                body=result.body,
+                revealed=result.revealed_links,
+            )
     if depth >= ctx.config.max_depth:
         return
     if _page_limit_reached(ctx):

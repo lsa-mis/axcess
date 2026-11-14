@@ -821,12 +821,22 @@ async def test_running_scan_shows_factual_pipeline_progress(
                     {
                         "url": "https://example.test/admissions/apply/",
                         "state": "checking",
-                        "checks": {"axe": "done", "alfa": "waiting", "keyboard": "running"},
+                        "checks": {
+                            "axe": "done",
+                            "alfa": "waiting",
+                            "keyboard": "running",
+                            "documents": "waiting",
+                        },
                     },
                     {
                         "url": "https://example.test/admissions/",
                         "state": "checked",
-                        "checks": {"axe": "done", "alfa": "done", "keyboard": "not_run"},
+                        "checks": {
+                            "axe": "done",
+                            "alfa": "done",
+                            "keyboard": "not_run",
+                            "documents": "done",
+                        },
                     },
                     {
                         "url": "https://example.test/admissions/visit/",
@@ -883,8 +893,24 @@ async def test_running_scan_shows_factual_pipeline_progress(
 
         table = page.get_by_role("table", name="Each page and where each check stands on it")
         await playwright_async.expect(table.get_by_role("columnheader")).to_have_text(
-            ["Page", "Status", "Rule check (axe)", "Rule check (Alfa)", "Keyboard check"]
+            [
+                "Page",
+                "Status",
+                "Rule check (axe)",
+                "Rule check (Alfa)",
+                "Keyboard check",
+                "Document links",
+            ]
         )
+        # The document check's column finds links; the line over the table
+        # says the files themselves are checked after the last page.
+        await playwright_async.expect(
+            page.get_by_text(
+                "Document links finds the links to documents on each page. "
+                "Axcess checks the PDFs after the last page.",
+                exact=False,
+            )
+        ).to_be_visible()
 
         def row(path: str) -> Any:
             return table.get_by_role("row").filter(
@@ -892,14 +918,14 @@ async def test_running_scan_shows_factual_pipeline_progress(
             )
 
         await playwright_async.expect(row("/admissions/apply/").get_by_role("cell")).to_have_text(
-            ["Being checked", "Done", "Waiting", "Checking"]
+            ["Being checked", "Done", "Waiting", "Checking", "Waiting"]
         )
         await playwright_async.expect(row("/admissions/").get_by_role("cell")).to_have_text(
-            ["Checked", "Done", "Done", "Not run"]
+            ["Checked", "Done", "Done", "Not run", "Done"]
         )
         # A waiting page has started no check.
         await playwright_async.expect(row("/admissions/visit/").get_by_role("cell")).to_have_text(
-            ["Waiting", "Waiting", "Waiting", "Waiting"]
+            ["Waiting", "Waiting", "Waiting", "Waiting", "Waiting"]
         )
 
         # Each check's totals are details: closed at first, then one click away.

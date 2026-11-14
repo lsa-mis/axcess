@@ -26,6 +26,7 @@ import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 
 import httpx
 import pytest
@@ -287,3 +288,38 @@ def test_turning_it_off_records_nothing(
         tmp_db.execute("SELECT config_json FROM scans WHERE id = ?", (scan_id,)).fetchone()[0]
     )
     assert config["linked_files_enabled"] is False
+
+
+def _record_marks(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, str]]:
+    """Every (check, state) the crawl marks on the progress page."""
+    from audit.crawler import live_progress
+
+    marks: list[tuple[str, str]] = []
+    real = live_progress._set
+
+    def spy(key: str, state: Any) -> None:
+        marks.append((key, state))
+        real(key, state)
+
+    monkeypatch.setattr(live_progress, "_set", spy)
+    return marks
+
+
+def test_each_page_is_marked_for_the_progress_pages_document_column(
+    tmp_db: sqlite3.Connection, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The scanning page's "Document links" column: each page's link
+    finding runs, then is done; with the check off it is never marked."""
+    monkeypatch.setenv("AUDIT_BLOB_DIR", str(tmp_path / "blobs"))
+    marks = _record_marks(monkeypatch)
+    with _serve() as (base, _port, _requests):
+        _crawl(tmp_db, base, _LocalOnly())
+    documents = [state for key, state in marks if key == "documents"]
+    assert documents and documents.count("running") == documents.count("done")
+
+    marks.clear()
+    with _serve() as (base, _port, _requests):
+        _crawl(
+            tmp_db, base, _LocalOnly(), linked_files_enabled=False, interaction_checks_enabled=False
+        )
+    assert not [key for key, _ in marks if key == "documents"]

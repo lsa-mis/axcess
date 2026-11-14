@@ -454,8 +454,11 @@ A PDF is marked [Mostly sure](#mostly-sure) when it fails one of these:
 
 A PDF that passes all five is [Not sure](#not-sure): a person must still check
 its reading order, alt text and table headers. Every other file, and any PDF
-Axcess could not open, is "Could not check", with the reason. It is on for
-every scan that does not sign in.
+Axcess could not open, is "Could not check", with the reason. It is on by
+default for every scan that does not sign in (**Check the documents the pages
+link to**, under Checks on the New scan page), and a sign-in scan never runs
+it. While a scan runs, the scanning page's **Document links** column shows it
+finding each page's document links; the PDFs are checked after the last page.
 
 ### Local AI model
 
