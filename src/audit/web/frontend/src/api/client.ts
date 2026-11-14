@@ -1,5 +1,6 @@
 import type {
   DocumentOnPage,
+  ScanDocumentResponse,
   ScanSettingsSnapshot,
   A11yByRuleResponse,
   A11yDrillFinding,
@@ -329,6 +330,8 @@ export const api = {
     const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
     return request<ScanDocumentsResponse>(`/api/scans/${scanId}/documents?${params}`);
   },
+  getScanDocument: (scanId: number, fileId: number) =>
+    request<ScanDocumentResponse>(`/api/scans/${scanId}/documents/${fileId}`),
   getDocumentOnPage: (scanId: number, fileId: number, pageId: number) =>
     request<DocumentOnPage>(`/api/scans/${scanId}/documents/${fileId}/pages/${pageId}`),
   getPageEvidence: (scanId: number, pageId: number) =>

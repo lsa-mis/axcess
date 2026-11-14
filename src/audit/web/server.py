@@ -147,7 +147,11 @@ from audit.web.export_readiness import (
     label_draft_export,
     public_export_filename,
 )
-from audit.web.linked_files_queries import DocumentOnPage, ScanDocumentsResponse
+from audit.web.linked_files_queries import (
+    DocumentOnPage,
+    ScanDocumentResponse,
+    ScanDocumentsResponse,
+)
 from audit.web.local_sign_in import (
     SIGN_IN_KEEP_MINUTES,
     EndedReason,
@@ -2385,6 +2389,18 @@ def create_app(
             return linked_files_queries.list_scan_documents(
                 conn, scan_id, limit=limit, offset=offset
             )
+
+    @app.get(
+        "/api/scans/{scan_id:int}/documents/{file_id:int}", response_model=ScanDocumentResponse
+    )
+    def api_scan_document(scan_id: int, file_id: int) -> ScanDocumentResponse:
+        """One file of this report and every page it appears on (its own page)."""
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            found = linked_files_queries.get_scan_document(conn, scan_id, file_id)
+        if found is None:
+            raise HTTPException(status_code=404, detail="This report has no such document")
+        return found
 
     @app.get(
         "/api/scans/{scan_id:int}/documents/{file_id:int}/pages/{page_id:int}",

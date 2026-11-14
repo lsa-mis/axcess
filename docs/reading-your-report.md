@@ -253,7 +253,8 @@ numbers, and its empty table says so.
 
 Each row shows:
 
-- **Document**: the file's name, which opens the file in a new tab.
+- **Document**: the file's name, which opens the document's own page (see
+  below).
 - **Type**: such as "PDF" or "Word, old format (.doc)".
 - **Site**: the site the file is kept on, such as "docs.google.com", and
   whether that is "This site" or "Another site".
@@ -272,14 +273,26 @@ Each row shows:
     download are reasons too.
 - **What Axcess found**: the failed checks, or the reason, and "Has a form to
   fill in" where it applies.
-- **Pages it appears on**: each page that links to the file or shows it
-  inside the page (up to 20), by its title, and, where it applies, "Shown
-  inside the page" or "Appears only after pressing" a named button. Two pages with the same title also show
-  their addresses. Open a page to see the link marked on it.
+- **Pages it appears on**: how many pages link to the file or show it inside
+  the page. The pages are listed on the document's own page.
 
 The order is fixed: Mostly sure, then Not sure, then Could not check. Within
 each, files that appear on more pages come first, then files with a form to fill
 in, then files with more serious problems. There is no single score.
+
+A document's own page works like an issue type's page. At the top right,
+**Open the file** opens it in a new tab. Under the heading are its facts
+(Accessibility problems?, Type, Site, Pages it appears on) and what Axcess
+found. Then a table lists every page it appears on, one row per page (up to
+2,000), with a search box and sortable columns:
+
+- **Page title**: opens the page inspector with the link to this file
+  outlined on the page.
+- **Page URL**: the page's address.
+- **How it appears**: "Link" with the link's own words, "Shown inside the
+  page" for a frame or embedded file, and "Appears only after pressing" a
+  named button for a link that shows only after a click. A page that reaches
+  the file in more than one way has one line for each.
 
 To check a PDF, Axcess downloads it once to your computer, checks it, and
 keeps only the result, not the file. A PDF on another site is downloaded once;

@@ -51,6 +51,7 @@ const PageEvidenceRoute = lazy(() => import("./routes/PageEvidence"));
 const PagesVisitedRoute = lazy(() => import("./routes/PagesVisited"));
 // The files a report's pages link to, the report's third tab.
 const DocumentsRoute = lazy(() => import("./routes/Documents"));
+const DocumentDetailRoute = lazy(() => import("./routes/DocumentDetail"));
 const InspectorRoute = lazy(() => import("./routes/Inspector"));
 const AboutRoute = lazy(() => import("./routes/About"));
 const SettingsRoute = lazy(() => import("./routes/Settings"));
@@ -109,6 +110,10 @@ export default function App() {
           element={<ProtectedReportGate><WhatChangedRoute /></ProtectedReportGate>}
         />
         <Route path="/scans/:scanId/documents" element={<ProtectedReportGate><DocumentsRoute /></ProtectedReportGate>} />
+        <Route
+          path="/scans/:scanId/documents/:fileId"
+          element={<ProtectedReportGate><DocumentDetailRoute /></ProtectedReportGate>}
+        />
         <Route path="/scans/:scanId/diff" element={<LegacyDiffRedirect />} />
         <Route path="/findings/:findingId" element={<FindingDetailRoute />} />
         <Route path="/tracking" element={<TrackingRoute />} />

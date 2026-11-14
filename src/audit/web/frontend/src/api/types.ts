@@ -1299,6 +1299,29 @@ export interface LinkedFileRow {
   refs: LinkedFileRef[];
 }
 
+/** One way a page reaches a file (`linked_files_queries.DocumentRefWay`). */
+export interface DocumentRefWay {
+  how: LinkedFileRefKind;
+  link_text: string;
+  revealed_by: string | null;
+}
+
+/** One page a file appears on, and every way it does (`linked_files_queries.DocumentPage`). */
+export interface DocumentPage {
+  page_id: number;
+  page_url: string;
+  page_title: string | null;
+  ways: DocumentRefWay[];
+}
+
+/** `GET /api/scans/{id}/documents/{file}` (`linked_files_queries.ScanDocumentResponse`). */
+export interface ScanDocumentResponse {
+  scan_id: number;
+  file: LinkedFileRow;
+  /** At most 2,000, in address order; `file.referring_page_count` is the total. */
+  pages: DocumentPage[];
+}
+
 /**
  * `GET /api/scans/{id}/documents/{file}/pages/{page}`
  * (`linked_files_queries.DocumentOnPage`): where one file is linked on one

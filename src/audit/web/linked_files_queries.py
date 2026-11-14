@@ -162,6 +162,27 @@ def list_scan_documents(
         setattr(counts, str(row[0]), int(row[1]))
     total = counts.mostly_sure + counts.not_sure + counts.could_not_check
 
+    files = _file_rows(conn, scan_id, limit=limit, offset=offset)
+    return ScanDocumentsResponse(
+        scan_id=scan_id,
+        recorded=recorded,
+        total=total,
+        counts=counts,
+        limit=limit,
+        offset=offset,
+        files=files,
+    )
+
+
+def _file_rows(
+    conn: sqlite3.Connection,
+    scan_id: int,
+    *,
+    limit: int,
+    offset: int,
+    file_id: int | None = None,
+) -> list[LinkedFileRow]:
+    """Files of ``scan_id`` in report order; only ``file_id`` when it is given."""
     rows = conn.execute(
         f"""
         SELECT f.id, f.url, f.file_type, f.off_site, {_SHOWN_STATUS_SQL} AS shown,
@@ -170,7 +191,7 @@ def list_scan_documents(
                (SELECT COUNT(DISTINCT r.page_id) FROM linked_file_refs r
                  WHERE r.file_id = f.id AND r.scan_id = f.scan_id) AS referring
           FROM linked_files f
-         WHERE f.scan_id = ?
+         WHERE f.scan_id = ? AND (? IS NULL OR f.id = ?)
          ORDER BY CASE {_SHOWN_STATUS_SQL}
                     WHEN 'mostly_sure' THEN 0 WHEN 'not_sure' THEN 1 ELSE 2 END,
                   referring DESC,
@@ -180,7 +201,7 @@ def list_scan_documents(
                   f.id ASC
          LIMIT ? OFFSET ?
         """,  # noqa: S608 - only fixed strings are interpolated
-        (scan_id, limit, offset),
+        (scan_id, file_id, file_id, limit, offset),
     ).fetchall()
 
     refs = _refs(conn, scan_id, [int(row[0]) for row in rows])
@@ -204,15 +225,7 @@ def list_scan_documents(
                 refs=file_refs,
             )
         )
-    return ScanDocumentsResponse(
-        scan_id=scan_id,
-        recorded=recorded,
-        total=total,
-        counts=counts,
-        limit=limit,
-        offset=offset,
-        files=files,
-    )
+    return files
 
 
 def _refs(
@@ -388,3 +401,75 @@ def document_on_page(
     return DocumentOnPage(
         file_id=file_id, page_id=page_id, name=name, refs=refs, saved_copy=True, places=places
     )
+
+
+#: Pages listed on one document's page. A file linked from more pages than
+#: this lists this many, and says how many there are in all.
+MAX_DOCUMENT_PAGES = 2000
+
+
+class DocumentRefWay(BaseModel):
+    """One way a page reaches the file: a link, a revealed link, a frame…"""
+
+    how: RefKind
+    #: The link's accessible name, or the frame's or embed's title.
+    link_text: str
+    #: The control a reader presses before the link exists, if any.
+    revealed_by: str | None
+
+
+class DocumentPage(BaseModel):
+    """One page of the report the file appears on, and every way it does."""
+
+    page_id: int
+    page_url: str
+    page_title: str | None
+    ways: list[DocumentRefWay]
+
+
+class ScanDocumentResponse(BaseModel):
+    """One file of a report, for its own page in the Documents tab."""
+
+    scan_id: int
+    file: LinkedFileRow
+    #: Every page the file appears on, in address order, at most
+    #: ``MAX_DOCUMENT_PAGES``; ``file.referring_page_count`` is the total.
+    pages: list[DocumentPage]
+
+
+def get_scan_document(
+    conn: sqlite3.Connection, scan_id: int, file_id: int
+) -> ScanDocumentResponse | None:
+    """One file of ``scan_id`` and the pages it appears on; None if not this report's."""
+    found = _file_rows(conn, scan_id, limit=1, offset=0, file_id=file_id)
+    if not found:
+        return None
+    rows = conn.execute(
+        """
+        SELECT r.page_id, p.url_normalized, p.title, r.how, r.link_text, r.revealed_by
+          FROM linked_file_refs r
+          JOIN pages p ON p.id = r.page_id AND p.scan_id = r.scan_id
+         WHERE r.scan_id = ? AND r.file_id = ?
+           AND r.page_id IN (
+               SELECT DISTINCT r2.page_id FROM linked_file_refs r2
+                 JOIN pages p2 ON p2.id = r2.page_id AND p2.scan_id = r2.scan_id
+                WHERE r2.scan_id = ? AND r2.file_id = ?
+                ORDER BY p2.url_normalized COLLATE NOCASE, r2.page_id
+                LIMIT ?
+           )
+         ORDER BY p.url_normalized COLLATE NOCASE, r.page_id, r.how, r.link_text, r.id
+        """,
+        (scan_id, file_id, scan_id, file_id, MAX_DOCUMENT_PAGES),
+    ).fetchall()
+    pages: list[DocumentPage] = []
+    for row in rows:
+        way = DocumentRefWay(how=row[3], link_text=str(row[4] or ""), revealed_by=row[5])
+        if pages and pages[-1].page_id == int(row[0]):
+            pages[-1].ways.append(way)
+        else:
+            pages.append(
+                DocumentPage(
+                    page_id=int(row[0]), page_url=str(row[1]), page_title=row[2], ways=[way]
+                )
+            )
+    return ScanDocumentResponse(scan_id=scan_id, file=found[0], pages=pages)

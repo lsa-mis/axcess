@@ -138,7 +138,7 @@ export function IssueGuidanceDialog({
  * announced, not just drawn.
  */
 /** A term and its value; each note is one more line under the value, empty ones left out. */
-function FactTile({
+export function FactTile({
   label,
   value,
   note,

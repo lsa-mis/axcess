@@ -543,17 +543,17 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
     await expect(form).to_contain_text("This site")
     await expect(form).to_contain_text("Not tagged")
     await expect(form).to_contain_text("Has a form to fill in")
-    # The pages by title only: no address, no link text, no count line.
-    await expect(form).not_to_contain_text("link to it.")
-    await expect(form).not_to_contain_text("Link text")
+    # The pages are a count, as Issues' "Affected pages" is; the list is on
+    # the document's own page. No page titles, addresses or link text here.
+    await expect(form.locator("td").last).to_have_text("2")
     await expect(form).not_to_contain_text(HOME)
-    await expect(form).to_contain_text("Appears only after pressing “More forms”")
+    await expect(form).not_to_contain_text("Apply for a permit")
+    await expect(form).not_to_contain_text("Appears only after pressing")
     # Not sure says what a person must still check: never read as a pass.
     await expect(rows.nth(2)).to_contain_text("Not sure")
     await expect(rows.nth(2)).to_contain_text(
         "the reading order, the image descriptions (alt text) and the table headers"
     )
-    await expect(rows.nth(2)).to_contain_text("Shown inside the page (in a frame)")
     # "Does not check yet" and "cannot check" read differently.
     await expect(rows.nth(3)).to_contain_text("Axcess cannot check this file type.")
     await expect(rows.nth(4)).to_contain_text("(HTTP 404)")
@@ -580,16 +580,20 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
     await expect(table.get_by_role("rowheader").get_by_text("docs.google.com")).to_have_count(0)
     await expect(table.get_by_role("rowheader").get_by_text("form to fill in")).to_have_count(0)
     await expect(table.get_by_role("rowheader").get_by_text("http://")).to_have_count(0)
-    # The file link names the file and says it opens a new tab.
-    link = table.get_by_role("link", name=re.compile(r"^permit-form\.pdf\s*, opens the file"))
-    await expect(link).to_have_attribute("href", "http://example.com/files/permit-form.pdf")
-    await expect(link).to_have_attribute("target", "_blank")
+    # The name opens the document's own page, as an issue type's title
+    # opens its record: one link per row.
+    link = table.get_by_role("link", name=re.compile(r"^permit-form\.pdf\s*, full details$"))
+    await expect(link).to_have_attribute(
+        "href", re.compile(rf"/app/scans/{scan_id}/documents/\d+\?origin=Documents&back=")
+    )
+    await expect(link).not_to_have_attribute("target", "_blank")
+    await expect(form.get_by_role("link")).to_have_count(1)
 
-    # Keyboard order follows the reading order: the tab, then the first
-    # file, then the first page that links to it, each with a visible focus.
+    # Keyboard order follows the reading order: the tab, then each file in
+    # turn, each with a visible focus.
     await tab.focus()
     stops = []
-    for _ in range(4):
+    for _ in range(5):
         await page.keyboard.press("Tab")
         stops.append(
             await page.evaluate(
@@ -606,8 +610,7 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
         )
     texts = [stop["text"] for stop in stops]
     first_file = next(i for i, t in enumerate(texts) if t.startswith("permit-form.pdf"))
-    first_page = next(i for i, t in enumerate(texts) if t.startswith("Home"))
-    assert first_file < first_page, texts
+    assert texts[first_file + 1].startswith("no-title.pdf"), texts
     assert all(stop["ring"] for stop in stops), stops
 
 
@@ -723,6 +726,95 @@ async def test_the_populated_tab_meets_the_aaa_checks(
     assert not [c for c in controls if vague(c["text"], in_nav=c["inNav"])], controls
 
 
+def test_one_document_lists_every_page_it_appears_on(client: TestClient, documents: int) -> None:
+    form = _file_id(client, documents, "permit-form.pdf")
+    body = client.get(f"/api/scans/{documents}/documents/{form}").json()
+    assert body["file"]["name"] == "permit-form.pdf"
+    assert body["file"]["referring_page_count"] == 2
+    # One entry per page, in address order, each with every way it reaches
+    # the file.
+    assert [(p["page_url"], p["ways"]) for p in body["pages"]] == [
+        (HOME, [{"how": "link", "link_text": "Apply for a permit (PDF)", "revealed_by": None}]),
+        (
+            ABOUT,
+            [{"how": "revealed_link", "link_text": "Permit form", "revealed_by": "More forms"}],
+        ),
+    ]
+
+
+def test_a_document_is_found_only_in_its_own_report(
+    client: TestClient, seeded_db: tuple[Path, Path, int], documents: int
+) -> None:
+    with sqlite3.connect(seeded_db[0]) as conn:
+        other = int(
+            conn.execute(
+                "INSERT INTO scans (seed_url, status, config_json) "
+                "VALUES ('http://example.com/', 'completed', '{}')"
+            ).lastrowid
+            or 0
+        )
+    form = _file_id(client, documents, "permit-form.pdf")
+    assert client.get(f"/api/scans/{other}/documents/{form}").status_code == 404
+    assert client.get(f"/api/scans/{documents}/documents/999999").status_code == 404
+    assert client.get(f"/api/scans/999999/documents/{form}").status_code == 404
+
+
+@on_module_loop
+@pytest.mark.parametrize("width", [1280, 320])
+@pytest.mark.parametrize("theme", ["light", "dark"])
+async def test_a_documents_page_passes_axe_and_the_aaa_checks(
+    documents: int, live_server: tuple[str, int], new_page: Any, theme: str, width: int
+) -> None:
+    """The document's facts, its "Open the file" link and its table of pages."""
+    from playwright.async_api import expect
+
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": width, "height": 800})
+    await page.add_init_script(
+        f"localStorage.setItem('axcess.preferences', JSON.stringify({{theme: '{theme}'}}))"
+    )
+    response = await page.request.get(f"{base}/api/scans/{scan_id}/documents?limit=200")
+    body = await response.json()
+    form = next(f["file_id"] for f in body["files"] if f["name"] == "permit-form.pdf")
+    await page.goto(f"{base}/app/scans/{scan_id}/documents/{form}", wait_until="networkidle")
+    assert await page.title() == "Document · Axcess"
+    # The file opens in a new tab, and its name and the new tab are said.
+    opener = page.get_by_role("link", name=re.compile(r"^Open the file permit-form\.pdf \("))
+    await expect(opener).to_have_attribute("href", "http://example.com/files/permit-form.pdf")
+    await expect(opener).to_have_attribute("target", "_blank")
+    facts = page.locator("main dl").first
+    await expect(facts.get_by_role("term")).to_have_text(
+        ["Accessibility problems?", "Type", "Site", "Pages it appears on"]
+    )
+    await expect(page.get_by_text("it has accessibility problems", exact=True)).to_be_visible()
+    await expect(page.get_by_role("heading", name="What Axcess found", level=2)).to_be_visible()
+    table = page.get_by_role("table", name="Pages permit-form.pdf appears on")
+    await expect(table.get_by_role("columnheader")).to_have_text(
+        [
+            re.compile(r"Row number"),
+            re.compile(r"^Page title"),
+            re.compile(r"^Page URL"),
+            "How it appears",
+        ]
+    )
+    rows = table.locator("tbody tr")
+    await expect(rows).to_have_count(2)
+    # How it appears: the link's own words, and the button that shows it.
+    await expect(rows.nth(0)).to_contain_text("Link: “Apply for a permit (PDF)”")
+    await expect(rows.nth(1)).to_contain_text("Appears only after pressing “More forms”")
+    for tags in (_AXE_TAGS_AA, None):
+        violations = await _run_axe(page, tags)
+        assert not violations, f"{theme} {width}px:\n{_render_violations(violations)}"
+    assert await page.evaluate(
+        "document.documentElement.scrollWidth <= document.documentElement.clientWidth"
+    )
+    if width == 1280 and theme == "light":
+        assert await page.evaluate(_SMALL_TARGETS) == []
+        assert await page.evaluate(_SHARED_NAMES) == []
+        controls = await page.evaluate(_COLLECT)
+        assert not [c for c in controls if vague(c["text"], in_nav=c["inNav"])], controls
+
+
 _MARKED_COPY = b"""<!doctype html><html><head><title>Home</title></head><body>
 <a id="first" href="/files/permit-form.pdf">Apply for a permit (PDF)</a>
 <p>Text between the links.</p>
@@ -738,8 +830,9 @@ async def test_the_inspector_marks_the_links_to_the_document(
     live_server: tuple[str, int],
     new_page: Any,
 ) -> None:
-    """Opened from a Documents row, the inspector outlines each link on the
-    page to that file, and only those, and says what it marked in words."""
+    """By keyboard from the Documents table to the document's page, then to
+    one of its pages: the inspector outlines each link on that page to the
+    file, and only those, and says what it marked in words."""
     from playwright.async_api import expect
 
     _save_copy(seeded_db[0], documents, HOME, _MARKED_COPY)
@@ -747,16 +840,28 @@ async def test_the_inspector_marks_the_links_to_the_document(
     page = await new_page(viewport={"width": 1280, "height": 900})
     try:
         await page.goto(f"{base}/app/scans/{scan_id}/documents", wait_until="networkidle")
-        row = page.get_by_role("table").locator("tbody tr").first
-        link = row.get_by_role("link", name=re.compile(r"^Home\b.*page inspector"))
+        name = page.get_by_role("table").get_by_role("link", name=re.compile(r"^permit-form\.pdf"))
+        await name.focus()
+        await page.keyboard.press("Enter")
+        await page.wait_for_url(re.compile(r"/documents/\d+\?"))
+        await expect(page.get_by_role("heading", level=1)).to_have_text("permit-form.pdf")
+        # The trail leads back through Documents, as an issue type's record
+        # leads back through Issues.
+        trail = page.get_by_role("navigation", name="Breadcrumb")
+        await expect(trail.get_by_role("link", name="Documents")).to_be_visible()
+        await expect(trail).to_contain_text("permit-form.pdf")
+
+        pages_table = page.get_by_role("table", name="Pages permit-form.pdf appears on")
+        link = pages_table.get_by_role("link", name=re.compile(r"^Home\b"))
         await expect(link).to_have_accessible_name(
-            re.compile(
-                r"^Home\s*, opens in the page inspector, marks the link to permit-form\.pdf$"
-            )
+            re.compile(r"^Home\s*, opens the saved copy with the link to permit-form\.pdf marked$")
         )
         await link.focus()
         await page.keyboard.press("Enter")
         await page.wait_for_url(re.compile(r"/inspect\?.*file="))
+        await expect(page.get_by_role("navigation", name="Breadcrumb")).to_contain_text(
+            "permit-form.pdf"
+        )
 
         group = page.get_by_role("group", name="Links to this document", exact=True)
         await expect(group.get_by_role("status")).to_have_text(

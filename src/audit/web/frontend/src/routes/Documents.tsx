@@ -1,9 +1,9 @@
 import { useEffect } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useLocation, useParams, useSearchParams } from "react-router";
+import { Link, useLocation, useParams, useSearchParams } from "react-router";
 import { ApiError, api } from "../api/client";
-import type { LinkedFileRef, LinkedFileRow, LinkedFileStatus } from "../api/types";
-import BreakableUrl from "../components/BreakableUrl";
+import type { LinkedFileRow, LinkedFileStatus } from "../api/types";
+import { Found, PAGES_COLUMN, RESULT_COLUMN, ResultTag, SiteCell } from "../components/DocumentParts";
 import HowSureTag from "../components/HowSureTag";
 import ReportHeader from "../components/ReportHeader";
 import {
@@ -25,18 +25,14 @@ import {
   TableHead,
   TableRegion,
 } from "../components/table/Table";
-import { Card, EmptyState, LinkButton, PageLink } from "../components/ui";
+import { Card, EmptyState, LinkButton, withReturnTrail } from "../components/ui";
 import { useTablePageSize } from "../hooks/usePreferences";
 import { useScanQuery } from "../hooks/useScanQuery";
 import {
-  LINKED_FILE_CHECK_TEXT,
-  LINKED_FILE_REF_LABEL,
   LINKED_FILE_STATUS_HELP,
   LINKED_FILE_STATUS_LABEL,
   LINKED_FILE_STATUS_NOTE,
   LINKED_FILE_TYPE_LABEL,
-  OPENS_NEW_WINDOW,
-  linkedFileReasonText,
 } from "../lib/terms";
 
 /** The trail label for this view; ReportCrumb and the document title use the same words. */
@@ -44,43 +40,13 @@ export const DOCUMENTS_VIEW = "Documents";
 
 const STATUSES: readonly LinkedFileStatus[] = ["mostly_sure", "not_sure", "could_not_check"];
 
-/**
- * The name of the column that holds each file's value (Mostly sure, Not
- * sure, Could not check), said as the question those values answer.
- *
- * The values are Issues' words, but the column is not called "How sure" as
- * Issues' is: on its own, "How sure" did not say how sure of what, so "0
- * Mostly sure" told the reader nothing about the files (the developer's
- * report, 2026-11-13). Named as the question, the values read as answers:
- * "Accessibility problems? Mostly sure." The developer asked to keep the
- * values and change only this name. Rejected: new values ("Problems found",
- * "A person must check", "Not checked"), which the developer declined, and
- * "How sure", which left the question unsaid (SC 2.4.6 Headings and Labels,
- * Level AA; SC 3.3.2 Labels or Instructions, Level A).
- */
-const RESULT_COLUMN = "Accessibility problems?";
-
-/**
- * The last column's name: the pages of the report where the file appears,
- * as a link or shown inside the page. The developer asked for "where it
- * appears" (2026-11-13); "Pages it appears on" keeps that word and says the
- * answer is pages. The order's second step in the labels note uses the same
- * words, so the column and its explanation match. Rejected: "Linked from",
- * which did not say from what and does not fit a file shown in a frame;
- * "Pages that link to it", which has the same frame problem; and "Where it
- * appears", too close to Issues' "Where it shows", which means something
- * else there (at page load, after clicking, in an image) (W3C COGA, "Making
- * Content Usable", https://www.w3.org/TR/coga-usable/, paraphrased: the
- * same word for the same thing, and different words for different things;
- * SC 3.2.4 Consistent Identification, Level AA).
- */
-const PAGES_COLUMN = "Pages it appears on";
 
 /** The fixed order, in words, for the table's caption and the labels note's order section. */
 const ORDER_WORDS = "Mostly sure first, then Not sure, then Could not check";
 
-function plural(count: number, one: string, many: string): string {
-  return `${count.toLocaleString()} ${count === 1 ? one : many}`;
+/** One document's own page, where its facts and every page it appears on are listed. */
+export function documentPath(scanId: number, fileId: number): string {
+  return `/scans/${scanId}/documents/${fileId}`;
 }
 
 /**
@@ -109,16 +75,20 @@ function plural(count: number, one: string, many: string): string {
  * nothing there since 2026-10-30 (the developer's request); Documents
  * follows it, the developer's choice on 2026-11-13.
  *
- * One file per row. The file names the row (its row header, `th
- * scope="row"`, technique H63) and opens the file itself in a new tab, as
- * "Open live page" opens a page: the file is the place the link goes, so its
- * name is the link's words (docs/plain-language.md rule 8), and the new tab
- * is said in screen-reader text (SC 3.2.5 Change on Request, Level AAA).
- * The row header holds the name only: a screen reader reads it again with
- * every cell, so anything else there (the full address, "On another site")
- * was heard five times. Then its type, its site (SiteCell), the
- * "Accessibility problems?" value (RESULT_COLUMN), what the checks found,
- * and the pages that link to it.
+ * One file per row, laid out as Issues lays out issue types: the name
+ * names the row (its row header, `th scope="row"`, technique H63) and
+ * opens the document's own page (routes/DocumentDetail.tsx), as an issue
+ * type's title opens its record, with screen-reader text ", full details"
+ * as there. That page leads with "Open the file" and lists every page the
+ * file appears on. The name opened the file itself until 2026-11-14; it
+ * moved to the document's page when the pages left this table (below), so
+ * Documents and Issues work the same way: list, then one thing, then its
+ * pages (SC 3.2.4 Consistent Identification, Level AA). The row header
+ * holds the name only: a screen reader reads it again with every cell, so
+ * anything else there (the full address, "On another site") was heard five
+ * times. Then its type, its site (SiteCell), the "Accessibility problems?"
+ * value (RESULT_COLUMN), what the checks found, and how many pages it
+ * appears on.
  *
  * The value uses the Issues table's tag (components/HowSureTag.tsx) and its
  * words for the same meaning, under a column name that says the question. What each value means is said in text in
@@ -141,11 +111,24 @@ function plural(count: number, one: string, many: string): string {
  * that line only while its table is sorted or filtered, and this one never
  * is. The table's caption still says the order to a screen reader.
  *
- * Each referring page is a page link that opens the page inspector, as
- * everywhere a page is named (PageLink, actions off as in Pages visited),
- * with the link's own text under it and, for a file shown inside the page or
- * reached only after a click, how. Up to 20 pages per file; the row says how
- * many there are in all.
+ * "Pages it appears on" is a plain number, as Issues' "Affected pages" is,
+ * and the pages are listed on the document's page. Until 2026-11-14 the
+ * cell listed up to 20 pages, each with its title and often its address,
+ * which made rows taller than a screen (the developer's report). The
+ * developer chose this after a review of other tools (Monsido / Acquia Web
+ * Governance, Pope Tech and Screaming Frog all show a document's pages one
+ * step away from the list, as a count or a per-document report) and of
+ * Adrian Roselli's rows that expand in place
+ * (https://adrianroselli.com/2019/09/table-with-expando-rows.html).
+ * Rejected: rows that expand, which put page rows under document columns
+ * that do not apply to them; the first 3 pages with "Show 11 more", which
+ * kept the tall rows once opened (and GOV.UK found some people avoid a
+ * "show more" link, https://design-system.service.gov.uk/components/details/);
+ * and a side panel, the pattern Issues removed. Not a link either: one
+ * link per row, as Issues' count stopped being one on 2026-11-02 (one way
+ * to do one thing; W3C COGA, "Making Content Usable", paraphrased). A
+ * document on one page works the same way, so the name always leads to the
+ * same kind of place.
  *
  * Paged by the server (Settings > Rows per page), with the page in the URL
  * so Back and reload return to the same rows. A table wider than the screen
@@ -490,186 +473,34 @@ function DocumentRow({
   scanId: number;
   backTo: string;
 }) {
-  // Only an http(s) address is ever stored; checked again here so a stored
-  // value can never become a script link.
-  const openable = /^https?:\/\//i.test(row.url);
   return (
     <Row index={index} className="align-top">
-      <RowHeader className="min-w-[12rem] max-w-xs align-top font-normal">
-        {openable ? (
-          <a
-            href={row.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex min-h-target items-center gap-1 break-words font-semibold text-umich-blue underline underline-offset-2"
-          >
-            <span className="[overflow-wrap:anywhere]" data-scanned-content>
-              {row.name}
-            </span>
-            <span aria-hidden className="text-2xs">
-              ↗
-            </span>
-            <span className="sr-only">, opens the file ({OPENS_NEW_WINDOW})</span>
-          </a>
-        ) : (
-          <span className="font-semibold [overflow-wrap:anywhere]">{row.name}</span>
-        )}
+      <RowHeader className="min-w-[12rem] max-w-xs align-top">
+        {/* The name opens the document's own page, as an issue type's title
+            opens its record on Issues; see DocumentsRoute. */}
+        <Link
+          to={withReturnTrail(documentPath(scanId, row.file_id), DOCUMENTS_VIEW, backTo)}
+          className="flex min-h-target items-center text-umich-blue underline underline-offset-2 hover:text-umich-blue-600"
+        >
+          <span className="[overflow-wrap:anywhere]" data-scanned-content>
+            {row.name}
+          </span>
+          <span className="sr-only">, full details</span>
+        </Link>
       </RowHeader>
       <Cell className="min-w-[8rem] align-top">{LINKED_FILE_TYPE_LABEL[row.file_type]}</Cell>
       <Cell className="min-w-[9rem] align-top">
         <SiteCell url={row.url} offSite={row.off_site} />
       </Cell>
       <Cell className="whitespace-nowrap align-top">
-        <HowSureTag
-          label={LINKED_FILE_STATUS_LABEL[row.status]}
-          help={LINKED_FILE_STATUS_HELP[row.status]}
-          quiet={row.status === "could_not_check"}
-        />
+        <ResultTag status={row.status} />
       </Cell>
       <Cell className="min-w-[14rem] max-w-sm align-top text-sm">
         <Found row={row} />
       </Cell>
-      <Cell className="min-w-[16rem] align-top">
-        <LinkedFrom row={row} scanId={scanId} backTo={backTo} />
+      <Cell numeric className="align-top">
+        {row.referring_page_count.toLocaleString()}
       </Cell>
     </Row>
-  );
-}
-
-/** What the checks found, or why there was nothing to find. */
-function Found({ row }: { row: LinkedFileRow }) {
-  return (
-    <>
-      <FoundResult row={row} />
-      {/* Something the check found in the file, and one of the steps of
-          the order, so it is said with the other findings rather than under
-          the file's name (where it was read out with the row header in
-          every cell). */}
-      {row.is_form && <p className="mt-2">Has a form to fill in.</p>}
-    </>
-  );
-}
-
-function FoundResult({ row }: { row: LinkedFileRow }) {
-  if (row.status === "mostly_sure") {
-    return (
-      <ul className="list-disc space-y-1 pl-4">
-        {row.failed_checks.map((check) => (
-          <li key={check}>{LINKED_FILE_CHECK_TEXT[check]}</li>
-        ))}
-      </ul>
-    );
-  }
-  if (row.status === "not_sure") return <p>{LINKED_FILE_STATUS_HELP.not_sure}</p>;
-  return <p>{row.reason ? linkedFileReasonText(row.reason, row.http_status) : LINKED_FILE_STATUS_HELP.could_not_check}</p>;
-}
-
-/**
- * Where the file is kept: the site's name (its host, such as
- * docs.google.com) and whether that is the scanned site or another one.
- *
- * Its own column, as the developer asked, in place of the file's full
- * address and an "On another site" line under its name. The full address
- * was long, broke mid-word, and, inside the row header, was read out again
- * by a screen reader in every cell of the row (row headers are announced
- * with each cell; technique H63). The host says what a reader needs (whose
- * site, and whether it is ours) in a few words; the full address is still
- * the file link's target. Rejected: the full address in this column, which
- * kept the length; and the host under the name, which kept it in the row
- * header (SC 1.3.1 Info and Relationships, Level A; W3C COGA, "Making
- * Content Usable", https://www.w3.org/TR/coga-usable/, paraphrased: one
- * idea per chunk).
- */
-function SiteCell({ url, offSite }: { url: string; offSite: boolean }) {
-  let host: string | null = null;
-  try {
-    host = new URL(url).host;
-  } catch {
-    host = null;
-  }
-  return (
-    <>
-      {host && (
-        <span className="block" data-scanned-content>
-          <BreakableUrl text={host} />
-        </span>
-      )}
-      <span className="block text-2xs text-fg-muted">{offSite ? "Another site" : "This site"}</span>
-    </>
-  );
-}
-
-/**
- * The pages that reach the file, each a page link to the inspector, which
- * marks the link (or frame) there; and how, when it is not a plain link.
- *
- * The page's title only. Its full address and the link's own words are not
- * shown, as the developer asked (2026-11-13): the address was long and said
- * little, and the inspector now shows the link itself, outlined, in place.
- * The address still appears when two pages in the cell share a title, so
- * they can be told apart (SC 2.4.9 Link Purpose (Link Only), Level AAA).
- * No count line ("2 pages link to it."): the column's name says what the
- * list is, and the list is the count; only pages past the shown 20 are
- * counted, under it.
- */
-function LinkedFrom({ row, scanId, backTo }: { row: LinkedFileRow; scanId: number; backTo: string }) {
-  if (row.refs.length === 0) {
-    return (
-      <p className="text-sm text-fg-muted">
-        No scanned page links to it. The scan reached it another way, such as the site map.
-      </p>
-    );
-  }
-  const more = row.referring_page_count - new Set(row.refs.map((ref) => ref.page_id)).size;
-  // Pages per title, so the address is shown only where a title is shared.
-  const pagesByTitle = new Map<string, Set<number>>();
-  for (const ref of row.refs) {
-    const title = ref.page_title?.trim() || ref.page_url;
-    pagesByTitle.set(title, (pagesByTitle.get(title) ?? new Set()).add(ref.page_id));
-  }
-  return (
-    <div className="text-sm">
-      <ul className="space-y-2">
-        {row.refs.map((ref, position) => (
-          <li key={`${ref.page_id}-${ref.how}-${position}`}>
-            <PageLink
-              pageId={ref.page_id}
-              scanId={scanId}
-              pageUrl={ref.page_url}
-              pageTitle={ref.page_title}
-              showUrlBelow={(pagesByTitle.get(ref.page_title?.trim() || ref.page_url)?.size ?? 0) > 1}
-              file={row.file_id}
-              fileName={row.name}
-              origin={DOCUMENTS_VIEW}
-              backTo={backTo}
-              actions={false}
-            />
-            <RefDetails refItem={ref} />
-          </li>
-        ))}
-      </ul>
-      {more > 0 && (
-        <p className="mt-2 text-fg-muted">
-          {plural(more, "more page links", "more pages link")} to it, not listed here.
-        </p>
-      )}
-    </div>
-  );
-}
-
-/** How the page shows the file, when it is not a plain link; nothing for a plain link. */
-function RefDetails({ refItem }: { refItem: LinkedFileRef }) {
-  const how = refItem.how === "link" || refItem.how === "revealed_link" ? null : LINKED_FILE_REF_LABEL[refItem.how];
-  if (!how && refItem.how !== "revealed_link") return null;
-  return (
-    <ul className="space-y-0.5 text-2xs text-fg-muted">
-      {how && <li>{how}</li>}
-      {refItem.how === "revealed_link" && (
-        <li>
-          Appears only after pressing{" "}
-          <span data-scanned-content>&ldquo;{refItem.revealed_by ?? "a control"}&rdquo;</span>
-        </li>
-      )}
-    </ul>
   );
 }

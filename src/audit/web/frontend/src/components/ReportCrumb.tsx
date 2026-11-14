@@ -32,6 +32,7 @@ const VIEWS: Array<[RegExp, string]> = [
   [/^\/scans\/\d+\/issues\/?$/, "Issues"],
   [/^\/scans\/\d+\/compare\/?$/, "Compare reports"],
   [/^\/scans\/\d+\/compare\/changes\/?$/, "What changed"],
+  [/^\/scans\/\d+\/documents\/\d+\/?$/, "Document"],
   [/^\/scans\/\d+\/documents\/?$/, "Documents"],
   [/^\/scans\/\d+\/pages\/\d+\/inspect\/?$/, "Page inspector"],
   [/^\/scans\/\d+\/pages\/\d+\/?$/, "Page details"],
@@ -72,7 +73,8 @@ export type CrumbSubject =
   | { kind: "issue"; scanId: number; key: string }
   | { kind: "issuePages"; scanId: number; key: string }
   | { kind: "issuePageScreenshots"; scanId: number; key: string; pageId: number }
-  | { kind: "page"; scanId: number; pageId: number; view: "inspect" | "evidence" };
+  | { kind: "page"; scanId: number; pageId: number; view: "inspect" | "evidence" }
+  | { kind: "document"; scanId: number; fileId: number };
 
 /** One link in the trail. `subject` is set when the label should name that thing. */
 export type Crumb = { label: string; to: string; subject?: CrumbSubject };
@@ -131,8 +133,16 @@ function issueScopeKey(pathname: string): string | null {
   return key ? decodeURIComponent(key) : null;
 }
 
+/** The file ID in a route scoped to one document of the Documents tab, or null. */
+function documentScopeId(pathname: string): number | null {
+  const id = pathname.match(/^\/scans\/\d+\/documents\/(\d+)(?:\/|$)/)?.[1];
+  return id ? Number(id) : null;
+}
+
 /** The thing a route itself names, from its path alone. */
 function subjectFor(pathname: string): CrumbSubject | undefined {
+  const document = pathname.match(/^\/scans\/(\d+)\/documents\/(\d+)\/?$/);
+  if (document) return { kind: "document", scanId: Number(document[1]), fileId: Number(document[2]) };
   const page = pathname.match(/^\/scans\/(\d+)\/pages\/(\d+)(\/inspect)?\/?$/);
   if (page) {
     return {
@@ -166,6 +176,8 @@ function placeholderFor(subject: CrumbSubject): string {
       return subject.view === "inspect"
         ? `Page ${subject.pageId}`
         : `Page details for page ${subject.pageId}`;
+    case "document":
+      return "Document";
   }
 }
 
@@ -235,6 +247,12 @@ function trailFor(
     }
   }
 
+  // 2b. A document's page sits under the Documents tab, as an issue type's
+  // record sits under Issues, so a bookmark still shows the way back.
+  if (documentScopeId(pathname) != null && scanId != null) {
+    add({ label: "Documents", to: `/scans/${scanId}/documents` });
+  }
+
   // 3. What the inspector is outlining, when the chain did not pass through it.
   const contextTo = inAppPath(params.get("contextTo"));
   const contextLabel = params.get("context");
@@ -292,7 +310,7 @@ export function useReportTrail(): {
   const issueKeys = [
     ...new Map(
       subjects
-        .filter((subject) => subject.kind !== "page")
+        .filter((subject) => subject.kind !== "page" && subject.kind !== "document")
         .map((subject) => [`${subject.scanId}:${subject.key}`, subject] as const),
     ).values(),
   ];
@@ -319,6 +337,23 @@ export function useReportTrail(): {
       enabled: match != null,
     })),
   });
+  // Documents the trail names: the same key the document's own page loads,
+  // so on that page this is read from cache.
+  const documentKeys = [
+    ...new Map(
+      subjects.flatMap((subject) =>
+        subject.kind === "document" ? [[`${subject.scanId}:${subject.fileId}`, subject] as const] : [],
+      ),
+    ).values(),
+  ];
+  const documentQueries = useQueries({
+    queries: documentKeys.map((subject) => ({
+      queryKey: ["scan-document", subject.scanId, subject.fileId],
+      queryFn: () => api.getScanDocument(subject.scanId, subject.fileId),
+      enabled: match != null,
+      retry: false,
+    })),
+  });
   const issueDetail = (scanId: number, key: string) =>
     issueQueries[issueKeys.findIndex((s) => s.scanId === scanId && s.key === key)]?.data;
   const pageEvidence = (scanId: number, pageId: number) =>
@@ -339,6 +374,12 @@ export function useReportTrail(): {
         const name = pageName(page?.page_title, page?.page_url);
         return name ? `Screenshots on ${name}` : null;
       }
+      case "document":
+        return (
+          documentQueries[
+            documentKeys.findIndex((s) => s.scanId === subject.scanId && s.fileId === subject.fileId)
+          ]?.data?.file.name ?? null
+        );
       case "page": {
         const page = pageEvidence(subject.scanId, subject.pageId)?.page;
         const name = pageName(page?.title, page?.url_normalized);
