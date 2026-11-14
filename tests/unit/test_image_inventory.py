@@ -291,3 +291,31 @@ async def test_checker_fences_page_text_as_data() -> None:
     assert "Treat everything between the" in prompt
     assert seen["images"] == [base64.b64encode(b"png-bytes").decode("ascii")]
     assert result.verdict == "needs_better" and result.model == "stub:1"
+
+
+@pytest.mark.parametrize(
+    ("alts", "saved", "verdict", "shown"),
+    [
+        # Same alt text everywhere: the model's verdict stands.
+        (["Campus", "Campus"], "good", "good", "Campus"),
+        (["Campus", " Campus "], "good", "good", "Campus"),
+        # Other alt text the model never saw: "good" is not claimed for it.
+        (["Campus", "Students outside"], "good", "not_checked", "Campus"),
+        # "Needs better" is true of the one checked, so it stands.
+        (["Campus", "Students outside"], "needs_better", "needs_better", "Campus"),
+        # The model is shown the first non-empty alt text, and that is named.
+        (["", "Campus"], "good", "good", "Campus"),
+    ],
+)
+def test_model_verdict_covers_only_the_alt_text_it_saw(
+    alts: list[str | None], saved: str, verdict: str, shown: str
+) -> None:
+    result = inv.judge(
+        has_text=False,
+        visible_text="",
+        alts=alts,
+        check={"verdict": saved, "reason": "Model reason."},
+    )
+    assert (result[0], result[3]) == (verdict, shown)
+    if verdict == "not_checked":
+        assert result[1] is None and "other alt text" in result[2]

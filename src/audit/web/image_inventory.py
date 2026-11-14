@@ -68,6 +68,18 @@ _REASON_PARTIAL = "Only partly matches the text in the image."
 _REASON_NO_MATCH = "Does not match the text in the image."
 _REASON_DECORATIVE = "Marked decorative (empty alt text). Check that the image adds nothing."
 _REASON_NOT_CHECKED = "No text in the image to compare."
+_REASON_OTHER_ALTS = (
+    "The AI checked one alt text. This image has other alt text on other pages, so check those."
+)
+
+
+def checked_alt(alts: list[str | None]) -> str | None:
+    """The alt text the model is shown: the first non-empty one.
+
+    ``check_target`` sends this one, and ``judge`` names it, so the verdict
+    shown is about the text the model saw.
+    """
+    return next((a for a in alts if a), None if any(a is None for a in alts) else "")
 
 
 class GroupCounts(BaseModel):
@@ -263,7 +275,17 @@ def judge(
         return "needs_better", "text_match", _REASON_NO_MATCH, shown
     shown = alts[0]
     if check is not None and check["verdict"] in ("good", "needs_better"):
-        return check["verdict"], "local_model", str(check["reason"] or ""), shown
+        checked = checked_alt(alts)
+        # The model saw one alt text. "Needs better" is true of that one, so
+        # it stands for the image, the way the worst text match decides above.
+        # "Good" covers only what the model saw: with other alt text on other
+        # pages, the image is not checked yet.
+        others = {" ".join(a.split()) for a in alts if a and a.strip()} - {
+            " ".join((checked or "").split())
+        }
+        if check["verdict"] == "good" and others:
+            return "not_checked", None, _REASON_OTHER_ALTS, checked
+        return check["verdict"], "local_model", str(check["reason"] or ""), checked
     if empty and len(empty) == len(alts):
         return "not_checked", None, _REASON_DECORATIVE, ""
     return "not_checked", None, _REASON_NOT_CHECKED, shown
@@ -413,9 +435,8 @@ def check_target(conn: sqlite3.Connection, scan_id: int, image_id: int) -> Check
         """,
         (image_id,),
     ).fetchone()
-    alts = [occ["alt_text"] for occ in occs]
     # The alt text a reader is most likely to meet: the first non-empty one.
-    alt = next((a for a in alts if a), None if any(a is None for a in alts) else "")
+    alt = checked_alt([occ["alt_text"] for occ in occs])
     snippet = next((occ["context_snippet"] for occ in occs if occ["context_snippet"]), None)
     return CheckTarget(
         image_id=image_id,
