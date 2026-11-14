@@ -11,7 +11,7 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from audit.analyzer.ollama_base import OllamaError, is_cloud_model
+from audit.analyzer.ollama_base import OllamaError, is_cloud_model, why_not_local
 from audit.analyzer.semantic.ollama_text import OllamaTextProvider
 from audit.protected import local_ai as protected_local_ai
 from audit.suggest.provider import OllamaSuggestionProvider, SuggestionError
@@ -35,6 +35,11 @@ CLOUD = "gpt-oss:120b-cloud"
         ("campus-cloud", False),
         ("campus-cloud:latest", False),
         ("campus-cloud:7b-cloud", True),
+        # A registry with a port: the colon before the slash is not a tag.
+        ("registry.local:5000/llava", False),
+        ("registry.local:5000/campus-cloud", False),
+        ("registry.local:5000/llava:7b", False),
+        ("registry.local:5000/gpt-oss:120b-cloud", True),
     ],
 )
 def test_is_cloud_model(name: str, cloud: bool) -> None:
@@ -256,3 +261,22 @@ async def test_a_model_replaced_between_retries_is_refused_on_the_retry(
 
 async def _no_wait(_seconds: float) -> None:
     return None
+
+
+@pytest.mark.parametrize(
+    ("model", "listed"),
+    [
+        ("registry.local:5000/llava", "registry.local:5000/llava:latest"),
+        ("registry.local:5000/llava:7b", "registry.local:5000/llava:7b"),
+        ("llava", "llava:latest"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_a_model_from_a_registry_with_a_port_matches_its_listed_name(
+    model: str, listed: str
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"models": [{"name": listed, "model": listed}]})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        assert await why_not_local(client, "http://127.0.0.1:11434/api/tags", model) is None

@@ -44,6 +44,16 @@ class OllamaError(Exception):
     """
 
 
+def _tag(name: str) -> str | None:
+    """The tag after the last colon, or None when the name has no tag.
+
+    A colon followed by a slash belongs to a registry address with a port
+    (``registry.local:5000/llava``), not to a tag; a tag never has a slash.
+    """
+    _, colon, tag = name.strip().rpartition(":")
+    return tag if colon and "/" not in tag else None
+
+
 def is_cloud_model(name: str) -> bool:
     """True for an Ollama cloud model, such as ``gpt-oss:120b-cloud``.
 
@@ -54,16 +64,16 @@ def is_cloud_model(name: str) -> bool:
     the computer unless an administrator chooses a remote address
     (AGENTS.md, "Context construction and privacy").
     """
-    # No colon means the default tag (":latest"), a local model, even when
-    # the name itself ends in "-cloud".
-    _, colon, tag = name.strip().lower().rpartition(":")
-    return bool(colon) and (tag == "cloud" or tag.endswith("-cloud"))
+    # No tag means the default (":latest"), a local model, even when the name
+    # itself ends in "-cloud".
+    tag = _tag(name.lower())
+    return tag is not None and (tag == "cloud" or tag.endswith("-cloud"))
 
 
 def _names(name: str) -> set[str]:
     """A model's name as Ollama may list it: with no tag it is ``:latest``."""
     name = name.strip()
-    return {name, f"{name}:latest"} if ":" not in name else {name}
+    return {name} if _tag(name) is not None else {name, f"{name}:latest"}
 
 
 async def model_list(client: httpx.AsyncClient, tags_url: str) -> tuple[set[str], set[str]] | None:
