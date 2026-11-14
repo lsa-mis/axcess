@@ -239,16 +239,19 @@ the documents, then how many are Mostly sure, Not sure and Could not check.
 Under the table, two closed rows open more detail. **What was checked** shows
 "Only PDFs checked" and opens what the list covers, what Axcess downloaded and
 kept, and what the list can miss (the same facts as below). **What "Mostly
-sure", "Not sure" and the other labels mean** explains a document, the How
-sure values, and the order. A report that did not look for documents shows no
+sure", "Not sure" and the other labels mean** explains a document, the
+values of the "Accessibility problems?" column, and the order. A report that did not look for documents shows no
 numbers, and its empty table says so.
 
 Each row shows:
 
-- **Document**: the file's name, which opens the file in a new tab, and its
-  address. "On another site" and "Has a form to fill in" show where they apply.
+- **Document**: the file's name, which opens the file in a new tab.
 - **Type**: such as "PDF" or "Word, old format (.doc)".
-- **How sure**: how sure Axcess is that the file has accessibility problems.
+- **Site**: the site the file is kept on, such as "docs.google.com", and
+  whether that is "This site" or "Another site".
+- **Accessibility problems?**: how sure Axcess is that the file has
+  accessibility problems. The values are the same words as the Issues table's
+  How sure column.
   - **Mostly sure**: a machine check found a problem, such as a PDF with no
     tags or no text a screen reader can read.
   - **Not sure**: the PDF passed the machine checks. A person must still check
@@ -259,13 +262,15 @@ Each row shows:
     is different from "Axcess cannot check" (old .doc, .xls and .ppt files,
     and Google files). A broken link, a password, a file over 10 MB, or a slow
     download are reasons too.
-- **What Axcess found**: the failed checks, or the reason.
-- **Linked from**: each page that links to the file (up to 20), with the
-  link's text, and, where it applies, "Shown inside the page" or "Appears
-  only after pressing" a named button.
+- **What Axcess found**: the failed checks, or the reason, and "Has a form to
+  fill in" where it applies.
+- **Pages it appears on**: each page that links to the file or shows it
+  inside the page (up to 20), by its title, and, where it applies, "Shown
+  inside the page" or "Appears only after pressing" a named button. Two pages with the same title also show
+  their addresses. Open a page to see the link marked on it.
 
 The order is fixed: Mostly sure, then Not sure, then Could not check. Within
-each, files linked from more pages come first, then files with a form to fill
+each, files that appear on more pages come first, then files with a form to fill
 in, then files with more serious problems. There is no single score.
 
 To check a PDF, Axcess downloads it once to your computer, checks it, and

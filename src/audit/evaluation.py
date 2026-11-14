@@ -523,7 +523,7 @@ def get_page_evidence(
         and "[ord=" in (f.get("target_selector") or "")
     ]
     if images or ordinal:
-        saved = _saved_copy(conn, page_id)
+        saved = saved_copy(conn, page_id)
         if saved is not None:
             _add_element_places(saved[0], ordinal)
             _add_image_locators(saved[0], saved[1], images)
@@ -540,7 +540,7 @@ def get_page_evidence(
     return {"page": dict(page), "a11y_findings": findings, "image_occurrences": images}
 
 
-def _saved_copy(conn: sqlite3.Connection, page_id: int) -> tuple[bytes, str] | None:
+def saved_copy(conn: sqlite3.Connection, page_id: int) -> tuple[bytes, str] | None:
     """The page as the scan read it, and the address it was read at; None if not kept."""
     row = conn.execute(
         "SELECT rendered_html, final_url, url_normalized FROM pages WHERE id = ?", (page_id,)

@@ -1278,6 +1278,22 @@ export interface LinkedFileRow {
   refs: LinkedFileRef[];
 }
 
+/**
+ * `GET /api/scans/{id}/documents/{file}/pages/{page}`
+ * (`linked_files_queries.DocumentOnPage`): where one file is linked on one
+ * page, for the inspector to mark.
+ */
+export interface DocumentOnPage {
+  file_id: number;
+  page_id: number;
+  name: string;
+  refs: LinkedFileRef[];
+  /** False when the scan kept no copy of the page. */
+  saved_copy: boolean;
+  /** Each element of the saved copy that reaches the file, in page order. */
+  places: ElementPlace[];
+}
+
 /** `GET /api/scans/{id}/documents` (`linked_files_queries.ScanDocumentsResponse`). */
 export interface ScanDocumentsResponse {
   scan_id: number;

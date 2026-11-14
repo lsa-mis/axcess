@@ -294,6 +294,122 @@ def test_one_report_never_lists_another_reports_files(
     assert theirs["files"][0]["refs"][0]["page_url"] == "http://other.example/"
 
 
+# -- where a file is linked on a page (the inspector's marks) ---------------
+
+_HOME_COPY = b"""<!doctype html><html><body>
+<a href="/files/permit-form.pdf">Apply for a permit (PDF)</a>
+<a href="#top">Top</a>
+<a href="http://example.com/files/no-title.pdf">Price list (PDF)</a>
+<noscript><a href="/files/permit-form.pdf">Not shown</a></noscript>
+<a href="files/permit-form.pdf">Apply again</a>
+<iframe src="/files/map.pdf" title="Course map"></iframe>
+</body></html>"""
+
+
+def _save_copy(db_path: Path, scan_id: int, url: str, html: bytes | None) -> int:
+    import gzip
+
+    with sqlite3.connect(db_path) as conn:
+        page_id = _page_id(conn, scan_id, url)
+        conn.execute(
+            "UPDATE pages SET rendered_html = ?, final_url = ? WHERE id = ?",
+            (gzip.compress(html) if html is not None else None, url, page_id),
+        )
+    return page_id
+
+
+def _file_id(client: TestClient, scan_id: int, name: str) -> int:
+    body = client.get(f"/api/scans/{scan_id}/documents?limit=200").json()
+    return int(next(f["file_id"] for f in body["files"] if f["name"] == name))
+
+
+def test_each_link_to_the_file_is_placed_as_the_browser_counts_it(
+    client: TestClient, seeded_db: tuple[Path, Path, int], documents: int
+) -> None:
+    home = _save_copy(seeded_db[0], documents, HOME, _HOME_COPY)
+    form = _file_id(client, documents, "permit-form.pdf")
+    body = client.get(f"/api/scans/{documents}/documents/{form}/pages/{home}").json()
+    assert body["saved_copy"] is True
+    assert body["name"] == "permit-form.pdf"
+    # Both links that resolve to the file, relative or not; never the copy
+    # in <noscript>, which the inspector does not count either, and never
+    # the fragment link.
+    assert body["places"] == [
+        {"selector": "a", "index": 0, "total": 4},
+        {"selector": "a", "index": 3, "total": 4},
+    ]
+    assert [ref["how"] for ref in body["refs"]] == ["link"]
+    frame = _file_id(client, documents, "map.pdf")
+    body = client.get(f"/api/scans/{documents}/documents/{frame}/pages/{home}").json()
+    assert body["places"] == [{"selector": "iframe", "index": 0, "total": 1}]
+
+
+def test_a_link_shown_only_after_a_click_has_no_place_and_says_why(
+    client: TestClient, seeded_db: tuple[Path, Path, int], documents: int
+) -> None:
+    about = _save_copy(
+        seeded_db[0], documents, ABOUT, b"<html><body><a href='/'>Home</a></body></html>"
+    )
+    form = _file_id(client, documents, "permit-form.pdf")
+    body = client.get(f"/api/scans/{documents}/documents/{form}/pages/{about}").json()
+    assert (body["saved_copy"], body["places"]) == (True, [])
+    assert [(r["how"], r["revealed_by"]) for r in body["refs"]] == [("revealed_link", "More forms")]
+
+
+def test_a_page_with_no_saved_copy_says_so(
+    client: TestClient, seeded_db: tuple[Path, Path, int], documents: int
+) -> None:
+    home = _save_copy(seeded_db[0], documents, HOME, None)
+    form = _file_id(client, documents, "permit-form.pdf")
+    body = client.get(f"/api/scans/{documents}/documents/{form}/pages/{home}").json()
+    assert (body["saved_copy"], body["places"]) == (False, [])
+
+
+def test_a_file_is_looked_up_only_on_its_own_reports_pages(
+    client: TestClient, seeded_db: tuple[Path, Path, int], documents: int
+) -> None:
+    home = _save_copy(seeded_db[0], documents, HOME, _HOME_COPY)
+    with sqlite3.connect(seeded_db[0]) as conn:
+        conn.row_factory = sqlite3.Row
+        other = int(
+            conn.execute(
+                "INSERT INTO scans (seed_url, status, config_json) "
+                "VALUES ('http://example.com/', 'completed', '{\"linked_files_enabled\": true}')"
+            ).lastrowid
+            or 0
+        )
+        their_page = repo.upsert_page(
+            conn,
+            scan_id=other,
+            url_normalized=HOME,
+            status_code=200,
+            title="Home",
+            render_mode="js",
+            html_hash=None,
+        )
+        their_file = _file(
+            conn,
+            other,
+            "http://example.com/files/permit-form.pdf",
+            "pdf",
+            store.CheckResult("not_sure"),
+            [(their_page, "link", "Apply", None)],
+        )
+    form = _file_id(client, documents, "permit-form.pdf")
+    budget = _file_id(client, documents, "budget.xls")
+    # Another report's file through this report, this report's file on
+    # another report's page, and a page that does not link to the file.
+    assert (
+        client.get(f"/api/scans/{documents}/documents/{their_file}/pages/{home}").status_code == 404
+    )
+    assert (
+        client.get(f"/api/scans/{documents}/documents/{form}/pages/{their_page}").status_code == 404
+    )
+    assert client.get(f"/api/scans/{other}/documents/{form}/pages/{their_page}").status_code == 404
+    assert client.get(f"/api/scans/{documents}/documents/{budget}/pages/{home}").status_code == 404
+    assert client.get(f"/api/scans/999999/documents/{form}/pages/{home}").status_code == 404
+
+
 # -- the screen -------------------------------------------------------------
 
 
@@ -384,7 +500,7 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
     await expect(glossary.get_by_role("heading", level=3)).to_have_text(
         [
             "The numbers: what is counted",
-            "How sure: how sure Axcess is that a file has accessibility problems",
+            "Accessibility problems? How sure Axcess is that a file has them",
             "The order: which files to look at first",
         ]
     )
@@ -394,8 +510,8 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
             "Mostly sure",
             "Not sure",
             "Could not check",
-            "1. How sure",
-            "2. Pages that link to it",
+            "1. Accessibility problems?",
+            "2. Pages it appears on",
             "3. A form to fill in",
             "4. How serious the problem is",
         ]
@@ -417,9 +533,13 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
     )
     form = rows.nth(0)
     await expect(form).to_contain_text("Mostly sure")
+    await expect(form).to_contain_text("This site")
     await expect(form).to_contain_text("Not tagged")
     await expect(form).to_contain_text("Has a form to fill in")
-    await expect(form).to_contain_text("2 pages link to it.")
+    # The pages by title only: no address, no link text, no count line.
+    await expect(form).not_to_contain_text("link to it.")
+    await expect(form).not_to_contain_text("Link text")
+    await expect(form).not_to_contain_text(HOME)
     await expect(form).to_contain_text("Appears only after pressing “More forms”")
     # Not sure says what a person must still check: never read as a pass.
     await expect(rows.nth(2)).to_contain_text("Not sure")
@@ -432,7 +552,27 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
     await expect(rows.nth(4)).to_contain_text("(HTTP 404)")
     await expect(rows.nth(5)).to_contain_text("Axcess does not check this file type yet.")
     await expect(rows.nth(6)).to_contain_text("Axcess cannot check files kept in Google")
-    await expect(rows.nth(6)).to_contain_text("On another site")
+    await expect(rows.nth(6)).to_contain_text("docs.google.com")
+    await expect(rows.nth(6)).to_contain_text("Another site")
+    # The columns say what each value is; "How sure" alone did not.
+    await expect(table.get_by_role("columnheader")).to_have_text(
+        [
+            "Document",
+            "Type",
+            "Site",
+            "Accessibility problems?",
+            "What Axcess found",
+            "Pages it appears on",
+        ]
+    )
+    # The row header is the file's name only: a screen reader reads it with
+    # every cell, so no address, site or form line is in it.
+    await expect(table.get_by_role("rowheader").nth(6)).to_have_text(
+        re.compile(r"^Meeting notes\b"), use_inner_text=True
+    )
+    await expect(table.get_by_role("rowheader").get_by_text("docs.google.com")).to_have_count(0)
+    await expect(table.get_by_role("rowheader").get_by_text("form to fill in")).to_have_count(0)
+    await expect(table.get_by_role("rowheader").get_by_text("http://")).to_have_count(0)
     # The file link names the file and says it opens a new tab.
     link = table.get_by_role("link", name=re.compile(r"^permit-form\.pdf\s*, opens the file"))
     await expect(link).to_have_attribute("href", "http://example.com/files/permit-form.pdf")
@@ -574,3 +714,98 @@ async def test_the_populated_tab_meets_the_aaa_checks(
     assert layout == {"long": [], "tight": []}
     controls = await page.evaluate(_COLLECT)
     assert not [c for c in controls if vague(c["text"], in_nav=c["inNav"])], controls
+
+
+_MARKED_COPY = b"""<!doctype html><html><head><title>Home</title></head><body>
+<a id="first" href="/files/permit-form.pdf">Apply for a permit (PDF)</a>
+<p>Text between the links.</p>
+<a id="price" href="/files/no-title.pdf">Price list (PDF)</a>
+<a id="second" href="files/permit-form.pdf">Apply again</a>
+</body></html>"""
+
+
+@on_module_loop
+async def test_the_inspector_marks_the_links_to_the_document(
+    documents: int,
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """Opened from a Documents row, the inspector outlines each link on the
+    page to that file, and only those, and says what it marked in words."""
+    from playwright.async_api import expect
+
+    _save_copy(seeded_db[0], documents, HOME, _MARKED_COPY)
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    try:
+        await page.goto(f"{base}/app/scans/{scan_id}/documents", wait_until="networkidle")
+        row = page.get_by_role("table").locator("tbody tr").first
+        link = row.get_by_role("link", name=re.compile(r"^Home\b.*page inspector"))
+        await expect(link).to_have_accessible_name(
+            re.compile(
+                r"^Home\s*, opens in the page inspector, marks the link to permit-form\.pdf$"
+            )
+        )
+        await link.focus()
+        await page.keyboard.press("Enter")
+        await page.wait_for_url(re.compile(r"/inspect\?.*file="))
+
+        group = page.get_by_role("group", name="Links to this document", exact=True)
+        await expect(group.get_by_role("status")).to_have_text(
+            re.compile(r"^Link to this document 1 of 2")
+        )
+        await expect(
+            page.get_by_text(
+                "Dashed red outlines mark the 2 links to “permit-form.pdf” on this page.",
+                exact=False,
+            )
+        ).to_be_visible()
+        # No issue wording: a link to a document flags nothing.
+        await expect(page.get_by_text("issue type has no element")).to_have_count(0)
+        await expect(page.get_by_text("flagged element", exact=False)).to_have_count(0)
+
+        frame = page.frame_locator("iframe[title^='Saved copy']")
+        await expect(frame.locator("#first")).to_have_css("outline-color", "rgb(0, 39, 76)")
+        await expect(frame.locator("#second")).to_have_css("outline-color", "rgb(190, 0, 30)")
+        await expect(frame.locator("#price")).not_to_have_css("outline-style", "dashed")
+
+        violations = await _run_axe(page, _AXE_TAGS_AA)
+        assert not violations, _render_violations(violations)
+    finally:
+        await page.context.close()
+
+
+@on_module_loop
+async def test_the_inspector_says_why_a_revealed_link_is_not_marked(
+    documents: int,
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    from playwright.async_api import expect
+
+    about = _save_copy(
+        seeded_db[0], documents, ABOUT, b"<html><body><a href='/'>Home</a></body></html>"
+    )
+    base, scan_id = live_server
+    response = await (await new_page()).request.get(
+        f"{base}/api/scans/{scan_id}/documents?limit=200"
+    )
+    body = await response.json()
+    form = next(f["file_id"] for f in body["files"] if f["name"] == "permit-form.pdf")
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    try:
+        await page.goto(
+            f"{base}/app/scans/{scan_id}/pages/{about}/inspect?file={form}",
+            wait_until="networkidle",
+        )
+        await expect(
+            page.get_by_text(
+                "The link to “permit-form.pdf” appears only after pressing “More forms”. "
+                "This copy shows the page at page load, so the link is not in it."
+            )
+        ).to_be_visible()
+        await expect(page.get_by_text("issue type has no element")).to_have_count(0)
+    finally:
+        await page.context.close()

@@ -96,6 +96,10 @@ export default function InspectorRoute() {
   const layout = checkLayout && asChecked ? checkLayout : null;
   const directSelector = params.get("selector");
   const directSnippet = params.get("snippet");
+  // Opened from a Documents row: mark the links on this page to that file
+  // (the report's Documents tab), not an issue's occurrences.
+  const fileParam = params.get("file");
+  const fileId = fileParam && /^\d+$/.test(fileParam) ? Number(fileParam) : null;
 
   const { data: scanData } = useScanQuery(scan);
 
@@ -106,6 +110,19 @@ export default function InspectorRoute() {
     queryKey: ["page-evidence", scan, page],
     queryFn: () => api.getPageEvidence(scan, page),
     enabled: Number.isFinite(scan) && Number.isFinite(page),
+  });
+
+  // Where the file is linked on this page: the elements of the saved copy
+  // the scan counted for it, found by the server with the scan's own rules
+  // (``linked_files_queries.document_on_page``). Each is outlined by its
+  // place among elements of its tag, as an AI review finding is; the
+  // highlighter checks the count first, so a different copy marks nothing
+  // rather than the wrong link.
+  const { data: documentOnPage, isError: documentError } = useQuery({
+    queryKey: ["document-on-page", scan, fileId, page],
+    queryFn: () => api.getDocumentOnPage(scan, fileId as number, page),
+    enabled: fileId != null && Number.isFinite(scan) && Number.isFinite(page),
+    retry: false,
   });
 
   // The findings that belong to the issue being reviewed on this page. For the
@@ -193,8 +210,13 @@ export default function InspectorRoute() {
         imageOccurrenceId: image.occurrence_id,
       });
     }
+    // A document's links, at page load: a link that appeared only after a
+    // click is not in this copy, and the server gives it no place.
+    for (const place of documentOnPage?.places ?? []) {
+      out.push({ selector: null, snippet: null, revealedBy: null, stateKey: null, place });
+    }
     return out;
-  }, [currentFindings, shownImages]);
+  }, [currentFindings, shownImages, documentOnPage]);
   const hasTarget = targets.length > 0;
 
   // The controls that were operated before these findings were first flagged,
@@ -1058,6 +1080,44 @@ export default function InspectorRoute() {
   // loaded just now because no copy was saved.
   const copyName =
     render.source === "stored" || render.source === "state" ? "Saved copy" : "Live page";
+  // Opened from the Documents tab, the marks are the links to one file, so
+  // every line about them says that and names the file, rather than
+  // "flagged element" or "This issue type has no element to mark", which
+  // were wrong here: a link to a document flags nothing, and there is no
+  // issue type. Rejected: reusing the issue wording, which told the reader
+  // something untrue (AGENTS.md, Interface language rule 5: keep text
+  // accurate to the code). Why nothing is marked is said in words, never
+  // left as a copy with no box (SC 1.3.3 Sensory Characteristics, Level A).
+  const documentQuote = documentOnPage ? `“${documentOnPage.name}”` : "this document";
+  const revealedBy = [
+    ...new Set(
+      (documentOnPage?.refs ?? [])
+        .filter((ref) => ref.how === "revealed_link")
+        .map((ref) => `“${ref.revealed_by ?? "a control"}”`),
+    ),
+  ];
+  const revealedList =
+    revealedBy.length <= 1 ? (revealedBy[0] ?? "") : `${revealedBy.slice(0, -1).join(", ")} or ${revealedBy[revealedBy.length - 1]}`;
+  const documentNote: string | null =
+    fileId == null
+      ? null
+      : documentError
+        ? "Axcess could not look up the links to this document. Reload the page to try again."
+        : !documentOnPage
+          ? null
+          : !documentOnPage.saved_copy
+            ? `The scan did not save a copy of this page, so Axcess cannot mark the link to ${documentQuote}.`
+            : documentOnPage.places.length === 0 && revealedBy.length > 0
+              ? `The link to ${documentQuote} appears only after pressing ${revealedList}. This copy shows the page at page load, so the link is not in it.`
+              : documentOnPage.places.length === 0
+                ? `Axcess could not find the link to ${documentQuote} in this copy. The page may have changed since the scan.`
+                : revealedBy.length > 0
+                  ? `Another link to ${documentQuote} appears only after pressing ${revealedList}, so it is not in this copy.`
+                  : null;
+  const stepperNoun =
+    fileId != null
+      ? { one: "Link to this document", many: "Links to this document", count: "link to this document" }
+      : undefined;
 
   return (
     <>
@@ -1256,6 +1316,7 @@ export default function InspectorRoute() {
             <div className="flex flex-wrap items-center gap-2 rounded-t-[7px] border-b border-border bg-surface-muted/40 px-3 py-2">
               {stepping ? (
                 <FlaggedStepper
+                  noun={stepperNoun}
                   count={highlightedCount}
                   index={pageMark}
                   onGo={goToPageMark}
@@ -1331,18 +1392,23 @@ export default function InspectorRoute() {
                 Level AAA); the band still spans the panel. */}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-border px-3 py-2 text-xs text-fg-muted empty:sr-only [&>span]:max-w-measure" aria-live="polite">
               {highlightPending && (
-                <span>Highlighting the flagged element…</span>
+                <span>{fileId != null ? "Marking the links to this document…" : "Highlighting the flagged element…"}</span>
               )}
+              {documentNote && !highlightPending && <span>{documentNote}</span>}
               {!highlightPending &&
                 showHighlights &&
                 highlight !== null &&
                 highlightedCount > 0 &&
                 highlight.located + highlight.ambiguous + unreachableCount < highlight.total && (
                   <span className="text-sev-major">
-                    Axcess found {highlight.located} of {highlight.total} flagged
-                    occurrences.{" "}
-                    {missingReason?.whenSomeFound ??
-                      "The others may have changed since the scan."}
+                    {fileId != null
+                      ? `Axcess found ${highlight.located} of ${highlight.total} links to ${documentQuote}. The others may have changed since the scan.`
+                      : <>
+                          Axcess found {highlight.located} of {highlight.total} flagged
+                          occurrences.{" "}
+                          {missingReason?.whenSomeFound ??
+                            "The others may have changed since the scan."}
+                        </>}
                   </span>
                 )}
               {!highlightPending && showHighlights && highlight !== null && highlight.ambiguous > 0 && (
@@ -1374,8 +1440,10 @@ export default function InspectorRoute() {
                 // flagging it warns about a fact of how the scan works; with a
                 // mix, something genuinely should have been matched.
                 <span className={missingReason?.certain ? undefined : "text-sev-major"}>
-                  {missingReason?.whenNoneFound ??
-                    "Axcess could not find the flagged element in this copy. The page may have changed since the scan."}
+                  {fileId != null
+                    ? `Axcess could not find the link to ${documentQuote} in this copy. The page may have changed since the scan.`
+                    : (missingReason?.whenNoneFound ??
+                      "Axcess could not find the flagged element in this copy. The page may have changed since the scan.")}
                 </span>
               )}
               {canvasPage && (
@@ -1401,7 +1469,7 @@ export default function InspectorRoute() {
               {!showHighlights && hasScopedTarget && (
                 <span>Highlights are hidden for this page.</span>
               )}
-              {!hasTarget && (
+              {!hasTarget && fileId == null && (
                 <span>
                   {render.source === "stored"
                     ? "This is the copy the scan saved. This issue type has no element to mark."
@@ -1597,11 +1665,11 @@ export default function InspectorRoute() {
                       place alone cannot say why (SC 1.3.3 Sensory
                       Characteristics, Level A). */}
                   {highlightedCount > 1
-                    ? `Dashed red outlines mark the ${highlightedCount} flagged elements on this page. The one you are on has a numbered blue box with a yellow ring, and the rest of the page is dimmed.`
+                    ? `Dashed red outlines mark the ${highlightedCount} ${fileId != null ? `links to ${documentQuote}` : "flagged elements"} on this page. The one you are on has a numbered blue box with a yellow ring, and the rest of the page is dimmed.`
                     : // Never describe a box that is not drawn (see ``drawsNoBox``).
                       drawsNoBox(currentElement?.where ?? null)
-                      ? "No box marks the flagged element."
-                      : "A blue box with a yellow ring marks the flagged element."}
+                      ? `No box marks the ${fileId != null ? `link to ${documentQuote}` : "flagged element"}.`
+                      : `A blue box with a yellow ring marks the ${fileId != null ? `link to ${documentQuote}` : "flagged element"}.`}
                   {currentElement?.where && ` Where the box is: ${BOX_NOTES[currentElement.where]}`}
                 </span>
               </p>
@@ -1620,7 +1688,7 @@ export default function InspectorRoute() {
                   ? "The page code shown here is a copy. Its styles are the ones the scan saved. Its fonts and images load from the live site now, so they can look different from how they looked during the scan."
                   : "The page code shown here is a copy. Its styles, fonts, and images load from the live site now, so the page can look different from how it looked during the scan."}{" "}
                 The page&rsquo;s own scripts never run here. So if the site would
-                only show a flagged element with JavaScript, Axcess makes it
+                only show {fileId != null ? "a link" : "a flagged element"} with JavaScript, Axcess makes it
                 visible to highlight it.
               </p>
             </div>
@@ -1704,9 +1772,13 @@ export default function InspectorRoute() {
                 {hasScopedTarget && (
                   <span className="text-2xs text-fg-muted">
                     {domMarkCount > 0
-                      ? `${domMarkCount} flagged ${domMarkCount === 1 ? "element is" : "elements are"} marked in the code below.`
-                      : (missingReason?.whenNoneFound ??
-                        "Axcess could not find the flagged element in this page code.")}
+                      ? fileId != null
+                        ? `${domMarkCount === 1 ? "1 link" : `${domMarkCount} links`} to ${documentQuote} ${domMarkCount === 1 ? "is" : "are"} marked in the code below.`
+                        : `${domMarkCount} flagged ${domMarkCount === 1 ? "element is" : "elements are"} marked in the code below.`
+                      : fileId != null
+                        ? `Axcess could not find the link to ${documentQuote} in this page code.`
+                        : (missingReason?.whenNoneFound ??
+                          "Axcess could not find the flagged element in this page code.")}
                   </span>
                 )}
                 {render.dom_truncated && (

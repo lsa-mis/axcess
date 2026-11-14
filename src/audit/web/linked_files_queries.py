@@ -252,3 +252,139 @@ def _refs(
             )
         )
     return out
+
+
+#: Elements of one page marked for one file. A page that links to one file
+#: more often than this is marked only this many times.
+MAX_PLACES = 50
+
+
+class ElementPlaceModel(BaseModel):
+    """The ``index``th of ``total`` elements a plain tag selector matches.
+
+    The inspector's ``ElementPlace``: it outlines that element only when its
+    own count of ``selector`` is ``total``.
+    """
+
+    selector: str
+    index: int
+    total: int
+
+
+class DocumentOnPage(BaseModel):
+    """Where one file of a report is reached on one page of that report."""
+
+    file_id: int
+    page_id: int
+    name: str
+    #: How the page reaches the file, as the Documents table lists it.
+    refs: list[LinkedFileRef]
+    #: False when the scan kept no copy of the page, so nothing can be marked.
+    saved_copy: bool
+    #: Each link, frame, object or embed in the saved copy that reaches the
+    #: file, in page order: the elements the scan counted for it.
+    places: list[ElementPlaceModel]
+
+
+_PLACE_TAGS: tuple[tuple[str, str], ...] = (
+    ("a", "href"),
+    ("iframe", "src"),
+    ("object", "data"),
+    ("embed", "src"),
+)
+
+
+def document_on_page(
+    conn: sqlite3.Connection, scan_id: int, file_id: int, page_id: int
+) -> DocumentOnPage | None:
+    """The elements of ``page_id``'s saved copy that reach ``file_id``.
+
+    None unless the file and the page both belong to ``scan_id`` and the
+    page reaches the file: one report's file is never looked up through
+    another report, and a page that does not link to a file is never
+    searched for it.
+
+    The saved copy is read with the scan's own rules
+    (:func:`audit.linked_files.discovery.resolve` and the tags
+    :func:`~audit.linked_files.discovery.find_links` reads), so an element
+    is marked exactly when the scan counted it. A link that appeared only
+    after a click is not in the copy and gets no place; the refs say so.
+    """
+    from selectolax.parser import HTMLParser
+
+    from audit.evaluation import saved_copy
+    from audit.extractor.places import Places, hidden_from_inspector
+    from audit.linked_files.discovery import resolve
+
+    file_row = conn.execute(
+        "SELECT url FROM linked_files WHERE id = ? AND scan_id = ?", (file_id, scan_id)
+    ).fetchone()
+    if file_row is None:
+        return None
+    page_row = conn.execute(
+        "SELECT url_normalized, title FROM pages WHERE id = ? AND scan_id = ?",
+        (page_id, scan_id),
+    ).fetchone()
+    if page_row is None:
+        return None
+    file_url = str(file_row[0])
+    ref_rows = conn.execute(
+        """
+        SELECT how, link_text, revealed_by FROM linked_file_refs
+         WHERE file_id = ? AND page_id = ? AND scan_id = ?
+         ORDER BY how, link_text, id
+         LIMIT ?
+        """,
+        (file_id, page_id, scan_id, MAX_REFS_SHOWN),
+    ).fetchall()
+    if not ref_rows:
+        return None
+    refs = [
+        LinkedFileRef(
+            page_id=page_id,
+            page_url=str(page_row[0]),
+            page_title=page_row[1],
+            how=row[0],
+            link_text=str(row[1] or ""),
+            revealed_by=row[2],
+        )
+        for row in ref_rows
+    ]
+    name = display_name(file_url, refs[0].link_text)
+
+    saved = saved_copy(conn, page_id)
+    if saved is None:
+        return DocumentOnPage(
+            file_id=file_id, page_id=page_id, name=name, refs=refs, saved_copy=False, places=[]
+        )
+    body, base_url = saved
+    places: list[ElementPlaceModel] = []
+    try:
+        tree = HTMLParser(body)
+    except Exception:
+        tree = None
+    if tree is not None:
+        counter = Places(tree)
+        for tag, attribute in _PLACE_TAGS:
+            for node in tree.css(tag):
+                raw = node.attributes.get(attribute)
+                if not raw or hidden_from_inspector(node):
+                    continue
+                if tag == "a" and raw.strip().startswith("#"):
+                    continue
+                if resolve(base_url, raw) != file_url:
+                    continue
+                place = counter.of(node, tag)
+                if place is not None:
+                    places.append(
+                        ElementPlaceModel(
+                            selector=place.selector, index=place.index, total=place.total
+                        )
+                    )
+                if len(places) >= MAX_PLACES:
+                    break
+            if len(places) >= MAX_PLACES:
+                break
+    return DocumentOnPage(
+        file_id=file_id, page_id=page_id, name=name, refs=refs, saved_copy=True, places=places
+    )

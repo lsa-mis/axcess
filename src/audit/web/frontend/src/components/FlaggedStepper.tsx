@@ -63,6 +63,12 @@ import { cn } from "../lib/cn";
  * element can hold several occurrences (the inspector's "Occurrences: 3 on
  * this element"), so a count of elements is not a count of occurrences. An
  * occurrence is one place a problem appears and a grouped rule is a "issue type" (docs/plain-language.md, "Why "occurrence" and "issue type"").
+ *
+ * ``noun`` names the steps when they are not flagged elements: opened from
+ * the Documents tab, the inspector marks the links to one document, which
+ * flag nothing ("Link to this document 1 of 2"). Same control, other words,
+ * rather than a second stepper (SC 3.2.4 Consistent Identification, Level
+ * AA). The buttons keep "element", which is still what they move between.
  */
 export default function FlaggedStepper({
   count,
@@ -71,7 +77,10 @@ export default function FlaggedStepper({
   detail,
   goTo,
   className,
+  noun = { one: "Flagged element", many: "Flagged elements", count: "flagged element" },
 }: {
+  /** What the steps are: "Flagged element 2 of 5", the group "Flagged elements", "1 flagged element". */
+  noun?: { one: string; many: string; count: string };
   /** How many flagged elements the page has. */
   count: number;
   /** Which one the reader is on, from 0. */
@@ -88,11 +97,11 @@ export default function FlaggedStepper({
   return (
     <span
       role="group"
-      aria-label="Flagged elements"
+      aria-label={noun.many}
       className={cn("inline-flex flex-wrap items-center gap-x-3 gap-y-2", className)}
     >
       <span role="status" aria-atomic="true" className="text-2xs font-semibold text-fg-muted">
-        {many ? `Flagged element ${index + 1} of ${count}` : "1 flagged element"}
+        {many ? `${noun.one} ${index + 1} of ${count}` : `1 ${noun.count}`}
         {detail && <span className="sr-only">: {detail}</span>}
       </span>
       <span className="inline-flex flex-wrap items-center gap-2">

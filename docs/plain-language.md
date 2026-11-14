@@ -100,7 +100,7 @@ Use the word in the first column, and never the words in the last.
 | What changed | The page that lists what is new, still found and no longer found between two reports. | Compare reports (for this page), diff, verify changes |
 | Does not apply | A table cell with no value for this row. | n/a |
 | document | A PDF, Word, Excel, PowerPoint, OpenDocument, RTF or Google file that a scanned page links to or shows: the **Documents** tab. In code, a "linked file". | attachment, asset, download (as a noun), linked file (in the interface) |
-| Could not check | The Documents tab's third "How sure" value: Axcess has no result for the file, and the row says why. Keep "does not check this file type yet" (a later version may) apart from "cannot check" (no machine check can). | Unknown, Error, Skipped, Not applicable, Accessible, Passed |
+| Could not check | The Documents tab's third "Accessibility problems?" value: Axcess has no result for the file, and the row says why. Keep "does not check this file type yet" (a later version may) apart from "cannot check" (no machine check can). | Unknown, Error, Skipped, Not applicable, Accessible, Passed |
 | remove private details (redact) | Replace likely private details in a download with "[redacted]". The choice is "Remove private details (redact)"; the file is a "redacted copy". | sanitize, scrub, anonymize, mask, PII |
 
 ### Why "occurrence" and "issue type"
@@ -182,6 +182,7 @@ issue type is a real problem? Each word was chosen against these alternatives.
 | Choice | Rejected | Why |
 | --- | --- | --- |
 | "How sure" (column) | "Type" | "Type" names no question, so the badges under it had nothing to answer. |
+| "Accessibility problems?" (the Documents column) | "How sure" | On Documents, "How sure" did not say of what, so "0 Mostly sure" told readers nothing about the files. The values stay the same words; only the column names the question they answer. |
 | "Mostly sure" | "Barrier" | Jargon, and it sounds certain. |
 | "Mostly sure" | "Very sure", "Sure" | A fixed rule gives the same result every time, but it can still misjudge a page, such as contrast on text over a picture. We tell people to check each one on the page first ("Zero false positive goal" in the glossary). "Very sure" invites them to skip that check, and AGENTS.md says never to claim more than the evidence shows. |
 | "Mostly sure" | "Fairly certain", "Pretty certain", "High chance" | Longer words. "Fairly" and "pretty" have other meanings that confuse translation, and "High chance" does not say of what. |

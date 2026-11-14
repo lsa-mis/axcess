@@ -1197,6 +1197,8 @@ export function PageLink({
   occurrenceId = null,
   snippet = null,
   issue = null,
+  file = null,
+  fileName = null,
   origin,
   context,
   contextTo,
@@ -1218,6 +1220,10 @@ export function PageLink({
   snippet?: string | null;
   /** Issue key to resolve the selector for (used when ``selector`` is absent). */
   issue?: string | null;
+  /** A Documents row's file ID: the inspector marks the links to that file. */
+  file?: number | null;
+  /** That file's name, said to a screen reader so each page link names its own target. */
+  fileName?: string | null;
   /** Label of the view this link lives in (orientation breadcrumb). */
   origin?: string;
   /** Short context label (rule/issue/finding) shown on the inspector. */
@@ -1247,6 +1253,11 @@ export function PageLink({
   // (2026-11-10): the element's code says what it is, and a locator such as
   // "div:nth-of-type(4) > div > header" told a reader nothing. The ID alone
   // keeps each link unique.
+  //
+  // A Documents row's page link marks that row's file, so one page listed
+  // under two files is two different targets: the file's name is added the
+  // same way ("Home, opens in the page inspector, marks the link to
+  // permit-form.pdf").
 
   // Build the inspector URL with whatever orientation/selector context the
   // caller can offer. The params are kept sparse so the route stays legible.
@@ -1258,6 +1269,7 @@ export function PageLink({
     // it at 4000 chars, so mirror that, no point truncating below the source.
     if (snippet) params.set("snippet", snippet.slice(0, 4000));
     if (issue) params.set("issue", issue);
+    if (file != null) params.set("file", String(file));
     if (origin) params.set("origin", origin);
     if (context) params.set("context", context);
     if (contextTo) params.set("contextTo", contextTo);
@@ -1287,6 +1299,7 @@ export function PageLink({
           <span className="sr-only">
             , opens in the page inspector
             {occurrenceId != null ? `, occurrence ${occurrenceId}` : ""}
+            {fileName ? `, marks the link to ${fileName}` : ""}
           </span>
         </Link>
       ) : (

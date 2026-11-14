@@ -43,6 +43,38 @@ export const DOCUMENTS_VIEW = "Documents";
 
 const STATUSES: readonly LinkedFileStatus[] = ["mostly_sure", "not_sure", "could_not_check"];
 
+/**
+ * The name of the column that holds each file's value (Mostly sure, Not
+ * sure, Could not check), said as the question those values answer.
+ *
+ * The values are Issues' words, but the column is not called "How sure" as
+ * Issues' is: on its own, "How sure" did not say how sure of what, so "0
+ * Mostly sure" told the reader nothing about the files (the developer's
+ * report, 2026-11-13). Named as the question, the values read as answers:
+ * "Accessibility problems? Mostly sure." The developer asked to keep the
+ * values and change only this name. Rejected: new values ("Problems found",
+ * "A person must check", "Not checked"), which the developer declined, and
+ * "How sure", which left the question unsaid (SC 2.4.6 Headings and Labels,
+ * Level AA; SC 3.3.2 Labels or Instructions, Level A).
+ */
+const RESULT_COLUMN = "Accessibility problems?";
+
+/**
+ * The last column's name: the pages of the report where the file appears,
+ * as a link or shown inside the page. The developer asked for "where it
+ * appears" (2026-11-13); "Pages it appears on" keeps that word and says the
+ * answer is pages. The order's second step in the labels note uses the same
+ * words, so the column and its explanation match. Rejected: "Linked from",
+ * which did not say from what and does not fit a file shown in a frame;
+ * "Pages that link to it", which has the same frame problem; and "Where it
+ * appears", too close to Issues' "Where it shows", which means something
+ * else there (at page load, after clicking, in an image) (W3C COGA, "Making
+ * Content Usable", https://www.w3.org/TR/coga-usable/, paraphrased: the
+ * same word for the same thing, and different words for different things;
+ * SC 3.2.4 Consistent Identification, Level AA).
+ */
+const PAGES_COLUMN = "Pages it appears on";
+
 /** The fixed order, in words, for the table's caption and the labels note's order section. */
 const ORDER_WORDS = "Mostly sure first, then Not sure, then Could not check";
 
@@ -81,11 +113,14 @@ function plural(count: number, one: string, many: string): string {
  * "Open live page" opens a page: the file is the place the link goes, so its
  * name is the link's words (docs/plain-language.md rule 8), and the new tab
  * is said in screen-reader text (SC 3.2.5 Change on Request, Level AAA).
- * Then its type, the "How sure" value, what the checks found, and the pages
- * that link to it.
+ * The row header holds the name only: a screen reader reads it again with
+ * every cell, so anything else there (the full address, "On another site")
+ * was heard five times. Then its type, its site (SiteCell), the
+ * "Accessibility problems?" value (RESULT_COLUMN), what the checks found,
+ * and the pages that link to it.
  *
- * "How sure" uses the Issues table's tag (components/HowSureTag.tsx) and the
- * same words for the same meaning. What each value means is said in text in
+ * The value uses the Issues table's tag (components/HowSureTag.tsx) and its
+ * words for the same meaning, under a column name that says the question. What each value means is said in text in
  * the labels note under the table, as on Issues, because the tag's hover hint
  * is not available to everyone (SC 1.4.13 Content on Hover or Focus, Level
  * AA, and SC 3.3.2 Labels or Instructions, Level A, in spirit). A Not sure
@@ -205,7 +240,7 @@ export default function DocumentsRoute() {
 
       {/* The counts as Issues shows its own: the shared row of summary
           numbers over the table (SummaryNumbers, SummaryStat), how many
-          documents and then how many of each "How sure" value, in the
+          documents and then how many of each "Accessibility problems?" value, in the
           table's order. Four numbers, so four across from 640px and two by
           two below that, where nothing is squeezed at 320px (SC 1.4.10
           Reflow, Level AA). Every value is shown, zero included, as Issues
@@ -266,9 +301,10 @@ export default function DocumentsRoute() {
                   <tr>
                     <ColumnHeader>Document</ColumnHeader>
                     <ColumnHeader>Type</ColumnHeader>
-                    <ColumnHeader>How sure</ColumnHeader>
+                    <ColumnHeader>Site</ColumnHeader>
+                    <ColumnHeader>{RESULT_COLUMN}</ColumnHeader>
                     <ColumnHeader>What Axcess found</ColumnHeader>
-                    <ColumnHeader>Linked from</ColumnHeader>
+                    <ColumnHeader>{PAGES_COLUMN}</ColumnHeader>
                   </tr>
                 </TableHead>
                 <tbody>
@@ -361,13 +397,13 @@ function DocumentsCoverageNote({ recorded }: { recorded: boolean }) {
 }
 
 /**
- * What the counts, the How sure values and the order mean, closed until
+ * What the counts, the "Accessibility problems?" values and the order mean, closed until
  * asked for: Issues' labels note (IssueGlossary in routes/Issues.tsx), with
  * the same title pattern, place, grid and parts (ReportNote, GlossaryList),
  * so the two tabs explain their labels the same way (SC 3.2.4 Consistent
  * Identification, Level AA).
  *
- * The sections follow Issues': what is counted first, then the How sure
+ * The sections follow Issues': what is counted first, then the "Accessibility problems?"
  * values, each the same tag the table draws, then the order, as its own
  * section, the way Issues explains Priority ("which issue types to look at
  * first"). The tags carry the same sentences as hover hints, but a hint
@@ -394,7 +430,7 @@ function DocumentsGlossary() {
           ]}
         />
         <GlossaryList
-          heading="How sure: how sure Axcess is that a file has accessibility problems"
+          heading={`${RESULT_COLUMN} How sure Axcess is that a file has them`}
           items={STATUSES.map((status) => ({
             key: status,
             term: <HowSureTag label={LINKED_FILE_STATUS_LABEL[status]} quiet={status === "could_not_check"} />,
@@ -406,13 +442,13 @@ function DocumentsGlossary() {
           items={[
             {
               key: "status",
-              term: <span className="font-semibold text-fg">1. How sure</span>,
+              term: <span className="font-semibold text-fg">1. {RESULT_COLUMN}</span>,
               help: `${ORDER_WORDS}.`,
             },
             {
               key: "pages",
-              term: <span className="font-semibold text-fg">2. Pages that link to it</span>,
-              help: "Within each How sure value, files linked from more pages come first.",
+              term: <span className="font-semibold text-fg">2. {PAGES_COLUMN}</span>,
+              help: "Within each answer, files that appear on more pages come first.",
             },
             {
               key: "form",
@@ -456,7 +492,7 @@ function DocumentRow({
             rel="noopener noreferrer"
             className="inline-flex min-h-target items-center gap-1 break-words font-semibold text-umich-blue underline underline-offset-2"
           >
-            <span className="break-all" data-scanned-content>
+            <span className="[overflow-wrap:anywhere]" data-scanned-content>
               {row.name}
             </span>
             <span aria-hidden className="text-2xs">
@@ -465,19 +501,13 @@ function DocumentRow({
             <span className="sr-only">, opens the file ({OPENS_NEW_WINDOW})</span>
           </a>
         ) : (
-          <span className="font-semibold">{row.name}</span>
-        )}
-        <div className="break-all text-2xs text-fg-subtle">
-          <BreakableUrl text={row.url} />
-        </div>
-        {(row.off_site || row.is_form) && (
-          <ul className="mt-1 space-y-0.5 text-2xs text-fg-muted">
-            {row.off_site && <li>On another site</li>}
-            {row.is_form && <li>Has a form to fill in</li>}
-          </ul>
+          <span className="font-semibold [overflow-wrap:anywhere]">{row.name}</span>
         )}
       </RowHeader>
       <Cell className="min-w-[8rem] align-top">{LINKED_FILE_TYPE_LABEL[row.file_type]}</Cell>
+      <Cell className="min-w-[9rem] align-top">
+        <SiteCell url={row.url} offSite={row.off_site} />
+      </Cell>
       <Cell className="whitespace-nowrap align-top">
         <HowSureTag
           label={LINKED_FILE_STATUS_LABEL[row.status]}
@@ -497,6 +527,19 @@ function DocumentRow({
 
 /** What the checks found, or why there was nothing to find. */
 function Found({ row }: { row: LinkedFileRow }) {
+  return (
+    <>
+      <FoundResult row={row} />
+      {/* Something the check found in the file, and one of the steps of
+          the order, so it is said with the other findings rather than under
+          the file's name (where it was read out with the row header in
+          every cell). */}
+      {row.is_form && <p className="mt-2">Has a form to fill in.</p>}
+    </>
+  );
+}
+
+function FoundResult({ row }: { row: LinkedFileRow }) {
   if (row.status === "mostly_sure") {
     return (
       <ul className="list-disc space-y-1 pl-4">
@@ -510,7 +553,54 @@ function Found({ row }: { row: LinkedFileRow }) {
   return <p>{row.reason ? linkedFileReasonText(row.reason, row.http_status) : LINKED_FILE_STATUS_HELP.could_not_check}</p>;
 }
 
-/** The pages that reach the file, each with its link's words and how. */
+/**
+ * Where the file is kept: the site's name (its host, such as
+ * docs.google.com) and whether that is the scanned site or another one.
+ *
+ * Its own column, as the developer asked, in place of the file's full
+ * address and an "On another site" line under its name. The full address
+ * was long, broke mid-word, and, inside the row header, was read out again
+ * by a screen reader in every cell of the row (row headers are announced
+ * with each cell; technique H63). The host says what a reader needs (whose
+ * site, and whether it is ours) in a few words; the full address is still
+ * the file link's target. Rejected: the full address in this column, which
+ * kept the length; and the host under the name, which kept it in the row
+ * header (SC 1.3.1 Info and Relationships, Level A; W3C COGA, "Making
+ * Content Usable", https://www.w3.org/TR/coga-usable/, paraphrased: one
+ * idea per chunk).
+ */
+function SiteCell({ url, offSite }: { url: string; offSite: boolean }) {
+  let host: string | null = null;
+  try {
+    host = new URL(url).host;
+  } catch {
+    host = null;
+  }
+  return (
+    <>
+      {host && (
+        <span className="block" data-scanned-content>
+          <BreakableUrl text={host} />
+        </span>
+      )}
+      <span className="block text-2xs text-fg-muted">{offSite ? "Another site" : "This site"}</span>
+    </>
+  );
+}
+
+/**
+ * The pages that reach the file, each a page link to the inspector, which
+ * marks the link (or frame) there; and how, when it is not a plain link.
+ *
+ * The page's title only. Its full address and the link's own words are not
+ * shown, as the developer asked (2026-11-13): the address was long and said
+ * little, and the inspector now shows the link itself, outlined, in place.
+ * The address still appears when two pages in the cell share a title, so
+ * they can be told apart (SC 2.4.9 Link Purpose (Link Only), Level AAA).
+ * No count line ("2 pages link to it."): the column's name says what the
+ * list is, and the list is the count; only pages past the shown 20 are
+ * counted, under it.
+ */
 function LinkedFrom({ row, scanId, backTo }: { row: LinkedFileRow; scanId: number; backTo: string }) {
   if (row.refs.length === 0) {
     return (
@@ -520,10 +610,15 @@ function LinkedFrom({ row, scanId, backTo }: { row: LinkedFileRow; scanId: numbe
     );
   }
   const more = row.referring_page_count - new Set(row.refs.map((ref) => ref.page_id)).size;
+  // Pages per title, so the address is shown only where a title is shared.
+  const pagesByTitle = new Map<string, Set<number>>();
+  for (const ref of row.refs) {
+    const title = ref.page_title?.trim() || ref.page_url;
+    pagesByTitle.set(title, (pagesByTitle.get(title) ?? new Set()).add(ref.page_id));
+  }
   return (
     <div className="text-sm">
-      <p className="text-fg-muted">{plural(row.referring_page_count, "page links", "pages link")} to it.</p>
-      <ul className="mt-1 space-y-2">
+      <ul className="space-y-2">
         {row.refs.map((ref, position) => (
           <li key={`${ref.page_id}-${ref.how}-${position}`}>
             <PageLink
@@ -531,6 +626,9 @@ function LinkedFrom({ row, scanId, backTo }: { row: LinkedFileRow; scanId: numbe
               scanId={scanId}
               pageUrl={ref.page_url}
               pageTitle={ref.page_title}
+              showUrlBelow={(pagesByTitle.get(ref.page_title?.trim() || ref.page_url)?.size ?? 0) > 1}
+              file={row.file_id}
+              fileName={row.name}
               origin={DOCUMENTS_VIEW}
               backTo={backTo}
               actions={false}
@@ -548,20 +646,12 @@ function LinkedFrom({ row, scanId, backTo }: { row: LinkedFileRow; scanId: numbe
   );
 }
 
-/** The link's own words, and how the page shows the file when it is not a plain link. */
+/** How the page shows the file, when it is not a plain link; nothing for a plain link. */
 function RefDetails({ refItem }: { refItem: LinkedFileRef }) {
-  const isLink = refItem.how === "link" || refItem.how === "revealed_link";
   const how = refItem.how === "link" || refItem.how === "revealed_link" ? null : LINKED_FILE_REF_LABEL[refItem.how];
+  if (!how && refItem.how !== "revealed_link") return null;
   return (
     <ul className="space-y-0.5 text-2xs text-fg-muted">
-      <li>
-        {isLink ? "Link text: " : "Title: "}
-        {refItem.link_text ? (
-          <span data-scanned-content>&ldquo;{refItem.link_text}&rdquo;</span>
-        ) : (
-          "none"
-        )}
-      </li>
       {how && <li>{how}</li>}
       {refItem.how === "revealed_link" && (
         <li>
