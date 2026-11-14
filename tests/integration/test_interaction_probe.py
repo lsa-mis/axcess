@@ -109,6 +109,24 @@ async def test_never_operates_a_destructive_control(page, axe) -> None:  # type:
 
 
 @pytest.mark.integration
+async def test_never_marks_messages_read_or_bookmarks(page, axe) -> None:  # type: ignore[no-untyped-def]
+    """ "Mark all as read" and its kin change the account, so are never pressed.
+
+    Real pages: a signed-in scan pressed a notifications menu's "Mark all as
+    read" on 98 of 100 pages. The menu itself is still opened and checked.
+    """
+    await page.goto(_file_url("notifications_menu.html"))
+    baseline = await axe.run(page, "AA")
+
+    result = await InteractionProbe(axe=axe).run(page, baseline=baseline)
+
+    pressed = await page.evaluate("() => document.body.dataset.pressed || ''")
+    assert pressed == "", f"probe pressed state-changing controls: {pressed}"
+    assert result.blocked_controls == 4
+    assert result.states >= 1, "the menu holding them must still be opened"
+
+
+@pytest.mark.integration
 async def test_repeated_controls_are_sampled_not_exhausted(page, axe) -> None:  # type: ignore[no-untyped-def]
     """Ten same-shaped buttons must not produce ten clicks."""
     await page.goto(_file_url("hidden_state.html"))

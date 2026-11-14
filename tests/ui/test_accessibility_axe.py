@@ -733,7 +733,7 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     # (the developer's order and words, 2026-10-30). Pages that could not
     # be loaded are said in words, never as "errors", which readers took for
     # accessibility errors, and only when there are some.
-    summary = page.locator("dl").filter(has_text="Pages visited")
+    summary = page.locator("dl").filter(has_text="Pages visited").first
     await playwright_async.expect(summary.get_by_role("term")).to_have_text(
         [
             re.compile(r"^Issue types?$"),
@@ -1548,11 +1548,12 @@ async def test_login_scan_is_visible_and_explains_login_before_crawl(
     dom_discovery = page.get_by_role("switch", name=re.compile(r"^Open menus, tabs"))
     await playwright_async.expect(dom_discovery).to_be_checked()
 
-    workers = page.get_by_role("spinbutton", name="Signed-in tabs")
+    workers = page.get_by_role("spinbutton", name="Pages at once (workers)")
     await playwright_async.expect(workers).to_be_enabled()
-    await playwright_async.expect(workers).to_have_value("2")
-    await workers.fill("4")
     await playwright_async.expect(workers).to_have_value("4")
+    await playwright_async.expect(workers).to_have_attribute("max", "8")
+    await workers.fill("8")
+    await playwright_async.expect(workers).to_have_value("8")
 
     both_engines = page.get_by_role("radio", name="Both", exact=True)
     axe_only = page.get_by_role("radio", name="axe", exact=True)
@@ -1878,5 +1879,36 @@ async def test_pages_visited_list_fits_a_phone_screen(
             })"""
         )
         assert widths["body"] <= widths["client"], widths
+    finally:
+        await page.context.close()
+
+
+async def test_how_this_scan_ran_is_a_closed_row_with_coverage_and_note(
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """ "How this scan ran" sits with the report's other notes on every
+    report, says on the closed row how the scan ended, opens by keyboard,
+    and lists the coverage facts and Axcess's own note when there is one."""
+    from audit.web.server import tab_fallback_note
+
+    base, scan_id = live_server
+    note = tab_fallback_note(4)
+    with sqlite3.connect(seeded_db[0]) as conn:
+        conn.execute("UPDATE scans SET scan_note = ? WHERE id = ?", (note, scan_id))
+    page = await new_page()
+    try:
+        await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+        row = page.get_by_role("button", name=re.compile(r"^How this scan ran"))
+        await playwright_async.expect(row).to_have_attribute("aria-expanded", "false")
+        await row.focus()
+        await page.keyboard.press("Enter")
+        panel = page.locator("#report-scan-note-panel")
+        for term in ("How it ended", "Pages found", "Pages visited", "Maximum pages"):
+            await playwright_async.expect(panel.get_by_text(term, exact=True)).to_be_visible()
+        await playwright_async.expect(panel.get_by_text(note)).to_be_visible()
+        violations = await _run_axe(page)
+        assert not violations, _render_violations(violations)
     finally:
         await page.context.close()

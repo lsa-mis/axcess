@@ -15,7 +15,6 @@ between ``page.goto`` and ``ctx.close``.
 
 from __future__ import annotations
 
-import asyncio
 import contextlib
 import io
 import math
@@ -38,8 +37,10 @@ from audit.analyzer.visual import VisualFinding, VisualProbe
 from audit.crawler import live_progress
 from audit.crawler.fetcher import FetchError, FetchResult
 from audit.crawler.frame_snapshot import SavedFrame, capture_frames
+from audit.crawler.render_detect import looks_like_authentication_page
 from audit.crawler.search import SearchExplorer
 from audit.crawler.style_snapshot import SheetCache, StyleSnapshot, capture_styles
+from audit.crawler.tab_pool import TabPool
 from audit.crawler.url_policy import normalize
 from audit.logging import get_logger
 from audit.wcag_version import LEGACY_WCAG_VERSION, WcagVersion
@@ -48,6 +49,11 @@ if TYPE_CHECKING:
     from playwright.async_api import Browser, BrowserContext, Page, Playwright, ViewportSize
 
 log = get_logger(__name__)
+
+
+class _CopiedTabSignedOutError(Exception):
+    """A tab holding a copied session loaded a sign-in page; check in the first tab."""
+
 
 _DEFAULT_VIEWPORT: ViewportSize = {"width": 1440, "height": 900}
 _NAV_TIMEOUT_MS = 30_000
@@ -232,6 +238,7 @@ class JsFetcher:
         capture_screenshots: bool = False,
         shared_context: BrowserContext | None = None,
         shared_pages: tuple[Page, ...] = (),
+        copied_session: bool = False,
         private_context: bool = False,
         max_rendered_html_chars: int | None = None,
         headless: bool = True,
@@ -291,11 +298,12 @@ class JsFetcher:
         if shared_pages and shared_context is None:
             raise ValueError("shared_pages requires shared_context")
         self._shared_pages = shared_pages
-        self._shared_page_pool: asyncio.Queue[Page] | None = None
-        if shared_pages:
-            self._shared_page_pool = asyncio.Queue(maxsize=len(shared_pages))
-            for shared_page in shared_pages:
-                self._shared_page_pool.put_nowait(shared_page)
+        # ``copied_session``: the tabs after the first start from a copy of
+        # its sessionStorage, so a sign-in page in one of them is checked in
+        # the first tab before it is believed (``audit.crawler.tab_pool``).
+        self.tab_pool: TabPool | None = (
+            TabPool(shared_pages, copied_session=copied_session) if shared_pages else None
+        )
         # A protected companion must never put target paths, redirect URLs, or
         # browser exception text (which can contain query/session material)
         # into the application log. Public crawling keeps the useful existing
@@ -345,7 +353,18 @@ class JsFetcher:
         """Render ``url`` with chromium and return the settled HTML.
 
         Raises :class:`FetchError` on navigation failure or timeout.
+
+        A sign-in page in a tab holding a copied session is not believed: the
+        page is loaded again in the first tab, before any check runs on it,
+        and if that tab shows the real page the scan falls back to the first
+        tab alone (``audit.crawler.tab_pool``).
         """
+        try:
+            return await self._fetch(url, primary=False)
+        except _CopiedTabSignedOutError:
+            return await self._fetch(url, primary=True)
+
+    async def _fetch(self, url: str, *, primary: bool) -> FetchResult:
         if self._browser is None and self._shared_context is None:
             raise RuntimeError("JsFetcher used outside its async context")
         if self._shared_context is not None:
@@ -365,8 +384,8 @@ class JsFetcher:
         page: Page | None = None
         pooled_page = False
         try:
-            if self._shared_page_pool is not None:
-                page = await self._shared_page_pool.get()
+            if self.tab_pool is not None:
+                page = await self.tab_pool.acquire(primary=primary)
                 pooled_page = True
             else:
                 page = await ctx.new_page()
@@ -408,6 +427,19 @@ class JsFetcher:
                         "Rendered page exceeded the configured extraction limit."
                     )
             html = await page.content()
+            pool = self.tab_pool
+            if pooled_page and pool is not None and pool.checks_copies:
+                # Before any check runs, so nothing is measured or kept from
+                # a page that only a stale copy of the session would show.
+                on_sign_in = looks_like_authentication_page(
+                    page.url, html.encode("utf-8", errors="replace")
+                )
+                if on_sign_in and page is not pool.primary:
+                    raise _CopiedTabSignedOutError
+                if primary and not on_sign_in:
+                    # The first tab shows the real page where a copy showed
+                    # a sign-in page: the copy was signed out.
+                    await pool.fall_back()
             status = resp.status
             headers = resp.headers
             # The CSS of the document just serialized, read before any probe
@@ -680,8 +712,8 @@ class JsFetcher:
             # wipes it only when the scan reaches a terminal state.  Close the
             # per-page tab, never the session itself.  Public scans retain the
             # old "new context per fetch" isolation guarantee.
-            if pooled_page and page is not None and self._shared_page_pool is not None:
-                self._shared_page_pool.put_nowait(page)
+            if pooled_page and page is not None and self.tab_pool is not None:
+                await self.tab_pool.release(page)
             elif owns_context:
                 await ctx.close()
             elif page is not None:

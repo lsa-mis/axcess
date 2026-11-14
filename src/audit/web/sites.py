@@ -5,9 +5,9 @@ report a scan is compared with, so the list and "compare to previous" never
 disagree about whether two reports cover the same site.
 
 Each group names two scans that can differ: the most recent scan of any
-status, and the most recent *completed* one. The headline numbers come only
-from the completed one; an interrupted or failed crawl has partial evidence
-and must not stand in for the site. Issue and occurrence counts use the
+status, and the most recent *report*: a completed scan, or any scan that
+ended with saved pages, however it ended (``page_count`` stays 0 until a
+scan ends). Issue and occurrence counts use the
 canonical issue projection, so they match the totals the Issues page shows
 for that report.
 """
@@ -46,23 +46,23 @@ class SiteGroup(BaseModel):
 
     site_url: str
     scan_count: int
-    completed_count: int
+    report_count: int
     most_recent: ScanSummaryModel
-    most_recent_completed: ScanSummaryModel | None
-    # Unified issue groups in ``most_recent_completed``; null when there is none.
-    most_recent_completed_issue_count: int | None
+    most_recent_report: ScanSummaryModel | None
+    # Unified issue groups in ``most_recent_report``; null when there is none.
+    most_recent_report_issue_count: int | None
     # Occurrences across those issues, the Issues page's "all evidence"
-    # total; null when there is no completed scan.
-    most_recent_completed_occurrence_count: int | None
+    # total; null when the site has no report yet.
+    most_recent_report_occurrence_count: int | None
     # The same two counts for the levels the Issues page shows when it opens
     # (``audit.labels.DEFAULT_REVIEW_LANES``, every level since 2026-11-13).
-    most_recent_completed_shown_issue_count: int | None
-    most_recent_completed_shown_occurrence_count: int | None
+    most_recent_report_shown_issue_count: int | None
+    most_recent_report_shown_occurrence_count: int | None
     scans: list[ScanSummaryModel]
 
 
 class ReportCounts(BaseModel):
-    """The two issue counts of one completed report, as the Issues page counts them.
+    """The two issue counts of one report, as the Issues page counts them.
 
     Field names are the data's: ``issue_count`` is unified issue groups (the
     interface's "issue types") and ``occurrence_count`` is every place
@@ -79,11 +79,7 @@ class ReportCounts(BaseModel):
 
 
 def report_counts(conn: sqlite3.Connection, scan_id: int) -> ReportCounts:
-    """Counts for one completed report, from the same cache as the site list.
-
-    The caller checks that the report exists and is completed; a partial
-    scan's counts would stand in for evidence it never gathered.
-    """
+    """Counts for one report, from the same cache as the site list."""
     issue_count, occurrence_count, shown_issues, shown_occurrences = _issue_count(conn, scan_id)
     return ReportCounts(
         issue_count=issue_count,
@@ -105,32 +101,30 @@ def group_scans(conn: sqlite3.Connection, summaries: Iterable[dict[str, Any]]) -
 
     groups: list[SiteGroup] = []
     for site_url, scans in by_site.items():
-        completed = [scan for scan in scans if scan["status"] == "completed"]
-        latest_completed = completed[0] if completed else None
-        counts = _issue_count(conn, int(latest_completed["id"])) if latest_completed else None
+        reports = [scan for scan in scans if scan["status"] == "completed" or scan["page_count"]]
+        latest_report = reports[0] if reports else None
+        counts = _issue_count(conn, int(latest_report["id"])) if latest_report else None
         groups.append(
             SiteGroup(
                 site_url=site_url,
                 scan_count=len(scans),
-                completed_count=len(completed),
+                report_count=len(reports),
                 most_recent=ScanSummaryModel(**scans[0]),
-                most_recent_completed=(
-                    ScanSummaryModel(**latest_completed) if latest_completed else None
-                ),
-                most_recent_completed_issue_count=counts[0] if counts else None,
-                most_recent_completed_occurrence_count=counts[1] if counts else None,
-                most_recent_completed_shown_issue_count=counts[2] if counts else None,
-                most_recent_completed_shown_occurrence_count=counts[3] if counts else None,
+                most_recent_report=(ScanSummaryModel(**latest_report) if latest_report else None),
+                most_recent_report_issue_count=counts[0] if counts else None,
+                most_recent_report_occurrence_count=counts[1] if counts else None,
+                most_recent_report_shown_issue_count=counts[2] if counts else None,
+                most_recent_report_shown_occurrence_count=counts[3] if counts else None,
                 scans=[ScanSummaryModel(**scan) for scan in scans],
             )
         )
     return groups
 
 
-# Issue counts of completed reports, by database file and report id, with the
+# Issue counts of reports, by database file and report id, with the
 # evidence they were counted from. Reports polls every few seconds while a scan runs, and
 # building the full issue list for every site on every poll grew with the
-# number of sites times their evidence. A completed report's count changes
+# number of sites times their evidence. An ended report's count changes
 # only if its evidence does (``audit synthesize`` rewrites image findings),
 # so the cheap fingerprint below decides when to count again.
 _issue_counts: dict[tuple[str, int], tuple[tuple[int, ...], tuple[int, int, int, int]]] = {}
@@ -151,7 +145,7 @@ def _evidence_fingerprint(conn: sqlite3.Connection, scan_id: int) -> tuple[int, 
 
 
 def _issue_count(conn: sqlite3.Connection, scan_id: int) -> tuple[int, int, int, int]:
-    """Issues and occurrences in a completed report, as the Issues page counts them.
+    """Issues and occurrences in a report, as the Issues page counts them.
 
     All of them first, then those the Issues page shows when it opens.
     """

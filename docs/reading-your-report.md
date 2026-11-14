@@ -1,7 +1,12 @@
 # Reading your Axcess report
 
-A report is one completed scan: the pages Axcess tested, what each check
-found, and the [evidence](glossary.md#evidence) behind each result. This guide
+A report is one completed scan, or a stopped or failed scan that saved at
+least one page: the pages Axcess tested, what each check
+found, and the [evidence](glossary.md#evidence) behind each result. Under
+**Pages visited**, the report says how many pages the scan found and how it
+ended, and **How this scan ran** lists its maximum pages and maximum link
+depth. A stopped scan's report covers the pages it visited, the same way a
+report with a page limit does. This guide
 explains every screen, column, and export, and what to do next. Terms link to
 the [Axcess glossary](glossary.md). A report is evidence for people to review;
 it never proves [WCAG](glossary.md#wcag) conformance or legal compliance.
@@ -434,7 +439,7 @@ side, each in its own panel. There are two ways to open it:
 
 - From a report, choose the **Compare reports** tab. The report opens in the
   first panel. The second panel is empty and lists the site's other
-  completed reports, newest first. Choose one to show it there.
+  reports, newest first. Choose one to show it there.
 - On **Reports**, open a site and choose **Compare with** on one of its
   scans, then the report to compare it with. Both panels open at once.
 
@@ -460,7 +465,7 @@ each [issue type](glossary.md#issue-type), not each occurrence, as one of these:
 | No longer found | Found in the earlier report but not found again in this one. That is not proof of a fix. Check the page yourself before you mark its occurrences Fixed. |
 | Still found | Found in both reports. Its number of occurrences can still go up or down. |
 
-What changed opens with **Trend over time**, which plots every completed scan of
+What changed opens with **Trend over time**, which plots every report of
 the site. Select a point in the trend, or use **Show as data table**, to open
 that scan's issues or compare it with this report. Below it are the three
 numbers; each is also a filter for the table under them. The table has one

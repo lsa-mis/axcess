@@ -602,7 +602,7 @@
     "/api/scans/{scan_id}/issue-counts": {
       "get": {
         "summary": "Api Scan Issue Counts",
-        "description": "One completed report's two issue counts, for the Reports list.\n\nFetched when a site's list of scans is opened, not with ``/api/sites``:\ncounting means building the issue list, and the site list is fetched\nevery few seconds while a scan runs.",
+        "description": "One report's two issue counts, for the Reports list.\n\nFetched when a site's list of scans is opened, not with ``/api/sites``:\ncounting means building the issue list, and the site list is fetched\nevery few seconds while a scan runs.",
         "operationId": "api_scan_issue_counts_api_scans__scan_id__issue_counts_get",
         "parameters": [
           {
@@ -1761,7 +1761,7 @@
     "/api/scans/{scan_id}/images/{image_id}/alt-check": {
       "post": {
         "summary": "Api Check Image Alt",
-        "description": "Ask the local model about one image's alt text, keep and return its answer.\n\nA person's explicit request from the Images tab. Refused for a scan\nthat is not complete, for a protected scan (its images do not leave\nthe protected store), and when no model is set. A timeout or an\nunusable answer saves nothing and says so; the tab keeps working.",
+        "description": "Ask the local model about one image's alt text, keep and return its answer.\n\nA person's explicit request from the Images tab. Refused while the\nscan is still running, for a protected scan (its images do not leave\nthe protected store), and when no model is set. A timeout or an\nunusable answer saves nothing and says so; the tab keeps working.",
         "operationId": "api_check_image_alt_api_scans__scan_id__images__image_id__alt_check_post",
         "parameters": [
           {
@@ -2861,7 +2861,7 @@
           },
           "max_depth": {"type": "integer", "maximum": 20.0, "minimum": 1.0, "title": "Max Depth", "default": 10},
           "rps": {"type": "number", "maximum": 5.0, "minimum": 0.1, "title": "Rps", "default": 1.0},
-          "workers": {"type": "integer", "maximum": 4.0, "minimum": 1.0, "title": "Workers", "default": 2},
+          "workers": {"type": "integer", "maximum": 8.0, "minimum": 1.0, "title": "Workers", "default": 4},
           "show_browser": {"type": "boolean", "title": "Show Browser", "default": false},
           "whole_host": {"type": "boolean", "title": "Whole Host", "default": false},
           "scan_engine": {
@@ -3446,7 +3446,7 @@
         "type": "object",
         "required": ["site_url", "total", "scans"],
         "title": "SiteHistory",
-        "description": "Completed public reports of one site, oldest first, for the trend."
+        "description": "Public reports of one site, oldest first, for the trend."
       },
       "Snapshot": {
         "properties": {

@@ -34,8 +34,14 @@ The tool combines evidence with different confidence levels:
 | Image-of-text OCR/VLM | `findings`, `analyses`, `page_images` | OCR plus local Ollama judgment; treat classification/rationale as evidence, not a legal conclusion. |
 | Semantic analyzer | `page_a11y_findings` with pipeline discrimination | Local LLM judgment of contextual WCAG criteria; explicitly present it as a lead requiring human confirmation. |
 
-An **accessibility report** in product language is one completed `scans` row
-and its child evidence. An **issue** is a grouped view within that report:
+An **accessibility report** in product language is one completed `scans`
+row, or a stopped or failed one that saved at least one page, and its child
+evidence. How a scan ended does not make it more or less
+of a report: a scan stopped after 100 pages covers more than one that
+completed at a 10-page limit. Say coverage with facts (pages found, pages
+visited, the limits chosen, how it ended), never by calling a report
+"partial" or "full", and never hide a report's views or refuse an action
+because the scan was stopped. An **issue** is a grouped view within that report:
 one axe/probe/semantic rule or one `(classification, alt_adequacy)` image
 finding group. Never mix data from different `scan_id` values in an answer
 unless the user explicitly requests a comparison.
@@ -136,16 +142,15 @@ Existing product constraints are load-bearing:
 ## Per-report MCP conversation: target design
 
 The desired feature is a brief, evidence-grounded conversation attached to a
-single completed accessibility report. It is **not implemented yet**. Build it
+single accessibility report. It is **not implemented yet**. Build it
 as an optional MCP integration with a separate model provider adapter; do not
 couple it to the existing Ollama analyzers or silently send report contents to
 an external model.
 
 ### Scope and interaction contract
 
-1. The chat entry point lives on a completed scan's detail/Issues page and is
-   initialized with an immutable `scan_id`. Reject chats for running,
-   failed, or deleted scans.
+1. The chat entry point lives on a report's Issues page and is
+   initialized with an immutable `scan_id`. Reject chats for deleted scans.
 2. The assistant can answer concise questions such as "What should we fix
    first?", "Why is this an issue?", and "Which pages are affected?" using
    that scan's stored evidence.
@@ -169,12 +174,12 @@ server-side session scope:
 
 | Tool | Purpose | Required guard |
 | --- | --- | --- |
-| `get_report_summary` | Scan metadata, coverage/methods used, counts and limitations. | Completed scan; exact `scan_id`. |
+| `get_report_summary` | Scan metadata, coverage/methods used, counts and limitations. | Exact `scan_id`. |
 | `list_issues` | Filtered, paginated unified issue rows. | Bounded `limit` (max 50); no cross-scan query. |
 | `get_issue_detail` | Remediation, affected pages, status summary, and rule metadata. | Validate canonical issue key belongs to scan. |
 | `get_finding_evidence` | Specific DOM/OCR/VLM/probe evidence and screenshot/blob reference. | Finding must belong to scan; omit oversized/raw HTML by default. |
 | `get_coverage_and_limitations` | Enabled/skipped methods and manual-review caveats. | Always include when discussing report completeness. |
-| `compare_reports` | Explicit opt-in diff between two completed scans of the same normalized scope. | Exact two IDs, no implicit comparison. |
+| `compare_reports` | Explicit opt-in diff between two reports of the same normalized scope. | Exact two IDs, no implicit comparison. |
 
 Do not expose raw SQL, arbitrary filesystem paths, arbitrary URLs, the
 access-token value, or a general HTTP-fetch tool through MCP. Do not make

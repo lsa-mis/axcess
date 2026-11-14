@@ -400,6 +400,22 @@ def test_zip_puts_images_in_group_and_verdict_folders(app_and_ids: Any) -> None:
     assert address.hyperlink.target == "http://example.com/students.png"
 
 
+def test_stopped_scan_with_saved_pages_is_a_report(app_and_ids: Any) -> None:
+    # Since 2026-11-14 a scan that ended with saved pages is a full report.
+    client, scan_id, photo, db_path = app_and_ids
+    conn = connect(db_path)
+    try:
+        conn.execute(
+            "UPDATE scans SET status = 'interrupted', page_count = 3 WHERE id = ?", (scan_id,)
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    client.app.state.alt_checker_factory = lambda _client: _Stub()
+    assert client.post(f"/api/scans/{scan_id}/images/{photo}/alt-check").status_code == 200
+    assert client.get(f"/api/scans/{scan_id}/images/export.zip").status_code == 200
+
+
 def test_zip_refuses_report_that_is_not_complete(app_and_ids: Any) -> None:
     client, scan_id, _, db_path = app_and_ids
     conn = connect(db_path)

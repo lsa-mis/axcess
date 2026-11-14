@@ -26,7 +26,6 @@
     "content_type": "application/json",
     "body": [
       {
-        "completed_count": "integer",
         "most_recent": {
           "dom_state_count": "integer",
           "finding_count": "integer",
@@ -38,26 +37,22 @@
           "started_at": "string",
           "status": "string"
         },
-        "most_recent_completed": {
-          "anyOf": [
-            "null",
-            {
-              "dom_state_count": "integer",
-              "finding_count": "integer",
-              "finished_at": "string",
-              "id": "integer",
-              "page_count": "integer",
-              "rule_checks": [],
-              "seed_url": "string",
-              "started_at": "string",
-              "status": "string"
-            }
-          ]
+        "most_recent_report": {
+          "dom_state_count": "integer",
+          "finding_count": "integer",
+          "finished_at": "null|string",
+          "id": "integer",
+          "page_count": "integer",
+          "rule_checks": [],
+          "seed_url": "string",
+          "started_at": "string",
+          "status": "string"
         },
-        "most_recent_completed_issue_count": "integer|null",
-        "most_recent_completed_occurrence_count": "integer|null",
-        "most_recent_completed_shown_issue_count": "integer|null",
-        "most_recent_completed_shown_occurrence_count": "integer|null",
+        "most_recent_report_issue_count": "integer",
+        "most_recent_report_occurrence_count": "integer",
+        "most_recent_report_shown_issue_count": "integer",
+        "most_recent_report_shown_occurrence_count": "integer",
+        "report_count": "integer",
         "scan_count": "integer",
         "scans": [
           {
@@ -87,6 +82,13 @@
       "axe_violations_total": "integer",
       "blocked": "null",
       "by_severity": {"critical": "integer", "info": "integer", "major": "integer", "minor": "integer"},
+      "coverage": {
+        "depth_limit": "integer",
+        "ended": "string",
+        "page_limit": "integer",
+        "pages_found": "null",
+        "pages_visited": "integer"
+      },
       "dom_state_count": "integer",
       "error_count": "integer",
       "failure_reason": "null",
@@ -113,6 +115,7 @@
       "previous_scan_id": "integer",
       "progress": "null",
       "rule_checks": ["string"],
+      "scan_note": "string",
       "seed_url": "string",
       "started_at": "string",
       "status": "string",
@@ -130,6 +133,13 @@
       "axe_violations_total": "integer",
       "blocked": "null",
       "by_severity": {"critical": "integer", "info": "integer", "major": "integer", "minor": "integer"},
+      "coverage": {
+        "depth_limit": "null",
+        "ended": "string",
+        "page_limit": "null",
+        "pages_found": "integer",
+        "pages_visited": "integer"
+      },
       "dom_state_count": "integer",
       "error_count": "integer",
       "failure_reason": "null",
@@ -188,6 +198,7 @@
         "static_pages": "integer"
       },
       "rule_checks": [],
+      "scan_note": "null",
       "seed_url": "string",
       "started_at": "string",
       "status": "string",
@@ -205,6 +216,13 @@
       "axe_violations_total": "integer",
       "blocked": {"page_count": "integer", "seed_url": "string", "status_code": "integer", "title": "string"},
       "by_severity": {"critical": "integer", "info": "integer", "major": "integer", "minor": "integer"},
+      "coverage": {
+        "depth_limit": "null",
+        "ended": "string",
+        "page_limit": "null",
+        "pages_found": "null",
+        "pages_visited": "integer"
+      },
       "dom_state_count": "integer",
       "error_count": "integer",
       "failure_reason": "null",
@@ -231,6 +249,7 @@
       "previous_scan_id": "null",
       "progress": "null",
       "rule_checks": [],
+      "scan_note": "null",
       "seed_url": "string",
       "started_at": "string",
       "status": "string",
@@ -248,6 +267,13 @@
       "axe_violations_total": "integer",
       "blocked": "null",
       "by_severity": {"critical": "integer", "info": "integer", "major": "integer", "minor": "integer"},
+      "coverage": {
+        "depth_limit": "null",
+        "ended": "string",
+        "page_limit": "null",
+        "pages_found": "null",
+        "pages_visited": "integer"
+      },
       "dom_state_count": "integer",
       "error_count": "integer",
       "failure_reason": "string",
@@ -274,6 +300,7 @@
       "previous_scan_id": "null",
       "progress": "null",
       "rule_checks": [],
+      "scan_note": "null",
       "seed_url": "string",
       "started_at": "string",
       "status": "string",
@@ -291,7 +318,16 @@
       "shown_occurrence_count": "integer"
     }
   },
-  "GET /api/scans/{scan_id}/issue-counts (running)": {"status": 409, "content_type": "application/json", "body": {"detail": "string"}},
+  "GET /api/scans/{scan_id}/issue-counts (running)": {
+    "status": 200,
+    "content_type": "application/json",
+    "body": {
+      "issue_count": "integer",
+      "occurrence_count": "integer",
+      "shown_issue_count": "integer",
+      "shown_occurrence_count": "integer"
+    }
+  },
   "GET /api/scans/{scan_id}/issues": {
     "status": 200,
     "content_type": "application/json",

@@ -509,13 +509,13 @@ def test_local_login_screenshots_follow_the_rendered_storage_opt_out(
     assert config.capture_screenshots is False
 
 
-def test_local_login_scan_rejects_more_than_four_workers(client: TestClient) -> None:
+def test_local_login_scan_rejects_more_than_eight_workers(client: TestClient) -> None:
     response = client.post(
         "/api/local-login-scans",
         json={
             "seed_url": "https://app.example.test/secure/",
             "authorization_acknowledged": True,
-            "workers": 5,
+            "workers": 9,
         },
     )
 
@@ -1690,26 +1690,6 @@ def test_export_fix_brief_draft_needs_the_same_acknowledgement(
     assert redacted.text.count("REDACTED COPY") == 1
 
 
-@pytest.mark.parametrize("status", ["running", "failed", "interrupted"])
-def test_export_fix_brief_refuses_a_scan_that_is_not_complete(
-    client: TestClient, seeded_db: tuple[object, object, int], status: str
-) -> None:
-    db_path, _, scan_id = seeded_db
-    conn = connect(Path(str(db_path)))
-    try:
-        conn.execute("UPDATE scans SET status = ? WHERE id = ?", (status, scan_id))
-        conn.commit()
-    finally:
-        conn.close()
-    resp = client.get(f"/api/scans/{scan_id}/export/brief", params={"draft": "acknowledged"})
-    assert resp.status_code == 409
-    assert "only be made from a completed scan" in resp.json()["detail"]
-    # The Export panel's sizes leave the brief out instead of failing.
-    options = client.get(f"/api/scans/{scan_id}/exports")
-    assert options.status_code == 200
-    assert "brief" not in {entry["format"] for entry in options.json()["formats"]}
-
-
 def test_export_fix_brief_of_a_deleted_or_unknown_scan_returns_404(
     client: TestClient, seeded_db: tuple[object, object, int]
 ) -> None:
@@ -2317,6 +2297,31 @@ def test_local_login_scan_defaults_to_wcag_21(
     status, captured = _local_login_post(seeded_db, monkeypatch)
     assert status == 201
     assert getattr(captured["config"], "wcag_version", None) == "2.1"
+
+
+def test_local_login_scan_defaults_to_four_tabs_and_accepts_eight(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One signed-in tab per worker; four by default, at most eight."""
+    status, captured = _local_login_post(seeded_db, monkeypatch)
+    assert status == 201
+    assert captured["config"].workers == 4
+    assert captured["config"].concurrency_per_host == 4
+    status, captured = _local_login_post(seeded_db, monkeypatch, workers=8)
+    assert status == 201
+    assert captured["config"].workers == 8
+
+
+def test_scan_detail_carries_the_scan_note(
+    client: TestClient, seeded_db: tuple[Path, Path, int]
+) -> None:
+    db_path, _, scan_id = seeded_db
+    assert client.get(f"/api/scans/{scan_id}").json()["scan_note"] is None
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            "UPDATE scans SET scan_note = 'Went back to one tab.' WHERE id = ?", (scan_id,)
+        )
+    assert client.get(f"/api/scans/{scan_id}").json()["scan_note"] == "Went back to one tab."
 
 
 @pytest.mark.parametrize("bad", ["3.0", "2.0", 2.1, None])

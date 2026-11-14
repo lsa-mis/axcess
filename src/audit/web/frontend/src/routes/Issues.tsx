@@ -37,7 +37,13 @@ import {
 } from "../components/table/sort";
 import ReportHeader from "../components/ReportHeader";
 import ReportDangerZone from "../components/ReportDangerZone";
-import { ReportCoverageNote, ReportNote, ReportNotes, ReportSummary } from "../components/ReportSummary";
+import {
+  ReportCoverageNote,
+  ReportNote,
+  ReportNotes,
+  ReportScanNote,
+  ReportSummary,
+} from "../components/ReportSummary";
 import { cn } from "../lib/cn";
 import { liveSearchParams } from "../lib/liveSearchParams";
 import { HIDDEN_ISSUE_FIELDS } from "../lib/hiddenIssueFields";
@@ -217,7 +223,6 @@ export default function IssuesRoute() {
 
   const scan = scanQuery.data;
   const data = issuesQuery.data;
-  const isComplete = scan.status === "completed";
   const summaryRows = hasFilter ? summaryQuery.data?.rows : data.rows;
   const onSort = (next: SortState) => setParam("sort", serializeSort(next));
   const exportMenu = (
@@ -267,15 +272,13 @@ export default function IssuesRoute() {
         actions={exportMenu}
       />
 
-      {isComplete && (
-        <ReportSummary
-          scan={scan}
-          issueGroups={defaultCounts?.issue_types ?? data.total_unfiltered}
-          occurrences={defaultCounts?.occurrences ?? data.occurrence_counts.all_evidence}
-          hiddenIssueGroups={defaultCounts?.hidden_issue_types ?? 0}
-          hiddenOccurrences={defaultCounts?.hidden_occurrences ?? 0}
-        />
-      )}
+      <ReportSummary
+        scan={scan}
+        issueGroups={defaultCounts?.issue_types ?? data.total_unfiltered}
+        occurrences={defaultCounts?.occurrences ?? data.occurrence_counts.all_evidence}
+        hiddenIssueGroups={defaultCounts?.hidden_issue_types ?? 0}
+        hiddenOccurrences={defaultCounts?.hidden_occurrences ?? 0}
+      />
 
       {/* Filtering changed the table silently: the visible count updated,
           but nothing announced it, so a screen-reader user typing in the
@@ -391,7 +394,8 @@ export default function IssuesRoute() {
           the numbers with nothing to step over. Why, and what keeps the
           limit in view, is on ReportCoverageNote. */}
       <ReportNotes className="mt-8">
-        {isComplete && <ReportCoverageNote scan={scan} rows={summaryRows} />}
+        <ReportCoverageNote scan={scan} rows={summaryRows} />
+        <ReportScanNote scan={scan} />
         <IssueGlossary />
       </ReportNotes>
 

@@ -70,8 +70,10 @@ from audit.config import Settings, get_settings
 from audit.crawler import live_progress, url_policy
 from audit.crawler.orchestrator import CrawlConfig, CrawlSummary, build_search_explorer, run_crawl
 from audit.crawler.search import SearchConfig, search_url_allowed
+from audit.crawler.tab_pool import TabPool
 from audit.crawler.user_agent import chosen_user_agent
 from audit.db import repo
+from audit.db.reports import record_pages_found, scan_coverage
 from audit.db.schema import connect
 from audit.exports.audit_report import render_audit_report
 from audit.exports.collector import DEFAULT_UI_BASE, ExportScan, collect_scan
@@ -224,7 +226,11 @@ class LocalLoginScanRequest(BaseModel):
     max_pages: int = Field(default=2500, ge=1, le=2500)
     max_depth: int = Field(default=10, ge=1, le=20)
     rps: float = Field(default=1.0, ge=0.1, le=5.0)
-    workers: int = Field(default=2, ge=1, le=4)
+    # "Pages at once (workers)": one signed-in tab per worker. Each tab after
+    # the first holds a copy of the sign-in;
+    # a copy the site signs out sends the scan back to one tab
+    # (audit.crawler.tab_pool), so more tabs cost speed at worst, not pages.
+    workers: int = Field(default=4, ge=1, le=8)
     show_browser: bool = False
     whole_host: bool = False
     scan_engine: Literal["axe", "alfa", "both"] = "axe"
@@ -585,9 +591,6 @@ _EXPORT_EXTENSIONS = {
 #: fix brief is made to be handed to a coding agent, so it never carries the
 #: unredacted evidence.
 _ALWAYS_REDACTED_FORMATS = frozenset({"brief"})
-#: Formats only a completed report can be exported as. A brief of a running,
-#: failed or stopped scan would send an agent to fix a partial list.
-_COMPLETED_ONLY_FORMATS = frozenset({"brief"})
 
 _BASE_DIR = Path(__file__).resolve().parent
 _FRONTEND_DIST = _BASE_DIR / "frontend" / "dist"
@@ -1296,7 +1299,7 @@ def create_app(
 
     @app.get("/api/scans/{scan_id:int}/issue-counts")
     def api_scan_issue_counts(scan_id: int) -> JSONResponse:
-        """One completed report's two issue counts, for the Reports list.
+        """One report's two issue counts, for the Reports list.
 
         Fetched when a site's list of scans is opened, not with ``/api/sites``:
         counting means building the issue list, and the site list is fetched
@@ -1305,12 +1308,7 @@ def create_app(
         from audit.web import sites
 
         with get_conn() as conn:
-            scan = _load_scan_or_404(conn, scan_id)
-            if scan["status"] != "completed":
-                raise HTTPException(
-                    status_code=409,
-                    detail="Issues are counted only for a scan that finished.",
-                )
+            _load_scan_or_404(conn, scan_id)
             counts = sites.report_counts(conn, scan_id)
         return JSONResponse(counts.model_dump())
 
@@ -1330,11 +1328,16 @@ def create_app(
             blocked = _detect_blocked_scan(conn, scan_id, scan)
             progress = _scan_progress(conn, scan_id) if scan["status"] == "running" else None
             method_coverage = _scan_method_coverage(conn, scan_id)
+            coverage = scan_coverage(conn, scan, page_count=int(scan.get("page_count") or 0))
         payload: dict[str, Any] = {
             **_scan_row_to_summary(scan),
             "error_count": int(scan.get("error_count") or 0),
             "by_severity": {level: int(breakdown.get(level, 0)) for level in _SEVERITY_OPTIONS},
             "previous_scan_id": prev,
+            # How much of the site this scan covered, as facts: pages found,
+            # pages visited, the limits chosen and how it ended. This replaces
+            # the old "partial report" label for a stopped scan.
+            "coverage": coverage.model_dump(),
             "blocked": blocked,
             "progress": progress,
             # Axe counters denormalized on scans for cheap reads. The SPA
@@ -1348,6 +1351,9 @@ def create_app(
             "failure_reason": (
                 str(scan.get("failure_reason")) if scan.get("failure_reason") else None
             ),
+            # What Axcess wants a reader of this report to know about how it
+            # was made (migration 0039). None when there is nothing to say.
+            "scan_note": str(scan.get("scan_note")) if scan.get("scan_note") else None,
             # Coverage truth: which detection methods were on for this
             # scan (derived from config_json + counters). Lets the UI
             # show when a scan was a partial / static-only run.
@@ -1701,8 +1707,9 @@ def create_app(
             rps=body.rps,
             whole_host=body.whole_host,
             # Login scans reuse an authenticated BrowserContext and a fixed
-            # tab pool (one tab for sessionStorage-backed sign-in). Keep the cap small
-            # so concurrent pages cannot overwhelm the shared session or the
+            # pool of signed-in tabs, one per worker (each later tab holds a
+            # copy of a sessionStorage sign-in). The cap stays small so
+            # concurrent pages cannot overwhelm the shared session or the
             # target application while still using modern laptop capacity.
             concurrency_per_host=body.workers,
             workers=body.workers,
@@ -2064,7 +2071,7 @@ def create_app(
         form = {
             "url": url,
             "search": search,
-            "max_pages": None if all_pages else int(body.get("max_pages") or 2500),
+            "max_pages": None if all_pages else int(body.get("max_pages") or 5000),
             "max_depth": int(body.get("max_depth") or 10),
             "rps": float(body.get("rps") or 2.0),
             "workers": int(body.get("workers") or 8),
@@ -2138,6 +2145,9 @@ def create_app(
                     "WHERE id = ?",
                     (scan_id, scan_id),
                 )
+                # Before the queue is emptied: the waiting addresses are part
+                # of "pages found", the report's own measure of coverage.
+                record_pages_found(conn, scan_id)
                 # Both states, for every scan. A leased job is one a worker
                 # had checked out when the stop arrived; leaving it behind
                 # meant the lease expired, the work became available again,
@@ -2254,9 +2264,8 @@ def create_app(
     def api_put_evaluation(scan_id: int, body: EvaluationUpdate) -> JSONResponse:
         """Persist the human-authored evaluation context for a completed scan."""
         with get_conn() as conn:
-            scan = _load_scan_or_404(conn, scan_id)
+            _load_scan_or_404(conn, scan_id)
             _deny_legacy_protected_review(conn, scan_id)
-            _require_completed_scan(scan)
             existing = evaluation.get_evaluation(conn, scan_id)
             changes = body.model_dump(exclude_none=True)
             values = {
@@ -2306,9 +2315,8 @@ def create_app(
         scan_id: int, criterion_sc: str, body: ManualCheckUpdate
     ) -> JSONResponse:
         with get_conn() as conn:
-            scan = _load_scan_or_404(conn, scan_id)
+            _load_scan_or_404(conn, scan_id)
             _deny_legacy_protected_review(conn, scan_id)
-            _require_completed_scan(scan)
             try:
                 payload = evaluation.update_manual_check(
                     conn,
@@ -2335,9 +2343,8 @@ def create_app(
         scan_id: int, criterion_sc: str, body: ManualEvidenceCreate
     ) -> JSONResponse:
         with get_conn() as conn:
-            scan = _load_scan_or_404(conn, scan_id)
+            _load_scan_or_404(conn, scan_id)
             _deny_legacy_protected_review(conn, scan_id)
-            _require_completed_scan(scan)
             try:
                 payload = evaluation.add_manual_evidence(
                     conn,
@@ -2925,8 +2932,8 @@ def create_app(
     async def api_check_image_alt(scan_id: int, image_id: int) -> JSONResponse:
         """Ask the local model about one image's alt text, keep and return its answer.
 
-        A person's explicit request from the Images tab. Refused for a scan
-        that is not complete, for a protected scan (its images do not leave
+        A person's explicit request from the Images tab. Refused while the
+        scan is still running, for a protected scan (its images do not leave
         the protected store), and when no model is set. A timeout or an
         unusable answer saves nothing and says so; the tab keeps working.
         """
@@ -2934,7 +2941,7 @@ def create_app(
 
         with get_conn() as conn:
             scan = _load_scan_or_404(conn, scan_id)
-            _require_completed_scan(scan)
+            _require_ended_report(scan)
             target = image_inventory.check_target(conn, scan_id, image_id)
         if _protected_scan_owner(resolved_db, scan_id) is not None:
             raise HTTPException(
@@ -3033,7 +3040,7 @@ def create_app(
         try:
             with os.fdopen(fd, "wb") as out, get_conn() as conn:
                 scan = _load_scan_or_404(conn, scan_id)
-                _require_completed_scan(scan)
+                _require_ended_report(scan)
                 write_images_zip(
                     conn,
                     scan_id=scan_id,
@@ -3515,11 +3522,6 @@ def create_app(
                 render=render,
                 redacted=redact,
                 always_redacted=_ALWAYS_REDACTED_FORMATS,
-                # A report that is not complete has no brief to measure; the
-                # panel shows the file without a size, and choosing it says why.
-                unavailable=(
-                    _COMPLETED_ONLY_FORMATS if scan.status != "completed" else frozenset()
-                ),
             )
 
     # The SPA's Export panel downloads from this ``/api/*`` route with
@@ -3556,17 +3558,6 @@ def create_app(
             raise HTTPException(status_code=400, detail="Unknown export format")
         with get_conn() as conn:
             scan = collect_public_export_scan(conn, scan_id, request)
-            if fmt_lower in _COMPLETED_ONLY_FORMATS and scan.status != "completed":
-                # Refused before the readiness check, as a deleted scan is
-                # refused before it: there is no complete report to export.
-                raise HTTPException(
-                    status_code=409,
-                    detail=(
-                        f"Report #{scan_id} is not complete (the scan is {scan.status}). "
-                        "A fix brief can only be made from a completed scan. Wait for "
-                        "the scan to finish, or start a new scan."
-                    ),
-                )
             try:
                 readiness = assess_public_export_readiness(
                     conn,
@@ -3707,12 +3698,21 @@ def _sweep_stale_running_scans(db_path: Path) -> int:
                  WHERE run_lease_id IS NOT NULL OR protection_status = 'running'
                 """
             )
-        cur = conn.execute(
-            "UPDATE scans SET status = 'interrupted', "
-            "finished_at = COALESCE(finished_at, CURRENT_TIMESTAMP) "
-            "WHERE status = 'running'"
-        )
-        swept = int(cur.rowcount or 0)
+        stale = [
+            int(row["id"]) for row in conn.execute("SELECT id FROM scans WHERE status = 'running'")
+        ]
+        # The page count and pages found go with the status, as Stop writes
+        # them: an interrupted scan that saved pages is a report.
+        for scan_id in stale:
+            conn.execute(
+                "UPDATE scans SET status = 'interrupted', "
+                "finished_at = COALESCE(finished_at, CURRENT_TIMESTAMP), "
+                "page_count = (SELECT COUNT(*) FROM pages WHERE scan_id = scans.id) "
+                "WHERE id = ?",
+                (scan_id,),
+            )
+            record_pages_found(conn, scan_id)
+        swept = len(stale)
         if swept:
             log.info("web.sweep_stale_scans", count=swept)
         return swept
@@ -4270,15 +4270,22 @@ async def _run_background_crawl(db_path: Path, config: CrawlConfig) -> None:
         # leave the up-front scan row looking "running" forever: that makes a
         # failed startup indistinguishable from a very slow first page.
         log.warning("web.crawl_failed", seed=config.seed_url, error=str(exc))
-        conn.execute(
-            "UPDATE scans SET status = 'failed', finished_at = CURRENT_TIMESTAMP, "
-            "failure_reason = ? "
-            "WHERE id = ("
+        row = conn.execute(
             "SELECT id FROM scans WHERE seed_url = ? AND status = 'running' "
-            "ORDER BY id DESC LIMIT 1"
-            ")",
-            (str(exc)[:1000], _canonical_scan_seed(config.seed_url)),
-        )
+            "ORDER BY id DESC LIMIT 1",
+            (_canonical_scan_seed(config.seed_url),),
+        ).fetchone()
+        if row is not None:
+            # The page count goes with the status: a failed scan that saved
+            # pages is a report (audit.db.reports), and it says how far it got.
+            conn.execute(
+                "UPDATE scans SET status = 'failed', finished_at = CURRENT_TIMESTAMP, "
+                "failure_reason = ?, "
+                "page_count = (SELECT COUNT(*) FROM pages WHERE scan_id = scans.id) "
+                "WHERE id = ?",
+                (str(exc)[:1000], int(row["id"])),
+            )
+            record_pages_found(conn, int(row["id"]))
     finally:
         conn.close()
 
@@ -4308,6 +4315,7 @@ async def _run_local_login_background(
     """
 
     conn: sqlite3.Connection | None = None
+    tab_pool: TabPool | None = None
     try:
         run.status = "verifying_authentication"
         if not config.browser_headless and not run.session.window_open:
@@ -4403,6 +4411,7 @@ async def _run_local_login_background(
             shared_pages=scan_pages,
             search_explorer=build_search_explorer(config, login_axe),
         )
+        tab_pool = fetcher.tab_pool
         run.status = "scanning"
         authenticated_alfa: _AuthenticatedAlfaRunner | None = None
         if config.alfa_enabled:
@@ -4457,7 +4466,40 @@ async def _run_local_login_background(
     finally:
         if conn is not None:
             conn.close()
+        if tab_pool is not None and tab_pool.fell_back:
+            _record_scan_note(db_path, run.scan_id, tab_fallback_note(tab_pool.size))
         await run.session.close()
+
+
+def tab_fallback_note(tabs: int) -> str:
+    """The scan note for a sign-in scan that fell back to one tab.
+
+    Plain words, no page address (the note is shown and exported with the
+    report). Says what happened, what Axcess did about it, and the one
+    limit a reader needs: pages already done in another tab were each
+    checked for a sign-in page when they loaded, not at every moment after.
+    """
+    # Says pages, not tabs: the form calls the setting "Pages at once
+    # (workers)", and the tabs are how that works, not what the person chose.
+    return (
+        f"Axcess started this sign-in scan working on {tabs} pages at once. "
+        "Partway through, the site signed out part of the scan: a page showed a "
+        "sign-in page, but the real page when Axcess loaded it again. Axcess "
+        "kept the real page and scanned the rest of the site one page at a time, "
+        "which is slower. Every page was checked for a sign-in page when it loaded."
+    )
+
+
+def _record_scan_note(db_path: Path, scan_id: int, note: str) -> None:
+    """Write Axcess's own note on a scan row. Never raises."""
+    try:
+        conn = connect(db_path)
+        try:
+            conn.execute("UPDATE scans SET scan_note = ? WHERE id = ?", (note, scan_id))
+        finally:
+            conn.close()
+    except Exception:
+        log.warning("web.scan_note_not_saved", scan_id=scan_id)
 
 
 class _AuthenticatedAlfaRunner:
@@ -4855,8 +4897,6 @@ def _detect_blocked_scan(
     Returns ``{'status_code': int | None, 'title': str | None, 'seed_url': str}``
     when a warning should be shown, or ``None`` to render normally.
     """
-    if scan.get("status") != "completed":
-        return None
     page_count = int(scan.get("page_count") or 0)
     if page_count == 0:
         return None
@@ -5303,6 +5343,21 @@ def _saved_page_count(conn: sqlite3.Connection, scan_id: int) -> int:
     return int(row["n"]) if row is not None else 0
 
 
+def _require_ended_report(scan: dict[str, Any]) -> None:
+    """Guard the Images tab's alt check and ZIP: a report, not a live crawl.
+
+    A report is a completed scan or one that ended with saved pages, however
+    it ended (the rule since 2026-11-14, ``sites.group_scans``). A running
+    scan is still adding images, so it is refused until it ends.
+    """
+    ended = scan["status"] != "running"
+    if not (scan["status"] == "completed" or (ended and int(scan.get("page_count") or 0) > 0)):
+        raise HTTPException(
+            status_code=409,
+            detail="This works once the scan has ended and saved pages.",
+        )
+
+
 def _load_scan_or_404(conn: sqlite3.Connection, scan_id: int) -> dict[str, Any]:
     # ``SELECT *`` keeps public report browsing compatible while a newly added
     # optional coverage column is being migrated. Accessors below use ``get``
@@ -5311,15 +5366,6 @@ def _load_scan_or_404(conn: sqlite3.Connection, scan_id: int) -> dict[str, Any]:
     if row is None:
         raise HTTPException(status_code=404, detail="Scan not found")
     return dict(row)
-
-
-def _require_completed_scan(scan: dict[str, Any]) -> None:
-    """Guard review writes: a live crawl cannot be a stable evaluation."""
-    if scan["status"] != "completed":
-        raise HTTPException(
-            status_code=409,
-            detail="Expert review can begin after this scan completes.",
-        )
 
 
 def _severity_breakdown(conn: sqlite3.Connection, scan_id: int) -> dict[str, int]:

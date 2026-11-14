@@ -383,7 +383,7 @@ async def test_a_site_with_one_report_has_nothing_to_compare_yet(
     base, scan_id = live_server
     page = await _open(new_page, base, f"/scans/{scan_id}/compare")
     empty = page.get_by_role("region", name="Nothing to compare with yet")
-    await expect(empty).to_contain_text("This site has one completed report so far.")
+    await expect(empty).to_contain_text("This site has one report so far.")
     await expect(empty.get_by_role("link")).to_have_count(0)
     violations = await _run_axe(page)
     assert not violations, _render_violations(violations)

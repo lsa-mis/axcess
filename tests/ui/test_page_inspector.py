@@ -70,23 +70,6 @@ def _unfinished_scan_with_page(
         conn.close()
 
 
-def test_inspect_refuses_to_render_a_page_an_unfinished_scan_never_stored(
-    client: TestClient, seeded_db: tuple[Path, Path, int]
-) -> None:
-    """The on-demand render is what needs a finished report.
-
-    It leaves this machine to fetch a page a partial report cannot vouch for,
-    so with nothing stored there is nothing to show and nothing safe to fetch.
-    """
-    db, _, _ = seeded_db
-    scan_id, page_id = _unfinished_scan_with_page(db, "running", stored=None)
-
-    resp = client.get(f"/api/scans/{scan_id}/pages/{page_id}/inspect")
-
-    assert resp.status_code == 409
-    assert "no stored capture" in resp.json()["detail"]
-
-
 def test_a_stopped_scan_can_still_show_what_it_captured(
     client: TestClient, seeded_db: tuple[Path, Path, int]
 ) -> None:

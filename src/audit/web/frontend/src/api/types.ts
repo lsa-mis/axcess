@@ -40,24 +40,24 @@ export interface ScanSummary {
 export type RuleCheck = "axe" | "alfa";
 
 /** Every public report of one site (normalized seed scope), newest first.
- *  The headline numbers come from `most_recent_completed` only: an
+ *  The headline numbers come from `most_recent_report` only: an
  *  interrupted or failed crawl holds partial evidence. */
 export interface SiteGroup {
   site_url: string;
   scan_count: number;
-  completed_count: number;
+  report_count: number;
   most_recent: ScanSummary;
-  most_recent_completed: ScanSummary | null;
-  /** Unified issue groups in `most_recent_completed`; null when there is none. */
-  most_recent_completed_issue_count: number | null;
+  most_recent_report: ScanSummary | null;
+  /** Unified issue groups in `most_recent_report`; null when there is none. */
+  most_recent_report_issue_count: number | null;
   /** Occurrences across those issues (the Issues page's total); null when there is none. */
-  most_recent_completed_occurrence_count: number | null;
+  most_recent_report_occurrence_count: number | null;
   /**
    * The same two counts for the levels the Issues page shows when it opens.
    * Optional: absent from a response cached before the fields existed.
    */
-  most_recent_completed_shown_issue_count?: number | null;
-  most_recent_completed_shown_occurrence_count?: number | null;
+  most_recent_report_shown_issue_count?: number | null;
+  most_recent_report_shown_occurrence_count?: number | null;
   scans: ScanSummary[];
 }
 
@@ -133,11 +133,32 @@ export interface ScanPageChecks {
   checks: Partial<Record<string, PageCheckState>>;
 }
 
+/** How a scan ended: ``all_found`` visited every page it found,
+ *  ``page_limit`` stopped at the page limit chosen for it. */
+export type ScanEndReason = "running" | "all_found" | "page_limit" | "stopped" | "failed";
+
+export interface ScanCoverage {
+  ended: ScanEndReason;
+  /** Pages the scan found (queued to visit). Null when not recorded. */
+  pages_found: number | null;
+  pages_visited: number;
+  /** The page limit chosen; null means no limit. */
+  page_limit: number | null;
+  depth_limit: number | null;
+}
+
 export interface ScanDetail extends ScanSummary {
   error_count: number;
   failure_reason: string | null;
+  /** Axcess's own plain-words note on how a completed scan ran, such as a
+   *  sign-in scan that went back to one tab. Null when there is nothing to
+   *  say. */
+  scan_note: string | null;
   by_severity: Record<Severity, number>;
   previous_scan_id: number | null;
+  /** How much of the site this scan covered, as facts rather than a
+   *  "partial" or "full" label (src/audit/db/reports.py, ScanCoverage). */
+  coverage: ScanCoverage;
   blocked: null | {
     status_code: number;
     title: string | null;
