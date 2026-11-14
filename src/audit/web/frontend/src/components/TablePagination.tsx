@@ -1,8 +1,8 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { useSearchParams } from "react-router";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "./ui";
-import { TableFoot } from "./table/Table";
+import { TableBar, TableFoot } from "./table/Table";
 import { useTablePageSize } from "../hooks/usePreferences";
 
 /*
@@ -145,6 +145,28 @@ export function pageItems(page: number, pages: number): (number | null)[] {
 const ARROW =
   "min-w-target justify-center px-0 aria-disabled:cursor-not-allowed aria-disabled:border-border aria-disabled:bg-surface-muted aria-disabled:text-fg-subtle aria-disabled:opacity-60 aria-disabled:shadow-none aria-disabled:hover:border-border aria-disabled:hover:bg-surface-muted aria-disabled:active:translate-y-0";
 
+/** The props of `TablePagination`, below; `PagedTable` takes them less `place`. */
+export type TablePaginationProps = {
+  /** The table's name, for the controls' accessible names ("Issues"). */
+  label: string;
+  /** What a row is, plural ("issue types", "pages"). */
+  noun: string;
+  page: number;
+  pages: number;
+  total: number;
+  setPage: (page: number) => void;
+  pageSize: number;
+  pagerId: string;
+  /** Hold every control while a server page is loading. */
+  disabled?: boolean;
+  /**
+   * `"top"` in the table's top bar (`TableBar`); `"end"` under its last
+   * row, in a `TableFoot` this draws. The top pager must be on the page
+   * too: the end pager sends focus to it after a page turn.
+   */
+  place?: "top" | "end";
+};
+
 /**
  * The pager in a table's top bar (`TableBar` in ./table/Table), and again
  * under its last row (`place="end"`, below): a previous
@@ -188,6 +210,9 @@ const ARROW =
  * 2.4.11), and at 320 px or 400% zoom the bar wraps to several lines and
  * would fill most of the screen (SC 1.4.10 Reflow, Level AA). The app
  * already dropped a second sticky bar on narrow screens (styles.css).
+ *
+ * Screens do not draw this themselves: `PagedTable`, below, draws the top
+ * pager and the end pager as one pair.
  */
 export function TablePagination({
   label,
@@ -200,26 +225,7 @@ export function TablePagination({
   pagerId,
   disabled = false,
   place = "top",
-}: {
-  /** The table's name, for the controls' accessible names ("Issues"). */
-  label: string;
-  /** What a row is, plural ("issue types", "pages"). */
-  noun: string;
-  page: number;
-  pages: number;
-  total: number;
-  setPage: (page: number) => void;
-  pageSize: number;
-  pagerId: string;
-  /** Hold every control while a server page is loading. */
-  disabled?: boolean;
-  /**
-   * `"top"` in the table's top bar (`TableBar`); `"end"` under its last
-   * row, in a `TableFoot` this draws. The top pager must be on the page
-   * too: the end pager sends focus to it after a page turn.
-   */
-  place?: "top" | "end";
-}) {
+}: TablePaginationProps) {
   if (pages <= 1) return null;
   const end = place === "end";
   const first = (page - 1) * pageSize + 1;
@@ -303,4 +309,63 @@ export function TablePagination({
     </nav>
   );
   return end ? <TableFoot>{pager}</TableFoot> : pager;
+}
+
+/**
+ * A paged table's pager, drawn twice as one pair: in the bar over the table
+ * (`top`) and again under its last row (`TablePagination` with
+ * `place="end"`), with the table itself (`children`) between them. Every
+ * paged table uses it, and only this module draws `TablePagination`.
+ *
+ * Why one component: until 2026-11-14 each screen drew the two pagers by
+ * hand, one in its `TableBar` and one under its table, and a screen added
+ * later drew only the top one, so its readers had to scroll back up to
+ * turn the page. With the pair in one component, a screen cannot draw one
+ * without the other. Rejected: keeping the hand-drawn pair and adding a
+ * source check that every top pager has an end pager. A check that reads
+ * the source can be fooled by a pager that is conditional, spread or
+ * renamed, and it still leaves each screen to wire the pair by hand; here
+ * it is wired once (tests/unit/test_table_pagers.py now checks only that no
+ * screen draws `TablePagination` itself).
+ *
+ * The same pager, with the same words, in the same two places on every
+ * table is what makes it read as one control shown twice (SC 3.2.4
+ * Consistent Identification, Level AA). What keeps the two from getting in
+ * each other's way (only the top one is a live region, the landmarks have
+ * different names, a page turn from the end pager moves focus to the top
+ * one) is in the comment on `TablePagination`, above, and is unchanged.
+ *
+ * `top` draws the bar over the table and is given the top pager, or null
+ * when there is one page or no `pagination`. A screen with search or
+ * filters passes its own `top`, which draws its `TableBar` (or a toolbar
+ * that wraps one) whether or not there is a pager, so the filter that
+ * emptied a table stays there to undo. It must put the pager it is given on
+ * the page: the end pager sends focus to it after a page turn. Without
+ * `top`, a table with no search or filters gets a plain `TableBar` holding
+ * the pager, and no bar at all when there is one page.
+ */
+export function PagedTable({
+  pagination,
+  top,
+  children,
+}: {
+  /** TablePagination's props except `place`; null or undefined draws no pager at all. */
+  pagination: Omit<TablePaginationProps, "place"> | null | undefined;
+  /**
+   * Draws the bar over the table, given the top pager element (null when
+   * there is one page or no pagination). Default: a plain
+   * `<TableBar pager={pager} />`, drawn only when `pager` is not null.
+   */
+  top?: (pager: ReactNode) => ReactNode;
+  /** Everything between the bar and the end pager: TableStatus, TableEmpty, TableRegion… */
+  children: ReactNode;
+}) {
+  const pager = pagination && pagination.pages > 1 ? <TablePagination {...pagination} /> : null;
+  return (
+    <>
+      {top ? top(pager) : pager && <TableBar pager={pager} />}
+      {children}
+      {pagination && <TablePagination {...pagination} place="end" />}
+    </>
+  );
 }

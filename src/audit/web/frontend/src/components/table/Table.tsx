@@ -27,6 +27,10 @@ import { ariaSort, nextSort, sortChip, type Sort, type SortKind } from "./sort";
  *                  `place="end"`), so a reader who has read to the end
  *                  turns the page there
  *
+ * A paged table wraps everything from TableBar down in `PagedTable`
+ * (../TablePagination), which draws the pager in TableBar and in TableFoot
+ * as one pair, so no table can have one without the other.
+ *
  * Tables compose these rather than restyling a <table>, so a change to the
  * design lands everywhere at once.
  */
@@ -69,10 +73,11 @@ export function TableBar({
 /**
  * The bar under a table's last row, styled like `TableBar` above it, with
  * the pager on the right where it sits in the top bar. It holds only the
- * end-of-table pager (`TablePagination` with `place="end"` draws it), so it
- * is there exactly when the top pager is: on a table with more than one
- * page. Search and filters stay in the top bar only; they change what the
- * table holds, which a reader decides before reading it, not after.
+ * end-of-table pager (`TablePagination` with `place="end"` draws it, and
+ * `PagedTable` draws that with the top pager), so it is there exactly when
+ * the top pager is: on a table with more than one page. Search and
+ * filters stay in the top bar only; they change what the table holds,
+ * which a reader decides before reading it, not after.
  */
 export function TableFoot({ children }: { children: ReactNode }) {
   return (
