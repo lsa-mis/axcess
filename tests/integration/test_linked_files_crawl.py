@@ -302,14 +302,27 @@ def _record_marks(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, str]]:
         real(key, state)
 
     monkeypatch.setattr(live_progress, "_set", spy)
+    real_later = live_progress.later
+
+    def spy_later(key: str) -> Any:
+        finish = real_later(key)
+
+        def recorded(ok: bool) -> None:
+            marks.append((key, "done" if ok else "not_run"))
+            finish(ok)
+
+        return recorded
+
+    monkeypatch.setattr(live_progress, "later", spy_later)
     return marks
 
 
 def test_each_page_is_marked_for_the_progress_pages_document_column(
     tmp_db: sqlite3.Connection, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The scanning page's "Document check" column: each page's link
-    finding runs, then is done; with the check off it is never marked."""
+    """The scanning page's "Document check" column: each page's check runs,
+    then is done when its PDFs are (after the page, in the background);
+    with the check off it is never marked."""
     monkeypatch.setenv("AUDIT_BLOB_DIR", str(tmp_path / "blobs"))
     marks = _record_marks(monkeypatch)
     with _serve() as (base, _port, _requests):

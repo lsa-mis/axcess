@@ -15,10 +15,14 @@ points, and nothing else in the crawl changes:
     memory (``_candidates``) and become its references now. If it is a PDF
     the crawler fetched without a browser, the PDF is checked from that same
     response, so the site is not asked for it twice.
-``check_page``
-    Right after ``record_page``, as part of the same page: every PDF that
-    page reaches and the crawl will not fetch itself is downloaded once and
-    checked: a PDF on another host (Google Drive, Box, a partner's site),
+``queue_page``
+    Right after ``record_page``: every PDF that page reaches and the crawl
+    will not fetch itself is queued to be downloaded once and checked, in
+    the background. The page does not wait: its worker goes on to the next
+    page while the downloads (``DOWNLOAD_CONCURRENCY`` at a time) work
+    through the PDFs of the pages before it, so a page with many new PDFs
+    never holds up the crawl (the developer's request, 2026-11-14). The PDFs
+    queued are: a PDF on another host (Google Drive, Box, a partner's site),
     which the crawl never visits, and one shown in a frame, object or embed,
     which the crawl does not follow. A PDF linked from many pages is
     downloaded with the first of them; the others find it checked. A PDF in
@@ -30,8 +34,10 @@ points, and nothing else in the crawl changes:
     extra request, in that case only.) One file per address, robots.txt and the crawl's rate limit
     honoured, links from the file never followed.
 ``check_pending``
-    After the last page: anything still waiting, such as a PDF in scope
-    past the page or depth limit, which the crawl never reached.
+    After the last page: first the queued downloads still running
+    (``drain``), then anything still waiting, such as a PDF in scope past
+    the page or depth limit, which the crawl never reached. A stop cancels
+    the queued downloads (``cancel_background``).
 
 PDFs on other hosts are checked with the page, not at the end, since
 2026-11-14 (the developer's choice): a scan stopped part way then keeps
@@ -51,7 +57,7 @@ import asyncio
 import functools
 import hashlib
 import sqlite3
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
@@ -124,6 +130,8 @@ class LinkedFileTracker:
         self._started = 0
         self._semaphore = asyncio.Semaphore(DOWNLOAD_CONCURRENCY)
         self._in_flight: dict[int, asyncio.Task[None]] = {}
+        # One task per page whose PDFs are being checked; see queue_page.
+        self._background: set[asyncio.Task[None]] = set()
 
     def attach_downloads(
         self,
@@ -289,33 +297,69 @@ class LinkedFileTracker:
 
     # -- after the last page ----------------------------------------------
 
-    async def check_page(self, page_id: int) -> None:
-        """Download and check the PDFs on other hosts ``page_id`` links to, not checked yet.
+    def queue_page(self, page_id: int, done: Callable[[bool], None] | None = None) -> None:
+        """Start checking the PDFs ``page_id`` reaches that the crawl will not fetch itself.
 
-        Part of the page: the progress page's "Document check" is done when
-        this returns. A PDF inside the crawl's scope is left to the crawl
-        (see the module docstring). Bounded and never raises; does nothing
-        before ``attach_downloads``.
+        Returns at once: the checks run in the background, and ``done`` is
+        called with True when they end (False if they fail or are stopped),
+        for the progress page's "Document check". A PDF inside the crawl's
+        scope that some page links to is left to the crawl (see the module
+        docstring). Never raises; before ``attach_downloads`` it only calls
+        ``done``.
         """
-        if self._downloads is None:
-            return
+        downloads = self._downloads
         try:
-            pending = [
-                (file_id, url)
-                for file_id, url, linked in store.pending_files_for_page(
-                    self._conn, self._scan_id, page_id
-                )
-                if not (
-                    linked
-                    and url_policy.is_in_scope(
-                        url, self._scope, allow_subdomains=self._allow_subdomains
+            pending = (
+                [
+                    (file_id, url)
+                    for file_id, url, linked in store.pending_files_for_page(
+                        self._conn, self._scan_id, page_id
                     )
-                )
-            ]
+                    if not (
+                        linked
+                        and url_policy.is_in_scope(
+                            url, self._scope, allow_subdomains=self._allow_subdomains
+                        )
+                    )
+                ]
+                if downloads is not None
+                else []
+            )
         except sqlite3.Error as exc:
             log.warning("linked_files.page_check_failed", error_type=type(exc).__name__)
+            if done is not None:
+                done(False)
             return
-        await self._check_all(pending, self._downloads)
+        if not pending or downloads is None:
+            if done is not None:
+                done(True)
+            return
+
+        async def run() -> None:
+            ok = False
+            try:
+                await self._check_all(pending, downloads)
+                ok = True
+            finally:
+                if done is not None:
+                    done(ok)
+
+        task = asyncio.ensure_future(run())
+        self._background.add(task)
+        task.add_done_callback(self._background.discard)
+
+    async def drain(self) -> None:
+        """Wait for every page's queued PDF checks (after the last page)."""
+        while self._background:
+            await asyncio.gather(*list(self._background), return_exceptions=True)
+
+    async def cancel_background(self) -> None:
+        """Stop the queued PDF checks and wait for them to end: the scan was stopped or failed."""
+        tasks = list(self._background) + list(self._in_flight.values())
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
 
     async def check_pending(
         self,
@@ -327,7 +371,9 @@ class LinkedFileTracker:
         blocked_url_patterns: Sequence[str],
         excluded_scopes: Sequence[str],
     ) -> None:
-        """Download and check every PDF still waiting. Bounded; never raises."""
+        """Wait for the queued checks, then download and check every PDF still waiting.
+
+        Bounded; never raises."""
         downloads = self._downloads or _Downloads(
             client=client,
             limiter=limiter,
@@ -336,10 +382,11 @@ class LinkedFileTracker:
             blocked_url_patterns=tuple(blocked_url_patterns),
             excluded_scopes=tuple(excluded_scopes),
         )
-        pending = store.pending_files(self._conn, self._scan_id)
-        if pending:
-            log.info("linked_files.checking", files=len(pending))
         try:
+            await self.drain()
+            pending = store.pending_files(self._conn, self._scan_id)
+            if pending:
+                log.info("linked_files.checking", files=len(pending))
             await self._check_all(pending, downloads)
         finally:
             # A stop or a fault leaves nothing silently pending: the report

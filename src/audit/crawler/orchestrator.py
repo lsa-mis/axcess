@@ -697,10 +697,10 @@ async def run_crawl(
             async with asyncio.TaskGroup() as tg:
                 for _ in range(config.workers):
                     tg.create_task(_worker(ctx))
-            # After the last page and before synthesis: anything still
-            # waiting (each page already checked the PDFs it links to). Inside
-            # this block so a stop during it is an interrupted scan like any
-            # other.
+            # After the last page and before synthesis: the PDF checks the
+            # pages queued and still running, then anything still waiting.
+            # Inside this block so a stop during it is an interrupted scan
+            # like any other.
             if ctx.linked_files is not None:
                 await ctx.linked_files.check_pending(
                     client=client,
@@ -716,6 +716,10 @@ async def run_crawl(
         interrupted = True
         raise
     finally:
+        # A stop or a failure ends the PDF checks the pages queued; the ones
+        # not finished stay "not checked" in the report.
+        if ctx.linked_files is not None:
+            await ctx.linked_files.cancel_background()
         if interrupted:
             summary.status = "interrupted"
             summary.notes.append("crawl interrupted")
@@ -1719,16 +1723,18 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
     # to files, and its files are checked even though its pages are not.
     if ctx.linked_files is not None and page_id is not None:
         # "documents" on the progress page (Document check): this page's
-        # document links found, and the PDFs among them that no earlier page
-        # had checked, downloaded and checked now.
-        with live_progress.check("documents"):
-            ctx.linked_files.record_page(
-                page_id=page_id,
-                base_url=result.url,
-                body=result.body,
-                revealed=result.revealed_links,
-            )
-            await ctx.linked_files.check_page(page_id)
+        # document links found now, and the PDFs among them that no earlier
+        # page had checked, downloaded and checked in the background. The
+        # worker does not wait for them; the check is marked done when they
+        # are (live_progress.later).
+        documents_done = live_progress.later("documents")
+        ctx.linked_files.record_page(
+            page_id=page_id,
+            base_url=result.url,
+            body=result.body,
+            revealed=result.revealed_links,
+        )
+        ctx.linked_files.queue_page(page_id, documents_done)
     if depth >= ctx.config.max_depth:
         return
     if _page_limit_reached(ctx):

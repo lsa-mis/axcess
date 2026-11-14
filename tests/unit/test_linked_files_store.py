@@ -215,3 +215,64 @@ async def test_errors_are_reported_not_raised() -> None:
         assert (await fetch_file(client, "https://a.test/x.pdf")).outcome == "broken_link"
     async with _client(httpx.MockTransport(slow)) as client:
         assert (await fetch_file(client, "https://a.test/x.pdf")).outcome == "timed_out"
+
+
+async def test_a_page_does_not_wait_for_its_pdfs(tmp_db: sqlite3.Connection) -> None:
+    """queue_page returns at once; the download runs in the background and
+    calls back when done, so the crawl's worker goes on to the next page."""
+    import asyncio
+
+    from audit.crawler.rate_limit import HostLimiter
+    from audit.crawler.robots import RobotsChecker
+    from audit.crawler.url_policy import build_scope
+    from audit.linked_files.tracker import LinkedFileTracker
+
+    scan_id, page_id = _scan_and_page(tmp_db, "site.test")
+    release = asyncio.Event()
+    asked: list[str] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        asked.append(request.url.path)
+        if request.url.path == "/robots.txt":
+            return httpx.Response(404)
+        await release.wait()
+        return httpx.Response(404)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        tracker = LinkedFileTracker(
+            tmp_db,
+            scan_id=scan_id,
+            scope=build_scope("https://site.test/"),
+            allow_subdomains=False,
+        )
+        tracker.attach_downloads(
+            client=client,
+            limiter=HostLimiter(rps=100.0),
+            robots=RobotsChecker(client, user_agent="test"),
+            ignore_robots=True,
+            blocked_url_patterns=(),
+            excluded_scopes=(),
+        )
+        # A PDF on another site: the crawl never fetches it, so the page queues it.
+        tracker.record_page(
+            page_id=page_id,
+            base_url="https://site.test/",
+            body=b'<a href="https://other.test/report.pdf">Report</a>',
+        )
+        results: list[bool] = []
+        tracker.queue_page(page_id, results.append)
+        # Returned at once: nothing finished, and the download is under way.
+        assert results == []
+        for _ in range(50):
+            if "/report.pdf" in asked:
+                break
+            await asyncio.sleep(0.01)
+        assert "/report.pdf" in asked
+        assert results == []
+        release.set()
+        await tracker.drain()
+        assert results == [True]
+    status = tmp_db.execute(
+        "SELECT status, reason FROM linked_files WHERE scan_id = ?", (scan_id,)
+    ).fetchone()
+    assert tuple(status) == ("could_not_check", "http_error")

@@ -38,9 +38,11 @@ import { CHECK_LABEL } from "../lib/terms";
  * links to PDF, Word and other files and checks the PDFs among them that
  * no earlier page had checked, except a PDF on this site that pages link
  * to: the scan opens that one as it opens a page, and checks it in its own
- * row (audit/linked_files/tracker.py, check_page). So "Done" means the
+ * row (audit/linked_files/tracker.py, queue_page). So "Done" means the
  * page's documents are found and each of its PDFs is checked or has a row
- * of its own. It was "Document links" while PDFs on other sites were
+ * of its own. The page does not wait for its PDFs: its row can read
+ * "Checked" while this column still reads "Checking", and the line over
+ * the table says so, so the two are not read as a contradiction. It was "Document links" while PDFs on other sites were
  * checked only after the last page (until 2026-11-14), when "Done" under a
  * check's name would have claimed more than was done. The line over the
  * table says both.
@@ -482,7 +484,7 @@ function PagesTable({
               that links only to PDFs checked before is quick (see
               DOCUMENT_CHECK_COLUMN). */}
           {tracked && documents && (
-            <> {DOCUMENT_CHECK_COLUMN} finds the documents each page links to and checks its PDFs, each PDF once. A PDF on this site that a page links to is checked in its own row.</>
+            <> {DOCUMENT_CHECK_COLUMN} finds the documents each page links to and checks its PDFs, each PDF once. A PDF on this site that a page links to is checked in its own row. The next page starts while a page&rsquo;s PDFs download, so a page marked Checked can still show Checking under {DOCUMENT_CHECK_COLUMN}.</>
           )}
           {!tracked && rows.length > 0 && (
             <> Each check&rsquo;s progress on a page is not available for this scan, so each page shows its status only.</>

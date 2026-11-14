@@ -908,7 +908,9 @@ async def test_running_scan_shows_factual_pipeline_progress(
             page.get_by_text(
                 "Document check finds the documents each page links to and checks "
                 "its PDFs, each PDF once. A PDF on this site that a page links to "
-                "is checked in its own row.",
+                "is checked in its own row. The next page starts while a page\u2019s "
+                "PDFs download, so a page marked Checked can still show Checking "
+                "under Document check.",
                 exact=False,
             )
         ).to_be_visible()
