@@ -4,7 +4,7 @@ import { useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ArrowLeft, Layers } from "lucide-react";
 import { api, blobUrl } from "../api/client";
-import { TablePagination } from "../components/TablePagination";
+import { PagedTable } from "../components/TablePagination";
 import { TableBar, TableSearch, TableStatus } from "../components/table/Table";
 import { ActiveFilters, FilterMenu, activeFilterItems, type FilterGroup } from "../components/table/FilterMenu";
 import {
@@ -168,26 +168,31 @@ export default function FindingsRoute() {
           list. The card stays up when nothing matches, so the filter that
           emptied the list is still there to undo. */}
       <Card className={empty ? "mb-4" : undefined}>
-        <TableBar
-          pager={data && <TablePagination {...pagerProps} />}
-          footer={<ActiveFilters items={activeFilterItems(filters)} onClear={resetFilters} />}
+        <PagedTable
+          pagination={data ? pagerProps : null}
+          top={(pager) => (
+            <TableBar
+              pager={pager}
+              footer={<ActiveFilters items={activeFilterItems(filters)} onClear={resetFilters} />}
+            >
+              <TableSearch
+                label="Search"
+                placeholder="Page, alt text, or image text"
+                value={filter.q ?? ""}
+                onChange={(v) => setParam("q", v)}
+              />
+              <FilterMenu
+              label="Filter images" groups={filters} onChange={setParam} onReset={resetFilters} />
+            </TableBar>
+          )}
         >
-          <TableSearch
-            label="Search"
-            placeholder="Page, alt text, or image text"
-            value={filter.q ?? ""}
-            onChange={(v) => setParam("q", v)}
-          />
-          <FilterMenu
-          label="Filter images" groups={filters} onChange={setParam} onReset={resetFilters} />
-        </TableBar>
-        <TableStatus className={empty ? "border-b-0" : undefined}>
-          {data
-            ? `${data.total.toLocaleString()} ${data.total === 1 ? "image" : "images"}.`
-            : "Loading…"}
-        </TableStatus>
-        {!empty && <FindingsTable rows={rows} isLoading={isLoading} />}
-        {data && !empty && <TablePagination {...pagerProps} place="end" />}
+          <TableStatus className={empty ? "border-b-0" : undefined}>
+            {data
+              ? `${data.total.toLocaleString()} ${data.total === 1 ? "image" : "images"}.`
+              : "Loading…"}
+          </TableStatus>
+          {!empty && <FindingsTable rows={rows} isLoading={isLoading} />}
+        </PagedTable>
       </Card>
 
       {empty && (
