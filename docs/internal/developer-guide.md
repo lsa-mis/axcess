@@ -206,7 +206,7 @@ Useful `audit crawl` flags:
 | `--skip-screenshots` | Off | Skips the outlined element screenshots |
 | `--axe-level` | AA | Sets the axe-core level: A, AA, or AAA |
 | `--wcag-version` | 2.1 | The WCAG version the level is checked against: 2.1, the current U-M standard, or 2.2. Applies to axe-core and Alfa. |
-| `--compare-to SCAN_ID` | The last completed scan of the same site | The report to compare image findings against |
+| `--compare-to SCAN_ID` | The last report of the same site (a completed scan, or a stopped or failed one that saved pages) | The report to compare image findings against |
 
 Each check also has an off switch: `--skip-axe`, `--skip-keyboard`,
 `--skip-responsive`, `--skip-focus`, `--skip-visual`, `--skip-ocr`,
@@ -254,7 +254,7 @@ scan has a completed expert evaluation. The evaluation lives in the
 holds its logic.
 
 - `GET /api/scans/{id}/evaluation` reads the record, and
-  `PUT /api/scans/{id}/evaluation` updates it for a completed scan. The body
+  `PUT /api/scans/{id}/evaluation` updates it for a report. The body
   (`EvaluationUpdate` in `server.py`) holds the target standard and level,
   purpose, included and excluded scope, sample description, reviewer,
   methods note, limitations, and `status` (`draft`, `in_progress`, or

@@ -200,7 +200,6 @@ export default function IssuesRoute() {
 
   const scan = scanQuery.data;
   const data = issuesQuery.data;
-  const isComplete = scan.status === "completed";
   const summaryRows = hasFilter ? summaryQuery.data?.rows : data.rows;
   const onSort = (next: SortState) => setParam("sort", serializeSort(next));
   const exportMenu = (
@@ -239,13 +238,11 @@ export default function IssuesRoute() {
         actions={exportMenu}
       />
 
-      {isComplete && (
-        <ReportSummary
-          scan={scan}
-          issueGroups={data.total_unfiltered}
-          occurrences={data.occurrence_counts.all_evidence}
-        />
-      )}
+      <ReportSummary
+        scan={scan}
+        issueGroups={data.total_unfiltered}
+        occurrences={data.occurrence_counts.all_evidence}
+      />
 
       {/* Filtering changed the table silently: the visible count updated,
           but nothing announced it, so a screen-reader user typing in the
@@ -360,8 +357,8 @@ export default function IssuesRoute() {
           the numbers with nothing to step over. Why, and what keeps the
           limit in view, is on ReportCoverageNote. */}
       <ReportNotes className="mt-8">
-        {isComplete && <ReportCoverageNote scan={scan} rows={summaryRows} />}
-        {isComplete && <ReportScanNote scan={scan} />}
+        <ReportCoverageNote scan={scan} rows={summaryRows} />
+        <ReportScanNote scan={scan} />
         <IssueGlossary />
       </ReportNotes>
 

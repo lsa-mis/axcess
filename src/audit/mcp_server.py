@@ -43,8 +43,6 @@ def _completed_scan(conn: sqlite3.Connection, scan_id: int) -> sqlite3.Row:
     ).fetchone()
     if protected is not None:
         raise ValueError("Protected reports are unavailable through MCP")
-    if scan["status"] != "completed":
-        raise ValueError("Report is not complete")
     return cast(sqlite3.Row, scan)
 
 

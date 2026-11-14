@@ -40,11 +40,11 @@ def _site(index: int, findings: int) -> dict[str, Any]:
         return {
             "site_url": url,
             "scan_count": 1,
-            "completed_count": 0,
+            "report_count": 0,
             "most_recent": failed,
-            "most_recent_completed": None,
-            "most_recent_completed_issue_count": None,
-            "most_recent_completed_occurrence_count": None,
+            "most_recent_report": None,
+            "most_recent_report_issue_count": None,
+            "most_recent_report_occurrence_count": None,
             "scans": [failed],
         }
     completed = _scan(7 + 2 * (index - 1), "completed", site=url, findings=findings)
@@ -52,11 +52,11 @@ def _site(index: int, findings: int) -> dict[str, Any]:
     return {
         "site_url": url,
         "scan_count": 2,
-        "completed_count": 1,
+        "report_count": 1,
         "most_recent": interrupted,
-        "most_recent_completed": completed,
-        "most_recent_completed_issue_count": 5,
-        "most_recent_completed_occurrence_count": 5 + findings,
+        "most_recent_report": completed,
+        "most_recent_report_issue_count": 5,
+        "most_recent_report_occurrence_count": 5 + findings,
         "scans": [interrupted, completed],
     }
 
@@ -75,9 +75,9 @@ async def _open_reports(
         elif counts := re.fullmatch(r"/api/scans/(\d+)/issue-counts", path):
             # Only completed reports are counted, as the server does.
             completed = {
-                s["most_recent_completed"]["id"]: s
+                s["most_recent_report"]["id"]: s
                 for s in sites
-                if s["most_recent_completed"] is not None
+                if s["most_recent_report"] is not None
             }
             site = completed.get(int(counts.group(1)))
             if site is None:
@@ -85,8 +85,8 @@ async def _open_reports(
             else:
                 await route.fulfill(
                     json={
-                        "issue_count": site["most_recent_completed_issue_count"],
-                        "occurrence_count": site["most_recent_completed_occurrence_count"],
+                        "issue_count": site["most_recent_report_issue_count"],
+                        "occurrence_count": site["most_recent_report_occurrence_count"],
                     }
                 )
         elif path.startswith("/api/"):
@@ -125,7 +125,7 @@ async def test_reports_table_keyboard_and_columns(
     # The caption says where a site row's numbers come from; the sentence
     # that repeated it over the table was removed after user testing.
     await playwright_async.expect(table).to_have_accessible_name(
-        "Public reports by site. A site\u2019s row shows its most recent completed scan. "
+        "Public reports by site. A site\u2019s row shows its most recent report. "
         "Open a site to list each of its scans under it."
     )
     await playwright_async.expect(page.get_by_text("Each row shows", exact=False)).to_have_count(0)
@@ -147,9 +147,7 @@ async def test_reports_table_keyboard_and_columns(
         f"site{newest}.example"
     )
     # How many scans the site has sits under its name, not in a column.
-    await playwright_async.expect(row.get_by_role("rowheader")).to_contain_text(
-        "2 scans, 1 completed"
-    )
+    await playwright_async.expect(row.get_by_role("rowheader")).to_contain_text("2 scans")
     headline_id = 7 + 2 * (newest - 1)
     # The site's newest run was interrupted ("Stopped"); the row shows only
     # the completed one.
@@ -179,7 +177,7 @@ async def test_reports_table_keyboard_and_columns(
     await playwright_async.expect(table.locator("thead")).not_to_contain_text("Page states")
     open_link = row.get_by_role(
         "link",
-        name=f"Open latest scan of site{newest}.example, the most recent completed scan",
+        name=f"Open latest scan of site{newest}.example, the most recent report",
     )
     await playwright_async.expect(open_link).to_have_attribute("href", f"/app/scans/{headline_id}")
     # Both actions are shown, no menu to open: "Scan again" sits beside
@@ -291,9 +289,9 @@ async def test_reports_table_keyboard_and_columns(
         table_box = await table.bounding_box()
         assert region_box and table_box
         assert region_box["height"] <= table_box["height"] + 2, (region_box, table_box)
-        # The failed-only site is last: no completed scan, so no numbers.
+        # The failed-only site is last: its scan saved no page, so no report.
         last = table.locator(":scope > tbody > tr").last
-        await playwright_async.expect(last).to_contain_text("No completed scan yet")
+        await playwright_async.expect(last).to_contain_text("No report yet")
         # Nothing to open yet, so only "Scan again", from its latest scan.
         await playwright_async.expect(
             last.get_by_role("link", name=re.compile(r"^Scan again\W+site\d+\.example"))
@@ -360,11 +358,11 @@ def _comparable_site() -> dict[str, Any]:
     return {
         "site_url": url,
         "scan_count": 3,
-        "completed_count": 2,
+        "report_count": 2,
         "most_recent": stopped,
-        "most_recent_completed": latest,
-        "most_recent_completed_issue_count": 3,
-        "most_recent_completed_occurrence_count": 6,
+        "most_recent_report": latest,
+        "most_recent_report_issue_count": 3,
+        "most_recent_report_occurrence_count": 6,
         "scans": [stopped, latest, earlier],
     }
 
@@ -556,11 +554,11 @@ async def test_reports_page_has_no_last_scanned_card_but_shows_a_running_scan(
         {
             "site_url": "https://site3.example/",
             "scan_count": 1,
-            "completed_count": 0,
+            "report_count": 0,
             "most_recent": running,
-            "most_recent_completed": None,
-            "most_recent_completed_issue_count": None,
-            "most_recent_completed_occurrence_count": None,
+            "most_recent_report": None,
+            "most_recent_report_issue_count": None,
+            "most_recent_report_occurrence_count": None,
             "scans": [running],
         },
     ]

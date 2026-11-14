@@ -949,7 +949,7 @@ export default function InspectorRoute() {
     }
     return null;
   }, [highlight, pageMark, scopedTargets]);
-  // Same gating as the page details screen (PageEvidence): only a finished,
+  // Same gating as the page details screen (PageEvidence): only an
   // unprotected report, and only when an administrator turned the feature on.
   const { data: suggestionStatus } = useQuery({
     queryKey: ["suggestion-status"],
@@ -958,7 +958,7 @@ export default function InspectorRoute() {
     staleTime: 30_000,
   });
   const suggestionsApply =
-    scanData?.status === "completed" && !scanData.protection && suggestionStatus !== undefined;
+    !!scanData && !scanData.protection && suggestionStatus !== undefined;
   const suggestions: SuggestionAvailability | null =
     // Keep saved answers visible when AI is off; request controls are hidden
     // inside FixSuggestion. W3C COGA (paraphrased: preserve context),

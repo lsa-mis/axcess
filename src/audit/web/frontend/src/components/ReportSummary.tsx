@@ -6,6 +6,22 @@ import MethodCoverageLedger, { methodsRan } from "./MethodCoverageLedger";
 import { Card, Disclosure } from "./ui";
 import { cn } from "../lib/cn";
 import { CLICK_THROUGH_STATES, clickThroughStates } from "../lib/labels";
+import { SCAN_END_LABEL } from "../lib/terms";
+import { NUMBERS } from "./newScan/copy";
+
+const pages = (n: number) => `${n.toLocaleString()} ${n === 1 ? "page" : "pages"}`;
+
+/**
+ * How the scan ended, with the page limit's number when it stopped there:
+ * "Stopped at its page limit of 10 pages". The number is what makes the
+ * line useful; without it the reader has to look the setting up.
+ */
+function endText(coverage: ScanDetail["coverage"]): string {
+  const words = SCAN_END_LABEL[coverage.ended];
+  return coverage.ended === "page_limit" && coverage.page_limit != null
+    ? `${words} of ${pages(coverage.page_limit)}`
+    : words;
+}
 
 /**
  * One number in the summary strip: the value large, what it counts under it,
@@ -69,7 +85,8 @@ function SummaryStat({
 }
 
 /**
- * What the old Overview tab said about a completed report, above its table.
+ * What the old Overview tab said about a report, above its table. Every
+ * report gets it, however its scan ended: a stopped scan used to have none.
  *
  * The report opens on Issues now, so the numbers that used to take a page of
  * their own sit over the table instead, as one row of stat cards.
@@ -218,6 +235,18 @@ export function ReportSummary({
           value={scan.page_count}
           className="col-span-2 sm:col-span-1"
           details={[
+            // How far the scan got, as facts, where a stopped scan used to
+            // be called a "partial report" and one that completed at a
+            // 10-page limit read as whole (the developer's decision,
+            // 2026-11-14). Pages found first, under the pages visited, so
+            // the two numbers read as one fact ("46 pages visited, out of
+            // 340 pages found"); then how the scan ended, in words, never
+            // colour alone (SC 1.4.1 Use of Color, Level A). Limits and the
+            // reason for a failure are under "How this scan ran".
+            ...(scan.coverage.pages_found != null
+              ? [{ text: `Out of ${pages(scan.coverage.pages_found)} found` }]
+              : []),
+            { text: endText(scan.coverage) },
             {
               text:
                 (scan.dom_state_count ?? 0) > 0
@@ -285,26 +314,54 @@ export function ReportCoverageNote({ scan, rows }: { scan: ScanDetail; rows: Iss
 }
 
 /**
- * "How this scan ran": Axcess's own note on how a completed scan was made,
- * as one more closed row of ``ReportNotes``. Shown only when the scan has a
- * note (``scan_note``, migration 0039); the first is a sign-in scan that
- * went back from several tabs to one because the site signed a tab out.
+ * "How this scan ran": how much of the site the scan covered and the
+ * settings that decided it, as one more closed row of ``ReportNotes``.
+ * Always shown: every report has an ending and limits worth knowing. The
+ * row's right side says how the scan ended, so it is seen without opening
+ * anything (AGENTS.md, Interface language rule 4: never drop a limitation
+ * to make the page shorter).
  *
- * One more row here rather than a banner over the table, as
- * ``ReportNotes`` asks of a new explanation: it says how the report was
- * made, not what is wrong with the site, so it sits with "What was checked"
- * and reads in the same place. The row's right side says a note is there,
- * so it is seen without opening anything (AGENTS.md, Interface language
- * rule 4: never drop a limitation to make the page shorter).
+ * It replaces the "Partial report" card a stopped scan used to get instead
+ * of its report (the developer's decision, 2026-11-14): pages found, pages
+ * visited, the limits chosen and how the scan ended say how complete a
+ * report is better than a label did. A failed scan's reason is here too,
+ * since its report now opens like any other. Axcess's own note
+ * (``scan_note``, migration 0039), such as a sign-in scan that went back
+ * from several tabs to one, follows them.
  *
- * Titled "How this scan ran", not "notes": "Issue notes" are what a person
- * writes (docs/plain-language.md), and this is written by Axcess.
+ * The labels are the New scan form's ("Maximum pages", "Maximum link
+ * depth"), so a setting has one name on both screens (SC 3.2.4 Consistent
+ * Identification, Level AA). An inline ``dl``, the pattern Compare's legend
+ * uses. Titled "How this scan ran", not "notes": "Issue notes" are what a
+ * person writes (docs/plain-language.md).
  */
 export function ReportScanNote({ scan }: { scan: ScanDetail }) {
-  if (!scan.scan_note) return null;
+  const { coverage } = scan;
+  const facts: [string, string][] = [
+    ["How it ended", endText(coverage)],
+    ["Pages found", coverage.pages_found != null ? coverage.pages_found.toLocaleString() : "Not recorded"],
+    ["Pages visited", coverage.pages_visited.toLocaleString()],
+    [NUMBERS.max_pages.label, coverage.page_limit != null ? coverage.page_limit.toLocaleString() : "No limit"],
+    [NUMBERS.max_depth.label, coverage.depth_limit != null ? coverage.depth_limit.toLocaleString() : "Not recorded"],
+    ...(scan.failure_reason ? [["Why it failed", scan.failure_reason] as [string, string]] : []),
+    ...(scan.scan_note ? [["Note from Axcess", scan.scan_note] as [string, string]] : []),
+  ];
   return (
-    <ReportNote id="report-scan-note" title="How this scan ran" meta={<span>1 note from Axcess</span>}>
-      <p className="max-w-prose text-sm text-fg">{scan.scan_note}</p>
+    <ReportNote id="report-scan-note" title="How this scan ran" meta={<span>{endText(coverage)}</span>}>
+      <dl className="max-w-prose space-y-1 text-sm text-fg">
+        {facts.map(([term, value]) => (
+          <div key={term}>
+            <dt className="inline font-semibold">{term}</dt>
+            <dd className="inline">: {value}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-3 max-w-prose text-sm text-fg-muted">
+        A page is found when the scan finds a link to it. The scan stops looking for new pages when it reaches its
+        maximum pages, when it is stopped, or when it fails, and it does not follow links deeper than its maximum
+        link depth. The site may have more pages than it found. &ldquo;Stopped before the end&rdquo; means someone
+        pressed Stop or Axcess closed while the scan ran.
+      </p>
     </ReportNote>
   );
 }

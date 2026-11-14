@@ -9,6 +9,7 @@ import type {
   ReviewDecision,
   ReviewLane,
   RuleCheck,
+  ScanEndReason,
   ScanStatus,
   SuggestionAudience,
   SuggestionCheckOutcome,
@@ -215,6 +216,34 @@ export const REDACTION_LIMITS =
  */
 export const FIX_BRIEF_SCOPE_NOTE =
   "The fix brief is not the whole report. It lists open issue types only, most important first, stops at a limit, and shows a few places for each. It says what it left out.";
+
+/**
+ * How a scan ended, said as what happened to its coverage, for the report's
+ * "Pages visited" line and "How this scan ran". This replaces calling a
+ * stopped scan a "partial report": a scan stopped after 100 pages covers more
+ * than one that completed at a 10-page limit, so the words say what the scan
+ * did, and the numbers beside them say how far it got.
+ *
+ * "Stopped" cannot say who stopped it: the status is the same when someone
+ * pressed Stop and when Axcess closed while the scan ran, so the words do not
+ * claim either.
+ */
+export const SCAN_END_LABEL: Record<ScanEndReason, string> = {
+  running: "Still scanning",
+  all_found: "Visited every page it found",
+  page_limit: "Stopped at its page limit",
+  stopped: "Stopped before the end",
+  failed: "Failed before the end",
+};
+
+/**
+ * Whether a scan has a report to open: it completed, or it ended with pages
+ * saved, however it ended (a running scan's stored page count stays 0 until
+ * it ends). The server uses the same rule (sites.py, comparison.py).
+ */
+export function isReport(scan: { status: ScanStatus; page_count: number }): boolean {
+  return scan.status === "completed" || scan.page_count > 0;
+}
 
 /** A scan's progress, for status badges. */
 export const SCAN_STATUS_LABEL: Record<ScanStatus, string> = {
