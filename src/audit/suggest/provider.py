@@ -20,7 +20,7 @@ from typing import Any, Protocol
 import httpx
 from pydantic import ValidationError
 
-from audit.analyzer.ollama_base import prompt_content_version, runs_off_this_computer
+from audit.analyzer.ollama_base import prompt_content_version, why_not_local
 from audit.suggest.context import EvidenceBundle
 from audit.suggest.models import ErrorCode, ModelAnswer, ModelAnswerV2
 
@@ -190,10 +190,9 @@ class OllamaSuggestionProvider:
     async def generate(self, prompt: str, *, model: str, image: bytes | None) -> str:
         # A cloud model runs on Ollama's servers, so the evidence would leave
         # this computer (audit.analyzer.ollama_base.is_cloud_model).
-        if await runs_off_this_computer(self._client, f"{self._base_url}/api/tags", model):
-            raise SuggestionError(
-                "model_unavailable", f"{model} is a cloud model; choose a local one"
-            )
+        reason = await why_not_local(self._client, f"{self._base_url}/api/tags", model)
+        if reason is not None:
+            raise SuggestionError("model_unavailable", reason)
         payload: dict[str, object] = {
             "model": model,
             "prompt": prompt,

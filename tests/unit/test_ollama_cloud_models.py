@@ -140,3 +140,57 @@ async def test_sign_in_scan_ai_refuses_a_cloud_model_under_a_local_name() -> Non
     ) as local:
         assert await local.assess_image(bytearray(b"signed-in page image")) is None
     assert calls == []
+
+
+@pytest.mark.parametrize(
+    "tags",
+    [
+        httpx.Response(500),
+        httpx.Response(200, text="not json"),
+        httpx.Response(200, json={"unexpected": True}),
+        httpx.Response(200, json=["not", "an", "object"]),
+    ],
+)
+@pytest.mark.asyncio
+async def test_every_path_refuses_when_the_model_list_cannot_be_read(
+    tags: httpx.Response,
+) -> None:
+    # Fails closed: no model is trusted as local without Ollama's own list.
+    calls: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/tags":
+            return tags
+        calls.append(request)
+        return httpx.Response(200, json={"response": "{}"})
+
+    transport = httpx.MockTransport(handler)
+    async with httpx.AsyncClient(transport=transport) as client:
+        provider = OllamaTextProvider(client, model="llava:7b", base_url="http://127.0.0.1:11434")
+        with pytest.raises(OllamaError, match="could not confirm"):
+            await provider._post_with_retries({"model": "llava:7b", "prompt": "page text"})
+        # Not cached: a later call checks again.
+        assert "llava:7b" not in provider._local_models
+        suggestions = OllamaSuggestionProvider(
+            client, base_url="http://127.0.0.1:11434", timeout_s=30
+        )
+        with pytest.raises(SuggestionError):
+            await suggestions.generate("evidence", model="llava:7b", image=None)
+    async with protected_local_ai.ProtectedLocalOllama(
+        base_url="http://127.0.0.1:11434", model="llava:7b", transport=transport
+    ) as local:
+        assert await local.assess_image(bytearray(b"signed-in page image")) is None
+    assert calls == []
+
+
+@pytest.mark.asyncio
+async def test_a_timeout_reading_the_model_list_refuses() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/tags":
+            raise httpx.ReadTimeout("slow", request=request)
+        raise AssertionError("nothing may be sent")
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        provider = OllamaTextProvider(client, model="llava:7b", base_url="http://127.0.0.1:11434")
+        with pytest.raises(OllamaError, match="could not confirm"):
+            await provider._post_with_retries({"model": "llava:7b", "prompt": "page text"})

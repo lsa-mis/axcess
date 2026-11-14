@@ -695,6 +695,8 @@ async def test_ollama_request_is_bounded_and_schema_shaped() -> None:
     sent: dict[str, Any] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/tags":  # the model runs on this computer
+            return httpx.Response(200, json={"models": [{"name": "m"}]})
         sent.update(json.loads(request.content))
         return httpx.Response(200, json={"response": json.dumps(GOOD_ANSWER)})
 

@@ -269,6 +269,8 @@ async def test_checker_fences_page_text_as_data() -> None:
     seen: dict[str, object] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/tags":  # the model runs on this computer
+            return httpx.Response(200, json={"models": [{"name": "stub:1"}]})
         body = json.loads(request.content)
         seen.update(body)
         answer = {"verdict": "needs_better", "reason": "Vague.", "suggestion": "A red barn"}

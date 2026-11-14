@@ -25,7 +25,7 @@ from typing import Any, Literal
 
 import httpx
 
-from audit.analyzer.ollama_base import runs_off_this_computer
+from audit.analyzer.ollama_base import why_not_local
 
 _MAX_IMAGE_BYTES = 8 * 1024 * 1024
 _MAX_RESPONSE_BYTES = 64 * 1024
@@ -97,7 +97,8 @@ class ProtectedLocalOllama:
             return None
         # A cloud model would carry the signed-in page's image off this
         # computer, past the loopback address the companion enforces.
-        if await runs_off_this_computer(client, "/api/tags", self._model):
+        # Fails closed: an unreadable model list sends nothing.
+        if await why_not_local(client, "/api/tags", self._model) is not None:
             return None
         prompt = (
             "You are reviewing one image for an authorized accessibility audit. "
