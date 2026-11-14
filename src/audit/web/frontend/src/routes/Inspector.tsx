@@ -35,6 +35,7 @@ import {
   boxPlace,
   type BoxNote,
   buildHighlightedHtml,
+  canFocusInCopy,
   countFound,
   describeElement,
   drawnOnCanvas,
@@ -527,6 +528,29 @@ export default function InspectorRoute() {
   }, [allTargetsRevealed, revealingControls, targets.length, activeStateKey]);
 
   const frameRef = useRef<HTMLIFrameElement | null>(null);
+  // Whether keyboard focus entering the saved copy can land on the flagged
+  // element the reader is on (``canFocusInCopy``): set at every step, and
+  // said in the frame's name.
+  const [landsOnElement, setLandsOnElement] = useState(false);
+  // Where Escape in the saved copy goes back to: the last control outside
+  // the copy that had focus, or, failing that, the toolbar above the copy.
+  const beforeCopyRef = useRef<HTMLElement | null>(null);
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
+  // Whether focus is in the saved copy, or was when the browser window
+  // lost focus: only focus coming in from the app moves to the flagged
+  // element, not focus coming back to the copy after switching apps.
+  const inCopyRef = useRef(false);
+  useEffect(() => {
+    const remember = (event: FocusEvent) => {
+      const el = event.target;
+      if (el instanceof HTMLElement && el.tagName !== "IFRAME") {
+        beforeCopyRef.current = el;
+        inCopyRef.current = false;
+      }
+    };
+    document.addEventListener("focusin", remember);
+    return () => document.removeEventListener("focusin", remember);
+  }, []);
 
   // The captured markup is shown via `srcDoc`, which gives the frame no
   // document URL of its own, so every relative stylesheet/font/image in the
@@ -667,14 +691,82 @@ export default function InspectorRoute() {
           delete frame.dataset.focused;
         });
       }
-      // Escape inside the saved copy goes back to "Go to element", the way
-      // in (FlaggedStepper). The copy runs no scripts of its own, so no
-      // key of the page's is taken.
+      // Escape inside the saved copy goes back to where the reader was
+      // before it: the control that last had focus outside the copy (the
+      // stepper, the review), or the toolbar's first button if that one is
+      // gone or disabled. Said in the frame's name, which a screen reader
+      // reads on the way in. The copy runs no scripts of its own, so no key
+      // of the page's is taken. A shortcut, not the only way out: Tab
+      // through the page also leaves the copy (SC 2.1.2 No Keyboard Trap,
+      // Level A).
       doc?.addEventListener("keydown", (event) => {
-        if (event.key === "Escape" && goToRef.current) {
-          event.preventDefault();
-          goToRef.current.focus();
-        }
+        if (event.key !== "Escape") return;
+        const back = beforeCopyRef.current;
+        const target =
+          back?.isConnected && !back.matches(":disabled")
+            ? back
+            : toolbarRef.current?.querySelector<HTMLElement>("button:not(:disabled), a[href]");
+        if (!target) return;
+        event.preventDefault();
+        target.focus();
+      });
+      // Keyboard focus coming into the saved copy from the app (Tab or
+      // Shift+Tab) goes straight on to the flagged element the reader is
+      // on, where a screen reader reads it in its place on the page with
+      // its "Flagged element 2 of 5" description (the developer's decision,
+      // 2026-11-14; FlaggedStepper says what was weighed). Then it is
+      // brought into view below the app's sticky top bar: the copy can
+      // start below the screen on a short window (SC 2.4.11 Focus Not
+      // Obscured (Minimum), Level AA).
+      // - Not for a click or tap: a pointer press in the copy marks the
+      //   focus that follows as the reader's own, and it stays where it
+      //   landed. mousedown as well as pointerdown, because on a touch
+      //   screen focus follows the mousedown the browser sends after the
+      //   tap, not the pointerdown.
+      // - Not for focus coming back after switching apps (inCopyRef).
+      // - Done on the first focusin, in the same moment the browser puts
+      //   focus on the page's first stop, so focus does not rest there
+      //   first. Not yet checked with a screen reader: whether one still
+      //   says that first stop before the element.
+      // - Nothing happens when the element cannot take focus (hidden, or
+      //   the whole page); the frame's name then does not promise it.
+      // - The page's own tab order is not changed: the element gets
+      //   tabindex="-1" only if it needs one to take focus (focusInCopy).
+      inCopyRef.current = false;
+      let pointer = false;
+      const pressed = () => {
+        pointer = true;
+        window.setTimeout(() => {
+          pointer = false;
+        }, 0);
+      };
+      doc?.addEventListener("pointerdown", pressed, true);
+      doc?.addEventListener("mousedown", pressed, true);
+      // The window's focus comes first, before the browser puts focus on
+      // the copy's first stop, so a move made then is undone. It only
+      // notes that focus came in; the move is made on the focusin that
+      // follows, or, in a copy with nothing to focus, after the browser
+      // is done.
+      let entering = false;
+      const moveToElement = () => {
+        entering = false;
+        if (!doc || !frameRef.current) return;
+        const target = doc.querySelector<HTMLElement>("[data-axcess-current]");
+        if (!target || doc.activeElement === target || !focusInCopy(target)) return;
+        keepCentered(target);
+        revealInPage(frameRef.current, target);
+      };
+      view?.addEventListener("focus", () => {
+        const fromApp = !inCopyRef.current;
+        inCopyRef.current = true;
+        if (!fromApp || pointer) return;
+        entering = true;
+        window.setTimeout(() => {
+          if (entering) moveToElement();
+        }, 0);
+      });
+      doc?.addEventListener("focusin", () => {
+        if (entering) moveToElement();
       });
       if (frame && doc) {
         setCanvasCheck({ doc: frame.srcdoc, drawn: drawnOnCanvas(doc) });
@@ -711,6 +803,7 @@ export default function InspectorRoute() {
     if (marks.length === 0) {
       spotlight(null, "", doc);
       noteCurrent(doc, null, "");
+      setLandsOnElement(false);
       return false;
     }
     marks.forEach((mark, i) => markCurrent(mark, i === index));
@@ -719,6 +812,7 @@ export default function InspectorRoute() {
       setCurrentElement(describeElement(el)),
     );
     noteCurrent(doc, target, marks.length > 1 ? `Flagged element ${index + 1} of ${marks.length}` : "Flagged element");
+    setLandsOnElement(canFocusInCopy(target));
     if (target) keepCentered(target);
     return true;
   }
@@ -907,35 +1001,6 @@ export default function InspectorRoute() {
     } finally {
       setBulkBusy(false);
     }
-  };
-  // "Go to element" (in FlaggedStepper): the button, to come back to with
-  // Escape, and what it says when the element cannot take focus.
-  const goToRef = useRef<HTMLButtonElement>(null);
-  const [goToNote, setGoToNote] = useState<{ attempt: number; text: string } | null>(null);
-  const goToAttempts = useRef(0);
-  useEffect(() => setGoToNote(null), [srcDoc, pageMark]);
-  const goToElement = () => {
-    goToAttempts.current += 1;
-    const attempt = goToAttempts.current;
-    let landed = false;
-    try {
-      const target = frameRef.current?.contentDocument?.querySelector<HTMLElement>("[data-axcess-current]");
-      landed = Boolean(target && focusInCopy(target));
-      if (target && landed && frameRef.current) {
-        keepCentered(target);
-        revealInPage(frameRef.current, target);
-      }
-    } catch {
-      // Opaque document: focus cannot be moved into it.
-    }
-    setGoToNote(
-      landed
-        ? null
-        : {
-            attempt,
-            text: "This element cannot take focus in the saved copy, because it is hidden there or it is the whole page. The line under the saved copy says where the box is.",
-          },
-    );
   };
   // The occurrence an AI suggestion is asked for: the first one on the
   // element the reader is on. Occurrences sharing an element are of the same
@@ -1238,22 +1303,26 @@ export default function InspectorRoute() {
           <div>
             {/* Top corners as the panel's inner ones (8px less its 1px border),
                 so the bar's fill does not paint square corners over them. */}
-            {/* Two sides and a line under them. Left, finding the element:
-                the stepper (count, Previous element, Next element, Go to
-                element; FlaggedStepper), the reader's main task, where
-                reading starts. Right, how the copy is shown: Show at full
-                width and Hide highlights, settings rather than steps. Under
-                both, on a line of its own at a reading width, what Go to
-                element does (also its description) and, when focus could
-                not move, why (a status, in words; SC 4.1.3 Status Messages,
-                Level AA). "5 places highlighted" is not shown beside the
-                stepper: "Flagged element 1 of 5" already gives the number,
+            {/* Two sides. Left, finding the element: the stepper (count,
+                Previous element, Next element; FlaggedStepper), the reader's
+                main task, where reading starts. Right, how the copy is
+                shown: Show at full width and Hide highlights, settings
+                rather than steps. No "Go to element" button and no line
+                explaining it: keyboard focus entering the copy goes to the
+                flagged element (``onFrameLoad``), and the frame's name says
+                so and says that Escape leaves it (the developer's decision,
+                2026-11-14; see FlaggedStepper). "5 places highlighted" is
+                not shown beside the stepper: "Flagged element 1 of 5"
+                already gives the number,
                 and saying it twice crowded the bar into a third line (W3C
                 COGA, "Making Content Usable",
                 https://www.w3.org/TR/coga-usable/: keep it simple, no
                 repeats). Without the stepper the label stays: it says the
                 copy's name, or that highlighting is under way. */}
-            <div className="flex flex-wrap items-center gap-2 rounded-t-[7px] border-b border-border bg-surface-muted/40 px-3 py-2">
+            <div
+              ref={toolbarRef}
+              className="flex flex-wrap items-center gap-2 rounded-t-[7px] border-b border-border bg-surface-muted/40 px-3 py-2"
+            >
               {stepping ? (
                 <FlaggedStepper
                   count={highlightedCount}
@@ -1264,7 +1333,6 @@ export default function InspectorRoute() {
                       ? `${currentElement.kind}${currentElement.text ? `, “${currentElement.text}”` : ""}`
                       : undefined
                   }
-                  goTo={currentElement ? { onClick: goToElement, ref: goToRef, hintId: "inspect-go-to-hint" } : undefined}
                 />
               ) : (
                 <span className="text-xs font-semibold text-fg-subtle">
@@ -1294,20 +1362,6 @@ export default function InspectorRoute() {
                   </button>
                 )}
               </span>
-              {stepping && currentElement && (
-                <p id="inspect-go-to-hint" className="basis-full text-xs text-fg-muted">
-                  <span className="block max-w-measure">
-                    Go to element moves keyboard focus to it. Press Escape to come back.
-                  </span>
-                </p>
-              )}
-              <p role="status" className="basis-full text-xs text-fg empty:sr-only">
-                {goToNote && (
-                  <span key={goToNote.attempt} className="block max-w-measure">
-                    {goToNote.text}
-                  </span>
-                )}
-              </p>
             </div>
             {/* Why a highlight is missing or partial ("Axcess could not find
                 the flagged element in this copy", "found 3 of 5"), and
@@ -1569,12 +1623,25 @@ export default function InspectorRoute() {
             {/* The check's window, centred on a grey stage, so its width is
                 the page's width, as it was when the issue was found. */}
             <div className={cn(layout?.width && "flex justify-center overflow-auto bg-surface-muted p-4")}>
+              {/* The frame's name says how to move in and out of it by
+                  keyboard: Tab into it goes to the flagged element (only
+                  when it can take focus, ``canFocusInCopy``), and Escape
+                  goes back. A
+                  screen reader reads the name as focus enters the copy,
+                  where the help is needed. It replaced a visible line under
+                  the toolbar ("Go to element moves keyboard focus to it.
+                  Press Escape to come back."), removed with that button
+                  (the developer's decision, 2026-11-14). A sighted keyboard
+                  user sees where focus landed: the focus ring is on the
+                  element inside the numbered box. */}
               {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
               <iframe
                 ref={frameRef}
                 srcDoc={srcDoc}
                 onLoad={onFrameLoad}
-                title={`${copyName}: ${displayTitle}`}
+                title={`${copyName}: ${displayTitle}. ${
+                  landsOnElement ? "Tab into it goes to the flagged element. " : ""
+                }Press Escape to go back to where you were.`}
                 sandbox="allow-same-origin"
                 referrerPolicy="no-referrer"
                 className={cn(
@@ -1916,13 +1983,14 @@ function escapeAttribute(value: string): string {
 
 /**
  * Scroll the inspector page so ``target``, inside the saved copy's frame, is
- * in view below the sticky top bar, after "Go to element" put focus on
- * it. Focus moves without scrolling (``focusInCopy``) and ``keepCentered``
- * scrolls only the frame, which is right while stepping, where the page must
- * not jump. But this button is above the frame, so on a short window (or
- * with a tall facts table) focus landed on an element below the bottom of
- * the screen, and a keyboard user could not see where it went (SC 2.4.11
- * Focus Not Obscured (Minimum), Level AA; found by review). The page moves
+ * in view below the sticky top bar, after keyboard focus entering the copy
+ * moved onto it (``onFrameLoad``). Focus moves without scrolling
+ * (``focusInCopy``) and ``keepCentered`` scrolls only the frame, which is
+ * right while stepping, where the page must not jump. But the copy can
+ * start below the screen on a short window, or with the element under the
+ * sticky bar, so a keyboard user could not see where focus went (SC 2.4.11
+ * Focus Not Obscured (Minimum), Level AA; found by review of the "Go to
+ * element" button this replaced). The page moves
  * only when the element is not fully shown already, and then centres it in
  * the room under the bar (the page's scroll-padding-top, styles.css).
  */
