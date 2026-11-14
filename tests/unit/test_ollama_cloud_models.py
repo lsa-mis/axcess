@@ -177,8 +177,6 @@ async def test_every_path_refuses_when_the_model_list_cannot_be_read(
         provider = OllamaTextProvider(client, model="llava:7b", base_url="http://127.0.0.1:11434")
         with pytest.raises(OllamaError, match="could not confirm"):
             await provider._post_with_retries({"model": "llava:7b", "prompt": "page text"})
-        # Not cached: a later call checks again.
-        assert "llava:7b" not in provider._local_models
         suggestions = OllamaSuggestionProvider(
             client, base_url="http://127.0.0.1:11434", timeout_s=30
         )
@@ -202,3 +200,28 @@ async def test_a_timeout_reading_the_model_list_refuses() -> None:
         provider = OllamaTextProvider(client, model="llava:7b", base_url="http://127.0.0.1:11434")
         with pytest.raises(OllamaError, match="could not confirm"):
             await provider._post_with_retries({"model": "llava:7b", "prompt": "page text"})
+
+
+@pytest.mark.asyncio
+async def test_a_model_replaced_by_a_cloud_copy_is_refused_on_the_next_call() -> None:
+    # ``ollama cp gpt-oss:120b-cloud llava:7b`` during a scan: the next
+    # request reads the list again and sends nothing.
+    replaced = False
+    calls: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/tags":
+            entry: dict[str, str] = {"name": "llava:7b"}
+            if replaced:
+                entry |= {"remote_host": "https://ollama.com:443", "remote_model": "gpt-oss:120b"}
+            return httpx.Response(200, json={"models": [entry]})
+        calls.append(request)
+        return httpx.Response(200, json={"response": "{}"})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        provider = OllamaTextProvider(client, model="llava:7b", base_url="http://127.0.0.1:11434")
+        await provider._post_with_retries({"model": "llava:7b", "prompt": "page one"})
+        replaced = True
+        with pytest.raises(OllamaError, match="cloud model"):
+            await provider._post_with_retries({"model": "llava:7b", "prompt": "page two"})
+    assert len(calls) == 1

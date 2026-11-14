@@ -161,9 +161,6 @@ class OllamaBase:
         # settable attribute. A read-only property here would break
         # LSP / structural-subtyping compatibility with that protocol.
         self.model_version = model
-        # Models already confirmed to run on this computer (one /api/tags
-        # read per model, not per request).
-        self._local_models: set[str] = set()
 
     @property
     def model(self) -> str:
@@ -201,12 +198,13 @@ class OllamaBase:
         aren't 408/429, exhausted retries, malformed Ollama envelope).
         """
         model = str(payload.get("model") or self._model)
-        if model not in self._local_models:
-            reason = await why_not_local(self._client, f"{self._base_url}/api/tags", model)
-            if reason is not None:
-                raise OllamaError(f"{reason} Choose a local model.")
-            # Cached only once confirmed local.
-            self._local_models.add(model)
+        # Checked before every request, not cached: a model can be replaced
+        # by a cloud copy under the same name (``ollama cp``) while a scan
+        # runs. Reading the local list takes milliseconds; a model call takes
+        # seconds.
+        reason = await why_not_local(self._client, f"{self._base_url}/api/tags", model)
+        if reason is not None:
+            raise OllamaError(f"{reason} Choose a local model.")
         url = f"{self._base_url}/api/generate"
         backoff = 1.0
         last_error: Exception | None = None
