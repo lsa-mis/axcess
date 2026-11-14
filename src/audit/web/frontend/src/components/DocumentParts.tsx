@@ -3,10 +3,11 @@ import type { DocumentRefWay, LinkedFileRow } from "../api/types";
 import BreakableUrl from "./BreakableUrl";
 import HowSureTag from "./HowSureTag";
 import {
-  LINKED_FILE_CHECK_TEXT,
+  LINKED_FILE_CHECK_PROBLEM,
   LINKED_FILE_REF_LABEL,
   LINKED_FILE_STATUS_HELP,
   LINKED_FILE_STATUS_LABEL,
+  LINKED_FILE_TYPE_LABEL,
   linkedFileReasonText,
 } from "../lib/terms";
 
@@ -49,6 +50,28 @@ export const RESULT_COLUMN = "Accessibility problems?";
  */
 export const PAGES_COLUMN = "Pages it appears on";
 
+/**
+ * The name of the column, and of the fact on a document's page, that says
+ * where the file is kept: its host ("docs.google.com") and whether that is
+ * this site or another one. "Hosted on", not "Site" (the developer's
+ * request, 2026-11-14): "Site" could be read as the page of our site the
+ * file is on, which is "Pages it appears on". "Hosted on" says what the
+ * column holds, the place the file itself lives (W3C COGA, "Making Content
+ * Usable", https://www.w3.org/TR/coga-usable/, paraphrased: different words
+ * for different things; SC 2.4.6 Headings and Labels, Level AA). Rejected:
+ * "What hosts it", a question where the other headers are names.
+ */
+export const HOSTED_COLUMN = "Hosted on";
+
+/** The host of a file's address ("hr.umich.edu"), or null for one that does not parse. */
+export function hostOf(url: string): string | null {
+  try {
+    return new URL(url).host;
+  } catch {
+    return null;
+  }
+}
+
 /** The file's "Accessibility problems?" value, as the Issues table's tag. */
 export function ResultTag({ status }: { status: LinkedFileRow["status"] }) {
   return (
@@ -60,26 +83,30 @@ export function ResultTag({ status }: { status: LinkedFileRow["status"] }) {
   );
 }
 
-/** What the checks found, or why there was nothing to find. */
+/**
+ * What the checks found, for the Documents table's "What Axcess found"
+ * column: each failed check by its short name, one a line, most serious
+ * first; for a file that passed, what a person must still check; for one
+ * Axcess could not check, why.
+ *
+ * Short names, not the sentence each used to be (LINKED_FILE_CHECK_PROBLEM
+ * in terms.ts; the developer's choice, 2026-11-14): a column of hundreds of
+ * files is scanned, not read, and why each matters is on the document's own
+ * page, in its table of checks. Still a list (`ul`), without bullets, so a
+ * screen reader says how many problems there are; the order is the
+ * report's own severity order. "Has a form to fill in" is not here any
+ * more: it is a fact about the file, not a problem, and read as one beside
+ * them; it is under the Type (TypeCell). Rejected: tags for each problem,
+ * which look like controls or filters (W3C COGA, "Making Content Usable":
+ * what is not a control should not look like one); and "2 problems" with
+ * the rest hidden, which takes the problems out of the table.
+ */
 export function Found({ row }: { row: LinkedFileRow }) {
-  return (
-    <>
-      <FoundResult row={row} />
-      {/* Something the check found in the file, and one of the steps of
-          the order, so it is said with the other findings rather than under
-          the file's name (where it was read out with the row header in
-          every cell). */}
-      {row.is_form && <p className="mt-2">Has a form to fill in.</p>}
-    </>
-  );
-}
-
-function FoundResult({ row }: { row: LinkedFileRow }) {
   if (row.status === "mostly_sure") {
     return (
-      <ul className="list-disc space-y-1 pl-4">
+      <ul className="space-y-1">
         {row.failed_checks.map((check) => (
-          <li key={check}>{LINKED_FILE_CHECK_TEXT[check]}</li>
+          <li key={check}>{LINKED_FILE_CHECK_PROBLEM[check]}</li>
         ))}
       </ul>
     );
@@ -89,7 +116,21 @@ function FoundResult({ row }: { row: LinkedFileRow }) {
 }
 
 /**
- * Where the file is kept: the site's name (its host, such as
+ * The file's type, and under it "Has a form to fill in" for a PDF with form
+ * fields: what the file is, together. It used to sit with the problems in
+ * "What Axcess found", where it read as one more problem.
+ */
+export function TypeCell({ row }: { row: LinkedFileRow }) {
+  return (
+    <>
+      <span className="block">{LINKED_FILE_TYPE_LABEL[row.file_type]}</span>
+      {row.is_form && <span className="block text-2xs text-fg-muted">Has a form to fill in</span>}
+    </>
+  );
+}
+
+/**
+ * Where the file is kept (the "Hosted on" column, HOSTED_COLUMN): the site's name (its host, such as
  * docs.google.com) and whether that is the scanned site or another one.
  *
  * Its own column, as the developer asked, in place of the file's full
@@ -105,12 +146,7 @@ function FoundResult({ row }: { row: LinkedFileRow }) {
  * idea per chunk).
  */
 export function SiteCell({ url, offSite }: { url: string; offSite: boolean }) {
-  let host: string | null = null;
-  try {
-    host = new URL(url).host;
-  } catch {
-    host = null;
-  }
+  const host = hostOf(url);
   return (
     <>
       {host && (

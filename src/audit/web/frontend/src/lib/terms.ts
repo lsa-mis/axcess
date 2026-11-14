@@ -130,6 +130,25 @@ export const LINKED_FILE_STATUS_HELP: Record<LinkedFileStatus, string> = {
   could_not_check: "Axcess could not check the file. The row says why.",
 };
 
+/** The Documents tab's Type filter groups: one per program, every format of it together. */
+export type LinkedFileKind = "pdf" | "word" | "excel" | "powerpoint" | "opendocument" | "rtf" | "google";
+
+/**
+ * Each Type filter group's name. The program's plain name, without the
+ * extensions the table's Type column adds (a filter for "Word" takes both
+ * .docx and .doc). Google's four kinds of file are one group: Axcess cannot
+ * check any of them, for the same reason.
+ */
+export const LINKED_FILE_KIND_LABEL: Record<LinkedFileKind, string> = {
+  pdf: "PDF",
+  word: "Word",
+  excel: "Excel",
+  powerpoint: "PowerPoint",
+  opendocument: "OpenDocument",
+  rtf: "Rich Text Format (RTF)",
+  google: "Google Docs, Sheets, Slides and Drive",
+};
+
 /** A linked file's type: the plain name first, the file extension after. */
 export const LINKED_FILE_TYPE_LABEL: Record<LinkedFileType, string> = {
   pdf: "PDF",
@@ -182,13 +201,54 @@ export function linkedFileReasonText(reason: LinkedFileReason, httpStatus: numbe
   return LINKED_FILE_REASON_TEXT[reason];
 }
 
-/** A failed machine check, as the problem it causes for a reader. */
-export const LINKED_FILE_CHECK_TEXT: Record<LinkedFileCheck, string> = {
-  not_tagged: "Not tagged: a screen reader cannot tell its headings, lists and tables apart.",
-  no_text: "No text a screen reader can read: the pages are pictures only, as in a scan.",
-  blocks_assistive_tech: "Its security settings stop screen readers from reading it.",
-  no_title: "No document title.",
-  no_language: "No language set, so a screen reader may read it in the wrong voice.",
+/**
+ * The five machine checks Axcess runs on every PDF it can open, most
+ * serious first: the order the report ranks them in (SEVERE_CHECKS in
+ * audit/linked_files/formats.py) and the order the server returns a file's
+ * failed checks in (ALL_CHECKS in pdf_check.py). Every check runs on every
+ * PDF Axcess opens, so a check a file did not fail found no problem.
+ */
+export const LINKED_FILE_CHECKS: readonly LinkedFileCheck[] = [
+  "not_tagged",
+  "no_text",
+  "blocks_assistive_tech",
+  "no_title",
+  "no_language",
+];
+
+/**
+ * A failed check, as a short name for the Documents table's "What Axcess
+ * found" column: a few words, so a column of hundreds of files can be
+ * scanned. Why each one matters is on the document's own page
+ * (LINKED_FILE_CHECK_WHY). Until 2026-11-14 the cell held name and reason
+ * in one sentence ("Not tagged: a screen reader cannot tell…"), which was
+ * hard to scan in a narrow column (the developer's choice).
+ */
+export const LINKED_FILE_CHECK_PROBLEM: Record<LinkedFileCheck, string> = {
+  not_tagged: "Not tagged",
+  no_text: "No text a screen reader can read",
+  blocks_assistive_tech: "Security settings block screen readers",
+  no_title: "No document title",
+  no_language: "No language set",
+};
+
+/** What each check looks at, for the "Check" column on a document's page. */
+export const LINKED_FILE_CHECK_NAME: Record<LinkedFileCheck, string> = {
+  not_tagged: "Tags",
+  no_text: "Text a screen reader can read",
+  blocks_assistive_tech: "Security settings",
+  no_title: "Document title",
+  no_language: "Language",
+};
+
+/** Why each check matters to a reader, in one sentence, for a document's page. */
+export const LINKED_FILE_CHECK_WHY: Record<LinkedFileCheck, string> = {
+  not_tagged: "Tags mark the headings, lists and tables, so a screen reader can tell them apart.",
+  no_text:
+    "A file whose pages are only pictures, as in a scan, has no text a screen reader can read. Axcess looks at the first 50 pages.",
+  blocks_assistive_tech: "Some security settings stop screen readers from reading the file.",
+  no_title: "A title tells people which file they have open.",
+  no_language: "The language tells a screen reader which voice to read the file in.",
 };
 
 /** How a page shows a file other than by a plain link. A plain link needs no note. */
