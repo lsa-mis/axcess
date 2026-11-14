@@ -783,10 +783,33 @@ async def test_a_documents_page_passes_axe_and_the_aaa_checks(
     await expect(opener).to_have_attribute("target", "_blank")
     facts = page.locator("main dl").first
     await expect(facts.get_by_role("term")).to_have_text(
-        ["Accessibility problems?", "Type", "Site", "Pages it appears on"]
+        ["Accessibility problems?", "Type", "Hosted on", "Pages it appears on"]
     )
     await expect(page.get_by_text("it has accessibility problems", exact=True)).to_be_visible()
     await expect(page.get_by_role("heading", name="What Axcess found", level=2)).to_be_visible()
+    # What Axcess found: every check, the ones with no problem too, by name,
+    # result in words and why it matters; the form is a fact under Type.
+    checks = page.get_by_role("table", name="Machine checks on permit-form.pdf")
+    await expect(checks.get_by_role("rowheader")).to_have_text(
+        [
+            "Tags",
+            "Text a screen reader can read",
+            "Security settings",
+            "Document title",
+            "Language",
+        ]
+    )
+    await expect(checks.locator("tbody tr td:nth-of-type(1)")).to_have_text(
+        [
+            "Problem found",
+            "No problem found",
+            "No problem found",
+            "No problem found",
+            "Problem found",
+        ]
+    )
+    await expect(checks).not_to_contain_text("Passed")
+    await expect(facts).to_contain_text("Has a form to fill in")
     table = page.get_by_role("table", name="Pages permit-form.pdf appears on")
     await expect(table.get_by_role("columnheader")).to_have_text(
         [

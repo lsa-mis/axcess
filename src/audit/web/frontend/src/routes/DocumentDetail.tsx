@@ -3,8 +3,16 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation, useParams } from "react-router";
 import { ExternalLink, ScanEye } from "lucide-react";
 import { ApiError, api } from "../api/client";
-import type { DocumentPage } from "../api/types";
-import { Found, HowItAppears, PAGES_COLUMN, RESULT_COLUMN, ResultTag, SiteCell } from "../components/DocumentParts";
+import type { DocumentPage, LinkedFileRow } from "../api/types";
+import {
+  Found,
+  HOSTED_COLUMN,
+  HowItAppears,
+  PAGES_COLUMN,
+  RESULT_COLUMN,
+  ResultTag,
+  SiteCell,
+} from "../components/DocumentParts";
 import { FactTile } from "../components/IssueEvidence";
 import ReportHeader from "../components/ReportHeader";
 import { TablePagination, usePagedRows } from "../components/TablePagination";
@@ -25,7 +33,15 @@ import {
 import { compareText, sortWords, type Sort, type SortKind } from "../components/table/sort";
 import { Card, EmptyState, ExternalLinkButton, LinkButton } from "../components/ui";
 import { useScanQuery } from "../hooks/useScanQuery";
-import { LINKED_FILE_STATUS_NOTE, LINKED_FILE_TYPE_LABEL, OPENS_NEW_WINDOW } from "../lib/terms";
+import {
+  LINKED_FILE_CHECKS,
+  LINKED_FILE_CHECK_NAME,
+  LINKED_FILE_CHECK_WHY,
+  LINKED_FILE_STATUS_HELP,
+  LINKED_FILE_STATUS_NOTE,
+  LINKED_FILE_TYPE_LABEL,
+  OPENS_NEW_WINDOW,
+} from "../lib/terms";
 
 type SortColumn = "Page title" | "Page URL";
 type PagesSort = Sort<SortColumn>;
@@ -57,8 +73,10 @@ const DEFAULT_SORT: PagesSort = { column: "Page URL", direction: "asc" };
  *
  * The facts are the Documents row's, as tiles: the "Accessibility problems?"
  * value with its sentence ("Mostly sure" / "it has accessibility
- * problems"), type, site and how many pages; then what the checks found,
- * under its own heading because it can run to several lines.
+ * problems"), type (with "Has a form to fill in" under it), where it is
+ * hosted and how many pages; then what the checks found, as a table of the
+ * five checks (ChecksTable), in a card with a titled bar like the pages
+ * table's.
  *
  * The pages table: one row per page, however many ways it reaches the file
  * (a link and a frame on one page are one row with two lines in "How it
@@ -153,17 +171,21 @@ export default function DocumentDetailRoute() {
           value={<ResultTag status={row.status} />}
           note={LINKED_FILE_STATUS_NOTE[row.status]}
         />
-        <FactTile label="Type" value={LINKED_FILE_TYPE_LABEL[row.file_type]} />
-        <FactTile label="Site" value={<SiteCell url={row.url} offSite={row.off_site} />} />
+        <FactTile
+          label="Type"
+          value={LINKED_FILE_TYPE_LABEL[row.file_type]}
+          note={row.is_form ? "Has a form to fill in" : undefined}
+        />
+        <FactTile label={HOSTED_COLUMN} value={<SiteCell url={row.url} offSite={row.off_site} />} />
         <FactTile label={PAGES_COLUMN} value={row.referring_page_count.toLocaleString()} />
       </dl>
 
-      <section aria-labelledby="document-found" className="mt-6 max-w-prose text-sm leading-6">
-        <h2 id="document-found" className="mb-2 text-base font-semibold">
-          What Axcess found
-        </h2>
-        <Found row={row} />
-      </section>
+      <Card className="mt-8">
+        <div className="flex flex-wrap items-baseline justify-between gap-3 rounded-t-[7px] border-b border-border bg-surface-muted px-4 py-3">
+          <h2 className="text-base font-semibold">What Axcess found</h2>
+        </div>
+        <ChecksTable row={row} />
+      </Card>
 
       <Card className="mt-8">
         <div className="flex flex-wrap items-baseline justify-between gap-3 rounded-t-[7px] border-b border-border bg-surface-muted px-4 py-3">
@@ -183,6 +205,71 @@ export default function DocumentDetailRoute() {
           backTo={here}
         />
       </Card>
+    </>
+  );
+}
+
+/**
+ * What Axcess found, as a table of its five machine checks: what each looks
+ * at, its result, and why it matters. Every check is listed, the ones with
+ * no problem too, so a reader sees what was looked at, not only what
+ * failed, and a Not sure file shows that its checks passed and what a
+ * person must still check (said over the table). The developer chose this
+ * on 2026-11-14 over a bullet list of sentences: the table's own cell keeps
+ * a short name per problem (Found, DocumentParts.tsx) and the reasons live
+ * here, where there is room.
+ *
+ * Row header the check (technique H63), so "Problem found" is heard with
+ * the check it belongs to. The result is in words, "Problem found" in bold
+ * and "No problem found" muted, never colour alone (SC 1.4.1 Use of Color,
+ * Level A), and never "Passed": a machine check cannot prove a file is
+ * accessible (AGENTS.md, Interface language rule 4). The checks run on
+ * every PDF Axcess opens (pdf_check.py), so a check the file did not fail
+ * found no problem; a file Axcess could not check has no table, only why.
+ * The same table parts as every table here, so it looks and reads the same.
+ */
+function ChecksTable({ row }: { row: LinkedFileRow }) {
+  if (row.status === "could_not_check") {
+    return (
+      <div className="max-w-prose px-4 py-3 text-sm leading-6">
+        <Found row={row} />
+      </div>
+    );
+  }
+  return (
+    <>
+      {row.status === "not_sure" && (
+        <p className="max-w-prose px-4 py-3 text-sm leading-6">{LINKED_FILE_STATUS_HELP.not_sure}</p>
+      )}
+      <TableRegion label="Checks table">
+        <Table caption={`Machine checks on ${row.name}`}>
+          <TableHead>
+            <tr>
+              <ColumnHeader>Check</ColumnHeader>
+              <ColumnHeader>Result</ColumnHeader>
+              <ColumnHeader>Why it matters</ColumnHeader>
+            </tr>
+          </TableHead>
+          <tbody>
+            {LINKED_FILE_CHECKS.map((check, index) => {
+              const failed = row.failed_checks.includes(check);
+              return (
+                <Row key={check} index={index} className="align-top">
+                  <RowHeader className="min-w-[10rem] align-top">{LINKED_FILE_CHECK_NAME[check]}</RowHeader>
+                  <Cell className="whitespace-nowrap align-top">
+                    {failed ? (
+                      <span className="font-semibold text-fg">Problem found</span>
+                    ) : (
+                      <span className="text-fg-muted">No problem found</span>
+                    )}
+                  </Cell>
+                  <Cell className="min-w-[16rem] align-top text-sm">{LINKED_FILE_CHECK_WHY[check]}</Cell>
+                </Row>
+              );
+            })}
+          </tbody>
+        </Table>
+      </TableRegion>
     </>
   );
 }

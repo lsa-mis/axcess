@@ -295,9 +295,14 @@ the table always count the whole report.
 
 A document's own page works like an issue type's page. At the top right,
 **Open the file** opens it in a new tab. Under the heading are its facts
-(Accessibility problems?, Type, Site, Pages it appears on) and what Axcess
-found. Then a table lists every page it appears on, one row per page (up to
-2,000), with a search box and sortable columns:
+(Accessibility problems?, Type, Hosted on, Pages it appears on). **What Axcess
+found** is a table of the five checks Axcess runs on every PDF it opens (Tags,
+Text a screen reader can read, Security settings, Document title, Language),
+each with its result ("Problem found" or "No problem found") and why it
+matters. "No problem found" is not a pass: a person must still check the file.
+For a file Axcess could not check, it says why instead. Then a table lists
+every page the file appears on, one row per page (up to 2,000), with a search
+box and sortable columns:
 
 - **Page title**: opens the page inspector with the link to this file
   outlined on the page.
