@@ -255,9 +255,11 @@ Each row shows:
 
 - **Document**: the file's name, which opens the document's own page (see
   below).
-- **Type**: such as "PDF" or "Word, old format (.doc)".
-- **Site**: the site the file is kept on, such as "docs.google.com", and
-  whether that is "This site" or "Another site".
+- **Type**: such as "PDF" or "Word, old format (.doc)", with "Has a form to
+  fill in" under it for a PDF with form fields.
+- **Hosted on**: the site the file itself is kept on, such as
+  "docs.google.com", and whether that is "This site" or "Another site". Not
+  the pages that link to it, which are in "Pages it appears on".
 - **Accessibility problems?**: how sure Axcess is that the file has
   accessibility problems. The values are the same words as the Issues table's
   How sure column.
@@ -271,14 +273,25 @@ Each row shows:
     is different from "Axcess cannot check" (old .doc, .xls and .ppt files,
     and Google files). A broken link, a password, a file over 10 MB, or a slow
     download are reasons too.
-- **What Axcess found**: the failed checks, or the reason, and "Has a form to
-  fill in" where it applies.
+- **What Axcess found**: each problem the checks found, by a short name, most
+  serious first ("Not tagged", "No language set"); for a Not sure file, what a
+  person must still check; for a file Axcess could not check, why. Why each
+  problem matters is on the document's own page.
 - **Pages it appears on**: how many pages link to the file or show it inside
   the page. The pages are listed on the document's own page.
 
-The order is fixed: Mostly sure, then Not sure, then Could not check. Within
-each, files that appear on more pages come first, then files with a form to fill
-in, then files with more serious problems. There is no single score.
+The table opens in the recommended order: Mostly sure, then Not sure, then
+Could not check. Within each, files that appear on more pages come first, then
+files with a form to fill in, then files with more serious problems. There is
+no single score.
+
+As on the Issues tab, every column header sorts the table (What Axcess found
+sorts by how many problems the checks found), and **Back to recommended
+order** above the table undoes it. **Filter documents** narrows the list by
+Accessibility problems?, Type (PDF, Word, Excel and so on) and Hosted on (this
+site or another site), with how many documents have each value. What is
+filtered is written under the bar, with **Clear filters**. The numbers above
+the table always count the whole report.
 
 A document's own page works like an issue type's page. At the top right,
 **Open the file** opens it in a new tab. Under the heading are its facts

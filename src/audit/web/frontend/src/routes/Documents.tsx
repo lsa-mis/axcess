@@ -1,9 +1,18 @@
-import { useEffect } from "react";
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useMemo, useRef, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation, useParams, useSearchParams } from "react-router";
 import { ApiError, api } from "../api/client";
 import type { LinkedFileRow, LinkedFileStatus } from "../api/types";
-import { Found, PAGES_COLUMN, RESULT_COLUMN, ResultTag, SiteCell } from "../components/DocumentParts";
+import {
+  Found,
+  HOSTED_COLUMN,
+  PAGES_COLUMN,
+  RESULT_COLUMN,
+  ResultTag,
+  SiteCell,
+  TypeCell,
+  hostOf,
+} from "../components/DocumentParts";
 import HowSureTag from "../components/HowSureTag";
 import ReportHeader from "../components/ReportHeader";
 import {
@@ -13,26 +22,44 @@ import {
   SummaryNumbers,
   SummaryStat,
 } from "../components/ReportSummary";
-import { TablePagination } from "../components/TablePagination";
+import { TablePagination, usePagedRows } from "../components/TablePagination";
+import {
+  ActiveFilters,
+  FilterMenu,
+  activeFilterItems,
+  splitFilter,
+  type FilterGroup,
+} from "../components/table/FilterMenu";
 import {
   Cell,
-  ColumnHeader,
   Row,
   RowHeader,
+  SortHeader,
   Table,
   TableBar,
   TableEmpty,
   TableHead,
   TableRegion,
+  TableStatus,
 } from "../components/table/Table";
-import { Card, EmptyState, LinkButton, withReturnTrail } from "../components/ui";
-import { useTablePageSize } from "../hooks/usePreferences";
-import { useScanQuery } from "../hooks/useScanQuery";
 import {
+  compareText,
+  parseSortParam,
+  sortParam,
+  sortWords,
+  type Sort,
+  type SortKind,
+} from "../components/table/sort";
+import { Card, EmptyState, LinkButton, withReturnTrail } from "../components/ui";
+import { useScanQuery } from "../hooks/useScanQuery";
+import { liveSearchParams } from "../lib/liveSearchParams";
+import {
+  LINKED_FILE_KIND_LABEL,
   LINKED_FILE_STATUS_HELP,
   LINKED_FILE_STATUS_LABEL,
   LINKED_FILE_STATUS_NOTE,
   LINKED_FILE_TYPE_LABEL,
+  type LinkedFileKind,
 } from "../lib/terms";
 
 /** The trail label for this view; ReportCrumb and the document title use the same words. */
@@ -40,6 +67,136 @@ export const DOCUMENTS_VIEW = "Documents";
 
 const STATUSES: readonly LinkedFileStatus[] = ["mostly_sure", "not_sure", "could_not_check"];
 
+/** Files asked for at once: the server's MAX_LIMIT (linked_files_queries.py). */
+const MAX_DOCUMENTS = 5000;
+
+/** The Type filter's groups, in the order the menu lists them. */
+const KIND_GROUPS: readonly LinkedFileKind[] = [
+  "pdf",
+  "word",
+  "excel",
+  "powerpoint",
+  "opendocument",
+  "rtf",
+  "google",
+];
+
+/** Which Type group a file is in: Word for .docx and .doc, and so on. */
+function kindOf(row: LinkedFileRow): LinkedFileKind {
+  switch (row.file_type) {
+    case "docx":
+    case "doc":
+      return "word";
+    case "xlsx":
+    case "xls":
+      return "excel";
+    case "pptx":
+    case "ppt":
+      return "powerpoint";
+    case "odt":
+    case "odp":
+    case "ods":
+      return "opendocument";
+    case "google_doc":
+    case "google_sheet":
+    case "google_slides":
+    case "google_drive":
+      return "google";
+    default:
+      return row.file_type;
+  }
+}
+
+/** The Hosted on filter's values: the words the column shows under the host. */
+const HOSTED = ["this", "other"] as const;
+type Hosted = (typeof HOSTED)[number];
+const HOSTED_LABEL: Record<Hosted, string> = { this: "This site", other: "Another site" };
+const hostedOf = (row: LinkedFileRow): Hosted => (row.off_site ? "other" : "this");
+
+/** A filter's checked values, kept to the ones its group offers, in its order (as Issues). */
+function parseList(raw: string | null, allowed: readonly string[]): string {
+  const on = new Set(splitFilter(raw ?? ""));
+  return allowed.filter((value) => on.has(value)).join(",");
+}
+
+function filterFiles(
+  files: readonly LinkedFileRow[],
+  { status, kind, hosted }: { status: string; kind: string; hosted: string },
+): LinkedFileRow[] {
+  const statuses = new Set(splitFilter(status));
+  const kinds = new Set(splitFilter(kind));
+  const hosts = new Set(splitFilter(hosted));
+  return files.filter(
+    (row) =>
+      (!statuses.size || statuses.has(row.status)) &&
+      (!kinds.size || kinds.has(kindOf(row))) &&
+      (!hosts.size || hosts.has(hostedOf(row))),
+  );
+}
+
+/**
+ * The columns, each sortable, in the table's order. The keys are what
+ * ``?sort=`` keeps ("pages_desc"); the labels are what the headers say.
+ */
+const SORT_COLUMNS = ["name", "type", "host", "status", "found", "pages"] as const;
+type DocumentsColumn = (typeof SORT_COLUMNS)[number];
+type DocumentsSort = Sort<DocumentsColumn>;
+const COLUMN_LABEL: Record<DocumentsColumn, string> = {
+  name: "Document",
+  type: "Type",
+  host: HOSTED_COLUMN,
+  status: RESULT_COLUMN,
+  found: "What Axcess found",
+  pages: PAGES_COLUMN,
+};
+/**
+ * Words open A to Z, counts open biggest first (./table/sort).
+ * "Accessibility problems?" sorts Mostly sure, Not sure, Could not check
+ * (A to Z reads as that order, as Issues' How sure column does). "What
+ * Axcess found" sorts by how many problems the checks found.
+ */
+const SORT_KINDS: Record<DocumentsColumn, SortKind> = {
+  name: "text",
+  type: "text",
+  host: "text",
+  status: "text",
+  found: "number",
+  pages: "number",
+};
+const STATUS_RANK: Record<LinkedFileStatus, number> = { mostly_sure: 0, not_sure: 1, could_not_check: 2 };
+
+function compareFiles(a: LinkedFileRow, b: LinkedFileRow, column: DocumentsColumn): number {
+  switch (column) {
+    case "name":
+      return compareText(a.name, b.name);
+    case "type":
+      return compareText(LINKED_FILE_TYPE_LABEL[a.file_type], LINKED_FILE_TYPE_LABEL[b.file_type]);
+    case "host":
+      return compareText(hostOf(a.url) ?? "", hostOf(b.url) ?? "");
+    case "status":
+      return STATUS_RANK[a.status] - STATUS_RANK[b.status];
+    case "found":
+      return a.failed_checks.length - b.failed_checks.length;
+    case "pages":
+      return a.referring_page_count - b.referring_page_count;
+  }
+}
+
+/** A stable sort: ties keep the recommended order the server sent. */
+function sortFiles(files: LinkedFileRow[], sort: DocumentsSort | null): LinkedFileRow[] {
+  if (!sort) return files;
+  const sign = sort.direction === "asc" ? 1 : -1;
+  return files
+    .map((row, index) => ({ row, index }))
+    .sort((a, b) => compareFiles(a.row, b.row, sort.column) * sign || a.index - b.index)
+    .map(({ row }) => row);
+}
+
+/** What the order is, in words, for the status line and the caption. */
+function describeSort(sort: DocumentsSort | null): string {
+  if (!sort) return `Recommended order: ${ORDER_WORDS}`;
+  return `Sorted by ${COLUMN_LABEL[sort.column]}, ${sortWords(SORT_KINDS[sort.column], sort.direction)}`;
+}
 
 /** The fixed order, in words, for the table's caption and the labels note's order section. */
 const ORDER_WORDS = "Mostly sure first, then Not sure, then Could not check";
@@ -98,18 +255,28 @@ export function documentPath(scanId: number, fileId: number): string {
  * row says in its own words what a person must still check, as the
  * developer asked, so it can never be read as a pass.
  *
- * The order is fixed and there are no sort buttons: the order is the answer
- * to "what do I fix first", worked out on the server
- * (audit/web/linked_files_queries.py) from the status, how many pages link to
- * the file, whether it is a form, and how serious its problem is. Each of
- * those is shown in the row, so a reader can see why a file sits where it
- * does; there is no hidden score. Rejected: sort buttons per column, which
- * would let the list lose its recommended order with nothing on screen to
- * get it back; and a single 0 to 100 score, which the developer ruled out.
- * The order is explained in the labels note, as its own section, the way
- * Issues explains Priority. No line over the table says it: Issues shows
- * that line only while its table is sorted or filtered, and this one never
- * is. The table's caption still says the order to a screen reader.
+ * The table opens in the recommended order, the answer to "what do I fix
+ * first", worked out on the server (audit/web/linked_files_queries.py) from
+ * the status, how many pages link to the file, whether it is a form, and how
+ * serious its problem is. Each of those is shown in the row, so a reader can
+ * see why a file sits where it does; there is no hidden score (a single 0 to
+ * 100 score was ruled out by the developer). The order is explained in the
+ * labels note, as its own section, the way Issues explains Priority.
+ *
+ * Every column sorts, and a Filter menu narrows the list by
+ * "Accessibility problems?", Type and "Hosted on" (the developer's request,
+ * 2026-11-14). Both are Issues', part for part: SortHeader on each column,
+ * the order kept in ``?sort=`` and the filters in the URL so Back and a
+ * shared link bring them back, FilterMenu and ActiveFilters in the bar over
+ * the table, and the line over the table that, only while the table is
+ * sorted or filtered, says the order and the count shown and offers "Back to
+ * recommended order" (SC 3.2.4 Consistent Identification, Level AA). That
+ * line is the way back a sorted header alone does not give, which is why the
+ * sort buttons were left out until now; with Issues' line it is there. The
+ * rows are all loaded at once (up to 5,000) and sorted, filtered and paged
+ * here, as Issues does, so every column sorts the whole list, not one page.
+ * The caption says the order to a screen reader, and a status line says it
+ * again on every change.
  *
  * "Pages it appears on" is a plain number, as Issues' "Affected pages" is,
  * and the pages are listed on the document's page. Until 2026-11-14 the
@@ -130,8 +297,8 @@ export function documentPath(scanId: number, fileId: number): string {
  * document on one page works the same way, so the name always leads to the
  * same kind of place.
  *
- * Paged by the server (Settings > Rows per page), with the page in the URL
- * so Back and reload return to the same rows. The pager is over the table
+ * Paged here (Settings > Rows per page, usePagedRows), with the page in
+ * the URL so Back and reload return to the same rows. The pager is over the table
  * and again under its last row, as on every paged table (TablePagination,
  * place="end"); the copy under the table was missing here until
  * 2026-11-14. A table wider than the screen
@@ -143,36 +310,58 @@ export default function DocumentsRoute() {
   const id = Number(scanId);
   const [params, setParams] = useSearchParams();
   const location = useLocation();
-  const pageSize = useTablePageSize();
-  const rawPage = Number(params.get("page") ?? "1");
-  const page = Number.isFinite(rawPage) && rawPage >= 1 ? Math.floor(rawPage) : 1;
-  const offset = (page - 1) * pageSize;
   const here = `${location.pathname}${location.search}`;
+  // Each filter is a comma-separated list of the values checked, kept to
+  // the values its group offers, in its order; "" is every row (as Issues).
+  const status = parseList(params.get("status"), STATUSES);
+  const kind = parseList(params.get("kind"), KIND_GROUPS);
+  const hosted = parseList(params.get("hosted"), HOSTED);
+  const rawSort = params.get("sort");
+  const sort = useMemo(() => parseSortParam(rawSort, SORT_COLUMNS), [rawSort]);
+  const hasFilter = Boolean(status || kind || hosted);
 
   const scanQuery = useScanQuery(id);
+  // Every file at once (up to MAX_LIMIT on the server), sorted, filtered
+  // and paged here, as the Issues table does with its rows: the headers can
+  // then sort by any column, and the Filter menu counts every value.
   const filesQuery = useQuery({
-    queryKey: ["scan-documents", id, pageSize, offset],
-    queryFn: () => api.listScanDocuments(id, { limit: pageSize, offset }),
-    placeholderData: (previous, query) => (query?.queryKey[1] === id ? keepPreviousData(previous) : undefined),
+    queryKey: ["scan-documents", id, "all"],
+    queryFn: () => api.listScanDocuments(id, { limit: MAX_DOCUMENTS, offset: 0 }),
     enabled: Number.isFinite(id),
   });
 
-  const total = filesQuery.data?.total ?? 0;
-  const pages = Math.max(1, Math.ceil(total / pageSize));
-  // A page past the end (a smaller Rows per page setting, an old link) shows
-  // the last page, as Pages visited does.
-  useEffect(() => {
-    if (!filesQuery.data || filesQuery.isPlaceholderData || page <= pages) return;
+  const setParam = (key: string, value: string) => {
     setParams(
-      (current) => {
-        const next = new URLSearchParams(current);
-        if (pages <= 1) next.delete("page");
-        else next.set("page", String(pages));
+      () => {
+        const next = liveSearchParams();
+        if (value) next.set(key, value);
+        else next.delete(key);
         return next;
       },
       { replace: true },
     );
-  }, [filesQuery.data, filesQuery.isPlaceholderData, page, pages, setParams]);
+  };
+  // Every group back to "All" in one update, as on Issues (FilterMenu's
+  // onReset): one setParam per group would put back what the first removed.
+  const resetFilters = () => {
+    setParams(
+      () => {
+        const next = liveSearchParams();
+        for (const key of ["status", "kind", "hosted", "page"]) next.delete(key);
+        return next;
+      },
+      { replace: true },
+    );
+  };
+  const onSort = (next: DocumentsSort | null) => setParam("sort", next ? sortParam(next) : "");
+  const region = useRef<HTMLDivElement>(null);
+
+  const files = filesQuery.data?.files;
+  const rows = useMemo(
+    () => sortFiles(filterFiles(files ?? [], { status, kind, hosted }), sort),
+    [files, status, kind, hosted, sort],
+  );
+  const paged = usePagedRows(rows, { resetKey: [status, kind, hosted, rawSort ?? ""].join("|") });
 
   const error = scanQuery.error ?? filesQuery.error;
   if (error) {
@@ -207,27 +396,14 @@ export default function DocumentsRoute() {
 
   const scan = scanQuery.data;
   const data = filesQuery.data;
-  const setPage = (next: number) =>
-    setParams(
-      (current) => {
-        const updated = new URLSearchParams(current);
-        if (next <= 1) updated.delete("page");
-        else updated.set("page", String(next));
-        return updated;
-      },
-      { replace: true },
-    );
-  const shownPage = Math.min(page, pages);
-  const pagerProps = {
-    label: DOCUMENTS_VIEW,
-    noun: "documents",
-    page: shownPage,
-    pages,
-    total,
-    setPage,
-    pageSize,
-    pagerId: "pager-documents",
-    disabled: filesQuery.isPlaceholderData,
+  const all = data.files;
+  const offset = (paged.page - 1) * paged.pageSize;
+  const cut = data.total > all.length;
+  // The button that was pressed goes away with the column sort, so focus
+  // moves to the table it just reordered (as on Issues).
+  const recommend = () => {
+    onSort(null);
+    region.current?.focus();
   };
 
   return (
@@ -248,7 +424,8 @@ export default function DocumentsRoute() {
           same kind of fact in two places (SC 3.2.4 Consistent
           Identification, Level AA). Shown only when the report looked for
           documents: with nothing looked for, there is nothing to count, as
-          Issues shows its numbers only for a completed report.
+          Issues shows its numbers only for a completed report. They count
+          the whole report, whatever the filters, as Issues' do.
 
           Each value has a short line under it that finishes it as a
           sentence ("Mostly sure" / "it has accessibility problems",
@@ -257,19 +434,76 @@ export default function DocumentsRoute() {
       {data.recorded && (
         <SummaryNumbers className="sm:grid-cols-4">
           <SummaryStat label={data.total === 1 ? "Document" : "Documents"} value={data.total} />
-          {STATUSES.map((status) => (
+          {STATUSES.map((value) => (
             <SummaryStat
-              key={status}
-              label={LINKED_FILE_STATUS_LABEL[status]}
-              note={LINKED_FILE_STATUS_NOTE[status]}
-              value={data.counts[status]}
+              key={value}
+              label={LINKED_FILE_STATUS_LABEL[value]}
+              note={LINKED_FILE_STATUS_NOTE[value]}
+              value={data.counts[value]}
             />
           ))}
         </SummaryNumbers>
       )}
 
+      {/* The order, said to a screen reader on every change, as on Issues. */}
+      <p role="status" className="sr-only">
+        {describeSort(sort)}.
+      </p>
+
+      {/* No overflow-hidden: it would clip the Filter menu's panel, as on Issues. */}
       <Card>
-        {pages > 1 && <TableBar pager={<TablePagination {...pagerProps} />} />}
+        {data.recorded && data.total > 0 && (
+          <DocumentsToolbar
+            files={all}
+            status={status}
+            kind={kind}
+            hosted={hosted}
+            onParam={setParam}
+            onResetFilters={resetFilters}
+            onClearFilters={() =>
+              setParams(
+                () => {
+                  const next = liveSearchParams();
+                  for (const key of ["status", "kind", "hosted", "page"]) next.delete(key);
+                  return next;
+                },
+                { replace: true },
+              )
+            }
+            pager={<TablePagination label={DOCUMENTS_VIEW} noun="documents" {...paged} />}
+          />
+        )}
+        {/* What the order is, the filtered count and the way back to the
+            recommended order: Issues' line over its table, shown, as there,
+            only while the table is sorted by a column or filtered. Not a
+            live region (the line above the card says the order). */}
+        {(sort || hasFilter || cut) && (
+          <TableStatus
+            announce={false}
+            actions={
+              <>
+                {hasFilter && (
+                  <span className="tabular-nums">
+                    {rows.length.toLocaleString()} of {all.length.toLocaleString()} shown
+                  </span>
+                )}
+                {sort && (
+                  // eslint-disable-next-line react/forbid-elements -- Convert: a text-link styled button; needs a link variant on Button (as on Issues)
+                  <button
+                    type="button"
+                    onClick={recommend}
+                    className="min-h-target rounded-xs px-1 font-semibold text-umich-blue underline underline-offset-2 hover:text-umich-blue-600 focus-visible:outline-none focus-visible:shadow-focus"
+                  >
+                    Back to recommended order
+                  </button>
+                )}
+              </>
+            }
+          >
+            {cut && `Showing the first ${all.length.toLocaleString()} of ${data.total.toLocaleString()} documents. `}
+            {sort && `${describeSort(sort)}.`}
+          </TableStatus>
+        )}
         {/* An empty table says what it means and points down to the note
             that says why, as Issues' does ("That does not mean the site
             meets WCAG… See “What was checked”, below this table."): an empty
@@ -285,38 +519,44 @@ export default function DocumentsRoute() {
             site has none, because the list can miss files. See “What was checked”, below this
             table.
           </TableEmpty>
+        ) : rows.length === 0 ? (
+          <TableEmpty>No documents match these filters. Clear a filter to see more results.</TableEmpty>
         ) : (
-          <>
-            <TableRegion label="Documents table" busy={filesQuery.isPlaceholderData}>
-              <Table caption={`Documents linked from report #${scan.id}, ${ORDER_WORDS}`}>
-                <TableHead>
-                  <tr>
-                    <ColumnHeader>Document</ColumnHeader>
-                    <ColumnHeader>Type</ColumnHeader>
-                    <ColumnHeader>Site</ColumnHeader>
-                    <ColumnHeader>{RESULT_COLUMN}</ColumnHeader>
-                    <ColumnHeader>What Axcess found</ColumnHeader>
-                    <ColumnHeader>{PAGES_COLUMN}</ColumnHeader>
-                  </tr>
-                </TableHead>
-                <tbody>
-                  {data.files.map((row, index) => (
-                    <DocumentRow
-                      key={row.file_id}
-                      row={row}
-                      index={(shownPage - 1) * pageSize + index}
-                      scanId={scan.id}
-                      backTo={here}
-                    />
+          <TableRegion label="Documents table" regionRef={region}>
+            <Table caption={`Documents linked from report #${scan.id}, ${describeSort(sort)}`}>
+              <TableHead>
+                <tr>
+                  {SORT_COLUMNS.map((column) => (
+                    <SortHeader
+                      key={column}
+                      column={column}
+                      wrap="words"
+                      kind={SORT_KINDS[column]}
+                      sort={sort}
+                      onSort={onSort}
+                    >
+                      {COLUMN_LABEL[column]}
+                    </SortHeader>
                   ))}
-                </tbody>
-              </Table>
-            </TableRegion>
-            {/* The same pager again under the last row, as on every paged
-                table (TablePagination, place="end"). */}
-            <TablePagination {...pagerProps} place="end" />
-          </>
+                </tr>
+              </TableHead>
+              <tbody>
+                {paged.pageRows.map((row, index) => (
+                  <DocumentRow
+                    key={row.file_id}
+                    row={row}
+                    index={offset + index}
+                    scanId={scan.id}
+                    backTo={here}
+                  />
+                ))}
+              </tbody>
+            </Table>
+          </TableRegion>
         )}
+        {/* The same pager again under the last row, as on every paged
+            table (TablePagination, place="end"). */}
+        <TablePagination label={DOCUMENTS_VIEW} noun="documents" place="end" {...paged} />
       </Card>
 
       {/* Under the table, as on Issues: the table follows the numbers with
@@ -329,6 +569,79 @@ export default function DocumentsRoute() {
         <DocumentsGlossary />
       </ReportNotes>
     </>
+  );
+}
+
+/**
+ * The bar over the table, as Issues' (IssueToolbar): the Filter menu on the
+ * left, the pager on the right, and what is filtered written out under both
+ * (ActiveFilters). One Filter control for every way the list narrows, each
+ * group named as its column is ("Accessibility problems?", "Type", "Hosted
+ * on") so the filter and the column read as one thing, with how many files
+ * each value has (FilterMenu, the Issues table's own; SC 3.2.4 Consistent
+ * Identification, Level AA). No search box: the developer asked for the
+ * filter; Issues' search is for long titles and WCAG numbers, and a file
+ * name is easy to find on a sorted Document column.
+ */
+function DocumentsToolbar({
+  files,
+  status,
+  kind,
+  hosted,
+  onParam,
+  onResetFilters,
+  onClearFilters,
+  pager,
+}: {
+  files: LinkedFileRow[];
+  status: string;
+  kind: string;
+  hosted: string;
+  onParam: (key: string, value: string) => void;
+  onResetFilters: () => void;
+  onClearFilters: () => void;
+  pager: ReactNode;
+}) {
+  const count = (test: (row: LinkedFileRow) => boolean) => files.filter(test).length;
+  const groups: FilterGroup[] = [
+    {
+      key: "status",
+      label: RESULT_COLUMN,
+      value: status,
+      multiple: true,
+      options: STATUSES.map((value) => ({
+        value,
+        label: LINKED_FILE_STATUS_LABEL[value],
+        count: count((row) => row.status === value),
+      })),
+    },
+    {
+      key: "kind",
+      label: "Type",
+      value: kind,
+      multiple: true,
+      options: KIND_GROUPS.map((value) => ({
+        value,
+        label: LINKED_FILE_KIND_LABEL[value],
+        count: count((row) => kindOf(row) === value),
+      })),
+    },
+    {
+      key: "hosted",
+      label: HOSTED_COLUMN,
+      value: hosted,
+      multiple: true,
+      options: HOSTED.map((value) => ({
+        value,
+        label: HOSTED_LABEL[value],
+        count: count((row) => hostedOf(row) === value),
+      })),
+    },
+  ];
+  return (
+    <TableBar pager={pager} footer={<ActiveFilters items={activeFilterItems(groups)} onClear={onClearFilters} />}>
+      <FilterMenu label="Filter documents" groups={groups} onChange={onParam} onReset={onResetFilters} />
+    </TableBar>
   );
 }
 
@@ -462,7 +775,17 @@ function DocumentsGlossary() {
   );
 }
 
-/** One linked file. */
+/**
+ * One linked file.
+ *
+ * The widest columns' minimums (Document 11rem, What Axcess found 12rem)
+ * leave room, at 1280px with the sidebar open, for the sort tag a sorted
+ * header adds under its name ("high → low" under "Pages it appears on"), so
+ * a sorted table still fits without sideways scrolling. At 14rem the table
+ * was 30px too wide once sorted by that column. Narrower screens scroll the
+ * table in its own region (TableRegion; SC 1.4.10 Reflow, Level AA, allows
+ * it for a data table).
+ */
 function DocumentRow({
   row,
   index,
@@ -476,7 +799,7 @@ function DocumentRow({
 }) {
   return (
     <Row index={index} className="align-top">
-      <RowHeader className="min-w-[12rem] max-w-xs align-top">
+      <RowHeader className="min-w-[11rem] max-w-xs align-top">
         {/* The name opens the document's own page, as an issue type's title
             opens its record on Issues; see DocumentsRoute. */}
         <Link
@@ -489,14 +812,16 @@ function DocumentRow({
           <span className="sr-only">, full details</span>
         </Link>
       </RowHeader>
-      <Cell className="min-w-[8rem] align-top">{LINKED_FILE_TYPE_LABEL[row.file_type]}</Cell>
+      <Cell className="min-w-[8rem] align-top">
+        <TypeCell row={row} />
+      </Cell>
       <Cell className="min-w-[9rem] align-top">
         <SiteCell url={row.url} offSite={row.off_site} />
       </Cell>
       <Cell className="whitespace-nowrap align-top">
         <ResultTag status={row.status} />
       </Cell>
-      <Cell className="min-w-[14rem] max-w-sm align-top text-sm">
+      <Cell className="min-w-[12rem] max-w-sm align-top text-sm">
         <Found row={row} />
       </Cell>
       <Cell numeric className="align-top">

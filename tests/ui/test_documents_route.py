@@ -454,10 +454,14 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
     # Nothing to read between the numbers and the table: no caveat, key or
     # order line there, as on Issues. The order is in the caption.
     await expect(page.get_by_text(CAVEAT)).to_be_hidden()
-    await expect(page.get_by_text(re.compile(r"recommended order", re.I))).to_have_count(0)
+    # Unsorted and unfiltered, no line over the table says the order, as on
+    # Issues: only the caption and a status line for screen readers do.
+    await expect(
+        page.locator("p:not(.sr-only)", has_text=re.compile(r"recommended order", re.I))
+    ).to_have_count(0)
     await expect(table).to_have_accessible_name(
         f"Documents linked from report #{scan_id}, "
-        "Mostly sure first, then Not sure, then Could not check"
+        "Recommended order: Mostly sure first, then Not sure, then Could not check"
     )
 
     # Under the table, Issues' two closed notes, in Issues' order; the
@@ -529,8 +533,13 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
     form = rows.nth(0)
     await expect(form).to_contain_text("Mostly sure")
     await expect(form).to_contain_text("This site")
-    await expect(form).to_contain_text("Not tagged")
-    await expect(form).to_contain_text("Has a form to fill in")
+    # Each problem by its short name, one a line; why it matters is on the
+    # document's page. The form is a fact under the type, not a problem.
+    await expect(form.locator("td").nth(3).get_by_role("listitem")).to_have_text(
+        ["Not tagged", "No language set"]
+    )
+    await expect(form.locator("td").nth(0)).to_contain_text("Has a form to fill in")
+    await expect(form.locator("td").nth(3)).not_to_contain_text("form")
     # The pages are a count, as Issues' "Affected pages" is; the list is on
     # the document's own page. No page titles, addresses or link text here.
     await expect(form.locator("td").last).to_have_text("2")
@@ -552,12 +561,12 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
     # The columns say what each value is; "How sure" alone did not.
     await expect(table.get_by_role("columnheader")).to_have_text(
         [
-            "Document",
-            "Type",
-            "Site",
-            "Accessibility problems?",
-            "What Axcess found",
-            "Pages it appears on",
+            re.compile(r"^Document"),
+            re.compile(r"^Type"),
+            re.compile(r"^Hosted on"),
+            re.compile(r"^Accessibility problems\?"),
+            re.compile(r"^What Axcess found"),
+            re.compile(r"^Pages it appears on"),
         ]
     )
     # The row header is the file's name only: a screen reader reads it with
@@ -577,11 +586,11 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
     await expect(link).not_to_have_attribute("target", "_blank")
     await expect(form.get_by_role("link")).to_have_count(1)
 
-    # Keyboard order follows the reading order: the tab, then each file in
-    # turn, each with a visible focus.
+    # Keyboard order follows the reading order: the tab, the Filter menu,
+    # the column headers, then each file in turn, each with a visible focus.
     await tab.focus()
     stops = []
-    for _ in range(5):
+    for _ in range(12):
         await page.keyboard.press("Tab")
         stops.append(
             await page.evaluate(
@@ -597,7 +606,9 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
             )
         )
     texts = [stop["text"] for stop in stops]
+    assert texts[0] == "Filter documents", texts
     first_file = next(i for i, t in enumerate(texts) if t.startswith("permit-form.pdf"))
+    assert texts[1].startswith("Document") and first_file == 7, texts
     assert texts[first_file + 1].startswith("no-title.pdf"), texts
     assert all(stop["ring"] for stop in stops), stops
 
@@ -950,3 +961,112 @@ async def test_a_long_list_has_the_pager_under_the_table_too(
     await end.get_by_role("button", name="Next page of documents").click()
     await expect(top.get_by_role("status")).to_contain_text("Page 2 of 2")
     await expect(top).to_be_focused()
+
+
+@on_module_loop
+async def test_the_table_sorts_by_any_column_and_goes_back(
+    documents: int, live_server: tuple[str, int], new_page: Any
+) -> None:
+    """As on Issues: a header sorts the whole list, the line over the table
+    says the order, and "Back to recommended order" undoes it."""
+    from playwright.async_api import expect
+
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(f"{base}/app/scans/{scan_id}/documents", wait_until="networkidle")
+    table = page.get_by_role("table")
+    names = table.get_by_role("rowheader")
+    await table.get_by_role("button", name=re.compile(r"^Document")).click()
+    await expect(page).to_have_url(re.compile(r"sort=name_asc"))
+    await expect(names).to_have_text(
+        [
+            re.compile(rf"^{re.escape(n)}\b")
+            for n in [
+                "budget.xls",
+                "map.pdf",
+                "Meeting notes",
+                "missing.pdf",
+                "no-title.pdf",
+                "permit-form.pdf",
+                "report.docx",
+            ]
+        ],
+        use_inner_text=True,
+    )
+    await expect(
+        page.locator("p:not(.sr-only)", has_text="Sorted by Document, A to Z.")
+    ).to_be_visible()
+    await expect(table.locator("th[aria-sort=ascending]")).to_have_count(1)
+    # Pages it appears on opens with the most first: the form, on 2 pages.
+    await table.get_by_role("button", name=re.compile(r"^Pages it appears on")).click()
+    await expect(names.first).to_have_text(re.compile(r"^permit-form\.pdf"), use_inner_text=True)
+    # Sorted by any column, the table still fits a 1280px screen: the sort
+    # tag under a narrow header must not push it wider than its card.
+    region = page.get_by_role("region", name="Documents table")
+    for key in ("name", "type", "host", "status", "found", "pages"):
+        for direction in ("asc", "desc"):
+            await page.goto(
+                f"{base}/app/scans/{scan_id}/documents?sort={key}_{direction}",
+                wait_until="networkidle",
+            )
+            widths = await region.evaluate("el => [el.scrollWidth, el.clientWidth]")
+            assert widths[0] <= widths[1], (key, direction, widths)
+    back = page.get_by_role("button", name="Back to recommended order")
+    await back.click()
+    await expect(back).to_have_count(0)
+    await expect(page).not_to_have_url(re.compile(r"sort="))
+    await expect(names.first).to_have_text(re.compile(r"^permit-form\.pdf"), use_inner_text=True)
+    await expect(names.nth(1)).to_have_text(re.compile(r"^no-title\.pdf"), use_inner_text=True)
+
+
+@on_module_loop
+async def test_filter_documents_narrows_the_list_and_says_how(
+    documents: int, live_server: tuple[str, int], new_page: Any
+) -> None:
+    """Issues' Filter menu, with the columns' own names and a count per
+    value; what is filtered is written out under the bar."""
+    from playwright.async_api import expect
+
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(f"{base}/app/scans/{scan_id}/documents", wait_until="networkidle")
+    toggle = page.get_by_role("button", name="Filter documents")
+    await toggle.click()
+    await expect(toggle).to_have_attribute("aria-expanded", "true")
+    for group in ("Accessibility problems?", "Type", "Hosted on"):
+        await expect(page.get_by_role("group", name=group)).to_be_visible()
+    await (
+        page.get_by_role("group", name="Accessibility problems?")
+        .get_by_role("checkbox", name=re.compile(r"^Could not check"))
+        .check()
+    )
+    await (
+        page.get_by_role("group", name="Hosted on")
+        .get_by_role("checkbox", name=re.compile(r"^This site"))
+        .check()
+    )
+    await expect(page).to_have_url(re.compile(r"status=could_not_check"))
+    await expect(page).to_have_url(re.compile(r"hosted=this"))
+    table = page.get_by_role("table")
+    await expect(table.get_by_role("rowheader")).to_have_count(3)
+    await expect(page.get_by_text("3 of 7 shown", exact=True)).to_be_visible()
+    await expect(
+        page.get_by_text(re.compile(r"Filtered by.*Could not check.*This site"))
+    ).to_be_visible()
+    # The numbers over the table still count the whole report.
+    numbers = page.locator("main dl").first
+    await expect(numbers.get_by_role("definition").first).to_have_text("7")
+    for tags in (_AXE_TAGS_AA, None):
+        violations = await _run_axe(page, tags)
+        assert not violations, _render_violations(violations)
+    await page.keyboard.press("Escape")
+    await page.get_by_role("button", name="Clear filters").click()
+    await expect(table.get_by_role("rowheader")).to_have_count(7)
+    # A filter that matches nothing says so, never an empty list.
+    await page.goto(
+        f"{base}/app/scans/{scan_id}/documents?status=not_sure&kind=google",
+        wait_until="networkidle",
+    )
+    await expect(
+        page.get_by_text("No documents match these filters. Clear a filter to see more results.")
+    ).to_be_visible()
