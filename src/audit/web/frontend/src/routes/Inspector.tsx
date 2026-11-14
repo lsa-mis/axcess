@@ -4,7 +4,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router";
 import { keepPreviousData, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, FileCode2, Layers, Loader2 } from "lucide-react";
 import DomSource from "../components/DomSource";
-import FixSuggestion, { SuggestionsBlockedNote } from "../components/FixSuggestion";
+import FixSuggestion, { SuggestionsBlockedNote, useSavedSuggestion } from "../components/FixSuggestion";
 import FlaggedStepper from "../components/FlaggedStepper";
 import ElementReview, { type ReviewDraft } from "../components/ElementReview";
 import { ApiError, api } from "../api/client";
@@ -1029,14 +1029,27 @@ export default function InspectorRoute() {
     // inside FixSuggestion. W3C COGA (paraphrased: preserve context),
     // https://www.w3.org/TR/coga-usable/.
     suggestionsApply ? suggestionStatus : null;
+  // AI turned off is not "blocked": nothing is said (SuggestionsBlockedNote).
   const suggestionsBlocked =
-    suggestionsApply && !suggestionStatus.enabled
+    suggestionsApply && !suggestionStatus.enabled && suggestionStatus.reason !== "turned_off"
       ? suggestionStatus
       : null;
+  // With AI off, the panel shows only for a saved answer: an empty panel
+  // would be a box with nothing in it. Same cache entry FixSuggestion reads.
+  const saved = useSavedSuggestion(
+    scan,
+    currentOccurrence?.kind ?? "a11y",
+    currentOccurrence?.id ?? 0,
+    Boolean(suggestions && !suggestions.enabled && currentOccurrence),
+  );
+  const hasSaved = Boolean(saved.data && saved.data.status !== "cancelled");
   // Which of the two panels under the toolbar show (see the comment on that
   // row for the layout).
   const showSuggestion = Boolean(
-    showHighlights && highlightedCount > 0 && currentOccurrence && (suggestions || suggestionsBlocked),
+    showHighlights &&
+      highlightedCount > 0 &&
+      currentOccurrence &&
+      (suggestions?.enabled || suggestionsBlocked || hasSaved),
   );
   const showReview = Boolean(showHighlights && highlightedCount > 0 && currentElement && canReview);
   const goToPageMark = (index: number) => {
