@@ -448,8 +448,15 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
     numbers = page.locator("main dl").filter(
         has=page.get_by_role("term").filter(has_text=re.compile(r"^Documents$"))
     )
+    # Each value says what Axcess is sure of, on a line under it.
     await expect(numbers.get_by_role("term")).to_have_text(
-        ["Documents", "Mostly sure", "Not sure", "Could not check"]
+        [
+            "Documents",
+            "Mostly sure it has accessibility problems",
+            "Not sure if it has accessibility problems",
+            "Could not check for accessibility problems",
+        ],
+        use_inner_text=True,
     )
     await expect(numbers.get_by_role("definition")).to_have_text(["7", "2", "1", "4"])
     numbers_box = await numbers.bounding_box()

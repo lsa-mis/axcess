@@ -241,7 +241,9 @@ which file to fix first. Axcess checks only the PDF files; see
 [Document check](glossary.md#document-check) for what it checks.
 
 The tab is laid out like the Issues tab. Four numbers above the table count
-the documents, then how many are Mostly sure, Not sure and Could not check.
+the documents, then how many are Mostly sure (it has accessibility problems),
+Not sure (if it has accessibility problems) and Could not check (for
+accessibility problems).
 Under the table, two closed rows open more detail. **What was checked** shows
 "Only PDFs checked" and opens what the list covers, what Axcess downloaded and
 kept, and what the list can miss (the same facts as below). **What "Mostly

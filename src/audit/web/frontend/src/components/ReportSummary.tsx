@@ -35,21 +35,37 @@ function endText(coverage: ScanDetail["coverage"]): string {
  * checked" and "7 of 60 pages found so far" while a scan runs (SC 3.2.4
  * Consistent Identification, Level AA; W3C COGA, "Making Content Usable":
  * the same pattern for the same kind of thing).
+ *
+ * ``note`` finishes a label that is not a whole idea alone, on a smaller
+ * line under it, inside the same ``dt``: "Mostly sure" / "it has
+ * accessibility problems". On the Documents tab the bare value left the
+ * reader asking "mostly sure of what?" (the developer's report,
+ * 2026-11-14). In the ``dt``, so a screen reader hears it as part of the
+ * name, before the number. Rejected: a longer label, which put the value's
+ * own words (the ones the table's tags show) out of view; and one heading
+ * over the three counts, which the grid would place over "Documents" too.
+ * Not for facts about the number (those are ``outOf``, or ScanFacts).
  */
 export function SummaryStat({
   label,
   value,
   outOf,
+  note,
   className,
 }: {
   label: string;
   value: number;
   outOf?: string;
+  /** The rest of the label's sentence, on its own line under it. */
+  note?: string;
   className?: string;
 }) {
   return (
     <div className={cn("flex flex-col gap-1", className)}>
-      <dt className="order-2 text-sm font-semibold text-fg">{label}</dt>
+      <dt className="order-2 text-sm font-semibold text-fg">
+        {label}
+        {note && <span className="block font-normal text-fg-muted">{note}</span>}
+      </dt>
       <dd className="order-1 mb-1 text-3xl font-semibold leading-none tabular-nums text-umich-blue">
         {value.toLocaleString()}
         {outOf && <span className="text-base font-semibold leading-none text-fg-muted"> {outOf}</span>}

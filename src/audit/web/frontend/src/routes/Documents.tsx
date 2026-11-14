@@ -33,6 +33,7 @@ import {
   LINKED_FILE_REF_LABEL,
   LINKED_FILE_STATUS_HELP,
   LINKED_FILE_STATUS_LABEL,
+  LINKED_FILE_STATUS_NOTE,
   LINKED_FILE_TYPE_LABEL,
   OPENS_NEW_WINDOW,
   linkedFileReasonText,
@@ -250,12 +251,22 @@ export default function DocumentsRoute() {
           same kind of fact in two places (SC 3.2.4 Consistent
           Identification, Level AA). Shown only when the report looked for
           documents: with nothing looked for, there is nothing to count, as
-          Issues shows its numbers only for a completed report. */}
+          Issues shows its numbers only for a completed report.
+
+          Each value has a short line under it that finishes it as a
+          sentence ("Mostly sure" / "it has accessibility problems",
+          LINKED_FILE_STATUS_NOTE): alone, the value did not say what Axcess
+          is sure of. See SummaryStat's ``note``. */}
       {data.recorded && (
         <SummaryNumbers className="sm:grid-cols-4">
           <SummaryStat label={data.total === 1 ? "Document" : "Documents"} value={data.total} />
           {STATUSES.map((status) => (
-            <SummaryStat key={status} label={LINKED_FILE_STATUS_LABEL[status]} value={data.counts[status]} />
+            <SummaryStat
+              key={status}
+              label={LINKED_FILE_STATUS_LABEL[status]}
+              note={LINKED_FILE_STATUS_NOTE[status]}
+              value={data.counts[status]}
+            />
           ))}
         </SummaryNumbers>
       )}

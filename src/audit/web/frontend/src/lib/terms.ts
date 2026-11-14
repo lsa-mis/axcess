@@ -109,6 +109,19 @@ export const LINKED_FILE_STATUS_LABEL: Record<LinkedFileStatus, string> = {
   could_not_check: "Could not check",
 };
 
+/**
+ * Each value finished as a sentence about the file, for the summary numbers
+ * on the Documents tab, where the value stands without its column's
+ * question ("Accessibility problems?"): "Mostly sure" / "it has
+ * accessibility problems". Each phrase fits its value's grammar, so the
+ * pair reads as one plain statement.
+ */
+export const LINKED_FILE_STATUS_NOTE: Record<LinkedFileStatus, string> = {
+  mostly_sure: "it has accessibility problems",
+  not_sure: "if it has accessibility problems",
+  could_not_check: "for accessibility problems",
+};
+
 /** What each value means, in one sentence: the hover hint and the page's key. */
 export const LINKED_FILE_STATUS_HELP: Record<LinkedFileStatus, string> = {
   mostly_sure: "A machine check found a problem that makes the file hard or impossible to use with a screen reader.",
