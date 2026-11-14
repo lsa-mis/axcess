@@ -37,10 +37,12 @@ from pydantic import BaseModel
 
 from audit.linked_files.formats import SEVERE_CHECKS, FailedCheck, FileType, Reason, RefKind
 
-#: Largest page of rows one request may ask for.
-MAX_LIMIT = 200
+#: Largest page of rows one request may ask for. The Documents tab asks
+#: for every file at once (up to this many) and sorts, filters and pages
+#: them in the browser, as the Issues tab does with its rows.
+MAX_LIMIT = 5000
 DEFAULT_LIMIT = 50
-#: Referring pages shown per file. The row also gives the total.
+#: Referring pages one inspector lookup lists for a file on one page.
 MAX_REFS_SHOWN = 20
 
 ShownStatus = Literal["mostly_sure", "not_sure", "could_not_check"]
@@ -72,10 +74,9 @@ class LinkedFileRow(BaseModel):
     http_status: int | None
     is_form: bool | None
     page_count: int | None
-    #: Distinct pages of this report that reach the file.
+    #: Distinct pages of this report that reach the file. The pages
+    #: themselves are on the file's own page (``get_scan_document``).
     referring_page_count: int
-    #: Up to ``MAX_REFS_SHOWN`` references, in page address order.
-    refs: list[LinkedFileRef]
 
 
 class LinkedFileCounts(BaseModel):
@@ -204,15 +205,14 @@ def _file_rows(
         (scan_id, file_id, file_id, limit, offset),
     ).fetchall()
 
-    refs = _refs(conn, scan_id, [int(row[0]) for row in rows])
+    first_texts = _first_link_texts(conn, scan_id, file_id)
     files = []
     for row in rows:
-        file_refs = refs.get(int(row[0]), [])
         files.append(
             LinkedFileRow(
                 file_id=int(row[0]),
                 url=str(row[1]),
-                name=display_name(str(row[1]), file_refs[0].link_text if file_refs else None),
+                name=display_name(str(row[1]), first_texts.get(int(row[0]))),
                 file_type=row[2],
                 off_site=bool(row[3]),
                 status=row[4],
@@ -222,49 +222,33 @@ def _file_rows(
                 is_form=None if row[8] is None else bool(row[8]),
                 page_count=row[9],
                 referring_page_count=int(row[10]),
-                refs=file_refs,
             )
         )
     return files
 
 
-def _refs(
-    conn: sqlite3.Connection, scan_id: int, file_ids: list[int]
-) -> dict[int, list[LinkedFileRef]]:
-    """At most ``MAX_REFS_SHOWN`` references per file, in page address order."""
-    if not file_ids:
-        return {}
-    marks = ",".join("?" for _ in file_ids)
+def _first_link_texts(
+    conn: sqlite3.Connection, scan_id: int, file_id: int | None
+) -> dict[int, str]:
+    """Each file's first link text, in page address order: what names a file
+    whose address has no file name (a Google document). Every file of the
+    scan, or only ``file_id``."""
     rows = conn.execute(
-        f"""
-        SELECT file_id, page_id, url, title, how, link_text, revealed_by FROM (
-            SELECT r.file_id, r.page_id, p.url_normalized AS url, p.title, r.how,
-                   r.link_text, r.revealed_by,
+        """
+        SELECT file_id, link_text FROM (
+            SELECT r.file_id, r.link_text,
                    ROW_NUMBER() OVER (
                        PARTITION BY r.file_id
                        ORDER BY p.url_normalized COLLATE NOCASE, r.how, r.link_text, r.id
                    ) AS n
               FROM linked_file_refs r
               JOIN pages p ON p.id = r.page_id AND p.scan_id = r.scan_id
-             WHERE r.scan_id = ? AND r.file_id IN ({marks})
-        ) WHERE n <= ?
-        ORDER BY file_id, n
-        """,  # noqa: S608 - only placeholders are interpolated
-        (scan_id, *file_ids, MAX_REFS_SHOWN),
+             WHERE r.scan_id = ? AND (? IS NULL OR r.file_id = ?)
+        ) WHERE n = 1
+        """,
+        (scan_id, file_id, file_id),
     ).fetchall()
-    out: dict[int, list[LinkedFileRef]] = {}
-    for row in rows:
-        out.setdefault(int(row[0]), []).append(
-            LinkedFileRef(
-                page_id=int(row[1]),
-                page_url=str(row[2]),
-                page_title=row[3],
-                how=row[4],
-                link_text=str(row[5] or ""),
-                revealed_by=row[6],
-            )
-        )
-    return out
+    return {int(row[0]): str(row[1] or "") for row in rows}
 
 
 #: Elements of one page marked for one file. A page that links to one file

@@ -1293,10 +1293,8 @@ export interface LinkedFileRow {
   http_status: number | null;
   is_form: boolean | null;
   page_count: number | null;
-  /** Distinct pages of the report that reach the file. */
+  /** Distinct pages of the report that reach the file; the pages are on its own page. */
   referring_page_count: number;
-  /** The first referring pages, at most 20, in address order. */
-  refs: LinkedFileRef[];
 }
 
 /** One way a page reaches a file (`linked_files_queries.DocumentRefWay`). */

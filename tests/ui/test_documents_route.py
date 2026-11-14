@@ -204,24 +204,8 @@ def test_files_come_in_the_recommended_order(client: TestClient, documents: int)
     form = body["files"][0]
     assert form["failed_checks"] == ["not_tagged", "no_language"]
     assert (form["is_form"], form["referring_page_count"]) == (True, 2)
-    assert form["refs"] == [
-        {
-            "page_id": form["refs"][0]["page_id"],
-            "page_url": HOME,
-            "page_title": "Home",
-            "how": "link",
-            "link_text": "Apply for a permit (PDF)",
-            "revealed_by": None,
-        },
-        {
-            "page_id": form["refs"][1]["page_id"],
-            "page_url": ABOUT,
-            "page_title": "About",
-            "how": "revealed_link",
-            "link_text": "Permit form",
-            "revealed_by": "More forms",
-        },
-    ]
+    # The pages themselves are on the file's own page, not in the list.
+    assert "refs" not in form
 
 
 def test_a_report_that_did_not_look_says_so(client: TestClient, seeded_db: Any) -> None:
@@ -237,7 +221,11 @@ def test_a_file_still_pending_shows_as_not_checked(
         _file(conn, documents, "http://example.com/files/late.pdf", "pdf", None, [])
     body = client.get(f"/api/scans/{documents}/documents?limit=200").json()
     late = next(f for f in body["files"] if f["name"] == "late.pdf")
-    assert (late["status"], late["reason"], late["refs"]) == ("could_not_check", "not_checked", [])
+    assert (late["status"], late["reason"], late["referring_page_count"]) == (
+        "could_not_check",
+        "not_checked",
+        0,
+    )
     assert body["counts"]["could_not_check"] == 5
 
 
@@ -249,7 +237,7 @@ def test_files_are_paged(client: TestClient, documents: int) -> None:
     assert first["total"] == rest["total"] == 7
 
 
-@pytest.mark.parametrize("query", ["limit=201", "limit=0", "offset=-1"])
+@pytest.mark.parametrize("query", ["limit=5001", "limit=0", "offset=-1"])
 def test_out_of_bounds_requests_are_refused(client: TestClient, documents: int, query: str) -> None:
     assert client.get(f"/api/scans/{documents}/documents?{query}").status_code == 422
 
@@ -291,7 +279,7 @@ def test_one_report_never_lists_another_reports_files(
     assert "secret.pdf" not in {f["name"] for f in mine["files"]}
     theirs = client.get(f"/api/scans/{other}/documents").json()
     assert [f["name"] for f in theirs["files"]] == ["secret.pdf"]
-    assert theirs["files"][0]["refs"][0]["page_url"] == "http://other.example/"
+    assert theirs["files"][0]["referring_page_count"] == 1
 
 
 # -- where a file is linked on a page (the inspector's marks) ---------------
