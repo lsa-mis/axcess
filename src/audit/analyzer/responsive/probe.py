@@ -231,6 +231,55 @@ _CLIP_CANDIDATES_JS = """
 }
 """ % {"helpers": _CLIP_HELPERS_JS, "scan_cap": _MAX_ELEMENTS_SCANNED}
 
+# Focus pass, run under the zoom condition (from UX-Nov-6, 23e6f78f). Text
+# hidden on purpose inside a control that shows itself on focus, such as a
+# skip link, is measured only while that control has focus: it is focused,
+# re-checked, measured if it is now visible, and focus is put back. A skip
+# link still cut off while focused is a real failure, because a sighted
+# keyboard user sees it then. These skip the comparison above: the text is
+# hidden at every size until focused, so there is nothing to compare with.
+# Run in the zoom check only, so one cut-off skip link is one finding, not
+# one per check.
+_FOCUS_CLIP_JS = """
+(maxOffenders) => {
+%(helpers)s
+  const focusTarget = (el) =>
+    el.closest('a[href], button, input, select, textarea, summary, [tabindex]');
+  const out = [];
+  const els = document.querySelectorAll('body *');
+  const limit = Math.min(els.length, %(scan_cap)d);
+  const previous = document.activeElement;
+  for (let i = 0; i < limit && out.length < maxOffenders; i++) {
+    const el = els[i];
+    if (el.children.length > 0) continue;            // leaf nodes only
+    const text = (el.innerText || el.textContent || '').trim();
+    if (!text) continue;
+    const target = focusTarget(el);
+    if (!target || target.matches('[tabindex="-1"]')) continue;
+    if (!hiddenOnPurpose(el, false)) continue;       // measured by the main pass
+    target.focus({ preventScroll: true });
+    if (document.activeElement !== target) continue;
+    const shown = !hiddenOnPurpose(el, false);
+    const c = shown ? clipState(el) : { clipX: false, clipY: false };
+    const record = (c.clipX || c.clipY) ? {
+      selector: sel(el),
+      html: (el.outerHTML || '').slice(0, 240),
+      detail: (c.clipX ? 'clipped horizontally' : 'clipped vertically')
+        + ' while it has keyboard focus: content '
+        + (c.clipX ? el.scrollWidth : el.scrollHeight) + 'px in a '
+        + (c.clipX ? el.clientWidth : el.clientHeight) + 'px box'
+        + '; text starts "' + text.slice(0, 40) + '"',
+    } : null;
+    target.blur();
+    if (record) out.push(record);
+  }
+  if (previous && previous !== document.activeElement && previous.focus) {
+    previous.focus({ preventScroll: true });
+  }
+  return out;
+}
+""" % {"helpers": _CLIP_HELPERS_JS, "scan_cap": _MAX_ELEMENTS_SCANNED}
+
 # Second half, run WITHOUT the test condition on the records from the first
 # half. Keeps a record only when the same element is still on the page,
 # visible, and not cut off in the direction it was cut off before. Returns
@@ -421,19 +470,24 @@ class ResponsiveProbe:
     ) -> list[ResponsiveFinding]:
         await page.set_viewport_size(_ZOOM_VIEWPORT)  # type: ignore[arg-type]
         await page.wait_for_timeout(150)
+        # Skip links and other text shown only on focus, measured while
+        # focused (see _FOCUS_CLIP_JS). Not compared with the normal size.
+        focused: list[dict[str, str]] = await page.evaluate(
+            _FOCUS_CLIP_JS, _MAX_OFFENDERS_PER_CHECK
+        )
+        clipped: list[dict[str, str]] = []
         candidates = await page.evaluate_handle(_CLIP_CANDIDATES_JS, _MAX_CLIP_CANDIDATES)
         try:
-            if not await candidates.evaluate("(c) => c.length"):
-                return []
-            # The comparison: back at the normal viewport, is the same text
-            # visible and uncut? Only then did resizing lose it.
-            await page.set_viewport_size(
-                {"width": self.base_viewport_width, "height": self.base_viewport_height}
-            )
-            await page.wait_for_timeout(150)
-            clipped: list[dict[str, str]] = await page.evaluate(
-                _CLIP_CONFIRM_JS, [candidates, _MAX_OFFENDERS_PER_CHECK]
-            )
+            if await candidates.evaluate("(c) => c.length"):
+                # The comparison: back at the normal viewport, is the same
+                # text visible and uncut? Only then did resizing lose it.
+                await page.set_viewport_size(
+                    {"width": self.base_viewport_width, "height": self.base_viewport_height}
+                )
+                await page.wait_for_timeout(150)
+                clipped = await page.evaluate(
+                    _CLIP_CONFIRM_JS, [candidates, _MAX_OFFENDERS_PER_CHECK]
+                )
         finally:
             with contextlib.suppress(Exception):
                 await candidates.dispose()
@@ -453,6 +507,25 @@ class ResponsiveProbe:
                 help="Text must stay visible and readable at 200% zoom.",
             )
             for c in clipped
+        ]
+        seen = {f.target_selector for f in findings}
+        findings += [
+            ResponsiveFinding(
+                rule_id=RULE_TEXT_CLIPPED,
+                criterion_sc="1.4.4",
+                impact="serious",
+                target_selector=str(c.get("selector", "(unknown)")),
+                failure_summary=(
+                    f"At ~200% zoom (640px viewport proxy) text is {c.get('detail', 'clipped')}. "
+                    "This text is hidden until it gets keyboard focus, and then a sighted "
+                    "keyboard user sees it cut off. "
+                    "WCAG 1.4.4 requires text to remain readable when resized up to 200%."
+                ),
+                html_snippet=str(c.get("html", "")),
+                help="Text must stay visible and readable at 200% zoom.",
+            )
+            for c in focused[: max(0, _MAX_OFFENDERS_PER_CHECK - len(findings))]
+            if str(c.get("selector", "")) not in seen
         ]
         if not findings or shot is None:
             return findings
