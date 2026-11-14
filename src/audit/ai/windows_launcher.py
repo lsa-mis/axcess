@@ -45,6 +45,10 @@ LAUNCHER_NAME = "axcess-ai-launcher.exe"
 # AppContainer process mitigations and AF_UNIX both need Windows 10 1809.
 MIN_WINDOWS_BUILD = 17763
 CHECK_LINES = ("AXCESS_NETWORK_BLOCKED", "AXCESS_FILES_LIMITED", "AXCESS_SOCKET_OK")
+# The launcher is a console program. Started from the desktop app, which has
+# no console, Windows would open a black console window for it that stays
+# while AI runs (and closing it would stop AI). It talks only through pipes.
+NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 
 class LauncherModelError(Exception):
@@ -147,6 +151,7 @@ def run_check(
             text=True,
             timeout=60,
             check=False,
+            creationflags=NO_WINDOW,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise IsolationError(
@@ -164,6 +169,12 @@ def run_check(
             "The AI isolation check did not prove that outside connections are blocked. "
             "AI was not started.",
         )
+
+
+def note(log: Path, text: str) -> None:
+    """One "axcess:" line in the launcher's log, so one file tells the story."""
+    with contextlib.suppress(OSError), log.open("a", encoding="utf-8") as fh:
+        fh.write(f"axcess {time.strftime('%H:%M:%S')}: {text}\n")
 
 
 def spec_text(processes: Sequence[ModelProcess]) -> str:
@@ -216,14 +227,18 @@ class LauncherService:
             stderr=subprocess.DEVNULL,
             text=True,
             encoding="utf-8",
+            creationflags=NO_WINDOW,
         )
         reader = threading.Thread(target=self._read, daemon=True, name="axcess-ai-launcher-out")
         reader.start()
         deadline = time.monotonic() + 30
+        last = "no answer within 30 s"
         while time.monotonic() < deadline:
             line = self._next(deadline)
             if line is None:
+                last = "the launcher closed its output"
                 break
+            last = line
             parts = line.split()
             if parts[:1] == ["PORT"] and len(parts) == 3 and parts[2].isdigit():
                 self.routes[parts[1]] = f"http://127.0.0.1:{int(parts[2])}"
@@ -233,7 +248,9 @@ class LauncherService:
                 break
             elif parts[:1] in (["AXCESS_ERROR"], ["EXIT"]):
                 break
+        code = self.process.poll()
         self.stop()
+        note(log, f"the launcher did not report its ports ({last}; exit code {code})")
         raise IsolationError(
             "runtime_failed", "The isolated AI service could not start. Check the application log."
         )

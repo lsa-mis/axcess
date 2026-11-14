@@ -495,6 +495,33 @@ async def test_open_client_unix_socket_builds_uds_transport() -> None:
         open_model_http_client(endpoint, transport=httpx.MockTransport(lambda r: r))  # type: ignore[arg-type,return-value]
 
 
+@pytest.mark.parametrize(
+    "endpoint",
+    [
+        ModelEndpoint("llama_cpp", "http://localhost", "/run/axcess/llama.sock"),
+        ModelEndpoint("llama_cpp", "http://localhost", None, (("text", "http://127.0.0.1:9"),)),
+    ],
+    ids=["socket", "windows-routes"],
+)
+async def test_private_service_never_goes_through_a_proxy(
+    monkeypatch: pytest.MonkeyPatch, endpoint: ModelEndpoint
+) -> None:
+    """A proxy setting (HTTP_PROXY, or Windows' system proxy) is ignored.
+
+    Before, httpx mounted the proxy for ``http://`` ahead of the private
+    transport: every model request went to the proxy, failed, and would
+    have carried report content off the computer.
+    """
+    monkeypatch.setenv("HTTP_PROXY", "http://proxy.example:3128")
+    monkeypatch.setenv("ALL_PROXY", "http://proxy.example:3128")
+    async with open_model_http_client(endpoint, timeout=2.0) as http:
+        url = httpx.URL("http://localhost/v1/models")
+        assert http._transport_for_url(url) is http._transport
+        assert not any(t is not None for t in http._mounts.values())
+    with pytest.raises(ValueError):
+        open_model_http_client(endpoint, trust_env=True)
+
+
 async def test_llama_cpp_over_a_real_unix_socket() -> None:
     """A real socket and a tiny HTTP responder stand in for llama-server."""
     requests: list[tuple[str, bytes]] = []

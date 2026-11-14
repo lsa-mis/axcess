@@ -292,15 +292,24 @@ def open_model_http_client(endpoint: ModelEndpoint, **kwargs: Any) -> httpx.Asyn
     existing callers build the same client they always did. For a UNIX
     socket it adds ``httpx.AsyncHTTPTransport(uds=...)`` (httpx's documented
     way to speak HTTP over a socket). The caller owns and closes the client.
+
+    The private service (routes or a socket) never goes through a proxy:
+    httpx otherwise reads ``HTTP_PROXY`` and, on Windows and macOS, the
+    system proxy, and mounts it for ``http://`` ahead of the transport given
+    here. The request would then go to the proxy, fail, and carry report
+    content off this computer.
     """
-    if endpoint.routes:
+    if endpoint.routes or endpoint.socket_path:
         if "transport" in kwargs:
-            raise ValueError("A routed endpoint chooses its own transport.")
-        kwargs["transport"] = ModelRoutingTransport(dict(endpoint.routes))
-    elif endpoint.socket_path:
-        if "transport" in kwargs:
-            raise ValueError("A UNIX-socket endpoint chooses its own transport.")
-        kwargs["transport"] = httpx.AsyncHTTPTransport(uds=endpoint.socket_path)
+            raise ValueError("The private AI service chooses its own transport.")
+        if kwargs.get("trust_env"):
+            raise ValueError("The private AI service never uses a proxy.")
+        kwargs["trust_env"] = False
+        kwargs["transport"] = (
+            ModelRoutingTransport(dict(endpoint.routes))
+            if endpoint.routes
+            else httpx.AsyncHTTPTransport(uds=endpoint.socket_path)
+        )
     return httpx.AsyncClient(**kwargs)
 
 

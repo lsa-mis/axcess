@@ -1080,6 +1080,10 @@ static int run_check(struct options *o)
 
 struct model {
     char name[64];
+    /* How often each relay note was logged, to keep the log short. */
+    volatile LONG refused_notes;
+    volatile LONG unreachable_notes;
+    volatile LONG relayed_notes;
     wchar_t *socket;
     wchar_t *args[MAX_ARGS];
     int argc;
@@ -1092,6 +1096,38 @@ struct model {
 static struct model g_models[MAX_MODELS];
 static int g_model_count = 0;
 static DWORD g_client_pid = 0;
+static HANDLE g_log = NULL; /* serve: the shared log, for relay notes */
+
+/* One "launcher:" line in the log, for diagnosing the relay from a log a
+ * person sends. Notes only: never anything a request carried. */
+static void log_note(const char *fmt, ...)
+{
+    char line[512];
+    SYSTEMTIME now;
+    DWORD written;
+    int n;
+    va_list ap;
+    if (!g_log)
+        return;
+    GetLocalTime(&now);
+    n = _snprintf(line, sizeof(line), "launcher %02u:%02u:%02u: ", now.wHour, now.wMinute,
+                  now.wSecond);
+    if (n < 0)
+        return;
+    va_start(ap, fmt);
+    _vsnprintf(line + n, sizeof(line) - (size_t)n - 2, fmt, ap);
+    va_end(ap);
+    line[sizeof(line) - 3] = 0;
+    strcat(line, "\n");
+    WriteFile(g_log, line, (DWORD)strlen(line), &written, NULL);
+}
+
+/* True for the first few notes of one kind, then for every 100th. */
+static int note_due(volatile LONG *count)
+{
+    LONG n = InterlockedIncrement(count);
+    return n <= 3 || n % 100 == 0;
+}
 
 static int valid_name(const char *s)
 {
@@ -1326,12 +1362,18 @@ static DWORD WINAPI connection_thread(LPVOID arg)
     if (svc == INVALID_SOCKET ||
         connect(svc, (struct sockaddr *)&a->model->addr, (int)sizeof(a->model->addr)) != 0) {
         /* The model is still loading (no socket yet), or has stopped. */
+        int err = WSAGetLastError();
+        if (note_due(&a->model->unreachable_notes))
+            log_note("%s: its socket is not answering yet (%d), connection closed",
+                     a->model->name, err);
         if (svc != INVALID_SOCKET)
             closesocket(svc);
         abort_socket(a->client);
         free(a);
         return 0;
     }
+    if (InterlockedIncrement(&a->model->relayed_notes) == 1)
+        log_note("%s: first connection from Axcess relayed", a->model->name);
     conn = (struct connection *)xalloc(sizeof(*conn));
     conn->client = a->client;
     conn->service = svc;
@@ -1371,10 +1413,19 @@ static DWORD WINAPI accept_thread(LPVOID arg)
             Sleep(50);
             continue;
         }
-        if (len != (int)sizeof(peer) || peer.sin_family != AF_INET ||
-            owner_pid(&peer, m->port_net) != g_client_pid) {
+        if (len != (int)sizeof(peer) || peer.sin_family != AF_INET) {
             abort_socket(c);
             continue;
+        }
+        {
+            DWORD owner = owner_pid(&peer, m->port_net);
+            if (owner != g_client_pid) {
+                if (note_due(&m->refused_notes))
+                    log_note("%s: refused a connection from process %lu (Axcess is %lu)",
+                             m->name, owner, g_client_pid);
+                abort_socket(c);
+                continue;
+            }
         }
         a = (struct accepted *)xalloc(sizeof(*a));
         a->client = c;
@@ -1395,8 +1446,10 @@ static DWORD WINAPI exit_thread(LPVOID arg)
     DWORD code = 0;
     WaitForSingleObject(m->pi.hProcess, INFINITE);
     GetExitCodeProcess(m->pi.hProcess, &code);
-    if (!g_stopping)
+    if (!g_stopping) {
+        log_note("%s: the server stopped by itself (exit code %lu)", m->name, code);
         out_line("EXIT %s %lu", m->name, code);
+    }
     return 0;
 }
 
@@ -1448,6 +1501,7 @@ static int run_serve(struct options *o)
     }
 
     sandbox_init(&sb, o, (DWORD)g_model_count);
+    g_log = sb.log;
     for (i = 0; i < g_model_count; i++) {
         struct model *m = &g_models[i];
         wchar_t *cmdline = build_cmdline(m->args, m->argc);
@@ -1460,6 +1514,9 @@ static int run_serve(struct options *o)
     for (i = 0; i < g_model_count; i++)
         out_line("PORT %s %u", g_models[i].name, (unsigned)ntohs(g_models[i].port_net));
     out_line("READY");
+    for (i = 0; i < g_model_count; i++)
+        log_note("%s: relayed from 127.0.0.1:%u for process %lu", g_models[i].name,
+                 (unsigned)ntohs(g_models[i].port_net), g_client_pid);
     for (i = 0; i < g_model_count; i++) {
         t = CreateThread(NULL, 0, exit_thread, &g_models[i], 0, NULL);
         if (!t)
@@ -1477,6 +1534,7 @@ static int run_serve(struct options *o)
     if (in && in != INVALID_HANDLE_VALUE)
         while (ReadFile(in, buf, sizeof(buf), &got, NULL) && got > 0) {
         }
+    log_note("Axcess asked the AI service to stop (input closed, %lu)", GetLastError());
     InterlockedExchange(&g_stopping, 1);
     TerminateJobObject(sb.job, 1);
     for (i = 0; i < g_model_count; i++)

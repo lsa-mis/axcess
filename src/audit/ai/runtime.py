@@ -26,6 +26,7 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import json
+import os
 import shutil
 import stat
 import subprocess
@@ -49,6 +50,7 @@ from audit.ai.windows_launcher import (
     LauncherModelError,
     LauncherService,
     ModelProcess,
+    note,
     private_copy,
     require_windows_sandbox,
     run_check,
@@ -481,13 +483,16 @@ class LlamaRuntime:
             service.wait_ready(self._abort, wait_s)
         except LauncherModelError as exc:
             self._stop_locked()
+            note(log, f"a model's server stopped while loading ({exc}); trying the next build")
             raise _ModelLoadError(
                 "The AI service could not load its models with this computer's graphics driver."
             ) from exc
         except IsolationError as exc:
             self._stop_locked()
+            note(log, f"start failed: {exc}")
             self.isolation_reason = exc.reason
             raise RuntimeSetupError(str(exc)) from exc
+        note(log, f"started; every model answered (process {os.getpid()})")
         self.routes = routes
         self.socket_path = None
         self.accelerator = accelerator
