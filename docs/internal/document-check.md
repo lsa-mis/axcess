@@ -82,9 +82,23 @@ most 13 s of downloads still running), but the page crawl is slower by
 about as much: a 50-page scan of hr.umich.edu makes about 57 page requests
 and 110 PDF downloads, at least 83 s of requests at the site's 2 a
 second, while the page crawl alone takes about 95 s, so pages and PDFs
-now share an almost full rate limit and the site's 2 connections (a PDF
-holds one for its whole transfer). The rate limit is the floor; what is
-left to gain is letting page requests go ahead of PDF downloads.
+now share an almost full rate limit. (The per-host connection limit is
+not the bottleneck: the app sets it to the worker count, 8 by default,
+and at most 4 downloads run at once.)
+
+Letting page requests go first (a PDF download started only when no page
+request for the host was waiting; tried 2026-11-14, not kept) did not
+help. With the check off: 91, 87 and 97 s. With it on: 108 s and 139 s
+in runs where the site answered normally, so about 31 s more, no better
+than before. The page crawl itself kept its speed, but the PDFs held back
+during it became a wait after the last page (46 s in the 139 s run). Two
+more runs with the check on (174 s and 266 s) hit periods of a minute or
+more when hr.umich.edu answered nothing, so 4 to 6 PDFs and 8 to 15 pages
+timed out. That happened in no earlier run, but 2 runs are too few to say
+whether the change caused it. Every PDF still needs one of the site's 2
+request slots a second, so on a site with this many PDFs the check costs
+real time unless the rate goes up, which is the site owner's decision
+("Page requests per second" on New scan).
 
 ## Why it is built this way
 
