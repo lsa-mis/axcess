@@ -232,8 +232,8 @@ export const SCAN_END_LABEL: Record<ScanEndReason, string> = {
   running: "Still scanning",
   all_found: "Visited every page it found",
   page_limit: "Stopped at its page limit",
-  stopped: "Stopped before the end",
-  failed: "Failed before the end",
+  stopped: "Stopped before the scan finished",
+  failed: "Failed before the scan finished",
 };
 
 /**
