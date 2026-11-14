@@ -7,7 +7,7 @@ import { Card, withReturnTrail } from "../components/ui";
 import { siteLabel } from "../components/ReportCrumb";
 import ConformanceBadge from "../components/ConformanceBadge";
 import ExportMenu from "../components/ExportMenu";
-import { TablePagination, usePagedRows } from "../components/TablePagination";
+import { PagedTable, usePagedRows } from "../components/TablePagination";
 import {
   Cell,
   Row,
@@ -263,94 +263,99 @@ export default function IssuesRoute() {
       {/* No ``overflow-hidden``: it would clip the Filter menu's panel on a
           short, filtered table. The table scrolls in its own region. */}
       <Card>
-        <IssueToolbar
-          conformanceCounts={data.conformance_counts}
-          laneCounts={data.review_lane_counts}
-          findingTypeCounts={data.finding_type_counts}
-          q={q}
-          conformance={conformance}
-          lane={lane}
-          findingType={findingType}
-          onParam={setParam}
-          onResetFilters={resetFilters}
-          onClearFilters={() => setParams(new URLSearchParams(), { replace: true })}
-          pager={<TablePagination label="Issues" noun="issue types" {...paged} />}
-        />
-        {/* Only for exactly one finding type: the link names one view. */}
-        {isFindingType(findingType) && (
-          <FindingTypeViewLink scanId={scan.id} findingType={findingType} imageCount={scan.finding_count} />
-        )}
-        {/* WAI-ARIA sortable table: the line over it says what the order is,
-            with the filtered count and the way back to the recommended order
-            beside it.
+        <PagedTable
+          pagination={{ label: "Issues", noun: "issue types", ...paged }}
+          top={(pager) => (
+            <IssueToolbar
+              conformanceCounts={data.conformance_counts}
+              laneCounts={data.review_lane_counts}
+              findingTypeCounts={data.finding_type_counts}
+              q={q}
+              conformance={conformance}
+              lane={lane}
+              findingType={findingType}
+              onParam={setParam}
+              onResetFilters={resetFilters}
+              onClearFilters={() => setParams(new URLSearchParams(), { replace: true })}
+              pager={pager}
+            />
+          )}
+        >
+          {/* Only for exactly one finding type: the link names one view. */}
+          {isFindingType(findingType) && (
+            <FindingTypeViewLink scanId={scan.id} findingType={findingType} imageCount={scan.finding_count} />
+          )}
+          {/* WAI-ARIA sortable table: the line over it says what the order is,
+              with the filtered count and the way back to the recommended order
+              beside it.
 
-            Shown only when the table is sorted by a column or filtered
-            (2026-11-02), and never with the sentence "Recommended order:
-            Mostly sure, then Not sure, then For information.", which the
-            developer asked to remove: the How sure column already shows
-            that grouping, top to bottom. Removing
-            the line in every state was the request, and was set aside here
-            because the line then holds the only way back to the recommended
-            order (a sorted header only flips between its two directions),
-            and the count of what a filter left (W3C COGA, "Making Content
-            Usable": do not take away the way back).
+              Shown only when the table is sorted by a column or filtered
+              (2026-11-02), and never with the sentence "Recommended order:
+              Mostly sure, then Not sure, then For information.", which the
+              developer asked to remove: the How sure column already shows
+              that grouping, top to bottom. Removing
+              the line in every state was the request, and was set aside here
+              because the line then holds the only way back to the recommended
+              order (a sorted header only flips between its two directions),
+              and the count of what a filter left (W3C COGA, "Making Content
+              Usable": do not take away the way back).
 
-            The order is still said to a screen reader on every change, by
-            the live region under this comment, which stays on the page
-            whether or not the line shows; the line itself is not a live
-            region (`announce={false}`), so nothing is read twice (SC 4.1.3
-            Status Messages, Level AA). The table's caption says the order
-            too. */}
-        <p role="status" className="sr-only">
-          {describeSort(sort)}.
-        </p>
-        {(sort || hasFilter) && (
-          <TableStatus
-            announce={false}
-            actions={
-              <>
-                {hasFilter && (
-                  <span className="tabular-nums">
-                    {rows.length.toLocaleString()} of {data.total_unfiltered.toLocaleString()} shown
-                  </span>
-                )}
-                {sort && (
-                  // eslint-disable-next-line react/forbid-elements -- Convert: a text-link styled button; needs a link variant on Button
-                  <button
-                    type="button"
-                    onClick={recommend}
-                    className="min-h-target rounded-xs px-1 font-semibold text-umich-blue underline underline-offset-2 hover:text-umich-blue-600 focus-visible:outline-none focus-visible:shadow-focus"
-                  >
-                    Back to recommended order
-                  </button>
-                )}
-              </>
-            }
-          >
-            {/* The sentence "Recommended order: …" is never shown, only
-                spoken (see above): with a filter on and the default order,
-                the line holds the count alone. */}
-            {sort && `${describeSort(sort)}.`}
-          </TableStatus>
-        )}
-        {rows.length === 0 ? (
-          <TableEmpty>
-            {hasFilter
-              ? "No issues match these filters. Clear a filter to see more results."
-              : "Axcess found no issues. That does not mean the site meets WCAG, because some checks may not have run. See “What was checked”, below this table."}
-          </TableEmpty>
-        ) : (
-          <IssueTable
-            scanId={scan.id}
-            paged={paged}
-            here={here}
-            sort={sort}
-            onSort={onSort}
-            busy={issuesQuery.isFetching}
-            regionRef={region}
-          />
-        )}
-        <TablePagination label="Issues" noun="issue types" place="end" {...paged} />
+              The order is still said to a screen reader on every change, by
+              the live region under this comment, which stays on the page
+              whether or not the line shows; the line itself is not a live
+              region (`announce={false}`), so nothing is read twice (SC 4.1.3
+              Status Messages, Level AA). The table's caption says the order
+              too. */}
+          <p role="status" className="sr-only">
+            {describeSort(sort)}.
+          </p>
+          {(sort || hasFilter) && (
+            <TableStatus
+              announce={false}
+              actions={
+                <>
+                  {hasFilter && (
+                    <span className="tabular-nums">
+                      {rows.length.toLocaleString()} of {data.total_unfiltered.toLocaleString()} shown
+                    </span>
+                  )}
+                  {sort && (
+                    // eslint-disable-next-line react/forbid-elements -- Convert: a text-link styled button; needs a link variant on Button
+                    <button
+                      type="button"
+                      onClick={recommend}
+                      className="min-h-target rounded-xs px-1 font-semibold text-umich-blue underline underline-offset-2 hover:text-umich-blue-600 focus-visible:outline-none focus-visible:shadow-focus"
+                    >
+                      Back to recommended order
+                    </button>
+                  )}
+                </>
+              }
+            >
+              {/* The sentence "Recommended order: …" is never shown, only
+                  spoken (see above): with a filter on and the default order,
+                  the line holds the count alone. */}
+              {sort && `${describeSort(sort)}.`}
+            </TableStatus>
+          )}
+          {rows.length === 0 ? (
+            <TableEmpty>
+              {hasFilter
+                ? "No issues match these filters. Clear a filter to see more results."
+                : "Axcess found no issues. That does not mean the site meets WCAG, because some checks may not have run. See “What was checked”, below this table."}
+            </TableEmpty>
+          ) : (
+            <IssueTable
+              scanId={scan.id}
+              paged={paged}
+              here={here}
+              sort={sort}
+              onSort={onSort}
+              busy={issuesQuery.isFetching}
+              regionRef={region}
+            />
+          )}
+        </PagedTable>
       </Card>
 
       {/* Under the table since user testing (2026-10-28): the table follows

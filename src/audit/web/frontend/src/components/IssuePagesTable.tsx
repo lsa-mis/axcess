@@ -1,7 +1,7 @@
 import { memo, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { ScanEye } from "lucide-react";
-import { TablePagination, usePagedRows } from "./TablePagination";
+import { PagedTable, usePagedRows } from "./TablePagination";
 import {
   Cell,
   ColumnHeader,
@@ -201,82 +201,87 @@ export default function IssuePagesTable({
 
   return (
     <>
-      <TableBar pager={<TablePagination label="Pages with this issue type" noun="pages" {...paged} />}>
-        <TableSearch label="Search pages" placeholder="Search by page title or URL" value={query} onChange={setQuery} />
-      </TableBar>
-      <TableStatus>
-        {needle ? `${visible.length} of ${pages.length} page${pages.length === 1 ? "" : "s"} match. ` : ""}
-        Sorted by {describeSort(sort)}.
-      </TableStatus>
-      {visible.length === 0 ? (
-        <TableEmpty>
-          {pages.length === 0
-            ? "No pages have this issue type."
-            : "No pages match that search."}
-        </TableEmpty>
-      ) : (
-        <TableRegion label="Pages table">
-          <Table className="min-w-[44rem]" caption={`Pages with ${row.title}`}>
-            <TableHead>
-              <tr>
-                <ColumnHeader className="w-10 whitespace-nowrap">
-                  <span aria-hidden="true">#</span>
-                  <span className="sr-only">Row number</span>
-                </ColumnHeader>
-                <SortHeader column="Page title" kind="text" {...sortProps}>
-                  Page title
-                </SortHeader>
-                <SortHeader column="Page URL" kind="text" {...sortProps}>
-                  Page URL
-                </SortHeader>
-                <SortHeader column="Occurrences" kind="number" {...sortProps}>
-                  {COLUMN_LABEL.Occurrences}
-                </SortHeader>
-                <SortHeader column="Issue screenshots" kind="number" {...sortProps}>
-                  {COLUMN_LABEL["Issue screenshots"]}
-                </SortHeader>
-                {!isInformational && (
-                  <SortHeader column="Status" kind="number" {...sortProps}>
-                    Status
+      <PagedTable
+        pagination={{ label: "Pages with this issue type", noun: "pages", ...paged }}
+        top={(pager) => (
+          <TableBar pager={pager}>
+            <TableSearch label="Search pages" placeholder="Search by page title or URL" value={query} onChange={setQuery} />
+          </TableBar>
+        )}
+      >
+        <TableStatus>
+          {needle ? `${visible.length} of ${pages.length} page${pages.length === 1 ? "" : "s"} match. ` : ""}
+          Sorted by {describeSort(sort)}.
+        </TableStatus>
+        {visible.length === 0 ? (
+          <TableEmpty>
+            {pages.length === 0
+              ? "No pages have this issue type."
+              : "No pages match that search."}
+          </TableEmpty>
+        ) : (
+          <TableRegion label="Pages table">
+            <Table className="min-w-[44rem]" caption={`Pages with ${row.title}`}>
+              <TableHead>
+                <tr>
+                  <ColumnHeader className="w-10 whitespace-nowrap">
+                    <span aria-hidden="true">#</span>
+                    <span className="sr-only">Row number</span>
+                  </ColumnHeader>
+                  <SortHeader column="Page title" kind="text" {...sortProps}>
+                    Page title
                   </SortHeader>
-                )}
-                {/* Checked by a person: how far the auditor has got on each
-                    page, so this table doubles as their list of what is
-                    left. Its own column after Status, not folded into it:
-                    a status is where a fix stands, this is whether a person
-                    has looked, and one cell holding both would blur them.
-                    "Checked" is the word the inspector's review uses
-                    ("Checked by a person"), never "verified", so one thing
-                    has one name (W3C COGA "Making Content Usable",
-                    paraphrased: use the same words for the same thing,
-                    https://www.w3.org/TR/coga-usable/; SC 3.2.4 Consistent
-                    Identification, Level AA). Shown for every issue, For
-                    information too, since any of them can be reviewed. Its
-                    label wraps (wrap="words"), so the table still fits a
-                    1280 px screen without clipping the column. */}
-                <SortHeader column="Checked by a person" kind="number" wrap="words" {...sortProps}>
-                  Checked by a person
-                </SortHeader>
-              </tr>
-            </TableHead>
-            <tbody>
-              {paged.pageRows.map((page, rowIndex) => (
-                <IssuePageRow
-                  key={page.page_id}
-                  page={page}
-                  index={offset + rowIndex}
-                  scanId={scanId}
-                  issueKey={issueKey}
-                  origin={origin}
-                  backTo={backTo}
-                  isInformational={isInformational}
-                />
-              ))}
-            </tbody>
-          </Table>
-        </TableRegion>
-      )}
-      <TablePagination label="Pages with this issue type" noun="pages" place="end" {...paged} />
+                  <SortHeader column="Page URL" kind="text" {...sortProps}>
+                    Page URL
+                  </SortHeader>
+                  <SortHeader column="Occurrences" kind="number" {...sortProps}>
+                    {COLUMN_LABEL.Occurrences}
+                  </SortHeader>
+                  <SortHeader column="Issue screenshots" kind="number" {...sortProps}>
+                    {COLUMN_LABEL["Issue screenshots"]}
+                  </SortHeader>
+                  {!isInformational && (
+                    <SortHeader column="Status" kind="number" {...sortProps}>
+                      Status
+                    </SortHeader>
+                  )}
+                  {/* Checked by a person: how far the auditor has got on each
+                      page, so this table doubles as their list of what is
+                      left. Its own column after Status, not folded into it:
+                      a status is where a fix stands, this is whether a person
+                      has looked, and one cell holding both would blur them.
+                      "Checked" is the word the inspector's review uses
+                      ("Checked by a person"), never "verified", so one thing
+                      has one name (W3C COGA "Making Content Usable",
+                      paraphrased: use the same words for the same thing,
+                      https://www.w3.org/TR/coga-usable/; SC 3.2.4 Consistent
+                      Identification, Level AA). Shown for every issue, For
+                      information too, since any of them can be reviewed. Its
+                      label wraps (wrap="words"), so the table still fits a
+                      1280 px screen without clipping the column. */}
+                  <SortHeader column="Checked by a person" kind="number" wrap="words" {...sortProps}>
+                    Checked by a person
+                  </SortHeader>
+                </tr>
+              </TableHead>
+              <tbody>
+                {paged.pageRows.map((page, rowIndex) => (
+                  <IssuePageRow
+                    key={page.page_id}
+                    page={page}
+                    index={offset + rowIndex}
+                    scanId={scanId}
+                    issueKey={issueKey}
+                    origin={origin}
+                    backTo={backTo}
+                    isInformational={isInformational}
+                  />
+                ))}
+              </tbody>
+            </Table>
+          </TableRegion>
+        )}
+      </PagedTable>
     </>
   );
 }
