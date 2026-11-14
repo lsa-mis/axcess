@@ -52,6 +52,7 @@ _RAIL_NAME = {
     "Check the page code for problems the rule check misses": "Page code check",
     "Check that forms describe their errors": "Form error check",
     "Check narrow screens and zoom": "Zoom and layout check",
+    "Check the documents the pages link to": "Document check",
     "Read text inside images (OCR)": "Image text check",
     "Compare image text with alt text (vision model)": "Vision model review",
     "AI review of wording": "AI review",
@@ -594,6 +595,7 @@ async def test_depth_dots_are_gone(live_server: tuple[str, int], new_page: Any) 
                 # On by default for public websites (2026-11-02).
                 "Form error check",
                 "Zoom and layout check",
+                "Document check",
                 "Image text check",
             ],
             [
@@ -904,6 +906,58 @@ async def test_the_form_error_check_is_on_for_public_websites_and_absent_when_si
     await _open_groups(page)
     await playwright_async.expect(
         page.get_by_role("group", name="Check that forms describe their errors")
+    ).to_have_count(0)
+
+
+async def test_the_document_check_is_on_by_default_and_absent_when_signed_in(
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """On for a public website (2026-11-14), named in the summary, sent as
+    skip_documents, and not offered for a sign-in scan, which never looks
+    for documents. It needs no browser, so Fast scan leaves it on."""
+    base, _ = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    posted: list[dict[str, Any]] = []
+
+    async def capture(route: Any) -> None:
+        posted.append(route.request.post_data_json)
+        await route.fulfill(status=409, json={"error": "A crawl is already running."})
+
+    await page.route("**/api/scans", capture)
+    await page.goto(f"{base}/app/scans/new", wait_until="networkidle")
+    await _open_groups(page)
+    switch = page.get_by_role("switch", name="Check the documents the pages link to")
+    if not await switch.count():
+        switch = page.get_by_role("checkbox", name="Check the documents the pages link to")
+    await playwright_async.expect(switch).to_be_checked()
+    await playwright_async.expect(switch).to_be_enabled()
+    # The privacy facts are read with it, as its description.
+    await playwright_async.expect(switch).to_have_accessible_description(
+        re.compile("downloads each PDF once to this computer.*keeps the result, not the file")
+    )
+    summary = page.get_by_role("complementary", name="What this scan will do")
+    assert "Document check" in await _rail_items(summary, "Checks that run")
+    await page.get_by_role("textbox", name="Website address", exact=True).fill(
+        "https://example.com/"
+    )
+    await page.get_by_role("button", name="Start scan").click()
+    await playwright_async.expect(page.get_by_role("alert").first).to_be_visible()
+    assert posted and posted[-1]["skip_documents"] is False
+
+    await switch.click()
+    assert "Document check" in await _rail_items(summary, "Not included")
+    await page.get_by_role("button", name="Start scan").click()
+    for _ in range(50):
+        if len(posted) >= 2:
+            break
+        await page.wait_for_timeout(100)
+    assert posted[-1]["skip_documents"] is True
+
+    await page.goto(f"{base}/app/scans/new?mode=login", wait_until="networkidle")
+    await _open_groups(page)
+    await playwright_async.expect(
+        page.get_by_text("Check the documents the pages link to", exact=True)
     ).to_have_count(0)
 
 

@@ -160,6 +160,24 @@ export default function ChecksGroup({ settings, update, policy, capabilities }: 
           label={SWITCHES.responsive.label}
           hint={rendered ? SWITCHES.responsive.hint : "Needs a browser. Turn off Fast scan to use it."}
         />
+        {/* The document check, last: every switch above checks the pages;
+            this one checks the files they link to (the report's Documents
+            tab), so it follows them rather than sitting among them. On by
+            default (the developer's request, 2026-11-14). Not disabled in
+            Fast scan: finding a page's links needs no browser. Its hint says
+            what is downloaded and kept, and that files on other sites are
+            downloaded too, since this is the one check that reaches beyond
+            the scanned site (AGENTS.md, Interface language rule 4: never
+            drop a privacy fact). Hidden in a sign-in scan, which never looks
+            for documents (fixed in the login policy), like the form check. */}
+        {!isFixed(policy, "skip_documents") && (
+          <SwitchRow
+            checked={switchOn(settings, "documents")}
+            onChange={(on) => update(switchPatch(settings, "documents", on))}
+            label={SWITCHES.documents.label}
+            hint={SWITCHES.documents.hint}
+          />
+        )}
       </SwitchList>
     </SettingsGroup>
   );

@@ -78,6 +78,9 @@ class ScanFormSettings(BaseModel):
     # The page code check is on unless turned off. A client that sends
     # nothing gets it, as it gets the other checks that only read the page.
     skip_markup: bool = False
+    # The document check (the Documents tab) is on unless turned off; a
+    # client that sends nothing gets it.
+    skip_documents: bool = False
     skip_visual: bool
     # The form error check (WCAG 3.3.1) is off unless chosen: a missing value
     # means skip it.
@@ -211,6 +214,9 @@ def snapshot_from_config(
         # Absent from scans made before the check existed. It only reads the
         # page, so running one of them again turns it on, as a new scan would.
         skip_markup=not _flag(config, "markup_checks_enabled", default=True),
+        # Absent from scans made before the document check; running one of
+        # them again turns it on, as a new scan would.
+        skip_documents=not _flag(config, "linked_files_enabled", default=True),
         skip_visual=not _flag(config, "visual_checks_enabled", default=False),
         skip_forms=not _flag(config, "form_error_checks_enabled", default=False),
         send_empty_forms=_flag(config, "form_send_empty_forms", default=False),

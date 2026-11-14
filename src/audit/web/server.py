@@ -2096,6 +2096,9 @@ def create_app(
             "skip_focus": bool(body.get("skip_focus")),
             # On unless asked off, like the other checks that only read.
             "skip_markup": bool(body.get("skip_markup")),
+            # On unless asked off: the Documents tab lists the files the
+            # pages link to and checks each PDF.
+            "skip_documents": bool(body.get("skip_documents")),
             "skip_visual": bool(body.get("skip_visual")),
             # Off unless asked for: an older client that sends nothing never
             # starts the form error check, which presses submit buttons.
@@ -4011,6 +4014,7 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
         responsive_checks_enabled=not bool(form.get("skip_responsive")),
         focus_checks_enabled=not bool(form.get("skip_focus")),
         markup_checks_enabled=not bool(form.get("skip_markup")),
+        linked_files_enabled=not bool(form.get("skip_documents")),
         visual_checks_enabled=not bool(form.get("skip_visual")),
         form_error_checks_enabled=not bool(form.get("skip_forms", True)),
         form_send_empty_forms=not bool(form.get("skip_forms", True))

@@ -381,6 +381,10 @@ export interface NewScanPayload {
   /** Skip the page code check, which reads the rendered page code after axe.
    *  On unless chosen off; the server treats a missing value as on. */
   skip_markup: boolean;
+  /** Skip the document check: listing the files the pages link to (the
+   *  Documents tab) and checking each PDF. On unless chosen off; the server
+   *  treats a missing value as on. Never in a sign-in scan. */
+  skip_documents: boolean;
   /** Skip motion and vision-assisted visual probes. */
   skip_visual: boolean;
   /** Skip the form error check (WCAG 3.3.1). Off unless chosen. */

@@ -109,6 +109,10 @@ export const SWITCHES = {
     label: "Check the page code for problems the rule check misses",
     hint: "Reads each page’s code (HTML) for problems the rule check (axe) does not look for, such as a field named only by its placeholder text. It only reads the page and changes nothing.",
   },
+  documents: {
+    label: "Check the documents the pages link to",
+    hint: "Lists the PDF, Word, Excel and other files the pages link to, in the report’s Documents tab, and checks each PDF after the last page. Axcess downloads each PDF once to this computer (up to 200, each up to 10 MB), also from other sites, and keeps the result, not the file."
+  },
   forms: {
     label: "Check that forms describe their errors",
     hint:
@@ -420,6 +424,9 @@ export const RAIL_LABELS = {
   markup: CHECK_LABEL.markup,
   forms: CHECK_LABEL.forms,
   responsive: CHECK_LABEL.responsive,
+  // The glossary's name for it ("Document check", docs/glossary.md), as the
+  // other checks use their report names here.
+  documents: "Document check",
   ocr: CHECK_LABEL.image,
   vision: "Vision model review",
   semantic: CHECK_LABEL.semantic,
