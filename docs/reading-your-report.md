@@ -276,7 +276,9 @@ Each row shows:
 - **What Axcess found**: each problem the checks found, by a short name, most
   serious first ("Not tagged", "No language set"); for a Not sure file, what a
   person must still check; for a file Axcess could not check, why. Why each
-  problem matters is on the document's own page.
+  problem matters is on the document's own page. A file with the same contents as
+  one earlier in the list (the same PDF at another address) says "Same file
+  as …" and shares that file's result.
 - **Pages it appears on**: how many pages link to the file or show it inside
   the page. The pages are listed on the document's own page.
 

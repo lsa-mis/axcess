@@ -111,7 +111,11 @@ on 130 of them, then got every verdict wrong on its first real pages
   link to (the report's Documents tab) and checks PDFs with pypdf. Called
   "linked files" in code because a crawler "document" is an HTML page.
   Storage: `src/audit/db/linked_files.py` (migration 0039); list:
-  `src/audit/web/linked_files_queries.py`.
+  `src/audit/web/linked_files_queries.py`. A file's identity is its
+  normalized address; the SHA-256 only marks copies. PDF downloads run
+  beside the crawl: a page queues its PDFs (`queue_page`) and its worker
+  moves on. Never make a page worker await a document download. See
+  `docs/internal/document-check.md`.
 - `src/audit/synthesizer/` turns raw evidence into image findings, severity,
   priority, remediation, and scan diffs.
 - `src/audit/db/` owns SQLite migrations, transactions, repositories, and the
