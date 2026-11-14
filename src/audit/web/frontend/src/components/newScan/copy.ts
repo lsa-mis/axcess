@@ -205,7 +205,7 @@ export const NUMBERS = {
   workers_login: {
     label: "Signed-in tabs",
     hint:
-      "How many tabs the temporary signed-in browser uses at once. Axcess recommends 2. The safe maximum is 4.",
+      "How many tabs the temporary signed-in browser uses at once. More tabs finish sooner but put more load on the site. Axcess recommends 4. The maximum is 8. If the site signs a tab out, Axcess goes back to one tab and says so in the report.",
   },
 } as const;
 

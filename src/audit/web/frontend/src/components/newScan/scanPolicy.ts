@@ -137,7 +137,9 @@ export const PUBLIC_DEFAULTS: ScanSettings = {
 export const LOGIN_DEFAULTS: ScanSettings = {
   ...PUBLIC_DEFAULTS,
   rps: 1,
-  workers: 2,
+  // One signed-in tab per worker; a tab the site signs out sends the scan
+  // back to one tab (audit.crawler.tab_pool), so 4 costs speed at worst.
+  workers: 4,
   // A signed-in session is the only way to reach these pages; robots.txt is
   // written for anonymous crawlers, and the authorization checkbox is the
   // consent that replaces it.
@@ -182,7 +184,7 @@ export const PUBLIC_POLICY: ScanPolicy = {
 
 export const LOGIN_POLICY: ScanPolicy = {
   mode: "login",
-  caps: { max_pages: 2500, max_depth: 20, rps: 5, workers: 4 },
+  caps: { max_pages: 2500, max_depth: 20, rps: 5, workers: 8 },
   defaults: LOGIN_DEFAULTS,
   fixed: {
     // A signed-in session keeps its page cap: an unbounded crawl behind a

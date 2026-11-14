@@ -70,6 +70,7 @@ from audit.config import Settings, get_settings
 from audit.crawler import live_progress, url_policy
 from audit.crawler.orchestrator import CrawlConfig, CrawlSummary, build_search_explorer, run_crawl
 from audit.crawler.search import SearchConfig, search_url_allowed
+from audit.crawler.tab_pool import TabPool
 from audit.crawler.user_agent import chosen_user_agent
 from audit.db import repo
 from audit.db.schema import connect
@@ -222,7 +223,10 @@ class LocalLoginScanRequest(BaseModel):
     max_pages: int = Field(default=2500, ge=1, le=2500)
     max_depth: int = Field(default=10, ge=1, le=20)
     rps: float = Field(default=1.0, ge=0.1, le=5.0)
-    workers: int = Field(default=2, ge=1, le=4)
+    # Signed-in tabs. Each tab after the first holds a copy of the sign-in;
+    # a copy the site signs out sends the scan back to one tab
+    # (audit.crawler.tab_pool), so more tabs cost speed at worst, not pages.
+    workers: int = Field(default=4, ge=1, le=8)
     show_browser: bool = False
     whole_host: bool = False
     scan_engine: Literal["axe", "alfa", "both"] = "axe"
@@ -1346,6 +1350,9 @@ def create_app(
             "failure_reason": (
                 str(scan.get("failure_reason")) if scan.get("failure_reason") else None
             ),
+            # What Axcess wants a reader of this report to know about how it
+            # was made (migration 0039). None when there is nothing to say.
+            "scan_note": str(scan.get("scan_note")) if scan.get("scan_note") else None,
             # Coverage truth: which detection methods were on for this
             # scan (derived from config_json + counters). Lets the UI
             # show when a scan was a partial / static-only run.
@@ -1699,8 +1706,9 @@ def create_app(
             rps=body.rps,
             whole_host=body.whole_host,
             # Login scans reuse an authenticated BrowserContext and a fixed
-            # tab pool (one tab for sessionStorage-backed sign-in). Keep the cap small
-            # so concurrent pages cannot overwhelm the shared session or the
+            # pool of signed-in tabs, one per worker (each later tab holds a
+            # copy of a sessionStorage sign-in). The cap stays small so
+            # concurrent pages cannot overwhelm the shared session or the
             # target application while still using modern laptop capacity.
             concurrency_per_host=body.workers,
             workers=body.workers,
@@ -4087,6 +4095,7 @@ async def _run_local_login_background(
     """
 
     conn: sqlite3.Connection | None = None
+    tab_pool: TabPool | None = None
     try:
         run.status = "verifying_authentication"
         if not config.browser_headless and not run.session.window_open:
@@ -4182,6 +4191,7 @@ async def _run_local_login_background(
             shared_pages=scan_pages,
             search_explorer=build_search_explorer(config, login_axe),
         )
+        tab_pool = fetcher.tab_pool
         run.status = "scanning"
         authenticated_alfa: _AuthenticatedAlfaRunner | None = None
         if config.alfa_enabled:
@@ -4236,7 +4246,39 @@ async def _run_local_login_background(
     finally:
         if conn is not None:
             conn.close()
+        if tab_pool is not None and tab_pool.fell_back:
+            _record_scan_note(db_path, run.scan_id, tab_fallback_note(tab_pool.size))
         await run.session.close()
+
+
+def tab_fallback_note(tabs: int) -> str:
+    """The scan note for a sign-in scan that fell back to one tab.
+
+    Plain words, no page address (the note is shown and exported with the
+    report). Says what happened, what Axcess did about it, and the one
+    limit a reader needs: pages already done in another tab were each
+    checked for a sign-in page when they loaded, not at every moment after.
+    """
+    return (
+        f"Axcess started this sign-in scan with {tabs} tabs, each with a copy of "
+        "your sign-in. Partway through, the site signed out one of the copies: a "
+        "page showed a sign-in page in that tab but the real page in the first tab. "
+        "Axcess scanned that page again in the first tab, closed the other tabs, "
+        "and scanned the rest of the site one page at a time. Every page was "
+        "checked for a sign-in page when it loaded."
+    )
+
+
+def _record_scan_note(db_path: Path, scan_id: int, note: str) -> None:
+    """Write Axcess's own note on a scan row. Never raises."""
+    try:
+        conn = connect(db_path)
+        try:
+            conn.execute("UPDATE scans SET scan_note = ? WHERE id = ?", (note, scan_id))
+        finally:
+            conn.close()
+    except Exception:
+        log.warning("web.scan_note_not_saved", scan_id=scan_id)
 
 
 class _AuthenticatedAlfaRunner:

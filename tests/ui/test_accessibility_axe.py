@@ -1461,9 +1461,10 @@ async def test_login_scan_is_visible_and_explains_login_before_crawl(
 
     workers = page.get_by_role("spinbutton", name="Signed-in tabs")
     await playwright_async.expect(workers).to_be_enabled()
-    await playwright_async.expect(workers).to_have_value("2")
-    await workers.fill("4")
     await playwright_async.expect(workers).to_have_value("4")
+    await playwright_async.expect(workers).to_have_attribute("max", "8")
+    await workers.fill("8")
+    await playwright_async.expect(workers).to_have_value("8")
 
     both_engines = page.get_by_role("radio", name="Both", exact=True)
     axe_only = page.get_by_role("radio", name="axe", exact=True)
@@ -1727,5 +1728,42 @@ async def test_pages_visited_list_fits_a_phone_screen(
             })"""
         )
         assert widths["body"] <= widths["client"], widths
+    finally:
+        await page.context.close()
+
+
+async def test_scan_note_shows_as_its_own_closed_row_only_when_there_is_one(
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """Axcess's note on how a scan ran ("How this scan ran") sits with the
+    report's other notes, says on the closed row that it is there, opens by
+    keyboard, and is absent for a scan with nothing to say."""
+    from audit.web.server import tab_fallback_note
+
+    base, scan_id = live_server
+    page = await new_page()
+    try:
+        await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+        await playwright_async.expect(
+            page.get_by_role("button", name="What was checked", exact=True)
+        ).to_be_visible()
+        row = page.get_by_role("button", name=re.compile(r"^How this scan ran"))
+        await playwright_async.expect(row).to_have_count(0)
+
+        note = tab_fallback_note(4)
+        with sqlite3.connect(seeded_db[0]) as conn:
+            conn.execute("UPDATE scans SET scan_note = ? WHERE id = ?", (note, scan_id))
+        await page.reload(wait_until="networkidle")
+        await playwright_async.expect(row).to_have_attribute("aria-expanded", "false")
+        await playwright_async.expect(
+            page.get_by_text("1 note from Axcess", exact=True)
+        ).to_be_visible()
+        await row.focus()
+        await page.keyboard.press("Enter")
+        await playwright_async.expect(page.get_by_text(note, exact=True)).to_be_visible()
+        violations = await _run_axe(page)
+        assert not violations, _render_violations(violations)
     finally:
         await page.context.close()

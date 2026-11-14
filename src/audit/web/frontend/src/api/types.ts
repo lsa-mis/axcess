@@ -124,6 +124,10 @@ export interface ScanPageChecks {
 export interface ScanDetail extends ScanSummary {
   error_count: number;
   failure_reason: string | null;
+  /** Axcess's own plain-words note on how a completed scan ran, such as a
+   *  sign-in scan that went back to one tab. Null when there is nothing to
+   *  say. */
+  scan_note: string | null;
   by_severity: Record<Severity, number>;
   previous_scan_id: number | null;
   blocked: null | {

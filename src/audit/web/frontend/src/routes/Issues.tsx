@@ -37,7 +37,13 @@ import {
 } from "../components/table/sort";
 import ReportHeader from "../components/ReportHeader";
 import ReportDangerZone from "../components/ReportDangerZone";
-import { ReportCoverageNote, ReportNote, ReportNotes, ReportSummary } from "../components/ReportSummary";
+import {
+  ReportCoverageNote,
+  ReportNote,
+  ReportNotes,
+  ReportScanNote,
+  ReportSummary,
+} from "../components/ReportSummary";
 import { cn } from "../lib/cn";
 import { liveSearchParams } from "../lib/liveSearchParams";
 import { HIDDEN_ISSUE_FIELDS } from "../lib/hiddenIssueFields";
@@ -355,6 +361,7 @@ export default function IssuesRoute() {
           limit in view, is on ReportCoverageNote. */}
       <ReportNotes className="mt-8">
         {isComplete && <ReportCoverageNote scan={scan} rows={summaryRows} />}
+        {isComplete && <ReportScanNote scan={scan} />}
         <IssueGlossary />
       </ReportNotes>
 

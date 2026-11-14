@@ -285,6 +285,31 @@ export function ReportCoverageNote({ scan, rows }: { scan: ScanDetail; rows: Iss
 }
 
 /**
+ * "How this scan ran": Axcess's own note on how a completed scan was made,
+ * as one more closed row of ``ReportNotes``. Shown only when the scan has a
+ * note (``scan_note``, migration 0039); the first is a sign-in scan that
+ * went back from several tabs to one because the site signed a tab out.
+ *
+ * One more row here rather than a banner over the table, as
+ * ``ReportNotes`` asks of a new explanation: it says how the report was
+ * made, not what is wrong with the site, so it sits with "What was checked"
+ * and reads in the same place. The row's right side says a note is there,
+ * so it is seen without opening anything (AGENTS.md, Interface language
+ * rule 4: never drop a limitation to make the page shorter).
+ *
+ * Titled "How this scan ran", not "notes": "Issue notes" are what a person
+ * writes (docs/plain-language.md), and this is written by Axcess.
+ */
+export function ReportScanNote({ scan }: { scan: ScanDetail }) {
+  if (!scan.scan_note) return null;
+  return (
+    <ReportNote id="report-scan-note" title="How this scan ran" meta={<span>1 note from Axcess</span>}>
+      <p className="max-w-prose text-sm text-fg">{scan.scan_note}</p>
+    </ReportNote>
+  );
+}
+
+/**
  * The report's closed explanations under the header, as one accordion: a
  * framed list of ``ReportNote`` rows, one per line, all closed on arrival.
  *

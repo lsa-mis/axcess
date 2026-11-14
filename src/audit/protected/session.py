@@ -495,6 +495,9 @@ class ManualAuthenticationSession:
         self._profile_dir: str | None = None
         # The kept sign-in and what keeps it fresh. See the module docstring.
         self._kept: _KeptSignIn | None = None
+        #: Whether the scan's tabs after the first hold a copy of its
+        #: sessionStorage (see ``switch_to_headless``).
+        self.scan_tabs_copied = False
         self._keep_refresh_s = keep_refresh_s
         self._keep_lock = asyncio.Lock()
         self._keep_tasks: set[asyncio.Task[Any]] = set()
@@ -680,9 +683,11 @@ class ManualAuthenticationSession:
         """Restore transferable login state in a new, normal headless Chromium.
 
         State stays in memory. The local login flow opts into this handoff;
-        the managed companion can continue using its original browser. Keep
-        one reusable tab when sessionStorage is present so token updates are
-        shared across successive pages, just as in the original login tab.
+        the managed companion can continue using its original browser. Opens
+        ``count`` tabs. sessionStorage belongs to a tab, so each one is seeded
+        with its own copy of the sign-in tab's; ``scan_tabs_copied`` records
+        that, so the fetcher checks a copy's sign-in pages against the first
+        tab (``audit.crawler.tab_pool``).
         """
         if self._state is not ManualAuthState.AUTHENTICATED or self._playwright is None:
             raise ManualAuthenticationError("Confirm sign-in before starting the headless scan.")
@@ -723,10 +728,11 @@ class ManualAuthenticationSession:
                 await context.add_init_script(_WEBRTC_BLOCK_INIT_SCRIPT)
                 await self._route_guard.install_on_context(context)
                 pages = []
-                for _ in range(1 if tab_storage else count):
+                for _ in range(count):
                     page = await context.new_page()
                     await restore_session_storage(page, tab_storage)
                     pages.append(page)
+                self.scan_tabs_copied = bool(tab_storage) and count > 1
                 # Only retire the login browser after the new context is ready.
                 if login_context is not None:
                     await login_context.close()
@@ -752,8 +758,10 @@ class ManualAuthenticationSession:
         reuse those pages without repeatedly bringing the browser to the
         foreground. The pages and their shared authenticated context remain
         memory-only and are destroyed together at session close.
-        If sign-in uses sessionStorage, the pool retains its single tab;
-        workers serialize access to preserve that tab-scoped session.
+        If sign-in uses sessionStorage, the sign-in tab is kept as the first
+        tab and each other tab is seeded with a copy of its sessionStorage
+        (``scan_tabs_copied``); the fetcher checks a copy's sign-in pages
+        against the first tab (``audit.crawler.tab_pool``).
         """
 
         if self._state is not ManualAuthState.AUTHENTICATED:
@@ -762,17 +770,31 @@ class ManualAuthenticationSession:
             )
         if count <= 0:
             raise ValueError("Background scan page count must be positive.")
-        # sessionStorage belongs to a tab, not its BrowserContext. Opening
-        # fresh worker tabs and closing sign-in silently signs out SPAs that
-        # keep their session there. Retain that tab and serialize the pool
-        # instead of exporting or copying any authentication material.
+        # sessionStorage belongs to a tab, not its BrowserContext. A fresh
+        # tab starts without it, which silently signs out SPAs that keep
+        # their session there. Keep the sign-in tab as the first tab, and
+        # seed every other tab with an in-memory copy of its storage, the
+        # same copy the headless handoff makes. Never written anywhere.
         auth_page = self.page
         # The scan uses this live window; the kept copy has no further use.
         self._kept = None
         if await auth_page.evaluate("() => sessionStorage.length > 0"):
+            tab_storage = await capture_session_storage(auth_page)
             self._auth_pages.remove(auth_page)
             self._page = None
-            return (auth_page,)
+            copies: list[Page] = []
+            try:
+                for _ in range(count - 1):
+                    copy = await self.context.new_page()
+                    copies.append(copy)
+                    await restore_session_storage(copy, tab_storage)
+            except Exception:
+                for copy in copies:
+                    with contextlib.suppress(Exception):
+                        await copy.close(run_before_unload=False)
+                raise
+            self.scan_tabs_copied = bool(copies)
+            return (auth_page, *copies)
         pages: list[Page] = []
         try:
             for _ in range(count):
@@ -914,6 +936,7 @@ class ManualAuthenticationSession:
             focus_probe=focus_probe,
             markup_probe=markup_probe,
             visual_probe=visual_probe,
+            copied_session=self.scan_tabs_copied,
             interaction_probe=interaction_probe,
             capture_screenshots=capture_screenshots,
             shared_context=self.context,

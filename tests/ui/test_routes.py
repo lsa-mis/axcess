@@ -509,13 +509,13 @@ def test_local_login_screenshots_follow_the_rendered_storage_opt_out(
     assert config.capture_screenshots is False
 
 
-def test_local_login_scan_rejects_more_than_four_workers(client: TestClient) -> None:
+def test_local_login_scan_rejects_more_than_eight_workers(client: TestClient) -> None:
     response = client.post(
         "/api/local-login-scans",
         json={
             "seed_url": "https://app.example.test/secure/",
             "authorization_acknowledged": True,
-            "workers": 5,
+            "workers": 9,
         },
     )
 
@@ -2317,6 +2317,31 @@ def test_local_login_scan_defaults_to_wcag_21(
     status, captured = _local_login_post(seeded_db, monkeypatch)
     assert status == 201
     assert getattr(captured["config"], "wcag_version", None) == "2.1"
+
+
+def test_local_login_scan_defaults_to_four_tabs_and_accepts_eight(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One signed-in tab per worker; four by default, at most eight."""
+    status, captured = _local_login_post(seeded_db, monkeypatch)
+    assert status == 201
+    assert captured["config"].workers == 4
+    assert captured["config"].concurrency_per_host == 4
+    status, captured = _local_login_post(seeded_db, monkeypatch, workers=8)
+    assert status == 201
+    assert captured["config"].workers == 8
+
+
+def test_scan_detail_carries_the_scan_note(
+    client: TestClient, seeded_db: tuple[Path, Path, int]
+) -> None:
+    db_path, _, scan_id = seeded_db
+    assert client.get(f"/api/scans/{scan_id}").json()["scan_note"] is None
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            "UPDATE scans SET scan_note = 'Went back to one tab.' WHERE id = ?", (scan_id,)
+        )
+    assert client.get(f"/api/scans/{scan_id}").json()["scan_note"] == "Went back to one tab."
 
 
 @pytest.mark.parametrize("bad", ["3.0", "2.0", 2.1, None])
