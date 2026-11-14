@@ -63,7 +63,7 @@ const MAX_NOTES = 2000;
  * dialog closes on save (SC 4.1.3 Status Messages, Level AA). A failed save
  * keeps the dialog open with the reason as an alert and the edit intact.
  *
- * "Mark N not checked as repeats", beside "Review this element", gives
+ * "Mark N elements not checked yet as repeats", beside "Review this element", gives
  * every flagged element in the page state on screen that has no review
  * yet (and no unsaved edit) "Checked: a repeat of one already reported",
  * in one press, as the developer chose. Evaluators step through a page's
@@ -76,15 +76,19 @@ const MAX_NOTES = 2000;
  * repeat of one already reported, and marking everything first would
  * leave the issue out of the ITS technical review. The count is in its
  * name, so it says exactly how much it changes, and its description says
- * which elements. It replaces a one-element "Mark as repeat", which made
+ * which elements. "Elements not checked yet", not "not checked": the label
+ * names what it marks and uses the review status's own words ("Not checked
+ * yet"), as the developer asked (2026-11-14; "Mark 25 not checked as
+ * repeats" did not say 25 of what). Not "other elements": the count can
+ * include the element on screen when it has no review yet. It replaces a one-element "Mark as repeat", which made
  * a second way to make one choice (the dialog's); a press on many
  * elements is a different job, so there is one way to do each (W3C COGA
  * "Making Content Usable", paraphrased: one way to do one thing,
  * https://www.w3.org/TR/coga-usable/).
  *
  * It takes a row of its own under "Review this element": the full label
- * (234 px for "Mark 2 not checked as repeats") does not fit beside it in
- * the 21rem column, and "Mark 2 as repeats" would no longer say which
+ * (322 px for "Mark 2 elements not checked yet as repeats") does not
+ * fit beside it in the 21rem column, and "Mark 2 as repeats" would no longer say which
  * elements (repo rule 8: a button names what it does). So while it is
  * offered, the region is one button taller and the saved page sits that
  * much lower; it is offered only once an element is reported.
@@ -333,7 +337,8 @@ export default function ElementReview({
               setFocusAfterBulk("undo");
             }}
           >
-            Mark {bulk.markCount} not checked as {bulk.markCount === 1 ? "a repeat" : "repeats"}
+            Mark {bulk.markCount} {bulk.markCount === 1 ? "element" : "elements"} not checked yet as{" "}
+            {bulk.markCount === 1 ? "a repeat" : "repeats"}
           </Button>
         ) : null}
         <span id={bulkHintId} hidden>
