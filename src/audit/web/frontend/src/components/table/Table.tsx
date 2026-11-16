@@ -482,7 +482,7 @@ export function SortHeader<K extends string>({
       <Arrow
         className={cn(
           "h-3.5 w-3.5 shrink-0 opacity-40 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100",
-          words && "ml-1 inline-block align-[-2px]",
+          words && (right ? "inline-block" : "ml-1 inline-block align-[-2px]"),
         )}
         aria-hidden
       />
@@ -551,6 +551,22 @@ export function SortHeader<K extends string>({
             <span>
               {label}
               <span className={cn("mt-0.5 flex", right ? "justify-end" : "justify-start")}>{indicator}</span>
+            </span>
+          ) : right ? (
+            // A right-aligned label that wraps ("Issue / occurrences"): the
+            // lines are right-aligned to each other and the arrow stands in
+            // its own column after them, centred on the label. With the
+            // arrow after the last word, the last line was pushed left of the
+            // others and "Issue" no longer ended where "occurrences" did
+            // (the developer's screenshots, 2026-11-16). Rejected: the arrow
+            // inline after the last word, the left-aligned columns' way,
+            // which is right where the lines start on the left. Proximity
+            // and alignment: W3C COGA, "Making Content Usable"
+            // (https://www.w3.org/TR/coga-usable/); the sort mark is still
+            // inside the one button (SC 2.5.3 Label in Name, Level A).
+            <span className="inline-flex items-center gap-1">
+              <span className="text-right">{label}</span>
+              {indicator}
             </span>
           ) : (
             <span>{withLastWord(label, indicator)}</span>
