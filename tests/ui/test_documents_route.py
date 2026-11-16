@@ -579,7 +579,7 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
     await expect(rows.nth(3)).to_contain_text("Axcess cannot check this file type.")
     await expect(rows.nth(4)).to_contain_text("(HTTP 404)")
     await expect(rows.nth(5)).to_contain_text("Axcess does not check this file type yet.")
-    await expect(rows.nth(6)).to_contain_text("Axcess cannot check files kept in Google")
+    await expect(rows.nth(6)).to_contain_text("Axcess cannot check files made in Google")
     await expect(rows.nth(6)).to_contain_text("docs.google.com")
     await expect(rows.nth(6)).to_contain_text("Another site")
     # The columns say what each value is; "How sure" alone did not.

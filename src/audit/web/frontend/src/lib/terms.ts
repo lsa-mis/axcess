@@ -196,7 +196,9 @@ export const LINKED_FILE_REASON_TEXT: Record<LinkedFileReason, string> = {
   type_not_checked_yet: "Axcess does not check this file type yet. Only PDF files are checked.",
   old_format:
     "Axcess cannot check this file type. Old Office files (.doc, .xls, .ppt) do not store the structure that a check needs.",
-  google_file: "Axcess cannot check files kept in Google Docs, Sheets, Slides or Drive. It cannot download them.",
+  // Drive files are downloaded since 2026-11-16 (linked_files/google.py);
+  // Docs, Sheets and Slides are not yet.
+  google_file: "Axcess cannot check files made in Google Docs, Sheets or Slides yet.",
   broken_link: "Broken link: the file could not be downloaded.",
   http_error: "Broken link: the site answered with an error",
   password: "The file needs a password to open.",
@@ -204,7 +206,11 @@ export const LINKED_FILE_REASON_TEXT: Record<LinkedFileReason, string> = {
   timed_out: "Downloading or checking the file took too long.",
   not_a_pdf: "The link did not lead to a PDF file. The site sent something else, such as a web page.",
   damaged: "Axcess could not read the file. It may be damaged.",
-  robots: "The site asks scanners not to open this file (in its robots.txt file).",
+  // Says what to do, not only why (the developer's request, 2026-11-16):
+  // Google asks scanners not to download any Drive file this way, so this
+  // is the row every Drive file gets in a scan that follows robots.txt.
+  robots:
+    "Not checked, because the scan followed robots.txt: the file’s site asks scanners not to download it. To check it, scan again with “Ignore the site’s robots.txt rules” turned on.",
   blocked: "The scan's settings say not to visit this address.",
   limit: "The scan reached its limit of 200 files to download.",
   not_checked: "The scan stopped before Axcess checked this file.",
@@ -212,6 +218,12 @@ export const LINKED_FILE_REASON_TEXT: Record<LinkedFileReason, string> = {
 
 /** The reason in words, with the server's status code where there is one. */
 export function linkedFileReasonText(reason: LinkedFileReason, httpStatus: number | null): string {
+  // 401 and 403 are not broken links: the file is there, for people who
+  // may open it (a Google Drive file shared only with signed-in accounts
+  // redirects to Google's sign-in page, which Axcess reports as 401).
+  if (reason === "http_error" && (httpStatus === 401 || httpStatus === 403)) {
+    return `The file needs a sign-in. Only people with access can open it (HTTP ${httpStatus}).`;
+  }
   if (reason === "http_error") {
     return `${LINKED_FILE_REASON_TEXT.http_error}${httpStatus != null ? ` (HTTP ${httpStatus})` : ""}.`;
   }
