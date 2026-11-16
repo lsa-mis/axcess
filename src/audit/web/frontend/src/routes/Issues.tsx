@@ -1,13 +1,13 @@
-import { memo, useMemo, useRef, type ReactNode, type Ref } from "react";
+import { Fragment, memo, useMemo, useRef, type ReactNode, type Ref } from "react";
 import { Link, useLocation, useParams, useSearchParams } from "react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
-import { Card, withReturnTrail } from "../components/ui";
+import { Card, HelpTip, withReturnTrail } from "../components/ui";
 // The same helper the topbar trail uses.
 import { siteLabel } from "../components/ReportCrumb";
 import ConformanceBadge from "../components/ConformanceBadge";
 import ExportMenu from "../components/ExportMenu";
-import { TablePagination, usePagedRows } from "../components/TablePagination";
+import { PagedTable, usePagedRows } from "../components/TablePagination";
 import {
   Cell,
   Row,
@@ -37,7 +37,13 @@ import {
 } from "../components/table/sort";
 import ReportHeader from "../components/ReportHeader";
 import ReportDangerZone from "../components/ReportDangerZone";
-import { ReportCoverageNote, ReportNote, ReportNotes, ReportSummary } from "../components/ReportSummary";
+import {
+  ReportCoverageNote,
+  ReportNote,
+  ReportNotes,
+  ReportScanNote,
+  ReportSummary,
+} from "../components/ReportSummary";
 import { cn } from "../lib/cn";
 import { liveSearchParams } from "../lib/liveSearchParams";
 import { HIDDEN_ISSUE_FIELDS } from "../lib/hiddenIssueFields";
@@ -47,6 +53,7 @@ import {
   FINDING_TYPE_LABELS,
   ISSUE_COLUMN_HELP,
   PRIORITY_HELP,
+  DEFAULT_REVIEW_LANES,
   REVIEW_LANES,
   REVIEW_LANE_HELP,
   isFindingType,
@@ -95,6 +102,7 @@ export default function IssuesRoute() {
   // Each filter is a comma-separated list of the values checked ("A,AA"),
   // kept to the values the group offers, in its order; "" is every row.
   const conformance = parseList(params.get("conformance"), CONFORMANCE_LEVELS);
+  // "" is the default view, not every row: see ``shownByDefault`` below.
   const lane = parseList(params.get("type"), REVIEW_LANES);
   const findingType = parseList(params.get("finding_type"), FINDING_TYPES);
   const q = params.get("q") ?? "";
@@ -166,10 +174,37 @@ export default function IssuesRoute() {
     );
   };
 
-  const rows = useMemo(
-    () => sortRows(issuesQuery.data?.rows ?? [], sort),
-    [issuesQuery.data, sort],
-  );
+  // The default view: with nothing chosen under "How sure", the table shows
+  // every issue type. From 2026-11-10 it held back Not sure and For
+  // information behind a "hidden" note; on 2026-11-13 the developer asked for
+  // all of them in the table instead. Nothing is held back, so the numbers
+  // above the table, the table and the exports agree.
+  //
+  // From 2026-11-13 to 2026-11-16 a note over the rows counted each "How
+  // sure" value, said what Not sure and For information mean, and had a
+  // "Show only Mostly sure and Measured" button. The developer removed it
+  // (2026-11-16): the button did what the Filter menu's How sure group
+  // already does, with the counts (W3C COGA, "Making Content Usable": no
+  // two controls for one job), and the sentences now open from the "?"
+  // beside the How sure header (``HowSureHelp``). The tradeoff, told to the
+  // developer before building it: "A person must check a Not sure issue
+  // type before you report it" is no longer on screen until someone opens
+  // the "?" or "What the labels mean" under the table, so a Not sure row can
+  // be read as a confirmed problem by someone who opens neither (AGENTS.md,
+  // Interface language rule 4). What still says it: the tag's own words
+  // ("Not sure"), the "?", and the glossary under the table.
+  //
+  // Kept from before: the Filter menu opens with nothing checked, its rule
+  // being "nothing checked is all" (FilterMenu.tsx), and its How sure group
+  // says in words what nothing checked shows (``hint``).
+  const shownByDefault = !lane;
+  const rows = useMemo(() => {
+    const all = issuesQuery.data?.rows ?? [];
+    const visible = shownByDefault
+      ? all.filter((row) => (DEFAULT_REVIEW_LANES as readonly ReviewLane[]).includes(row.review_lane))
+      : all;
+    return sortRows(visible, sort);
+  }, [issuesQuery.data, sort, shownByDefault]);
   // The pager sits in the bar over the table, so the rows are paged here,
   // before the table is drawn, and the bar shows even when no row matches.
   // A new filter, search or sort starts over at page 1; the key is built
@@ -194,7 +229,6 @@ export default function IssuesRoute() {
 
   const scan = scanQuery.data;
   const data = issuesQuery.data;
-  const isComplete = scan.status === "completed";
   const summaryRows = hasFilter ? summaryQuery.data?.rows : data.rows;
   const onSort = (next: SortState) => setParam("sort", serializeSort(next));
   const exportMenu = (
@@ -203,7 +237,8 @@ export default function IssuesRoute() {
       site={siteLabel(scan.seed_url)}
       pageCount={scan.page_count}
       issueGroups={data.total_unfiltered}
-      shownIssueGroups={hasFilter ? rows.length : undefined}
+      // Also when only the default view holds rows back: the export has them.
+      shownIssueGroups={rows.length < data.total_unfiltered ? rows.length : undefined}
     />
   );
   // The button that was pressed goes away with the column sort, so focus
@@ -212,6 +247,9 @@ export default function IssuesRoute() {
     onSort(null);
     region.current?.focus();
   };
+  // ``default_view_counts`` is absent from a response cached before the
+  // field existed; the totals then stand in until the next fetch.
+  const defaultCounts = data.default_view_counts;
 
   return (
     <>
@@ -233,13 +271,11 @@ export default function IssuesRoute() {
         actions={exportMenu}
       />
 
-      {isComplete && (
-        <ReportSummary
-          scan={scan}
-          issueGroups={data.total_unfiltered}
-          occurrences={data.occurrence_counts.all_evidence}
-        />
-      )}
+      <ReportSummary
+        scan={scan}
+        issueGroups={defaultCounts?.issue_types ?? data.total_unfiltered}
+        occurrences={defaultCounts?.occurrences ?? data.occurrence_counts.all_evidence}
+      />
 
       {/* Filtering changed the table silently: the visible count updated,
           but nothing announced it, so a screen-reader user typing in the
@@ -260,100 +296,107 @@ export default function IssuesRoute() {
       {/* No ``overflow-hidden``: it would clip the Filter menu's panel on a
           short, filtered table. The table scrolls in its own region. */}
       <Card>
-        <IssueToolbar
-          conformanceCounts={data.conformance_counts}
-          laneCounts={data.review_lane_counts}
-          findingTypeCounts={data.finding_type_counts}
-          q={q}
-          conformance={conformance}
-          lane={lane}
-          findingType={findingType}
-          onParam={setParam}
-          onResetFilters={resetFilters}
-          onClearFilters={() => setParams(new URLSearchParams(), { replace: true })}
-          pager={<TablePagination label="Issues" noun="issue types" {...paged} />}
-        />
-        {/* Only for exactly one finding type: the link names one view. */}
-        {isFindingType(findingType) && (
-          <FindingTypeViewLink scanId={scan.id} findingType={findingType} imageCount={scan.finding_count} />
-        )}
-        {/* WAI-ARIA sortable table: the line over it says what the order is,
-            with the filtered count and the way back to the recommended order
-            beside it.
+        <PagedTable
+          pagination={{ label: "Issues", noun: "issue types", ...paged }}
+          top={(pager) => (
+            <IssueToolbar
+              conformanceCounts={data.conformance_counts}
+              laneCounts={data.review_lane_counts}
+              findingTypeCounts={data.finding_type_counts}
+              q={q}
+              conformance={conformance}
+              lane={lane}
+              findingType={findingType}
+              onParam={setParam}
+              onResetFilters={resetFilters}
+              onClearFilters={() => setParams(new URLSearchParams(), { replace: true })}
+              pager={pager}
+            />
+          )}
+        >
+          {/* Only for exactly one finding type: the link names one view. */}
+          {isFindingType(findingType) && (
+            <FindingTypeViewLink scanId={scan.id} findingType={findingType} imageCount={scan.finding_count} />
+          )}
+          {/* WAI-ARIA sortable table: the line over it says what the order is,
+              with the filtered count and the way back to the recommended order
+              beside it.
 
-            Shown only when the table is sorted by a column or filtered
-            (2026-11-02), and never with the sentence "Recommended order:
-            Mostly sure, then Not sure, then For information.", which the
-            developer asked to remove: the How sure column already shows
-            that grouping, top to bottom. Removing
-            the line in every state was the request, and was set aside here
-            because the line then holds the only way back to the recommended
-            order (a sorted header only flips between its two directions),
-            and the count of what a filter left (W3C COGA, "Making Content
-            Usable": do not take away the way back).
+              Shown only when the table is sorted by a column or filtered
+              (2026-11-02), and never with the sentence "Recommended order:
+              Mostly sure, then Not sure, then For information.", which the
+              developer asked to remove: the How sure column already shows
+              that grouping, top to bottom. Removing
+              the line in every state was the request, and was set aside here
+              because the line then holds the only way back to the recommended
+              order (a sorted header only flips between its two directions),
+              and the count of what a filter left (W3C COGA, "Making Content
+              Usable": do not take away the way back).
 
-            The order is still said to a screen reader on every change, by
-            the live region under this comment, which stays on the page
-            whether or not the line shows; the line itself is not a live
-            region (`announce={false}`), so nothing is read twice (SC 4.1.3
-            Status Messages, Level AA). The table's caption says the order
-            too. */}
-        <p role="status" className="sr-only">
-          {describeSort(sort)}.
-        </p>
-        {(sort || hasFilter) && (
-          <TableStatus
-            announce={false}
-            actions={
-              <>
-                {hasFilter && (
-                  <span className="tabular-nums">
-                    {rows.length.toLocaleString()} of {data.total_unfiltered.toLocaleString()} shown
-                  </span>
-                )}
-                {sort && (
-                  // eslint-disable-next-line react/forbid-elements -- Convert: a text-link styled button; needs a link variant on Button
-                  <button
-                    type="button"
-                    onClick={recommend}
-                    className="min-h-target rounded-xs px-1 font-semibold text-umich-blue underline underline-offset-2 hover:text-umich-blue-600 focus-visible:outline-none focus-visible:shadow-focus"
-                  >
-                    Back to recommended order
-                  </button>
-                )}
-              </>
-            }
-          >
-            {/* The sentence "Recommended order: …" is never shown, only
-                spoken (see above): with a filter on and the default order,
-                the line holds the count alone. */}
-            {sort && `${describeSort(sort)}.`}
-          </TableStatus>
-        )}
-        {rows.length === 0 ? (
-          <TableEmpty>
-            {hasFilter
-              ? "No issues match these filters. Clear a filter to see more results."
-              : "Axcess found no issues. That does not mean the site meets WCAG, because some checks may not have run. See “What was checked”, below this table."}
-          </TableEmpty>
-        ) : (
-          <IssueTable
-            scanId={scan.id}
-            paged={paged}
-            here={here}
-            sort={sort}
-            onSort={onSort}
-            busy={issuesQuery.isFetching}
-            regionRef={region}
-          />
-        )}
+              The order is still said to a screen reader on every change, by
+              the live region under this comment, which stays on the page
+              whether or not the line shows; the line itself is not a live
+              region (`announce={false}`), so nothing is read twice (SC 4.1.3
+              Status Messages, Level AA). The table's caption says the order
+              too. */}
+          <p role="status" className="sr-only">
+            {describeSort(sort)}.
+          </p>
+          {(sort || hasFilter) && (
+            <TableStatus
+              announce={false}
+              actions={
+                <>
+                  {hasFilter && (
+                    <span className="tabular-nums">
+                      {rows.length.toLocaleString()} of {data.total_unfiltered.toLocaleString()} shown
+                    </span>
+                  )}
+                  {sort && (
+                    // eslint-disable-next-line react/forbid-elements -- Convert: a text-link styled button; needs a link variant on Button
+                    <button
+                      type="button"
+                      onClick={recommend}
+                      className="min-h-target rounded-xs px-1 font-semibold text-umich-blue underline underline-offset-2 hover:text-umich-blue-600 focus-visible:outline-none focus-visible:shadow-focus"
+                    >
+                      Back to recommended order
+                    </button>
+                  )}
+                </>
+              }
+            >
+              {/* The sentence "Recommended order: …" is never shown, only
+                  spoken (see above): with a filter on and the default order,
+                  the line holds the count alone. */}
+              {sort && `${describeSort(sort)}.`}
+            </TableStatus>
+          )}
+          {rows.length === 0 ? (
+            <TableEmpty>
+              {hasFilter
+                ? "No issues match these filters. Clear a filter to see more results."
+                : "Axcess found no issues. That does not mean the site meets WCAG, because some checks may not have run. See “What was checked”, below this table."}
+            </TableEmpty>
+          ) : (
+            <IssueTable
+              scanId={scan.id}
+              paged={paged}
+              here={here}
+              sort={sort}
+              onSort={onSort}
+              busy={issuesQuery.isFetching}
+              regionRef={region}
+            />
+          )}
+        </PagedTable>
       </Card>
 
       {/* Under the table since user testing (2026-10-28): the table follows
           the numbers with nothing to step over. Why, and what keeps the
           limit in view, is on ReportCoverageNote. */}
       <ReportNotes className="mt-8">
-        {isComplete && <ReportCoverageNote scan={scan} rows={summaryRows} />}
+        <ReportCoverageNote scan={scan} rows={summaryRows} />
+        <ReportScanNote scan={scan} />
         <IssueGlossary />
       </ReportNotes>
 
@@ -419,6 +462,10 @@ function IssueToolbar({
       label: COLUMN_LABEL.Type,
       value: lane,
       multiple: true,
+      // What nothing checked means in this one group (see ``shownByDefault``
+      // in the route). In words, in the group itself, so the menu and the
+      // table never disagree silently.
+      hint: "With nothing checked, the table shows every issue type.",
       options: [
         ...REVIEW_LANES.map((key) => ({
           value: key,
@@ -622,7 +669,7 @@ function describeSort(sort: SortState): string {
   return `Sorted by ${COLUMN_LABEL[sort.column]}, ${sortWords(SORT_KINDS[sort.column], sort.direction)}`;
 }
 
-const LANE_RANK: Record<ReviewLane, number> = { likely_barrier: 0, expert_review: 1, informational: 2 };
+const LANE_RANK: Record<ReviewLane, number> = { likely_barrier: 0, measured: 1, expert_review: 2, informational: 3 };
 
 /**
  * Finding types in table order, the first type leading: a WCAG row, then a
@@ -789,8 +836,17 @@ function IssueTable({
                 kind={SORT_KINDS[column]}
                 sort={sort}
                 onSort={onSort}
-                className={cn("px-1.5", column === "Issue" && "sticky left-0 z-[1] bg-surface-muted")}
+                className={cn(
+                  "px-1.5",
+                  column === "Issue" && "sticky left-0 z-[1] bg-surface-muted",
+                  // "How sure ⇅ ?" on one line. Wrapped, the label's box kept
+                  // the column's full width, so "sure ⇅" sat centred in it
+                  // with a wide gap before the "?" (the developer's
+                  // screenshots, 2026-11-16).
+                  column === "Type" && "whitespace-nowrap",
+                )}
                 hint={columnHint(column)}
+                help={column === "Type" ? <HowSureHelp /> : undefined}
               >
                 {column === "WCAG" ? (
                   <>
@@ -891,11 +947,28 @@ const IssueTableRow = memo(function IssueTableRow({
       <Cell className={cell}>{CHECK_LABEL[row.pipeline] ?? row.pipeline}</Cell>
       <Cell className={cn(cell, "whitespace-nowrap")}>
         {row.wcag_sc ? (
-          <span className="inline-flex items-center gap-1.5">
-            <span className="tabular-nums">{row.wcag_sc}</span>
-            <ConformanceBadge level={row.conformance} />
-            {row.wcag_name && <span className="sr-only">{row.wcag_name}</span>}
-          </span>
+          <>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="tabular-nums">{row.wcag_sc}</span>
+              <ConformanceBadge level={row.conformance} />
+              {row.wcag_name && <span className="sr-only">{row.wcag_name}</span>}
+            </span>
+            {/* The rule's other criteria under the first, numbers on screen
+                and names for a screen reader, as the first criterion's
+                name is. Why "also": alsoWcagText in lib/labels.ts. */}
+            {row.also_wcag.length > 0 && (
+              <span className="mt-0.5 block text-xs tabular-nums text-fg-muted">
+                also{" "}
+                {row.also_wcag.map((ref, index) => (
+                  <Fragment key={ref.sc}>
+                    {index > 0 && ", "}
+                    {ref.sc}
+                    {ref.name && <span className="sr-only"> {ref.name}</span>}
+                  </Fragment>
+                ))}
+              </span>
+            )}
+          </>
         ) : (
           <span className="text-fg-muted">Best practice</span>
         )}
@@ -921,6 +994,51 @@ const IssueTableRow = memo(function IssueTableRow({
     </Row>
   );
 });
+
+/**
+ * The "?" beside the How sure header: what the column says and what each of
+ * its four values means, the glossary's own words (REVIEW_LANE_HELP), so
+ * the two never disagree (W3C COGA, "Making Content Usable": the same words
+ * for the same thing).
+ *
+ * In the header, the one place every row's value is explained from (the
+ * developer's choice, 2026-11-16). Rejected: a "?" on each row's tag, one
+ * more Tab stop per row for the same four sentences; and a "?" in the note
+ * over the rows, which the developer removed.
+ *
+ * Known cost: the button's words sit inside the header cell, so a screen
+ * reader that names the column for each cell may read "How sure, What does
+ * How sure mean?" there. Kept short for that reason.
+ */
+function HowSureHelp() {
+  return (
+    <HelpTip
+      question={`What does \u201c${COLUMN_LABEL.Type}\u201d mean`}
+      // The icon sits on the label's line, as the sort button's words sit at
+      // the foot of their target (SortHeader, wrap="words"); centred in its
+      // target it floated above the words (the developer's screenshots,
+      // 2026-11-16). 28px wide: the icon then has the same space on its
+      // right as "How sure" has on its left, so the header reads as one
+      // centred group. Allowed because "What the labels mean" under the
+      // table (IssueGlossary) is a 44px control with the same explanation
+      // (HelpTip, ``equivalent``).
+      equivalent="report-labels-button"
+      className="items-end pb-[0.3125rem]"
+    >
+      <p className="mb-2 font-semibold">How sure Axcess is that an issue type is a real problem.</p>
+      <dl className="space-y-2">
+        {REVIEW_LANES.map((key) => (
+          <div key={key}>
+            <dt>
+              <LaneTag lane={key} hint={false} />
+            </dt>
+            <dd className="mt-0.5 text-fg-muted">{REVIEW_LANE_HELP[key]}</dd>
+          </div>
+        ))}
+      </dl>
+    </HelpTip>
+  );
+}
 
 /**
  * A row's type as the table shows it; the glossary reuses it so the two match.
@@ -1030,8 +1148,8 @@ function IssueGlossary() {
             help: FINDING_TYPE_HELP[key],
           }))}
         />
-        {/* The bands' limits, such as a critical problem on one page showing
-            as Low, in words everyone can reach, not only in a hover hint. */}
+        {/* The bands' meaning, such as Not sure never being High, in words
+            everyone can reach, not only in a hover hint. */}
         <GlossaryList
           heading={`${COLUMN_LABEL.Priority}: which issue types to look at first`}
           items={(["High", "Medium", "Low"] as const).map((key) => ({
@@ -1123,7 +1241,7 @@ function columnHint(column: SortColumn): string | undefined {
   return label in ISSUE_COLUMN_HELP ? ISSUE_COLUMN_HELP[label as keyof typeof ISSUE_COLUMN_HELP] : undefined;
 }
 
-/** A plain-English band for the priority score (severity × log1p(pages)). */
+/** A plain-English band for the priority score (``_priority`` in src/audit/web/issues.py). */
 function priorityTier(priority: number): "High" | "Medium" | "Low" {
   if (priority >= 6) return "High";
   if (priority >= 3) return "Medium";

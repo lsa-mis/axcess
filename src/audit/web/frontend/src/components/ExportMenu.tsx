@@ -10,6 +10,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle, Check, ChevronDown, Copy, Download, Loader2 } from "lucide-react";
 import { ApiError, api, exportUrl } from "../api/client";
+import { copyText } from "../lib/clipboard";
 import type { ExportFormat } from "../api/types";
 import { cn } from "../lib/cn";
 import {
@@ -61,6 +62,31 @@ import { Button, Checkbox } from "./ui";
  * a refused or failed export saved the error as the file, or nothing, with
  * no word on the page. The link's `href` stays the real export URL, so a
  * modified click (a new tab, copying the link) still does what it asks.
+ *
+ * The ITS technical review is its own file in the list, not a setting on
+ * the issue list workbook. It is a different document: the University of
+ * Michigan ITS Accessibility Team's own template, filled in with only the
+ * elements a person checked and reported in the page inspector, one row
+ * each. Its hint says so, since a reader expecting every issue would
+ * otherwise take a short or empty sheet for a broken export (repo rule:
+ * never drop a limitation to make text shorter). A setting would add a second step to one
+ * of the two files and hide the other behind it; a row keeps one choice
+ * per file, the same as every other download here. It sits directly
+ * under the other Excel file so the two spreadsheets are grouped, and it
+ * shares that file's XLSX badge because the badge names the file type
+ * (W3C COGA "Making Content Usable", paraphrased: group related content
+ * and use the same sign for the same thing,
+ * https://www.w3.org/TR/coga-usable/; SC 3.2.4 Consistent
+ * Identification, Level AA). The hint spells out "ITS" (SC 3.1.4
+ * Abbreviations, Level AAA).
+ *
+ * Each row is top-aligned: the badge, the name and the size start on the
+ * first line, whatever the height of the hint under the name. Centred, a
+ * row whose hint wraps to several lines (the ITS one) floated its badge
+ * beside the middle of the hint, away from the name it labels, and the
+ * badges no longer lined up from row to row (W3C COGA "Making Content
+ * Usable", paraphrased: keep related things together, and a consistent
+ * layout, https://www.w3.org/TR/coga-usable/).
  *
  * **Remove private details (redact).** A report of a site behind a sign-in
  * can hold a person's own data (a filled-in field, an email address in a
@@ -129,6 +155,9 @@ const FORMAT_BADGES: {
   tone: string;
 }[] = [
   { format: "xlsx", badge: "XLSX", tone: "bg-umich-blue/10 text-umich-blue" },
+  // Directly under the other Excel file, sharing its badge: see the
+  // component's comment on the ITS technical review.
+  { format: "its", badge: "XLSX", tone: "bg-umich-blue/10 text-umich-blue" },
   { format: "audit", badge: "MD", tone: "bg-sev-info-bg text-sev-info" },
   // The fix brief sits beside the written report, the other Markdown file,
   // so the two are compared where they are chosen. Its badge says what it is
@@ -181,8 +210,9 @@ export default function ExportMenu({
   site?: string;
   pageCount?: number;
   issueGroups?: number;
-  /** Issue types (rows) the table shows now; pass it only while a filter or a
-   *  search narrows the table. */
+  /** Issue types (rows) the table shows now; pass it only while the table
+   *  shows fewer than all of them (a filter, a search, or the default view
+   *  that holds back Not sure and For information). */
   shownIssueGroups?: number;
 }) {
   const [open, setOpen] = useState(false);
@@ -346,7 +376,12 @@ export default function ExportMenu({
         const blob = text.then((markdown) => new Blob([markdown], { type: "text/plain" }));
         await navigator.clipboard.write([new ClipboardItem({ "text/plain": blob })]);
       } else {
-        await navigator.clipboard.writeText(await text);
+        // No ClipboardItem, or no clipboard API at all (plain http on a
+        // network address): the shared helper falls back to the older copy
+        // method (lib/clipboard.ts). It runs after the fetch, so a browser
+        // that has let the click's permission lapse can still refuse; the
+        // message below then says to download the file.
+        if (!(await copyText(await text))) throw new Error("copy refused");
       }
       setCopyState({ kind: "done" });
       setAnnouncement(COPY_FIX_BRIEF_DONE);
@@ -384,11 +419,15 @@ export default function ExportMenu({
   ]
     .filter(Boolean)
     .join(" · ");
+  // The ITS technical review is the one file that does not hold every issue
+  // (its hint says what it holds), so the scope says so rather than claim
+  // "every issue" for all five.
   const scopeNote =
-    shownIssueGroups !== undefined && issueGroups !== undefined && shownIssueGroups < issueGroups
-    ? `Every file except the fix brief includes all ${plural(issueGroups, "issue type", "issue types")} ` +
-      `and every status, not only the ${shownIssueGroups.toLocaleString()} your filters show.`
-    : "Every file except the fix brief includes every issue type and every status in this report, even if the table has filters on.";
+    (shownIssueGroups !== undefined && issueGroups !== undefined && shownIssueGroups < issueGroups
+      ? `Every file except the fix brief and the ITS technical review includes all ${plural(issueGroups, "issue type", "issue types")} ` +
+        `and every status, not only the ${shownIssueGroups.toLocaleString()} your filters show.`
+      : "Every file except the fix brief and the ITS technical review includes every issue type and every status in this report, even if the table has filters on.") +
+    " The ITS technical review lists only the elements checked as a problem to report.";
 
   return (
     <div ref={containerRef} className="relative">
@@ -490,7 +529,7 @@ export default function ExportMenu({
                   // would otherwise strike through every line inside it.
                   data-button
                   className={cn(
-                    "flex min-h-target items-center gap-3 rounded-2xs px-2.5 py-2 no-underline hover:bg-surface-muted hover:no-underline",
+                    "flex min-h-target items-start gap-3 rounded-2xs px-2.5 py-2 no-underline hover:bg-surface-muted hover:no-underline",
                     state?.kind === "preparing" && "cursor-progress",
                   )}
                 >

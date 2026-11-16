@@ -1,14 +1,19 @@
 # Reading your Axcess report
 
-A report is one completed scan: the pages Axcess tested, what each check
-found, and the [evidence](glossary.md#evidence) behind each result. This guide
+A report is one completed scan, or a stopped or failed scan that saved at
+least one page: the pages Axcess tested, what each check
+found, and the [evidence](glossary.md#evidence) behind each result. Under
+**Pages visited**, the report says how many pages the scan found and how it
+ended, and **How this scan ran** lists its maximum pages and maximum link
+depth. A stopped scan's report covers the pages it visited, the same way a
+report with a page limit does. This guide
 explains every screen, column, and export, and what to do next. Terms link to
 the [Axcess glossary](glossary.md). A report is evidence for people to review;
 it never proves [WCAG](glossary.md#wcag) conformance or legal compliance.
 
 ## On this page
 
-- [The three report groups at a glance](#the-three-report-groups-at-a-glance)
+- [The report groups at a glance](#the-report-groups-at-a-glance)
 - [Find a problem and fix it (for developers)](#find-a-problem-and-fix-it-for-developers)
 - [The report summary](#the-report-summary)
 - [The Issues tab](#the-issues-tab)
@@ -21,19 +26,27 @@ it never proves [WCAG](glossary.md#wcag) conformance or legal compliance.
 - [Delete a report](#delete-a-report)
 - [What the report cannot tell you](#what-the-report-cannot-tell-you)
 
-## The three report groups at a glance
+## The report groups at a glance
 
-![Diagram of the three report groups in the How sure column. Mostly sure holds rule-engine failures from axe-core and Siteimprove Alfa, including problems found after clicking or after a configured search; confirm them on the page, fix, and rescan. Not sure holds browser checks, the keyboard trap check, motion checks, text in images whose alt text is missing or does not match, AI checks, and Alfa "cannot tell" results; a person tests and records a decision. For information holds images whose alt text already matches and older records kept for history; no action is needed.](images/diagrams/report-groups.png)
+![Diagram of the three report groups in the How sure column. Mostly sure holds rule-engine failures from axe-core and Siteimprove Alfa, including problems found after clicking or after a configured search, and clear form errors, where a field is marked in error with no text that says what is wrong; confirm them on the page, fix, and rescan. Not sure holds browser checks, the keyboard trap check, form errors that are unclear, motion checks, text in images whose alt text is missing or does not match, AI checks, and Alfa "cannot tell" results; a person tests and records a decision. For information holds images whose alt text already matches and older records kept for history; no action is needed.](images/diagrams/report-groups.png)
 
 Each [issue type](glossary.md#issue-type) lands in one report group,
-based on the check that found it and its result. Only rule-engine failures are
-marked Mostly sure; anything a person has to judge is marked Not sure. The app
+based on the check that found it and its result. Only rule-engine failures,
+the form error check's clear failures, and the page code check's facts (such as
+a field named only by its placeholder text) are marked Mostly sure. Most
+browser checks that measure the page with no AI are marked
+[Measured](glossary.md#measured); the glossary names the three that are not.
+Anything a model or a person has to judge is marked Not sure. The Issues table
+opens showing every issue type; a line over the table counts each kind, and
+**Show only Mostly sure and Measured** narrows it. (The diagram above predates
+Measured.) The app
 shows the report group in the Issues table's **How sure** column: how sure
 Axcess is that the issue type is a real problem.
 
 | Report group | What to do |
 | --- | --- |
 | [Mostly sure](glossary.md#mostly-sure) | Start here. Confirm it on the page, fix it, and rescan. |
+| [Measured](glossary.md#measured) | A browser check measured it with no AI. Check it on the page before you report it. |
 | [Not sure](glossary.md#not-sure) | Test it on the page and record a decision before anyone calls it a problem. |
 | [For information](glossary.md#for-information) | Nothing to fix. It shows you what was checked. |
 
@@ -46,9 +59,9 @@ On the **Issues** tab, select the name of a
 | You need | Where it is |
 | --- | --- |
 | The page URL | **Pages with this issue type** lists each page's title and URL. In the inspector, **Open live page** opens the page on the real site. |
-| The element locator and code | In the inspector, **Evidence from the scan**, under the page, lists the first three occurrences with their element locator (CSS selector) and element code (HTML). A page's **Page details**, linked from its screenshots view, lists every occurrence on that page, with **Element locator (CSS selector), for developers**. |
+| The element code | In the inspector, **Evidence from the scan**, under the page, lists the first three occurrences with their element code (HTML). A page's **Page details**, linked from its screenshots view, lists every occurrence on that page with its **Element code (HTML)**. The app does not show element locators (CSS selectors); the CSV, JSON and Excel exports still have them, in `target_selector`. |
 | An image with text in it | For an [image of text](glossary.md#image-of-text), the page's **Page details** lists the image under **Images on this page**, with **Open the image** (the image's address), any alt text, and the text read from it. Search your code or content system for that image address. |
-| A screenshot | The **Screenshots** column in **Pages with this issue type** links to a screenshot of each occurrence, when the scan took one. An outline marks where the occurrence was found. Rule check (Alfa) results have no screenshots, because Alfa runs in a separate browser. |
+| A screenshot | The **Screenshots** column in **Pages with this issue type** links to a screenshot of each occurrence, when the scan took one. An outline marks where the occurrence was found. For the [form error check](glossary.md#form-error-check), it shows the form twice, **Before** and **After** its button was pressed. If the scan let it send empty forms, **After** shows the page the site sent back. Rule check (Alfa) results have no screenshots, because Alfa runs in a separate browser. |
 | The page inspector | Select a page title in **Pages with this issue type**. The inspector opens the page's **Saved copy** (or the **Live page**, if the scan saved no copy) with scripts off, and red outlines mark the flagged elements. The arrow buttons beside the count, such as "Flagged element 2 of 5", step to the previous or next flagged element; the one you are on has a thicker blue outline on yellow. The **Page code (DOM)** tab shows the page code, with the same buttons. |
 
 **Issue guidance**, at the top right of the page for an issue type, opens
@@ -74,6 +87,44 @@ To reproduce a problem that appears only after a click:
    control in order and shows the page code the scan saved.
 3. On the live page, use each control in that order, then find the element by
    its element locator (CSS selector).
+
+### Record your review of an element
+
+Beside the element facts in the inspector, **Your review:** shows what you
+decided about the element the arrow buttons are on, as a badge such as **Not
+checked yet**, and the first two lines of its **Issue notes**. It is there when the inspector was opened for one issue (from **Pages
+with this issue**), on the **Saved copy** tab.
+
+1. Step to the element with the arrow buttons.
+2. Select **Review this element**.
+3. Under **Checked by a person**, choose **Checked: a problem to report**, or
+   **Checked: a repeat of one already reported** if it is the same problem as
+   one you already reported. **Not checked yet** takes a choice back.
+4. Write **Issue notes** for the vendor: where it is, what is wrong, and what
+   to fix. If the element has no saved notes, the box starts with notes
+   suggested from the scan, in the order the ITS team writes them: the page
+   state (After clicking “Menu”), the element's text and what it is, the
+   problem, and any specifics from the check (such as a contrast ratio and
+   its colors). Read and edit them before you save. Saved notes are never
+   replaced by a suggestion.
+5. Select **Save review**. The dialog closes and the panel says **Saved.**
+
+When the rest of the elements are repeats, such as the same menu again,
+report the first one, step through the others with the arrow buttons, then
+choose **Mark 9 elements not checked yet as repeats** (the number is how
+many). Every
+flagged element in the page state on screen with no review yet becomes
+**Checked: a repeat of one already reported**, in one press. Elements
+already checked, and every note, are left as they are. It is offered once
+an element of the issue has been reported, since a repeat is a repeat of
+one already reported. **Undo 9 repeats** then takes exactly those back to
+**Not checked yet**.
+
+The review covers every occurrence of the issue on that element, in the page
+state on screen. **Close without saving** (or Escape) keeps your choice and
+notes while you stay on the page, and **Your review:** then says **Not saved
+yet** beside the badge. Leaving the page or reloading it discards them. Any report can
+be reviewed, finished or not, except a protected report.
 
 ### If you have a ticket or a workbook row, not the app
 
@@ -108,8 +159,8 @@ column. Three numbers above the table count:
 
 | Number | What it counts |
 | --- | --- |
-| Issue types | Rows in the Issues table, across all three report groups. |
-| Issue occurrences | Every [occurrence](glossary.md#occurrence): one place a problem appears, such as one element on one page. It counts every report group, including Not sure and For information, so it is not a count of confirmed problems. |
+| Issue types | Every row the Issues table shows when it opens: all four report groups. |
+| Issue occurrences | Every [occurrence](glossary.md#occurrence): one place a problem appears, such as one element on one page. It counts the same rows as Issue types, in all four report groups. It is not a count of confirmed problems: a person still checks each one. |
 | Pages visited | Every page the scan recorded, including pages that answered with an error and most pages that failed to load. |
 
 Two lines under **Pages visited** say more about it:
@@ -122,6 +173,15 @@ Two lines under **Pages visited** say more about it:
   [pages not reached](glossary.md#pages-not-reached), and most of them are
   already counted in **Pages visited**.
 
+Under those lines, **List the pages visited** opens a table of every page the
+scan recorded. Pages that could not be loaded come first, then pages that
+answered with an error, such as "Page not found (HTTP 404)". Each row shows
+how the page loaded and how many occurrences, images and page states the
+checks stored for it, the same counts as that page's **Page details**. A page
+that could not be loaded reads "Not checked" in those columns, because no
+check ran on it. An element that repeats on many pages, such as a menu,
+counts on each page in this table, but only once in the Issues table.
+
 Below the numbers, two closed rows open more detail. **What was checked**
 shows how many checks ran, such as "7 of 9 checks ran". It opens a table with
 one row per check, such as Rule check (axe) and Click-Through, and the checks
@@ -129,12 +189,18 @@ that ran come first. **Status** is one of Not selected, Waiting, Checking, Ran,
 Partly ran, Did not run, or Not recorded, with a check mark for Ran and Partly
 ran. **Result** says what the check ran on and what it found. **About this
 check** says in one line each what the check does and its limit, and **More
-about this check** opens its card on the Axcess website. The focus and visual
-checks have no row here. The second row, **What "Mostly sure", "Not sure"
+about this check** opens its card on the Axcess website. The **Form error
+check** row also counts the forms it pressed, the forms it did not press
+(such as sign-in, payment or search forms, or a form a dialog covered), and
+the forms it could not judge
+because they tried to send themselves. The focus and visual checks have no
+row here. The second row, **What "Mostly sure", "Not sure"
 and the other labels mean**, explains the words in the **How sure** and **Where it shows**
 columns.
 
-The "could not be loaded" line says how many pages failed, not which ones. See
+The "could not be loaded" line says how many pages failed. **List the pages
+visited** shows which ones. The line also counts other failures while Axcess
+scanned a page, so its number can differ from the table's. See
 [pages not reached](glossary.md#pages-not-reached) for what the report does and
 does not list.
 
@@ -146,7 +212,7 @@ summary counts issue types, then occurrences. The table's columns, in order:
 | Column | What it shows |
 | --- | --- |
 | Issue type | Its name. Select it to open its page. |
-| How sure | The report group: Mostly sure, Not sure, or For information. |
+| How sure | The report group: Mostly sure, Measured, Not sure, or For information. |
 | Priority | High, Medium, or Low (see [priority](glossary.md#priority)); "Does not apply" for rows marked For information. |
 | Issue occurrences | How many [occurrences](glossary.md#occurrence) of this issue type the scan found: how many places it appears. |
 | Affected pages | How many pages have it. The issue type's page lists them. |
@@ -160,12 +226,17 @@ or Best practice), **How sure** (a report group), and **Where it shows**. When y
 one **Where it shows** value, a link to its detailed view appears above the table:
 **Rule check issues by WCAG criterion**, or **Images** for In an image.
 
-The table opens in the recommended order: Mostly sure, then Not sure, then
-For information, each by priority. Select a column header to sort by that
+The table opens showing every issue type. With nothing checked under **How
+sure**, all four report groups show, and a note over the table counts each
+one and says what Not sure and For information mean. When search, **Level**
+or **Where it shows** narrows the rows, the note says it shows every issue
+type that matches your filters. **Show only Mostly sure and Measured** in the
+note narrows the table to those two. The recommended order is Mostly sure,
+then Measured, then Not sure, then For information, each by priority. Select a column header to sort by that
 column, and **Back to recommended order** to return. As the filters change, a
 screen reader hears how many issue types show and how many of them are in
 each report group, such as "12 of 40 issue types shown, filtered: Mostly
-sure 3, Not sure 7, For information 2".
+sure 3, Measured 2, Not sure 5, For information 2".
 
 The name of each issue type opens [its page](#the-full-evidence-record).
 **Delete report**, at the end of the Issues page, is described under
@@ -175,8 +246,13 @@ The name of each issue type opens [its page](#the-full-evidence-record).
 
 The page for an issue type is its full evidence record. It leads with
 **Pages with this issue type**: page title (opens the inspector), Page URL,
-Occurrences, Screenshots, and Status. Its header names the WCAG criterion and the
-report group, in the same words as the Issues table's **How sure** column.
+Issue occurrences, Screenshots, Status, and **Checked by a person**: how
+many of the page's occurrences a person has checked in the inspector, as
+**Not checked yet**, **2 of 6 checked** or **All checked**. Both kinds of
+checked count (a problem to report, and a repeat). Sort by it to bring the
+pages not checked yet to the top. Its header names the WCAG criterion and
+the report group, in the same words as the Issues table's **How sure**
+column.
 
 **Issue guidance**, at the top right, opens a dialog with every section open:
 
@@ -203,6 +279,7 @@ problem visible at page load never gets this note.
 
 | Where | What it says |
 | --- | --- |
+| An issue page's **Issue occurrences** | Under the count, `1 at page load, 7 after clicking`. Shown only when something was found after clicking. |
 | A page's **Page details** | Groups `At page load (N occurrences)`, then `After clicking “Menu” (N occurrences)` |
 | Page inspector, **Page state** list | `At page load: N occurrences` and `After clicking “Menu” → “Settings”: N occurrences`. When every occurrence came after a click, At page load shows `Issue not here`. |
 | Workbook, **User action** column | `Open "Menu" on this page.` or `Load the page.` |
@@ -247,16 +324,17 @@ report group.
 ## Exports
 
 The **Export report** menu, at the top right of the Issues tab, offers the
-first four formats. The last two need the API (`/api/scans/{id}/export/jira`
+first five formats. The last two need the API (`/api/scans/{id}/export/jira`
 or `.../export/markdown`) or the command line (`audit export -f jira` or
 `-f markdown`).
 
 | Format | Best for | Main sheets or columns |
 | --- | --- | --- |
 | Issue types with fixes (Excel, `.xlsx`) | Assigning and tracking fixes | A summary, an index with one row per issue type, a tab for each issue type, and supporting sheets (listed below the table) |
+| ITS technical review (Excel, `.its.xlsx`) | Handing the report to the University of Michigan Information and Technology Services (ITS) Accessibility Team | The team's own Technical Review form, with only the elements checked as a problem to report (described below the table) |
 | Written report (Markdown, `.audit.md`) | A narrative report for stakeholders | Sections from an executive summary to the appendices (listed below the table) |
-| Occurrence list (CSV, `.csv`) | Filtering in a spreadsheet | One row per occurrence (per page for an image), 24 columns such as `severity`, `status`, `wcag_criterion`, `page_url`, `target_selector`, and `revealed_by` |
-| All report data (JSON, `.json`) | Scripts and other tools | `scan`, `findings` (image results), and `a11y_findings` (everything else) |
+| Occurrence list (CSV, `.csv`) | Filtering in a spreadsheet | One row per occurrence (per page for an image), 25 columns such as `severity`, `status`, `wcag_criterion`, `page_url`, `rule_id`, `target_selector`, `revealed_by`, and `axe_core_version` (the axe-core release behind an axe row, so you can compare it with another tool's report) |
+| All report data (JSON, `.json`) | Scripts and other tools | `scan` (with `axe_core_version`), `findings` (image results), and `a11y_findings` (everything else, each with its `rule_id`) |
 | Jira CSV (`.jira.csv`) | Importing tickets | Summary, Description, Priority, Issue Type, Labels, Component; one row per occurrence not marked Fixed, Accepted risk, or Not a problem (one row per image for an image of text) |
 | Markdown evidence inventory (`.md`) | A raw list of every result | Every result with its status, including Not sure results |
 
@@ -277,6 +355,40 @@ Instance.
 - Coverage & Method
 - Test Tracking
 - Manual Review Evidence
+
+### ITS technical review
+
+The ITS technical review is the ITS Accessibility Team's own form, kept
+exactly as the team wrote it: its sheets, formulas, lists, styles and
+reference tables are not changed. It lists only what a person reported: the
+elements reviewed in the page inspector as **Checked: a problem to report**
+(see [Record your review of an element](#record-your-review-of-an-element)).
+Elements not checked yet, and repeats of a problem already reported, are left
+out. Axcess fills in:
+
+| Sheet | What Axcess fills in |
+| --- | --- |
+| Coversheet | Scan date, site name and main web address, and the checks used. If an expert review records a purpose, it goes in Background. Tester(s), Login info and the other prompts are left for a person to answer. |
+| Test Plan | Each place a reported element is, one row each: a page, or a page state reached by clicking (such as "Home, after clicking “Menu”"). URL or location gives the clicks, then the web address. The Description column is left empty for you. These rows are the choices in the Test column. |
+| Summary | A short summary of the scan, in the Narrative Summary box. The form's own counts are left as they are. |
+| Findings Issues | One row for each reported element. Issue notes are the notes you saved in Axcess, as written; an element saved without notes gets the issue's name. Test is the page or page state it is in. An issue's rows sit together. Category, Criterion, Impact and "Most affects" use the team's own wording. |
+| Reference, Reference Impact | Nothing. They stay as the team wrote them. |
+
+If nothing has been reported yet, Findings Issues is empty and the summary
+says how to report elements.
+
+The form has room for 48 rows. If more elements are reported, Axcess still
+lists them all, but the rows after row 49 have no drop-down lists or formatting, and the
+Summary counts leave them out. The summary text says when this happens.
+In Excel, the Summary's percentages show `#NAME?`, because the form uses a
+Google Sheets function (`DIVIDE`). They work in Google Sheets.
+
+Severity is a first estimate. Axcess turns each issue's automated impact into
+the form's scale: Critical becomes 4 Critical, Serious becomes 3 Major, and
+Moderate or Minor becomes 2 Minor. An issue with no WCAG criterion becomes
+1 Best practice. Nothing is marked 5 Blocker, because that depends on which
+tasks matter most on the site, and only a person can judge that. Check each
+issue and its severity before you share the form.
 
 Written report sections:
 
@@ -313,8 +425,8 @@ Notes on the exports:
 ### Draft labels
 
 Export menu downloads are labeled a [draft](glossary.md#draft-export) until
-the report's expert review is complete and every Mostly sure and Not sure
-occurrence has a status other than New or Reviewing. A draft has `_DRAFT` in
+the report's expert review is complete and every Mostly sure, Measured and
+Not sure occurrence has a status other than New or Reviewing. A draft has `_DRAFT` in
 its file name and a notice inside, such as a "DRAFT NOTICE" sheet or an
 "Axcess export state" CSV column. The app has no screen for completing the
 review yet, so for now every download from the **Export report** menu is a
@@ -328,7 +440,7 @@ side, each in its own panel. There are two ways to open it:
 
 - From a report, choose the **Compare reports** tab. The report opens in the
   first panel. The second panel is empty and lists the site's other
-  completed reports, newest first. Choose one to show it there.
+  reports, newest first. Choose one to show it there.
 - On **Reports**, open a site and choose **Compare with** on one of its
   scans, then the report to compare it with. Both panels open at once.
 
@@ -354,7 +466,7 @@ each [issue type](glossary.md#issue-type), not each occurrence, as one of these:
 | No longer found | Found in the earlier report but not found again in this one. That is not proof of a fix. Check the page yourself before you mark its occurrences Fixed. |
 | Still found | Found in both reports. Its number of occurrences can still go up or down. |
 
-What changed opens with **Trend over time**, which plots every completed scan of
+What changed opens with **Trend over time**, which plots every report of
 the site. Select a point in the trend, or use **Show as data table**, to open
 that scan's issues or compare it with this report. Below it are the three
 numbers; each is also a filter for the table under them. The table has one
@@ -374,14 +486,16 @@ A long list is normal for a first scan, and nobody clears it in one sitting.
 Progress Over Perfection: each barrier you fix helps someone use the site today.
 
 1. **Mostly sure first.** They top the Issues table; confirm each one, then fix
-   it. [Priority](glossary.md#priority) favors spread, so also check the
-   workbook's Severity column for a severe problem on a single page.
-2. **Then Not sure.** Check each one on the page and record a decision.
-3. **Batch shared fixes.** Axcess groups by check, not by
+   it, starting with High [priority](glossary.md#priority). Priority starts
+   from the impact rating, so a critical problem on a single page is High.
+2. **Then Measured.** A browser check measured these with no AI. Check each
+   one on the page and record a decision.
+3. **Then Not sure.** Check each one on the page and record a decision.
+4. **Batch shared fixes.** Axcess groups by check, not by
    [root cause](glossary.md#root-cause), so look for one template or component
    behind an issue type on many pages, and route the fix to whoever owns
    it.
-4. **Rescan** and check your work in **Compare reports** and **What changed**.
+5. **Rescan** and check your work in **Compare reports** and **What changed**.
 
 ## Delete a report
 
@@ -406,5 +520,8 @@ running scan: cancel it first.
   appear. Click-Through cannot reach hover-only content, gestures,
   operating-system menus, closed shadow DOM, cross-origin embeds, or page
   states with no change to the page code (DOM).
-- **What axe-core could not decide.** Axcess keeps only axe-core's
-  violations, not the results it marks as incomplete.
+- **What axe-core could not decide.** axe-core marks some results "needs
+  review", such as text over a background image. Axcess lists them as Not
+  sure issue types ending ", a person must decide". They are not failures, and
+  the scan's count of axe failures leaves them out. Scans made before this
+  change do not have them.

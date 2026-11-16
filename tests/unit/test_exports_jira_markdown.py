@@ -209,3 +209,33 @@ def test_markdown_for_empty_scan_does_not_crash(tmp_db: sqlite3.Connection) -> N
     assert "No image-analysis evidence was retained" in md
     assert "not a pass or conformance conclusion" in md
     assert "_No findings._" in md
+
+
+def test_every_check_the_schema_allows_has_a_label_in_each_export() -> None:
+    """A new check gets a name in the exports, not its raw pipeline value.
+
+    The form error check (pipeline ``forms``) printed "forms" in the
+    Markdown and Jira exports until it had a label. The allowed pipelines are
+    read from the newest migration that lists them, so a check added later
+    fails here until each export names it.
+    """
+    import re
+    from pathlib import Path
+
+    from audit.exports import jira_export, markdown_report
+
+    migrations = Path(__file__).parents[2] / "src" / "audit" / "db" / "migrations"
+    listing = [
+        path
+        for path in sorted(migrations.glob("*.sql"))
+        if not path.name.endswith(".rollback.sql") and "CHECK (pipeline IN" in path.read_text()
+    ][-1]
+    allowed = set(
+        re.findall(
+            r"'([a-z_]+)'", listing.read_text().split("CHECK (pipeline IN", 1)[1].split(")", 1)[0]
+        )
+    )
+    assert "forms" in allowed, (listing.name, allowed)
+    for module in (jira_export, markdown_report):
+        missing = allowed - set(module._SOURCE_LABELS)
+        assert not missing, (module.__name__, missing)

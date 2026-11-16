@@ -461,6 +461,137 @@ def test_local_login_scan_starts_from_same_loopback_origin(
     assert config.capture_screenshots is True
 
 
+def _sign_in_config(
+    seeded_db: tuple[Path, Path, int],
+    monkeypatch: pytest.MonkeyPatch,
+    extra: dict[str, object],
+) -> tuple[object, dict[str, object]]:
+    """The crawl config a sign-in scan starts with, and the sign-in browser's
+    arguments, for a request with ``extra`` settings."""
+    from audit.web import server
+
+    db_path, blob_dir, _ = seeded_db
+    captured: dict[str, object] = {}
+
+    async def _no_browser_run(
+        _db_path: object, _blob_dir: object, config: object, _run: object
+    ) -> None:
+        captured["config"] = config
+
+    FakeSignInSession.instances.clear()
+    monkeypatch.setattr(server, "_run_local_login_background", _no_browser_run)
+    monkeypatch.setattr(server, "ManualAuthenticationSession", FakeSignInSession)
+    app = server.create_app(db_path=db_path, blob_dir=blob_dir)
+    with TestClient(
+        app, base_url="http://127.0.0.1:8765", client=("127.0.0.1", 45678)
+    ) as local_client:
+        response = local_client.post(
+            "/api/local-login-scans",
+            headers={"origin": "http://127.0.0.1:8765"},
+            json={
+                "seed_url": "https://app.example.test/secure/",
+                "authorization_acknowledged": True,
+                **extra,
+            },
+        )
+        assert response.status_code == 201, response.text
+        sign_in_id = response.json()["sign_in_id"]
+        assert wait_for_sign_in(local_client, sign_in_id)["status"] == "awaiting_authentication"
+        started = start_sign_in_scan(local_client, sign_in_id)
+        assert started.status_code == 201, started.text
+    return captured["config"], FakeSignInSession.instances[-1].kwargs
+
+
+def test_a_sign_in_scan_keeps_its_defaults_when_nothing_new_is_sent(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An older client that sends none of the settings added on 2026-11-16
+    gets what a sign-in scan always did."""
+    from audit.config import get_settings
+
+    config, browser = _sign_in_config(seeded_db, monkeypatch, {})
+    assert config.max_pages == 10_000  # type: ignore[attr-defined]
+    assert config.allow_subdomains is False  # type: ignore[attr-defined]
+    assert config.ignore_robots is True  # type: ignore[attr-defined]
+    assert config.browser_only is True and config.js_eager is True  # type: ignore[attr-defined]
+    assert config.focus_checks_enabled is True  # type: ignore[attr-defined]
+    assert config.markup_checks_enabled is True  # type: ignore[attr-defined]
+    assert config.semantic_enabled is False  # type: ignore[attr-defined]
+    assert config.visual_checks_enabled is False  # type: ignore[attr-defined]
+    assert config.form_error_checks_enabled is False  # type: ignore[attr-defined]
+    assert config.form_send_empty_forms is False  # type: ignore[attr-defined]
+    assert config.user_agent == get_settings().user_agent  # type: ignore[attr-defined]
+    assert browser["user_agent"] == get_settings().user_agent
+
+
+def test_a_sign_in_scan_takes_every_setting_the_public_form_has(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The settings the sign-in form offers since 2026-11-16 reach the crawl,
+    and the chosen browser name reaches the sign-in window too."""
+    from audit.config import get_settings
+
+    chrome = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36"
+    )
+    config, browser = _sign_in_config(
+        seeded_db,
+        monkeypatch,
+        {
+            "all_pages": True,
+            "include_subdomain": True,
+            "ignore_robots": False,
+            "static_only": True,
+            "skip_focus": True,
+            "skip_markup": True,
+            "skip_visual": False,
+            "skip_forms": False,
+            "send_empty_forms": True,
+            "user_agent_choice": "chrome_windows",
+            "user_agent": chrome,
+        },
+    )
+    assert config.max_pages is None  # type: ignore[attr-defined]
+    assert config.allow_subdomains is True  # type: ignore[attr-defined]
+    assert config.ignore_robots is False  # type: ignore[attr-defined]
+    # Without scripts, through the signed-in browser's request client.
+    assert config.js_eager is False and config.browser_only is False  # type: ignore[attr-defined]
+    assert config.focus_checks_enabled is False  # type: ignore[attr-defined]
+    assert config.markup_checks_enabled is False  # type: ignore[attr-defined]
+    assert config.visual_checks_enabled is True  # type: ignore[attr-defined]
+    assert config.form_error_checks_enabled is True  # type: ignore[attr-defined]
+    assert config.form_send_empty_forms is True  # type: ignore[attr-defined]
+    assert config.user_agent == chrome  # type: ignore[attr-defined]
+    assert config.robots_user_agent == get_settings().user_agent  # type: ignore[attr-defined]
+    # One name while signing in and while scanning.
+    assert browser["user_agent"] == chrome
+
+
+def test_a_sign_in_scan_refuses_a_browser_name_it_cannot_send(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from audit.web import server
+
+    db_path, blob_dir, _ = seeded_db
+    monkeypatch.setattr(server, "ManualAuthenticationSession", FakeSignInSession)
+    app = server.create_app(db_path=db_path, blob_dir=blob_dir)
+    with TestClient(
+        app, base_url="http://127.0.0.1:8765", client=("127.0.0.1", 45678)
+    ) as local_client:
+        response = local_client.post(
+            "/api/local-login-scans",
+            headers={"origin": "http://127.0.0.1:8765"},
+            json={
+                "seed_url": "https://app.example.test/secure/",
+                "authorization_acknowledged": True,
+                "user_agent_choice": "custom",
+                "user_agent": "two\nlines",
+            },
+        )
+    assert response.status_code == 422, response.text
+
+
 def test_local_login_screenshots_follow_the_rendered_storage_opt_out(
     seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -509,13 +640,13 @@ def test_local_login_screenshots_follow_the_rendered_storage_opt_out(
     assert config.capture_screenshots is False
 
 
-def test_local_login_scan_rejects_more_than_four_workers(client: TestClient) -> None:
+def test_local_login_scan_rejects_more_than_eight_workers(client: TestClient) -> None:
     response = client.post(
         "/api/local-login-scans",
         json={
             "seed_url": "https://app.example.test/secure/",
             "authorization_acknowledged": True,
-            "workers": 5,
+            "workers": 9,
         },
     )
 
@@ -1464,7 +1595,25 @@ def test_export_xlsx_route(client: TestClient, seeded_db: tuple[object, object, 
     assert load_workbook(BytesIO(resp.content)).sheetnames[0] == "Summary"
 
 
-@pytest.mark.parametrize("fmt", ("csv", "json", "jira", "markdown", "audit", "xlsx"))
+def test_export_its_route(client: TestClient, seeded_db: tuple[object, object, int]) -> None:
+    """The ITS technical review downloads as the team's own template, filled in."""
+    db_path, _, scan_id = seeded_db
+    _complete_evaluation(client, db_path, scan_id)
+    resp = client.get(f"/api/scans/{scan_id}/export/its")
+    assert resp.status_code == 200
+    assert "spreadsheetml.sheet" in resp.headers["content-type"]
+    assert f'filename="scan_{scan_id}.its.xlsx"' in resp.headers["content-disposition"]
+    assert load_workbook(BytesIO(resp.content)).sheetnames == [
+        "Coversheet",
+        "Test Plan",
+        "Summary",
+        "Findings Issues",
+        "Reference",
+        "Reference Impact",
+    ]
+
+
+@pytest.mark.parametrize("fmt", ("csv", "json", "jira", "markdown", "audit", "xlsx", "its"))
 def test_incomplete_evaluation_export_requires_explicit_draft_acknowledgement(
     client: TestClient,
     seeded_db: tuple[object, object, int],
@@ -1479,7 +1628,7 @@ def test_incomplete_evaluation_export_requires_explicit_draft_acknowledgement(
     assert "draft=acknowledged" in response.json()["detail"]
 
 
-@pytest.mark.parametrize("fmt", ("csv", "json", "jira", "markdown", "audit", "xlsx"))
+@pytest.mark.parametrize("fmt", ("csv", "json", "jira", "markdown", "audit", "xlsx", "its"))
 def test_acknowledged_draft_export_uses_draft_filename_and_visible_label(
     client: TestClient,
     seeded_db: tuple[object, object, int],
@@ -1503,7 +1652,7 @@ def test_acknowledged_draft_export_uses_draft_filename_and_visible_label(
         assert notice["draft"] is True
         assert notice["evaluation_status"] == "draft"
         assert notice["label"] == "DRAFT, INCOMPLETE ACCESSIBILITY EVALUATION"
-    elif fmt == "xlsx":
+    elif fmt in {"xlsx", "its"}:
         workbook = load_workbook(BytesIO(response.content))
         assert workbook.sheetnames[0] == "DRAFT NOTICE"
         assert workbook["DRAFT NOTICE"]["A1"].value == (
@@ -1672,26 +1821,6 @@ def test_export_fix_brief_draft_needs_the_same_acknowledgement(
     assert redacted.text.count("REDACTED COPY") == 1
 
 
-@pytest.mark.parametrize("status", ["running", "failed", "interrupted"])
-def test_export_fix_brief_refuses_a_scan_that_is_not_complete(
-    client: TestClient, seeded_db: tuple[object, object, int], status: str
-) -> None:
-    db_path, _, scan_id = seeded_db
-    conn = connect(Path(str(db_path)))
-    try:
-        conn.execute("UPDATE scans SET status = ? WHERE id = ?", (status, scan_id))
-        conn.commit()
-    finally:
-        conn.close()
-    resp = client.get(f"/api/scans/{scan_id}/export/brief", params={"draft": "acknowledged"})
-    assert resp.status_code == 409
-    assert "only be made from a completed scan" in resp.json()["detail"]
-    # The Export panel's sizes leave the brief out instead of failing.
-    options = client.get(f"/api/scans/{scan_id}/exports")
-    assert options.status_code == 200
-    assert "brief" not in {entry["format"] for entry in options.json()["formats"]}
-
-
 def test_export_fix_brief_of_a_deleted_or_unknown_scan_returns_404(
     client: TestClient, seeded_db: tuple[object, object, int]
 ) -> None:
@@ -1841,7 +1970,9 @@ async def test_login_handoff_starts_the_crawl_where_sign_in_landed(
             assert not headless
 
         def create_shared_js_fetcher(self, **kwargs):  # type: ignore[no-untyped-def]
-            return SimpleNamespace()
+            # The handoff reads the fetcher's tab pool (one signed-in tab per
+            # worker); None means no pool, as for one worker.
+            return SimpleNamespace(tab_pool=None)
 
         async def close(self):  # type: ignore[no-untyped-def]
             return None
@@ -2299,6 +2430,31 @@ def test_local_login_scan_defaults_to_wcag_21(
     status, captured = _local_login_post(seeded_db, monkeypatch)
     assert status == 201
     assert getattr(captured["config"], "wcag_version", None) == "2.1"
+
+
+def test_local_login_scan_defaults_to_four_tabs_and_accepts_eight(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One signed-in tab per worker; four by default, at most eight."""
+    status, captured = _local_login_post(seeded_db, monkeypatch)
+    assert status == 201
+    assert captured["config"].workers == 4
+    assert captured["config"].concurrency_per_host == 4
+    status, captured = _local_login_post(seeded_db, monkeypatch, workers=8)
+    assert status == 201
+    assert captured["config"].workers == 8
+
+
+def test_scan_detail_carries_the_scan_note(
+    client: TestClient, seeded_db: tuple[Path, Path, int]
+) -> None:
+    db_path, _, scan_id = seeded_db
+    assert client.get(f"/api/scans/{scan_id}").json()["scan_note"] is None
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            "UPDATE scans SET scan_note = 'Went back to one tab.' WHERE id = ?", (scan_id,)
+        )
+    assert client.get(f"/api/scans/{scan_id}").json()["scan_note"] == "Went back to one tab."
 
 
 @pytest.mark.parametrize("bad", ["3.0", "2.0", 2.1, None])

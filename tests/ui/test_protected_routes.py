@@ -166,7 +166,10 @@ def _public_resolver(_: str) -> tuple[str, ...]:
 
 @pytest.fixture
 def protected_client(
-    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch
+    seeded_db: tuple[Path, Path, int],
+    monkeypatch: pytest.MonkeyPatch,
+    request: pytest.FixtureRequest,
+    tmp_path: Path,
 ) -> Iterator[tuple[TestClient, Settings, Path, int]]:
     """Create a protected-enabled app with an injected in-memory test KMS.
 
@@ -186,6 +189,9 @@ def protected_client(
         protected_agent_proxy_hmac_secret=_AGENT_PROXY_SECRET,
         protected_public_origin="https://axcess.example.test",
     )
+    if getattr(request, "param", False):
+        settings = settings.model_copy(update={"desktop": True, "data_dir": tmp_path})
+        monkeypatch.setattr("audit.ai.manager.system_ollama", lambda: None)
 
     class TestProtectedEgressPolicy(RealPolicy):
         def __init__(self, allowed_origins: Iterable[str]) -> None:
@@ -199,6 +205,20 @@ def protected_client(
         base_url=settings.protected_public_origin,
     ) as test_client:
         yield test_client, settings, db_path, public_scan_id
+
+
+@pytest.mark.parametrize("protected_client", [True], indirect=True)
+def test_desktop_ai_off_rejects_protected_model_checks(
+    protected_client: tuple[TestClient, Settings, Path, int],
+) -> None:
+    client, settings, _, _ = protected_client
+    response = client.post(
+        "/api/protected-scans",
+        headers=_identity_headers(settings, method="POST", path="/api/protected-scans"),
+        json=_request_payload(allow_local_ai=True, local_ai_acknowledged=True),
+    )
+    assert response.status_code == 409
+    assert "AI features are off" in response.json()["detail"]
 
 
 def _create_protected_draft(

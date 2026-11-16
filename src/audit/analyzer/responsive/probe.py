@@ -23,6 +23,26 @@ Three checks, all impossible from static HTML and absent from axe-core:
    own readability stylesheets; this is exactly the technique our own
    UI gate (tests/ui/test_accessibility_text_spacing.py) uses.
 
+Checks 2 and 3 share one detector, and both are a comparison, not a single
+reading. SC 1.4.4 is about content lost *by resizing* and SC 1.4.12 about
+content lost *by the spacing*, so text counts only when:
+
+* it is cut off under the test condition (the zoom viewport, or the
+  spacing override); and
+* the same element shows the same text, uncut and visible, without that
+  condition (the crawl's normal viewport, or no override).
+
+Text that is hidden from sight on purpose is never reported: the
+visually-hidden pattern for screen-reader text (``.sr-only``: a 1px box
+with ``overflow: hidden`` and ``clip: rect(0 0 0 0)`` or ``clip-path:
+inset(50%)``), ``opacity: 0``, ``visibility: hidden``, and closed panels.
+Such text paints no pixel at any size, so neither criterion applies to it,
+and a single reading used to report it as "content 262px in a 1px box".
+Text that is already cut off before the test condition is not reported by
+these two checks either: resizing or spacing did not cause it. Limit: text
+that only exists in the narrow layout (for example a mobile-only label) has
+nothing at the normal viewport to compare with, so it is not judged.
+
 Ordering contract: the probe MUTATES the page (viewport size, injected
 CSS). It must run LAST in ``JsFetcher.fetch``, after the HTML capture,
 after axe, after the keyboard probe, and it restores the original
@@ -41,7 +61,9 @@ pathological page can't stall the crawl.
 from __future__ import annotations
 
 import contextlib
+import dataclasses
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -53,9 +75,12 @@ from audit.analyzer.responsive.base import (
 )
 
 if TYPE_CHECKING:
-    from playwright.async_api import Page
+    from playwright.async_api import JSHandle, Page
 
 log = logging.getLogger(__name__)
+
+#: Photographs one element on the page as it is now; None when it cannot.
+ShotFn = Callable[["Page", str], Awaitable[bytes | None]]
 
 # Viewports. 320 is WCAG 1.4.10's literal number; 640x450 is the
 # accepted 200%-zoom-at-1280 proxy used by most automated checkers.
@@ -84,14 +109,17 @@ p {
 }
 """
 
-# Shared JS: find leaf elements whose text is clipped by overflow:hidden.
-# Returns up to `max` {selector, html, detail} records. Ellipsis elements
-# are skipped (designed truncation, human judgment, not an auto-fail).
-_CLIPPED_TEXT_JS = """
-(maxOffenders) => {
-  const out = [];
-  const els = document.querySelectorAll('body *');
-  const limit = Math.min(els.length, %(scan_cap)d);
+# How many cut-off elements the detector carries from the test condition
+# to the comparison. Higher than ``_MAX_OFFENDERS_PER_CHECK`` because some
+# will turn out to be cut off without the condition too, and those must not
+# use up the report's five places.
+_MAX_CLIP_CANDIDATES = 200
+
+# Helpers shared by the two halves of the clipped-text detector.
+#
+# ``hiddenOnPurpose`` has a twin in audit/analyzer/focus/probe.py
+# (``paintsNothing``). Keep the two in step.
+_CLIP_HELPERS_JS = """
   const sel = (el) => {
     const tag = el.tagName.toLowerCase();
     if (el.id) return tag + '#' + el.id;
@@ -101,31 +129,188 @@ _CLIPPED_TEXT_JS = """
     }
     return tag;
   };
-  for (let i = 0; i < limit && out.length < maxOffenders; i++) {
+  // Is the element's own box cutting off its text, and in which direction?
+  // Ellipsis elements never count (designed truncation, human judgment).
+  const clipState = (el) => {
+    const cs = getComputedStyle(el);
+    const hidesX = cs.overflowX === 'hidden' || cs.overflow === 'hidden';
+    const hidesY = cs.overflowY === 'hidden' || cs.overflow === 'hidden';
+    if ((!hidesX && !hidesY) || cs.textOverflow === 'ellipsis') {
+      return { clipX: false, clipY: false };
+    }
+    return {
+      clipX: hidesX && el.scrollWidth > el.clientWidth + 4,
+      clipY: hidesY && el.scrollHeight > el.clientHeight + 4,
+    };
+  };
+  // clip: rect(top, right, bottom, left) with no area, as in the
+  // visually-hidden pattern's rect(0, 0, 0, 0).
+  const emptyClipRect = (value) => {
+    const m = /^rect\\(([^)]*)\\)$/.exec(value || '');
+    if (!m) return false;
+    const p = m[1].split(/[\\s,]+/).filter(Boolean).map(parseFloat);
+    if (p.length !== 4 || p.some(Number.isNaN)) return false;
+    return p[2] - p[0] <= 0 || p[1] - p[3] <= 0;
+  };
+  // clip-path: inset(50%) and its relatives that leave no area.
+  const emptyClipPath = (value) => {
+    const m = /^inset\\(([^)]*)\\)$/.exec(value || '');
+    if (!m) return false;
+    const parts = m[1].split(/\\s+round\\s+/)[0].trim().split(/\\s+/);
+    if (!parts.length || !parts.every((x) => /%$/.test(x))) return false;
+    const n = parts.map(parseFloat);
+    const top = n[0];
+    const right = n.length > 1 ? n[1] : top;
+    const bottom = n.length > 2 ? n[2] : top;
+    const left = n.length > 3 ? n[3] : right;
+    return top + bottom >= 100 || left + right >= 100;
+  };
+  // Is this text kept out of sight on purpose, by the element or anything
+  // around it?  Always: not displayed, visibility hidden, opacity 0, a clip
+  // that leaves no area, or a box of at most 1px by 1px that cuts off its
+  // content (the visually-hidden pattern).  With `closedCounts`, a box
+  // collapsed to 1px or less in ONE direction counts too (a closed panel).
+  // That stricter test is only for "is it visible at the normal size":
+  // under the test condition a box squeezed to nothing is the very loss
+  // these checks exist to find.
+  const hiddenOnPurpose = (el, closedCounts) => {
+    if (getComputedStyle(el).visibility !== 'visible') return true;
+    for (let cur = el; cur && cur.nodeType === 1; cur = cur.parentElement) {
+      const cs = getComputedStyle(cur);
+      if (cs.display === 'none') return true;
+      if (parseFloat(cs.opacity) === 0) return true;
+      if ((cs.position === 'absolute' || cs.position === 'fixed')
+          && emptyClipRect(cs.clip)) return true;
+      if (emptyClipPath(cs.clipPath)) return true;
+      if (cur instanceof HTMLElement
+          && cs.display !== 'inline' && cs.display !== 'contents'
+          && cs.overflowX !== 'visible' && cs.overflowY !== 'visible'
+          && cur.getClientRects().length) {
+        const w = cur.clientWidth;
+        const h = cur.clientHeight;
+        if (w <= 1 && h <= 1) return true;
+        if (closedCounts && (w <= 1 || h <= 1)) return true;
+      }
+    }
+    return false;
+  };
+"""
+
+# First half, run UNDER the test condition (zoom viewport, or spacing
+# override): leaf elements whose text their own box cuts off, leaving out
+# text hidden on purpose. Returns records that keep the element itself, so
+# it must be called with ``evaluate_handle``.
+_CLIP_CANDIDATES_JS = """
+(maxCandidates) => {
+%(helpers)s
+  const out = [];
+  const els = document.querySelectorAll('body *');
+  const limit = Math.min(els.length, %(scan_cap)d);
+  for (let i = 0; i < limit && out.length < maxCandidates; i++) {
     const el = els[i];
     if (el.children.length > 0) continue;            // leaf nodes only
     const text = (el.innerText || '').trim();
     if (!text) continue;
-    const cs = getComputedStyle(el);
-    const hidesX = cs.overflowX === 'hidden' || cs.overflow === 'hidden';
-    const hidesY = cs.overflowY === 'hidden' || cs.overflow === 'hidden';
-    if (!hidesX && !hidesY) continue;
-    if (cs.textOverflow === 'ellipsis') continue;    // designed truncation
-    const clipX = hidesX && el.scrollWidth > el.clientWidth + 4;
-    const clipY = hidesY && el.scrollHeight > el.clientHeight + 4;
-    if (!clipX && !clipY) continue;
+    const c = clipState(el);
+    if (!c.clipX && !c.clipY) continue;
+    if (hiddenOnPurpose(el, false)) continue;        // paints no pixel
     out.push({
+      el: el,
+      clipX: c.clipX,
+      clipY: c.clipY,
+      contentW: el.scrollWidth,
+      boxW: el.clientWidth,
+      contentH: el.scrollHeight,
+      boxH: el.clientHeight,
+      text: text.slice(0, 40),
       selector: sel(el),
       html: (el.outerHTML || '').slice(0, 240),
-      detail: (clipX ? 'clipped horizontally' : 'clipped vertically')
-        + ': content ' + (clipX ? el.scrollWidth : el.scrollHeight) + 'px'
-        + ' in a ' + (clipX ? el.clientWidth : el.clientHeight) + 'px box'
-        + '; text starts "' + text.slice(0, 40) + '"',
     });
   }
   return out;
 }
-""" % {"scan_cap": _MAX_ELEMENTS_SCANNED}
+""" % {"helpers": _CLIP_HELPERS_JS, "scan_cap": _MAX_ELEMENTS_SCANNED}
+
+# Focus pass, run under the zoom condition (from UX-Nov-6, 23e6f78f). Text
+# hidden on purpose inside a control that shows itself on focus, such as a
+# skip link, is measured only while that control has focus: it is focused,
+# re-checked, measured if it is now visible, and focus is put back. A skip
+# link still cut off while focused is a real failure, because a sighted
+# keyboard user sees it then. These skip the comparison above: the text is
+# hidden at every size until focused, so there is nothing to compare with.
+# Run in the zoom check only, so one cut-off skip link is one finding, not
+# one per check.
+_FOCUS_CLIP_JS = """
+(maxOffenders) => {
+%(helpers)s
+  const focusTarget = (el) =>
+    el.closest('a[href], button, input, select, textarea, summary, [tabindex]');
+  const out = [];
+  const els = document.querySelectorAll('body *');
+  const limit = Math.min(els.length, %(scan_cap)d);
+  const previous = document.activeElement;
+  for (let i = 0; i < limit && out.length < maxOffenders; i++) {
+    const el = els[i];
+    if (el.children.length > 0) continue;            // leaf nodes only
+    const text = (el.innerText || el.textContent || '').trim();
+    if (!text) continue;
+    const target = focusTarget(el);
+    if (!target || target.matches('[tabindex="-1"]')) continue;
+    if (!hiddenOnPurpose(el, false)) continue;       // measured by the main pass
+    target.focus({ preventScroll: true });
+    if (document.activeElement !== target) continue;
+    const shown = !hiddenOnPurpose(el, false);
+    const c = shown ? clipState(el) : { clipX: false, clipY: false };
+    const record = (c.clipX || c.clipY) ? {
+      selector: sel(el),
+      html: (el.outerHTML || '').slice(0, 240),
+      detail: (c.clipX ? 'clipped horizontally' : 'clipped vertically')
+        + ' while it has keyboard focus: content '
+        + (c.clipX ? el.scrollWidth : el.scrollHeight) + 'px in a '
+        + (c.clipX ? el.clientWidth : el.clientHeight) + 'px box'
+        + '; text starts "' + text.slice(0, 40) + '"',
+    } : null;
+    target.blur();
+    if (record) out.push(record);
+  }
+  if (previous && previous !== document.activeElement && previous.focus) {
+    previous.focus({ preventScroll: true });
+  }
+  return out;
+}
+""" % {"helpers": _CLIP_HELPERS_JS, "scan_cap": _MAX_ELEMENTS_SCANNED}
+
+# Second half, run WITHOUT the test condition on the records from the first
+# half. Keeps a record only when the same element is still on the page,
+# visible, and not cut off in the direction it was cut off before. Returns
+# up to `max` {selector, html, detail}.
+_CLIP_CONFIRM_JS = """
+([candidates, maxOffenders]) => {
+%(helpers)s
+  const out = [];
+  for (const c of candidates) {
+    if (out.length >= maxOffenders) break;
+    const el = c.el;
+    if (!el || !el.isConnected) continue;            // gone, e.g. a status message
+    if (!el.getClientRects().length) continue;       // not shown at all here
+    if (!(el.innerText || '').trim()) continue;
+    if (hiddenOnPurpose(el, true)) continue;         // not visible here
+    const now = clipState(el);
+    const newX = c.clipX && !now.clipX;
+    const newY = c.clipY && !now.clipY;
+    if (!newX && !newY) continue;                    // cut off here as well
+    out.push({
+      selector: c.selector,
+      html: c.html,
+      detail: (newX ? 'clipped horizontally' : 'clipped vertically')
+        + ': content ' + (newX ? c.contentW : c.contentH) + 'px'
+        + ' in a ' + (newX ? c.boxW : c.boxH) + 'px box'
+        + '; text starts "' + c.text + '"',
+    });
+  }
+  return out;
+}
+""" % {"helpers": _CLIP_HELPERS_JS}
 
 # Reflow detector: does the document need a horizontal scrollbar at the
 # current (320px) viewport, and which elements are wider than it?
@@ -179,23 +364,27 @@ class ResponsiveProbe:
     # Keep logs terse when the companion asks for a private diagnostic mode.
     suppress_diagnostics: bool = False
 
-    async def run(self, page: Page) -> list[ResponsiveFinding]:
+    async def run(self, page: Page, *, shot: ShotFn | None = None) -> list[ResponsiveFinding]:
         """Probe ``page``; returns findings, never raises.
 
         Restores the original viewport on exit regardless of failures —
         the page object may still be inspected by a caller afterwards.
+
+        With ``shot``, each finding is photographed while its failure holds
+        (the narrow viewport, or the spacing stylesheet), so the picture
+        shows the overflow or the cut-off text rather than the restored page.
         """
         findings: list[ResponsiveFinding] = []
         try:
-            findings.extend(await self._check_reflow(page))
+            findings.extend(await self._photograph(page, await self._check_reflow(page), shot))
         except Exception as exc:
             self._log_failure("reflow", exc)
         try:
-            findings.extend(await self._check_zoom_clipping(page))
+            findings.extend(await self._check_zoom_clipping(page, shot))
         except Exception as exc:
             self._log_failure("zoom_clipping", exc)
         try:
-            findings.extend(await self._check_text_spacing(page))
+            findings.extend(await self._check_text_spacing(page, shot))
         except Exception as exc:
             self._log_failure("text_spacing", exc)
         # Always restore the crawl's standard viewport.
@@ -204,6 +393,23 @@ class ResponsiveProbe:
                 {"width": self.base_viewport_width, "height": self.base_viewport_height}
             )
         return findings
+
+    async def _photograph(
+        self, page: Page, findings: list[ResponsiveFinding], shot: ShotFn | None
+    ) -> list[ResponsiveFinding]:
+        """Attach a picture of each finding's element, taken now. Never raises."""
+        if shot is None:
+            return findings
+        out: list[ResponsiveFinding] = []
+        for finding in findings:
+            png: bytes | None = None
+            if finding.target_selector not in ("", "html", "body", "(unknown)"):
+                try:
+                    png = await shot(page, finding.target_selector)
+                except Exception:
+                    png = None
+            out.append(dataclasses.replace(finding, screenshot=png) if png else finding)
+        return out
 
     def _log_failure(self, check: str, exc: Exception) -> None:
         if self.suppress_diagnostics:
@@ -259,13 +465,33 @@ class ResponsiveProbe:
     # Check 2, text clipping at the 200% zoom proxy (SC 1.4.4).
     # -----------------------------------------------------------------
 
-    async def _check_zoom_clipping(self, page: Page) -> list[ResponsiveFinding]:
+    async def _check_zoom_clipping(
+        self, page: Page, shot: ShotFn | None = None
+    ) -> list[ResponsiveFinding]:
         await page.set_viewport_size(_ZOOM_VIEWPORT)  # type: ignore[arg-type]
         await page.wait_for_timeout(150)
-        clipped: list[dict[str, str]] = await page.evaluate(
-            _CLIPPED_TEXT_JS, _MAX_OFFENDERS_PER_CHECK
+        # Skip links and other text shown only on focus, measured while
+        # focused (see _FOCUS_CLIP_JS). Not compared with the normal size.
+        focused: list[dict[str, str]] = await page.evaluate(
+            _FOCUS_CLIP_JS, _MAX_OFFENDERS_PER_CHECK
         )
-        return [
+        clipped: list[dict[str, str]] = []
+        candidates = await page.evaluate_handle(_CLIP_CANDIDATES_JS, _MAX_CLIP_CANDIDATES)
+        try:
+            if await candidates.evaluate("(c) => c.length"):
+                # The comparison: back at the normal viewport, is the same
+                # text visible and uncut? Only then did resizing lose it.
+                await page.set_viewport_size(
+                    {"width": self.base_viewport_width, "height": self.base_viewport_height}
+                )
+                await page.wait_for_timeout(150)
+                clipped = await page.evaluate(
+                    _CLIP_CONFIRM_JS, [candidates, _MAX_OFFENDERS_PER_CHECK]
+                )
+        finally:
+            with contextlib.suppress(Exception):
+                await candidates.dispose()
+        findings = [
             ResponsiveFinding(
                 rule_id=RULE_TEXT_CLIPPED,
                 criterion_sc="1.4.4",
@@ -273,6 +499,8 @@ class ResponsiveProbe:
                 target_selector=str(c.get("selector", "(unknown)")),
                 failure_summary=(
                     f"At ~200% zoom (640px viewport proxy) text is {c.get('detail', 'clipped')}. "
+                    f"At the normal {self.base_viewport_width}px-wide viewport this element "
+                    "does not cut off its text. "
                     "WCAG 1.4.4 requires text to remain readable when resized up to 200%."
                 ),
                 html_snippet=str(c.get("html", "")),
@@ -280,12 +508,40 @@ class ResponsiveProbe:
             )
             for c in clipped
         ]
+        seen = {f.target_selector for f in findings}
+        findings += [
+            ResponsiveFinding(
+                rule_id=RULE_TEXT_CLIPPED,
+                criterion_sc="1.4.4",
+                impact="serious",
+                target_selector=str(c.get("selector", "(unknown)")),
+                failure_summary=(
+                    f"At ~200% zoom (640px viewport proxy) text is {c.get('detail', 'clipped')}. "
+                    "This text is hidden until it gets keyboard focus, and then a sighted "
+                    "keyboard user sees it cut off. "
+                    "WCAG 1.4.4 requires text to remain readable when resized up to 200%."
+                ),
+                html_snippet=str(c.get("html", "")),
+                help="Text must stay visible and readable at 200% zoom.",
+            )
+            for c in focused[: max(0, _MAX_OFFENDERS_PER_CHECK - len(findings))]
+            if str(c.get("selector", "")) not in seen
+        ]
+        if not findings or shot is None:
+            return findings
+        # The comparison ended at the normal viewport, where the text is whole.
+        # Go back to the zoom viewport for the pictures, so they show the cut.
+        await page.set_viewport_size(_ZOOM_VIEWPORT)  # type: ignore[arg-type]
+        await page.wait_for_timeout(150)
+        return await self._photograph(page, findings, shot)
 
     # -----------------------------------------------------------------
     # Check 3, WCAG text-spacing override (SC 1.4.12).
     # -----------------------------------------------------------------
 
-    async def _check_text_spacing(self, page: Page) -> list[ResponsiveFinding]:
+    async def _check_text_spacing(
+        self, page: Page, shot: ShotFn | None = None
+    ) -> list[ResponsiveFinding]:
         # Run at the crawl's standard viewport, spacing failures are
         # about hard-coded boxes, not narrow screens, and running at
         # 320px would double-report what the reflow check already saw.
@@ -295,15 +551,28 @@ class ResponsiveProbe:
         handle = await page.add_style_tag(content=_TEXT_SPACING_CSS)
         try:
             await page.wait_for_timeout(100)
-            clipped: list[dict[str, str]] = await page.evaluate(
-                _CLIPPED_TEXT_JS, _MAX_OFFENDERS_PER_CHECK
+            candidates: JSHandle = await page.evaluate_handle(
+                _CLIP_CANDIDATES_JS, _MAX_CLIP_CANDIDATES
             )
         finally:
             # Remove the injected sheet so the page is clean if anything
-            # inspects it later in the fetch lifecycle.
+            # inspects it later in the fetch lifecycle. Removing it also sets
+            # up the comparison: the same elements, without the override. If
+            # the removal fails, every candidate is still cut off below and
+            # nothing is reported, which is the safe way to be wrong.
             with contextlib.suppress(Exception):
                 await handle.evaluate("el => el.remove()")
-        return [
+        try:
+            if not await candidates.evaluate("(c) => c.length"):
+                return []
+            await page.wait_for_timeout(100)
+            clipped: list[dict[str, str]] = await page.evaluate(
+                _CLIP_CONFIRM_JS, [candidates, _MAX_OFFENDERS_PER_CHECK]
+            )
+        finally:
+            with contextlib.suppress(Exception):
+                await candidates.dispose()
+        findings = [
             ResponsiveFinding(
                 rule_id=RULE_SPACING_CLIPPED,
                 criterion_sc="1.4.12",
@@ -311,12 +580,25 @@ class ResponsiveProbe:
                 target_selector=str(c.get("selector", "(unknown)")),
                 failure_summary=(
                     "With WCAG's text-spacing override applied (line-height "
-                    "1.5, letter-spacing 0.12em, word-spacing 0.16em) text is "
-                    f"{c.get('detail', 'clipped')}. Users who apply their own "
-                    "readability stylesheets lose this content."
+                    "1.5, letter-spacing 0.12em, word-spacing 0.16em, paragraph "
+                    "spacing 2em) text is "
+                    f"{c.get('detail', 'clipped')}. Without the override this "
+                    "element does not cut off its text. Users who apply their "
+                    "own readability stylesheets lose this content."
                 ),
                 html_snippet=str(c.get("html", "")),
                 help="Content must not clip when users override text spacing.",
             )
             for c in clipped
         ]
+        if not findings or shot is None:
+            return findings
+        # The comparison ran without the override, where the text is whole.
+        # Apply it again for the pictures, so they show the clip, then remove it.
+        handle = await page.add_style_tag(content=_TEXT_SPACING_CSS)
+        try:
+            await page.wait_for_timeout(100)
+            return await self._photograph(page, findings, shot)
+        finally:
+            with contextlib.suppress(Exception):
+                await handle.evaluate("el => el.remove()")

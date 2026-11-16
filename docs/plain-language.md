@@ -45,7 +45,10 @@ readers; this page tells contributors which words to use.
     Buttons and controls too: "Start a scan", not "Start A Scan". Names
     keep their capitals ("Axcess", "Excel", "Claude Code"), and so do the
     named terms in the table below ("Mostly sure", "Not sure", "Best practice",
-    "Click-Through"). One exception: the logo beside the brand mark,
+    "Click-Through"). The ITS technical review export names the team it is
+    for, and that name keeps its capitals too: "University of Michigan
+    Information and Technology Services (ITS) Accessibility Team". One
+    exception: the logo beside the brand mark,
     top left, spells it "axcess", in lowercase, as a logo; text everywhere
     else writes "Axcess".
     Two tests enforce this: `tests/ui/test_control_label_case.py` reads
@@ -68,10 +71,14 @@ Use the word in the first column, and never the words in the last.
 | occurrence | One place a problem appears: one element on one page, or in one page state. "476 occurrences". As a label or column header: "Issue occurrences". Explain it where a screen first counts it: "An occurrence is one place a problem appears." | issue (for one place), instance, violation, result, finding, hit, error (for an occurrence); "Occurrences" alone as a label |
 | issue | A general word for a problem, and part of names: the Issues page, the Issues table, "All issues", "Issue type". | "N issues" as a count (count issue types or occurrences) |
 | image | One image the image text check looked at: "Image #12". | finding (for an image) |
-| Mostly sure / Not sure / For information | The three "How sure" values, in the Issues table's "How sure" column: how sure Axcess is that an issue type is a real problem. An Alfa "cannot tell" result is Not sure. | Barrier, Needs review, Informational, likely barrier, likely problem, possible problem, needs confirmation, review lead, lead, expert decision, cantTell, "Type" (for this column) |
+| Needs alt text / Needs better alt text / Good alt text / Needs a person to check | The alt text verdicts on the Images tab. "Needs alt text" when there is none (or `alt=""` on an image with text); "Needs better alt text" when there is some and it falls short; "Needs a person to check" when Axcess could not judge it. Not "Adequate" for an image the scan could not judge, and not "Not checked yet", which is the "Checked by a person" value. | bad alt text, adequate, inadequate, partial, missing (as a verdict) |
+| Images with text / Images without alt text / Images with alt text | The Images tab's three groups. An image is in "Images with text" and one of the other two. | image of text (as a group name), alt missing |
+| Mostly sure / Measured / Not sure / For information | The four "How sure" values, in the Issues table's "How sure" column: how sure Axcess is that an issue type is a real problem. Measured is a browser check that used no AI and is trusted to be shown by default (docs/glossary.md, "Measured", lists which). An Alfa "cannot tell" result is Not sure; a clear form error is Mostly sure, an unclear one Not sure. The Issues table opens showing every issue type, with a note over it that says what Not sure and For information mean. | Barrier, Needs review, Informational, likely barrier, likely problem, possible problem, needs confirmation, review lead, lead, expert decision, cantTell, "Type" (for this column) |
 | At page load / After clicking / In an image | The values of the Issues table's "Where it shows" column: where an issue type shows up. "At page load" and "After clicking" match the page state names. | Found by, Found (as the header), WCAG (as a value), Click-Through (as a value; it stays the feature's name), Alt Text (as a value), finding type |
 | Critical / Serious / Moderate / Minor | An issue type's impact rating: how badly the problem affects people (glossary "Impact"). | critical, serious (lower case, as raw values), severity (for this rating) |
 | status | Where an occurrence stands in review. Values: New, Reviewing, In progress, Fixed, Accepted risk, Not a problem (false positive). | triage status, review status, remediated, raw values like `in_progress` |
+| Checked by a person | A person's choice about an element in the page inspector. Values: Not checked yet; Checked: a problem to report; Checked: a repeat of one already reported. Separate from status. | confirmed, verified, validated, approved, human-checked, triaged, redundant, duplicate |
+| Issue notes | What a person writes about one element for the vendor. Matches the ITS technical review's column. | comment, annotation, remarks, rationale (for these notes) |
 | check | One way Axcess tests pages. See the check names below. | engine, pipeline, probe, method, detector, source |
 | page state | How a page looked at one moment: "At page load" or "After clicking Menu". | DOM state, interaction state, captured state |
 | saved copy | The copy of a page the scan stored. | capture, stored capture, stored render, loaded DOM |
@@ -86,6 +93,9 @@ Use the word in the first column, and never the words in the last.
 | what was checked | Which checks ran and which pages and states a report covers. | coverage, method coverage |
 | Product roadmap | The page listing planned checks. | coverage tracking, coverage and tracking |
 | element code (HTML) | The code of one flagged element. | snippet, outerHTML, markup |
+| AI suggestion | A fix the local AI model suggests for one occurrence, on request. It can be wrong; a person checks it. | AI fix, AI remediation, recommendation, auto-fix |
+| AI features | The optional local AI program (Ollama) and models the desktop app can download, in one of three sizes: Small, Standard, Large. | AI pack, AI bundle, AI dependencies, tier |
+| Image model | The local AI model that looks at pictures. | vision model, VLM (outside developer notes) |
 | element locator (CSS selector) | The text that finds an element in the page code. | selector (alone) |
 | element locator (XPath) | The path that finds an element in the page code, as the rule check (Alfa) records it. | selector, path (alone) |
 | panel | One of the two reports on Compare reports, each in its own frame: "Go back in the report #24 panel". Never "left" or "right": on a narrow screen the panels are one above the other. | pane, side, left, right |
@@ -177,6 +187,9 @@ issue type is a real problem? Each word was chosen against these alternatives.
 | "Mostly sure" | "Fairly certain", "Pretty certain", "High chance" | Longer words. "Fairly" and "pretty" have other meanings that confuse translation, and "High chance" does not say of what. |
 | "Not sure" | "Needs review" | It did not say who reviews, or that the problem may not be real. |
 | "Mostly sure" / "Not sure" | "Likely problem" / "Possible problem" | Both mean "maybe", so readers could not tell them apart. Badges in one column are read against each other, so they need to be clear opposites. |
+| "Measured" | "Likely", "Probably" | Added 2026-11-10 for browser checks that measure the page with no AI model. "Likely" cannot be ranked against "Mostly sure" (the "Likely problem" row above). "Measured" says what happened, so it does not compete with the two "sure" words, and it does not claim the problem is real. |
+| "Measured" | "Sure" for rule checks, with "Mostly sure" here | "Sure" claims more than a rule check can show (the "Very sure" row above). The developer kept "Mostly sure" on top. |
+| "hidden" (issue types the table holds back when it opens) | "filtered out", "suppressed", "low confidence" | "Hidden" is the short, common word, and the note beside it says how to show them. Nothing is deleted, and the exports include them. |
 | "For information" | "Informational" | A longer word for the same idea. |
 | "For information" | "Not a problem" | Already the status for a false positive. One phrase names one thing. |
 
@@ -189,6 +202,8 @@ issue type is a real problem? Each word was chosen against these alternatives.
 | Keyboard | Keyboard check |
 | Responsive and zoom | Zoom and layout check |
 | Focus | Focus check |
+| Form errors (WCAG 3.3.1) | Form error check |
+| Page code (rendered DOM questions axe-core does not ask) | Page code check |
 | Visual order, motion, and autoplay | Motion and reading-order check |
 | Semantic (local language model) | AI review |
 | Image text (OCR and vision model) | Image text check |

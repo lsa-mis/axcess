@@ -1,16 +1,25 @@
-import { type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { serverDate } from "../lib/serverTime";
 import { useNavigate, useParams, useSearchParams } from "react-router";
-import { keepPreviousData, useQueries, useQuery } from "@tanstack/react-query";
-import { Check, ChevronDown, ChevronUp, Copy, ExternalLink, FileCode2, Layers, Loader2 } from "lucide-react";
+import { keepPreviousData, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ExternalLink, FileCode2, Layers, Loader2 } from "lucide-react";
 import DomSource from "../components/DomSource";
+import FixSuggestion, { SuggestionsBlockedNote, useSavedSuggestion } from "../components/FixSuggestion";
 import FlaggedStepper from "../components/FlaggedStepper";
-import { api } from "../api/client";
-import type { PageEvidence, PageInspection, SavedFrame, SavedStyles } from "../api/types";
+import ElementReview, { type ReviewDraft } from "../components/ElementReview";
+import { ApiError, api } from "../api/client";
+import type {
+  OccurrenceReview,
+  PageEvidence,
+  PageInspection,
+  SavedFrame,
+  SavedStyles,
+  SuggestionAvailability,
+  SuggestionOccurrenceKind,
+} from "../api/types";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import Tabs from "../components/Tabs";
 import {
-  Button,
   Card,
   Disclosure,
   EmptyState,
@@ -21,10 +30,12 @@ import {
 } from "../components/ui";
 import { useScanQuery } from "../hooks/useScanQuery";
 import { cn } from "../lib/cn";
+import { suggestIssueNotes } from "../lib/suggestedNotes";
 import {
   boxPlace,
   type BoxNote,
   buildHighlightedHtml,
+  canFocusInCopy,
   countFound,
   describeElement,
   drawnOnCanvas,
@@ -35,7 +46,6 @@ import {
   markCurrent,
   noteCurrent,
   normalizeWhitespace,
-  readableLocator,
   scrollPanels,
   snippetCutFor,
   spotlight,
@@ -46,6 +56,7 @@ import {
 } from "../lib/highlightTargets";
 import { checkFingerprint, looksDifferent } from "../lib/styleFingerprint";
 import { withSavedFrames } from "../lib/savedFrames";
+import { OPENS_NEW_WINDOW } from "../lib/terms";
 
 type TabId = "page" | "dom";
 
@@ -86,6 +97,11 @@ export default function InspectorRoute() {
   const layout = checkLayout && asChecked ? checkLayout : null;
   const directSelector = params.get("selector");
   const directSnippet = params.get("snippet");
+  // One image to outline, by its content hash: the Images tab's links
+  // (2026-11-16, the developer's request: opening an image's page from the
+  // Images tab showed the page with nothing marked). Most of those images
+  // have no issue type, so ``?issue=`` cannot name them.
+  const imageHash = params.get("image");
 
   const { data: scanData } = useScanQuery(scan);
 
@@ -116,18 +132,25 @@ export default function InspectorRoute() {
     );
   }, [pageEvidence, issueKey, directSelector, directSnippet]);
 
-  // An Images with text issue's occurrences on this page: images, which carry
-  // no selector. One row per occurrence (the evidence lists an image once per
+  // The images to outline on this page, which carry no selector: an Images
+  // with text issue's occurrences, or every place one image (``?image=``)
+  // appears. One row per occurrence (the evidence lists an image once per
   // analysis of it).
   const currentImages = useMemo(() => {
-    if (!pageEvidence || !issueKey?.startsWith("image:")) return [];
+    if (!pageEvidence) return [];
+    const wanted = imageHash
+      ? (image: { content_hash: string }) => image.content_hash === imageHash
+      : issueKey?.startsWith("image:")
+        ? (image: { issue_key: string | null }) => image.issue_key === issueKey
+        : null;
+    if (!wanted) return [];
     const seen = new Set<number>();
     return pageEvidence.image_occurrences.filter((image) => {
-      if (image.issue_key !== issueKey || seen.has(image.occurrence_id)) return false;
+      if (!wanted(image) || seen.has(image.occurrence_id)) return false;
       seen.add(image.occurrence_id);
       return true;
     });
-  }, [pageEvidence, issueKey]);
+  }, [pageEvidence, issueKey, imageHash]);
   // Copies inside <noscript> or <template> (in practice the no-script fallback
   // of a lazy-loaded image, whose shown twin is outlined): not in the saved
   // copy on screen, so they are said, not counted as missing.
@@ -138,7 +161,7 @@ export default function InspectorRoute() {
   // identical siblings are intentionally one location). This list drives both
   // the highlight pass and the auto-scroll, so it is computed once.
   const targets = useMemo<Target[]>(() => {
-    const seen = new Set<string>();
+    const seen = new Map<string, Target>();
     const out: Target[] = [];
     for (const f of currentFindings) {
       const selector = f.target_selector || null;
@@ -154,16 +177,23 @@ export default function InspectorRoute() {
         selector ?? "",
         snippet ? normalizeWhitespace(snippet) : "",
       ].join("\u0000");
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push({
+      const same = seen.get(key);
+      if (same) {
+        // The same element again: one outline, but the review covers both.
+        same.findingIds?.push(f.id);
+        continue;
+      }
+      const target: Target = {
         selector,
         snippet,
         revealedBy: f.revealed_by || null,
         stateKey: f.revealed_state_key || null,
         place: f.element_place,
         cutAt: snippetCutFor(f.pipeline),
-      });
+        findingIds: [f.id],
+      };
+      seen.set(key, target);
+      out.push(target);
     }
     // Images were read at page load. Each occurrence is its own element.
     for (const image of shownImages) {
@@ -173,6 +203,7 @@ export default function InspectorRoute() {
         revealedBy: null,
         stateKey: null,
         image: { locator: image.locator, alt: image.alt_text },
+        imageOccurrenceId: image.occurrence_id,
       });
     }
     return out;
@@ -214,7 +245,7 @@ export default function InspectorRoute() {
   const inspectEnabled =
     Number.isFinite(scan) &&
     Number.isFinite(page) &&
-    (!issueKey || !!pageEvidence || evidenceError);
+    (!(issueKey || imageHash) || !!pageEvidence || evidenceError);
 
   // Which state is on screen. In the URL like the view above it, so a link to
   // "the dialog on page 12" survives being sent to someone.
@@ -313,7 +344,7 @@ export default function InspectorRoute() {
             return count != null && count.missing < count.total;
           }) ?? checkedStates[0])
         : undefined;
-  const openingScope = [scan, page, issueKey, directSelector, directSnippet].join("\n");
+  const openingScope = [scan, page, issueKey, directSelector, directSnippet, imageHash].join("\n");
   const [opening, setOpening] = useState<{ scope: string; state: string | null } | null>(null);
   useEffect(() => {
     if (autoState !== undefined && opening?.scope !== openingScope) {
@@ -509,6 +540,29 @@ export default function InspectorRoute() {
   }, [allTargetsRevealed, revealingControls, targets.length, activeStateKey]);
 
   const frameRef = useRef<HTMLIFrameElement | null>(null);
+  // Whether keyboard focus entering the saved copy can land on the flagged
+  // element the reader is on (``canFocusInCopy``): set at every step, and
+  // said in the frame's name.
+  const [landsOnElement, setLandsOnElement] = useState(false);
+  // Where Escape in the saved copy goes back to: the last control outside
+  // the copy that had focus, or, failing that, the toolbar above the copy.
+  const beforeCopyRef = useRef<HTMLElement | null>(null);
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
+  // Whether focus is in the saved copy, or was when the browser window
+  // lost focus: only focus coming in from the app moves to the flagged
+  // element, not focus coming back to the copy after switching apps.
+  const inCopyRef = useRef(false);
+  useEffect(() => {
+    const remember = (event: FocusEvent) => {
+      const el = event.target;
+      if (el instanceof HTMLElement && el.tagName !== "IFRAME") {
+        beforeCopyRef.current = el;
+        inCopyRef.current = false;
+      }
+    };
+    document.addEventListener("focusin", remember);
+    return () => document.removeEventListener("focusin", remember);
+  }, []);
 
   // The captured markup is shown via `srcDoc`, which gives the frame no
   // document URL of its own, so every relative stylesheet/font/image in the
@@ -649,14 +703,82 @@ export default function InspectorRoute() {
           delete frame.dataset.focused;
         });
       }
-      // Escape inside the saved copy goes back to "Go to element", the way
-      // in (FlaggedStepper). The copy runs no scripts of its own, so no
-      // key of the page's is taken.
+      // Escape inside the saved copy goes back to where the reader was
+      // before it: the control that last had focus outside the copy (the
+      // stepper, the review), or the toolbar's first button if that one is
+      // gone or disabled. Said in the frame's name, which a screen reader
+      // reads on the way in. The copy runs no scripts of its own, so no key
+      // of the page's is taken. A shortcut, not the only way out: Tab
+      // through the page also leaves the copy (SC 2.1.2 No Keyboard Trap,
+      // Level A).
       doc?.addEventListener("keydown", (event) => {
-        if (event.key === "Escape" && goToRef.current) {
-          event.preventDefault();
-          goToRef.current.focus();
-        }
+        if (event.key !== "Escape") return;
+        const back = beforeCopyRef.current;
+        const target =
+          back?.isConnected && !back.matches(":disabled")
+            ? back
+            : toolbarRef.current?.querySelector<HTMLElement>("button:not(:disabled), a[href]");
+        if (!target) return;
+        event.preventDefault();
+        target.focus();
+      });
+      // Keyboard focus coming into the saved copy from the app (Tab or
+      // Shift+Tab) goes straight on to the flagged element the reader is
+      // on, where a screen reader reads it in its place on the page with
+      // its "Flagged element 2 of 5" description (the developer's decision,
+      // 2026-11-14; FlaggedStepper says what was weighed). Then it is
+      // brought into view below the app's sticky top bar: the copy can
+      // start below the screen on a short window (SC 2.4.11 Focus Not
+      // Obscured (Minimum), Level AA).
+      // - Not for a click or tap: a pointer press in the copy marks the
+      //   focus that follows as the reader's own, and it stays where it
+      //   landed. mousedown as well as pointerdown, because on a touch
+      //   screen focus follows the mousedown the browser sends after the
+      //   tap, not the pointerdown.
+      // - Not for focus coming back after switching apps (inCopyRef).
+      // - Done on the first focusin, in the same moment the browser puts
+      //   focus on the page's first stop, so focus does not rest there
+      //   first. Not yet checked with a screen reader: whether one still
+      //   says that first stop before the element.
+      // - Nothing happens when the element cannot take focus (hidden, or
+      //   the whole page); the frame's name then does not promise it.
+      // - The page's own tab order is not changed: the element gets
+      //   tabindex="-1" only if it needs one to take focus (focusInCopy).
+      inCopyRef.current = false;
+      let pointer = false;
+      const pressed = () => {
+        pointer = true;
+        window.setTimeout(() => {
+          pointer = false;
+        }, 0);
+      };
+      doc?.addEventListener("pointerdown", pressed, true);
+      doc?.addEventListener("mousedown", pressed, true);
+      // The window's focus comes first, before the browser puts focus on
+      // the copy's first stop, so a move made then is undone. It only
+      // notes that focus came in; the move is made on the focusin that
+      // follows, or, in a copy with nothing to focus, after the browser
+      // is done.
+      let entering = false;
+      const moveToElement = () => {
+        entering = false;
+        if (!doc || !frameRef.current) return;
+        const target = doc.querySelector<HTMLElement>("[data-axcess-current]");
+        if (!target || doc.activeElement === target || !focusInCopy(target)) return;
+        keepCentered(target);
+        revealInPage(frameRef.current, target);
+      };
+      view?.addEventListener("focus", () => {
+        const fromApp = !inCopyRef.current;
+        inCopyRef.current = true;
+        if (!fromApp || pointer) return;
+        entering = true;
+        window.setTimeout(() => {
+          if (entering) moveToElement();
+        }, 0);
+      });
+      doc?.addEventListener("focusin", () => {
+        if (entering) moveToElement();
       });
       if (frame && doc) {
         setCanvasCheck({ doc: frame.srcdoc, drawn: drawnOnCanvas(doc) });
@@ -693,6 +815,7 @@ export default function InspectorRoute() {
     if (marks.length === 0) {
       spotlight(null, "", doc);
       noteCurrent(doc, null, "");
+      setLandsOnElement(false);
       return false;
     }
     marks.forEach((mark, i) => markCurrent(mark, i === index));
@@ -701,6 +824,7 @@ export default function InspectorRoute() {
       setCurrentElement(describeElement(el)),
     );
     noteCurrent(doc, target, marks.length > 1 ? `Flagged element ${index + 1} of ${marks.length}` : "Flagged element");
+    setLandsOnElement(canFocusInCopy(target));
     if (target) keepCentered(target);
     return true;
   }
@@ -710,60 +834,236 @@ export default function InspectorRoute() {
   // frame's document changes.
   const [pageMark, setPageMark] = useState(0);
   useEffect(() => setPageMark(0), [srcDoc]);
-  const currentTarget = scopedTargets[highlight?.steps[pageMark]?.targets[0] ?? -1];
-  const currentLocator = readableLocator(currentTarget?.selector ?? null);
-  // An image or an AI review finding is found by its place among elements of
-  // its kind; its selector (``a[ord=6]``) is not one a browser can use.
-  const currentPlace = currentTarget?.image?.locator
-    ? {
-        selector: currentTarget.image.locator.kind === "source" ? "picture > source" : currentTarget.image.locator.kind,
-        index: currentTarget.image.locator.index,
-        total: currentTarget.image.locator.total,
-      }
-    : (currentTarget?.place ?? null);
-  const currentAddress = currentTarget?.image?.locator?.candidate ?? null;
-  // How many occurrences share the element the reader is on.
-  const sharedCount = highlight?.steps[pageMark]?.targets.length ?? 0;
-  // readableLocator returns a selector unchanged and turns a Rule check
-  // (Alfa) record into its XPath, so a changed string is an XPath. An AI
-  // review selector such as ``a[ord=6]`` counts the analyzer's own list of
-  // links, which no browser can use: it is not shown as a locator at all
-  // (the table still says what the element is).
-  const locatorIsXPath = currentLocator !== null && currentLocator !== currentTarget?.selector;
-  const shownLocator = currentLocator && !/\[ord=\d+\]/.test(currentLocator) ? currentLocator : null;
-  const locatorTerm = locatorIsXPath ? "Element locator (XPath)" : "Element locator (CSS selector)";
-  // Whether the locator is shown in full. It stays as the reader set it while
-  // they step, so every element's row keeps the same shape.
-  const [locatorOpen, setLocatorOpen] = useState(false);
-  // "Go to element" (in FlaggedStepper): the button, to come back to with
-  // Escape, and what it says when the element cannot take focus.
-  const goToRef = useRef<HTMLButtonElement>(null);
-  const [goToNote, setGoToNote] = useState<{ attempt: number; text: string } | null>(null);
-  const goToAttempts = useRef(0);
-  useEffect(() => setGoToNote(null), [srcDoc, pageMark]);
-  const goToElement = () => {
-    goToAttempts.current += 1;
-    const attempt = goToAttempts.current;
-    let landed = false;
-    try {
-      const target = frameRef.current?.contentDocument?.querySelector<HTMLElement>("[data-axcess-current]");
-      landed = Boolean(target && focusInCopy(target));
-      if (target && landed && frameRef.current) {
-        keepCentered(target);
-        revealInPage(frameRef.current, target);
-      }
-    } catch {
-      // Opaque document: focus cannot be moved into it.
-    }
-    setGoToNote(
-      landed
-        ? null
-        : {
-            attempt,
-            text: "This element cannot take focus in the saved copy, because it is hidden there or it is the whole page. The table above describes it.",
-          },
-    );
+
+  // A person's review of the element the reader is on: every occurrence of
+  // the issue outlined there, in this page state, gets the same review.
+  const queryClient = useQueryClient();
+  // Unsaved edits, by element, while this page is open: they outlast
+  // Previous / Next, and leaving the page discards them.
+  const [reviewDrafts, setReviewDrafts] = useState<Record<string, ReviewDraft>>({});
+  // Reviews saved while this page is open, by element. Kept here rather than
+  // written into the page evidence: changing that data re-runs the
+  // highlighting, which rebuilds this panel (losing the "Saved." message)
+  // and moves the saved copy under the reader.
+  const [savedReviews, setSavedReviews] = useState<Record<string, OccurrenceReview>>({});
+  // Each outlined element the stepper steps through, as the occurrences it
+  // stands for: the unit a review is saved for.
+  const reviewElements = (highlight?.steps ?? []).map((step) => {
+    const targets = step.targets
+      .map((index) => scopedTargets[index])
+      .filter((target): target is Target => Boolean(target));
+    const a11yIds = [...new Set(targets.flatMap((target) => target.findingIds ?? []))];
+    const imageIds = [
+      ...new Set(
+        targets.flatMap((target) =>
+          target.imageOccurrenceId === undefined ? [] : [target.imageOccurrenceId],
+        ),
+      ),
+    ];
+    return { key: `${a11yIds.join(",")}|${imageIds.join(",")}`, a11yIds, imageIds };
+  });
+  type ReviewElement = (typeof reviewElements)[number];
+  const storedReview = (element: ReviewElement): OccurrenceReview | null =>
+    savedReviews[element.key] ??
+    pageEvidence?.a11y_findings.find((f) => element.a11yIds.includes(f.id) && f.review)?.review ??
+    pageEvidence?.image_occurrences.find(
+      (image) => element.imageIds.includes(image.occurrence_id) && image.review,
+    )?.review ??
+    null;
+  const currentReviewElement = reviewElements[pageMark] ?? { key: "|", a11yIds: [], imageIds: [] };
+  const reviewFindingIds = currentReviewElement.a11yIds;
+  const reviewImageIds = currentReviewElement.imageIds;
+  const reviewKey = currentReviewElement.key;
+  const savedReview = storedReview(currentReviewElement);
+  const canReview = reviewing && reviewFindingIds.length + reviewImageIds.length > 0;
+  // The issue's plain-language title, for the suggested notes. The same
+  // query, and so the same cache, as the issue page the reader came from.
+  const { data: issueDetail } = useQuery({
+    queryKey: ["issue-detail", scan, issueKey, "occurrences_desc"],
+    queryFn: () => api.getIssueDetail(scan, issueKey ?? "", "occurrences_desc"),
+    enabled: canReview && Boolean(issueKey),
+    staleTime: 60_000,
+  });
+  // Issue notes suggested from the scan: page state, element, problem.
+  const activeState = data?.states.find((state) => state.state_key === activeStateKey) ?? null;
+  const suggestedNotes =
+    canReview && currentElement && issueDetail
+      ? suggestIssueNotes({
+          clickChain: activeState ? clickChain(activeState) : null,
+          kind: currentElement.kind,
+          text: currentElement.text,
+          title: issueDetail.row.title,
+          details: currentFindings
+            .filter((f) => reviewFindingIds.includes(f.id))
+            .map((f) => f.failure_summary ?? ""),
+        })
+      : "";
+  const setReviewDraft = (next: ReviewDraft | undefined) =>
+    setReviewDrafts((drafts) => {
+      const rest = { ...drafts };
+      delete rest[reviewKey];
+      return next ? { ...rest, [reviewKey]: next } : rest;
+    });
+  // The saved review is shown at once, from the server's answer. The page
+  // evidence is marked stale without refetching it now, so the next visit
+  // reads the stored review.
+  const reviewsChanged = () => {
+    void queryClient.invalidateQueries({
+      queryKey: ["page-evidence", scan, page],
+      refetchType: "none",
+    });
+    // The issue's counts (checked, reported) feed "Mark … as repeats".
+    void queryClient.invalidateQueries({ queryKey: ["issue-detail", scan, issueKey] });
   };
+  const reviewSaved = (review: OccurrenceReview) => {
+    setSavedReviews((reviews) => ({ ...reviews, [reviewKey]: review }));
+    reviewsChanged();
+  };
+
+  // "Mark … as repeats": every element the stepper steps through in this
+  // page state that has no decision yet and no unsaved edit. Offered only
+  // once a person has reported an element of this issue, anywhere in the
+  // report: a repeat is a repeat of one already reported, and marking
+  // everything before that would leave the issue out of the ITS export.
+  const notCheckedElements = reviewElements.filter(
+    (element) => !storedReview(element)?.decision && !reviewDrafts[element.key],
+  );
+  const reportedInIssue =
+    (issueDetail?.pages.reduce((total, p) => total + (p.reported_count ?? 0), 0) ?? 0) +
+    Object.values(savedReviews).filter((review) => review.decision === "report").length;
+  // The elements the last "Mark … as repeats" changed, with the review each
+  // had before, so it can be taken back exactly.
+  const [lastRepeats, setLastRepeats] = useState<
+    { element: ReviewElement; before: OccurrenceReview | null }[]
+  >([]);
+  // A bulk change's outcome, said in the review region's status line.
+  const [bulkMessage, setBulkMessage] = useState<{ text: string; error?: boolean } | null>(null);
+  useEffect(() => setBulkMessage(null), [reviewKey]);
+  // A new page or page state is a new set of elements; its undo goes too.
+  useEffect(() => setLastRepeats([]), [page, activeStateKey]);
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  /** Save one decision for many elements, notes kept, in requests the server accepts. */
+  const saveDecision = async (elements: ReviewElement[], decision: "repeat" | null) => {
+    const a11y = elements.flatMap((element) => element.a11yIds);
+    const images = elements.flatMap((element) => element.imageIds);
+    for (let start = 0; start < a11y.length; start += REVIEW_BATCH) {
+      await api.saveOccurrenceReview(scan, page, {
+        a11y_finding_ids: a11y.slice(start, start + REVIEW_BATCH),
+        page_image_ids: [],
+        decision,
+        notes: null,
+      });
+    }
+    for (let start = 0; start < images.length; start += REVIEW_BATCH) {
+      await api.saveOccurrenceReview(scan, page, {
+        a11y_finding_ids: [],
+        page_image_ids: images.slice(start, start + REVIEW_BATCH),
+        decision,
+        notes: null,
+      });
+    }
+  };
+  const markRepeats = async () => {
+    if (bulkBusy || notCheckedElements.length === 0) return;
+    const elements = notCheckedElements;
+    const before = elements.map((element) => ({ element, before: storedReview(element) }));
+    setBulkBusy(true);
+    try {
+      await saveDecision(elements, "repeat");
+      const now = new Date().toISOString();
+      setSavedReviews((reviews) => ({
+        ...reviews,
+        ...Object.fromEntries(
+          before.map(({ element, before: was }) => [
+            element.key,
+            { decision: "repeat" as const, notes: was?.notes ?? "", updated_at: now },
+          ]),
+        ),
+      }));
+      setLastRepeats(before);
+      setBulkMessage({ text: `${plural(elements.length, "element")} marked as repeats.` });
+      reviewsChanged();
+    } catch (error) {
+      setBulkMessage({ text: `Axcess could not mark them as repeats. ${errorText(error)} Try again.`, error: true });
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+  const undoRepeats = async () => {
+    if (bulkBusy || lastRepeats.length === 0) return;
+    setBulkBusy(true);
+    try {
+      await saveDecision(lastRepeats.map(({ element }) => element), null);
+      const now = new Date().toISOString();
+      setSavedReviews((reviews) => ({
+        ...reviews,
+        ...Object.fromEntries(
+          lastRepeats.map(({ element, before: was }) => [
+            element.key,
+            { decision: null, notes: was?.notes ?? "", updated_at: now },
+          ]),
+        ),
+      }));
+      setBulkMessage({ text: `${plural(lastRepeats.length, "element")} set back to not checked yet.` });
+      setLastRepeats([]);
+      reviewsChanged();
+    } catch (error) {
+      setBulkMessage({ text: `Axcess could not take them back. ${errorText(error)} Try again.`, error: true });
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+  // The occurrence an AI suggestion is asked for: the first one on the
+  // element the reader is on. Occurrences sharing an element are of the same
+  // issue on the same markup, so one suggestion fixes them all.
+  const currentOccurrence = useMemo((): { kind: SuggestionOccurrenceKind; id: number } | null => {
+    for (const index of highlight?.steps[pageMark]?.targets ?? []) {
+      const target = scopedTargets[index];
+      if (target?.imageOccurrenceId !== undefined) return { kind: "image", id: target.imageOccurrenceId };
+      const findingId = target?.findingIds?.[0];
+      if (findingId !== undefined) return { kind: "a11y", id: findingId };
+    }
+    return null;
+  }, [highlight, pageMark, scopedTargets]);
+  // Same gating as the page details screen (PageEvidence): only an
+  // unprotected report, and only when an administrator turned the feature on.
+  const { data: suggestionStatus } = useQuery({
+    queryKey: ["suggestion-status"],
+    queryFn: api.getSuggestionStatus,
+    retry: false,
+    staleTime: 30_000,
+  });
+  const suggestionsApply =
+    !!scanData && !scanData.protection && suggestionStatus !== undefined;
+  const suggestions: SuggestionAvailability | null =
+    // Keep saved answers visible when AI is off; request controls are hidden
+    // inside FixSuggestion. W3C COGA (paraphrased: preserve context),
+    // https://www.w3.org/TR/coga-usable/.
+    suggestionsApply ? suggestionStatus : null;
+  // AI turned off is not "blocked": nothing is said (SuggestionsBlockedNote).
+  const suggestionsBlocked =
+    suggestionsApply && !suggestionStatus.enabled && suggestionStatus.reason !== "turned_off"
+      ? suggestionStatus
+      : null;
+  // With AI off, the panel shows only for a saved answer: an empty panel
+  // would be a box with nothing in it. Same cache entry FixSuggestion reads.
+  const saved = useSavedSuggestion(
+    scan,
+    currentOccurrence?.kind ?? "a11y",
+    currentOccurrence?.id ?? 0,
+    Boolean(suggestions && !suggestions.enabled && currentOccurrence),
+  );
+  const hasSaved = Boolean(saved.data && saved.data.status !== "cancelled");
+  // Which of the two panels under the toolbar show (see the comment on that
+  // row for the layout).
+  const showSuggestion = Boolean(
+    showHighlights &&
+      highlightedCount > 0 &&
+      currentOccurrence &&
+      (suggestions?.enabled || suggestionsBlocked || hasSaved),
+  );
+  const showReview = Boolean(showHighlights && highlightedCount > 0 && currentElement && canReview);
   const goToPageMark = (index: number) => {
     const bounded = Math.max(0, Math.min(highlightedCount - 1, index));
     setPageMark(bounded);
@@ -879,7 +1179,7 @@ export default function InspectorRoute() {
           <ExternalLinkButton
             href={liveUrl}
             variant="secondary"
-            aria-label={`Open live page: ${displayTitle} (opens in a new tab)`}
+            aria-label={`Open live page: ${displayTitle} (${OPENS_NEW_WINDOW})`}
           >
             <ExternalLink className="h-4 w-4" aria-hidden />
             Open live page
@@ -1028,22 +1328,26 @@ export default function InspectorRoute() {
           <div>
             {/* Top corners as the panel's inner ones (8px less its 1px border),
                 so the bar's fill does not paint square corners over them. */}
-            {/* Two sides and a line under them. Left, finding the element:
-                the stepper (count, Previous element, Next element, Go to
-                element; FlaggedStepper), the reader's main task, where
-                reading starts. Right, how the copy is shown: Show at full
-                width and Hide highlights, settings rather than steps. Under
-                both, on a line of its own at a reading width, what Go to
-                element does (also its description) and, when focus could
-                not move, why (a status, in words; SC 4.1.3 Status Messages,
-                Level AA). "5 places highlighted" is not shown beside the
-                stepper: "Flagged element 1 of 5" already gives the number,
+            {/* Two sides. Left, finding the element: the stepper (count,
+                Previous element, Next element; FlaggedStepper), the reader's
+                main task, where reading starts. Right, how the copy is
+                shown: Show at full width and Hide highlights, settings
+                rather than steps. No "Go to element" button and no line
+                explaining it: keyboard focus entering the copy goes to the
+                flagged element (``onFrameLoad``), and the frame's name says
+                so and says that Escape leaves it (the developer's decision,
+                2026-11-14; see FlaggedStepper). "5 places highlighted" is
+                not shown beside the stepper: "Flagged element 1 of 5"
+                already gives the number,
                 and saying it twice crowded the bar into a third line (W3C
                 COGA, "Making Content Usable",
                 https://www.w3.org/TR/coga-usable/: keep it simple, no
                 repeats). Without the stepper the label stays: it says the
                 copy's name, or that highlighting is under way. */}
-            <div className="flex flex-wrap items-center gap-2 rounded-t-[7px] border-b border-border bg-surface-muted/40 px-3 py-2">
+            <div
+              ref={toolbarRef}
+              className="flex flex-wrap items-center gap-2 rounded-t-[7px] border-b border-border bg-surface-muted/40 px-3 py-2"
+            >
               {stepping ? (
                 <FlaggedStepper
                   count={highlightedCount}
@@ -1054,7 +1358,6 @@ export default function InspectorRoute() {
                       ? `${currentElement.kind}${currentElement.text ? `, “${currentElement.text}”` : ""}`
                       : undefined
                   }
-                  goTo={currentElement ? { onClick: goToElement, ref: goToRef, hintId: "inspect-go-to-hint" } : undefined}
                 />
               ) : (
                 <span className="text-xs font-semibold text-fg-subtle">
@@ -1084,20 +1387,6 @@ export default function InspectorRoute() {
                   </button>
                 )}
               </span>
-              {stepping && currentElement && (
-                <p id="inspect-go-to-hint" className="basis-full text-xs text-fg-muted">
-                  <span className="block max-w-measure">
-                    Go to element moves keyboard focus to it. Press Escape to come back.
-                  </span>
-                </p>
-              )}
-              <p role="status" className="basis-full text-xs text-fg empty:sr-only">
-                {goToNote && (
-                  <span key={goToNote.attempt} className="block max-w-measure">
-                    {goToNote.text}
-                  </span>
-                )}
-              </p>
             </div>
             {/* Why a highlight is missing or partial ("Axcess could not find
                 the flagged element in this copy", "found 3 of 5"), and
@@ -1211,72 +1500,116 @@ export default function InspectorRoute() {
                 screenshot is captured or stored. `onLoad` is a document-load
                 lifecycle signal, not an interaction, so the a11y rule below is
                 a false positive for an iframe. */}
-            {/* What the numbered box is on, as a short table with the same
-                labels in the same places for every flagged element, so
-                Previous / Next change only the values. The toolbar above
-                already says which one you are on, so this does not repeat it. */}
-            {showHighlights && highlightedCount > 0 && currentElement && (
+            {/* The AI suggestion and the person's review of the flagged
+                element share one row under the toolbar: the suggestion on
+                the left, two thirds of the width, and the review on the
+                right, one third (the developer's layout, 2026-11-11). Both
+                are about the element the reader is on, so they sit together
+                and follow Previous / Next (W3C COGA "Making Content Usable",
+                paraphrased: keep related content together;
+                https://www.w3.org/TR/coga-usable/).
+                - The suggestion comes first in the page code too, not only on
+                  screen, so Tab and a screen reader meet them in the order
+                  they are seen, left then right (SC 2.4.3 Focus Order,
+                  Level A; SC 1.3.2 Meaningful Sequence, Level A). Rejected:
+                  keeping the review first in the code and moving it right
+                  with CSS, which would send focus right and then back left.
+                - Side by side from lg (1024 px). Narrower, they stack in the
+                  same order, so nothing needs scrolling sideways at 320 px
+                  (SC 1.4.10 Reflow, Level AA).
+                - When only one shows (no suggestion when AI suggestions are
+                  not set up, no review on a protected report), it keeps the
+                  width it had alone: the suggestion the full row, the review
+                  its 21rem column.
+                - The review keeps its 21rem column inside its third, so its
+                  buttons keep the rows ElementReview's layout is built for
+                  ("Mark ... as repeats" under "Review this element").
+                - The suggestion needs only the occurrence, so it must not
+                  wait for, or vanish with, the saved copy; the review needs
+                  the element described, so it waits. Keyed on the occurrence
+                  so stepping never shows the last element's suggestion.
+                  Heading level 2: this sits straight under the page's h1
+                  (SC 1.3.1 Info and Relationships, Level A). Rejected for
+                  the suggestion: a list under the page, a long scroll from
+                  the element, and a third tab beside "Saved copy", which
+                  would hide the outlined element while the fix is read.
+
+                There was a table of facts here too: What it is, Text or
+                label, Size, Where the box is, and an element's place in the
+                page code. The developer removed it (2026-11-10), against the
+                recommendation to keep it, as part of taking locators and
+                other page-code details off the screens. What it said is
+                still said elsewhere: the toolbar status names the element
+                ("Link, “Read the big story”"), and when no box is drawn the
+                line under the saved copy says why (BOX_NOTES), so a hidden
+                element is never left unexplained (SC 1.3.3 Sensory
+                Characteristics, Level A: the box's absence alone cannot say
+                why). Lost with it: the size in pixels, the image address,
+                and the count of occurrences on one element. */}
+            {(showSuggestion || showReview) && (
               <div
-                role="group"
-                aria-label="The flagged element you are on"
-                className="border-b border-border bg-surface px-3 py-2 text-sm text-fg"
+                className={cn(
+                  "border-b border-border bg-surface px-3 py-2 text-sm text-fg",
+                  showSuggestion && showReview && "lg:grid lg:grid-cols-3 lg:gap-6",
+                )}
               >
-                <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 sm:gap-x-4">
-                  <ElementFact term="What it is">{currentElement.kind}</ElementFact>
-                  <ElementFact term="Text or label">
-                    {currentElement.text ? (
-                      `“${currentElement.text}”`
-                    ) : (
-                      <span className="text-fg-muted">None found</span>
+                {showSuggestion && currentOccurrence && (
+                  <div className="min-w-0 lg:col-span-2">
+                    {suggestions && (
+                      <FixSuggestion
+                        key={`${currentOccurrence.kind}-${currentOccurrence.id}`}
+                        scanId={scan}
+                        kind={currentOccurrence.kind}
+                        occurrenceId={currentOccurrence.id}
+                        availability={suggestions}
+                        headingLevel={2}
+                      />
                     )}
-                  </ElementFact>
-                  <ElementFact term="Size">
-                    <span className="tabular-nums">
-                      {pixels(currentElement.width)} wide, {pixels(currentElement.height)} tall
-                    </span>
-                    {/* The row below says where the box is when it is not on the element. */}
-                    {currentElement.where === null &&
-                      (currentElement.width === 0 || currentElement.height === 0) && (
-                      <span className="block text-xs text-fg-muted">
-                        It has no visible size in this saved copy, so the box marks where it sits.
-                      </span>
+                    {suggestionsBlocked && (
+                      <SuggestionsBlockedNote status={suggestionsBlocked} className={suggestions ? "mt-3" : ""} />
                     )}
-                  </ElementFact>
-                  {currentElement.where && (
-                    <ElementFact term="Where the box is">{BOX_NOTES[currentElement.where]}</ElementFact>
-                  )}
-                  {sharedCount > 1 && <ElementFact term="Issue occurrences">{sharedCount} on this element</ElementFact>}
-                  {currentPlace ? (
-                    <>
-                      <ElementFact term="Where it is in the page code" stack>
-                        Number {currentPlace.index + 1} of the {currentPlace.total}{" "}
-                        <code translate="no" className="font-mono text-xs">
-                          {currentPlace.selector}
-                        </code>{" "}
-                        {currentPlace.total === 1 ? "element" : "elements"}
-                      </ElementFact>
-                      {currentAddress && (
-                        <ElementFact term="Image address">
-                          <code translate="no" className="font-mono text-xs">
-                            {currentAddress}
-                          </code>
-                        </ElementFact>
-                      )}
-                    </>
-                  ) : (
-                    shownLocator && (
-                      <ElementFact term={locatorTerm} stack>
-                        <LocatorValue
-                          key={shownLocator}
-                          id="inspect-locator"
-                          value={shownLocator}
-                          open={locatorOpen}
-                          onOpenChange={setLocatorOpen}
-                        />
-                      </ElementFact>
-                    )
-                  )}
-                </dl>
+                  </div>
+                )}
+                {showReview && currentElement && (
+                  <div
+                    role="group"
+                    aria-label="The flagged element you are on"
+                    className={cn(
+                      showSuggestion &&
+                        "mt-3 border-t border-border pt-3 lg:mt-0 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0",
+                    )}
+                  >
+                    <div className="max-w-[21rem]">
+                      <ElementReview
+                        key={`${scan}:${page}`}
+                        scanId={scan}
+                        pageId={page}
+                        elementKey={reviewKey}
+                        elementName={[
+                          currentElement.kind,
+                          currentElement.text ? `“${currentElement.text}”` : null,
+                        ]
+                          .filter(Boolean)
+                          .join(", ")}
+                        a11yFindingIds={reviewFindingIds}
+                        pageImageIds={reviewImageIds}
+                        suggestedNotes={suggestedNotes}
+                        bulk={{
+                          markCount: reportedInIssue > 0 ? notCheckedElements.length : 0,
+                          undoCount: lastRepeats.length,
+                          busy: bulkBusy,
+                          message: bulkMessage,
+                          onMark: markRepeats,
+                          onUndo: undoRepeats,
+                        }}
+                        saved={savedReview}
+                        draft={reviewDrafts[reviewKey]}
+                        onDraftChange={setReviewDraft}
+                        onSaved={reviewSaved}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
             {/* Says when the saved copy may not look like the page Axcess
@@ -1315,12 +1648,25 @@ export default function InspectorRoute() {
             {/* The check's window, centred on a grey stage, so its width is
                 the page's width, as it was when the issue was found. */}
             <div className={cn(layout?.width && "flex justify-center overflow-auto bg-surface-muted p-4")}>
+              {/* The frame's name says how to move in and out of it by
+                  keyboard: Tab into it goes to the flagged element (only
+                  when it can take focus, ``canFocusInCopy``), and Escape
+                  goes back. A
+                  screen reader reads the name as focus enters the copy,
+                  where the help is needed. It replaced a visible line under
+                  the toolbar ("Go to element moves keyboard focus to it.
+                  Press Escape to come back."), removed with that button
+                  (the developer's decision, 2026-11-14). A sighted keyboard
+                  user sees where focus landed: the focus ring is on the
+                  element inside the numbered box. */}
               {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
               <iframe
                 ref={frameRef}
                 srcDoc={srcDoc}
                 onLoad={onFrameLoad}
-                title={`${copyName}: ${displayTitle}`}
+                title={`${copyName}: ${displayTitle}. ${
+                  landsOnElement ? "Tab into it goes to the flagged element. " : ""
+                }Press Escape to go back to where you were.`}
                 sandbox="allow-same-origin"
                 referrerPolicy="no-referrer"
                 className={cn(
@@ -1335,12 +1681,20 @@ export default function InspectorRoute() {
             {!highlightPending && showHighlights && highlightedCount > 0 && (
               <p className="border-t border-border px-3 py-2 text-xs text-fg-muted">
                 <span className="block max-w-measure">
+                  {/* Where the box is, in words, follows the key whenever it is
+                      not simply around the element: a box that is not drawn,
+                      or one drawn on a list box or around what an element
+                      holds. The facts table used to say it; it was removed
+                      (see the comment above the review panel), and the box's
+                      place alone cannot say why (SC 1.3.3 Sensory
+                      Characteristics, Level A). */}
                   {highlightedCount > 1
                     ? `Dashed red outlines mark the ${highlightedCount} flagged elements on this page. The one you are on has a numbered blue box with a yellow ring, and the rest of the page is dimmed.`
                     : // Never describe a box that is not drawn (see ``drawsNoBox``).
                       drawsNoBox(currentElement?.where ?? null)
-                      ? "No box marks the flagged element. The table above the saved copy says why."
+                      ? "No box marks the flagged element."
                       : "A blue box with a yellow ring marks the flagged element."}
+                  {currentElement?.where && ` Where the box is: ${BOX_NOTES[currentElement.where]}`}
                 </span>
               </p>
             )}
@@ -1378,11 +1732,8 @@ export default function InspectorRoute() {
                         {f.help}
                         <span className="ml-1 font-normal text-fg-muted">({f.rule_id})</span>
                       </p>
-                      {f.target_selector && (
-                        <code className="mt-0.5 block overflow-x-auto whitespace-nowrap rounded-2xs border border-border bg-surface px-2 py-1 text-2xs text-fg">
-                          {f.target_selector}
-                        </code>
-                      )}
+                      {/* The code without the locator above it: why, ElementCode
+                          in components/ui.tsx. */}
                       {f.html_snippet && (
                         <pre className="mt-1 max-h-24 overflow-auto whitespace-pre-wrap break-all rounded-2xs border border-border bg-surface px-2 py-1 text-2xs leading-relaxed text-fg-muted">
                           {f.html_snippet}
@@ -1657,13 +2008,14 @@ function escapeAttribute(value: string): string {
 
 /**
  * Scroll the inspector page so ``target``, inside the saved copy's frame, is
- * in view below the sticky top bar, after "Go to element" put focus on
- * it. Focus moves without scrolling (``focusInCopy``) and ``keepCentered``
- * scrolls only the frame, which is right while stepping, where the page must
- * not jump. But this button is above the frame, so on a short window (or
- * with a tall facts table) focus landed on an element below the bottom of
- * the screen, and a keyboard user could not see where it went (SC 2.4.11
- * Focus Not Obscured (Minimum), Level AA; found by review). The page moves
+ * in view below the sticky top bar, after keyboard focus entering the copy
+ * moved onto it (``onFrameLoad``). Focus moves without scrolling
+ * (``focusInCopy``) and ``keepCentered`` scrolls only the frame, which is
+ * right while stepping, where the page must not jump. But the copy can
+ * start below the screen on a short window, or with the element under the
+ * sticky bar, so a keyboard user could not see where focus went (SC 2.4.11
+ * Focus Not Obscured (Minimum), Level AA; found by review of the "Go to
+ * element" button this replaced). The page moves
  * only when the element is not fully shown already, and then centres it in
  * the room under the bar (the page's scroll-padding-top, styles.css).
  */
@@ -1920,206 +2272,6 @@ function unreachableSentence(count: number, where: Unreachable): string {
     : `${lead} inside another page shown within this one (an iframe). The saved copy does not keep that page.`;
 }
 
-/** "1 pixel", "924 pixels". */
-function pixels(n: number): string {
-  return `${n} ${n === 1 ? "pixel" : "pixels"}`;
-}
-
-/**
- * One labelled fact about the flagged element: the label, then its value,
- * lined up with the rows above and below. A long label (`stack`) sits above
- * its value until the screen is wide, so the value keeps its room on a
- * narrow screen.
- */
-function ElementFact({ term, stack = false, children }: { term: string; stack?: boolean; children: ReactNode }) {
-  return (
-    <div
-      className={cn(
-        "col-span-2",
-        stack ? "lg:grid lg:grid-cols-subgrid lg:items-baseline" : "grid grid-cols-subgrid items-baseline",
-      )}
-    >
-      <dt className="text-xs font-semibold text-fg-muted">{term}</dt>
-      <dd className="min-w-0 [overflow-wrap:anywhere]">{children}</dd>
-    </div>
-  );
-}
-
-/**
- * An element locator, and under it the two controls for it: "Copy element
- * locator" and, when the locator is cut, "Show all".
- *
- * The locator is on one line, cut at its start, so its end, the part that
- * names the element, stays in view; "Show all" puts each step on its own
- * line. The cut is visual only: the text in the page is the whole locator,
- * character for character, and a screen reader reads all of it.
- *
- * The controls are on their own line under the locator, in the value
- * column. Rejected, in turn: (1) the controls at the end of the locator's
- * line, which made that row a 44 px button tall, taller than the rows above
- * it, so the facts table lost its even rhythm where the eye reads values;
- * and a "Show all" that came and went there changed the locator's width,
- * which changed whether it was cut, every frame, so it had to stay in place
- * invisibly, keeping the gap. (2) "Copy element locator" in a row of its
- * own under the whole table, behind a divider, far from the value it copies.
- * Under the locator, Copy sits next to what it acts on (W3C COGA, "Making
- * Content Usable", https://www.w3.org/TR/coga-usable/: keep related things
- * together), the locator's line is plain text like the others, and "Show
- * all" can be left out entirely when the locator fits, since it no longer
- * shares the locator's line. Copy comes first, so it stays in one place
- * whether or not Show all is there. Both are full 44 px targets (SC 2.5.5
- * Target Size (Enhanced), Level AAA).
- *
- * The copy button's words never change; the result is said in words in a
- * status under the controls, at a reading width (SC 4.1.3 Status Messages,
- * Level AA; SC 1.4.8 Visual Presentation, Level AAA). Each copy gets a new
- * key, so a second "Copied" is announced like the first. When the browser
- * blocks copying (plain http on a network address), the whole locator is
- * shown and selected, so Ctrl+C or Command+C copies it.
- */
-function LocatorValue({
-  id,
-  value,
-  open,
-  onOpenChange,
-}: {
-  id: string;
-  value: string;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const codeRef = useRef<HTMLElement>(null);
-  const probeRef = useRef<HTMLSpanElement>(null);
-  const toggleRef = useRef<HTMLButtonElement>(null);
-  const copyRef = useRef<HTMLButtonElement>(null);
-  const [cut, setCut] = useState(false);
-  // Whether the locator is wider than its line, measured on a hidden copy of
-  // it on one line (the probe), so the answer holds while it is shown in
-  // full too. A font that arrives late resizes the probe, which measures
-  // again.
-  useLayoutEffect(() => {
-    const code = codeRef.current;
-    const probe = probeRef.current;
-    if (!code || !probe) return;
-    const measure = () => {
-      const isCut = probe.getBoundingClientRect().width > code.clientWidth + 0.5;
-      // The toggle is about to go: move its focus on rather than lose it.
-      if (!isCut && !open && document.activeElement === toggleRef.current) copyRef.current?.focus();
-      setCut(isCut);
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(code);
-    observer.observe(probe);
-    return () => observer.disconnect();
-  }, [open]);
-
-  const attempts = useRef(0);
-  const [copied, setCopied] = useState<{ attempt: number; ok: boolean } | null>(null);
-  const selectLocator = () => {
-    const code = codeRef.current;
-    if (code) window.getSelection()?.selectAllChildren(code);
-  };
-  // Selected once the whole locator is on screen, not on a guess at when that is.
-  const selectWhenOpen = useRef(false);
-  useLayoutEffect(() => {
-    if (!open || !selectWhenOpen.current) return;
-    selectWhenOpen.current = false;
-    selectLocator();
-  });
-  const copy = async () => {
-    attempts.current += 1;
-    const attempt = attempts.current;
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied({ attempt, ok: true });
-    } catch {
-      setCopied({ attempt, ok: false });
-      if (open) selectLocator();
-      else {
-        selectWhenOpen.current = true;
-        onOpenChange(true);
-      }
-    }
-  };
-
-  // Split before each " > ", so the steps join back into the exact locator.
-  // The split is for display only: textContent, copy and tests stay exact.
-  const steps = value.split(/(?= > )/);
-  const last = steps.length - 1;
-  const stepSpans = (block: boolean) =>
-    steps.map((step, index) => (
-      <span
-        key={index}
-        className={cn(block && "block pl-4 -indent-4", index === last && steps.length > 1 && "font-semibold")}
-      >
-        {step}
-      </span>
-    ));
-  return (
-    <div className="relative">
-      {/* Out of the flow and clipped to nothing, so it never widens the page. */}
-      <span aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-0 overflow-hidden">
-        <span ref={probeRef} className="invisible inline-block whitespace-nowrap font-mono text-xs">
-          {stepSpans(false)}
-        </span>
-      </span>
-      <code
-        id={id}
-        ref={codeRef}
-        translate="no"
-        className={cn(
-          "block min-w-0 font-mono text-xs text-fg",
-          !open && "overflow-hidden text-ellipsis whitespace-nowrap text-left [direction:rtl]",
-        )}
-      >
-        <span dir="ltr" className={open ? "block" : undefined}>
-          {stepSpans(open)}
-        </span>
-      </code>
-      <div className="mt-1 flex flex-wrap items-center gap-2">
-        <Button ref={copyRef} type="button" variant="secondary" size="sm" className="min-h-target" onClick={copy}>
-          <Copy className="h-3.5 w-3.5" aria-hidden />
-          Copy element locator
-        </Button>
-        {(cut || open) && (
-          <Button
-            ref={toggleRef}
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="min-h-target"
-            aria-expanded={open}
-            aria-controls={id}
-            onClick={() => {
-              // Closing a locator that fits removes this button: focus Copy first.
-              if (open && !cut) copyRef.current?.focus();
-              onOpenChange(!open);
-            }}
-          >
-            {open ? <ChevronUp className="h-3.5 w-3.5" aria-hidden /> : <ChevronDown className="h-3.5 w-3.5" aria-hidden />}
-            {open ? "Show less" : "Show all"}
-          </Button>
-        )}
-      </div>
-      <p role="status" className="mt-1 max-w-measure text-xs text-fg empty:sr-only">
-        {copied &&
-          (copied.ok ? (
-            <span key={copied.attempt} className="inline-flex items-center gap-1">
-              <Check className="h-3.5 w-3.5" aria-hidden />
-              Copied
-            </span>
-          ) : (
-            <span key={copied.attempt}>
-              Not copied. Your browser did not allow it. The element locator is now shown in full and selected.
-              Press Ctrl+C, or Command+C on a Mac, to copy it.
-            </span>
-          ))}
-      </p>
-    </div>
-  );
-}
-
 /**
  * How many of the occurrences under review a page state holds, in words:
  * ": 19 occurrences". A bare "(19)" left the reader to guess what was
@@ -2132,6 +2284,19 @@ function LocatorValue({
  * for a card can run on ("Fellowships · FundedTeach For Nepal…"), so each
  * name is cut at a word near 40 characters.
  */
+/** Occurrences one review request may name (the server's bound). */
+const REVIEW_BATCH = 50;
+
+function plural(count: number, noun: string): string {
+  return `${count.toLocaleString()} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+function errorText(error: unknown): string {
+  return error instanceof ApiError
+    ? error.message
+    : "The Axcess server did not respond. Check that it is still running.";
+}
+
 function clickChain(state: { path_labels: string[]; revealed_by: string }): string {
   const names = state.path_labels.length > 0 ? state.path_labels : [state.revealed_by];
   return names.map((name) => `“${shortName(name)}”`).join(" → ");
@@ -2185,14 +2350,17 @@ function shorten(text: string, max: number): string {
  * keys the Issues page builds: ``axe:rule`` and ``keyboard:rule`` (and the
  * other browser checks), ``semantic:2.4.6`` for AI review (whose findings
  * keep the whole key as their rule), and ``alfa:rule:failed`` or
- * ``alfa:rule:cant_tell``, one issue for each Alfa outcome.
+ * ``alfa:rule:cant_tell``, one issue for each Alfa outcome. An axe rule has
+ * the same split: ``axe:rule`` is its failures and ``axe:rule:cant_tell``
+ * what axe could not decide ("needs review").
  */
 function findingInIssue(finding: PageEvidence["a11y_findings"][number], key: string): boolean {
   const [pipeline, rule, outcome] = key.split(":");
   if (!pipeline || !rule || finding.pipeline !== pipeline) return false;
   if (pipeline === "semantic") return finding.rule_id === key || finding.rule_id === rule;
   if (finding.rule_id !== rule) return false;
-  if (pipeline === "alfa") return (finding.engine_outcome || "failed") === (outcome || "failed");
+  if (pipeline === "alfa" || pipeline === "axe")
+    return (finding.engine_outcome || "failed") === (outcome || "failed");
   return true;
 }
 
@@ -2256,4 +2424,3 @@ function scheduleIdle(task: () => void): void {
     window.setTimeout(task, 0);
   }
 }
-

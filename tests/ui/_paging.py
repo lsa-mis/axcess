@@ -13,9 +13,11 @@ async def all_pages_text(page: Any, cells: Any, label: str) -> list[str]:
     Each turn waits for the "Showing …" line to change, so it never reads or
     clicks against the page it is leaving.
     """
-    previous = page.get_by_role("button", name=f"Previous page of {label.lower()}")
-    next_button = page.get_by_role("button", name=f"Next page of {label.lower()}")
-    status = page.get_by_role("navigation", name=f"{label}: page controls").get_by_role("status")
+    # The pager over the table: the one under it has the same buttons.
+    pager = page.get_by_role("navigation", name=f"{label}: page controls", exact=True)
+    previous = pager.get_by_role("button", name=f"Previous page of {label.lower()}")
+    next_button = pager.get_by_role("button", name=f"Next page of {label.lower()}")
+    status = pager.get_by_role("status")
 
     async def enabled(button: Any) -> bool:
         return bool(await button.count()) and await button.get_attribute("aria-disabled") != "true"

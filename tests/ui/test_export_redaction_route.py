@@ -178,6 +178,7 @@ def test_export_options_describe_the_redacted_files(
         assert option["filename"].endswith(
             {
                 "xlsx": ".xlsx",
+                "its": ".xlsx",
                 "audit": ".audit.md",
                 "brief": ".fix-brief.md",
                 "csv": ".csv",
@@ -191,7 +192,9 @@ def test_export_options_describe_the_redacted_files(
         )
         filename = response.headers["content-disposition"].split('filename="', 1)[1].rstrip('"')
         assert option["filename"] == filename
-        if option["format"] == "xlsx":
+        # Both workbooks are re-saved by the redaction pass, which stamps the
+        # time, so their sizes can differ by a few bytes between renders.
+        if option["format"] in {"xlsx", "its"}:
             assert abs(option["size_bytes"] - len(response.content)) <= 64
         else:
             assert option["size_bytes"] == len(response.content)

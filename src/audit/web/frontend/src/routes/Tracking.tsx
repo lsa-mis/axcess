@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
-import { TablePagination, usePagedRows } from "../components/TablePagination";
+import { PagedTable, usePagedRows } from "../components/TablePagination";
 import { Card, EmptyState, PageHeader } from "../components/ui";
 import {
   Cell,
@@ -204,70 +204,76 @@ export default function TrackingRoute() {
         </p>
 
         <Card>
-          <TableBar
-            pager={<TablePagination label="Criteria" noun="criteria" {...criteria} />}
-            footer={<ActiveFilters items={activeFilterItems(filterGroups)} onClear={clearFilters} />}
+          <PagedTable
+            pagination={{ label: "Criteria", noun: "criteria", ...criteria }}
+            top={(pager) => (
+              <TableBar
+                pager={pager}
+                footer={<ActiveFilters items={activeFilterItems(filterGroups)} onClear={clearFilters} />}
+              >
+                <FilterMenu
+              label="Filter criteria" groups={filterGroups} onChange={onFilter} onReset={clearFilters} />
+              </TableBar>
+            )}
           >
-            <FilterMenu
-          label="Filter criteria" groups={filterGroups} onChange={onFilter} onReset={clearFilters} />
-          </TableBar>
-          <TableStatus
-            actions={
-              <p role="status">
-                {isLoading
-                  ? "Loading the roadmap…"
-                  : `Showing ${rows.length} of ${allRows.length} rows${filterSummary ? ` · ${filterSummary}` : ""}`}
-              </p>
-            }
-          >
-            Sorted by {SORT_LABELS[sort]}, {sortWords(SORT_KINDS[sort], dir)}.
-          </TableStatus>
-          <TableRegion label="Roadmap table">
-            <Table caption="What Axcess checks for each WCAG 2.2 Level A and AA criterion, and planned AI reviews">
-              <TableHead>
-                <tr>
-                  <SortHeader column="sc" kind={SORT_KINDS.sc} {...sortProps}>
-                    Number
-                  </SortHeader>
-                  <SortHeader column="name" kind={SORT_KINDS.name} {...sortProps}>
-                    WCAG criterion
-                  </SortHeader>
-                  <SortHeader column="level" kind={SORT_KINDS.level} {...sortProps}>
-                    Level
-                  </SortHeader>
-                  {/* "How it's checked", not "Group": the column holds how each
-                      criterion is checked (Automated, Partly automated, AI-assisted,
-                      Manual only), and its sort button's words must say so on their
-                      own (SC 2.4.6 Headings and Labels, Level AA;
-                      tests/ui/test_control_text_purpose.py). */}
-                  <SortHeader column="method" kind={SORT_KINDS.method} {...sortProps}>
-                    How it&apos;s checked
-                  </SortHeader>
-                  <ColumnHeader>Where it stands</ColumnHeader>
-                  <ColumnHeader>What Axcess does</ColumnHeader>
-                  <ColumnHeader>What remains</ColumnHeader>
-                </tr>
-              </TableHead>
-              <tbody>
-                {criteria.pageRows.map((row, index) => (
-                  <Row key={row.key} index={(criteria.page - 1) * criteria.pageSize + index}>
-                    <RowHeader className="whitespace-nowrap font-mono text-xs text-fg">{row.sc}</RowHeader>
-                    <Cell className="text-fg">{row.name}</Cell>
-                    <Cell className="text-xs text-fg-muted">{row.level}</Cell>
-                    <Cell className="text-xs text-fg-muted">{GROUP_LABEL[row.group]}</Cell>
-                    <Cell>
-                      <Badge tone={row.tone}>{row.badge}</Badge>
-                    </Cell>
-                    <Cell className="text-xs text-fg-muted">
-                      {row.detail || "Does not apply"}
-                      {row.note && <span className="mt-1 block text-2xs">{row.note}</span>}
-                    </Cell>
-                    <Cell className="text-xs text-fg-muted">{row.remaining}</Cell>
-                  </Row>
-                ))}
-              </tbody>
-            </Table>
-          </TableRegion>
+            <TableStatus
+              actions={
+                <p role="status">
+                  {isLoading
+                    ? "Loading the roadmap…"
+                    : `Showing ${rows.length} of ${allRows.length} rows${filterSummary ? ` · ${filterSummary}` : ""}`}
+                </p>
+              }
+            >
+              Sorted by {SORT_LABELS[sort]}, {sortWords(SORT_KINDS[sort], dir)}.
+            </TableStatus>
+            <TableRegion label="Roadmap table">
+              <Table caption="What Axcess checks for each WCAG 2.2 Level A and AA criterion, and planned AI reviews">
+                <TableHead>
+                  <tr>
+                    <SortHeader column="sc" kind={SORT_KINDS.sc} {...sortProps}>
+                      Number
+                    </SortHeader>
+                    <SortHeader column="name" kind={SORT_KINDS.name} {...sortProps}>
+                      WCAG criterion
+                    </SortHeader>
+                    <SortHeader column="level" kind={SORT_KINDS.level} {...sortProps}>
+                      Level
+                    </SortHeader>
+                    {/* "How it's checked", not "Group": the column holds how each
+                        criterion is checked (Automated, Partly automated, AI-assisted,
+                        Manual only), and its sort button's words must say so on their
+                        own (SC 2.4.6 Headings and Labels, Level AA;
+                        tests/ui/test_control_text_purpose.py). */}
+                    <SortHeader column="method" kind={SORT_KINDS.method} {...sortProps}>
+                      How it&apos;s checked
+                    </SortHeader>
+                    <ColumnHeader>Where it stands</ColumnHeader>
+                    <ColumnHeader>What Axcess does</ColumnHeader>
+                    <ColumnHeader>What remains</ColumnHeader>
+                  </tr>
+                </TableHead>
+                <tbody>
+                  {criteria.pageRows.map((row, index) => (
+                    <Row key={row.key} index={(criteria.page - 1) * criteria.pageSize + index}>
+                      <RowHeader className="whitespace-nowrap font-mono text-xs text-fg">{row.sc}</RowHeader>
+                      <Cell className="text-fg">{row.name}</Cell>
+                      <Cell className="text-xs text-fg-muted">{row.level}</Cell>
+                      <Cell className="text-xs text-fg-muted">{GROUP_LABEL[row.group]}</Cell>
+                      <Cell>
+                        <Badge tone={row.tone}>{row.badge}</Badge>
+                      </Cell>
+                      <Cell className="text-xs text-fg-muted">
+                        {row.detail || "Does not apply"}
+                        {row.note && <span className="mt-1 block text-2xs">{row.note}</span>}
+                      </Cell>
+                      <Cell className="text-xs text-fg-muted">{row.remaining}</Cell>
+                    </Row>
+                  ))}
+                </tbody>
+              </Table>
+            </TableRegion>
+          </PagedTable>
         </Card>
         {!isLoading && rows.length === 0 && (
           <EmptyState
@@ -290,58 +296,57 @@ export default function TrackingRoute() {
           Ollama, an app that runs AI models on this computer.
         </p>
         <Card>
-          {pipelines.pages > 1 && (
-            <TableBar pager={<TablePagination label="Checks" noun="checks" {...pipelines} />} />
-          )}
-          <TableRegion label="Checks table">
-            <Table caption="Checks that run in a default scan">
-              <TableHead>
-                <tr>
-                  <ColumnHeader>Check</ColumnHeader>
-                  <ColumnHeader>Tool</ColumnHeader>
-                  <ColumnHeader>WCAG criteria checked</ColumnHeader>
-                  <ColumnHeader>Uses AI?</ColumnHeader>
-                </tr>
-              </TableHead>
-              <tbody>
-                {isLoading && (
-                  <tr className="border-t border-border">
-                    <td className="px-4 py-3.5 text-fg-muted" colSpan={4}>
-                      Loading…
-                    </td>
+          <PagedTable pagination={{ label: "Checks", noun: "checks", ...pipelines }}>
+            <TableRegion label="Checks table">
+              <Table caption="Checks that run in a default scan">
+                <TableHead>
+                  <tr>
+                    <ColumnHeader>Check</ColumnHeader>
+                    <ColumnHeader>Tool</ColumnHeader>
+                    <ColumnHeader>WCAG criteria checked</ColumnHeader>
+                    <ColumnHeader>Uses AI?</ColumnHeader>
                   </tr>
-                )}
-                {pipelines.pageRows.map((p, index) => (
-                  <Row key={p.pipeline} index={(pipelines.page - 1) * pipelines.pageSize + index}>
-                    <RowHeader className="font-medium text-fg">
-                      {p.name}{" "}
-                      <code className="rounded bg-surface-muted px-1 text-2xs text-fg-muted">
-                        {p.pipeline}
-                      </code>
-                      {p.note && (
-                        <span className="mt-1 block text-2xs font-normal text-fg-muted">
-                          {p.note}
-                        </span>
-                      )}
-                    </RowHeader>
-                    <Cell className="text-fg-muted">{p.engine}</Cell>
-                    <Cell className="text-fg-muted">{p.scs}</Cell>
-                    <Cell>
-                      {p.needs_ai ? (
-                        <span className="rounded bg-umich-blue px-2 py-0.5 text-2xs font-bold text-fg-inverse">
-                          AI
-                        </span>
-                      ) : (
-                        <span className="rounded bg-surface-muted px-2 py-0.5 text-2xs font-semibold text-fg-muted">
-                          Rules
-                        </span>
-                      )}
-                    </Cell>
-                  </Row>
-                ))}
-              </tbody>
-            </Table>
-          </TableRegion>
+                </TableHead>
+                <tbody>
+                  {isLoading && (
+                    <tr className="border-t border-border">
+                      <td className="px-4 py-3.5 text-fg-muted" colSpan={4}>
+                        Loading…
+                      </td>
+                    </tr>
+                  )}
+                  {pipelines.pageRows.map((p, index) => (
+                    <Row key={p.pipeline} index={(pipelines.page - 1) * pipelines.pageSize + index}>
+                      <RowHeader className="font-medium text-fg">
+                        {p.name}{" "}
+                        <code className="rounded bg-surface-muted px-1 text-2xs text-fg-muted">
+                          {p.pipeline}
+                        </code>
+                        {p.note && (
+                          <span className="mt-1 block text-2xs font-normal text-fg-muted">
+                            {p.note}
+                          </span>
+                        )}
+                      </RowHeader>
+                      <Cell className="text-fg-muted">{p.engine}</Cell>
+                      <Cell className="text-fg-muted">{p.scs}</Cell>
+                      <Cell>
+                        {p.needs_ai ? (
+                          <span className="rounded bg-umich-blue px-2 py-0.5 text-2xs font-bold text-fg-inverse">
+                            AI
+                          </span>
+                        ) : (
+                          <span className="rounded bg-surface-muted px-2 py-0.5 text-2xs font-semibold text-fg-muted">
+                            Rules
+                          </span>
+                        )}
+                      </Cell>
+                    </Row>
+                  ))}
+                </tbody>
+              </Table>
+            </TableRegion>
+          </PagedTable>
         </Card>
       </section>
 

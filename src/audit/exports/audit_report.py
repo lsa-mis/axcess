@@ -53,6 +53,8 @@ from audit.exports.interaction_coverage import InteractionCoverage
 from audit.exports.redaction import redact_evidence
 from audit.labels import CLICK_THROUGH, CLICK_THROUGH_STATES_LABEL, REVIEW_LANE_LABELS
 from audit.web import issues as issues_mod
+from audit.web.screen_reader_checks import ScreenReaderCheck, check_for
+from audit.web.screen_reader_checks import plain_text as sr_plain_text
 
 # The framework caps the executive summary at 8 sentences. The renderer
 # enforces this as a soft contract, it just doesn't emit more.
@@ -120,6 +122,7 @@ _PIPELINE_LABEL = {
     "responsive": "responsive & zoom probe",
     "focus": "live-page focus probe",
     "visual": "visual order and media playback probe",
+    "markup": "page code check (deterministic DOM questions axe-core does not ask)",
 }
 
 # Static description of each detection pipeline for the coverage section.
@@ -202,6 +205,16 @@ _PIPELINE_COVERAGE = [
         "partial-overlap and post-click overlays still need a human.",
     },
     {
+        "key": "markup",
+        "name": "Page code check",
+        "method": "Reads the rendered page code (DOM) right after axe-core, without "
+        "changing the page, and asks questions axe-core does not.",
+        "checks": "Each rule is its own issue type; its card names the WCAG criterion, "
+        "or says it is a best practice.",
+        "confidence": "Depends on the rule: each issue type says how sure it is. "
+        "It reads the page only as it loaded, not after clicking.",
+    },
+    {
         "key": "interaction",
         "name": CLICK_THROUGH,
         "method": "Operates the page's own menus, tabs, dialogs, and disclosure "
@@ -252,6 +265,10 @@ class IssueLocation:
     # instance a reader can reproduce and one they cannot: "open the Account
     # menu, then look at the field" versus "load the page".
     revealed_by: str | None = None
+    # The occurrence's own record and review status, for exports that list
+    # one row per occurrence (the ITS technical review).
+    finding_id: int | None = None
+    status: str | None = None
 
 
 @dataclass(frozen=True)
@@ -301,6 +318,9 @@ class AuditCard:
     needs_human_review: bool
     note: str | None
     finding_ids: list[int]
+    # Shared Mac and Windows steps (rules/screen_reader_checks.yaml), printed
+    # under the manual check, as the issue guidance shows them.
+    screen_reader_check: ScreenReaderCheck | None = None
 
 
 @dataclass(frozen=True)
@@ -364,7 +384,9 @@ def _bucket_rows_into_cards(
                 )
             )
 
-        if row.review_lane == "expert_review":
+        # A browser measurement is shown by default on the Issues page, but a
+        # report still states it only once a person has confirmed it.
+        if row.review_lane in {"measured", "expert_review"}:
             # ``in_progress`` is the current persisted decision that the expert
             # confirmed a barrier and remediation is still open. It belongs in
             # the substantive worklist; ``new`` and ``reviewing`` remain review
@@ -526,6 +548,8 @@ def render_audit_report(
     lines.append("")
     lines.append(f"**Seed URL:** {scan.seed_url}")
     lines.append(f"**Audited against:** WCAG {scan.wcag_version} Level {scan.axe_level}")
+    if scan.axe_core_version:
+        lines.append(f"**Rule check (axe) version:** axe-core {scan.axe_core_version}")
     lines.append(f"**Pages crawled:** {scan.page_count}")
     lines.append(f"**Detection methods used:** {_methods_line(rows)}")
     lines.append("")
@@ -1273,6 +1297,15 @@ def _render_card(idx: int, card: AuditCard) -> list[str]:
         lines.append("")
         if card.verify_manual:
             lines.append(f"- **Manual:** {_strip_html(card.verify_manual).strip()}")
+        if card.screen_reader_check:
+            for platform in card.screen_reader_check.platforms:
+                intro = f" {sr_plain_text(platform.intro).strip()}" if platform.intro else ""
+                lines.append(f"  - **{platform.name}:**{intro}")
+                if platform.link_url:
+                    link_text = platform.link_text or platform.link_url
+                    lines.append(f"    [{link_text}]({platform.link_url})")
+                for i, step in enumerate(platform.steps, start=1):
+                    lines.append(f"    {i}. {sr_plain_text(step)}")
         if card.verify_automated:
             lines.append(f"- **Automated:** {_strip_html(card.verify_automated).strip()}")
         if card.acceptance:
@@ -1352,7 +1385,11 @@ def _appendix_b(best_practice: list[Any]) -> list[str]:
         plural = "s" if row.page_count != 1 else ""
         # Show the underlying rule id (stripped of the ``axe:`` UI prefix)
         # so a developer can grep for it; keep the human title up front.
-        rule_id = row.issue_key.split(":", 1)[-1]
+        rule_id = (
+            issues_mod.axe_rule_id(row.issue_key)
+            if row.pipeline == "axe"
+            else row.issue_key.split(":", 1)[-1]
+        )
         lines.append(
             f"- **{row.title}** (`{rule_id}`), {row.occurrence_count} "
             f"finding(s) on {row.page_count} page{plural}; "
@@ -1423,20 +1460,28 @@ def _card_from_row(
         needs_human_review=(row.pipeline == "alfa") or not row.fix_steps,
         note=row.help_url,
         finding_ids=list(row.finding_ids),
+        screen_reader_check=check_for(meta.get("screen_reader_check")),
     )
+
+
+# Ids bound per query when every occurrence is loaded; well under SQLite's
+# bound-parameter limit.
+_LOCATION_BATCH = 500
 
 
 def _locations_for_row(
     conn: sqlite3.Connection,
     row: Any,
     *,
+    limit: int | None = MAX_LOCATIONS_PER_CARD,
     redact: bool = False,
 ) -> tuple[list[IssueLocation], int]:
     """Pull element-level "exactly where" pointers for a row's findings.
 
     DOM pipelines (axe/semantic/keyboard) live in ``page_a11y_findings``;
     image findings live in ``findings`` joined out to their pages. Capped
-    at ``MAX_LOCATIONS_PER_CARD`` with the remainder reported as overflow.
+    at ``limit`` (``MAX_LOCATIONS_PER_CARD`` by default) with the remainder
+    reported as overflow; ``limit=None`` loads every occurrence.
 
     With ``redact``, each description is written from a redacted copy of the
     occurrence's evidence (:func:`audit.exports.redaction.redact_evidence`).
@@ -1449,16 +1494,44 @@ def _locations_for_row(
     ids = list(row.finding_ids)
     if not ids:
         return [], 0
-    sample = ids[:MAX_LOCATIONS_PER_CARD]
+    sample = ids if limit is None else ids[:limit]
+    locations: list[IssueLocation] = []
+    for start in range(0, len(sample), _LOCATION_BATCH):
+        locations.extend(
+            _locations_for_ids(conn, row, sample[start : start + _LOCATION_BATCH], redact=redact)
+        )
+    overflow = max(0, len(ids) - len(locations))
+    return locations, overflow
+
+
+def _locations_for_ids(
+    conn: sqlite3.Connection,
+    row: Any,
+    sample: list[int],
+    *,
+    redact: bool = False,
+) -> list[IssueLocation]:
+    """Load the locations of one batch of a row's finding ids (redacted when
+    asked; see ``_locations_for_row``)."""
     placeholders = ",".join("?" for _ in sample)
     locations: list[IssueLocation] = []
 
-    if row.pipeline in ("axe", "alfa", "semantic", "keyboard", "responsive", "focus", "visual"):
+    if row.pipeline in (
+        "axe",
+        "alfa",
+        "semantic",
+        "keyboard",
+        "responsive",
+        "focus",
+        "visual",
+        "markup",
+    ):
         db_rows = conn.execute(
             f"""
             SELECT p.url_normalized AS page_url, p.title AS page_title,
                    a.target_selector, a.html_snippet, a.failure_summary, a.revealed_by,
-                   a.pipeline, a.engine_outcome, a.engine_evidence_json
+                   a.pipeline, a.engine_outcome, a.engine_evidence_json,
+                   a.id AS finding_id, a.status AS status
               FROM page_a11y_findings a
               JOIN pages p ON p.id = a.page_id
              WHERE a.id IN ({placeholders})
@@ -1490,6 +1563,8 @@ def _locations_for_row(
                     )
                     or None,
                     revealed_by=str(r["revealed_by"] or "") or None,
+                    finding_id=int(r["finding_id"]),
+                    status=str(r["status"] or "new"),
                 )
             )
     else:  # image pipeline
@@ -1497,7 +1572,8 @@ def _locations_for_row(
             f"""
             SELECT p.url_normalized AS page_url, p.title AS page_title,
                    i.src_url_canonical AS image_url,
-                   pi.above_fold AS above_fold, pi.position AS position
+                   pi.above_fold AS above_fold, pi.position AS position,
+                   f.id AS finding_id, f.status AS status
               FROM findings f
               JOIN images i ON i.id = f.image_id
               JOIN page_images pi ON pi.image_id = i.id
@@ -1520,18 +1596,25 @@ def _locations_for_row(
                     selector=None,
                     image_url=str(r["image_url"] or "") or None,
                     detail=None,
+                    finding_id=int(r["finding_id"]),
+                    status=str(r["status"] or "new"),
                 )
             )
-
-    overflow = max(0, len(ids) - len(locations))
-    return locations, overflow
+    return locations
 
 
 def issue_locations(
-    conn: sqlite3.Connection, row: Any, *, redact: bool = False
+    conn: sqlite3.Connection,
+    row: Any,
+    *,
+    limit: int | None = MAX_LOCATIONS_PER_CARD,
+    redact: bool = False,
 ) -> tuple[list[IssueLocation], int]:
-    """Expose retained locations for review-only rows that have no issue card."""
-    return _locations_for_row(conn, row, redact=redact)
+    """Expose retained locations for review-only rows that have no issue card.
+
+    ``limit=None`` returns every occurrence (the ITS review lists each one).
+    """
+    return _locations_for_row(conn, row, limit=limit, redact=redact)
 
 
 # ---------------------------------------------------------------------------
@@ -1560,7 +1643,17 @@ def _methods_line(rows: list[Any]) -> str:
     present = {r.pipeline for r in rows}
     labels = [
         _PIPELINE_LABEL[p]
-        for p in ("axe", "alfa", "image", "semantic", "keyboard", "responsive", "focus", "visual")
+        for p in (
+            "axe",
+            "alfa",
+            "markup",
+            "image",
+            "semantic",
+            "keyboard",
+            "responsive",
+            "focus",
+            "visual",
+        )
         if p in present
     ]
     return ", ".join(labels) if labels else "none (no findings produced)"

@@ -75,6 +75,8 @@ src/audit/
     jira_export.py
     markdown_report.py        evidence inventory
     xlsx_export.py            remediation workbook
+    its_review.py             U-M ITS Technical Review template, filled in
+    templates/                the ITS template, kept as the team supplied it
     audit_report.py           audit report (Markdown)
     interaction_coverage.py   click-through coverage text (workbook, audit report, Jira)
     webhook.py                env-gated webhook; nothing calls it yet
@@ -174,7 +176,7 @@ try a crawl without touching a real site, run `make fixture-site` and crawl
 | --- | --- |
 | `audit crawl URL` | Crawls and checks a site, stores a new report, or resumes an interrupted crawl of the same URL |
 | `audit status` | Shows the latest report's status, pages, and errors. Its findings count covers image-of-text findings only. |
-| `audit export [SCAN_ID] --format FORMAT` | Writes a report to a file. Formats are `csv` (the default), `json`, `jira`, `markdown`, and `xlsx`. |
+| `audit export [SCAN_ID] --format FORMAT` | Writes a report to a file. Formats are `csv` (the default), `json`, `jira`, `markdown`, `xlsx`, and `its`. |
 | `audit synthesize [SCAN_ID]` | Recomputes image-of-text findings without crawling again |
 | `audit serve` | Serves the review app, by default at `http://127.0.0.1:8765/` |
 | `audit protected-maintenance` | Runs the retention cleanup for protected reports |
@@ -204,7 +206,7 @@ Useful `audit crawl` flags:
 | `--skip-screenshots` | Off | Skips the outlined element screenshots |
 | `--axe-level` | AA | Sets the axe-core level: A, AA, or AAA |
 | `--wcag-version` | 2.1 | The WCAG version the level is checked against: 2.1, the current U-M standard, or 2.2. Applies to axe-core and Alfa. |
-| `--compare-to SCAN_ID` | The last completed scan of the same site | The report to compare image findings against |
+| `--compare-to SCAN_ID` | The last report of the same site (a completed scan, or a stopped or failed one that saved pages) | The report to compare image findings against |
 
 Each check also has an off switch: `--skip-axe`, `--skip-keyboard`,
 `--skip-responsive`, `--skip-focus`, `--skip-visual`, `--skip-ocr`,
@@ -219,8 +221,7 @@ The command line differs from the app's New scan form in a few ways:
   reachable, the model-based passes are skipped with a warning and the crawl
   continues.
 - There is no option for Siteimprove Alfa. Choose it in the app instead.
-- It uses 4 workers and a 500 page limit, where the form uses 8 workers and
-  2,500 pages.
+- It uses 4 workers where the form uses 8. Both default to a 10,000 page limit.
 - Ctrl-C interrupts the crawl. Run the same command again to resume it.
 
 ## Common extension tasks
@@ -253,7 +254,7 @@ scan has a completed expert evaluation. The evaluation lives in the
 holds its logic.
 
 - `GET /api/scans/{id}/evaluation` reads the record, and
-  `PUT /api/scans/{id}/evaluation` updates it for a completed scan. The body
+  `PUT /api/scans/{id}/evaluation` updates it for a report. The body
   (`EvaluationUpdate` in `server.py`) holds the target standard and level,
   purpose, included and excluded scope, sample description, reviewer,
   methods note, limitations, and `status` (`draft`, `in_progress`, or

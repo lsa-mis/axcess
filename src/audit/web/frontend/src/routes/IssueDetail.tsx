@@ -8,7 +8,7 @@ import IssueEvidence, { IssueGuidanceDialog, issuePageLaneLabel } from "../compo
 import { Button, Card, EmptyState, LinkButton } from "../components/ui";
 import ConformanceBadge from "../components/ConformanceBadge";
 import { useScanQuery } from "../hooks/useScanQuery";
-import { REVIEW_LANE_HELP } from "../lib/labels";
+import { REVIEW_LANE_HELP, alsoWcagText } from "../lib/labels";
 
 /**
  * Per-issue evidence at a stable URL (``/scans/:id/issues/:key``).
@@ -87,6 +87,7 @@ export default function IssueDetailRoute() {
                 <>
                   <abbr title="Web Content Accessibility Guidelines">WCAG</abbr> {row.wcag_sc}
                   {row.wcag_name ? ` ${row.wcag_name}` : ""}
+                  {row.also_wcag.length > 0 ? `, ${alsoWcagText(row.also_wcag, true)}` : ""}
                   {" · "}
                 </>
               )}

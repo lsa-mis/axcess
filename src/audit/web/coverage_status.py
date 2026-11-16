@@ -85,6 +85,20 @@ SHIPPED: tuple[ShippedPipeline, ...] = (
         needs_ai=False,
     ),
     ShippedPipeline(
+        name="Page code check",
+        pipeline="markup",
+        engine="Deterministic Playwright (reads the rendered DOM after axe; changes nothing)",
+        scs=(
+            "3.3.2 Labels or Instructions (field named only by its placeholder), "
+            "1.3.1 Info and Relationships (label tied to no field; text styled as a "
+            "heading, a guess); best practice "
+            "(a title that repeats the visible text)"
+        ),
+        needs_ai=False,
+        note="Each rule is its own issue type with its own How sure; see "
+        "audit/analyzer/markup/base.py.",
+    ),
+    ShippedPipeline(
         name="Image-of-text (VLM)",
         pipeline="image",
         engine="OCR (Tesseract) + VLM via Ollama",

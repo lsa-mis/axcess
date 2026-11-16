@@ -34,11 +34,81 @@ The tool combines evidence with different confidence levels:
 | Image-of-text OCR/VLM | `findings`, `analyses`, `page_images` | OCR plus local Ollama judgment; treat classification/rationale as evidence, not a legal conclusion. |
 | Semantic analyzer | `page_a11y_findings` with pipeline discrimination | Local LLM judgment of contextual WCAG criteria; explicitly present it as a lead requiring human confirmation. |
 
-An **accessibility report** in product language is one completed `scans` row
-and its child evidence. An **issue** is a grouped view within that report:
+An **accessibility report** in product language is one completed `scans`
+row, or a stopped or failed one that saved at least one page, and its child
+evidence. How a scan ended does not make it more or less
+of a report: a scan stopped after 100 pages covers more than one that
+completed at a 10-page limit. Say coverage with facts (pages found, pages
+visited, the limits chosen, how it ended), never by calling a report
+"partial" or "full", and never hide a report's views or refuse an action
+because the scan was stopped. An **issue** is a grouped view within that report:
 one axe/probe/semantic rule or one `(classification, alt_adequacy)` image
 finding group. Never mix data from different `scan_id` values in an answer
 unless the user explicitly requests a comparison.
+
+### Building a check: real pages first
+
+Build and tune a new check or probe against real websites, not only
+pages we write ourselves. Test pages written next to the detector share
+its assumptions, so they pass: the form error check scored 100% precision
+on 130 of them, then got every verdict wrong on its first real pages
+(Bootstrap's hidden feedback text, Parsley's radio-group message).
+
+1. Before writing the detector, collect real public pages that show the
+   pattern: library demos, design-system docs, and accessibility demo
+   sites (W3C BAD, WebAIM). Include ones that get it right and ones
+   that get it wrong. Get the user's approval before visiting them
+   (see Verification), and never press anything a real business acts on.
+2. Find failing pages as hard as passing ones. Most real pages pass or
+   are skipped, and passes alone cannot show that the check catches
+   anything: the form error check had 2 failures in 54 real pages.
+   Search until you have several proved failures for the exact
+   criterion the check tests.
+3. Prove a failure before you rely on it. A page counts as failing only
+   when a source outside this repo says it fails that exact criterion
+   (the demo's own evaluation report or annotations, or a published
+   audit), and you have seen the failure yourself in the browser. A
+   site built to be inaccessible is not proof, and one source may not
+   be either: read every source the demo has, and when they disagree,
+   what the page does decides. W3C's evaluation report on its BAD
+   "before" survey passes 3.3.1 ("no corresponding content"), but its
+   Easy Checks page says that, sent empty, "errors are only indicated by
+   the label being red, and there is no explanation of the errors", and
+   the survey's own code (in W3C's bad.zip) does exactly that: a 3.3.1
+   failure the form error check missed. Never give the user a page as
+   one that should fail, or as one that should pass, or score against
+   it, on a guess; say what you have not confirmed.
+4. Run the check on those pages in a visible browser while you build it.
+   Look at the screenshots to confirm each verdict yourself. A verdict
+   no one has looked at is not evidence.
+5. For each mistake on a real page, add a cut-down copy of that page's
+   markup to the test cases (a "real pages" batch), confirm it fails on
+   the old code, then fix the detector. Synthetic cases stay as
+   regression tests, not as proof that the check works.
+6. Measure on real pages. A check's precision and recall are the numbers
+   from its labelled set of real pages, kept in the repo: each page's
+   address, the form or element judged, the verdict it should get, and
+   the basis (an outside source, or a person who looked at the
+   screenshot). Rerun the set after every change to the detector, before
+   you report the change. A page whose source and visible behaviour
+   disagree is listed as disputed, not scored. The set visits outside
+   sites, so it runs only on request, never in CI.
+7. Pages we wrote are regression tests, not the metric. They gate CI and
+   catch one fix undoing another, but their score is always reported
+   second and named for what it is ("on pages we wrote"). Never lead
+   with it or present it as real-world accuracy: the form error check
+   scored 100% precision and 96.2% recall on 142 of them, while its real
+   set, the number that counts, had only 9 failing forms, most of them
+   used to tune it. Say how small and how independent the real set is.
+## Project management (Asana)
+
+All project management for this repo lives in one Asana project:
+**"Axcess – Feature & Development Tracker"** (project GID `1218150267797869`,
+https://app.asana.com/1/939514425027676/project/1218150267797869).
+
+When reading or writing Asana tasks for this project, scope every query and
+update to that project only. Do not pull tasks from, or create tasks in, any
+other Asana project on behalf of this repo.
 
 ## Code map
 
@@ -72,16 +142,15 @@ Existing product constraints are load-bearing:
 ## Per-report MCP conversation: target design
 
 The desired feature is a brief, evidence-grounded conversation attached to a
-single completed accessibility report. It is **not implemented yet**. Build it
+single accessibility report. It is **not implemented yet**. Build it
 as an optional MCP integration with a separate model provider adapter; do not
 couple it to the existing Ollama analyzers or silently send report contents to
 an external model.
 
 ### Scope and interaction contract
 
-1. The chat entry point lives on a completed scan's detail/Issues page and is
-   initialized with an immutable `scan_id`. Reject chats for running,
-   failed, or deleted scans.
+1. The chat entry point lives on a report's Issues page and is
+   initialized with an immutable `scan_id`. Reject chats for deleted scans.
 2. The assistant can answer concise questions such as "What should we fix
    first?", "Why is this an issue?", and "Which pages are affected?" using
    that scan's stored evidence.
@@ -105,12 +174,12 @@ server-side session scope:
 
 | Tool | Purpose | Required guard |
 | --- | --- | --- |
-| `get_report_summary` | Scan metadata, coverage/methods used, counts and limitations. | Completed scan; exact `scan_id`. |
+| `get_report_summary` | Scan metadata, coverage/methods used, counts and limitations. | Exact `scan_id`. |
 | `list_issues` | Filtered, paginated unified issue rows. | Bounded `limit` (max 50); no cross-scan query. |
 | `get_issue_detail` | Remediation, affected pages, status summary, and rule metadata. | Validate canonical issue key belongs to scan. |
 | `get_finding_evidence` | Specific DOM/OCR/VLM/probe evidence and screenshot/blob reference. | Finding must belong to scan; omit oversized/raw HTML by default. |
 | `get_coverage_and_limitations` | Enabled/skipped methods and manual-review caveats. | Always include when discussing report completeness. |
-| `compare_reports` | Explicit opt-in diff between two completed scans of the same normalized scope. | Exact two IDs, no implicit comparison. |
+| `compare_reports` | Explicit opt-in diff between two reports of the same normalized scope. | Exact two IDs, no implicit comparison. |
 
 Do not expose raw SQL, arbitrary filesystem paths, arbitrary URLs, the
 access-token value, or a general HTTP-fetch tool through MCP. Do not make
@@ -332,8 +401,17 @@ the task. Report them.
 
 ## Verification
 
-Run the narrowest relevant tests during development, then the appropriate
-project gates before handoff:
+**Run tests only before a merge the developer asks for.** Do not run
+`pytest`, the UI suites, or `make test` while iterating on a change, even
+for one file: a UI run takes minutes and the developer reviews the change
+in the running app instead. Fast build steps that the running app needs
+(`make frontend-build`) and `make lint` / `make typecheck` are fine at any
+time. Update or add the tests a change needs as you go, without running
+them, and when you report a change, say plainly that its tests have not
+been run yet. When the developer asks to merge, run the gates below first,
+fix what fails, and only then merge.
+
+The gates, run before a requested merge:
 
 ```bash
 uv run pytest tests/unit
@@ -366,7 +444,8 @@ If you cannot verify an action is reversible, treat it as irreversible.
 **If any premise in your task turns out to be wrong or impossible, stop and
 report that instead of working around it.** State what you **verified** (ran it,
 saw the output) separately from what you **assumed**. Do not report a task
-complete on the basis of code you did not run.
+complete on the basis of code you did not run. Until the tests run before a
+merge (see Verification), report a change as built but not yet tested.
 
 ## Session hygiene
 

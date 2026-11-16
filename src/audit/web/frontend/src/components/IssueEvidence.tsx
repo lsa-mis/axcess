@@ -1,14 +1,15 @@
 import type { ReactNode } from "react";
 import { useModalDialog } from "../hooks/useModalDialog";
 import { useQuery } from "@tanstack/react-query";
-import { AlertOctagon, AlertTriangle, ExternalLink, Info, X, type LucideIcon } from "lucide-react";
+import { AlertOctagon, AlertTriangle, ExternalLink, Info, Ruler, X, type LucideIcon } from "lucide-react";
 import { api } from "../api/client";
 import { Button, Card } from "./ui";
 import IssuePagesTable from "./IssuePagesTable";
+import ScreenReaderSteps from "./ScreenReaderSteps";
 import type { AbilityLabel, IssueDetail, IssueRow } from "../api/types";
 import { HIDDEN_ISSUE_FIELDS } from "../lib/hiddenIssueFields";
-import { REVIEW_LANE_HELP } from "../lib/labels";
-import { REVIEW_TYPE_LABEL } from "../lib/terms";
+import { REVIEW_LANE_HELP, whereFoundText } from "../lib/labels";
+import { OPENS_NEW_WINDOW, REVIEW_TYPE_LABEL } from "../lib/terms";
 
 /**
  * Every page one issue type affects, with its occurrences (one per place)
@@ -137,12 +138,26 @@ export function IssueGuidanceDialog({
  * note under the value. A ``dt`` and one or two ``dd``s, so the pairing is
  * announced, not just drawn.
  */
-function FactTile({ label, value, note }: { label: string; value: ReactNode; note?: string }) {
+/** A term and its value; each note is one more line under the value, empty ones left out. */
+function FactTile({
+  label,
+  value,
+  note,
+}: {
+  label: string;
+  value: ReactNode;
+  note?: string | readonly string[];
+}) {
+  const notes = (typeof note === "string" ? [note] : (note ?? [])).filter(Boolean);
   return (
     <div className="rounded-xs border border-border bg-surface-subtle px-4 py-3">
       <dt className="text-sm text-fg-muted">{label}</dt>
       <dd className="mt-1 text-lg font-semibold tabular-nums leading-snug text-fg">{value}</dd>
-      {note && <dd className="mt-0.5 text-sm text-fg-muted">{note}</dd>}
+      {notes.map((line) => (
+        <dd key={line} className="mt-0.5 text-sm text-fg-muted">
+          {line}
+        </dd>
+      ))}
     </div>
   );
 }
@@ -175,10 +190,17 @@ function DoneWhen({ text }: { text: string }) {
 /** The guidance sections themselves, all expanded. */
 function IssueGuidance({ detail }: { detail: IssueDetail }) {
   const { row, description, why_matters, fix_steps, verify_manual,
-    verify_automated, acceptance, help_url } = detail;
+    verify_automated, acceptance, help_url, screen_reader_check } = detail;
   const lane = LANES[row.review_lane] ?? LANES.informational;
   const isInformational = row.review_lane === "informational";
-  const isLead = row.review_lane === "expert_review";
+  // Measured is confirmed first too. That is its guardrail: the table shows
+  // it by default, but the guidance still opens on "How to confirm it" and
+  // ends on "look at each occurrence", exactly as a Not sure row does, so
+  // being shown by default never reads as "safe to report" (AGENTS.md:
+  // browser-observed behaviour needs a person; W3C COGA, "Making Content
+  // Usable", https://www.w3.org/TR/coga-usable/: the same steps for the
+  // same job).
+  const isLead = row.review_lane === "expert_review" || row.review_lane === "measured";
   const LaneIcon = lane.icon;
 
   // A lead is confirmed before anyone fixes it, so its checks are the next
@@ -221,7 +243,7 @@ function IssueGuidance({ detail }: { detail: IssueDetail }) {
                   >
                     About this rule
                     <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                    <span className="sr-only">, opens in a new tab</span>
+                    <span className="sr-only">, {OPENS_NEW_WINDOW}</span>
                   </a>
                 )}
               </div>
@@ -252,7 +274,11 @@ function IssueGuidance({ detail }: { detail: IssueDetail }) {
             <FactTile
               label="Issue occurrences"
               value={row.occurrence_count.toLocaleString()}
-              note={`across ${row.page_count.toLocaleString()} page${row.page_count === 1 ? "" : "s"}`}
+              note={[
+                `across ${row.page_count.toLocaleString()} page${row.page_count === 1 ? "" : "s"}`,
+                // Where they were found: why, whereFoundText in lib/labels.ts.
+                whereFoundText(row.occurrence_count, row.click_through_occurrence_count),
+              ]}
             />
             {!isInformational && row.abilities_affected.length > 0 && (
               <FactTile
@@ -317,6 +343,9 @@ function IssueGuidance({ detail }: { detail: IssueDetail }) {
                 </li>
               )}
             </ol>
+            {/* The screen reader steps go right after the check that points
+                to them ("steps for Mac and Windows are below"). */}
+            {isLead && screen_reader_check && <ScreenReaderSteps check={screen_reader_check} />}
             {!isLead && acceptance && (
               <DoneWhen text={acceptance} />
             )}
@@ -347,6 +376,7 @@ function IssueGuidance({ detail }: { detail: IssueDetail }) {
                 <ul className="mt-2 max-w-measure list-disc space-y-3 pl-6 text-base leading-7 text-fg">
                   {verifySteps.map((step, i) => <li key={i}>{step}</li>)}
                 </ul>
+                {screen_reader_check && <ScreenReaderSteps check={screen_reader_check} />}
               </>
             )}
           </GuidanceSection>
@@ -380,6 +410,17 @@ const LANES: Record<
     icon: AlertOctagon,
     className: "border-umich-blue/30 border-l-umich-blue bg-umich-blue/5",
     iconClass: "text-umich-blue",
+  },
+  // Its own icon (a ruler: it was measured) and its own words, so it differs
+  // from Mostly sure and Not sure by more than tint (SC 1.4.1 Use of Color,
+  // Level A). The tint is the Not sure one on purpose: both still need a
+  // person before they are reported.
+  measured: {
+    label: REVIEW_TYPE_LABEL.measured,
+    meaning: REVIEW_LANE_HELP.measured,
+    icon: Ruler,
+    className: "border-sev-major/40 border-l-sev-major bg-sev-major-bg",
+    iconClass: "text-sev-major",
   },
   expert_review: {
     label: REVIEW_TYPE_LABEL.expert_review,
@@ -441,7 +482,7 @@ function capitalize(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-/** A plain-English band for the priority score (severity × log1p(pages)). */
+/** A plain-English band for the priority score (``_priority`` in src/audit/web/issues.py). */
 function priorityTier(priority: number): "High" | "Medium" | "Low" {
   if (priority >= 6) return "High";
   if (priority >= 3) return "Medium";

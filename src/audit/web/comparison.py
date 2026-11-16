@@ -16,6 +16,7 @@ from typing import Any, Literal, cast
 from pydantic import BaseModel, Field
 
 from audit.analyzer.alfa_evidence import parse_evidence
+from audit.analyzer.forms import base as forms_base
 from audit.crawler import url_policy
 from audit.labels import CLICK_THROUGH_STATES
 from audit.wcag_version import stored_wcag_version
@@ -26,7 +27,18 @@ Category = Literal["new", "still_detected", "changed", "no_longer_detected", "ca
 # only in the later report, only in the earlier one, or in both. ``Category``
 # keeps the stricter reading of the same row (whether coverage supports it).
 Change = Literal["new", "resolved", "remaining"]
-Pipeline = Literal["axe", "alfa", "keyboard", "responsive", "focus", "visual", "semantic", "image"]
+Pipeline = Literal[
+    "axe",
+    "alfa",
+    "keyboard",
+    "responsive",
+    "focus",
+    "visual",
+    "forms",
+    "markup",
+    "semantic",
+    "image",
+]
 CATEGORIES: tuple[Category, ...] = (
     "new",
     "still_detected",
@@ -41,6 +53,8 @@ PIPELINES: tuple[Pipeline, ...] = (
     "responsive",
     "focus",
     "visual",
+    "forms",
+    "markup",
     "semantic",
     "image",
 )
@@ -190,11 +204,16 @@ def _load_scan(conn: sqlite3.Connection, scan_id: int) -> dict[str, Any]:
 
 
 def previous_scan_id(conn: sqlite3.Connection, scan: dict[str, Any]) -> int | None:
-    """Latest strictly earlier public report in the same normalized seed scope."""
+    """Latest strictly earlier public report in the same normalized seed scope.
+
+    A completed scan, or any scan that ended with saved pages, however it
+    ended (``page_count`` stays 0 until a scan ends); how it ended is a
+    coverage fact the comparison states.
+    """
     if _protected(conn, int(scan["id"])):
         return None
     rows = conn.execute(
-        "SELECT id, seed_url FROM scans WHERE status = 'completed' "
+        "SELECT id, seed_url FROM scans WHERE (status = 'completed' OR page_count > 0) "
         "AND (julianday(started_at) < julianday(?) OR "
         "(julianday(started_at) = julianday(?) AND id < ?)) "
         "ORDER BY julianday(started_at) DESC, id DESC",
@@ -230,10 +249,10 @@ class HistoryPoint(BaseModel):
 
 
 class SiteHistory(BaseModel):
-    """Completed public reports of one site, oldest first, for the trend."""
+    """Public reports of one site, oldest first, for the trend."""
 
     site_url: str
-    # Every completed public report of the site; ``scans`` keeps the latest.
+    # Every public report of the site; ``scans`` keeps the latest.
     total: int
     scans: list[HistoryPoint] = Field(max_length=HISTORY_LIMIT)
 
@@ -277,12 +296,24 @@ class _Group:
         )
 
 
+# The form error check's rule before the Mostly sure / Not sure split
+# (2026-11-05) and its clear rule after it are one issue across reports.
+_FORMS_LEGACY_KEY = f"forms:{forms_base.RULE_LEGACY}"
+_FORMS_CLEAR_KEY = f"forms:{forms_base.RULE_CLEAR}"
+
+
 def _group_key(row: issues.IssueRow) -> str:
-    """One Alfa rule is one group whichever outcome it had, so a finding that
-    moves between failed and cannot-tell is a change, not a new issue."""
+    """One Alfa or axe rule is one group whichever outcome it had, so a finding
+    that moves between failed and cannot-tell is a change, not a new issue. The
+    form error check's old rule and its clear rule are one group, so an old
+    report and a new one compare as the same issue."""
     key = row.issue_key
     if row.pipeline == "alfa" and key.rsplit(":", 1)[-1] in {"failed", "cant_tell"}:
         key = key.rsplit(":", 1)[0]
+    if row.pipeline == "axe":
+        key = key.removesuffix(issues.AXE_CANT_TELL_SUFFIX)
+    if key == _FORMS_LEGACY_KEY:
+        key = _FORMS_CLEAR_KEY
     return key
 
 
@@ -390,6 +421,8 @@ _COUNTERS = {
     "semantic": "semantic_pages_analyzed",
     "keyboard": "keyboard_pages_probed",
     "responsive": "responsive_pages_probed",
+    "forms": "forms_pages_checked",
+    "markup": "markup_pages_checked",
 }
 _FLAGS = {
     "axe": "axe_enabled",
@@ -398,6 +431,8 @@ _FLAGS = {
     "keyboard": "keyboard_probe_enabled",
     "responsive": "responsive_checks_enabled",
     "focus": "focus_checks_enabled",
+    "forms": "form_error_checks_enabled",
+    "markup": "markup_checks_enabled",
     "visual": "visual_checks_enabled",
 }
 
@@ -433,6 +468,13 @@ def _coverage(
         return str(notes[-1])
 
     common: list[str] = []
+    # How the scan ended is a coverage fact, like the page count below, not
+    # a reason to refuse the comparison: a stopped scan may still have
+    # covered more of the site than one that completed at a low page limit.
+    if scan["status"] == "interrupted":
+        common.append(note("The scan was stopped before it visited every page it found."))
+    elif scan["status"] == "failed":
+        common.append(note("The scan failed before it visited every page it found."))
     if not rows or any(
         not row["status_code"] or not 200 <= row["status_code"] < 300 for row in rows
     ):
@@ -457,7 +499,10 @@ def _coverage(
         flag = _FLAGS.get(pipeline)
         if flag and cfg.get(flag) is False:
             limitations.append(note(f"{pipeline} was disabled.", in_table=True))
-        elif pipeline in {"focus", "visual"}:
+        elif pipeline == "markup" and flag and cfg.get(flag) is None:
+            # Reports made before the page code check existed never ran it.
+            limitations.append(note("markup was not run in this report.", in_table=True))
+        elif pipeline in {"focus", "visual", "forms"}:
             limitations.append(
                 note(f"completed {pipeline} coverage was not recorded.", in_table=True)
             )
@@ -559,7 +604,8 @@ def _method_coverage(
 ) -> MethodCoverage:
     cfg = _config(scan)
     flag = _FLAGS.get(pipeline)
-    if flag and cfg.get(flag) is False:
+    # A report from before the page code check existed did not run it.
+    if flag and (cfg.get(flag) is False or (pipeline == "markup" and cfg.get(flag) is None)):
         state: Literal["complete", "incomplete", "unknown", "disabled"] = "disabled"
     elif (
         pipeline not in _COUNTERS
@@ -586,7 +632,7 @@ def compare_reports(
     category: Category | None = None,
     pipeline: Pipeline | None = None,
 ) -> ComparisonResponse:
-    """Compare exactly two completed public reports without changing evidence."""
+    """Compare exactly two public reports without changing evidence."""
     if page < 1 or not 1 <= page_size <= MAX_PAGE_SIZE:
         raise ComparisonError(
             f"Page must be positive and page_size must be between 1 and {MAX_PAGE_SIZE}.", 422
@@ -596,8 +642,6 @@ def compare_reports(
     if pipeline is not None and pipeline not in PIPELINES:
         raise ComparisonError("Unknown pipeline.", 422)
     current = _load_scan(conn, scan_id)
-    if current["status"] != "completed":
-        raise ComparisonError("Only completed reports can be compared.", 409)
     baseline_id = compare_to if compare_to is not None else previous_scan_id(conn, current)
     counts: dict[str, int] = dict.fromkeys(CATEGORIES, 0)
     changes: dict[str, int] = dict.fromkeys(CHANGES, 0)
@@ -610,7 +654,7 @@ def compare_reports(
             before_totals=None,
             after_totals=_totals(conn, scan_id),
             pipeline_counts={},
-            limitations=["Scan the same site again to compare with an earlier completed report."],
+            limitations=["Scan the same site again to compare with an earlier report."],
             rows=[],
             total=0,
             page=page,
@@ -619,8 +663,6 @@ def compare_reports(
     baseline = _load_scan(conn, baseline_id)
     if baseline_id == scan_id:
         raise ComparisonError("Choose two different reports.")
-    if baseline["status"] != "completed":
-        raise ComparisonError("Only completed reports can be compared.", 409)
     if site_scope(str(current["seed_url"])) != site_scope(str(baseline["seed_url"])):
         raise ComparisonError("Reports must have the same normalized seed URL.")
     earlier = conn.execute(
@@ -665,7 +707,9 @@ def compare_reports(
         for k in old_cfg.keys() | new_cfg.keys()
         if old_cfg.get(k) != new_cfg.get(k)
         and not k.endswith("coverage_version")
-        and k not in {"seed_url", "db_path", "blob_dir", "workers"}
+        # ``user_agent_choice`` never changes without ``user_agent`` (the
+        # string sent) changing too, so it would name one change twice.
+        and k not in {"seed_url", "db_path", "blob_dir", "workers", "user_agent_choice"}
     )
     if changed:
         common.append("Scan settings changed: " + ", ".join(changed[:12]) + ".")
@@ -789,7 +833,7 @@ def _totals(conn: sqlite3.Connection, scan_id: int) -> GroupTotals:
 def site_history(
     conn: sqlite3.Connection, scan_id: int, *, limit: int = HISTORY_LIMIT
 ) -> SiteHistory:
-    """The completed public reports of ``scan_id``'s site, oldest first.
+    """The public reports of ``scan_id``'s site, oldest first.
 
     Ordered the way ``previous_scan_id`` picks a baseline (start time, then
     id), so the point before a report in the trend is the report it is
@@ -802,7 +846,7 @@ def site_history(
         row
         for row in conn.execute(
             "SELECT id, seed_url, started_at, finished_at FROM scans "
-            "WHERE status = 'completed' ORDER BY julianday(started_at), id"
+            "WHERE (status = 'completed' OR page_count > 0) ORDER BY julianday(started_at), id"
         )
         if site_scope(str(row["seed_url"])) == scope and not _protected(conn, int(row["id"]))
     ]

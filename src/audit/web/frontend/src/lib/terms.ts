@@ -1,12 +1,28 @@
 import type {
+  AiInstallState,
+  AiInstallStep,
+  AiTierId,
+  AltVerdict,
+  AltVerdictSource,
   AxeImpact,
+  CheckMethod,
   DetectionPipeline,
   ExportFormat,
   FindingStatus,
+  FoundLayer,
+  ImageGroup,
+  ReviewDecision,
   ReviewLane,
   RuleCheck,
+  ScanEndReason,
   ScanStatus,
+  StudyCheck,
+  SuggestionAudience,
+  SuggestionCheckOutcome,
+  SuggestionErrorCode,
+  SuggestionStatus,
 } from "../api/types";
+import { isDesktopApp } from "../hooks/useSwipeNavigation";
 
 /**
  * The words the interface uses for shared values, in one place.
@@ -66,9 +82,20 @@ export const STATUS_OPTION_LABEL: Record<FindingStatus, string> = {
  * https://www.w3.org/TR/coga-usable/: use the same word for the same thing;
  * docs/plain-language.md). The full reasoning is in docs/plain-language.md,
  * "Why Mostly sure, Not sure, and For information".
+ *
+ * "Measured" (2026-11-10) is the level between Mostly sure and Not sure: a
+ * browser check measured the page and no AI model judged it. The word says
+ * what happened, not how likely the problem is, so it cannot be confused
+ * with the two "sure" words. Rejected: "Likely", which the pair "Likely
+ * problem" / "Possible problem" above already showed readers cannot rank
+ * against "Mostly sure"; and "Sure" for the rule checks with "Mostly sure"
+ * here, which claims more than a rule check can show (the developer chose
+ * to keep "Mostly sure" on top). A Measured row still says "check before
+ * you report" wherever it is shown (REVIEW_LANE_HELP in labels.ts).
  */
 export const REVIEW_TYPE_LABEL: Record<ReviewLane, string> = {
   likely_barrier: "Mostly sure",
+  measured: "Measured",
   expert_review: "Not sure",
   informational: "For information",
 };
@@ -92,9 +119,30 @@ export const CHECK_LABEL: Record<DetectionPipeline, string> = {
   responsive: "Zoom and layout check",
   focus: "Focus check",
   visual: "Motion and reading-order check",
+  forms: "Form error check",
+  markup: "Page code check",
   semantic: "AI review",
   image: "Image text check",
   protected_image: "Image text check",
+};
+
+/**
+ * What a person decided about an element in the page inspector, the
+ * "Checked by a person" choice. "none" is not checked yet, the starting
+ * choice: a radio cannot be cleared, so it is also how a reviewer takes a
+ * decision back. Which elements are repeats is the person's call.
+ */
+export const REVIEW_DECISION_LABEL: Record<ReviewDecision | "none", string> = {
+  none: "Not checked yet",
+  report: "Checked: a problem to report",
+  repeat: "Checked: a repeat of one already reported",
+};
+
+export const REVIEW_DECISION_HELP: Record<ReviewDecision | "none", string> = {
+  none: "",
+  report: "You looked at it, and it is a real problem.",
+  repeat:
+    "A real problem, but the same as one you already reported, such as the same menu on another page.",
 };
 
 /**
@@ -123,6 +171,7 @@ export function ruleChecksText(checks: readonly RuleCheck[]): string {
  */
 export const EXPORT_FORMAT_LABEL: Record<ExportFormat, string> = {
   xlsx: "Issue types with fixes (Excel)",
+  its: "ITS technical review (Excel)",
   audit: "Written report (Markdown)",
   brief: "Fix brief for a coding agent (Markdown)",
   csv: "Occurrence list (CSV)",
@@ -132,6 +181,7 @@ export const EXPORT_FORMAT_LABEL: Record<ExportFormat, string> = {
 /** One line under each Export panel file: what it is for. */
 export const EXPORT_FORMAT_HINT: Record<ExportFormat, string> = {
   xlsx: "One row for each issue type, with how to fix it",
+  its: "The University of Michigan Information and Technology Services (ITS) Accessibility Team's form, with only the elements checked as a problem to report",
   audit: "The whole report as readable text",
   brief:
     "Open issue types with where and how to fix them, for Claude Code or another coding agent. Always removes likely private details, as best effort.",
@@ -184,6 +234,34 @@ export const REDACTION_LIMITS =
 export const FIX_BRIEF_SCOPE_NOTE =
   "The fix brief is not the whole report. It lists open issue types only, most important first, stops at a limit, and shows a few places for each. It says what it left out.";
 
+/**
+ * How a scan ended, said as what happened to its coverage, for the report's
+ * "Pages visited" line and "How this scan ran". This replaces calling a
+ * stopped scan a "partial report": a scan stopped after 100 pages covers more
+ * than one that completed at a 10-page limit, so the words say what the scan
+ * did, and the numbers beside them say how far it got.
+ *
+ * "Stopped" cannot say who stopped it: the status is the same when someone
+ * pressed Stop and when Axcess closed while the scan ran, so the words do not
+ * claim either.
+ */
+export const SCAN_END_LABEL: Record<ScanEndReason, string> = {
+  running: "Still scanning",
+  all_found: "Visited every page it found",
+  page_limit: "Stopped at its page limit",
+  stopped: "Stopped before the scan finished",
+  failed: "Failed before the scan finished",
+};
+
+/**
+ * Whether a scan has a report to open: it completed, or it ended with pages
+ * saved, however it ended (a running scan's stored page count stays 0 until
+ * it ends). The server uses the same rule (sites.py, comparison.py).
+ */
+export function isReport(scan: { status: ScanStatus; page_count: number }): boolean {
+  return scan.status === "completed" || scan.page_count > 0;
+}
+
 /** A scan's progress, for status badges. */
 export const SCAN_STATUS_LABEL: Record<ScanStatus, string> = {
   running: "Scanning",
@@ -191,3 +269,246 @@ export const SCAN_STATUS_LABEL: Record<ScanStatus, string> = {
   failed: "Failed",
   interrupted: "Stopped",
 };
+
+/**
+ * The Images tab's groups (routes/Images.tsx). Each is a question asked of
+ * the report's images, so an image can be in two: "Images with text" and
+ * one of the other two.
+ */
+export const IMAGE_GROUP_LABEL: Record<ImageGroup, string> = {
+  with_text: "Images with text",
+  missing_alt: "Images without alt text",
+  with_alt: "Images with alt text",
+};
+
+/**
+ * One verdict on an image's alt text (the text a screen reader reads for
+ * an image). "Needs alt text" and "Needs better alt text" are two verdicts,
+ * not one (the developer's call, 2026-11-13): an image with no alt text has
+ * nothing to improve, it needs alt text written. "Needs a person to check",
+ * not "Adequate": the text match cannot judge an image with no text in it, and
+ * a word that sounds like a pass would claim a check that did not run. It
+ * was "Not checked yet" until 2026-11-16, when the developer renamed it to
+ * say who acts: most of a report's images land here, and "not checked yet"
+ * read as Axcess still working on them. The new words also part it from the
+ * "Checked by a person" value "Not checked yet" (REVIEW_DECISION_LABEL),
+ * which is about an occurrence, not an image.
+ * Rejected: "Bad alt text", which blames, and says less than "needs better".
+ */
+export const ALT_VERDICT_LABEL: Record<AltVerdict, string> = {
+  needs_alt: "Needs alt text",
+  needs_better: "Needs better alt text",
+  not_checked: "Needs a person to check",
+  good: "Good alt text",
+};
+
+/**
+ * The same verdicts under a count of more than one image, as the Images
+ * tab's numbers show them ("41 / Need alt text"): the verb agrees with the
+ * number. One image takes ``ALT_VERDICT_LABEL``.
+ */
+export const ALT_VERDICT_COUNT_LABEL: Record<AltVerdict, string> = {
+  needs_alt: "Need alt text",
+  needs_better: "Need better alt text",
+  not_checked: "Need a person to check",
+  good: "Good alt text",
+};
+
+/** What decided a verdict, said plainly, for the line under the verdict. */
+export const ALT_VERDICT_SOURCE_LABEL: Record<AltVerdictSource, string> = {
+  page_code: "From the page code",
+  text_match: "Compared with the text in the image",
+  local_model: "Local AI model: check before you rely on it",
+};
+
+/**
+ * How Axcess checks a WCAG criterion (Coverage page), said as what it means
+ * for the person testing. The technical name follows in CHECK_METHOD_TECH, in
+ * smaller text, for developers (docs/plain-language.md rule 3).
+ */
+export const CHECK_METHOD_LABEL: Record<CheckMethod, string> = {
+  automated: "Axcess checks",
+  partial: "Axcess partly checks",
+  "ai-assisted": "AI gives hints",
+  manual: "You check",
+  not_needed: "No longer needed",
+};
+
+export const CHECK_METHOD_TECH: Record<CheckMethod, string> = {
+  automated: "Automated",
+  partial: "Partly automated",
+  "ai-assisted": "AI-assisted",
+  manual: "Manual only",
+  not_needed: "4.1.1 Parsing",
+};
+
+export const CHECK_METHOD_BLURB: Record<CheckMethod, string> = {
+  // Not "a full test": each of these still has a part only a person can
+  // judge (a title's meaning, nothing lost at 200% zoom), shown in the
+  // criterion's "You check" line (AGENTS.md, Interface language rule 4).
+  automated: "Tests it on every page. You still confirm the result.",
+  partial: "Finds some problems. You test the rest.",
+  "ai-assisted": "Points to possible problems. You decide.",
+  // "No proven check", not "can't test": a trial check may run but not count
+  // yet (3.3.1's form error check).
+  manual: "No proven check yet. You test these.",
+  not_needed: "Removed in WCAG 2.2. Today's HTML always meets it.",
+};
+
+/** Where an occurrence came from, for the Coverage page's count by check. */
+export const FOUND_LAYER_LABEL: Record<FoundLayer, string> = {
+  axe_loaded: "Rule check (axe), page as loaded",
+  axe_click_through: "Rule check (axe), after Click-Through",
+  alfa: "Rule check (Alfa)",
+  probes: "Browser checks: keyboard, zoom, focus, motion, forms and page code",
+  image: "Image text check",
+  semantic: "AI review",
+};
+
+/** The checks a study row credits beyond the rule check (Coverage page). */
+export const STUDY_CHECK_LABEL: Record<StudyCheck, string> = {
+  click_through: "Click-Through",
+  image: CHECK_LABEL.image,
+  focus: CHECK_LABEL.focus,
+  keyboard: CHECK_LABEL.keyboard,
+  visual: CHECK_LABEL.visual,
+  semantic: CHECK_LABEL.semantic,
+  responsive: CHECK_LABEL.responsive,
+};
+
+/**
+ * axe-core's own kinds of problem (its ``cat.*`` rule tags), in plain words.
+ * An unknown kind falls back to "Other" where it is read.
+ */
+export const AXE_CATEGORY_LABEL: Record<string, string> = {
+  color: "Colour and contrast",
+  "name-role-value": "Names, roles and values",
+  aria: "ARIA attributes and roles",
+  forms: "Forms",
+  "text-alternatives": "Text alternatives",
+  structure: "Page structure",
+  semantics: "Headings and landmarks",
+  keyboard: "Keyboard",
+  language: "Language",
+  tables: "Tables",
+  parsing: "Page code errors",
+  "time-and-media": "Time and media",
+  "sensory-and-visual-cues": "Size, zoom and visual cues",
+  other: "Other",
+};
+/** The feature's one name, on its button and in its heading. */
+export const AI_SUGGESTION = "AI suggestion";
+
+/** Where an AI suggestion is in its queue, for its status line. */
+export const SUGGESTION_STATUS_LABEL: Record<SuggestionStatus, string> = {
+  queued: "Waiting to start",
+  running: "Writing the fix",
+  ready: "Ready",
+  failed: "Could not write a suggestion",
+  cancelled: "Stopped",
+};
+
+/** Who an AI suggestion is written for. */
+export const SUGGESTION_AUDIENCE_LABEL: Record<SuggestionAudience, string> = {
+  developer: "For developers",
+  editor: "For content editors",
+};
+
+/**
+ * What Axcess saw when it re-ran the one rule check on the suggested code.
+ * A pass checks one rule only, so it never says the page now passes.
+ */
+export const SUGGESTION_CHECK_LABEL: Record<SuggestionCheckOutcome, string> = {
+  passed: "The rule check passed on the suggested code",
+  still_fails: "The rule check still fails on the suggested code",
+  not_checked: "Axcess could not check this suggestion",
+};
+
+/** Two code choices: the smaller change is always first. */
+export const SUGGESTION_OPTION_LABEL = {
+  minimal: "Option 1: Smallest change",
+  matches_pattern: "Option 2: Matches nearby code",
+};
+
+/** Desktop AI setup: what the download is doing now. */
+export const AI_INSTALL_STEP_LABEL: Record<AiInstallStep, string> = {
+  program: "Downloading the Ollama program",
+  starting: "Starting Ollama",
+  text_model: "Downloading the text model",
+  vision_model: "Downloading the image model",
+  finishing: "Finishing setup",
+};
+
+/** Desktop AI setup: where the download stands. */
+export const AI_INSTALL_STATE_LABEL: Record<AiInstallState, string> = {
+  idle: "Not set up",
+  running: "Downloading",
+  paused: "Paused",
+  failed: "Stopped with a problem",
+  done: "Ready",
+};
+
+/** Saved desktop AI choice, separate from whether models are ready. */
+export const AI_FEATURE_STATE_LABEL = {
+  on: "AI features are on",
+  off: "AI features are off",
+};
+
+/** Desktop AI setup: the size of the AI models. */
+export const AI_TIER_LABEL: Record<AiTierId, string> = {
+  small: "Small",
+  standard: "Standard",
+  large: "Large",
+};
+
+/** Why a suggestion failed, in words that say what to do next. */
+export const SUGGESTION_ERROR_LABEL: Record<SuggestionErrorCode, string> = {
+  model_unavailable: "The local AI service (Ollama) is not running. Start it, then try again.",
+  model_missing: "The AI model is not installed in Ollama. Install it with ollama pull, then try again.",
+  // A cloud model, or one Ollama's model list cannot confirm is on this
+  // computer. Says nothing was sent, because that is the privacy fact.
+  model_not_local:
+    "The AI model may run off this computer, so Axcess sent nothing. Choose a model installed on this computer in Settings.",
+  timeout: "The AI model took too long to answer. Try again when the computer is less busy.",
+  no_change: "The AI did not suggest a real change to the code, even when asked twice, so nothing is shown. A bigger AI model in Settings may do better. You can also fix it by hand with the rule guidance.",
+  bad_answer: "The AI wrote an answer Axcess could not show safely, even when asked twice, so nothing is shown. A bigger AI model in Settings may do better. You can also fix it by hand with the rule guidance.",
+  restarted: "Axcess restarted before the suggestion was finished. Try again.",
+  occurrence_gone: "This occurrence is no longer in the report.",
+  internal: "Something went wrong in Axcess. Try again.",
+};
+
+export const AI_RUNTIME_START_LABEL: Record<import("../api/types").AiRuntimeStartState, string> = {
+  started: "AI service started. It is isolated and stays on this computer.",
+  already_running: "AI service: isolated, local only.",
+  model_missing: "The private AI program or models are missing. Choose a size and confirm its download below.",
+  not_isolated: "AI was not started because Axcess could not keep it isolated.",
+  system_ollama_not_managed: "This is your own Ollama. Axcess does not start, stop or isolate it. Choose a private download for isolated AI.",
+  ai_off: "AI features are off. Turn them on before starting the service.",
+  not_desktop: "Starting AI is available only in the Axcess desktop app.",
+  busy: "Finish or stop current work before starting the AI service.",
+};
+export const AI_ISOLATION_REASON_LABEL: Record<string, string> = {
+  sandbox_unavailable: "This computer cannot isolate the AI service. AI was not started. Saved results still work.",
+  network_test_failed: "The isolation check could not prove that outside connections are blocked. AI was not started.",
+  namespace_unreachable: "Axcess cannot reach the AI service inside its private network on this computer. AI was not started.",
+  runtime_failed: "The isolated AI service could not start. Check the application log.",
+  system_ollama_not_managed: "Your own Ollama is not isolated by Axcess. Axcess never starts or stops it.",
+};
+
+/**
+ * What happens when someone opens a link to another website, for the
+ * screen-reader note and visible text on every external link.
+ *
+ * In a browser the link opens a new tab. In the desktop app, the app
+ * (desktop/src/main.cjs) blocks the new window and opens the address in
+ * the person's default web browser, so "new tab" would be wrong there.
+ * Rejected: keeping one wording everywhere, because it would describe
+ * something that does not happen in the app. People need to hear where
+ * a link takes them before they use it (WCAG 2.2 SC 3.2.5 Change on
+ * Request, Level AAA). Text must also match what the code does (repo
+ * plain-language rules), and one shared phrase keeps every link the same
+ * (SC 3.2.4 Consistent Identification, Level AA).
+ */
+export const OPENS_NEW_WINDOW = isDesktopApp()
+  ? "opens in your web browser"
+  : "opens in a new tab";

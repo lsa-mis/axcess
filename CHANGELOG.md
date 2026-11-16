@@ -10,6 +10,25 @@ merge.
 
 ### Added
 
+- New scan: **Check that forms describe their errors** (WCAG 3.3.1 Error
+  Identification), on by default for public websites and never in sign-in
+  scans. It presses
+  each form's submit button once, with nothing typed, stops the form from
+  being sent, and reports a form that marks fields in error without saying
+  in words what is wrong, or shows a general error that names no field.
+  A third answer, **Check forms, and send empty ones to this site**, lets
+  it send a form whose every field is empty and check the page the site
+  sends back, for forms that only the site's server checks. It is never a
+  default and is meant for sites you own or test sites. Results appear in the Issues table as "Form shows
+  an error without describing it in text", under Mostly sure, or as "Form
+  may show an error without describing it in text", under Not sure, when
+  the page did something an expert has yet to decide counts (a "Required"
+  hint that only turns red, text only screen readers get, a changed
+  placeholder, a picture with alt text). Reports made before this change
+  keep every result under Not sure. It never
+  presses sign-in, payment, delete or search forms. Each result keeps a
+  picture of the form before and after the press, and **What was checked**
+  says how many forms it pressed, did not press, and could not judge.
 - Reports: each completed scan of an opened site has **Compare with**,
   a short list of the site's other completed reports. Choosing one opens
   Compare reports for the two, without opening a report first.
@@ -266,6 +285,28 @@ merge.
 
 ### Fixed
 
+- Form error check: it now judges forms built from web components, whose
+  fields and messages sit inside the component (shadow DOM). Before, such
+  forms were not found at all. It also hears the browser's own message for
+  those fields, waits for a form a script builds after the page loads, and
+  counts a form it could not press (a dialog covering the page) instead of
+  leaving it out.
+- Form error check: a question that turns red with no words now fails,
+  even when the page is built from tables nested several levels deep. On
+  W3C's BAD survey, sent empty, the red questions sat too deep in their
+  layout tables, so the check saw no error at all.
+- Inspector: a form the form error check flagged is now outlined in the
+  page copy. For a form with long code, it said the form "may not appear
+  here", though the form is on the page from the start.
+- Form error check: it now presses each form as the page loaded it, by
+  reloading the page before its first press. The other checks run first on
+  the same page. The keyboard and focus checks move focus through every
+  field, and a page that checks a field when it loses focus marked it in
+  error before the press, so the press changed nothing (Section 508's test
+  pages). Click-Through left radio buttons ticked (W3C's BAD survey).
+- Form error check: the scan's log now has one line per form with its
+  result, its reason, and, for a form sent empty, the reply's status and
+  title.
 - About: the desktop app now shows the version you are running, such as
   "Desktop preview 0.2.3". It always said 0.2.0, because the page took the
   number from the web part of the app, which each release does not change.

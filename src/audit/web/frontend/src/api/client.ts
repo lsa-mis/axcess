@@ -15,11 +15,19 @@ import type {
   ManualChecksResponse,
   ManualOutcome,
   PageEvidence,
+  ScanPagesResponse,
+  ScanPagesSort,
   PageInspection,
   DiffReport,
   ExportFormat,
+  OccurrenceReview,
+  OccurrenceReviewRequest,
   ExportOptions,
   FindingDetail,
+  ReportImage,
+  ReportImagesFilter,
+  ReportImageDetail,
+  ReportImagesResponse,
   FindingsFilter,
   FindingsPage,
   FindingStatus,
@@ -47,7 +55,18 @@ import type {
   ScanSummary,
   SiteGroup,
   ScopePreview,
+  AiInstallStatus,
+  AiPlan,
+  AiPreferences,
+  AiTierId,
+  SuggestionAvailability,
+  SuggestionFeedback,
+  SuggestionOccurrenceKind,
+  SuggestionRecord,
   TrackingData,
+  CoverageChecks,
+  CoverageFound,
+  WcagVersion,
 } from "./types";
 
 /**
@@ -272,6 +291,12 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(payload),
     }),
+  /** Save a person's review of the occurrences on one element of a page. */
+  saveOccurrenceReview: (scanId: number, pageId: number, payload: OccurrenceReviewRequest) =>
+    request<OccurrenceReview>(`/api/scans/${scanId}/pages/${pageId}/review`, {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    }),
   getManualChecks: (scanId: number) =>
     request<ManualChecksResponse>(`/api/scans/${scanId}/manual-checks`),
   updateManualCheck: (
@@ -292,8 +317,68 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  /** One page of the pages a report visited; `limit` is at most 200. */
+  listScanPages: (
+    scanId: number,
+    { limit, offset, sort }: { limit: number; offset: number; sort: ScanPagesSort },
+  ) => {
+    const params = new URLSearchParams({
+      limit: String(limit),
+      offset: String(offset),
+      sort,
+    });
+    return request<ScanPagesResponse>(`/api/scans/${scanId}/pages?${params}`);
+  },
   getPageEvidence: (scanId: number, pageId: number) =>
     request<PageEvidence>(`/api/scans/${scanId}/pages/${pageId}`),
+  /** Desktop only: this computer, the AI sizes it can run, and the current setup. 404 elsewhere. */
+  startAiRuntime,
+  getAiRuntime,
+  getAiPlan: () => request<AiPlan>("/api/ai/plan", { cache: "no-store" }),
+  getAiPreferences: () => request<AiPreferences>("/api/ai/preferences", { cache: "no-store" }),
+  setAiEnabled: (enabled: boolean) =>
+    request<AiPreferences>("/api/ai/preferences", {
+      method: "PUT",
+      body: JSON.stringify({ enabled }),
+    }),
+  getAiInstall: () => request<AiInstallStatus>("/api/ai/install", { cache: "no-store" }),
+  /** Start or resume downloading the AI program and models for one size. */
+  installAi: (tier: AiTierId) =>
+    request<AiInstallStatus>("/api/ai/install", {
+      method: "POST",
+      body: JSON.stringify({ tier }),
+    }),
+  pauseAiInstall: () => request<AiInstallStatus>("/api/ai/install", { method: "DELETE" }),
+  /** Turn AI features off and delete what Axcess downloaded. */
+  removeAi: () => request<void>("/api/ai", { method: "DELETE" }),
+  /** Whether AI fix suggestions are turned on and their local model is ready. */
+  getSuggestionStatus: () =>
+    request<SuggestionAvailability>("/api/suggestions/status", { cache: "no-store" }),
+  /** Queue an AI fix suggestion for one occurrence. Nothing leaves this computer. */
+  requestSuggestion: (scanId: number, kind: SuggestionOccurrenceKind, occurrenceId: number) =>
+    request<SuggestionRecord>(`/api/scans/${scanId}/suggestions`, {
+      method: "POST",
+      body: JSON.stringify({ occurrence_kind: kind, occurrence_id: occurrenceId }),
+    }),
+  /** The newest suggestion for one occurrence, or null when there is none. */
+  getLatestSuggestion: (scanId: number, kind: SuggestionOccurrenceKind, occurrenceId: number) =>
+    request<SuggestionRecord | null>(
+      `/api/scans/${scanId}/occurrences/${kind}/${occurrenceId}/suggestion`,
+      { cache: "no-store" },
+    ),
+  cancelSuggestion: (scanId: number, suggestionId: number) =>
+    request<SuggestionRecord>(`/api/scans/${scanId}/suggestions/${suggestionId}/cancel`, {
+      method: "POST",
+    }),
+  setSuggestionFeedback: (
+    scanId: number,
+    suggestionId: number,
+    feedback: SuggestionFeedback | null,
+  ) =>
+    request<SuggestionRecord>(`/api/scans/${scanId}/suggestions/${suggestionId}/feedback`, {
+      method: "POST",
+      body: JSON.stringify({ feedback }),
+    }),
   /**
    * Rendered page + DOM for the Page/DOM inspector. Serves the rendered
    * document persisted at scan time when present; otherwise re-renders the
@@ -436,6 +521,28 @@ export const api = {
     if (filter.q) params.set("q", filter.q);
     return request<FindingsPage>(`/api/scans/${scanId}/findings?${params}`);
   },
+  /** One page of one group of the report's images (the Images tab). */
+  /** One image of the report, and every page it appears on (up to 2,000). */
+  getReportImage: (scanId: number, imageId: number) =>
+    request<ReportImageDetail>(`/api/scans/${scanId}/images/${imageId}`),
+  listReportImages: (scanId: number, filter: ReportImagesFilter) => {
+    const params = new URLSearchParams();
+    params.set("group", filter.group);
+    if (filter.verdict) params.set("verdict", filter.verdict);
+    if (filter.q) params.set("q", filter.q);
+    params.set("limit", String(filter.limit));
+    params.set("offset", String(filter.offset));
+    return request<ReportImagesResponse>(`/api/scans/${scanId}/images?${params}`);
+  },
+  /**
+   * Ask the local model about one image's alt text. A person's explicit
+   * request; the server saves the answer and returns the image's new row.
+   */
+  checkImageAlt: (scanId: number, imageId: number) =>
+    request<ReportImage>(`/api/scans/${scanId}/images/${imageId}/alt-check`, {
+      method: "POST",
+    }),
+  downloadImagesZip,
   getFinding: (id: number) => request<FindingDetail>(`/api/findings/${id}`),
   setStatus: (id: number, status: FindingStatus, rationale?: string) =>
     request<{ status: FindingStatus }>(`/api/findings/${id}/status`, {
@@ -578,7 +685,7 @@ export const api = {
       responsibility?: string;
       abilities?: AbilityLabel | "";
       status?: FindingStatus | "";
-      review_lane?: "likely_barrier" | "expert_review" | "informational" | "" | (string & {});
+      review_lane?: "likely_barrier" | "measured" | "expert_review" | "informational" | "" | (string & {});
       finding_type?: FindingType | "" | (string & {});
       q?: string;
       sort?: string;
@@ -599,11 +706,42 @@ export const api = {
    * drift from the code.
    */
   getTracking: () => request<TrackingData>("/api/tracking"),
+  /** What Axcess checks for each WCAG criterion, built from its own code. */
+  getCoverageChecks: (version: WcagVersion) =>
+    request<CoverageChecks>(`/api/coverage/checks?version=${encodeURIComponent(version)}`),
+  /**
+   * What Axcess found, counted on request from this computer's completed
+   * reports: across the most recent ones, or one report.
+   */
+  getCoverageFound: (scanId?: number) =>
+    request<CoverageFound>(scanId ? `/api/coverage/found?scan_id=${scanId}` : "/api/coverage/found"),
 };
 
 /** Direct URL (bypass fetch) for image blobs, used in <img src=…>. */
 export const blobUrl = (contentHash: string): string =>
   `/blobs/${contentHash}`;
+
+/**
+ * Fetch the Images tab's ZIP and hand it to the browser to save, the way
+ * Export report does (downloadExport): a plain download link was ignored in
+ * some windows (the developer's report, 2026-11-13), and fetching lets the
+ * page say it is working and show an error in words.
+ */
+async function downloadImagesZip(scanId: number): Promise<{ filename: string; sizeBytes: number }> {
+  const res = await fetch(imagesZipUrl(scanId), { credentials: "same-origin", cache: "no-store" });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new ApiError(res.status, apiErrorMessage(res.status, body));
+  }
+  const blob = await res.blob();
+  const filename =
+    dispositionFilename(res.headers.get("Content-Disposition")) ?? `report-${scanId}-images.zip`;
+  saveBlob(blob, filename);
+  return { filename, sizeBytes: blob.size };
+}
+
+/** Download URL for the Images tab's ZIP: pictures in folders by group and verdict, and a sheet. */
+export const imagesZipUrl = (scanId: number): string => `/api/scans/${scanId}/images/export.zip`;
 
 /**
  * Download URL for a scan export; incomplete reports require explicit draft
@@ -622,3 +760,15 @@ export const exportUrl = (
   const query = params.toString();
   return `/api/scans/${scanId}/export/${format}${query ? `?${query}` : ""}`;
 };
+
+/** Start only Axcess's private, isolated service after a deliberate button press. */
+export function startAiRuntime(): Promise<import("./types").AiRuntimeStartResponse> {
+  return request("/api/ai/runtime/start", {
+    method: "POST",
+    body: JSON.stringify({ confirm: true }),
+  });
+}
+
+export function getAiRuntime(): Promise<import("./types").AiRuntimeStatus> {
+  return request("/api/ai/runtime", { cache: "no-store" });
+}

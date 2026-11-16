@@ -276,6 +276,26 @@ def test_workbook_cells_and_links_are_redacted_and_a_notice_sheet_added() -> Non
     assert issues_sheet["C2"].value == 42
 
 
+def test_the_its_technical_review_is_redacted_like_the_issue_workbook() -> None:
+    """The ITS review (format ``its``) is a workbook too, merged in with
+    WCAG331 after redaction landed on main. It must be redacted, never
+    refused: the Export panel renders every file when the box is ticked."""
+    workbook = Workbook()
+    sheet = workbook.active
+    assert sheet is not None
+    sheet.title = "Technical Review"
+    sheet["A2"] = '<input value="jane@example.com">'
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+
+    redacted = redact_export(buffer.getvalue(), export_format="its")
+
+    assert isinstance(redacted, bytes)
+    result = load_workbook(io.BytesIO(redacted))
+    assert result.sheetnames == ["REDACTION NOTICE", "Technical Review"]
+    assert result["Technical Review"]["A2"].value == '<input value="[redacted]">'
+
+
 def test_an_unknown_format_is_refused_rather_than_served_unredacted() -> None:
     with pytest.raises(ValueError, match="not available"):
         redact_export("x", export_format="pdf")

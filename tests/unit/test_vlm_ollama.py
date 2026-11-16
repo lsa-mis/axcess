@@ -21,6 +21,21 @@ from audit.analyzer.vlm.ollama import (
     prompt_version,
 )
 
+
+@pytest.fixture(autouse=True)
+def _no_remote_models(monkeypatch: pytest.MonkeyPatch) -> None:
+    """These tests mock only /api/generate; the model runs on this computer.
+
+    The /api/tags read that refuses a cloud model is tested in
+    tests/unit/test_ollama_cloud_models.py.
+    """
+
+    async def local(*_args: object) -> None:
+        return None
+
+    monkeypatch.setattr("audit.analyzer.ollama_base.why_not_local", local)
+
+
 BASE = "http://ollama-test.local"
 MODEL = "qwen3-vl:2b-instruct"
 

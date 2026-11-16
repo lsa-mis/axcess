@@ -11,6 +11,7 @@ import pytest
 from PIL import Image
 
 from audit.protected import companion
+from audit.protected import session as session_module
 from audit.protected.egress import EgressViolation
 from audit.protected.session import (
     ManualAuthenticationError,
@@ -376,7 +377,22 @@ def _session_with_fake_browser() -> tuple[
 
 
 @pytest.mark.asyncio
-async def test_tab_scoped_session_survives_login_handoff() -> None:
+async def test_tab_scoped_session_survives_login_handoff(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The sign-in tab leads; every other tab gets a copy of its sessionStorage."""
+    captured = {"https://app.example.edu": {"token": "t"}}
+    seeded: list[tuple[object, object]] = []
+
+    async def capture(tab: object) -> object:
+        assert tab is page
+        return captured
+
+    async def restore(tab: object, state: object) -> None:
+        seeded.append((tab, state))
+
+    monkeypatch.setattr(session_module, "capture_session_storage", capture)
+    monkeypatch.setattr(session_module, "restore_session_storage", restore)
     session, _, _, context, page = _session_with_fake_browser()
     await session.start()
     page.url = "https://app.example.edu/#/dashboard"
@@ -384,9 +400,13 @@ async def test_tab_scoped_session_survives_login_handoff() -> None:
     assert session.enter_scan_mode() == page.url
     scan_pages = await session.prepare_background_scan_pages(4)
     await session.discard_manual_auth_page()
-    assert scan_pages == (page,)
+    assert scan_pages[0] is page
+    assert len(scan_pages) == 4
+    assert [tab for tab, _ in seeded] == list(scan_pages[1:])
+    assert all(state is captured for _, state in seeded)
+    assert session.scan_tabs_copied
     assert not page.closed
-    assert not context.additional_pages
+    assert not any(tab.closed for tab in scan_pages)
     await session.close()
     assert context.closed
 
@@ -607,7 +627,17 @@ async def test_a_handoff_tab_that_closes_itself_falls_back_to_the_previous_tab()
 
 
 @pytest.mark.asyncio
-async def test_closing_extra_login_tabs_preserves_the_original_for_scanning() -> None:
+async def test_closing_extra_login_tabs_preserves_the_original_for_scanning(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def capture(_tab: object) -> object:
+        return {"https://app.example.edu": {"token": "t"}}
+
+    async def restore(_tab: object, _state: object) -> None:
+        return None
+
+    monkeypatch.setattr(session_module, "capture_session_storage", capture)
+    monkeypatch.setattr(session_module, "restore_session_storage", restore)
     session, _, _, context, page = _session_with_fake_browser()
     try:
         await session.start()
@@ -625,8 +655,9 @@ async def test_closing_extra_login_tabs_preserves_the_original_for_scanning() ->
         scan_pages = await session.prepare_background_scan_pages(2)
         await session.discard_manual_auth_page()
 
-        assert scan_pages == (page,)
+        assert scan_pages[0] is page and len(scan_pages) == 2
         assert not page.closed, "sign-in cleanup closed the retained scan tab"
+        assert not scan_pages[1].closed, "sign-in cleanup closed a copied scan tab"
     finally:
         await session.close()
 

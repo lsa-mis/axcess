@@ -91,13 +91,39 @@ async def test_two_panels_show_their_reports_without_the_app_chrome(
 
     for report in (third, second):
         frame = await _frame(page, report)
-        # A panel is the page alone: no sidebar, no top bar, no skip link,
-        # and no Compare reports tab (so no report tabs at all).
+        # A panel is the page alone: no sidebar, no top bar, no skip link.
+        # It keeps its report's tabs, Issues and Images, without Compare
+        # reports (2026-11-16), so it switches views like the whole window.
         await expect(frame.get_by_role("complementary", name="Primary")).to_have_count(0)
         await expect(frame.get_by_role("banner")).to_have_count(0)
         await expect(frame.get_by_role("link", name="Skip to main content")).to_have_count(0)
-        await expect(frame.get_by_role("navigation", name="Report views")).to_have_count(0)
+        views = frame.get_by_role("navigation", name="Report views")
+        await expect(views.get_by_role("link")).to_have_text(["Issues", "Images"])
         await expect(frame.get_by_role("main")).to_have_count(1)
+
+    # Images in one panel; the other stays on Issues, and the panel's title
+    # follows it.
+    left_frame = await _frame(page, third)
+    await (
+        left_frame.get_by_role("navigation", name="Report views")
+        .get_by_role("link", name="Images")
+        .click()
+    )
+    await expect(left_frame.get_by_role("heading", level=1, name="Images")).to_be_visible()
+    await expect(left.locator("iframe")).to_have_attribute(
+        "title", re.compile(rf"^Report #{third}, Images")
+    )
+    await expect(right.locator("iframe")).to_have_attribute(
+        "title", f"Report #{second}, Accessibility issues"
+    )
+    await (
+        left_frame.get_by_role("navigation", name="Report views")
+        .get_by_role("link", name="Issues")
+        .click()
+    )
+    await expect(left.locator("iframe")).to_have_attribute(
+        "title", f"Report #{third}, Accessibility issues"
+    )
 
     # Side by side at 1280 with the sidebar open, each about 460 pixels wide,
     # the page inside laid out for that width with nothing sideways.
@@ -160,6 +186,11 @@ async def test_each_panel_moves_on_its_own_and_goes_back_in_itself(
         arg=third,
     )
 
+    # The table opens on every issue type, so the seeded report's Not sure
+    # and For information rows are there already; nothing was navigated.
+    await expect(left_frame.locator("table a[href*='/issues/']").first).to_be_visible()
+    await expect(back).to_have_attribute("aria-disabled", "true")
+
     # Scroll the panel's page to the issue, then open it.
     inner = next(f for f in page.frames if f"/scans/{third}/issues" in f.url)
     issue = left_frame.locator("table a[href*='/issues/']").first
@@ -191,6 +222,7 @@ async def test_each_panel_moves_on_its_own_and_goes_back_in_itself(
     # With nothing left to go back to, pressing it does nothing.
     await page.keyboard.press("Enter")
     await page.wait_for_timeout(200)
+    # Back in the panel's own Issues table, as it opened.
     assert re.search(rf"/scans/{third}/issues$", _frame_url(page, third))
     assert page.url == f"{base}/app{address}"
 
@@ -377,7 +409,7 @@ async def test_a_site_with_one_report_has_nothing_to_compare_yet(
     base, scan_id = live_server
     page = await _open(new_page, base, f"/scans/{scan_id}/compare")
     empty = page.get_by_role("region", name="Nothing to compare with yet")
-    await expect(empty).to_contain_text("This site has one completed report so far.")
+    await expect(empty).to_contain_text("This site has one report so far.")
     await expect(empty.get_by_role("link")).to_have_count(0)
     violations = await _run_axe(page)
     assert not violations, _render_violations(violations)

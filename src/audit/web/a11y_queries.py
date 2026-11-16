@@ -358,8 +358,16 @@ def grouped_by_rule(
         raw_outcome = str(r["engine_outcome"] or "failed")
         # Non-Alfa pipelines keep their established per-rule grouping. Alfa's
         # two outcome types have materially different evidentiary meaning and
-        # therefore may never share a group or a list of bulk-action ids.
-        outcome_group = raw_outcome if pipeline == "alfa" else None
+        # therefore may never share a group or a list of bulk-action ids. The
+        # same holds for axe's "needs review" (cant_tell) rows; an axe failure
+        # keeps ``None`` so its group, and its ``axe:<rule>`` issue key, are
+        # what they were.
+        if pipeline == "alfa":
+            outcome_group: str | None = raw_outcome
+        elif raw_outcome == "cant_tell":
+            outcome_group = "cant_tell"
+        else:
+            outcome_group = None
         key = (pipeline, rule_id, outcome_group)
         entry = groups.setdefault(
             key,

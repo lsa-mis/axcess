@@ -818,7 +818,11 @@ def redact_export(
     """
 
     redactor = _Redactor(locators)
-    if export_format == "xlsx":
+    # Both workbooks: the issue workbook, and the U-M ITS technical review
+    # (its = the ITS team's template, filled in). The pass is the same for
+    # any workbook: every text cell and link, pictures removed, a notice
+    # sheet first.
+    if export_format in ("xlsx", "its"):
         if not isinstance(rendered, bytes):
             raise TypeError("XLSX exports must be bytes")
         return _redact_workbook(rendered, redactor)

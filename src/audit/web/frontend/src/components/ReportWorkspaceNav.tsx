@@ -3,7 +3,8 @@ import Tabs from "./Tabs";
 import { FRAMED } from "../lib/framed";
 
 /**
- * Report navigation: the issue table, and Compare reports, which shows this
+ * Report navigation: the issue table, the Images tab (every image and its
+ * alt text), and Compare reports, which shows this
  * report and another of the site side by side. (What changed between the
  * two, the older comparison page, opens from Compare reports and keeps this
  * tab lit: it is part of that view.)
@@ -19,7 +20,8 @@ import { FRAMED } from "../lib/framed";
  * overview's numbers above the table, and ``/scans/:id`` redirects there.
  *
  * Only the views themselves render this (see ``ReportHeader``), so the
- * active tab is read from the path alone.
+ * active tab is read from the path alone. In a panel of Compare reports the
+ * row is the same, without Compare reports (below).
  *
  * The views are data (``REPORT_VIEWS``), not markup: a further view of the
  * report's findings, such as findings by page or by component, is one entry
@@ -51,6 +53,15 @@ export const REPORT_VIEWS: readonly ReportView[] = [
     segment: "issues",
     path: (scanId) => `/scans/${scanId}/issues`,
   },
+  // Images (2026-11-13): every image with a verdict on its alt text. After
+  // Issues, so the report still opens on its issues, and before Compare
+  // reports, which looks across two reports rather than into this one.
+  {
+    key: "images",
+    label: "Images",
+    segment: "images",
+    path: (scanId) => `/scans/${scanId}/images`,
+  },
   {
     key: "compare",
     label: "Compare reports",
@@ -77,13 +88,17 @@ export default function ReportWorkspaceNav({
   const { pathname } = useLocation();
   const active = activeReportView(pathname);
   // The current view stays, so a saved link to it still has its tab. As a
-  // panel of Compare reports (lib/framed.ts) there is no Compare reports tab:
-  // it would open the comparison inside one of its own panels. With Issues
-  // alone left, the row is not drawn at all (below).
+  // panel of Compare reports (lib/framed.ts) every view but Compare reports
+  // is offered: a panel switches between its report's Issues and Images
+  // like the whole window does (the developer's decision, 2026-11-16), so
+  // the two panels can show one report's issues beside the other's, or both
+  // reports' images. Compare reports stays out of a panel: it would open the
+  // comparison inside one of its own panels. From 2026-11-13 to 2026-11-16 a
+  // panel kept only its current view, so it had no tab row at all.
   const views = REPORT_VIEWS.filter(
     (view) =>
-      !(FRAMED && view.key === "compare") &&
-      (view === active || (view.available?.(previousScanId) ?? true)),
+      view === active ||
+      (!(FRAMED && view.key === "compare") && (view.available?.(previousScanId) ?? true)),
   );
   // One view is not a choice; the heading already names it.
   if (views.length < 2) return null;

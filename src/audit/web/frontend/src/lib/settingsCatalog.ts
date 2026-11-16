@@ -302,6 +302,17 @@ export const SETTING_SECTIONS: ReadonlyArray<{ id: string; title: string; settin
           { value: "collapsed", label: "Icons only" },
         ],
       }),
+      // Where "Don’t show again" on that message is undone (ImageParts.tsx).
+      setting({
+        key: "aiOffNotice",
+        label: "Message that the local AI check is off",
+        description:
+          "On the Images tab: says the local AI check is off, with a link to turn on AI features. The images still say \u201cLocal AI check is off\u201d when it is hidden.",
+        options: [
+          { value: "on", label: "Show" },
+          { value: "off", label: "Hide" },
+        ],
+      }),
     ],
   },
 ];

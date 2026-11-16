@@ -16,7 +16,7 @@ from typing import Any
 
 import pytest
 
-from ._inspector_case import BOX_RECT, DOC, fact, open_inspector, rect_of, seed, settled
+from ._inspector_case import BOX_RECT, DOC, box_note, open_inspector, rect_of, seed, settled
 
 pytestmark = [pytest.mark.ui, pytest.mark.asyncio(loop_scope="module")]
 
@@ -67,7 +67,8 @@ async def test_hidden_content_is_opened_or_said(
         assert drawn is not None, drawn
         assert drawn["left"] <= link[0] and link[2] <= drawn["right"], (drawn, link)
         assert drawn["top"] <= link[1] and link[3] <= drawn["bottom"], (drawn, link)
-        await playwright_async.expect(fact(page, "Where the box is")).to_have_text(
+        await playwright_async.expect(box_note(page)).to_contain_text(
+            "Where the box is: "
             "Around it. Axcess opened the closed section it is in (<details>) in this saved copy."
         )
 
@@ -75,8 +76,8 @@ async def test_hidden_content_is_opened_or_said(
         before = await page.evaluate(f"{DOC}.defaultView.scrollY")
         await group.get_by_role("button", name="Next element").click()
         await playwright_async.expect(box).to_have_text("2 of 2")
-        await playwright_async.expect(fact(page, "Where the box is")).to_have_text(
-            "No box. It was hidden in this saved copy (display: none)."
+        await playwright_async.expect(box_note(page)).to_contain_text(
+            "Where the box is: No box. It was hidden in this saved copy (display: none)."
         )
         await settled(page)
         assert await page.evaluate(f"({BOX_RECT})()") is None

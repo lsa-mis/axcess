@@ -452,11 +452,91 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/pages",
+        "methods": ["GET"],
+        "name": "api_scan_pages",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["limit", "offset", "sort"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/scans/{scan_id:int}/pages/{page_id:int}",
         "methods": ["GET"],
         "name": "api_page_evidence",
         "async": false,
         "params": {"path": ["scan_id", "page_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/pages/{page_id:int}/review",
+        "methods": ["PUT"],
+        "name": "api_save_occurrence_review",
+        "async": false,
+        "params": {"path": ["scan_id", "page_id"], "body": ["body"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/suggestions/status",
+        "methods": ["GET"],
+        "name": "api_suggestion_status",
+        "async": true,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/suggestions",
+        "methods": ["POST"],
+        "name": "api_create_suggestion",
+        "async": false,
+        "params": {"path": ["scan_id"], "body": ["body"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/suggestions/{suggestion_id:int}",
+        "methods": ["GET"],
+        "name": "api_get_suggestion",
+        "async": false,
+        "params": {"path": ["scan_id", "suggestion_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/occurrences/{occurrence_kind}/{occurrence_id:int}/suggestion",
+        "methods": ["GET"],
+        "name": "api_latest_suggestion",
+        "async": false,
+        "params": {"path": ["scan_id", "occurrence_kind", "occurrence_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/suggestions/{suggestion_id:int}/cancel",
+        "methods": ["POST"],
+        "name": "api_cancel_suggestion",
+        "async": false,
+        "params": {"path": ["scan_id", "suggestion_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/suggestions/{suggestion_id:int}/feedback",
+        "methods": ["POST"],
+        "name": "api_suggestion_feedback",
+        "async": false,
+        "params": {"path": ["scan_id", "suggestion_id"], "body": ["body"]},
         "request_param": null,
         "background_tasks_param": null
       },
@@ -577,6 +657,46 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/images",
+        "methods": ["GET"],
+        "name": "api_scan_images",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["group", "verdict", "q", "limit", "offset"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/images/{image_id:int}",
+        "methods": ["GET"],
+        "name": "api_scan_image",
+        "async": false,
+        "params": {"path": ["scan_id", "image_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/images/{image_id:int}/alt-check",
+        "methods": ["POST"],
+        "name": "api_check_image_alt",
+        "async": true,
+        "params": {"path": ["scan_id", "image_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/images/export.zip",
+        "methods": ["GET"],
+        "name": "api_scan_images_zip",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/findings/{finding_id:int}/status",
         "methods": ["POST"],
         "name": "api_set_finding_status",
@@ -667,6 +787,26 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/coverage/checks",
+        "methods": ["GET"],
+        "name": "api_coverage_checks",
+        "async": false,
+        "params": {"query": ["version"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/coverage/found",
+        "methods": ["GET"],
+        "name": "api_coverage_found",
+        "async": false,
+        "params": {"query": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/",
         "methods": ["GET"],
         "name": "root",
@@ -748,8 +888,8 @@
       "fastapi.exceptions.WebSocketRequestValidationError": "websocket_request_validation_exception_handler",
       "starlette.exceptions.HTTPException": "http_exception_handler"
     },
-    "on_startup": ["_configure_scan_logging", "_start_protected_retention_worker"],
-    "on_shutdown": ["_end_waiting_sign_ins", "_stop_protected_retention_worker"]
+    "on_startup": ["_configure_scan_logging", "_start_protected_retention_worker", "_start_suggestion_worker"],
+    "on_shutdown": ["_end_waiting_sign_ins", "_stop_protected_retention_worker", "_stop_suggestion_worker"]
   },
   "token-set/dist-built": {
     "routes": [
@@ -1218,11 +1358,91 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/pages",
+        "methods": ["GET"],
+        "name": "api_scan_pages",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["limit", "offset", "sort"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/scans/{scan_id:int}/pages/{page_id:int}",
         "methods": ["GET"],
         "name": "api_page_evidence",
         "async": false,
         "params": {"path": ["scan_id", "page_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/pages/{page_id:int}/review",
+        "methods": ["PUT"],
+        "name": "api_save_occurrence_review",
+        "async": false,
+        "params": {"path": ["scan_id", "page_id"], "body": ["body"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/suggestions/status",
+        "methods": ["GET"],
+        "name": "api_suggestion_status",
+        "async": true,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/suggestions",
+        "methods": ["POST"],
+        "name": "api_create_suggestion",
+        "async": false,
+        "params": {"path": ["scan_id"], "body": ["body"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/suggestions/{suggestion_id:int}",
+        "methods": ["GET"],
+        "name": "api_get_suggestion",
+        "async": false,
+        "params": {"path": ["scan_id", "suggestion_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/occurrences/{occurrence_kind}/{occurrence_id:int}/suggestion",
+        "methods": ["GET"],
+        "name": "api_latest_suggestion",
+        "async": false,
+        "params": {"path": ["scan_id", "occurrence_kind", "occurrence_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/suggestions/{suggestion_id:int}/cancel",
+        "methods": ["POST"],
+        "name": "api_cancel_suggestion",
+        "async": false,
+        "params": {"path": ["scan_id", "suggestion_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/suggestions/{suggestion_id:int}/feedback",
+        "methods": ["POST"],
+        "name": "api_suggestion_feedback",
+        "async": false,
+        "params": {"path": ["scan_id", "suggestion_id"], "body": ["body"]},
         "request_param": null,
         "background_tasks_param": null
       },
@@ -1343,6 +1563,46 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/images",
+        "methods": ["GET"],
+        "name": "api_scan_images",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["group", "verdict", "q", "limit", "offset"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/images/{image_id:int}",
+        "methods": ["GET"],
+        "name": "api_scan_image",
+        "async": false,
+        "params": {"path": ["scan_id", "image_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/images/{image_id:int}/alt-check",
+        "methods": ["POST"],
+        "name": "api_check_image_alt",
+        "async": true,
+        "params": {"path": ["scan_id", "image_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/images/export.zip",
+        "methods": ["GET"],
+        "name": "api_scan_images_zip",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/findings/{finding_id:int}/status",
         "methods": ["POST"],
         "name": "api_set_finding_status",
@@ -1433,6 +1693,26 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/coverage/checks",
+        "methods": ["GET"],
+        "name": "api_coverage_checks",
+        "async": false,
+        "params": {"query": ["version"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/coverage/found",
+        "methods": ["GET"],
+        "name": "api_coverage_found",
+        "async": false,
+        "params": {"query": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/",
         "methods": ["GET"],
         "name": "root",
@@ -1514,8 +1794,8 @@
       "fastapi.exceptions.WebSocketRequestValidationError": "websocket_request_validation_exception_handler",
       "starlette.exceptions.HTTPException": "http_exception_handler"
     },
-    "on_startup": ["_configure_scan_logging", "_start_protected_retention_worker"],
-    "on_shutdown": ["_end_waiting_sign_ins", "_stop_protected_retention_worker"]
+    "on_startup": ["_configure_scan_logging", "_start_protected_retention_worker", "_start_suggestion_worker"],
+    "on_shutdown": ["_end_waiting_sign_ins", "_stop_protected_retention_worker", "_stop_suggestion_worker"]
   },
   "token-unset/dist-absent": {
     "routes": [
@@ -1970,11 +2250,91 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/pages",
+        "methods": ["GET"],
+        "name": "api_scan_pages",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["limit", "offset", "sort"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/scans/{scan_id:int}/pages/{page_id:int}",
         "methods": ["GET"],
         "name": "api_page_evidence",
         "async": false,
         "params": {"path": ["scan_id", "page_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/pages/{page_id:int}/review",
+        "methods": ["PUT"],
+        "name": "api_save_occurrence_review",
+        "async": false,
+        "params": {"path": ["scan_id", "page_id"], "body": ["body"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/suggestions/status",
+        "methods": ["GET"],
+        "name": "api_suggestion_status",
+        "async": true,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/suggestions",
+        "methods": ["POST"],
+        "name": "api_create_suggestion",
+        "async": false,
+        "params": {"path": ["scan_id"], "body": ["body"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/suggestions/{suggestion_id:int}",
+        "methods": ["GET"],
+        "name": "api_get_suggestion",
+        "async": false,
+        "params": {"path": ["scan_id", "suggestion_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/occurrences/{occurrence_kind}/{occurrence_id:int}/suggestion",
+        "methods": ["GET"],
+        "name": "api_latest_suggestion",
+        "async": false,
+        "params": {"path": ["scan_id", "occurrence_kind", "occurrence_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/suggestions/{suggestion_id:int}/cancel",
+        "methods": ["POST"],
+        "name": "api_cancel_suggestion",
+        "async": false,
+        "params": {"path": ["scan_id", "suggestion_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/suggestions/{suggestion_id:int}/feedback",
+        "methods": ["POST"],
+        "name": "api_suggestion_feedback",
+        "async": false,
+        "params": {"path": ["scan_id", "suggestion_id"], "body": ["body"]},
         "request_param": null,
         "background_tasks_param": null
       },
@@ -2095,6 +2455,46 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/images",
+        "methods": ["GET"],
+        "name": "api_scan_images",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["group", "verdict", "q", "limit", "offset"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/images/{image_id:int}",
+        "methods": ["GET"],
+        "name": "api_scan_image",
+        "async": false,
+        "params": {"path": ["scan_id", "image_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/images/{image_id:int}/alt-check",
+        "methods": ["POST"],
+        "name": "api_check_image_alt",
+        "async": true,
+        "params": {"path": ["scan_id", "image_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/images/export.zip",
+        "methods": ["GET"],
+        "name": "api_scan_images_zip",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/findings/{finding_id:int}/status",
         "methods": ["POST"],
         "name": "api_set_finding_status",
@@ -2185,6 +2585,26 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/coverage/checks",
+        "methods": ["GET"],
+        "name": "api_coverage_checks",
+        "async": false,
+        "params": {"query": ["version"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/coverage/found",
+        "methods": ["GET"],
+        "name": "api_coverage_found",
+        "async": false,
+        "params": {"query": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/",
         "methods": ["GET"],
         "name": "root",
@@ -2265,8 +2685,8 @@
       "fastapi.exceptions.WebSocketRequestValidationError": "websocket_request_validation_exception_handler",
       "starlette.exceptions.HTTPException": "http_exception_handler"
     },
-    "on_startup": ["_configure_scan_logging", "_start_protected_retention_worker"],
-    "on_shutdown": ["_end_waiting_sign_ins", "_stop_protected_retention_worker"]
+    "on_startup": ["_configure_scan_logging", "_start_protected_retention_worker", "_start_suggestion_worker"],
+    "on_shutdown": ["_end_waiting_sign_ins", "_stop_protected_retention_worker", "_stop_suggestion_worker"]
   },
   "token-unset/dist-built": {
     "routes": [
@@ -2735,11 +3155,91 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/pages",
+        "methods": ["GET"],
+        "name": "api_scan_pages",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["limit", "offset", "sort"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/scans/{scan_id:int}/pages/{page_id:int}",
         "methods": ["GET"],
         "name": "api_page_evidence",
         "async": false,
         "params": {"path": ["scan_id", "page_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/pages/{page_id:int}/review",
+        "methods": ["PUT"],
+        "name": "api_save_occurrence_review",
+        "async": false,
+        "params": {"path": ["scan_id", "page_id"], "body": ["body"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/suggestions/status",
+        "methods": ["GET"],
+        "name": "api_suggestion_status",
+        "async": true,
+        "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/suggestions",
+        "methods": ["POST"],
+        "name": "api_create_suggestion",
+        "async": false,
+        "params": {"path": ["scan_id"], "body": ["body"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/suggestions/{suggestion_id:int}",
+        "methods": ["GET"],
+        "name": "api_get_suggestion",
+        "async": false,
+        "params": {"path": ["scan_id", "suggestion_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/occurrences/{occurrence_kind}/{occurrence_id:int}/suggestion",
+        "methods": ["GET"],
+        "name": "api_latest_suggestion",
+        "async": false,
+        "params": {"path": ["scan_id", "occurrence_kind", "occurrence_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/suggestions/{suggestion_id:int}/cancel",
+        "methods": ["POST"],
+        "name": "api_cancel_suggestion",
+        "async": false,
+        "params": {"path": ["scan_id", "suggestion_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/suggestions/{suggestion_id:int}/feedback",
+        "methods": ["POST"],
+        "name": "api_suggestion_feedback",
+        "async": false,
+        "params": {"path": ["scan_id", "suggestion_id"], "body": ["body"]},
         "request_param": null,
         "background_tasks_param": null
       },
@@ -2860,6 +3360,46 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/images",
+        "methods": ["GET"],
+        "name": "api_scan_images",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["group", "verdict", "q", "limit", "offset"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/images/{image_id:int}",
+        "methods": ["GET"],
+        "name": "api_scan_image",
+        "async": false,
+        "params": {"path": ["scan_id", "image_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/images/{image_id:int}/alt-check",
+        "methods": ["POST"],
+        "name": "api_check_image_alt",
+        "async": true,
+        "params": {"path": ["scan_id", "image_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/images/export.zip",
+        "methods": ["GET"],
+        "name": "api_scan_images_zip",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/findings/{finding_id:int}/status",
         "methods": ["POST"],
         "name": "api_set_finding_status",
@@ -2950,6 +3490,26 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/coverage/checks",
+        "methods": ["GET"],
+        "name": "api_coverage_checks",
+        "async": false,
+        "params": {"query": ["version"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/coverage/found",
+        "methods": ["GET"],
+        "name": "api_coverage_found",
+        "async": false,
+        "params": {"query": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/",
         "methods": ["GET"],
         "name": "root",
@@ -3030,7 +3590,7 @@
       "fastapi.exceptions.WebSocketRequestValidationError": "websocket_request_validation_exception_handler",
       "starlette.exceptions.HTTPException": "http_exception_handler"
     },
-    "on_startup": ["_configure_scan_logging", "_start_protected_retention_worker"],
-    "on_shutdown": ["_end_waiting_sign_ins", "_stop_protected_retention_worker"]
+    "on_startup": ["_configure_scan_logging", "_start_protected_retention_worker", "_start_suggestion_worker"],
+    "on_shutdown": ["_end_waiting_sign_ins", "_stop_protected_retention_worker", "_stop_suggestion_worker"]
   }
 }

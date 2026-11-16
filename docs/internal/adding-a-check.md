@@ -18,7 +18,10 @@ any threshold.
 
 - **[Mostly sure](../glossary.md#mostly-sure) (`likely_barrier`)** is only for a rule
   engine that failed a fixed, machine-testable rule. Today that means axe-core
-  violations and Siteimprove Alfa `failed` outcomes.
+  violations, Siteimprove Alfa `failed` outcomes, the form error check's clear
+  failures, and the page code check's two facts of the page code (a field
+  named only by its placeholder, a label tied to no field). The page code
+  check keeps each rule's group in `audit/analyzer/markup/base.py` `RULES`.
 - **[Not sure](../glossary.md#not-sure) (`expert_review`)** is for
   anything a person has to confirm: browser measurements, heuristics, anything
   a model judged, and engine results such as Alfa `cantTell`. Almost every new

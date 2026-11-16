@@ -1,0 +1,101 @@
+# Step-by-step screen reader checks, shared by several issue types.
+#
+# A card in audit_report.yaml names one of these with
+# `screen_reader_check: <key>`. The issue guidance then shows the steps for
+# each computer (Mac with VoiceOver, Windows with NVDA) as numbered lists,
+# beside the card's own verify_manual sentence, which says what you should
+# find. One block per kind of check keeps the steps word for word the same
+# on every issue that uses them (W3C COGA, "Making Content Usable": the same
+# steps for the same job; WCAG 2.2 SC 3.2.4 Consistent Identification, AA).
+#
+# Text rules (docs/plain-language.md): plain text only, no HTML. A key the
+# reader presses is written in braces, {Command}, and shown as a key; the
+# exports drop the braces. Spell keys out (WCAG 3.1.4 Abbreviations): never
+# "VO" or "NVDA+".
+#
+# Each block starts and ends with the same steps to turn the screen reader
+# on and off, and the same introduction, so a reader learns them once
+# (tests/unit/test_screen_reader_checks.py keeps them identical). Only the
+# list chosen and what you move through change.
+#
+# Keys were taken from Apple's VoiceOver User Guide and the NVDA User Guide
+# (Elements List, browse mode quick navigation). Check them again when either
+# changes its default keys.
+
+landmarks:
+  title: "Check the landmarks with a screen reader"
+  platforms:
+    - id: mac
+      name: "Mac, with VoiceOver"
+      intro: "VoiceOver is built into every Mac."
+      steps:
+        - "Turn VoiceOver on: press {Command} + {F5}. On some keyboards: {Fn} + {Command} + {F5}."
+        - "Open the rotor (VoiceOver's list of page parts): press {Control} + {Option} + {U}."
+        - "Press {Right Arrow} until you hear \"Landmarks\"."
+        - "Press {Up Arrow} or {Down Arrow} to hear each landmark. Press {Return} to go to one."
+        - "When you are done: {Escape} closes the rotor, and {Command} + {F5} turns VoiceOver off."
+    - id: windows
+      name: "Windows, with NVDA"
+      intro: >-
+        NVDA is a free screen reader. Below, "NVDA key" means {Insert}, or
+        {Caps Lock} if you chose the laptop keyboard layout.
+      link_text: "Get NVDA from NV Access"
+      link_url: "https://www.nvaccess.org/download/"
+      steps:
+        - "Turn NVDA on: press {Control} + {Alt} + {N}. Then go to the page in your browser."
+        - "Open the Elements List (NVDA's list of page parts): press {NVDA key} + {F7}."
+        - "Choose Landmarks: press {Alt} + {D}."
+        - "Press {Tab} to reach the list, then {Up Arrow} or {Down Arrow} to hear each landmark. Press {Enter} to go to one. Or close the list and press {D} to jump from landmark to landmark."
+        - "When you are done: {Escape} closes the list, and {NVDA key} + {Q}, then {Enter}, turns NVDA off."
+
+headings:
+  title: "Check the headings with a screen reader"
+  platforms:
+    - id: mac
+      name: "Mac, with VoiceOver"
+      intro: "VoiceOver is built into every Mac."
+      steps:
+        - "Turn VoiceOver on: press {Command} + {F5}. On some keyboards: {Fn} + {Command} + {F5}."
+        - "Open the rotor (VoiceOver's list of page parts): press {Control} + {Option} + {U}."
+        - "Press {Right Arrow} until you hear \"Headings\"."
+        - "Press {Up Arrow} or {Down Arrow} to hear each heading. Press {Return} to go to one."
+        - "When you are done: {Escape} closes the rotor, and {Command} + {F5} turns VoiceOver off."
+    - id: windows
+      name: "Windows, with NVDA"
+      intro: >-
+        NVDA is a free screen reader. Below, "NVDA key" means {Insert}, or
+        {Caps Lock} if you chose the laptop keyboard layout.
+      link_text: "Get NVDA from NV Access"
+      link_url: "https://www.nvaccess.org/download/"
+      steps:
+        - "Turn NVDA on: press {Control} + {Alt} + {N}. Then go to the page in your browser."
+        - "Open the Elements List (NVDA's list of page parts): press {NVDA key} + {F7}."
+        - "Choose Headings: press {Alt} + {H}."
+        - "Press {Tab} to reach the list, then {Up Arrow} or {Down Arrow} to hear each heading. Press {Enter} to go to one. Or close the list and press {H} to jump from heading to heading."
+        - "When you are done: {Escape} closes the list, and {NVDA key} + {Q}, then {Enter}, turns NVDA off."
+
+links:
+  title: "Check the links with a screen reader"
+  platforms:
+    - id: mac
+      name: "Mac, with VoiceOver"
+      intro: "VoiceOver is built into every Mac."
+      steps:
+        - "Turn VoiceOver on: press {Command} + {F5}. On some keyboards: {Fn} + {Command} + {F5}."
+        - "Open the rotor (VoiceOver's list of page parts): press {Control} + {Option} + {U}."
+        - "Press {Right Arrow} until you hear \"Links\"."
+        - "Press {Up Arrow} or {Down Arrow} to hear each link. Press {Return} to go to one."
+        - "When you are done: {Escape} closes the rotor, and {Command} + {F5} turns VoiceOver off."
+    - id: windows
+      name: "Windows, with NVDA"
+      intro: >-
+        NVDA is a free screen reader. Below, "NVDA key" means {Insert}, or
+        {Caps Lock} if you chose the laptop keyboard layout.
+      link_text: "Get NVDA from NV Access"
+      link_url: "https://www.nvaccess.org/download/"
+      steps:
+        - "Turn NVDA on: press {Control} + {Alt} + {N}. Then go to the page in your browser."
+        - "Open the Elements List (NVDA's list of page parts): press {NVDA key} + {F7}."
+        - "Choose Links: press {Alt} + {K}."
+        - "Press {Tab} to reach the list, then {Up Arrow} or {Down Arrow} to hear each link. Press {Enter} to go to one. Or close the list and press {K} to jump from link to link."
+        - "When you are done: {Escape} closes the list, and {NVDA key} + {Q}, then {Enter}, turns NVDA off."

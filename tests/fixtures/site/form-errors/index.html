@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Form errors</title></head>
+<body>
+  <main>
+    <h1>Contact us</h1>
+    <!-- Detects the empty fields but only colours them: a WCAG 3.3.1 failure. -->
+    <form id="contact" novalidate>
+      <label for="name">Name</label><input id="name" style="border:1px solid #767676">
+      <label for="email">Email</label><input id="email" style="border:1px solid #767676">
+      <button type="submit">Send message</button>
+    </form>
+    <!-- Describes the error in text: no finding. -->
+    <form id="newsletter" novalidate>
+      <div><label for="news">Newsletter email</label><input id="news"></div>
+      <button type="submit">Subscribe</button>
+    </form>
+  </main>
+  <script>
+    document.getElementById('contact').addEventListener('submit', e => {
+      e.preventDefault();
+      for (const i of e.target.querySelectorAll('input')) if (!i.value) i.style.border = '2px solid #c62828';
+    });
+    document.getElementById('newsletter').addEventListener('submit', e => {
+      e.preventDefault();
+      const i = document.getElementById('news');
+      if (!i.value) i.insertAdjacentHTML('afterend', '<span>Please enter your email address</span>');
+    });
+  </script>
+</body>
+</html>

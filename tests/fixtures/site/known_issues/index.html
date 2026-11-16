@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Known issues test page</title>
+  <style>
+    /* Known issues, each one a short, real pattern. Keep this page small:
+       tests/integration/test_known_issues_page.py lists what Axcess must
+       find here, and what it is known to miss. Run WAVE or another tool on
+       the same file to compare counts (see docs/internal/known-issues-page.md). */
+    body { font-family: sans-serif; margin: 0; padding: 1rem; }
+    .faint { color: #b5b5b5; background: #ffffff; }        /* 2.0:1 contrast */
+    .over-gradient { color: #ffffff; background-image: linear-gradient(#336, #99c); }
+    [x-cloak] { display: none !important; }
+  </style>
+</head>
+<body>
+  <header>
+    <!-- 1. A menu hidden until its button is pressed (like Alpine x-show).
+         The link inside has no name, so only Click-Through can find it. -->
+    <button id="menu-button" type="button" aria-expanded="false" aria-controls="menu">Menu</button>
+    <nav id="menu" aria-label="Site" style="display: none">
+      <a href="/account"><svg width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="6"></circle></svg></a>
+    </nav>
+  </header>
+  <main>
+    <h1>Known issues</h1>
+    <!-- 2. A heading level skipped: h1 then h3. -->
+    <h3>Opening hours</h3>
+    <!-- 3. A button with no name (an icon only). -->
+    <button type="button" class="icon-only"><svg width="16" height="16" aria-hidden="true"><rect width="16" height="16"></rect></svg></button>
+    <!-- 4. Text with too little contrast. -->
+    <p class="faint">Offices close at noon on Fridays.</p>
+    <!-- 7. Text over a gradient. axe cannot measure its contrast, so it
+         reports "needs review" rather than a pass or a failure. -->
+    <p class="over-gradient">Closed on public holidays.</p>
+    <!-- 9. Bold text that looks like a heading, but is a paragraph. -->
+    <p><b>Parking</b></p>
+    <p>Use the car park on Elm Street.</p>
+    <!-- 8. A link whose title repeats its own text, so some screen readers
+         say "Contact us" twice. A best practice, not a WCAG failure. -->
+    <p><a href="/contact" title="Contact us">Contact us</a></p>
+    <form>
+      <!-- 5. An input with a placeholder and no real label. -->
+      <input type="email" id="email" placeholder="Email address">
+      <!-- 6. A label connected to no field (for= points nowhere). -->
+      <label for="phone-number">Phone</label>
+      <input type="tel" id="phone">
+    </form>
+  </main>
+  <script>
+    document.getElementById("menu-button").addEventListener("click", (event) => {
+      const button = event.currentTarget;
+      const open = button.getAttribute("aria-expanded") !== "true";
+      button.setAttribute("aria-expanded", String(open));
+      document.getElementById("menu").style.display = open ? "block" : "none";
+    });
+  </script>
+</body>
+</html>

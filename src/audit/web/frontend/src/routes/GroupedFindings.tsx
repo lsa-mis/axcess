@@ -21,7 +21,7 @@ import type {
   FindingsGroup,
   GroupedFinding,
 } from "../api/types";
-import { TablePagination, usePagedRows } from "../components/TablePagination";
+import { PagedTable, usePagedRows } from "../components/TablePagination";
 import {
   Cell,
   ColumnHeader,
@@ -35,7 +35,7 @@ import {
 import { ActiveFilters, FilterMenu, activeFilterItems, type FilterGroup } from "../components/table/FilterMenu";
 import { requestStatusRationale } from "../statusDecision";
 import { useScanQuery } from "../hooks/useScanQuery";
-import { STATUS_LABEL, STATUS_OPTION_LABEL } from "../lib/terms";
+import { OPENS_NEW_WINDOW, STATUS_LABEL, STATUS_OPTION_LABEL } from "../lib/terms";
 
 const STATUS_OPTIONS: FindingStatus[] = [
   "new",
@@ -400,32 +400,31 @@ function FindingsInGroup({
   const paged = usePagedRows(findings, { local: true, resetKey });
   return (
     <>
-      {paged.pages > 1 && (
-        <TableBar pager={<TablePagination label="Images in this group" noun="images" {...paged} />} />
-      )}
-      <TableRegion label={`${label} images table`}>
-        <Table caption={`Images in ${label}`}>
-          <TableHead>
-            <tr>
-              <ColumnHeader>Image</ColumnHeader>
-              <ColumnHeader>Text read from image (OCR)</ColumnHeader>
-              <ColumnHeader>Severity</ColumnHeader>
-              <ColumnHeader>Status</ColumnHeader>
-              <ColumnHeader>Pages</ColumnHeader>
-            </tr>
-          </TableHead>
-          <tbody>
-            {paged.pageRows.map((f, index) => (
-              <FindingRow
-                key={f.id}
-                finding={f}
-                scanId={scanId}
-                index={(paged.page - 1) * paged.pageSize + index}
-              />
-            ))}
-          </tbody>
-        </Table>
-      </TableRegion>
+      <PagedTable pagination={{ label: "Images in this group", noun: "images", ...paged }}>
+        <TableRegion label={`${label} images table`}>
+          <Table caption={`Images in ${label}`}>
+            <TableHead>
+              <tr>
+                <ColumnHeader>Image</ColumnHeader>
+                <ColumnHeader>Text read from image (OCR)</ColumnHeader>
+                <ColumnHeader>Severity</ColumnHeader>
+                <ColumnHeader>Status</ColumnHeader>
+                <ColumnHeader>Pages</ColumnHeader>
+              </tr>
+            </TableHead>
+            <tbody>
+              {paged.pageRows.map((f, index) => (
+                <FindingRow
+                  key={f.id}
+                  finding={f}
+                  scanId={scanId}
+                  index={(paged.page - 1) * paged.pageSize + index}
+                />
+              ))}
+            </tbody>
+          </Table>
+        </TableRegion>
+      </PagedTable>
     </>
   );
 }
@@ -556,7 +555,7 @@ function FindingRow({
                     ? `…${occ.page_url.slice(-60)}`
                     : occ.page_url}
                   <span aria-hidden> ↗</span>
-                  <span className="sr-only">opens in a new tab</span>
+                  <span className="sr-only">{OPENS_NEW_WINDOW}</span>
                 </a>
                 {/* The page's evidence in this report. It pointed at
                     `/pages/:id`, an address the app never had, so it

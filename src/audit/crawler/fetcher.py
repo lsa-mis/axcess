@@ -7,17 +7,23 @@ failures (DNS, timeout, connection reset) raise :class:`FetchError`.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from email.utils import parsedate_to_datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
+from urllib.parse import urljoin
 
 import httpx
 
 if TYPE_CHECKING:
+    from playwright.async_api import APIRequestContext
+
     from audit.analyzer.axe import AxeViolation
     from audit.analyzer.focus import FocusFinding
+    from audit.analyzer.forms import FormFinding
     from audit.analyzer.interaction import RevealedViolation, StateCapture
     from audit.analyzer.keyboard import KeyboardTrap
+    from audit.analyzer.markup import MarkupFinding
     from audit.analyzer.responsive import ResponsiveFinding
     from audit.analyzer.visual import VisualFinding
     from audit.crawler.frame_snapshot import SavedFrame
@@ -60,6 +66,11 @@ class FetchResult:
     # SC 2.4.11 Focus Not Obscured, live-page focus probe results. Same
     # population rules: JsFetcher only, default on, ``--skip-focus`` disables.
     focus_findings: tuple[FocusFinding, ...] = field(default=())
+    # Page code check results (``pipeline='markup'``). JsFetcher only, run
+    # right after axe; default on, ``--skip-markup`` disables. ``ran`` says
+    # the check ran on this page, so a page with nothing found still counts.
+    markup_findings: tuple[MarkupFinding, ...] = field(default=())
+    markup_check_ran: bool = False
     # SC 1.3.2 Meaningful Sequence, visual (VLM) probe. JsFetcher only;
     # no-op without a vision model. ``--skip-visual`` disables.
     visual_findings: tuple[VisualFinding, ...] = field(default=())
@@ -107,6 +118,18 @@ class FetchResult:
     # touched it (see ``audit.crawler.frame_snapshot``). JsFetcher only, and
     # never for a sign-in scan.
     frames: tuple[SavedFrame, ...] = field(default=())
+    # SC 3.3.1 form error check: forms that detected an error without
+    # describing it. JsFetcher only, when the check is turned on, and never
+    # in a sign-in scan.
+    form_findings: tuple[FormFinding, ...] = field(default=())
+    # Their screenshots: target_hash -> (before the press, after it), each an
+    # outlined PNG or None. Empty when the scan keeps no screenshots.
+    form_screenshots: dict[str, tuple[bytes | None, bytes | None]] = field(default_factory=dict)
+    # Whether the form error check ran on this page, and how many forms ended
+    # in each outcome ("fail", "pass", "skipped", "not_checked", ...), for the
+    # report's "What was checked" counts.
+    form_check_ran: bool = False
+    form_outcomes: dict[str, int] = field(default_factory=dict)
 
     @property
     def is_html(self) -> bool:
@@ -144,6 +167,83 @@ class StaticFetcher:
             body=body,
             retry_after=_parse_retry_after(resp.headers.get("retry-after")),
         )
+
+
+class PageFetcher(Protocol):
+    """What the crawl needs from a static fetcher: one page's response."""
+
+    async def fetch(self, url: str) -> FetchResult: ...
+
+
+class AuthenticatedStaticFetcher:
+    """A static fetch through a signed-in browser's own request client.
+
+    A sign-in scan's "Load pages without running scripts" (2026-11-16): the
+    page's code comes from ``APIRequestContext.get``, which carries the
+    signed-in context's cookies, so the response is the signed-in page, not
+    an anonymous one. A sign-in kept only in sessionStorage is not sent this
+    way, which the New scan form's hint says. Every address, and every
+    redirect, is checked by ``validate_url`` (the sign-in scan's egress
+    policy) before it is requested, the same rule as
+    ``AuthenticatedImageDownloader``.
+    """
+
+    def __init__(
+        self,
+        request_context: APIRequestContext,
+        *,
+        validate_url: Callable[[str], str],
+        max_body_bytes: int = 10 * 1024 * 1024,
+        max_redirects: int = 5,
+        timeout_ms: float = 30_000,
+    ) -> None:
+        self._request = request_context
+        self._validate_url = validate_url
+        self._max_body_bytes = max_body_bytes
+        self._max_redirects = max_redirects
+        self._timeout_ms = timeout_ms
+
+    async def fetch(self, url: str) -> FetchResult:
+        """Fetch ``url``. Raises :class:`FetchError` on failure or scope escape."""
+        try:
+            current = self._validate_url(url)
+        except Exception as exc:
+            raise FetchError("address is outside the scan's scope") from exc
+        for _ in range(self._max_redirects + 1):
+            response = None
+            try:
+                response = await self._request.get(
+                    current,
+                    fail_on_status_code=False,
+                    max_redirects=0,
+                    timeout=self._timeout_ms,
+                )
+                status = response.status
+                headers = response.headers
+                if status in {301, 302, 303, 307, 308} and headers.get("location"):
+                    try:
+                        current = self._validate_url(urljoin(current, headers["location"]))
+                    except Exception as exc:
+                        raise FetchError("redirect left the scan's scope") from exc
+                    continue
+                body = (await response.body())[: self._max_body_bytes]
+                return FetchResult(
+                    url=current,
+                    status_code=status,
+                    content_type=headers.get("content-type", ""),
+                    body=body,
+                    retry_after=_parse_retry_after(headers.get("retry-after")),
+                )
+            except FetchError:
+                raise
+            except Exception as exc:
+                # The class only: a protected page's error text can carry
+                # session detail.
+                raise FetchError(type(exc).__name__) from exc
+            finally:
+                if response is not None:
+                    await response.dispose()
+        raise FetchError("too many redirects")
 
 
 def _parse_retry_after(raw: str | None) -> float | None:

@@ -18,6 +18,7 @@ _EXTENSIONS = {
     "markdown": "md",
     "audit": "audit.md",
     "xlsx": "xlsx",
+    "its": "its.xlsx",
     "brief": "fix-brief.md",
 }
 
@@ -36,6 +37,7 @@ def test_text_is_measured_in_the_utf8_bytes_the_route_sends() -> None:
 def test_each_panel_format_is_named_and_sized_as_rendered(is_draft: bool, suffix: str) -> None:
     rendered: dict[str, str | bytes] = {
         "xlsx": b"PK" + b"\x00" * 98,
+        "its": b"PK" + b"\x00" * 48,
         "audit": "# Report\n",
         "brief": "# Brief\n",
         "csv": "a,b\n1,é\n",
@@ -60,6 +62,7 @@ def test_each_panel_format_is_named_and_sized_as_rendered(is_draft: bool, suffix
     assert options.evaluation_status == "in_progress"
     assert [(o.format, o.filename, o.size_bytes) for o in options.formats] == [
         ("xlsx", f"scan_12{suffix}.xlsx", 100),
+        ("its", f"scan_12{suffix}.its.xlsx", 50),
         ("audit", f"scan_12{suffix}.audit.md", 9),
         # The fix brief is always the redacted copy, and named so.
         ("brief", f"scan_12{suffix}_REDACTED.fix-brief.md", 8),
@@ -80,4 +83,4 @@ def test_a_format_the_route_would_refuse_is_left_out() -> None:
         unavailable={"brief"},
     )
 
-    assert [option.format for option in options.formats] == ["xlsx", "audit", "csv", "json"]
+    assert [option.format for option in options.formats] == ["xlsx", "its", "audit", "csv", "json"]

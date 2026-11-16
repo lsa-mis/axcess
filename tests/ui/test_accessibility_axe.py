@@ -26,7 +26,15 @@ import pytest
 from audit.exports.audit_report import load_report_rules
 
 from ._paging import all_pages_text
-from ._seed_evidence import SCREENSHOT_ISSUE_KEY, add_screenshot_finding
+from ._seed_evidence import (
+    FORM_ERROR_ISSUE_KEY,
+    LANDMARK_ISSUE_KEY,
+    SCREENSHOT_ISSUE_KEY,
+    add_form_error_finding,
+    add_landmark_finding,
+    add_screenshot_finding,
+)
+from .conftest import ALL_HOW_SURE
 
 # One browser per module (tests/ui/conftest.py), so the tests run on the
 # module's event loop. Each ``new_page`` call still opens its own context.
@@ -180,6 +188,52 @@ async def test_tracking_page_has_no_axe_violations(
     # text labels (not colour alone) and the tables are properly headed.
     base, _ = live_server
     await _axe_clean(new_page, base, "/app/tracking")
+
+
+async def test_coverage_pages_have_no_axe_violations(
+    live_server: tuple[str, int], new_page: Any
+) -> None:
+    base, _ = live_server
+    await _axe_clean(new_page, base, "/app/coverage")
+    await _axe_clean(new_page, base, "/app/coverage?type=partial&criterion=1.4.3")
+    await _axe_clean(new_page, base, "/app/coverage/found")
+
+
+async def test_coverage_works_by_keyboard_alone(
+    live_server: tuple[str, int], new_page: Any
+) -> None:
+    """Tab reaches a filter button, Enter filters the map, and a square opens its details."""
+    base, _ = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(f"{base}/app/coverage", wait_until="networkidle")
+    partly = page.get_by_role("button", name=re.compile(r"^Show only Axcess partly checks"))
+    for _ in range(60):
+        await page.keyboard.press("Tab")
+        if await partly.evaluate("(button) => button === document.activeElement"):
+            break
+    else:
+        pytest.fail("Tab never reached the Axcess partly checks filter button")
+    await page.keyboard.press("Enter")
+    await playwright_async.expect(partly).to_have_attribute("aria-pressed", "true")
+    await playwright_async.expect(
+        page.get_by_role("status").filter(has_text="Showing 15 of 50: Axcess partly checks")
+    ).to_be_visible()
+
+    square = page.get_by_role("button", name=re.compile(r"^1\.4\.3\b.*Contrast \(Minimum\)"))
+    await square.focus()
+    await page.keyboard.press("Enter")
+    await playwright_async.expect(square).to_have_attribute("aria-pressed", "true")
+    await playwright_async.expect(
+        page.get_by_role("heading", name="1.4.3 Contrast (Minimum)")
+    ).to_be_visible()
+    # Focus stays on the square; the status line names what opened.
+    assert await square.evaluate("(button) => button === document.activeElement")
+
+    details = page.get_by_role("button", name="Details for developers")
+    await details.focus()
+    await page.keyboard.press("Enter")
+    await playwright_async.expect(details).to_have_attribute("aria-expanded", "true")
+    await playwright_async.expect(page.get_by_text("color-contrast", exact=True)).to_be_visible()
 
 
 async def test_about_page_has_no_axe_violations(
@@ -490,7 +544,8 @@ async def test_issue_table_fits_the_default_desktop_width(
     """
     base, scan_id = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
-    await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+    # Every "How sure" value shown, so the table has its widest rows.
+    await page.goto(f"{base}/app/scans/{scan_id}/issues?{ALL_HOW_SURE}", wait_until="networkidle")
     issues = page.get_by_role("table", name="Accessibility issue types")
     scroller = page.get_by_role("region", name="Issues table")
     # Who fixes it is hidden for now (HIDDEN_ISSUE_FIELDS), so Pages stands in.
@@ -574,7 +629,8 @@ async def test_informational_evidence_is_read_only_and_not_barrier_language(
             else None
         ),
     )
-    await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+    # For information rows are held back when the table opens; show them.
+    await page.goto(f"{base}/app/scans/{scan_id}/issues?{ALL_HOW_SURE}", wait_until="networkidle")
     issues = page.get_by_role("table", name="Accessibility issue types")
     logo_title = load_report_rules()["image_findings"]["logo_adequate"]["title"]
     row_link = issues.get_by_role("rowheader").get_by_role("link", name=logo_title, exact=False)
@@ -666,7 +722,7 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     ).to_be_visible()
     workspace = page.get_by_role("navigation", name="Report views")
     await playwright_async.expect(workspace.get_by_role("link")).to_have_text(
-        ["Issues", "Compare reports"]
+        ["Issues", "Images", "Compare reports"]
     )
     await playwright_async.expect(
         workspace.get_by_role("link", name="Issues", exact=True)
@@ -677,7 +733,7 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     # (the developer's order and words, 2026-10-30). Pages that could not
     # be loaded are said in words, never as "errors", which readers took for
     # accessibility errors, and only when there are some.
-    summary = page.locator("dl").filter(has_text="Pages visited")
+    summary = page.locator("dl").filter(has_text="Pages visited").first
     await playwright_async.expect(summary.get_by_role("term")).to_have_text(
         [
             re.compile(r"^Issue types?$"),
@@ -686,7 +742,13 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
         ]
     )
     await playwright_async.expect(summary.get_by_text(re.compile(r"error", re.I))).to_have_count(0)
-    failed = summary.get_by_text(re.compile(r"pages? could not be loaded$"))
+    # On the facts line under the numbers (ScanFacts), with how the scan ended.
+    await playwright_async.expect(
+        page.get_by_role("listitem").filter(has_text=re.compile(r"^Visited every page it found$"))
+    ).to_have_count(1)
+    failed = page.get_by_role("listitem").filter(
+        has_text=re.compile(r"pages? could not be loaded$")
+    )
     await playwright_async.expect(failed).to_have_count(0)
     with sqlite3.connect(seeded_db[0]) as conn:
         conn.execute("UPDATE scans SET error_count = 3 WHERE id = ?", (scan_id,))
@@ -727,7 +789,21 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     ledger = page.get_by_role("region", name="What was checked")
     await playwright_async.expect(ledger).to_be_hidden()
     # Under the table since user testing (2026-10-28), not between it and
-    # the numbers; the summary numbers carry no line under them.
+    # the numbers. The seeded report has only Not sure and For information
+    # issue types; the table opens on every issue type (2026-11-13), so it
+    # shows both. What they mean opens from the "?" beside the How sure
+    # header (2026-11-16); the note that said it over the rows is gone.
+    table = page.get_by_role("table", name="Accessibility issue types")
+    await playwright_async.expect(table.locator("tbody tr")).to_have_count(2)
+    await playwright_async.expect(table.locator("tbody")).to_contain_text("Not sure")
+    await playwright_async.expect(table.locator("tbody")).to_contain_text("For information")
+    await playwright_async.expect(summary.get_by_text("hidden", exact=False)).to_have_count(0)
+    await playwright_async.expect(page.get_by_role("note", name="Issue types shown")).to_have_count(
+        0
+    )
+    await playwright_async.expect(
+        table.get_by_role("button", name="What does \u201cHow sure\u201d mean?", exact=True)
+    ).to_have_attribute("aria-expanded", "false")
     table_box = await page.get_by_role("region", name="Issues table").bounding_box()
     coverage_box = await coverage.bounding_box()
     assert table_box and coverage_box and coverage_box["y"] > table_box["y"], (
@@ -1022,6 +1098,7 @@ async def test_every_spa_route_has_an_accurate_document_title(
         (f"/app/scans/{scan_id}/manual-checks", "Accessibility issues"),
         (f"/app/scans/{scan_id}/handoff", "Accessibility issues"),
         (f"/app/scans/{scan_id}/pages/1", "Page details"),
+        (f"/app/scans/{scan_id}/pages", "Pages visited"),
         (f"/app/scans/{scan_id}/issues", "Accessibility issues"),
         (f"/app/scans/{scan_id}/issues/image:logo_adequate", "Issue evidence"),
         (f"/app/scans/{scan_id}/findings", "Images"),
@@ -1032,6 +1109,8 @@ async def test_every_spa_route_has_an_accurate_document_title(
         (f"/app/scans/{scan_id}/compare/changes", "What changed"),
         ("/app/findings/1", "Image details"),
         ("/app/tracking", "Product roadmap"),
+        ("/app/coverage", "What Axcess checks"),
+        ("/app/coverage/found", "What Axcess found"),
         ("/app/about", "About"),
         ("/app/not-a-real-route", "Page not found"),
     ]
@@ -1157,6 +1236,36 @@ async def test_search_finds_every_sidebar_place(
         await page.keyboard.press("Enter")
         await playwright_async.expect(dialog).to_have_count(0)
         await playwright_async.expect(page).to_have_url(re.compile(re.escape(path) + r"$"))
+
+
+@pytest.mark.parametrize(
+    ("query", "label", "url"),
+    [
+        ("1.4.3", "1.4.3 Contrast (Minimum)", r"version=2\.1&criterion=1\.4\.3"),
+        # Only in WCAG 2.2: it opens the 2.2 map, the one that holds it.
+        ("2.5.8", "2.5.8 Target Size (Minimum)", r"version=2\.2&criterion=2\.5\.8"),
+    ],
+)
+async def test_search_opens_a_wcag_criterion_on_its_own_version(
+    live_server: tuple[str, int],
+    new_page: Any,
+    query: str,
+    label: str,
+    url: str,
+) -> None:
+    """A criterion from either WCAG version can be found with Search."""
+    base, _scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(f"{base}/app/scans", wait_until="networkidle")
+    sidebar = page.get_by_role("complementary", name="Primary")
+    await sidebar.get_by_role("button", name="Search everything (Cmd+K)", exact=True).click()
+    dialog = page.get_by_role("dialog", name="Search everything")
+    await dialog.get_by_role("textbox", name="Search").fill(query)
+    option = dialog.get_by_role("option").filter(has_text=label).first
+    await playwright_async.expect(option).to_be_visible()
+    await option.click()
+    await playwright_async.expect(page).to_have_url(re.compile(url))
+    await playwright_async.expect(page.get_by_role("heading", name=label)).to_be_visible()
 
 
 @pytest.mark.parametrize(
@@ -1431,33 +1540,38 @@ async def test_login_scan_is_visible_and_explains_login_before_crawl(
     await playwright_async.expect(
         page.get_by_role("checkbox", name=re.compile(r"^The site owner allows this scan"))
     ).to_be_visible()
-    # No disabled-for-parity controls: what a login scan pins is said
-    # once, in the Pages to scan group, and the switches are simply absent.
+    # Every setting the public form has, nothing pinned (2026-11-16): no
+    # note about fixed settings, and the switches it used to leave out are
+    # there, off by default.
     await _open_scan_groups(page)
     await playwright_async.expect(
         page.get_by_role("note").filter(has_text="Sign-in scans always work this way")
-    ).to_be_visible()
-    await playwright_async.expect(
-        page.get_by_role("switch", name=re.compile(r"^Follow links to subdomains"))
     ).to_have_count(0)
+    for name in (r"^Follow links to subdomains", r"^Fast scan"):
+        await playwright_async.expect(
+            page.get_by_role("switch", name=re.compile(name))
+        ).not_to_be_checked()
+    # A disabled switch is a dependency, never a sign-in rule: the vision
+    # model waits for image text reading, which a sign-in scan starts with
+    # off, and the AI review waits for a local model, as in a public scan.
     await playwright_async.expect(
-        page.get_by_role("switch", name=re.compile(r"^Fast scan"))
-    ).to_have_count(0)
-    # The one disabled switch is a dependency, not parity: the vision
-    # model waits for image text reading, which a login scan starts with off.
+        page.get_by_role(
+            "switch", name=re.compile(r"^Compare image text with alt text"), disabled=True
+        )
+    ).to_have_count(1)
     disabled = page.get_by_role("switch", disabled=True)
-    await playwright_async.expect(disabled).to_have_count(1)
-    await playwright_async.expect(disabled).to_have_accessible_name(
-        re.compile(r"^Compare image text with alt text")
-    )
+    for switch in await disabled.all():
+        name = await switch.evaluate("el => el.closest('label').innerText")
+        assert name.startswith(("Compare image text with alt text", "AI review of wording")), name
     dom_discovery = page.get_by_role("switch", name=re.compile(r"^Open menus, tabs"))
     await playwright_async.expect(dom_discovery).to_be_checked()
 
-    workers = page.get_by_role("spinbutton", name="Signed-in tabs")
+    workers = page.get_by_role("spinbutton", name="Pages at once (workers)")
     await playwright_async.expect(workers).to_be_enabled()
-    await playwright_async.expect(workers).to_have_value("2")
-    await workers.fill("4")
     await playwright_async.expect(workers).to_have_value("4")
+    await playwright_async.expect(workers).to_have_attribute("max", "8")
+    await workers.fill("8")
+    await playwright_async.expect(workers).to_have_value("8")
 
     both_engines = page.get_by_role("radio", name="Both", exact=True)
     axe_only = page.get_by_role("radio", name="axe", exact=True)
@@ -1554,6 +1668,49 @@ async def test_search_settings_keyboard_and_axe(
     assert not violations, _render_violations(violations)
 
 
+async def test_a_form_error_occurrence_shows_its_form_before_and_after_the_press(
+    live_server: tuple[str, int],
+    seeded_db: tuple[Path, Path, int],
+    new_page: Any,
+) -> None:
+    """The form error check's occurrence shows both pictures, each named in words.
+
+    "Before" and "After" are text above each picture, not told by position or
+    colour, and each picture's alt text says which it is (migration 0035).
+    """
+    base, scan_id = live_server
+    db_path, blob_dir, _ = seeded_db
+    page_id, before_hash, after_hash = add_form_error_finding(db_path, blob_dir, scan_id)
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    try:
+        await page.goto(
+            f"{base}/app/scans/{scan_id}/issues/{FORM_ERROR_ISSUE_KEY}/pages/{page_id}/screenshots",
+            wait_until="networkidle",
+        )
+        before = page.get_by_role("img", name=re.compile(r"^Occurrence 1 on .+: the form before"))
+        after = page.get_by_role(
+            "img", name=re.compile(r"^Occurrence 1 on .+: the form after its button was pressed")
+        )
+        await playwright_async.expect(before).to_be_visible()
+        await playwright_async.expect(after).to_be_visible()
+        assert before_hash in (await before.get_attribute("src") or "")
+        assert after_hash in (await after.get_attribute("src") or "")
+        # Both load: the image route serves the before picture too.
+        for image in (before, after):
+            assert await image.evaluate("img => img.complete && img.naturalWidth > 0")
+        figure = page.locator("figure").first
+        await playwright_async.expect(figure).to_contain_text("Before")
+        await playwright_async.expect(figure).to_contain_text("After")
+        # In reading order: Before, its picture, After, its picture.
+        before_box, after_box = await before.bounding_box(), await after.bounding_box()
+        assert before_box and after_box and before_box["y"] < after_box["y"]
+        await playwright_async.expect(figure).to_contain_text("stopped the form from being sent")
+        violations = await _run_axe(page)
+        assert not violations, _render_violations(violations)
+    finally:
+        await page.context.close()
+
+
 async def test_instance_screenshots_describe_the_outline_and_pass_axe(
     live_server: tuple[str, int],
     seeded_db: tuple[Path, Path, int],
@@ -1582,6 +1739,193 @@ async def test_instance_screenshots_describe_the_outline_and_pass_axe(
                 name=re.compile(r"^Occurrence 1 on .+\. An outline marks where it was found\.$"),
             )
         ).to_be_visible()
+        violations = await _run_axe(page)
+        assert not violations, _render_violations(violations)
+    finally:
+        await page.context.close()
+
+
+@pytest.mark.parametrize("width", [1280, 320])
+async def test_landmark_guidance_gives_mac_and_windows_steps(
+    live_server: tuple[str, int],
+    seeded_db: tuple[Path, Path, int],
+    new_page: Any,
+    width: int,
+) -> None:
+    """A landmark issue's guidance shows numbered VoiceOver and NVDA steps.
+
+    Both computers' steps are visible at once, each under its own heading as
+    a numbered list, keys spelled out; the dialog passes axe and, at 320 px,
+    nothing in it scrolls sideways (SC 1.4.10).
+    """
+    base, scan_id = live_server
+    db_path, _, _ = seeded_db
+    add_landmark_finding(db_path, scan_id)
+    page = await new_page(viewport={"width": width, "height": 900})
+    await page.goto(
+        f"{base}/app/scans/{scan_id}/issues/{LANDMARK_ISSUE_KEY.replace(':', '%3A')}",
+        wait_until="networkidle",
+    )
+    # Keyboard only: Tab to the guidance button and open it with Enter.
+    guidance = page.get_by_role("button", name="Issue guidance", exact=True)
+    await guidance.focus()
+    await page.keyboard.press("Enter")
+    dialog = page.get_by_role("dialog", name="Issue guidance")
+    await playwright_async.expect(dialog).to_be_visible()
+    await playwright_async.expect(
+        dialog.get_by_role("heading", name="Check the landmarks with a screen reader")
+    ).to_be_visible()
+    mac = dialog.get_by_role("region", name="Mac, with VoiceOver")
+    windows = dialog.get_by_role("region", name="Windows, with NVDA")
+    await playwright_async.expect(mac.get_by_role("listitem")).to_have_count(5)
+    await playwright_async.expect(windows.get_by_role("listitem")).to_have_count(5)
+    await playwright_async.expect(mac.get_by_role("listitem").first).to_contain_text(
+        "Turn VoiceOver on: press Command + F5."
+    )
+    await playwright_async.expect(mac.get_by_role("listitem").nth(2)).to_contain_text(
+        'Press Right Arrow until you hear "Landmarks".'
+    )
+    await playwright_async.expect(windows.get_by_role("listitem").nth(1)).to_contain_text(
+        "press NVDA key + F7"
+    )
+    await playwright_async.expect(
+        windows.get_by_role(
+            "link", name=re.compile(r"^Get NVDA from NV Access\s*, opens in a new tab$")
+        )
+    ).to_have_attribute("href", "https://www.nvaccess.org/download/")
+    # No raw {Key} markup reaches the screen.
+    assert "{" not in await dialog.inner_text()
+    violations = await _run_axe(page)
+    assert not violations, _render_violations(violations)
+    if width == 320:
+        overflow = await dialog.evaluate(
+            "el => [...el.querySelectorAll('section')].filter("
+            "s => s.scrollWidth > s.clientWidth + 1).length"
+        )
+        assert overflow == 0
+    await page.keyboard.press("Escape")
+    await playwright_async.expect(guidance).to_be_focused()
+
+
+async def test_pages_visited_list_says_which_pages_failed_and_passes_axe(
+    live_server: tuple[str, int],
+    seeded_db: tuple[Path, Path, int],
+    new_page: Any,
+) -> None:
+    """The summary's "Pages visited" leads, by keyboard, to every page and how it loaded.
+
+    A page that could not be loaded says so in words and reads "Not checked",
+    never "0", so a gap in coverage is not mistaken for a clean page.
+    """
+    base, scan_id = live_server
+    db_path, blob_dir, _ = seeded_db
+    add_screenshot_finding(db_path, blob_dir, scan_id)
+    with sqlite3.connect(db_path) as conn:
+        conn.executemany(
+            "INSERT INTO pages (scan_id, url_normalized, status_code, title, render_mode) "
+            "VALUES (?, ?, ?, NULL, 'static')",
+            [
+                (scan_id, "http://example.com/down", None),
+                (scan_id, "http://example.com/gone", 404),
+            ],
+        )
+        conn.execute("UPDATE scans SET page_count = 4, error_count = 1 WHERE id = ?", (scan_id,))
+    page = await new_page()
+    try:
+        await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+        link = page.get_by_role("link", name="List the pages visited", exact=True)
+        await link.focus()
+        await page.keyboard.press("Enter")
+        await page.wait_for_url(f"**/app/scans/{scan_id}/pages")
+        await playwright_async.expect(
+            page.get_by_role("heading", name="Pages visited", level=1)
+        ).to_be_visible()
+        await playwright_async.expect(
+            page.get_by_text("4 pages · 1 could not be loaded · 1 answered with an error")
+        ).to_be_visible()
+
+        table = page.get_by_role("table", name=re.compile(r"^Pages visited by report"))
+        rows = table.locator("tbody tr")
+        await playwright_async.expect(rows).to_have_count(4)
+        # Problems first: the page that could not be loaded, then the 404.
+        down = rows.nth(0)
+        await playwright_async.expect(down.get_by_role("rowheader")).to_contain_text(
+            "http://example.com/down"
+        )
+        await playwright_async.expect(down).to_contain_text("Could not be loaded")
+        await playwright_async.expect(down.get_by_text("Not checked")).to_have_count(3)
+        await playwright_async.expect(rows.nth(1)).to_contain_text("Page not found (HTTP 404)")
+        await playwright_async.expect(
+            page.get_by_text("Sorted by Page load result, problems first.")
+        ).to_be_visible()
+        await playwright_async.expect(
+            down.get_by_role("link", name="Page details for http://example.com/down")
+        ).to_have_attribute("href", re.compile(rf"/app/scans/{scan_id}/pages/\d+\?origin="))
+
+        violations = await _run_axe(page)
+        assert not violations, _render_violations(violations)
+
+        # Sorting works by keyboard, and the line under the bar says so.
+        # Found by its column, not its name: the name gains the sort chip.
+        header = table.get_by_role("columnheader", name=re.compile(r"^Issue occurrences"))
+        sort = header.get_by_role("button")
+        await sort.focus()
+        await page.keyboard.press("Enter")
+        await playwright_async.expect(
+            page.get_by_text("Sorted by Issue occurrences, highest first.")
+        ).to_be_visible()
+        await playwright_async.expect(sort).to_be_focused()
+        await playwright_async.expect(rows.nth(0).get_by_role("rowheader")).to_contain_text("Home")
+    finally:
+        await page.context.close()
+
+
+async def test_pages_visited_list_fits_a_phone_screen(
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """At 320 px only the table's own region scrolls sideways (SC 1.4.10 Reflow)."""
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 320, "height": 800})
+    try:
+        await page.goto(f"{base}/app/scans/{scan_id}/pages", wait_until="networkidle")
+        await page.wait_for_selector("main#main h1", timeout=5000)
+        widths = await page.evaluate(
+            """() => ({
+                client: document.documentElement.clientWidth,
+                body: document.body.scrollWidth,
+            })"""
+        )
+        assert widths["body"] <= widths["client"], widths
+    finally:
+        await page.context.close()
+
+
+async def test_how_this_scan_ran_is_a_closed_row_with_coverage_and_note(
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """ "How this scan ran" sits with the report's other notes on every
+    report, says on the closed row how the scan ended, opens by keyboard,
+    and lists the coverage facts and Axcess's own note when there is one."""
+    from audit.web.server import tab_fallback_note
+
+    base, scan_id = live_server
+    note = tab_fallback_note(4)
+    with sqlite3.connect(seeded_db[0]) as conn:
+        conn.execute("UPDATE scans SET scan_note = ? WHERE id = ?", (note, scan_id))
+    page = await new_page()
+    try:
+        await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+        row = page.get_by_role("button", name=re.compile(r"^How this scan ran"))
+        await playwright_async.expect(row).to_have_attribute("aria-expanded", "false")
+        await row.focus()
+        await page.keyboard.press("Enter")
+        panel = page.locator("#report-scan-note-panel")
+        for term in ("How it ended", "Pages found", "Pages visited", "Maximum pages"):
+            await playwright_async.expect(panel.get_by_text(term, exact=True)).to_be_visible()
+        await playwright_async.expect(panel.get_by_text(note)).to_be_visible()
         violations = await _run_axe(page)
         assert not violations, _render_violations(violations)
     finally:

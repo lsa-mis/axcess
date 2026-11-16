@@ -36,7 +36,8 @@ import { serverDate } from "../lib/serverTime";
  *   found, no longer found) is its own page, What changed
  *   (routes/Compare.tsx), one link away.
  * - **Inside a frame the app knows it is a panel** (lib/framed.ts): no
- *   sidebar or top bar, no Compare reports tab, its own history. If this
+ *   sidebar or top bar, its own history, and the report's own tabs (Issues,
+ *   Images) without Compare reports (2026-11-16, ReportWorkspaceNav). If this
  *   route itself is opened inside a panel, it offers a link to open it in the
  *   whole window instead of nesting panels in panels.
  * - **Each frame has a title naming its report and page**, "Report #24,
@@ -152,7 +153,7 @@ function CompareReports() {
   };
 
   // What changed compares a later report with an earlier one of the same
-  // site, both completed (src/audit/web/comparison.py). The site's history
+  // site, however each ended (src/audit/web/comparison.py). The site's history
   // lists exactly those, oldest first, in the order the server uses for
   // "earlier", so the link shows only when both reports are in it.
   const at = (id: number | null | undefined) => (id == null || !points ? -1 : points.findIndex((p) => p.id === id));
@@ -463,7 +464,7 @@ const PANEL_HEIGHT = "h-[80vh] min-h-[28rem] lg:h-[calc(100vh-7rem)] lg:min-h-[3
 
 /**
  * The second panel before a report is chosen for it: a dashed box listing the
- * site's other completed reports, each a link that shows it here.
+ * site's other reports, each a link that shows it here.
  *
  * Why (keep these when you change it):
  *
@@ -528,7 +529,7 @@ function EmptyPane({
           <p role="status" className="mt-1 text-sm text-fg-muted">Loading the list of reports…</p>
         ) : others.length === 0 ? (
           <p className="mt-1 text-sm leading-relaxed text-fg-muted">
-            This site has one completed report so far. Scan the site again after you fix issues, then compare the two
+            This site has one report so far. Scan the site again after you fix issues, then compare the two
             reports here.
           </p>
         ) : (

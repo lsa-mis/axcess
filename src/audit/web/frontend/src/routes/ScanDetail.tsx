@@ -2,10 +2,14 @@
  * A report's own URL: progress while it runs, why it stopped if it failed,
  * and the report itself once it finishes.
  *
- * This route has three faces, chosen by scan status. Running shows the
- * progress panel and a cancel control. Failed or interrupted shows why and
- * offers a retry. Completed redirects to the Issues table, which is where a
- * report opens: it used to have an Overview tab of its own here; its
+ * This route has three faces. Running shows the progress panel and a cancel
+ * control. A scan that saved pages redirects to its Issues table, however it
+ * ended: completed, stopped or failed. A scan stopped after 100 pages is as
+ * much a report as one that completed at a 10-page limit, so it is no longer
+ * held on a "Partial report" card (the developer's decision, 2026-11-14);
+ * the report says how it ended and how many pages it found and visited
+ * (ReportSummary). A scan that ended before saving any page shows why and
+ * offers a retry. The Issues table is where a report opens: it used to have an Overview tab of its own here; its
  * numbers now sit above the table (``ReportSummary``) and what was checked
  * under it (``ReportCoverageNote``). The
  * redirect keeps every existing ``/scans/:id`` link working, and a scan that
@@ -30,7 +34,7 @@ import {
   PageHeader,
 } from "../components/ui";
 import { withoutUserinfo } from "../components/ReportCrumb";
-import { SCAN_STATUS_LABEL } from "../lib/terms";
+import { SCAN_STATUS_LABEL, isReport } from "../lib/terms";
 import { useScanQuery } from "../hooks/useScanQuery";
 
 export default function ScanDetailRoute() {
@@ -75,7 +79,7 @@ export default function ScanDetailRoute() {
   const previousSettings = useQuery({
     queryKey: ["scan-settings", id],
     queryFn: () => api.getScanSettings(id),
-    enabled: Boolean(data) && data?.status !== "running" && data?.status !== "completed",
+    enabled: Boolean(data) && data?.status !== "running",
     retry: false,
     staleTime: Infinity,
   });
@@ -119,7 +123,7 @@ export default function ScanDetailRoute() {
     );
   }
 
-  if (data.status === "completed") {
+  if (isReport(data)) {
     return <Navigate replace to={`/scans/${data.id}/issues`} />;
   }
 
@@ -132,38 +136,11 @@ export default function ScanDetailRoute() {
       )}
 
       <Card className="p-5">
-        {/* "No report was produced" was told to scans that had produced
-            thousands of findings across hundreds of pages, because it keyed
-            on the status rather than on whether anything was collected. A
-            stopped scan keeps everything it reached; what it cannot claim is
-            that the site was covered. Say that, and leave the evidence
-            reachable.
-
-            `page_count` is the live number of saved pages for any scan that
-            has not completed (the server counts them, and Stop writes the
-            count with the status). It used to be written only when the crawl
-            wound down, so for about 15 seconds after Stop this card said "No
-            report was produced" over pages that were saved. */}
-        <h2 className="font-semibold text-fg">
-          {data.page_count > 0 ? "Partial report" : "No report was produced"}
-        </h2>
+        <h2 className="font-semibold text-fg">No report was produced</h2>
         <p className="mt-1 text-sm text-fg-muted">
-          {data.page_count > 0 ? (
-            <>
-              This scan ended with the status{" "}
-              <strong>{SCAN_STATUS_LABEL[data.status]}</strong> after{" "}
-              {data.page_count.toLocaleString()} page
-              {data.page_count === 1 ? "" : "s"}. Axcess saved everything it
-              reached. The scan did not visit the rest of the site, so this
-              report does not cover the whole site.
-            </>
-          ) : (
-            <>
-              This scan ended with the status{" "}
-              <strong>{SCAN_STATUS_LABEL[data.status]}</strong> before any page
-              finished. Axcess did not create a report.
-            </>
-          )}
+          This scan ended with the status{" "}
+          <strong>{SCAN_STATUS_LABEL[data.status]}</strong> before any page
+          finished. Axcess did not create a report.
         </p>
         {data.failure_reason && (
           <p className="mt-3 rounded-xs border border-sev-critical/30 bg-sev-critical-bg p-3 text-sm text-sev-critical">
@@ -177,35 +154,12 @@ export default function ScanDetailRoute() {
         )}
         {/* Each action is one row of the same shape: a button of one width
             and, beside it, what it does, so the choice is made on the words
-            and not on a guess at "balanced". "Review what the scan found"
-            used to be added as a bare button of its own width with no words,
-            so the card mixed two patterns (W3C COGA, "Making Content
+            and not on a guess at "balanced" (W3C COGA, "Making Content
             Usable": the same kind of thing looks and works the same way).
-
-            One primary button per card, the likeliest next step. With a
-            partial report that is reviewing what was saved, so it leads;
-            with no report there is nothing to review, and changing the
-            settings leads. The retries follow as secondary buttons. */}
+            One primary button per card, the likeliest next step: with no
+            report there is nothing to review, so changing the settings
+            leads, and the quick retry follows as a secondary button. */}
         <ul className="mt-4 flex flex-col gap-4">
-          {data.page_count > 0 && (
-            <li className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:gap-4">
-              <LinkButton
-                to={`/scans/${data.id}/issues`}
-                variant="primary"
-                aria-describedby="review-partial-hint"
-                className="shrink-0 sm:w-56"
-              >
-                Review what the scan found
-              </LinkButton>
-              {/* Without this the page said evidence "remains available" and
-                  then offered no way to reach it, so the only route onward
-                  was to run the scan again. */}
-              <p id="review-partial-hint" className="text-sm text-fg-muted sm:pt-2">
-                Opens the issues found on the {data.page_count.toLocaleString()} page
-                {data.page_count === 1 ? "" : "s"} this scan reached.
-              </p>
-            </li>
-          )}
           <li className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:gap-4">
             <LinkButton
               to={
@@ -213,7 +167,7 @@ export default function ScanDetailRoute() {
                   ? `/scans/new?${loginScan ? "mode=login&" : ""}from=${data.id}`
                   : `/scans/new?url=${encodeURIComponent(data.seed_url)}`
               }
-              variant={data.page_count > 0 ? "secondary" : "primary"}
+              variant="primary"
               aria-describedby="retry-edit-hint"
               className="shrink-0 sm:w-56"
             >

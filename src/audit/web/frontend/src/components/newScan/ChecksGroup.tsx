@@ -1,4 +1,13 @@
-import { CLICK_THROUGH_COPY, ENGINE, GROUPS, STANDARD, SWITCHES, WCAG_VERSION } from "./copy";
+import {
+  CLICK_THROUGH_COPY,
+  ENGINE,
+  FORMS_CHOICE,
+  GROUPS,
+  SIGN_IN_NOTES,
+  STANDARD,
+  SWITCHES,
+  WCAG_VERSION,
+} from "./copy";
 import { CHECK_LABEL } from "../../lib/terms";
 import type { GroupProps } from "./groupProps";
 import PillGroup from "./PillGroup";
@@ -19,6 +28,7 @@ import SwitchRow from "./SwitchRow";
  * alone cannot), so the switch it disables is right below it.
  */
 export default function ChecksGroup({ settings, update, policy, capabilities }: GroupProps) {
+  const login = policy.mode === "login";
   const rendered = !settings.static_only;
   const alfaOff = capabilities.alfa?.available === false;
   const alfaReason = alfaOff
@@ -100,6 +110,70 @@ export default function ChecksGroup({ settings, update, policy, capabilities }: 
             disabled={!rendered}
             label={SWITCHES.focus.label}
             hint={rendered ? SWITCHES.focus.hint : "Needs a browser. Turn off Fast scan to use it."}
+          />
+        )}
+        {/* The page code check, after focus: like the switches above it, one
+            switch per check that needs a browser, worded as what it checks
+            (repo plain-language rules: a verb and an object). Its hint says
+            it only reads the page, because the switches around it change
+            or press the page and a reader deciding whether to turn one off
+            needs to know which do (W3C COGA "Making Content Usable",
+            https://www.w3.org/TR/coga-usable/, paraphrased: say what will
+            happen). Offered in a sign-in scan too (2026-11-16): the two
+            forms offer the same settings. */}
+        {!isFixed(policy, "skip_markup") && (
+          <SwitchRow
+            checked={switchOn(settings, "markup")}
+            onChange={(on) => update(switchPatch(settings, "markup", on))}
+            disabled={!rendered}
+            label={SWITCHES.markup.label}
+            hint={rendered ? SWITCHES.markup.hint : "Needs a browser. Turn off Fast scan to use it."}
+          />
+        )}
+        {/* One question with three answers, in place of the old on/off
+            switch: don't check forms, check them without sending anything
+            (the default for public websites), or check them and send empty
+            ones to the site. The developer asked for the sending choice to
+            replace the switch (2026-11-04). Rejected: the sending switch
+            alone, which either sends by default on every public site or
+            loses the safe check by default; and a second switch under this
+            one, enabled only when it is on, which splits one decision
+            across two controls whose meanings depend on each other (W3C
+            COGA "Making Content Usable": one way to do one thing,
+            https://www.w3.org/TR/coga-usable/). Native radios in a
+            fieldset whose legend names the question (SC 1.3.1 Info and
+            Relationships, Level A, technique H71), each answer's risk in
+            its own hint (SC 3.3.2 Labels or Instructions, Level A). Offered
+            in a sign-in scan too since 2026-11-16 (the developer's decision:
+            the two forms offer the same settings), off by default there
+            (LOGIN_DEFAULTS), and its hints add that a form is pressed, or
+            sent, as the person signed in (SIGN_IN_NOTES). */}
+        {!isFixed(policy, "skip_forms") && (
+          <PillGroup
+            name="form-check"
+            layout="list"
+            label={SWITCHES.forms.label}
+            hint={
+              rendered
+                ? login
+                  ? `${SWITCHES.forms.hint} ${SIGN_IN_NOTES.forms}`
+                  : SWITCHES.forms.hint
+                : FORMS_CHOICE.needsBrowser
+            }
+            value={settings.skip_forms ? "off" : settings.send_empty_forms ? "send" : "page"}
+            onChange={(choice) =>
+              update({ skip_forms: choice === "off", send_empty_forms: choice === "send" })
+            }
+            options={[
+              { value: "off", label: FORMS_CHOICE.off.label },
+              { value: "page", label: FORMS_CHOICE.page.label, hint: FORMS_CHOICE.page.hint, disabled: !rendered },
+              {
+                value: "send",
+                label: FORMS_CHOICE.send.label,
+                hint: login ? `${FORMS_CHOICE.send.hint} ${SIGN_IN_NOTES.sendForms}` : FORMS_CHOICE.send.hint,
+                disabled: !rendered,
+              },
+            ]}
           />
         )}
         <SwitchRow

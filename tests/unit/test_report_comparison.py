@@ -26,15 +26,17 @@ def scan(
     status: str = "completed",
     config: dict[str, Any] | None = None,
 ) -> int:
+    # A running scan's stored page_count stays 0 until it ends.
     row = conn.execute(
         "INSERT INTO scans(seed_url,status,config_json,started_at,page_count,"
         "axe_pages_scanned,alfa_pages_scanned,keyboard_pages_probed,"
-        "responsive_pages_probed,semantic_pages_analyzed) VALUES(?,?,?,?,1,1,1,1,1,1)",
+        "responsive_pages_probed,semantic_pages_analyzed) VALUES(?,?,?,?,?,1,1,1,1,1)",
         (
             seed,
             status,
             json.dumps(config if config is not None else {"method_coverage_version": 1}),
             date,
+            0 if status == "running" else 1,
         ),
     )
     scan_id = int(row.lastrowid or 0)
@@ -229,8 +231,12 @@ def test_predecessor_normalizes_seed_and_uses_time_not_id(tmp_db: sqlite3.Connec
     current = scan(tmp_db, date="2026-09-03 12:00:00")
     scan(tmp_db, date="2026-09-04 12:00:00")
     closer = scan(tmp_db, date="2026-09-02 12:00:00")
-    scan(tmp_db, date="2026-09-02 18:00:00", status="failed")
-    assert compare_reports(tmp_db, current).baseline.id == closer  # type: ignore[union-attr]
+    # A failed or stopped scan that saved pages is a report like any other;
+    # how it ended is a coverage note, not a reason to skip it.
+    failed = scan(tmp_db, date="2026-09-02 18:00:00", status="failed")
+    comparison = compare_reports(tmp_db, current)
+    assert comparison.baseline.id == failed  # type: ignore[union-attr]
+    assert any("failed before it visited every page" in note for note in comparison.limitations)
     assert compare_reports(tmp_db, closer).baseline.id == old  # type: ignore[union-attr]
     row = dict(tmp_db.execute("SELECT * FROM scans WHERE id=?", (old,)).fetchone())
     assert previous_scan_id(tmp_db, row) is None
@@ -250,7 +256,6 @@ def test_timestamp_ties_use_lower_id(tmp_db: sqlite3.Connection) -> None:
         ("missing", 404),
         ("later", 400),
         ("unrelated", 400),
-        ("running", 409),
         ("protected", 403),
     ],
 )
@@ -265,8 +270,6 @@ def test_pair_guards(tmp_db: sqlite3.Connection, kind: str, code: int) -> None:
         other = scan(tmp_db, date="2026-09-03 12:00:00")
     elif kind == "unrelated":
         other = scan(tmp_db, seed="https://elsewhere.com/")
-    elif kind == "running":
-        other = scan(tmp_db, status="running")
     elif kind == "protected":
         # The service guard needs only ownership existence. A temporary view
         # avoids constructing unrelated encrypted transport metadata here.
@@ -278,13 +281,19 @@ def test_pair_guards(tmp_db: sqlite3.Connection, kind: str, code: int) -> None:
     assert exc.value.status_code == code
 
 
-def test_no_baseline_and_current_not_completed(tmp_db: sqlite3.Connection) -> None:
+def test_no_baseline(tmp_db: sqlite3.Connection) -> None:
     first = scan(tmp_db)
     result = compare_reports(tmp_db, first)
     assert result.baseline is None and result.rows == [] and result.limitations
-    tmp_db.execute("UPDATE scans SET status='running' WHERE id=?", (first,))
-    with pytest.raises(ComparisonError, match="completed"):
-        compare_reports(tmp_db, first)
+
+
+def test_a_stopped_scan_is_compared_and_says_it_was_stopped(tmp_db: sqlite3.Connection) -> None:
+    stopped = scan(tmp_db, status="interrupted")
+    current = scan(tmp_db, date="2026-09-02 12:00:00")
+    comparison = compare_reports(tmp_db, current)
+    assert comparison.baseline and comparison.baseline.id == stopped
+    assert any("stopped before it visited every page" in n for n in comparison.limitations)
+    assert [p.id for p in site_history(tmp_db, current).scans] == [stopped, current]
 
 
 def test_filters_pagination_and_empty_page_metadata(tmp_db: sqlite3.Connection) -> None:
@@ -645,7 +654,7 @@ def test_no_baseline_still_reports_this_reports_totals(tmp_db: sqlite3.Connectio
     assert result.changes == {"new": 0, "resolved": 0, "remaining": 0}
 
 
-def test_site_history_is_one_sites_completed_public_reports(tmp_db: sqlite3.Connection) -> None:
+def test_site_history_is_one_sites_public_reports(tmp_db: sqlite3.Connection) -> None:
     """Oldest first, in the order a baseline is chosen, with comparison totals."""
     later = scan(tmp_db, date="2026-09-03 12:00:00")
     earlier = scan(tmp_db, seed="https://EXAMPLE.com:443", date="2026-09-01 12:00:00")

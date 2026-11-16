@@ -52,6 +52,14 @@ export type Target = {
    * element's code, and matches as a prefix. See ``snippetCutFor``.
    */
   cutAt?: number | null;
+  /**
+   * The rule-check occurrences this outline stands for: one element can be
+   * flagged more than once (two rules, identical records). A person's review
+   * is saved for every one of them.
+   */
+  findingIds?: number[];
+  /** For an image, the occurrence (the image placed on this page). */
+  imageOccurrenceId?: number;
 };
 
 /**
@@ -62,6 +70,10 @@ export type Target = {
  */
 const SNIPPET_CUTS: Record<string, number> = {
   focus: 300,
+  // The form error check (``forms/probe.py``, ``_COLLECT_JS``). Missing, a
+  // form longer than this matched nothing, and the inspector said it "may
+  // not appear here", though the form is there at page load.
+  forms: 600,
   keyboard: 240,
   responsive: 240,
   visual: 240,
@@ -325,7 +337,8 @@ const NOTE_ID = "axcess-flagged-note";
  * readers (``aria-hidden``): they are boxes over the page, not part of it.
  * So the element the reader is on also gets a description (aria-describedby)
  * pointing at one hidden note, "Flagged element 2 of 5", which a screen
- * reader says when focus lands on it (``focusInCopy``). Its own description,
+ * reader says when focus lands on it (keyboard focus entering the copy
+ * goes there, ``focusInCopy``). Its own description,
  * if it has one, is kept and comes after. Only the current element carries
  * it: the note is moved, not copied, at every step. Rejected: text written
  * into the page beside the element, which a screen reader would also read
@@ -358,17 +371,32 @@ export function noteCurrent(doc: Document, el: Element | null, text: string): vo
 }
 
 /**
- * Move keyboard (and screen reader) focus onto ``el`` in the saved copy.
- * Most flagged elements, such as a heading or an image, cannot take focus,
- * so they get ``tabindex="-1"``: focusable from here, still skipped by Tab.
- * True when focus landed on it; false for the whole page, and for an
- * element the copy hides, which cannot take focus at all.
+ * Whether keyboard focus can land on ``el`` in the saved copy: not the whole
+ * page, and not an element the copy hides, disables or makes inert.
+ */
+export function canFocusInCopy(el: Element | null): boolean {
+  if (!el || isWholePage(el)) return false;
+  if (el.closest("[inert]") || el.matches(":disabled")) return false;
+  // Checked by its method, not instanceof: the element belongs to the
+  // frame's window, whose Element is not this one.
+  const visible = el as Element & { checkVisibility?: (options?: { visibilityProperty?: boolean }) => boolean };
+  if (typeof visible.checkVisibility === "function") return visible.checkVisibility({ visibilityProperty: true });
+  return el.getClientRects().length > 0;
+}
+
+/**
+ * Move keyboard (and screen reader) focus onto ``el`` in the saved copy,
+ * when focus enters the copy by keyboard (see the Inspector's
+ * ``onFrameLoad``). Most flagged elements, such as a heading or an image,
+ * cannot take focus, so they get ``tabindex="-1"``: focusable from here,
+ * still skipped by Tab, so the page's own tab order is not changed. True
+ * when focus landed on it; false for the whole page, and for an element
+ * the copy hides, which cannot take focus at all.
  */
 export function focusInCopy(el: Element): boolean {
-  // Checked by its focus method, not instanceof: the element belongs to
-  // the frame's window, whose HTMLElement is not this one.
+  // Checked by its focus method, not instanceof, as above.
   const target = el as HTMLElement;
-  if (isWholePage(el) || typeof target.focus !== "function") return false;
+  if (!canFocusInCopy(el) || typeof target.focus !== "function") return false;
   if (target.tabIndex < 0 && !el.hasAttribute("tabindex")) el.setAttribute("tabindex", "-1");
   target.focus({ preventScroll: true });
   return el.ownerDocument.activeElement === el;
@@ -1245,19 +1273,6 @@ function nameOrText(el: Element): string {
     pick(el.getAttribute("title")) ||
     pick(el.getAttribute("placeholder"))
   );
-}
-
-/** A locator as a reader can use it: the CSS selector, or an Alfa record's XPath. */
-export function readableLocator(selector: string | null): string | null {
-  if (!selector) return null;
-  if (!isAlfaJsonSelector(selector)) return selector;
-  try {
-    const parsed = JSON.parse(selector) as unknown;
-    const first = (Array.isArray(parsed) ? parsed[0] : parsed) as { path?: unknown } | undefined;
-    return typeof first?.path === "string" ? first.path : null;
-  } catch {
-    return null;
-  }
 }
 
 function forceVisible(el: HTMLElement | SVGElement): void {

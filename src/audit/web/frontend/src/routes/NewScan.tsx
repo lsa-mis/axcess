@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { withScheme } from "../lib/webAddress";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
@@ -13,6 +12,7 @@ import ScanTypeTabs, { SCAN_PANEL_ID, scanTabId } from "../components/newScan/Sc
 import {
   applyPolicy,
   policyFor,
+  publicPayload,
   settingsFromSnapshot,
   toLocalLoginPayload,
   validateScan,
@@ -22,12 +22,14 @@ import {
   type ScanSettings,
 } from "../components/newScan/scanPolicy";
 import { useScopePreview } from "../components/newScan/useScopePreview";
+import { CUSTOM_USER_AGENT_CHOICE } from "../components/newScan/userAgents";
 
 const FIELD_IDS = {
   url: "scan-url",
   max_pages: "scan-max-pages",
   max_depth: "scan-max-depth",
   static_only: "scan-static-only",
+  user_agent: "scan-user-agent",
   authorized: "scan-authorized",
   image_ack: "scan-image-ack",
 } as const;
@@ -38,6 +40,7 @@ const ERROR_CLEARED_BY: Partial<Record<FieldKey, ReadonlyArray<keyof ScanSetting
   max_pages: ["max_pages"],
   max_depth: ["max_depth"],
   static_only: ["static_only", "scan_engine"],
+  user_agent: ["user_agent", "user_agent_choice"],
 };
 
 function positiveId(raw: string | null): number | null {
@@ -184,6 +187,16 @@ export default function NewScanRoute() {
     queryFn: api.getLocalAnalysisCapability,
     retry: false,
   });
+  // A retry may restore AI choices from an older scan. Honor today's saved
+  // off setting, and say why beside the switches instead of leaving a checked
+  // but unavailable model option (WCAG 2.2 SC 3.3.2 Labels or Instructions,
+  // Level A). Keep deterministic motion/OCR choices unchanged.
+  const aiOff = localAnalysisCapability.data?.ai_enabled === false;
+  useEffect(() => {
+    if (aiOff && (!settings.skip_vlm || !settings.skip_semantic)) {
+      setSettings((previous) => ({ ...previous, skip_vlm: true, skip_semantic: true }));
+    }
+  }, [aiOff, settings.skip_vlm, settings.skip_semantic]);
   const protectedCapability = useQuery({
     queryKey: ["capabilities", "protected-scans"],
     queryFn: api.getProtectedScanCapability,
@@ -342,9 +355,10 @@ export default function NewScanRoute() {
     setEndNotice(null);
     if (found.length) return;
     if (mode === "login") createLogin.mutate(settings);
-    // The public payload sends the address as typed, so complete it here; the
-    // sign-in payload completes it in toLocalLoginPayload (parseUrl).
-    else createPublic.mutate({ ...settings, url: withScheme(settings.url) });
+    // The public payload completes the address and adds the chosen
+    // browser's string (publicPayload); the sign-in payload completes the
+    // address in toLocalLoginPayload (parseUrl).
+    else createPublic.mutate(publicPayload(settings));
   };
 
   const loginDisabledReason =
@@ -392,6 +406,9 @@ export default function NewScanRoute() {
             <>
               {RECOVERY.loaded(fromScanId)}
               {mode === "login" && <> {RECOVERY.loadedLogin}</>}
+              {snapshot.settings.user_agent_choice === CUSTOM_USER_AGENT_CHOICE && (
+                <> {RECOVERY.typedUserAgent}</>
+              )}
             </>
           ) : (
             RECOVERY.loading(fromScanId)

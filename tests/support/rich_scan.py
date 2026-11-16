@@ -532,3 +532,54 @@ def seed_rich_scan(conn: sqlite3.Connection) -> int:
         evidence_url="",
     )
     return scan_id
+
+
+def seed_rich_reviews(conn: sqlite3.Connection, scan_id: int) -> None:
+    """A person's reviews on the rich scan, so the ITS technical review has rows.
+
+    Reported, with notes; reported without notes (the workbook then uses the
+    issue's title); a repeat (left out of the workbook); and a reported
+    image. Separate from :func:`seed_rich_scan`, which many tests use with
+    no reviews at all.
+    """
+    from audit.occurrence_reviews import save_review
+
+    def finding(target: str) -> tuple[int, int]:
+        row = conn.execute(
+            "SELECT id, page_id FROM page_a11y_findings WHERE scan_id = ? AND target_selector = ? "
+            "ORDER BY id LIMIT 1",
+            (scan_id, target),
+        ).fetchone()
+        return int(row[0]), int(row[1])
+
+    for target, decision, notes in (
+        ("p > span.muted", "report", "Muted grey text on white fails contrast."),
+        ("footer small", "report", ""),
+        (".details p", "repeat", "Same muted text as the home page."),
+        ("nav > a:nth-child(1)", "report", "The first menu link has no name."),
+    ):
+        finding_id, page_id = finding(target)
+        save_review(
+            conn,
+            scan_id=scan_id,
+            page_id=page_id,
+            a11y_finding_ids=[finding_id],
+            page_image_ids=[],
+            decision=decision,  # type: ignore[arg-type]
+            notes=notes,
+        )
+    image = conn.execute(
+        "SELECT pi.id, pi.page_id FROM page_images pi JOIN pages p ON p.id = pi.page_id "
+        "JOIN findings f ON f.image_id = pi.image_id AND f.scan_id = p.scan_id "
+        "WHERE p.scan_id = ? ORDER BY pi.id LIMIT 1",
+        (scan_id,),
+    ).fetchone()
+    save_review(
+        conn,
+        scan_id=scan_id,
+        page_id=int(image[1]),
+        a11y_finding_ids=[],
+        page_image_ids=[int(image[0])],
+        decision="report",
+        notes="The banner's words are not in its alt text.",
+    )

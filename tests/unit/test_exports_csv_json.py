@@ -214,7 +214,9 @@ def test_json_matches_golden(tmp_db: sqlite3.Connection, scan_fixture: int) -> N
     assert payload["scan"]["by_severity"]["critical"] + payload["scan"]["by_severity"]["major"] >= 1
     # v2 schema additions — the a11y section is present but empty on a
     # legacy fixture scan (no axe pages run).
-    assert payload["schema_version"] == 4
+    assert payload["schema_version"] == 5
+    # An older report recorded no axe-core version.
+    assert payload["scan"]["axe_core_version"] is None
     assert payload["a11y_findings"] == []
     assert payload["scan"]["axe_pages_scanned"] == 0
     assert payload["scan"]["axe_violations_total"] == 0
@@ -366,3 +368,38 @@ def test_behavioral_and_ai_sources_are_not_mislabeled_as_axe(
     assert "Not sure: a person must decide (a check that cannot be sure)" in markdown
     assert "Not sure: a person must decide (a check that cannot be sure" in jira
     assert "**Source:** axe-core" not in jira
+
+
+def test_axe_version_reaches_every_axe_row(tmp_db: sqlite3.Connection, scan_fixture: int) -> None:
+    """The scan's axe-core version is in the JSON and on each CSV axe row."""
+    import csv
+    import io
+
+    tmp_db.execute(
+        "UPDATE scans SET config_json = ? WHERE id = ?",
+        (json.dumps({"axe_core_version": "4.10.2"}), scan_fixture),
+    )
+    page_row = tmp_db.execute(
+        "SELECT id FROM pages WHERE scan_id = ? ORDER BY id LIMIT 1", (scan_fixture,)
+    ).fetchone()
+    _seed_axe_finding(tmp_db, scan_id=scan_fixture, page_id=int(page_row["id"]))
+    scan = collect_scan(tmp_db, scan_fixture, ui_base_url="http://127.0.0.1:8765")
+    assert scan.axe_core_version == "4.10.2"
+    assert json.loads(render_json(scan))["scan"]["axe_core_version"] == "4.10.2"
+    rows = list(csv.DictReader(io.StringIO(render_csv(scan))))
+    axe_rows = [r for r in rows if r["finding_kind"] == "wcag_axe"]
+    assert [(r["rule_id"], r["axe_core_version"]) for r in axe_rows] == [
+        ("color-contrast", "4.10.2")
+    ]
+    assert all(r["axe_core_version"] == "" for r in rows if r["finding_kind"] != "wcag_axe")
+
+
+def test_bundled_axe_version_is_read_from_the_banner() -> None:
+    from audit.analyzer.axe import DEFAULT_AXE_BUNDLE, bundled_axe_version
+    from audit.crawler.orchestrator import CrawlConfig, config_json_for_scan
+
+    version = bundled_axe_version()
+    assert version is not None
+    assert version in DEFAULT_AXE_BUNDLE.read_text(encoding="utf-8")[:200]
+    config = CrawlConfig(seed_url="https://example.com/")
+    assert json.loads(config_json_for_scan(config))["axe_core_version"] == version

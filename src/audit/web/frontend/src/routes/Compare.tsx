@@ -22,7 +22,18 @@ import { cn } from "../lib/cn";
 import { CHECK_LABEL } from "../lib/terms";
 
 // Each check by its shared interface name (terms.ts), keyed as the API names it.
-const PIPELINE_KEYS: DetectionPipeline[] = ["axe", "alfa", "keyboard", "responsive", "focus", "visual", "semantic", "image"];
+const PIPELINE_KEYS: DetectionPipeline[] = [
+  "axe",
+  "alfa",
+  "keyboard",
+  "responsive",
+  "focus",
+  "visual",
+  "forms",
+  "markup",
+  "semantic",
+  "image",
+];
 const PIPELINES: Record<string, string> = Object.fromEntries(PIPELINE_KEYS.map((key) => [key, CHECK_LABEL[key]]));
 
 const isChange = (value: string | null): value is ComparisonChange =>
@@ -30,7 +41,7 @@ const isChange = (value: string | null): value is ComparisonChange =>
 
 /**
  * What changed: what changed between this report and an earlier scan of the
- * same site, and how the site has trended across every completed scan.
+ * same site, and how the site has trended across every report.
  *
  * Its address is `/scans/:id/compare/changes?compare_to=N`. It was Compare
  * reports, at `/scans/:id/compare`, until 2026-10-29; that address is now the
@@ -169,7 +180,7 @@ export default function CompareRoute() {
             ) : history.scans.length < 2 ? (
               <>
                 <h2 id="trend-heading" className="text-base font-semibold">Trend over time</h2>
-                <p className="mt-1 text-sm text-fg-muted">This site has one completed scan so far. The trend appears after you scan the site again.</p>
+                <p className="mt-1 text-sm text-fg-muted">This site has one report so far. The trend appears after you scan the site again.</p>
               </>
             ) : (
               <TrendChart
@@ -193,7 +204,7 @@ export default function CompareRoute() {
             <Card className="mb-5 p-4 text-sm leading-relaxed">
               <h2 className="font-semibold">Nothing earlier to compare with</h2>
               <p className="mt-1 text-fg-muted">
-                This is the first completed scan of this site. Scan the site again after you fix issues, then compare the two here.
+                This is the first report of this site. Scan the site again after you fix issues, then compare the two here.
                 {history && history.scans.length > 1 && " To compare a later scan with this one, choose it in the trend above."}
               </p>
             </Card>
@@ -270,7 +281,7 @@ function Comparison({
         </p>
         {total !== null && (
           <span className="rounded-full border border-border bg-surface-muted px-3 py-1 text-xs font-semibold">
-            {count(total, "completed scan")} of this site so far
+            {count(total, "report")} of this site so far
           </span>
         )}
         <p className="text-fg-muted">
@@ -565,6 +576,8 @@ const SETTING_NAMES: Record<string, string> = {
   keyboard_probe_enabled: CHECK_LABEL.keyboard,
   responsive_checks_enabled: CHECK_LABEL.responsive,
   focus_checks_enabled: CHECK_LABEL.focus,
+  markup_checks_enabled: CHECK_LABEL.markup,
+  form_error_checks_enabled: CHECK_LABEL.forms,
   visual_checks_enabled: CHECK_LABEL.visual,
   semantic_enabled: CHECK_LABEL.semantic,
   ocr_enabled: CHECK_LABEL.image,
@@ -584,6 +597,8 @@ const SETTING_NAMES: Record<string, string> = {
   search: "Search",
   rps: "Pages per second",
   browser_headless: "Show the browser",
+  // The New scan label, word for word.
+  user_agent: "Browser the site sees (user agent)",
   resumable: "Resume after a stop",
 };
 

@@ -441,200 +441,7 @@ The script runs only the axe rule `fixture-rule-36`. Before your fix it should f
 - Place 1: `python axcess_check.py fix-brief.md 3.1`
 - Place 2: `python axcess_check.py fix-brief.md 3.2`
 
-### 4. Text does not stand out enough from its background
-
-- How sure: Mostly sure · Impact: Serious · WCAG 1.4.3 Contrast (Minimum), Level AA
-- Open occurrences: 3 of 4, on 3 pages (3 New)
-- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:color-contrast
-
-#### Where it is
-
-Place 1 of 3 shown:
-
-```untrusted-data
-page: https://example.org/
-page state: at page load
-element locator (CSS selector): p > span.muted
-element code (HTML): <span class="muted">low text</span>
-note: Fix any of the following: the rule's check failed.
-```
-
-Place 2 of 3 shown:
-
-```untrusted-data
-page: https://example.org/
-page state: at page load
-element locator (CSS selector): footer small
-note: Fix any of the following: the rule's check failed.
-```
-
-Place 3 of 3 shown:
-
-```untrusted-data
-page: https://example.org/about
-page state: after clicking Show more
-element locator (CSS selector): .details p
-note: Fix any of the following: the rule's check failed.
-```
-
-#### What is wrong
-
-The rule check (axe) measured the contrast between the text color and its background color, and it is too low. Normal text needs a ratio of at least 4.5:1, and large text needs 3:1. Large text is at least 18pt (24px), or at least 14pt (about 18.7px) and bold. The rule check does not report text it cannot measure, such as text over an image or a gradient.
-
-#### How to fix it
-
-1. Open the occurrence and read the measured ratio, the two colors, the font size and the font weight. For example: "color contrast of 4.16 (foreground color: #3170fb, background color: #fafafc, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1". The foreground color is the text color.
-2. Put the two colors into a contrast checker, such as the WebAIM Contrast Checker. Find a darker text color or a lighter background that reaches 4.5:1, or 3:1 for large text. Do not round up: 4.499:1 does not pass.
-3. Change the color where the whole site sets it, such as a shared color setting (design token) or a CSS custom property like `--link-color`. One setting often colors many elements, so one change can fix many occurrences.
-4. Check the same text in every state people can see, such as hover, focus and visited.
-
-#### How to check the fix
-
-- **By hand:** In Chrome's developer tools, use the Inspect tool and point at the text: the pop-up shows the contrast ratio. Check text over images or gradients by eye, because the rule check does not report it. Text in a logo, or on a control that is turned off (disabled), has no contrast requirement.
-- **With a tool:** Scan again and see if this text is still found.
-- **Done when:** Every piece of text on the affected pages reaches 4.5:1 against its background, or 3:1 when it is large text.
-- **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/color-contrast
-- **Then:** scan the site again in Axcess and check that this issue type has no open occurrences on these pages.
-
-#### Check it with the script
-
-The script runs only the axe rule `color-contrast`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
-
-- Every place shown: `python axcess_check.py fix-brief.md 4`
-- Place 1: `python axcess_check.py fix-brief.md 4.1`
-- Place 2: `python axcess_check.py fix-brief.md 4.2`
-- Place 3: `python axcess_check.py fix-brief.md 4.3`. This place appears only after a click, and the script checks the page as it loads, so it reports not checked. Check it by hand.
-
-### 5. Fixture rule 09 synthetic check
-
-- How sure: Mostly sure · Impact: Serious · WCAG 2.4.7, Level AA
-- Open occurrences: 2 of 2, on 2 pages (2 New)
-- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:fixture-rule-09
-
-#### Where it is
-
-Place 1 of 2 shown:
-
-```untrusted-data
-page: https://example.org/
-page state: at page load
-element locator (CSS selector): #fixture-09
-note: Fix any of the following: the rule's check failed.
-```
-
-Place 2 of 2 shown:
-
-```untrusted-data
-page: https://example.org/about
-page state: at page load
-element locator (CSS selector): #fixture-09
-note: Fix any of the following: the rule's check failed.
-```
-
-#### How to fix it
-
-Axcess has no written fix for this check. Use the rule's guide below.
-
-#### How to check the fix
-
-- **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/fixture-rule-09
-- **Then:** scan the site again in Axcess and check that this issue type has no open occurrences on these pages.
-
-#### Check it with the script
-
-The script runs only the axe rule `fixture-rule-09`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
-
-- Every place shown: `python axcess_check.py fix-brief.md 5`
-- Place 1: `python axcess_check.py fix-brief.md 5.1`
-- Place 2: `python axcess_check.py fix-brief.md 5.2`
-
-### 6. Fixture rule 21 synthetic check
-
-- How sure: Mostly sure · Impact: Serious · WCAG 2.4.7, Level AA
-- Open occurrences: 2 of 2, on 2 pages (2 New)
-- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:fixture-rule-21
-
-#### Where it is
-
-Place 1 of 2 shown:
-
-```untrusted-data
-page: https://example.org/
-page state: at page load
-element locator (CSS selector): #fixture-21
-note: Fix any of the following: the rule's check failed.
-```
-
-Place 2 of 2 shown:
-
-```untrusted-data
-page: https://example.org/about
-page state: at page load
-element locator (CSS selector): #fixture-21
-note: Fix any of the following: the rule's check failed.
-```
-
-#### How to fix it
-
-Axcess has no written fix for this check. Use the rule's guide below.
-
-#### How to check the fix
-
-- **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/fixture-rule-21
-- **Then:** scan the site again in Axcess and check that this issue type has no open occurrences on these pages.
-
-#### Check it with the script
-
-The script runs only the axe rule `fixture-rule-21`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
-
-- Every place shown: `python axcess_check.py fix-brief.md 6`
-- Place 1: `python axcess_check.py fix-brief.md 6.1`
-- Place 2: `python axcess_check.py fix-brief.md 6.2`
-
-### 7. Fixture rule 33 synthetic check
-
-- How sure: Mostly sure · Impact: Serious · WCAG 2.4.7, Level AA
-- Open occurrences: 2 of 2, on 2 pages (2 New)
-- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:fixture-rule-33
-
-#### Where it is
-
-Place 1 of 2 shown:
-
-```untrusted-data
-page: https://example.org/
-page state: at page load
-element locator (CSS selector): #fixture-33
-note: Fix any of the following: the rule's check failed.
-```
-
-Place 2 of 2 shown:
-
-```untrusted-data
-page: https://example.org/about
-page state: at page load
-element locator (CSS selector): #fixture-33
-note: Fix any of the following: the rule's check failed.
-```
-
-#### How to fix it
-
-Axcess has no written fix for this check. Use the rule's guide below.
-
-#### How to check the fix
-
-- **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/fixture-rule-33
-- **Then:** scan the site again in Axcess and check that this issue type has no open occurrences on these pages.
-
-#### Check it with the script
-
-The script runs only the axe rule `fixture-rule-33`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
-
-- Every place shown: `python axcess_check.py fix-brief.md 7`
-- Place 1: `python axcess_check.py fix-brief.md 7.1`
-- Place 2: `python axcess_check.py fix-brief.md 7.2`
-
-### 8. Fixture rule 04 synthetic check
+### 4. Fixture rule 04 synthetic check
 
 - How sure: Mostly sure · Impact: Critical · WCAG 1.3.1, Level A
 - Open occurrences: 1 of 1, on 1 page (1 New)
@@ -664,10 +471,10 @@ Axcess has no written fix for this check. Use the rule's guide below.
 
 The script runs only the axe rule `fixture-rule-04`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
 
-- Every place shown: `python axcess_check.py fix-brief.md 8`
-- Place 1: `python axcess_check.py fix-brief.md 8.1`
+- Every place shown: `python axcess_check.py fix-brief.md 4`
+- Place 1: `python axcess_check.py fix-brief.md 4.1`
 
-### 9. Fixture rule 08 synthetic check
+### 5. Fixture rule 08 synthetic check
 
 - How sure: Mostly sure · Impact: Critical · WCAG 1.3.1, Level A
 - Open occurrences: 1 of 1, on 1 page (1 New)
@@ -697,10 +504,10 @@ Axcess has no written fix for this check. Use the rule's guide below.
 
 The script runs only the axe rule `fixture-rule-08`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
 
-- Every place shown: `python axcess_check.py fix-brief.md 9`
-- Place 1: `python axcess_check.py fix-brief.md 9.1`
+- Every place shown: `python axcess_check.py fix-brief.md 5`
+- Place 1: `python axcess_check.py fix-brief.md 5.1`
 
-### 10. Fixture rule 16 synthetic check
+### 6. Fixture rule 16 synthetic check
 
 - How sure: Mostly sure · Impact: Critical · WCAG 1.3.1, Level A
 - Open occurrences: 1 of 1, on 1 page (1 New)
@@ -730,10 +537,10 @@ Axcess has no written fix for this check. Use the rule's guide below.
 
 The script runs only the axe rule `fixture-rule-16`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
 
-- Every place shown: `python axcess_check.py fix-brief.md 10`
-- Place 1: `python axcess_check.py fix-brief.md 10.1`
+- Every place shown: `python axcess_check.py fix-brief.md 6`
+- Place 1: `python axcess_check.py fix-brief.md 6.1`
 
-### 11. Fixture rule 20 synthetic check
+### 7. Fixture rule 20 synthetic check
 
 - How sure: Mostly sure · Impact: Critical · WCAG 1.3.1, Level A
 - Open occurrences: 1 of 1, on 1 page (1 New)
@@ -763,10 +570,10 @@ Axcess has no written fix for this check. Use the rule's guide below.
 
 The script runs only the axe rule `fixture-rule-20`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
 
-- Every place shown: `python axcess_check.py fix-brief.md 11`
-- Place 1: `python axcess_check.py fix-brief.md 11.1`
+- Every place shown: `python axcess_check.py fix-brief.md 7`
+- Place 1: `python axcess_check.py fix-brief.md 7.1`
 
-### 12. Fixture rule 28 synthetic check
+### 8. Fixture rule 28 synthetic check
 
 - How sure: Mostly sure · Impact: Critical · WCAG 1.3.1, Level A
 - Open occurrences: 1 of 1, on 1 page (1 New)
@@ -796,10 +603,10 @@ Axcess has no written fix for this check. Use the rule's guide below.
 
 The script runs only the axe rule `fixture-rule-28`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
 
-- Every place shown: `python axcess_check.py fix-brief.md 12`
-- Place 1: `python axcess_check.py fix-brief.md 12.1`
+- Every place shown: `python axcess_check.py fix-brief.md 8`
+- Place 1: `python axcess_check.py fix-brief.md 8.1`
 
-### 13. Fixture rule 32 synthetic check
+### 9. Fixture rule 32 synthetic check
 
 - How sure: Mostly sure · Impact: Critical · WCAG 1.3.1, Level A
 - Open occurrences: 1 of 1, on 1 page (1 New)
@@ -829,10 +636,10 @@ Axcess has no written fix for this check. Use the rule's guide below.
 
 The script runs only the axe rule `fixture-rule-32`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
 
-- Every place shown: `python axcess_check.py fix-brief.md 13`
-- Place 1: `python axcess_check.py fix-brief.md 13.1`
+- Every place shown: `python axcess_check.py fix-brief.md 9`
+- Place 1: `python axcess_check.py fix-brief.md 9.1`
 
-### 14. Images have no alt text for screen readers
+### 10. Images have no alt text for screen readers
 
 - How sure: Mostly sure · Impact: Critical · WCAG 1.1.1 Non-text Content, Level A
 - Open occurrences: 1 of 1, on 1 page (1 New)
@@ -873,14 +680,14 @@ An image (`<img>`) has no alt text (the text a screen reader reads for an image)
 
 The script runs only the axe rule `image-alt`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
 
-- Every place shown: `python axcess_check.py fix-brief.md 14`
-- Place 1: `python axcess_check.py fix-brief.md 14.1`
+- Every place shown: `python axcess_check.py fix-brief.md 10`
+- Place 1: `python axcess_check.py fix-brief.md 10.1`
 
-### 15. The page has no main heading (h1)
+### 11. Text does not stand out enough from its background
 
-- How sure: Mostly sure · Impact: Moderate · Best practice
-- Open occurrences: 3 of 3, on 3 pages (3 New)
-- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:page-has-heading-one
+- How sure: Mostly sure · Impact: Serious · WCAG 1.4.3 Contrast (Minimum), Level AA
+- Open occurrences: 3 of 4, on 3 pages (3 New)
+- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:color-contrast
 
 #### Where it is
 
@@ -889,60 +696,62 @@ Place 1 of 3 shown:
 ```untrusted-data
 page: https://example.org/
 page state: at page load
-element locator (CSS selector): body
+element locator (CSS selector): p > span.muted
+element code (HTML): <span class="muted">low text</span>
 note: Fix any of the following: the rule's check failed.
 ```
 
 Place 2 of 3 shown:
 
 ```untrusted-data
-page: https://example.org/about
+page: https://example.org/
 page state: at page load
-element locator (CSS selector): body
+element locator (CSS selector): footer small
 note: Fix any of the following: the rule's check failed.
 ```
 
 Place 3 of 3 shown:
 
 ```untrusted-data
-page: https://example.org/products
-page state: at page load
-element locator (CSS selector): body
+page: https://example.org/about
+page state: after clicking Show more
+element locator (CSS selector): .details p
 note: Fix any of the following: the rule's check failed.
 ```
 
 #### What is wrong
 
-The rule check (axe) looks for a level-one heading (`<h1>`, or `role="heading"` with `aria-level="1"`) on the page or in its frames. It found none that screen readers can reach, and a heading hidden with `display: none` does not count. Text styled to look big, such as a `<div>` with a large font class, is not a heading. WCAG does not require an h1, but it is a best practice.
+The rule check (axe) measured the contrast between the text color and its background color, and it is too low. Normal text needs a ratio of at least 4.5:1, and large text needs 3:1. Large text is at least 18pt (24px), or at least 14pt (about 18.7px) and bold. Text it cannot measure, such as text over an image or a gradient, is not counted as a failure here. It is listed separately as Not sure, for a person to check.
 
 #### How to fix it
 
-1. Compare the page's headings with how the page looks. Use a screen reader's heading list, or the browser's developer tools to see what the browser passes to screen readers (accessibility tree). Every block that looks like a section title should appear as a heading.
-2. Mark the title that names the page as the page's one level-one heading, usually at the start of the main content: `<main><h1>Undergraduate admissions</h1>…`. Then mark the section titles below it as `<h2>` and `<h3>`, without skipping levels.
-3. If the design shows no visible title, keep the h1 for screen readers with a visually hidden class. Do not use `display: none`, `visibility: hidden` or `aria-hidden="true"`: they hide it from screen readers too.
+1. Open the occurrence and read the measured ratio, the two colors, the font size and the font weight. For example: "color contrast of 4.16 (foreground color: #3170fb, background color: #fafafc, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1". The foreground color is the text color.
+2. Put the two colors into a contrast checker, such as the WebAIM Contrast Checker. Find a darker text color or a lighter background that reaches 4.5:1, or 3:1 for large text. Do not round up: 4.499:1 does not pass.
+3. Change the color where the whole site sets it, such as a shared color setting (design token) or a CSS custom property like `--link-color`. One setting often colors many elements, so one change can fix many occurrences.
+4. Check the same text in every state people can see, such as hover, focus and visited.
 
 #### How to check the fix
 
-- **By hand:** Open the heading list in a screen reader (VoiceOver on Mac: Control+Option+U, then choose Headings; NVDA on Windows: Insert+F7, then choose Headings). There should be one level 1 heading that names the page, and the levels below it should step down without gaps. Everything that looks like a heading should be in the list.
-- **With a tool:** Scan again and see if this page is still found.
-- **Done when:** Every page has one level-one heading that names the page, and screen readers can reach it.
-- **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/page-has-heading-one
+- **By hand:** In Chrome's developer tools, use the Inspect tool and point at the text: the pop-up shows the contrast ratio. Check text over images or gradients by eye, because the rule check does not report it. Text in a logo, or on a control that is turned off (disabled), has no contrast requirement.
+- **With a tool:** Scan again and see if this text is still found.
+- **Done when:** Every piece of text on the affected pages reaches 4.5:1 against its background, or 3:1 when it is large text.
+- **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/color-contrast
 - **Then:** scan the site again in Axcess and check that this issue type has no open occurrences on these pages.
 
 #### Check it with the script
 
-The script runs only the axe rule `page-has-heading-one`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
+The script runs only the axe rule `color-contrast`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
 
-- Every place shown: `python axcess_check.py fix-brief.md 15`
-- Place 1: `python axcess_check.py fix-brief.md 15.1`
-- Place 2: `python axcess_check.py fix-brief.md 15.2`
-- Place 3: `python axcess_check.py fix-brief.md 15.3`
+- Every place shown: `python axcess_check.py fix-brief.md 11`
+- Place 1: `python axcess_check.py fix-brief.md 11.1`
+- Place 2: `python axcess_check.py fix-brief.md 11.2`
+- Place 3: `python axcess_check.py fix-brief.md 11.3`. This place appears only after a click, and the script checks the page as it loads, so it reports not checked. Check it by hand.
 
-### 16. Fixture rule without a documentation link
+### 12. Fixture rule 09 synthetic check
 
-- How sure: Mostly sure · Impact: Moderate · WCAG 1.3.1, Level A
+- How sure: Mostly sure · Impact: Serious · WCAG 2.4.7, Level AA
 - Open occurrences: 2 of 2, on 2 pages (2 New)
-- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:fixture-empty-help
+- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:fixture-rule-09
 
 #### Where it is
 
@@ -951,16 +760,16 @@ Place 1 of 2 shown:
 ```untrusted-data
 page: https://example.org/
 page state: at page load
-element locator (CSS selector): div.card
+element locator (CSS selector): #fixture-09
 note: Fix any of the following: the rule's check failed.
 ```
 
 Place 2 of 2 shown:
 
 ```untrusted-data
-page: https://example.org/blog
+page: https://example.org/about
 page state: at page load
-element locator (CSS selector): div.card
+element locator (CSS selector): #fixture-09
 note: Fix any of the following: the rule's check failed.
 ```
 
@@ -970,21 +779,22 @@ Axcess has no written fix for this check. Use the rule's guide below.
 
 #### How to check the fix
 
+- **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/fixture-rule-09
 - **Then:** scan the site again in Axcess and check that this issue type has no open occurrences on these pages.
 
 #### Check it with the script
 
-The script runs only the axe rule `fixture-empty-help`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
+The script runs only the axe rule `fixture-rule-09`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
 
-- Every place shown: `python axcess_check.py fix-brief.md 16`
-- Place 1: `python axcess_check.py fix-brief.md 16.1`
-- Place 2: `python axcess_check.py fix-brief.md 16.2`
+- Every place shown: `python axcess_check.py fix-brief.md 12`
+- Place 1: `python axcess_check.py fix-brief.md 12.1`
+- Place 2: `python axcess_check.py fix-brief.md 12.2`
 
-### 17. Fixture rule 06 synthetic check
+### 13. Fixture rule 21 synthetic check
 
-- How sure: Mostly sure · Impact: Moderate · WCAG 3.3.2, Level A
+- How sure: Mostly sure · Impact: Serious · WCAG 2.4.7, Level AA
 - Open occurrences: 2 of 2, on 2 pages (2 New)
-- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:fixture-rule-06
+- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:fixture-rule-21
 
 #### Where it is
 
@@ -993,7 +803,7 @@ Place 1 of 2 shown:
 ```untrusted-data
 page: https://example.org/
 page state: at page load
-element locator (CSS selector): #fixture-06
+element locator (CSS selector): #fixture-21
 note: Fix any of the following: the rule's check failed.
 ```
 
@@ -1002,7 +812,7 @@ Place 2 of 2 shown:
 ```untrusted-data
 page: https://example.org/about
 page state: at page load
-element locator (CSS selector): #fixture-06
+element locator (CSS selector): #fixture-21
 note: Fix any of the following: the rule's check failed.
 ```
 
@@ -1012,22 +822,22 @@ Axcess has no written fix for this check. Use the rule's guide below.
 
 #### How to check the fix
 
-- **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/fixture-rule-06
+- **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/fixture-rule-21
 - **Then:** scan the site again in Axcess and check that this issue type has no open occurrences on these pages.
 
 #### Check it with the script
 
-The script runs only the axe rule `fixture-rule-06`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
+The script runs only the axe rule `fixture-rule-21`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
 
-- Every place shown: `python axcess_check.py fix-brief.md 17`
-- Place 1: `python axcess_check.py fix-brief.md 17.1`
-- Place 2: `python axcess_check.py fix-brief.md 17.2`
+- Every place shown: `python axcess_check.py fix-brief.md 13`
+- Place 1: `python axcess_check.py fix-brief.md 13.1`
+- Place 2: `python axcess_check.py fix-brief.md 13.2`
 
-### 18. Fixture rule 18 synthetic check
+### 14. Fixture rule 33 synthetic check
 
-- How sure: Mostly sure · Impact: Moderate · WCAG 3.3.2, Level A
+- How sure: Mostly sure · Impact: Serious · WCAG 2.4.7, Level AA
 - Open occurrences: 2 of 2, on 2 pages (2 New)
-- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:fixture-rule-18
+- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:fixture-rule-33
 
 #### Where it is
 
@@ -1036,7 +846,7 @@ Place 1 of 2 shown:
 ```untrusted-data
 page: https://example.org/
 page state: at page load
-element locator (CSS selector): #fixture-18
+element locator (CSS selector): #fixture-33
 note: Fix any of the following: the rule's check failed.
 ```
 
@@ -1045,7 +855,7 @@ Place 2 of 2 shown:
 ```untrusted-data
 page: https://example.org/about
 page state: at page load
-element locator (CSS selector): #fixture-18
+element locator (CSS selector): #fixture-33
 note: Fix any of the following: the rule's check failed.
 ```
 
@@ -1055,354 +865,18 @@ Axcess has no written fix for this check. Use the rule's guide below.
 
 #### How to check the fix
 
-- **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/fixture-rule-18
+- **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/fixture-rule-33
 - **Then:** scan the site again in Axcess and check that this issue type has no open occurrences on these pages.
 
 #### Check it with the script
 
-The script runs only the axe rule `fixture-rule-18`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
+The script runs only the axe rule `fixture-rule-33`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
 
-- Every place shown: `python axcess_check.py fix-brief.md 18`
-- Place 1: `python axcess_check.py fix-brief.md 18.1`
-- Place 2: `python axcess_check.py fix-brief.md 18.2`
+- Every place shown: `python axcess_check.py fix-brief.md 14`
+- Place 1: `python axcess_check.py fix-brief.md 14.1`
+- Place 2: `python axcess_check.py fix-brief.md 14.2`
 
-### 19. Fixture rule 30 synthetic check
-
-- How sure: Mostly sure · Impact: Moderate · WCAG 3.3.2, Level A
-- Open occurrences: 2 of 2, on 2 pages (2 New)
-- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:fixture-rule-30
-
-#### Where it is
-
-Place 1 of 2 shown:
-
-```untrusted-data
-page: https://example.org/
-page state: at page load
-element locator (CSS selector): #fixture-30
-note: Fix any of the following: the rule's check failed.
-```
-
-Place 2 of 2 shown:
-
-```untrusted-data
-page: https://example.org/about
-page state: at page load
-element locator (CSS selector): #fixture-30
-note: Fix any of the following: the rule's check failed.
-```
-
-#### How to fix it
-
-Axcess has no written fix for this check. Use the rule's guide below.
-
-#### How to check the fix
-
-- **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/fixture-rule-30
-- **Then:** scan the site again in Axcess and check that this issue type has no open occurrences on these pages.
-
-#### Check it with the script
-
-The script runs only the axe rule `fixture-rule-30`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
-
-- Every place shown: `python axcess_check.py fix-brief.md 19`
-- Place 1: `python axcess_check.py fix-brief.md 19.1`
-- Place 2: `python axcess_check.py fix-brief.md 19.2`
-
-### 20. Some content sits outside any page region
-
-- How sure: Mostly sure · Impact: Moderate · Best practice
-- Open occurrences: 2 of 2, on 2 pages (2 New)
-- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:region
-
-#### Where it is
-
-Place 1 of 2 shown:
-
-```untrusted-data
-page: https://example.org/blog
-page state: at page load
-element locator (CSS selector): div.promo
-note: Fix any of the following: the rule's check failed.
-```
-
-Place 2 of 2 shown:
-
-```untrusted-data
-page: https://example.org/products
-page state: at page load
-element locator (CSS selector): div.promo
-note: Fix any of the following: the rule's check failed.
-```
-
-#### What is wrong
-
-The rule check (axe) found content outside every landmark. A landmark is a page region that screen reader users can jump to, such as the menu (`<nav>`) or the main content (`<main>`). A few things may sit outside, such as skip links, dialogs and areas that announce updates (live regions, `aria-live`). WCAG does not require this, but it is a best practice.
-
-#### How to fix it
-
-1. Use the element locator (CSS selector) in an occurrence to find the content. Look at its parent elements in the browser's developer tools to see which part of the layout it belongs to.
-2. Put each part of the page into the matching landmark. Use `<header>` for the top of the site and `<nav>` for menus. Use `<main>` for the page's own content, `<aside>` for side content and `<footer>` for the footer. Use only one `<main>` per page. For example: `<body><header>…</header><main>…</main><footer>…</footer></body>`
-3. Fix it in the shared page template or layout component. The rule check (axe) reports each block of content separately. So one missing wrapper can cause many occurrences, and one template change can clear them all.
-
-#### How to check the fix
-
-- **By hand:** Open the landmark list in a screen reader (VoiceOver on Mac: Control+Option+U, then choose Landmarks; NVDA on Windows: Insert+F7, then choose Landmarks). Every part of the page you can see should belong to one of the listed regions. In NVDA you can also press D to jump from landmark to landmark.
-- **With a tool:** Scan again and see if content outside a landmark is still found on this page.
-- **Done when:** Every piece of visible content on the page sits inside a landmark, such as the header, menu, main content or footer.
-- **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/region
-- **Then:** scan the site again in Axcess and check that this issue type has no open occurrences on these pages.
-
-#### Check it with the script
-
-The script runs only the axe rule `region`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
-
-- Every place shown: `python axcess_check.py fix-brief.md 20`
-- Place 1: `python axcess_check.py fix-brief.md 20.1`
-- Place 2: `python axcess_check.py fix-brief.md 20.2`
-
-### 21. Text misses the stricter Level AAA contrast ratio
-
-- How sure: Mostly sure · Impact: Serious · WCAG 1.4.6 Contrast (Enhanced), Level AAA
-- Open occurrences: 1 of 1, on 1 page (1 New)
-- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:color-contrast-enhanced
-
-#### Where it is
-
-Place 1 of 1 shown:
-
-```untrusted-data
-page: https://example.org/about
-page state: at page load
-element locator (CSS selector): p.subtle
-note: Fix any of the following: the rule's check failed.
-```
-
-#### What is wrong
-
-The rule check (axe) found text that meets the Level AA contrast minimum but not the stricter Level AAA level. The contrast ratio measures how much lighter one color is than the other, from 1:1 (same color) to 21:1 (black on white). This text is at least 4.5:1 but under 7:1, or, for large text, at least 3:1 but under 4.5:1. Text below the AA minimum shows up in the `color-contrast` issue instead.
-
-#### How to fix it
-
-1. Check whether your policy asks for Level AAA. If it asks only for Level AA, you do not have to fix this, but a fix still helps people with low vision. The World Wide Web Consortium (W3C), which writes WCAG, does not advise requiring Level AAA for a whole site. Some content cannot meet every Level AAA criterion.
-2. Open each occurrence and read the check's message. It gives the contrast ratio, the text color (foreground color), the background color, the font size and the font weight. For example: "contrast of 6.54 ... Expected contrast ratio of 7:1".
-3. Pick a darker text color, or a lighter background, that reaches 7:1 for normal text, or 4.5:1 for large text. Large text is 24px (18pt) or bigger, or 14pt (about 18.7px) or bigger in bold. Do not round up: 6.99:1 does not meet 7:1. For example, on white, `#767676` gives 4.54:1 and `#595959` just reaches 7:1.
-4. Change the color in the shared style (the design token or CSS custom property, such as `--text-muted: #595959;`), not on each element. One shared color often causes many occurrences, so one change can fix them all.
-
-#### How to check the fix
-
-- **By hand:** Inspect the text in your browser's developer tools; in Chrome, the color picker shows the contrast ratio with AA and AAA lines. Check hover and focus states too. Use a contrast checker for text on images or gradients, text under other elements, and images of text, because the rule check (axe) skips them.
-- **With a tool:** Scan again at Level AAA and see if this text is still found, because a Level AA scan does not run this rule.
-- **Done when:** Every text element on the affected pages reaches 7:1 contrast with its background, or 4.5:1 if large, except logos and disabled controls.
-- **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/color-contrast-enhanced
-- **Then:** scan the site again in Axcess and check that this issue type has no open occurrences on these pages.
-
-#### Check it with the script
-
-The script runs only the axe rule `color-contrast-enhanced`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
-
-- Every place shown: `python axcess_check.py fix-brief.md 21`
-- Place 1: `python axcess_check.py fix-brief.md 21.1`
-
-### 22. Fixture: buttons [primary/secondary] need names?
-
-- How sure: Mostly sure · Impact: Serious · WCAG 2.4.7, Level AA
-- Open occurrences: 1 of 1, on 1 page (1 New)
-- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:fixture-rule-01
-
-#### Where it is
-
-Place 1 of 1 shown:
-
-```untrusted-data
-page: https://example.org/about
-page state: at page load
-element locator (CSS selector): #fixture-01
-note: Fix any of the following: the rule's check failed.
-```
-
-#### How to fix it
-
-Axcess has no written fix for this check. Use the rule's guide below.
-
-#### How to check the fix
-
-- **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/fixture-rule-01
-- **Then:** scan the site again in Axcess and check that this issue type has no open occurrences on these pages.
-
-#### Check it with the script
-
-The script runs only the axe rule `fixture-rule-01`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
-
-- Every place shown: `python axcess_check.py fix-brief.md 22`
-- Place 1: `python axcess_check.py fix-brief.md 22.1`
-
-### 23. Fixture rule 05 synthetic check
-
-- How sure: Mostly sure · Impact: Serious · WCAG 2.4.7, Level AA
-- Open occurrences: 1 of 1, on 1 page (1 New)
-- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:fixture-rule-05
-
-#### Where it is
-
-Place 1 of 1 shown:
-
-```untrusted-data
-page: https://example.org/
-page state: at page load
-element locator (CSS selector): #fixture-05
-note: Fix any of the following: the rule's check failed.
-```
-
-#### How to fix it
-
-Axcess has no written fix for this check. Use the rule's guide below.
-
-#### How to check the fix
-
-- **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/fixture-rule-05
-- **Then:** scan the site again in Axcess and check that this issue type has no open occurrences on these pages.
-
-#### Check it with the script
-
-The script runs only the axe rule `fixture-rule-05`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
-
-- Every place shown: `python axcess_check.py fix-brief.md 23`
-- Place 1: `python axcess_check.py fix-brief.md 23.1`
-
-### 24. Fixture rule 13 synthetic check
-
-- How sure: Mostly sure · Impact: Serious · WCAG 2.4.7, Level AA
-- Open occurrences: 1 of 1, on 1 page (1 New)
-- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:fixture-rule-13
-
-#### Where it is
-
-Place 1 of 1 shown:
-
-```untrusted-data
-page: https://example.org/products
-page state: at page load
-element locator (CSS selector): #fixture-13
-note: Fix any of the following: the rule's check failed.
-```
-
-#### How to fix it
-
-Axcess has no written fix for this check. Use the rule's guide below.
-
-#### How to check the fix
-
-- **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/fixture-rule-13
-- **Then:** scan the site again in Axcess and check that this issue type has no open occurrences on these pages.
-
-#### Check it with the script
-
-The script runs only the axe rule `fixture-rule-13`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
-
-- Every place shown: `python axcess_check.py fix-brief.md 24`
-- Place 1: `python axcess_check.py fix-brief.md 24.1`
-
-### 25. Fixture rule 17 synthetic check
-
-- How sure: Mostly sure · Impact: Serious · WCAG 2.4.7, Level AA
-- Open occurrences: 1 of 1, on 1 page (1 New)
-- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:fixture-rule-17
-
-#### Where it is
-
-Place 1 of 1 shown:
-
-```untrusted-data
-page: https://example.org/contact
-page state: at page load
-element locator (CSS selector): #fixture-17
-note: Fix any of the following: the rule's check failed.
-```
-
-#### How to fix it
-
-Axcess has no written fix for this check. Use the rule's guide below.
-
-#### How to check the fix
-
-- **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/fixture-rule-17
-- **Then:** scan the site again in Axcess and check that this issue type has no open occurrences on these pages.
-
-#### Check it with the script
-
-The script runs only the axe rule `fixture-rule-17`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
-
-- Every place shown: `python axcess_check.py fix-brief.md 25`
-- Place 1: `python axcess_check.py fix-brief.md 25.1`
-
-### 26. Fixture rule 25 synthetic check
-
-- How sure: Mostly sure · Impact: Serious · WCAG 2.4.7, Level AA
-- Open occurrences: 1 of 1, on 1 page (1 New)
-- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:fixture-rule-25
-
-#### Where it is
-
-Place 1 of 1 shown:
-
-```untrusted-data
-page: https://example.org/
-page state: at page load
-element locator (CSS selector): #fixture-25
-note: Fix any of the following: the rule's check failed.
-```
-
-#### How to fix it
-
-Axcess has no written fix for this check. Use the rule's guide below.
-
-#### How to check the fix
-
-- **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/fixture-rule-25
-- **Then:** scan the site again in Axcess and check that this issue type has no open occurrences on these pages.
-
-#### Check it with the script
-
-The script runs only the axe rule `fixture-rule-25`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
-
-- Every place shown: `python axcess_check.py fix-brief.md 26`
-- Place 1: `python axcess_check.py fix-brief.md 26.1`
-
-### 27. Fixture rule 29 synthetic check
-
-- How sure: Mostly sure · Impact: Serious · WCAG 2.4.7, Level AA
-- Open occurrences: 1 of 1, on 1 page (1 New)
-- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:fixture-rule-29
-
-#### Where it is
-
-Place 1 of 1 shown:
-
-```untrusted-data
-page: https://example.org/blog
-page state: at page load
-element locator (CSS selector): #fixture-29
-note: Fix any of the following: the rule's check failed.
-```
-
-#### How to fix it
-
-Axcess has no written fix for this check. Use the rule's guide below.
-
-#### How to check the fix
-
-- **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/fixture-rule-29
-- **Then:** scan the site again in Axcess and check that this issue type has no open occurrences on these pages.
-
-#### Check it with the script
-
-The script runs only the axe rule `fixture-rule-29`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
-
-- Every place shown: `python axcess_check.py fix-brief.md 27`
-- Place 1: `python axcess_check.py fix-brief.md 27.1`
-
-### 28. Links have no name for screen readers
+### 15. Links have no name for screen readers
 
 - How sure: Mostly sure · Impact: Serious · WCAG 2.4.4 Link Purpose (In Context), Level A
 - Open occurrences: 12 of 12, on 1 page (12 New)
@@ -1453,7 +927,22 @@ A link (`<a href>`) has no name that a screen reader can read (accessible name).
 
 #### How to check the fix
 
-- **By hand:** Turn on a screen reader and open its list of links (VoiceOver: Control+Option+U, then choose Links; NVDA: Insert+F7). Every link should have a name that says where it goes. Then press Tab to each fixed link and listen to what the screen reader says.
+- **By hand:** Open the list of links with a screen reader (steps for Mac and Windows are below). Every link should have a name that says where it goes. Then press Tab to each fixed link and listen to what the screen reader says.
+  - Mac, with VoiceOver:
+    VoiceOver is built into every Mac.
+    1. Turn VoiceOver on: press Command + F5. On some keyboards: Fn + Command + F5.
+    2. Open the rotor (VoiceOver's list of page parts): press Control + Option + U.
+    3. Press Right Arrow until you hear "Links".
+    4. Press Up Arrow or Down Arrow to hear each link. Press Return to go to one.
+    5. When you are done: Escape closes the rotor, and Command + F5 turns VoiceOver off.
+  - Windows, with NVDA:
+    NVDA is a free screen reader. Below, "NVDA key" means Insert, or Caps Lock if you chose the laptop keyboard layout.
+    Get NVDA from NV Access: https://www.nvaccess.org/download/
+    1. Turn NVDA on: press Control + Alt + N. Then go to the page in your browser.
+    2. Open the Elements List (NVDA's list of page parts): press NVDA key + F7.
+    3. Choose Links: press Alt + K.
+    4. Press Tab to reach the list, then Up Arrow or Down Arrow to hear each link. Press Enter to go to one. Or close the list and press K to jump from link to link.
+    5. When you are done: Escape closes the list, and NVDA key + Q, then Enter, turns NVDA off.
 - **With a tool:** Scan again and see if this link is still found.
 - **Done when:** Every link on the affected pages has a name a screen reader can read, and the name says where the link goes.
 - **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/link-name
@@ -1463,10 +952,566 @@ A link (`<a href>`) has no name that a screen reader can read (accessible name).
 
 The script runs only the axe rule `link-name`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
 
+- Every place shown: `python axcess_check.py fix-brief.md 15`
+- Place 1: `python axcess_check.py fix-brief.md 15.1`
+- Place 2: `python axcess_check.py fix-brief.md 15.2`
+- Place 3: `python axcess_check.py fix-brief.md 15.3`
+
+### 16. Text misses the stricter Level AAA contrast ratio
+
+- How sure: Mostly sure · Impact: Serious · WCAG 1.4.6 Contrast (Enhanced), Level AAA
+- Open occurrences: 1 of 1, on 1 page (1 New)
+- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:color-contrast-enhanced
+
+#### Where it is
+
+Place 1 of 1 shown:
+
+```untrusted-data
+page: https://example.org/about
+page state: at page load
+element locator (CSS selector): p.subtle
+note: Fix any of the following: the rule's check failed.
+```
+
+#### What is wrong
+
+The rule check (axe) found text that meets the Level AA contrast minimum but not the stricter Level AAA level. The contrast ratio measures how much lighter one color is than the other, from 1:1 (same color) to 21:1 (black on white). This text is at least 4.5:1 but under 7:1, or, for large text, at least 3:1 but under 4.5:1. Text below the AA minimum shows up in the `color-contrast` issue instead.
+
+#### How to fix it
+
+1. Check whether your policy asks for Level AAA. If it asks only for Level AA, you do not have to fix this, but a fix still helps people with low vision. The World Wide Web Consortium (W3C), which writes WCAG, does not advise requiring Level AAA for a whole site. Some content cannot meet every Level AAA criterion.
+2. Open each occurrence and read the check's message. It gives the contrast ratio, the text color (foreground color), the background color, the font size and the font weight. For example: "contrast of 6.54 ... Expected contrast ratio of 7:1".
+3. Pick a darker text color, or a lighter background, that reaches 7:1 for normal text, or 4.5:1 for large text. Large text is 24px (18pt) or bigger, or 14pt (about 18.7px) or bigger in bold. Do not round up: 6.99:1 does not meet 7:1. For example, on white, `#767676` gives 4.54:1 and `#595959` just reaches 7:1.
+4. Change the color in the shared style (the design token or CSS custom property, such as `--text-muted: #595959;`), not on each element. One shared color often causes many occurrences, so one change can fix them all.
+
+#### How to check the fix
+
+- **By hand:** Inspect the text in your browser's developer tools; in Chrome, the color picker shows the contrast ratio with AA and AAA lines. Check hover and focus states too. Use a contrast checker for text on images or gradients, text under other elements, and images of text, because the rule check (axe) skips them.
+- **With a tool:** Scan again at Level AAA and see if this text is still found, because a Level AA scan does not run this rule.
+- **Done when:** Every text element on the affected pages reaches 7:1 contrast with its background, or 4.5:1 if large, except logos and disabled controls.
+- **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/color-contrast-enhanced
+- **Then:** scan the site again in Axcess and check that this issue type has no open occurrences on these pages.
+
+#### Check it with the script
+
+The script runs only the axe rule `color-contrast-enhanced`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
+
+- Every place shown: `python axcess_check.py fix-brief.md 16`
+- Place 1: `python axcess_check.py fix-brief.md 16.1`
+
+### 17. Fixture: buttons [primary/secondary] need names?
+
+- How sure: Mostly sure · Impact: Serious · WCAG 2.4.7, Level AA
+- Open occurrences: 1 of 1, on 1 page (1 New)
+- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:fixture-rule-01
+
+#### Where it is
+
+Place 1 of 1 shown:
+
+```untrusted-data
+page: https://example.org/about
+page state: at page load
+element locator (CSS selector): #fixture-01
+note: Fix any of the following: the rule's check failed.
+```
+
+#### How to fix it
+
+Axcess has no written fix for this check. Use the rule's guide below.
+
+#### How to check the fix
+
+- **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/fixture-rule-01
+- **Then:** scan the site again in Axcess and check that this issue type has no open occurrences on these pages.
+
+#### Check it with the script
+
+The script runs only the axe rule `fixture-rule-01`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
+
+- Every place shown: `python axcess_check.py fix-brief.md 17`
+- Place 1: `python axcess_check.py fix-brief.md 17.1`
+
+### 18. Fixture rule 05 synthetic check
+
+- How sure: Mostly sure · Impact: Serious · WCAG 2.4.7, Level AA
+- Open occurrences: 1 of 1, on 1 page (1 New)
+- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:fixture-rule-05
+
+#### Where it is
+
+Place 1 of 1 shown:
+
+```untrusted-data
+page: https://example.org/
+page state: at page load
+element locator (CSS selector): #fixture-05
+note: Fix any of the following: the rule's check failed.
+```
+
+#### How to fix it
+
+Axcess has no written fix for this check. Use the rule's guide below.
+
+#### How to check the fix
+
+- **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/fixture-rule-05
+- **Then:** scan the site again in Axcess and check that this issue type has no open occurrences on these pages.
+
+#### Check it with the script
+
+The script runs only the axe rule `fixture-rule-05`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
+
+- Every place shown: `python axcess_check.py fix-brief.md 18`
+- Place 1: `python axcess_check.py fix-brief.md 18.1`
+
+### 19. Fixture rule 13 synthetic check
+
+- How sure: Mostly sure · Impact: Serious · WCAG 2.4.7, Level AA
+- Open occurrences: 1 of 1, on 1 page (1 New)
+- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:fixture-rule-13
+
+#### Where it is
+
+Place 1 of 1 shown:
+
+```untrusted-data
+page: https://example.org/products
+page state: at page load
+element locator (CSS selector): #fixture-13
+note: Fix any of the following: the rule's check failed.
+```
+
+#### How to fix it
+
+Axcess has no written fix for this check. Use the rule's guide below.
+
+#### How to check the fix
+
+- **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/fixture-rule-13
+- **Then:** scan the site again in Axcess and check that this issue type has no open occurrences on these pages.
+
+#### Check it with the script
+
+The script runs only the axe rule `fixture-rule-13`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
+
+- Every place shown: `python axcess_check.py fix-brief.md 19`
+- Place 1: `python axcess_check.py fix-brief.md 19.1`
+
+### 20. Fixture rule 17 synthetic check
+
+- How sure: Mostly sure · Impact: Serious · WCAG 2.4.7, Level AA
+- Open occurrences: 1 of 1, on 1 page (1 New)
+- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:fixture-rule-17
+
+#### Where it is
+
+Place 1 of 1 shown:
+
+```untrusted-data
+page: https://example.org/contact
+page state: at page load
+element locator (CSS selector): #fixture-17
+note: Fix any of the following: the rule's check failed.
+```
+
+#### How to fix it
+
+Axcess has no written fix for this check. Use the rule's guide below.
+
+#### How to check the fix
+
+- **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/fixture-rule-17
+- **Then:** scan the site again in Axcess and check that this issue type has no open occurrences on these pages.
+
+#### Check it with the script
+
+The script runs only the axe rule `fixture-rule-17`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
+
+- Every place shown: `python axcess_check.py fix-brief.md 20`
+- Place 1: `python axcess_check.py fix-brief.md 20.1`
+
+### 21. Fixture rule 25 synthetic check
+
+- How sure: Mostly sure · Impact: Serious · WCAG 2.4.7, Level AA
+- Open occurrences: 1 of 1, on 1 page (1 New)
+- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:fixture-rule-25
+
+#### Where it is
+
+Place 1 of 1 shown:
+
+```untrusted-data
+page: https://example.org/
+page state: at page load
+element locator (CSS selector): #fixture-25
+note: Fix any of the following: the rule's check failed.
+```
+
+#### How to fix it
+
+Axcess has no written fix for this check. Use the rule's guide below.
+
+#### How to check the fix
+
+- **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/fixture-rule-25
+- **Then:** scan the site again in Axcess and check that this issue type has no open occurrences on these pages.
+
+#### Check it with the script
+
+The script runs only the axe rule `fixture-rule-25`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
+
+- Every place shown: `python axcess_check.py fix-brief.md 21`
+- Place 1: `python axcess_check.py fix-brief.md 21.1`
+
+### 22. Fixture rule 29 synthetic check
+
+- How sure: Mostly sure · Impact: Serious · WCAG 2.4.7, Level AA
+- Open occurrences: 1 of 1, on 1 page (1 New)
+- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:fixture-rule-29
+
+#### Where it is
+
+Place 1 of 1 shown:
+
+```untrusted-data
+page: https://example.org/blog
+page state: at page load
+element locator (CSS selector): #fixture-29
+note: Fix any of the following: the rule's check failed.
+```
+
+#### How to fix it
+
+Axcess has no written fix for this check. Use the rule's guide below.
+
+#### How to check the fix
+
+- **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/fixture-rule-29
+- **Then:** scan the site again in Axcess and check that this issue type has no open occurrences on these pages.
+
+#### Check it with the script
+
+The script runs only the axe rule `fixture-rule-29`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
+
+- Every place shown: `python axcess_check.py fix-brief.md 22`
+- Place 1: `python axcess_check.py fix-brief.md 22.1`
+
+### 23. The page has no main heading (h1)
+
+- How sure: Mostly sure · Impact: Moderate · Best practice
+- Open occurrences: 3 of 3, on 3 pages (3 New)
+- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:page-has-heading-one
+
+#### Where it is
+
+Place 1 of 3 shown:
+
+```untrusted-data
+page: https://example.org/
+page state: at page load
+element locator (CSS selector): body
+note: Fix any of the following: the rule's check failed.
+```
+
+Place 2 of 3 shown:
+
+```untrusted-data
+page: https://example.org/about
+page state: at page load
+element locator (CSS selector): body
+note: Fix any of the following: the rule's check failed.
+```
+
+Place 3 of 3 shown:
+
+```untrusted-data
+page: https://example.org/products
+page state: at page load
+element locator (CSS selector): body
+note: Fix any of the following: the rule's check failed.
+```
+
+#### What is wrong
+
+The rule check (axe) looks for a level-one heading (`<h1>`, or `role="heading"` with `aria-level="1"`) on the page or in its frames. It found none that screen readers can reach, and a heading hidden with `display: none` does not count. Text styled to look big, such as a `<div>` with a large font class, is not a heading. WCAG does not require an h1, but it is a best practice.
+
+#### How to fix it
+
+1. Compare the page's headings with how the page looks. Use a screen reader's heading list, or the browser's developer tools to see what the browser passes to screen readers (accessibility tree). Every block that looks like a section title should appear as a heading.
+2. Mark the title that names the page as the page's one level-one heading, usually at the start of the main content: `<main><h1>Undergraduate admissions</h1>…`. Then mark the section titles below it as `<h2>` and `<h3>`, without skipping levels.
+3. If the design shows no visible title, keep the h1 for screen readers with a visually hidden class. Do not use `display: none`, `visibility: hidden` or `aria-hidden="true"`: they hide it from screen readers too.
+
+#### How to check the fix
+
+- **By hand:** Open the list of headings with a screen reader (steps for Mac and Windows are below). There should be one level 1 heading that names the page, and the levels below it should step down without gaps. Everything that looks like a heading should be in the list.
+  - Mac, with VoiceOver:
+    VoiceOver is built into every Mac.
+    1. Turn VoiceOver on: press Command + F5. On some keyboards: Fn + Command + F5.
+    2. Open the rotor (VoiceOver's list of page parts): press Control + Option + U.
+    3. Press Right Arrow until you hear "Headings".
+    4. Press Up Arrow or Down Arrow to hear each heading. Press Return to go to one.
+    5. When you are done: Escape closes the rotor, and Command + F5 turns VoiceOver off.
+  - Windows, with NVDA:
+    NVDA is a free screen reader. Below, "NVDA key" means Insert, or Caps Lock if you chose the laptop keyboard layout.
+    Get NVDA from NV Access: https://www.nvaccess.org/download/
+    1. Turn NVDA on: press Control + Alt + N. Then go to the page in your browser.
+    2. Open the Elements List (NVDA's list of page parts): press NVDA key + F7.
+    3. Choose Headings: press Alt + H.
+    4. Press Tab to reach the list, then Up Arrow or Down Arrow to hear each heading. Press Enter to go to one. Or close the list and press H to jump from heading to heading.
+    5. When you are done: Escape closes the list, and NVDA key + Q, then Enter, turns NVDA off.
+- **With a tool:** Scan again and see if this page is still found.
+- **Done when:** Every page has one level-one heading that names the page, and screen readers can reach it.
+- **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/page-has-heading-one
+- **Then:** scan the site again in Axcess and check that this issue type has no open occurrences on these pages.
+
+#### Check it with the script
+
+The script runs only the axe rule `page-has-heading-one`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
+
+- Every place shown: `python axcess_check.py fix-brief.md 23`
+- Place 1: `python axcess_check.py fix-brief.md 23.1`
+- Place 2: `python axcess_check.py fix-brief.md 23.2`
+- Place 3: `python axcess_check.py fix-brief.md 23.3`
+
+### 24. Fixture rule without a documentation link
+
+- How sure: Mostly sure · Impact: Moderate · WCAG 1.3.1, Level A
+- Open occurrences: 2 of 2, on 2 pages (2 New)
+- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:fixture-empty-help
+
+#### Where it is
+
+Place 1 of 2 shown:
+
+```untrusted-data
+page: https://example.org/
+page state: at page load
+element locator (CSS selector): div.card
+note: Fix any of the following: the rule's check failed.
+```
+
+Place 2 of 2 shown:
+
+```untrusted-data
+page: https://example.org/blog
+page state: at page load
+element locator (CSS selector): div.card
+note: Fix any of the following: the rule's check failed.
+```
+
+#### How to fix it
+
+Axcess has no written fix for this check. Use the rule's guide below.
+
+#### How to check the fix
+
+- **Then:** scan the site again in Axcess and check that this issue type has no open occurrences on these pages.
+
+#### Check it with the script
+
+The script runs only the axe rule `fixture-empty-help`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
+
+- Every place shown: `python axcess_check.py fix-brief.md 24`
+- Place 1: `python axcess_check.py fix-brief.md 24.1`
+- Place 2: `python axcess_check.py fix-brief.md 24.2`
+
+### 25. Fixture rule 06 synthetic check
+
+- How sure: Mostly sure · Impact: Moderate · WCAG 3.3.2, Level A
+- Open occurrences: 2 of 2, on 2 pages (2 New)
+- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:fixture-rule-06
+
+#### Where it is
+
+Place 1 of 2 shown:
+
+```untrusted-data
+page: https://example.org/
+page state: at page load
+element locator (CSS selector): #fixture-06
+note: Fix any of the following: the rule's check failed.
+```
+
+Place 2 of 2 shown:
+
+```untrusted-data
+page: https://example.org/about
+page state: at page load
+element locator (CSS selector): #fixture-06
+note: Fix any of the following: the rule's check failed.
+```
+
+#### How to fix it
+
+Axcess has no written fix for this check. Use the rule's guide below.
+
+#### How to check the fix
+
+- **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/fixture-rule-06
+- **Then:** scan the site again in Axcess and check that this issue type has no open occurrences on these pages.
+
+#### Check it with the script
+
+The script runs only the axe rule `fixture-rule-06`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
+
+- Every place shown: `python axcess_check.py fix-brief.md 25`
+- Place 1: `python axcess_check.py fix-brief.md 25.1`
+- Place 2: `python axcess_check.py fix-brief.md 25.2`
+
+### 26. Fixture rule 18 synthetic check
+
+- How sure: Mostly sure · Impact: Moderate · WCAG 3.3.2, Level A
+- Open occurrences: 2 of 2, on 2 pages (2 New)
+- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:fixture-rule-18
+
+#### Where it is
+
+Place 1 of 2 shown:
+
+```untrusted-data
+page: https://example.org/
+page state: at page load
+element locator (CSS selector): #fixture-18
+note: Fix any of the following: the rule's check failed.
+```
+
+Place 2 of 2 shown:
+
+```untrusted-data
+page: https://example.org/about
+page state: at page load
+element locator (CSS selector): #fixture-18
+note: Fix any of the following: the rule's check failed.
+```
+
+#### How to fix it
+
+Axcess has no written fix for this check. Use the rule's guide below.
+
+#### How to check the fix
+
+- **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/fixture-rule-18
+- **Then:** scan the site again in Axcess and check that this issue type has no open occurrences on these pages.
+
+#### Check it with the script
+
+The script runs only the axe rule `fixture-rule-18`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
+
+- Every place shown: `python axcess_check.py fix-brief.md 26`
+- Place 1: `python axcess_check.py fix-brief.md 26.1`
+- Place 2: `python axcess_check.py fix-brief.md 26.2`
+
+### 27. Fixture rule 30 synthetic check
+
+- How sure: Mostly sure · Impact: Moderate · WCAG 3.3.2, Level A
+- Open occurrences: 2 of 2, on 2 pages (2 New)
+- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:fixture-rule-30
+
+#### Where it is
+
+Place 1 of 2 shown:
+
+```untrusted-data
+page: https://example.org/
+page state: at page load
+element locator (CSS selector): #fixture-30
+note: Fix any of the following: the rule's check failed.
+```
+
+Place 2 of 2 shown:
+
+```untrusted-data
+page: https://example.org/about
+page state: at page load
+element locator (CSS selector): #fixture-30
+note: Fix any of the following: the rule's check failed.
+```
+
+#### How to fix it
+
+Axcess has no written fix for this check. Use the rule's guide below.
+
+#### How to check the fix
+
+- **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/fixture-rule-30
+- **Then:** scan the site again in Axcess and check that this issue type has no open occurrences on these pages.
+
+#### Check it with the script
+
+The script runs only the axe rule `fixture-rule-30`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
+
+- Every place shown: `python axcess_check.py fix-brief.md 27`
+- Place 1: `python axcess_check.py fix-brief.md 27.1`
+- Place 2: `python axcess_check.py fix-brief.md 27.2`
+
+### 28. Some content sits outside any page region
+
+- How sure: Mostly sure · Impact: Moderate · Best practice
+- Open occurrences: 2 of 2, on 2 pages (2 New)
+- Every occurrence, in Axcess: http://127.0.0.1:8765/app/scans/1/issues/axe:region
+
+#### Where it is
+
+Place 1 of 2 shown:
+
+```untrusted-data
+page: https://example.org/blog
+page state: at page load
+element locator (CSS selector): div.promo
+note: Fix any of the following: the rule's check failed.
+```
+
+Place 2 of 2 shown:
+
+```untrusted-data
+page: https://example.org/products
+page state: at page load
+element locator (CSS selector): div.promo
+note: Fix any of the following: the rule's check failed.
+```
+
+#### What is wrong
+
+The rule check (axe) found content outside every landmark. A landmark is a page region that screen reader users can jump to, such as the menu (`<nav>`) or the main content (`<main>`). A few things may sit outside, such as skip links, dialogs and areas that announce updates (live regions, `aria-live`). WCAG does not require this, but it is a best practice.
+
+#### How to fix it
+
+1. Use the element locator (CSS selector) in an occurrence to find the content. Look at its parent elements in the browser's developer tools to see which part of the layout it belongs to.
+2. Put each part of the page into the matching landmark. Use `<header>` for the top of the site and `<nav>` for menus. Use `<main>` for the page's own content, `<aside>` for side content and `<footer>` for the footer. Use only one `<main>` per page. For example: `<body><header>…</header><main>…</main><footer>…</footer></body>`
+3. Fix it in the shared page template or layout component. The rule check (axe) reports each block of content separately. So one missing wrapper can cause many occurrences, and one template change can clear them all.
+
+#### How to check the fix
+
+- **By hand:** Open the list of landmarks with a screen reader (steps for Mac and Windows are below). Every part of the page you can see should belong to one of the listed landmarks.
+  - Mac, with VoiceOver:
+    VoiceOver is built into every Mac.
+    1. Turn VoiceOver on: press Command + F5. On some keyboards: Fn + Command + F5.
+    2. Open the rotor (VoiceOver's list of page parts): press Control + Option + U.
+    3. Press Right Arrow until you hear "Landmarks".
+    4. Press Up Arrow or Down Arrow to hear each landmark. Press Return to go to one.
+    5. When you are done: Escape closes the rotor, and Command + F5 turns VoiceOver off.
+  - Windows, with NVDA:
+    NVDA is a free screen reader. Below, "NVDA key" means Insert, or Caps Lock if you chose the laptop keyboard layout.
+    Get NVDA from NV Access: https://www.nvaccess.org/download/
+    1. Turn NVDA on: press Control + Alt + N. Then go to the page in your browser.
+    2. Open the Elements List (NVDA's list of page parts): press NVDA key + F7.
+    3. Choose Landmarks: press Alt + D.
+    4. Press Tab to reach the list, then Up Arrow or Down Arrow to hear each landmark. Press Enter to go to one. Or close the list and press D to jump from landmark to landmark.
+    5. When you are done: Escape closes the list, and NVDA key + Q, then Enter, turns NVDA off.
+- **With a tool:** Scan again and see if content outside a landmark is still found on this page.
+- **Done when:** Every piece of visible content on the page sits inside a landmark, such as the header, menu, main content or footer.
+- **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/region
+- **Then:** scan the site again in Axcess and check that this issue type has no open occurrences on these pages.
+
+#### Check it with the script
+
+The script runs only the axe rule `region`. Before your fix it should fail (exit code 1). After it, it should pass (exit code 0).
+
 - Every place shown: `python axcess_check.py fix-brief.md 28`
 - Place 1: `python axcess_check.py fix-brief.md 28.1`
 - Place 2: `python axcess_check.py fix-brief.md 28.2`
-- Place 3: `python axcess_check.py fix-brief.md 28.3`
 
 ### 29. Fixture rule 02 synthetic check
 
@@ -1973,87 +2018,6 @@ The script reads this block. It holds page addresses and element locators copied
     },
     "4.1": {
       "id": "4.1",
-      "rule": "color-contrast",
-      "page": "https://example.org/",
-      "page_exact": true,
-      "locator": "p > span.muted",
-      "locator_exact": true,
-      "after_click": false
-    },
-    "4.2": {
-      "id": "4.2",
-      "rule": "color-contrast",
-      "page": "https://example.org/",
-      "page_exact": true,
-      "locator": "footer small",
-      "locator_exact": true,
-      "after_click": false
-    },
-    "4.3": {
-      "id": "4.3",
-      "rule": "color-contrast",
-      "page": "https://example.org/about",
-      "page_exact": true,
-      "locator": ".details p",
-      "locator_exact": true,
-      "after_click": true
-    },
-    "5.1": {
-      "id": "5.1",
-      "rule": "fixture-rule-09",
-      "page": "https://example.org/",
-      "page_exact": true,
-      "locator": "#fixture-09",
-      "locator_exact": true,
-      "after_click": false
-    },
-    "5.2": {
-      "id": "5.2",
-      "rule": "fixture-rule-09",
-      "page": "https://example.org/about",
-      "page_exact": true,
-      "locator": "#fixture-09",
-      "locator_exact": true,
-      "after_click": false
-    },
-    "6.1": {
-      "id": "6.1",
-      "rule": "fixture-rule-21",
-      "page": "https://example.org/",
-      "page_exact": true,
-      "locator": "#fixture-21",
-      "locator_exact": true,
-      "after_click": false
-    },
-    "6.2": {
-      "id": "6.2",
-      "rule": "fixture-rule-21",
-      "page": "https://example.org/about",
-      "page_exact": true,
-      "locator": "#fixture-21",
-      "locator_exact": true,
-      "after_click": false
-    },
-    "7.1": {
-      "id": "7.1",
-      "rule": "fixture-rule-33",
-      "page": "https://example.org/",
-      "page_exact": true,
-      "locator": "#fixture-33",
-      "locator_exact": true,
-      "after_click": false
-    },
-    "7.2": {
-      "id": "7.2",
-      "rule": "fixture-rule-33",
-      "page": "https://example.org/about",
-      "page_exact": true,
-      "locator": "#fixture-33",
-      "locator_exact": true,
-      "after_click": false
-    },
-    "8.1": {
-      "id": "8.1",
       "rule": "fixture-rule-04",
       "page": "https://example.org/blog",
       "page_exact": true,
@@ -2061,8 +2025,8 @@ The script reads this block. It holds page addresses and element locators copied
       "locator_exact": true,
       "after_click": false
     },
-    "9.1": {
-      "id": "9.1",
+    "5.1": {
+      "id": "5.1",
       "rule": "fixture-rule-08",
       "page": "https://example.org/products",
       "page_exact": true,
@@ -2070,8 +2034,8 @@ The script reads this block. It holds page addresses and element locators copied
       "locator_exact": true,
       "after_click": false
     },
-    "10.1": {
-      "id": "10.1",
+    "6.1": {
+      "id": "6.1",
       "rule": "fixture-rule-16",
       "page": "https://example.org/about",
       "page_exact": true,
@@ -2079,8 +2043,8 @@ The script reads this block. It holds page addresses and element locators copied
       "locator_exact": true,
       "after_click": false
     },
-    "11.1": {
-      "id": "11.1",
+    "7.1": {
+      "id": "7.1",
       "rule": "fixture-rule-20",
       "page": "https://example.org/",
       "page_exact": true,
@@ -2088,8 +2052,8 @@ The script reads this block. It holds page addresses and element locators copied
       "locator_exact": true,
       "after_click": false
     },
-    "12.1": {
-      "id": "12.1",
+    "8.1": {
+      "id": "8.1",
       "rule": "fixture-rule-28",
       "page": "https://example.org/products",
       "page_exact": true,
@@ -2097,8 +2061,8 @@ The script reads this block. It holds page addresses and element locators copied
       "locator_exact": true,
       "after_click": false
     },
-    "13.1": {
-      "id": "13.1",
+    "9.1": {
+      "id": "9.1",
       "rule": "fixture-rule-32",
       "page": "https://example.org/contact",
       "page_exact": true,
@@ -2106,8 +2070,8 @@ The script reads this block. It holds page addresses and element locators copied
       "locator_exact": true,
       "after_click": false
     },
-    "14.1": {
-      "id": "14.1",
+    "10.1": {
+      "id": "10.1",
       "rule": "image-alt",
       "page": "https://example.org/",
       "page_exact": true,
@@ -2115,188 +2079,89 @@ The script reads this block. It holds page addresses and element locators copied
       "locator_exact": true,
       "after_click": false
     },
+    "11.1": {
+      "id": "11.1",
+      "rule": "color-contrast",
+      "page": "https://example.org/",
+      "page_exact": true,
+      "locator": "p > span.muted",
+      "locator_exact": true,
+      "after_click": false
+    },
+    "11.2": {
+      "id": "11.2",
+      "rule": "color-contrast",
+      "page": "https://example.org/",
+      "page_exact": true,
+      "locator": "footer small",
+      "locator_exact": true,
+      "after_click": false
+    },
+    "11.3": {
+      "id": "11.3",
+      "rule": "color-contrast",
+      "page": "https://example.org/about",
+      "page_exact": true,
+      "locator": ".details p",
+      "locator_exact": true,
+      "after_click": true
+    },
+    "12.1": {
+      "id": "12.1",
+      "rule": "fixture-rule-09",
+      "page": "https://example.org/",
+      "page_exact": true,
+      "locator": "#fixture-09",
+      "locator_exact": true,
+      "after_click": false
+    },
+    "12.2": {
+      "id": "12.2",
+      "rule": "fixture-rule-09",
+      "page": "https://example.org/about",
+      "page_exact": true,
+      "locator": "#fixture-09",
+      "locator_exact": true,
+      "after_click": false
+    },
+    "13.1": {
+      "id": "13.1",
+      "rule": "fixture-rule-21",
+      "page": "https://example.org/",
+      "page_exact": true,
+      "locator": "#fixture-21",
+      "locator_exact": true,
+      "after_click": false
+    },
+    "13.2": {
+      "id": "13.2",
+      "rule": "fixture-rule-21",
+      "page": "https://example.org/about",
+      "page_exact": true,
+      "locator": "#fixture-21",
+      "locator_exact": true,
+      "after_click": false
+    },
+    "14.1": {
+      "id": "14.1",
+      "rule": "fixture-rule-33",
+      "page": "https://example.org/",
+      "page_exact": true,
+      "locator": "#fixture-33",
+      "locator_exact": true,
+      "after_click": false
+    },
+    "14.2": {
+      "id": "14.2",
+      "rule": "fixture-rule-33",
+      "page": "https://example.org/about",
+      "page_exact": true,
+      "locator": "#fixture-33",
+      "locator_exact": true,
+      "after_click": false
+    },
     "15.1": {
       "id": "15.1",
-      "rule": "page-has-heading-one",
-      "page": "https://example.org/",
-      "page_exact": true,
-      "locator": "body",
-      "locator_exact": true,
-      "after_click": false
-    },
-    "15.2": {
-      "id": "15.2",
-      "rule": "page-has-heading-one",
-      "page": "https://example.org/about",
-      "page_exact": true,
-      "locator": "body",
-      "locator_exact": true,
-      "after_click": false
-    },
-    "15.3": {
-      "id": "15.3",
-      "rule": "page-has-heading-one",
-      "page": "https://example.org/products",
-      "page_exact": true,
-      "locator": "body",
-      "locator_exact": true,
-      "after_click": false
-    },
-    "16.1": {
-      "id": "16.1",
-      "rule": "fixture-empty-help",
-      "page": "https://example.org/",
-      "page_exact": true,
-      "locator": "div.card",
-      "locator_exact": true,
-      "after_click": false
-    },
-    "16.2": {
-      "id": "16.2",
-      "rule": "fixture-empty-help",
-      "page": "https://example.org/blog",
-      "page_exact": true,
-      "locator": "div.card",
-      "locator_exact": true,
-      "after_click": false
-    },
-    "17.1": {
-      "id": "17.1",
-      "rule": "fixture-rule-06",
-      "page": "https://example.org/",
-      "page_exact": true,
-      "locator": "#fixture-06",
-      "locator_exact": true,
-      "after_click": false
-    },
-    "17.2": {
-      "id": "17.2",
-      "rule": "fixture-rule-06",
-      "page": "https://example.org/about",
-      "page_exact": true,
-      "locator": "#fixture-06",
-      "locator_exact": true,
-      "after_click": false
-    },
-    "18.1": {
-      "id": "18.1",
-      "rule": "fixture-rule-18",
-      "page": "https://example.org/",
-      "page_exact": true,
-      "locator": "#fixture-18",
-      "locator_exact": true,
-      "after_click": false
-    },
-    "18.2": {
-      "id": "18.2",
-      "rule": "fixture-rule-18",
-      "page": "https://example.org/about",
-      "page_exact": true,
-      "locator": "#fixture-18",
-      "locator_exact": true,
-      "after_click": false
-    },
-    "19.1": {
-      "id": "19.1",
-      "rule": "fixture-rule-30",
-      "page": "https://example.org/",
-      "page_exact": true,
-      "locator": "#fixture-30",
-      "locator_exact": true,
-      "after_click": false
-    },
-    "19.2": {
-      "id": "19.2",
-      "rule": "fixture-rule-30",
-      "page": "https://example.org/about",
-      "page_exact": true,
-      "locator": "#fixture-30",
-      "locator_exact": true,
-      "after_click": false
-    },
-    "20.1": {
-      "id": "20.1",
-      "rule": "region",
-      "page": "https://example.org/blog",
-      "page_exact": true,
-      "locator": "div.promo",
-      "locator_exact": true,
-      "after_click": false
-    },
-    "20.2": {
-      "id": "20.2",
-      "rule": "region",
-      "page": "https://example.org/products",
-      "page_exact": true,
-      "locator": "div.promo",
-      "locator_exact": true,
-      "after_click": false
-    },
-    "21.1": {
-      "id": "21.1",
-      "rule": "color-contrast-enhanced",
-      "page": "https://example.org/about",
-      "page_exact": true,
-      "locator": "p.subtle",
-      "locator_exact": true,
-      "after_click": false
-    },
-    "22.1": {
-      "id": "22.1",
-      "rule": "fixture-rule-01",
-      "page": "https://example.org/about",
-      "page_exact": true,
-      "locator": "#fixture-01",
-      "locator_exact": true,
-      "after_click": false
-    },
-    "23.1": {
-      "id": "23.1",
-      "rule": "fixture-rule-05",
-      "page": "https://example.org/",
-      "page_exact": true,
-      "locator": "#fixture-05",
-      "locator_exact": true,
-      "after_click": false
-    },
-    "24.1": {
-      "id": "24.1",
-      "rule": "fixture-rule-13",
-      "page": "https://example.org/products",
-      "page_exact": true,
-      "locator": "#fixture-13",
-      "locator_exact": true,
-      "after_click": false
-    },
-    "25.1": {
-      "id": "25.1",
-      "rule": "fixture-rule-17",
-      "page": "https://example.org/contact",
-      "page_exact": true,
-      "locator": "#fixture-17",
-      "locator_exact": true,
-      "after_click": false
-    },
-    "26.1": {
-      "id": "26.1",
-      "rule": "fixture-rule-25",
-      "page": "https://example.org/",
-      "page_exact": true,
-      "locator": "#fixture-25",
-      "locator_exact": true,
-      "after_click": false
-    },
-    "27.1": {
-      "id": "27.1",
-      "rule": "fixture-rule-29",
-      "page": "https://example.org/blog",
-      "page_exact": true,
-      "locator": "#fixture-29",
-      "locator_exact": true,
-      "after_click": false
-    },
-    "28.1": {
-      "id": "28.1",
       "rule": "link-name",
       "page": "https://example.org/",
       "page_exact": true,
@@ -2304,8 +2169,8 @@ The script reads this block. It holds page addresses and element locators copied
       "locator_exact": true,
       "after_click": false
     },
-    "28.2": {
-      "id": "28.2",
+    "15.2": {
+      "id": "15.2",
       "rule": "link-name",
       "page": "https://example.org/",
       "page_exact": true,
@@ -2313,12 +2178,192 @@ The script reads this block. It holds page addresses and element locators copied
       "locator_exact": true,
       "after_click": false
     },
-    "28.3": {
-      "id": "28.3",
+    "15.3": {
+      "id": "15.3",
       "rule": "link-name",
       "page": "https://example.org/",
       "page_exact": true,
       "locator": "nav > a:nth-child(3)",
+      "locator_exact": true,
+      "after_click": false
+    },
+    "16.1": {
+      "id": "16.1",
+      "rule": "color-contrast-enhanced",
+      "page": "https://example.org/about",
+      "page_exact": true,
+      "locator": "p.subtle",
+      "locator_exact": true,
+      "after_click": false
+    },
+    "17.1": {
+      "id": "17.1",
+      "rule": "fixture-rule-01",
+      "page": "https://example.org/about",
+      "page_exact": true,
+      "locator": "#fixture-01",
+      "locator_exact": true,
+      "after_click": false
+    },
+    "18.1": {
+      "id": "18.1",
+      "rule": "fixture-rule-05",
+      "page": "https://example.org/",
+      "page_exact": true,
+      "locator": "#fixture-05",
+      "locator_exact": true,
+      "after_click": false
+    },
+    "19.1": {
+      "id": "19.1",
+      "rule": "fixture-rule-13",
+      "page": "https://example.org/products",
+      "page_exact": true,
+      "locator": "#fixture-13",
+      "locator_exact": true,
+      "after_click": false
+    },
+    "20.1": {
+      "id": "20.1",
+      "rule": "fixture-rule-17",
+      "page": "https://example.org/contact",
+      "page_exact": true,
+      "locator": "#fixture-17",
+      "locator_exact": true,
+      "after_click": false
+    },
+    "21.1": {
+      "id": "21.1",
+      "rule": "fixture-rule-25",
+      "page": "https://example.org/",
+      "page_exact": true,
+      "locator": "#fixture-25",
+      "locator_exact": true,
+      "after_click": false
+    },
+    "22.1": {
+      "id": "22.1",
+      "rule": "fixture-rule-29",
+      "page": "https://example.org/blog",
+      "page_exact": true,
+      "locator": "#fixture-29",
+      "locator_exact": true,
+      "after_click": false
+    },
+    "23.1": {
+      "id": "23.1",
+      "rule": "page-has-heading-one",
+      "page": "https://example.org/",
+      "page_exact": true,
+      "locator": "body",
+      "locator_exact": true,
+      "after_click": false
+    },
+    "23.2": {
+      "id": "23.2",
+      "rule": "page-has-heading-one",
+      "page": "https://example.org/about",
+      "page_exact": true,
+      "locator": "body",
+      "locator_exact": true,
+      "after_click": false
+    },
+    "23.3": {
+      "id": "23.3",
+      "rule": "page-has-heading-one",
+      "page": "https://example.org/products",
+      "page_exact": true,
+      "locator": "body",
+      "locator_exact": true,
+      "after_click": false
+    },
+    "24.1": {
+      "id": "24.1",
+      "rule": "fixture-empty-help",
+      "page": "https://example.org/",
+      "page_exact": true,
+      "locator": "div.card",
+      "locator_exact": true,
+      "after_click": false
+    },
+    "24.2": {
+      "id": "24.2",
+      "rule": "fixture-empty-help",
+      "page": "https://example.org/blog",
+      "page_exact": true,
+      "locator": "div.card",
+      "locator_exact": true,
+      "after_click": false
+    },
+    "25.1": {
+      "id": "25.1",
+      "rule": "fixture-rule-06",
+      "page": "https://example.org/",
+      "page_exact": true,
+      "locator": "#fixture-06",
+      "locator_exact": true,
+      "after_click": false
+    },
+    "25.2": {
+      "id": "25.2",
+      "rule": "fixture-rule-06",
+      "page": "https://example.org/about",
+      "page_exact": true,
+      "locator": "#fixture-06",
+      "locator_exact": true,
+      "after_click": false
+    },
+    "26.1": {
+      "id": "26.1",
+      "rule": "fixture-rule-18",
+      "page": "https://example.org/",
+      "page_exact": true,
+      "locator": "#fixture-18",
+      "locator_exact": true,
+      "after_click": false
+    },
+    "26.2": {
+      "id": "26.2",
+      "rule": "fixture-rule-18",
+      "page": "https://example.org/about",
+      "page_exact": true,
+      "locator": "#fixture-18",
+      "locator_exact": true,
+      "after_click": false
+    },
+    "27.1": {
+      "id": "27.1",
+      "rule": "fixture-rule-30",
+      "page": "https://example.org/",
+      "page_exact": true,
+      "locator": "#fixture-30",
+      "locator_exact": true,
+      "after_click": false
+    },
+    "27.2": {
+      "id": "27.2",
+      "rule": "fixture-rule-30",
+      "page": "https://example.org/about",
+      "page_exact": true,
+      "locator": "#fixture-30",
+      "locator_exact": true,
+      "after_click": false
+    },
+    "28.1": {
+      "id": "28.1",
+      "rule": "region",
+      "page": "https://example.org/blog",
+      "page_exact": true,
+      "locator": "div.promo",
+      "locator_exact": true,
+      "after_click": false
+    },
+    "28.2": {
+      "id": "28.2",
+      "rule": "region",
+      "page": "https://example.org/products",
+      "page_exact": true,
+      "locator": "div.promo",
       "locator_exact": true,
       "after_click": false
     },

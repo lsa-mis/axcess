@@ -4,7 +4,7 @@ The snapshot is how a failed or stopped scan is started again without
 re-entering every setting. These tests pin the two things that matter: every
 form setting survives the trip through ``config_json``, and nothing that is
 not a form setting (credentials, session state, the post-sign-in landing URL,
-the user agent) can come back out.
+the user agent string) can come back out.
 """
 
 from __future__ import annotations
@@ -50,14 +50,28 @@ _CUSTOM_FORM: dict[str, Any] = {
     "skip_responsive": True,
     "skip_semantic": False,
     "skip_focus": True,
+    "skip_markup": True,
     "skip_visual": False,
+    "skip_forms": False,
+    "send_empty_forms": True,
     "skip_rendered_storage": True,
     "axe_level": "AAA",
     "wcag_version": "2.2",
+    "user_agent_choice": "safari_mac",
+    # Never sent back: the form fills in a listed browser's string itself.
+    "user_agent": "",
 }
+
+_SAFARI = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 "
+    "(KHTML, like Gecko) Version/27.2 Safari/605.1.15"
+)
 
 
 def _round_trip(form: dict[str, Any]) -> dict[str, Any]:
+    # What the form posts: the chosen browser's string rides along.
+    if form.get("user_agent_choice", "axcess") != "axcess":
+        form = {**form, "user_agent": _SAFARI}
     config = server._build_crawl_config(form, Settings())
     snapshot = snapshot_from_config(
         scan_id=7, seed_url=form["url"], config_json=config_json_for_scan(config)
@@ -69,6 +83,16 @@ def _round_trip(form: dict[str, Any]) -> dict[str, Any]:
 
 def test_every_public_form_setting_round_trips() -> None:
     assert _round_trip(_CUSTOM_FORM) == _CUSTOM_FORM
+
+
+def test_the_browser_name_is_stored_but_only_its_choice_comes_back() -> None:
+    config = server._build_crawl_config({**_CUSTOM_FORM, "user_agent": _SAFARI}, Settings())
+    stored = json.loads(config_json_for_scan(config))
+    assert (stored["user_agent"], stored["user_agent_choice"]) == (_SAFARI, "safari_mac")
+    snapshot = snapshot_from_config(
+        scan_id=7, seed_url=_CUSTOM_FORM["url"], config_json=config_json_for_scan(config)
+    )
+    assert "Safari/605" not in snapshot.model_dump_json()
 
 
 def test_the_form_defaults_round_trip() -> None:
@@ -91,10 +115,14 @@ def test_the_form_defaults_round_trip() -> None:
         "skip_responsive": False,
         "skip_semantic": True,
         "skip_focus": False,
+        "skip_markup": False,
         "skip_visual": True,
+        "skip_forms": True,
+        "send_empty_forms": False,
         "skip_rendered_storage": False,
         "axe_level": "AA",
         "wcag_version": "2.1",
+        "user_agent_choice": "axcess",
     }
     assert _round_trip(defaults) == defaults
 
@@ -124,6 +152,22 @@ def test_an_older_scan_without_a_limit_key_had_a_limit() -> None:
     )
     assert snapshot.settings.all_pages is False
     assert snapshot.settings.max_pages == 2500
+
+
+def test_a_request_without_the_form_setting_never_presses_submit() -> None:
+    """The form error check presses submit buttons, so it runs only when a
+    request asks for it; an older client that sends nothing leaves it off."""
+    form = {k: v for k, v in _CUSTOM_FORM.items() if k not in {"skip_forms", "send_empty_forms"}}
+    assert server._build_crawl_config(form, Settings()).form_error_checks_enabled is False
+    assert server._build_crawl_config(_CUSTOM_FORM, Settings()).form_error_checks_enabled is True
+    old = snapshot_from_config(scan_id=3, seed_url="https://old.example.test/", config_json="{}")
+    assert old.settings.skip_forms is True
+    # Nor does it ever send a form: that needs its own yes, and the check on.
+    assert server._build_crawl_config(form, Settings()).form_send_empty_forms is False
+    assert old.settings.send_empty_forms is False
+    assert server._build_crawl_config(_CUSTOM_FORM, Settings()).form_send_empty_forms is True
+    check_off = {**_CUSTOM_FORM, "skip_forms": True}
+    assert server._build_crawl_config(check_off, Settings()).form_send_empty_forms is False
 
 
 def test_fast_crawl_with_alfa_round_trips() -> None:

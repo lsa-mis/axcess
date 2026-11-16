@@ -1,10 +1,11 @@
-"""Stopping a real scan shows its partial report at once, with no reload.
+"""Stopping a real scan opens its report at once, with no reload.
 
 Reproduced in a real browser: Stop on a normal scan showed "No report was
-produced" with 3 pages saved, then "Partial report" about 15 seconds later.
+produced" with 3 pages saved, and its report only about 15 seconds later.
 The cancel endpoint marked the scan interrupted at once, but the row's page
-count was written only when the crawl task wound down, and the stopped-scan
-page chooses its heading from that count.
+count was written only when the crawl task wound down, and the scan page
+decides from that count whether there is a report to open. A stopped scan
+with saved pages opens its Issues page like any other report.
 
 This runs a real scan of the fixture site through the live server, presses
 Stop once a few pages are saved, and watches the page from before the click:
@@ -102,7 +103,7 @@ def slow_final_write(
         timer.cancel()
 
 
-async def test_stopping_a_real_scan_shows_the_partial_report_at_once(
+async def test_stopping_a_real_scan_opens_its_report_at_once(
     seeded_db: tuple[Path, Path, int],
     slow_final_write: None,
     live_server: tuple[str, int],
@@ -164,14 +165,10 @@ async def test_stopping_a_real_scan_shows_the_partial_report_at_once(
 
             # "Immediately": well inside the 15 seconds the crawl took to
             # write its count, and with no reload.
+            await page.wait_for_url(f"**/app/scans/{scan_id}/issues", timeout=5_000)
             await playwright_async.expect(
-                page.get_by_role("heading", name="Partial report", exact=True)
+                page.get_by_role("heading", name="Issues", level=1)
             ).to_be_visible(timeout=5_000)
-            review = page.get_by_role("link", name="Review what the scan found")
-            await playwright_async.expect(review).to_be_visible(timeout=1_000)
-            await playwright_async.expect(review).to_have_attribute(
-                "href", f"/app/scans/{scan_id}/issues"
-            )
             assert await page.evaluate("window.__sawNoReport") is False, (
                 "the page said 'No report was produced' for a scan that had saved pages"
             )

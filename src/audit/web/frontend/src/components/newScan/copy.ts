@@ -53,11 +53,26 @@ export const GROUPS = {
   speed: {
     legend: "Speed and browser window",
     description:
-      "How fast the scan runs, and whether you can watch it.",
+      "How fast the scan runs, whether you can watch it, and which browser the site sees.",
   },
 } as const;
 
 /** Switch copy, keyed by the positive setting name used in `scanPolicy.ts`. */
+/** The form error check's three answers (ChecksGroup). The group's name is
+ *  SWITCHES.forms.label, so the rail and the report keep one name for it. */
+export const FORMS_CHOICE = {
+  off: { label: "Don’t check forms" },
+  page: {
+    label: "Check forms, and stop them from being sent",
+    hint: "Nothing reaches the site. A form that only the site’s server checks is counted as could not judge.",
+  },
+  send: {
+    label: "Check forms, and send empty ones to this site",
+    hint: "Use only on a site you own or a test site. Axcess sends a form only when every field is empty, then checks the page the site sends back. The site may still act on it, for example by emailing a blank message to someone.",
+  },
+  needsBrowser: "Needs a browser. Turn off Fast scan to use it.",
+} as const;
+
 export const SWITCHES = {
   whole_host: {
     label: "Scan the whole website",
@@ -65,7 +80,7 @@ export const SWITCHES = {
   },
   whole_host_login: {
     label: "Scan the whole signed-in website",
-    hint: "Ignores the path in the address above, but never leaves the website you sign in to.",
+    hint: "Ignores the path in the address above. Every signed-in page on this host is included.",
   },
   include_subdomain: {
     label: "Follow links to subdomains",
@@ -89,6 +104,15 @@ export const SWITCHES = {
     label: "Check that keyboard focus is never hidden",
     hint:
       "Finds the focus outline (the box that shows where the keyboard is) hidden behind sticky headers or footers. WCAG 2.4.11 is new in WCAG 2.2. A WCAG 2.1 scan reports it as Best practice.",
+  },
+  markup: {
+    label: "Check the page code for problems the rule check misses",
+    hint: "Reads each page’s code (HTML) for problems the rule check (axe) does not look for, such as a field named only by its placeholder text. It only reads the page and changes nothing.",
+  },
+  forms: {
+    label: "Check that forms describe their errors",
+    hint:
+      "Presses each form’s submit button once, with nothing typed. Finds forms that mark a field in error without saying in words what is wrong (WCAG 3.3.1). Never presses sign-in, payment, delete or search forms. Adds about 1–2 seconds per form.",
   },
   responsive: {
     label: "Check narrow screens and zoom",
@@ -131,6 +155,26 @@ export const SWITCHES = {
   },
 } as const;
 
+/**
+ * The browser name (user agent) a public scan sends (SpeedGroup). The hint
+ * keeps both limits, never to be dropped for length: only the name changes,
+ * not the browser, and robots.txt is still read for Axcess.
+ */
+export const USER_AGENT = {
+  label: "Browser the site sees (user agent)",
+  hint:
+    "Some sites show a different page, or block scans, depending on which browser they think is visiting. This changes only the browser name Axcess sends. Every page still opens in Chromium, so a site that checks what the browser can do may still tell. The site’s robots.txt rules for Axcess still apply.",
+  defaultOption: "Axcess (default)",
+  customOption: "Type your own…",
+  sendsDefault: "Sends Axcess’s own name, so the site can see that a scanner is visiting.",
+  sends: "Sends:",
+  phone:
+    "The scanning window stays computer-sized. The site may send its phone layout to that wide window.",
+  customLabel: "Browser name to send (user agent)",
+  customHint:
+    "Paste the exact text a browser sends. For example, copy it from your browser’s developer tools. One line, up to 512 characters. Axcess does not keep this text for a later scan.",
+} as const;
+
 /** New scan's no-limit switch, beside Maximum pages (public scans only). */
 export const ALL_PAGES = {
   label: "Scan every page it finds",
@@ -158,10 +202,12 @@ export const NUMBERS = {
     label: "Pages at once (workers)",
     hint: "How many pages this computer works on at the same time. On a fast computer, such as an M4 Pro, start at 8 and go up to 32.",
   },
+  // A sign-in scan's own hint for the same "Pages at once (workers)"
+  // field: its numbers differ, and it has one limit the public scan does
+  // not (the site can sign out part of the scan).
   workers_login: {
-    label: "Signed-in tabs",
     hint:
-      "How many tabs the temporary signed-in browser uses at once. Axcess recommends 2. The safe maximum is 4.",
+      "How many pages this computer works on at the same time. Higher is faster but puts more load on the site. Axcess recommends 4. The maximum is 8. If the site signs out part of the scan, Axcess goes back to one page at a time and says so in the report.",
   },
 } as const;
 
@@ -193,8 +239,20 @@ export const ENGINE = {
   },
 } as const;
 
-export const FIXED_NOTE_LOGIN =
-  "Sign-in scans always work this way: they stay on this exact website, respect robots.txt, open every page in a real browser, and ask for 1 page per second.";
+/**
+ * What a setting means in addition behind a sign-in, added to its hint in
+ * the sign-in form. The sign-in form offers every setting the public form
+ * does (2026-11-16); these keep the extra risk or limit in words (AGENTS.md,
+ * Interface language rule 4: never drop a safety fact).
+ */
+export const SIGN_IN_NOTES = {
+  forms: "In a sign-in scan, Axcess presses each form as you, the person signed in.",
+  sendForms:
+    "In a sign-in scan, the site receives each empty form from your account and may act on it as if you sent it.",
+  staticOnly:
+    "In a sign-in scan, Axcess loads each page with your sign-in cookies. A site that keeps your sign-in only inside the page (session storage) shows its signed-out pages instead.",
+  userAgent: "In a sign-in scan, the sign-in window sends this name too, so the site sees one browser throughout.",
+} as const;
 
 export const AUTHORIZATION = {
   label:
@@ -232,6 +290,10 @@ export const ERRORS = {
   notAuthorized: "Confirm that the site owner allows this accessibility scan.",
   imageAck:
     "Before you turn on reading text inside images, confirm where Axcess saves the images and their text.",
+  userAgentEmpty: "Type the browser name (user agent) to send, or choose one from the list.",
+  userAgentLong: (max: number) => `The browser name (user agent) can be at most ${max} characters.`,
+  userAgentCharacters:
+    "The browser name (user agent) can use only English letters, numbers, spaces and keyboard symbols, on one line.",
   limitEmpty: (label: string, min: number, max: number) =>
     `${label} is empty. Enter a whole number from ${min} to ${max.toLocaleString()}.`,
   limitWhole: (label: string) => `${label} must be a whole number.`,
@@ -300,6 +362,7 @@ export const RECOVERY = {
     "Axcess never saves your sign-in. Sign in again in the browser window, and confirm again below that the site owner allows this scan.",
   failed: (id: number) =>
     `Axcess could not load the settings from scan ${id}. The form shows the default settings instead.`,
+  typedUserAgent: `Axcess does not keep a browser name you typed. Type it again under ${GROUPS.speed.legend}.`,
 } as const;
 
 /**
@@ -314,7 +377,7 @@ export const RETRY = {
   quick: "Scan again with faster settings",
   quickPending: "Starting the scan again…",
   quickHint:
-    `Scans the same address again right away, with the default settings. It does not open menus or pop-up windows (${CLICK_THROUGH}), so it finishes sooner. That shows quickly whether Axcess can scan the site. It keeps only this scan’s address and its Web Content Accessibility Guidelines (WCAG) version.`,
+    `Scans the same address again right away, with the default settings. It does not open menus or pop-up windows (${CLICK_THROUGH}) or press form buttons, so it finishes sooner. That shows quickly whether Axcess can scan the site. It keeps only this scan’s address and its Web Content Accessibility Guidelines (WCAG) version.`,
 } as const;
 
 export const SUMMARY = {
@@ -338,6 +401,10 @@ export const SUMMARY = {
   noSignIn: "Pages behind a sign-in",
   /** For a sign-in scan: it never leaves the approved website. */
   noOtherSites: "Pages on any other website",
+  /** A Pages to scan line when the scan sends a browser's name. */
+  userAgent: (browser: string) => `Tells the site it is ${browser}`,
+  /** The same line for a name the person typed. */
+  userAgentCustom: "Tells the site it is the browser you typed",
   /** A Pages to scan line during a Fast scan. */
   htmlOnly: "Page code (HTML) only, no browser",
   loginPrivacy: "Axcess uploads nothing. It deletes the sign-in cookie (session cookie) when the scan ends.",
@@ -362,6 +429,8 @@ export const RAIL_LABELS = {
   click_through: `Opens menus and pop-up windows (${CLICK_THROUGH})`,
   keyboard: CHECK_LABEL.keyboard,
   focus: CHECK_LABEL.focus,
+  markup: CHECK_LABEL.markup,
+  forms: CHECK_LABEL.forms,
   responsive: CHECK_LABEL.responsive,
   ocr: CHECK_LABEL.image,
   vision: "Vision model review",

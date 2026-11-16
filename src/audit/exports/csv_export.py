@@ -56,6 +56,11 @@ CSV_COLUMNS = (
     # reproduced from this file alone. Appended last so existing column
     # positions stay stable for saved spreadsheet templates.
     "revealed_by",
+    # The axe-core release whose rule produced an axe row (rule_id), so the
+    # row can be compared with another tool's report or a later scan. Blank
+    # for other checks and for reports made before Axcess recorded it.
+    # Appended last, like revealed_by, so column positions stay stable.
+    "axe_core_version",
 )
 
 
@@ -86,7 +91,9 @@ def render_csv(scan: ExportScan) -> str:
             )
 
     for af in scan.a11y_findings:
-        writer.writerow(_axe_row(af))
+        writer.writerow(
+            [*_axe_row(af), (scan.axe_core_version or "") if af.pipeline == "axe" else ""]
+        )
 
     return buf.getvalue()
 
@@ -125,6 +132,7 @@ def _image_row(
         "",
         "",
         "",
+        "",  # axe_core_version
     ]
 
 

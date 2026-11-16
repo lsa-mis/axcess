@@ -23,6 +23,7 @@ expect = playwright_async.expect
 
 _FORMATS = (
     "Issue types with fixes (Excel)",
+    "ITS technical review (Excel)",
     "Written report (Markdown)",
     "Fix brief for a coding agent (Markdown)",
     "Occurrence list (CSV)",
@@ -58,8 +59,12 @@ async def test_panel_says_what_each_download_delivers(
     # The seeded scan's expert review is unfinished.
     await expect(panel).to_contain_text("each file is marked DRAFT")
     await expect(panel).to_contain_text(
-        "Every file except the fix brief includes every issue type and every status "
-        "in this report, even if the table has filters on."
+        "Every file except the fix brief and the ITS technical review includes every "
+        "issue type and every status in this report, even if the table has filters on."
+    )
+    # The ITS technical review does not hold every issue either, and says so.
+    await expect(panel).to_contain_text(
+        "The ITS technical review lists only the elements checked as a problem to report."
     )
     # The fix brief is a sample of the report, and the panel says so beside
     # the note about the other files (PR #58 review).
@@ -96,6 +101,8 @@ async def test_arrow_keys_move_between_downloads(
     await expect(redact).to_be_focused()
     await page.keyboard.press("ArrowDown")
     await expect(link("Issue types with fixes (Excel)")).to_be_focused()
+    await page.keyboard.press("ArrowDown")
+    await expect(link("ITS technical review (Excel)")).to_be_focused()
     await page.keyboard.press("ArrowDown")
     await expect(link("Written report (Markdown)")).to_be_focused()
     await page.keyboard.press("ArrowDown")
@@ -220,7 +227,9 @@ async def test_fix_brief_downloads_redacted_for_a_coding_agent(
     await expect(brief).to_have_accessible_description(re.compile(r" about \d+(\.\d)? (B|KB|MB)$"))
     await expect(brief).to_have_attribute("href", re.compile(r"/export/brief\?draft=acknowledged$"))
 
-    for _ in range(3):
+    # Past the checkbox, the issue workbook and the ITS technical review,
+    # then the written report: the brief is the fourth stop.
+    for _ in range(4):
         await page.keyboard.press("ArrowDown")
     await expect(brief).to_be_focused()
     async with page.expect_download() as download_info:
@@ -293,6 +302,51 @@ async def test_copy_fix_brief_puts_its_markdown_on_the_clipboard(
     await page.keyboard.press("ArrowDown")
     csv = panel.get_by_role("link", name="Occurrence list (CSV)", exact=True)
     await expect(csv).to_be_focused()
+
+
+# Plain http on a network address: no clipboard API, no ClipboardItem. The
+# older copy command is wrapped so the test can read what it copied.
+_PLAIN_HTTP = """
+Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
+delete window.ClipboardItem;
+window.__copied = null;
+const realExec = document.execCommand.bind(document);
+document.execCommand = (command, ...rest) => {
+  if (command === "copy") {
+    const box = document.activeElement;
+    window.__copied = box && "value" in box ? box.value : null;
+    return true;
+  }
+  return realExec(command, ...rest);
+};
+"""
+
+
+async def test_copy_fix_brief_without_a_clipboard_api_keeps_the_menu_open(
+    live_server: tuple[str, int], new_page: Any
+) -> None:
+    """On plain http the fallback copy keeps focus, and the menu, where they were.
+
+    The hidden text box it copies from used to sit at the end of the page, so
+    focusing it closed the Export menu mid-copy and left keyboard focus on a
+    button that was no longer shown.
+    """
+    base, scan_id = live_server
+    page = await new_page()
+    await page.add_init_script(_PLAIN_HTTP)
+    await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+    await page.get_by_role("button", name="Export").click()
+    panel = page.get_by_role("group", name=f"Export Report #{scan_id}")
+    copy = panel.get_by_role("button", name="Copy fix brief", exact=True)
+    await copy.focus()
+    await page.keyboard.press("Enter")
+
+    done = "Copied the fix brief. Paste it into your coding agent."
+    await expect(page.get_by_role("status").filter(has_text="Copied")).to_have_text(done)
+    await expect(panel).to_be_visible()
+    await expect(copy).to_be_focused()
+    copied = await page.evaluate("window.__copied")
+    assert copied and f"# Fix brief for a coding agent: Report #{scan_id}" in copied
 
 
 async def test_a_refused_copy_is_reported_in_words(

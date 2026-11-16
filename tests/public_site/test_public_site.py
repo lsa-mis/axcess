@@ -154,6 +154,20 @@ def test_coverage_numbers_come_from_the_matrix(pages: dict[str, str]) -> None:
         assert f'id="sc-{c.sc.replace(".", "-")}"' in cov, c.sc
 
 
+def test_every_check_in_the_app_has_a_card(pages: dict[str, str]) -> None:
+    # The app's "What was checked" table links each row to
+    # coverage/#check-<key> (MethodCoverageLedger.tsx). The form error check
+    # shipped with no card, so its link landed nowhere.
+    source = (ROOT / "src" / "audit" / "web" / "server.py").read_text(encoding="utf-8")
+    body = source[source.index("def _methods_used(") :]
+    body = body[: body.index("\ndef ", 1)]
+    keys = re.findall(r'"key": "([a-z_]+)"', body)
+    assert "forms" in keys, keys
+    cov = pages["coverage/"]
+    missing = [k for k in keys if f'id="check-{k}"' not in cov]
+    assert not missing, missing
+
+
 def test_volume_is_unlisted(pages: dict[str, str]) -> None:
     assert '<meta name="robots" content="noindex"' in pages["volume/"]
     for route, html in pages.items():

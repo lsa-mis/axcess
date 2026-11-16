@@ -1,0 +1,38 @@
+{
+  "ollama": {
+    "version": "0.33.0",
+    "release_url": "https://github.com/ollama/ollama/releases/tag/v0.33.0",
+    "licence": "MIT",
+    "assets": {
+      "darwin-arm64": {"name": "ollama-darwin.tgz", "size": 154169325, "sha256": "63e05ad537bc02a9ee790345341ca1aff7803d289fdd4f5fda065190a2087124", "binary": "ollama"},
+      "darwin-x64": {"name": "ollama-darwin.tgz", "size": 154169325, "sha256": "63e05ad537bc02a9ee790345341ca1aff7803d289fdd4f5fda065190a2087124", "binary": "ollama"},
+      "linux-x64": {"name": "ollama-linux-amd64.tar.zst", "size": 1422232853, "sha256": "72c4b9d91c317742ffd11b92e0a7fbe6353072c6354d910f1a03fd3ce40403d4", "binary": "bin/ollama"},
+      "linux-arm64": {"name": "ollama-linux-arm64.tar.zst", "size": 1543385573, "sha256": "c09f5ae1fc90f70ac6e19e325bd958d9c8c02c29ec0908785c21672fab5f4ee4", "binary": "bin/ollama"},
+      "win32-x64": {"name": "ollama-windows-amd64.zip", "size": 1460309471, "sha256": "cb8f0eb7b84efd19222bf5dfa96dac2fe97f963e778c0d92082d4227cce338ee", "binary": "ollama.exe"},
+      "win32-arm64": {"name": "ollama-windows-arm64.zip", "size": 209964143, "sha256": "96bd9dd8dbf82f1076922f7b54f715fbae6bd3526e6609277cf8059500796f5c", "binary": "ollama.exe"}
+    }
+  },
+  "tiers": [
+    {
+      "id": "small",
+      "label": "Small",
+      "min_memory_gb": 8,
+      "text": {"tag": "qwen3:4b-instruct-2507-q4_K_M", "size": 2500000000, "licence": "Apache-2.0"},
+      "vision": {"tag": "qwen3-vl:2b-instruct", "size": 1890000000, "licence": "Apache-2.0"}
+    },
+    {
+      "id": "standard",
+      "label": "Standard",
+      "min_memory_gb": 16,
+      "text": {"tag": "qwen2.5-coder:7b-instruct", "size": 4680000000, "licence": "Apache-2.0"},
+      "vision": {"tag": "qwen3-vl:4b-instruct", "size": 3300000000, "licence": "Apache-2.0"}
+    },
+    {
+      "id": "large",
+      "label": "Large",
+      "min_memory_gb": 32,
+      "text": {"tag": "qwen2.5-coder:14b-instruct", "size": 8990000000, "licence": "Apache-2.0"},
+      "vision": {"tag": "qwen3-vl:8b-instruct", "size": 6140000000, "licence": "Apache-2.0"}
+    }
+  ]
+}

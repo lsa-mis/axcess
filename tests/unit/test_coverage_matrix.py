@@ -33,6 +33,8 @@ SHIPPED_PIPELINE_SCS = {
     "1.4.12": "responsive",
     "1.4.5": "image",
     "2.4.4": "semantic",
+    "3.3.2": "markup",
+    "1.3.1": "markup",
 }
 
 

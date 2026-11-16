@@ -237,17 +237,19 @@ def board_groups() -> str:
                     height=632)
 
     barrier = column(
-        "Mostly sure", "octagon", NAVY, "#FFFFFF", "A rule engine reported a failure.",
+        "Mostly sure", "octagon", NAVY, "#FFFFFF", "A fixed rule failed, or a form error was clear.",
         ["axe-core rule failures",
          "axe-core failures found after clicking menus, tabs, and dialogs, or after a "
          "configured search",
-         "Siteimprove Alfa rules that failed"],
+         "Siteimprove Alfa rules that failed",
+         "Clear form errors: marked in error, with no text that says what is wrong"],
         "Confirm on the page, fix, then rescan.",
     )
     review = column(
         "Not sure", "search", MAIZE, NAVY, "A possible problem a person must confirm.",
         ["Browser checks: reflow, zoom, text spacing, focus",
          "Keyboard trap check",
+         "Form errors that are unclear",
          "Motion checks",
          "Text in images whose alt text is missing or does not match",
          "AI checks: reading order, link purpose, headings, labels, transcripts",
@@ -264,8 +266,8 @@ def board_groups() -> str:
                grid_template_columns="repeat(3, 1fr)", gap=28, margin_top=26)
     footer = div(
         icon("user", 28, MAIZE)
-        + span("Only rule-engine failures are marked Mostly sure. Anything that needs "
-               "judgment waits for a person."),
+        + span("Only rule-engine failures and clear form errors are marked Mostly sure. "
+               "Anything that needs judgment waits for a person."),
         display="flex", align_items="center", gap=14, background=NAVY, color="#FFFFFF",
         font_size=22, font_weight=700, border_radius=14, padding="14px 26px", margin_top=18,
     )

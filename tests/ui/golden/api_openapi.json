@@ -602,7 +602,7 @@
     "/api/scans/{scan_id}/issue-counts": {
       "get": {
         "summary": "Api Scan Issue Counts",
-        "description": "One completed report's two issue counts, for the Reports list.\n\nFetched when a site's list of scans is opened, not with ``/api/sites``:\ncounting means building the issue list, and the site list is fetched\nevery few seconds while a scan runs.",
+        "description": "One report's two issue counts, for the Reports list.\n\nFetched when a site's list of scans is opened, not with ``/api/sites``:\ncounting means building the issue list, and the site list is fetched\nevery few seconds while a scan runs.",
         "operationId": "api_scan_issue_counts_api_scans__scan_id__issue_counts_get",
         "parameters": [
           {
@@ -1020,6 +1020,65 @@
         }
       }
     },
+    "/api/scans/{scan_id}/pages": {
+      "get": {
+        "summary": "Api Scan Pages",
+        "description": "Every page this report visited, one bounded page of rows at a time.",
+        "operationId": "api_scan_pages_api_scans__scan_id__pages_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "integer", "maximum": 200, "minimum": 1, "default": 50, "title": "Limit"}
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "integer", "minimum": 0, "default": 0, "title": "Offset"}
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "load_desc",
+                "load_asc",
+                "url_asc",
+                "url_desc",
+                "occurrences_desc",
+                "occurrences_asc",
+                "images_desc",
+                "images_asc",
+                "states_desc",
+                "states_asc"
+              ],
+              "type": "string",
+              "default": "load_desc",
+              "title": "Sort"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ScanPagesResponse"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
     "/api/scans/{scan_id}/pages/{page_id}": {
       "get": {
         "summary": "Api Page Evidence",
@@ -1041,6 +1100,225 @@
         ],
         "responses": {
           "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/pages/{page_id}/review": {
+      "put": {
+        "summary": "Api Save Occurrence Review",
+        "description": "Save a person's review of the occurrences on one element of this page.\n\nAny report can be reviewed, finished or not. A protected report is\nrefused: its ordinary tables keep only opaque aliases, and notes\nabout its pages would be the plaintext evidence they keep out.",
+        "operationId": "api_save_occurrence_review_api_scans__scan_id__pages__page_id__review_put",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "page_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Page Id"}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/OccurrenceReviewRequest"}}}
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {"schema": {"$ref": "#/components/schemas/OccurrenceReviewResponse"}}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/suggestions/status": {
+      "get": {
+        "summary": "Api Suggestion Status",
+        "description": "Whether AI fix suggestions can be used now, and why not if not.",
+        "operationId": "api_suggestion_status_api_suggestions_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {"schema": {"$ref": "#/components/schemas/SuggestionAvailability"}}
+            }
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/suggestions": {
+      "post": {
+        "summary": "Api Create Suggestion",
+        "description": "Queue an AI fix suggestion for one occurrence in this report.",
+        "operationId": "api_create_suggestion_api_scans__scan_id__suggestions_post",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuggestionCreate"}}}
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuggestionRecord"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/suggestions/{suggestion_id}": {
+      "get": {
+        "summary": "Api Get Suggestion",
+        "operationId": "api_get_suggestion_api_scans__scan_id__suggestions__suggestion_id__get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "suggestion_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Suggestion Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuggestionRecord"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/occurrences/{occurrence_kind}/{occurrence_id}/suggestion": {
+      "get": {
+        "summary": "Api Latest Suggestion",
+        "description": "The newest suggestion for one occurrence, or null if none yet.",
+        "operationId": "api_latest_suggestion_api_scans__scan_id__occurrences__occurrence_kind___occurrence_id__suggestion_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "occurrence_kind",
+            "in": "path",
+            "required": true,
+            "schema": {"enum": ["a11y", "image"], "type": "string", "title": "Occurrence Kind"}
+          },
+          {
+            "name": "occurrence_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Occurrence Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [{"$ref": "#/components/schemas/SuggestionRecord"}, {"type": "null"}],
+                  "title": "Response Api Latest Suggestion Api Scans  Scan Id  Occurrences  Occurrence Kind   Occurrence Id  Suggestion Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/suggestions/{suggestion_id}/cancel": {
+      "post": {
+        "summary": "Api Cancel Suggestion",
+        "operationId": "api_cancel_suggestion_api_scans__scan_id__suggestions__suggestion_id__cancel_post",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "suggestion_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Suggestion Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuggestionRecord"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/suggestions/{suggestion_id}/feedback": {
+      "post": {
+        "summary": "Api Suggestion Feedback",
+        "operationId": "api_suggestion_feedback_api_scans__scan_id__suggestions__suggestion_id__feedback_post",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "suggestion_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Suggestion Id"}
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/FeedbackUpdate"}}}
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/SuggestionRecord"}}}
+          },
           "422": {
             "description": "Validation Error",
             "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
@@ -1428,6 +1706,136 @@
         }
       }
     },
+    "/api/scans/{scan_id}/images": {
+      "get": {
+        "summary": "Api Scan Images",
+        "description": "One page of one group of the report's images, worst verdict first.",
+        "operationId": "api_scan_images_api_scans__scan_id__images_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "group",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "string", "default": "with_text", "title": "Group"}
+          },
+          {
+            "name": "verdict",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "string", "default": "", "title": "Verdict"}
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "string", "maxLength": 200, "default": "", "title": "Q"}
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "integer", "maximum": 50, "minimum": 1, "default": 25, "title": "Limit"}
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "integer", "maximum": 1000000, "minimum": 0, "default": 0, "title": "Offset"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/images/{image_id}": {
+      "get": {
+        "summary": "Api Scan Image",
+        "description": "One image of the report, and every page it appears on.",
+        "operationId": "api_scan_image_api_scans__scan_id__images__image_id__get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Image Id"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/images/{image_id}/alt-check": {
+      "post": {
+        "summary": "Api Check Image Alt",
+        "description": "Ask the local model about one image's alt text, keep and return its answer.\n\nA person's explicit request from the Images tab. Refused while the\nscan is still running, for a protected scan (its images do not leave\nthe protected store), and when no model is set. A timeout or an\nunusable answer saves nothing and says so; the tab keeps working.",
+        "operationId": "api_check_image_alt_api_scans__scan_id__images__image_id__alt_check_post",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Image Id"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/images/export.zip": {
+      "get": {
+        "summary": "Api Scan Images Zip",
+        "description": "The report's images in folders by group and verdict, with a sheet.\n\nA download a person asks for from the Images tab. Only for a completed,\nnon-protected report: a protected report's images stay in its store.\nBuilt in a temporary file, not in memory, because a report can hold\nthousands of images; the file is removed once it has been sent.",
+        "operationId": "api_scan_images_zip_api_scans__scan_id__images_export_zip_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
     "/api/findings/{finding_id}/status": {
       "post": {
         "summary": "Api Set Finding Status",
@@ -1574,7 +1982,18 @@
             "schema": {
               "anyOf": [
                 {
-                  "enum": ["axe", "alfa", "keyboard", "responsive", "focus", "visual", "semantic", "image"],
+                  "enum": [
+                    "axe",
+                    "alfa",
+                    "keyboard",
+                    "responsive",
+                    "focus",
+                    "visual",
+                    "forms",
+                    "markup",
+                    "semantic",
+                    "image"
+                  ],
                   "type": "string"
                 },
                 {"type": "null"}
@@ -1684,6 +2103,58 @@
         }
       }
     },
+    "/api/coverage/checks": {
+      "get": {
+        "summary": "Api Coverage Checks",
+        "description": "What Axcess checks for each WCAG criterion, built from its own code.\n\nDescribes Axcess, not a scan, so it holds no report data\n(audit/web/coverage_checks.py).",
+        "operationId": "api_coverage_checks_api_coverage_checks_get",
+        "parameters": [
+          {
+            "name": "version",
+            "in": "query",
+            "required": false,
+            "schema": {"enum": ["2.1", "2.2"], "type": "string", "default": "2.1", "title": "Version"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {"schema": {"$ref": "#/components/schemas/CoverageChecksResponse"}}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/coverage/found": {
+      "get": {
+        "summary": "Api Coverage Found",
+        "description": "What Axcess found, counted on request from this computer's completed reports.\n\nAcross the most recent completed reports, or one of them. Nothing is\nsent anywhere (audit/web/issue_share.py).",
+        "operationId": "api_coverage_found_api_coverage_found_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "query",
+            "required": false,
+            "schema": {"anyOf": [{"type": "integer", "minimum": 1}, {"type": "null"}], "title": "Scan Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/IssueShareResponse"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
     "/api/scans/{scan_id}/exports": {
       "get": {
         "summary": "Export Options",
@@ -1724,7 +2195,7 @@
     "/api/scans/{scan_id}/export/{fmt}": {
       "get": {
         "summary": "Export Scan",
-        "description": "Download a scan export as CSV / JSON / Jira CSV / Markdown / Audit / fix brief.",
+        "description": "Download a scan export: CSV, JSON, Jira CSV, Markdown, Audit, Excel or fix brief.",
         "operationId": "export_scan_api_scans__scan_id__export__fmt__get",
         "parameters": [
           {
@@ -1852,6 +2323,93 @@
         "title": "AgentHeartbeatRequest",
         "description": "Opaque lease presentation for a companion liveness heartbeat."
       },
+      "CheckCriterion": {
+        "properties": {
+          "sc": {"type": "string", "title": "Sc"},
+          "name": {"type": "string", "title": "Name"},
+          "understanding_url": {"type": "string", "title": "Understanding Url"},
+          "apg": {"items": {"$ref": "#/components/schemas/Guidance"}, "type": "array", "title": "Apg"},
+          "level": {"type": "string", "title": "Level"},
+          "principle": {"type": "string", "title": "Principle"},
+          "guideline": {"type": "string", "title": "Guideline"},
+          "method": {
+            "type": "string",
+            "enum": ["automated", "partial", "ai-assisted", "manual", "not_needed"],
+            "title": "Method"
+          },
+          "checks": {"items": {"type": "string"}, "type": "array", "title": "Checks"},
+          "rules": {"items": {"$ref": "#/components/schemas/RuleInfo"}, "type": "array", "title": "Rules"},
+          "confidence": {"type": "string", "title": "Confidence"},
+          "does": {"type": "string", "title": "Does"},
+          "you": {"type": "string", "title": "You"},
+          "technical": {"type": "string", "title": "Technical"},
+          "study": {"anyOf": [{"$ref": "#/components/schemas/StudyFigures"}, {"type": "null"}]}
+        },
+        "type": "object",
+        "required": [
+          "sc",
+          "name",
+          "understanding_url",
+          "apg",
+          "level",
+          "principle",
+          "guideline",
+          "method",
+          "checks",
+          "rules",
+          "confidence",
+          "does",
+          "you",
+          "technical",
+          "study"
+        ],
+        "title": "CheckCriterion"
+      },
+      "CheckedCodeOption": {
+        "properties": {
+          "kind": {"type": "string", "enum": ["minimal", "matches_pattern"], "title": "Kind"},
+          "label": {"type": "string", "maxLength": 60, "minLength": 1, "title": "Label"},
+          "after_html": {"type": "string", "maxLength": 4000, "minLength": 1, "title": "After Html"},
+          "css": {"anyOf": [{"type": "string", "maxLength": 4000}, {"type": "null"}], "title": "Css"},
+          "check_outcome": {
+            "type": "string",
+            "enum": ["passed", "still_fails", "not_checked"],
+            "title": "Check Outcome"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["kind", "label", "after_html", "check_outcome"],
+        "title": "CheckedCodeOption",
+        "description": "The server adds this result; the model is not allowed to supply it."
+      },
+      "CheckedDeveloperViewV2": {
+        "properties": {
+          "change_sentence": {"type": "string", "maxLength": 240, "minLength": 1, "title": "Change Sentence"},
+          "options": {
+            "items": {"$ref": "#/components/schemas/CheckedCodeOption"},
+            "type": "array",
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Options"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["change_sentence", "options"],
+        "title": "CheckedDeveloperViewV2"
+      },
+      "CommonProblem": {
+        "properties": {
+          "label": {"type": "string", "title": "Label"},
+          "share_of_sites": {"type": "number", "title": "Share Of Sites"},
+          "rule": {"type": "string", "title": "Rule"},
+          "sc": {"type": "string", "title": "Sc"}
+        },
+        "type": "object",
+        "required": ["label", "share_of_sites", "rule", "sc"],
+        "title": "CommonProblem"
+      },
       "ComparisonResponse": {
         "properties": {
           "current": {"$ref": "#/components/schemas/ReportIdentity"},
@@ -1909,7 +2467,18 @@
           "key": {"type": "string", "title": "Key"},
           "pipeline": {
             "type": "string",
-            "enum": ["axe", "alfa", "keyboard", "responsive", "focus", "visual", "semantic", "image"],
+            "enum": [
+              "axe",
+              "alfa",
+              "keyboard",
+              "responsive",
+              "focus",
+              "visual",
+              "forms",
+              "markup",
+              "semantic",
+              "image"
+            ],
             "title": "Pipeline"
           },
           "title": {"type": "string", "title": "Title"},
@@ -1942,6 +2511,44 @@
         ],
         "title": "ComparisonRow"
       },
+      "CoverageChecksResponse": {
+        "properties": {
+          "wcag_version": {"type": "string", "enum": ["2.1", "2.2"], "title": "Wcag Version"},
+          "scan_default_version": {"type": "string", "enum": ["2.1", "2.2"], "title": "Scan Default Version"},
+          "axe_version": {"type": "string", "title": "Axe Version"},
+          "criteria": {
+            "items": {"$ref": "#/components/schemas/CheckCriterion"},
+            "type": "array",
+            "title": "Criteria"
+          },
+          "study": {
+            "items": {"$ref": "#/components/schemas/StudyFigures"},
+            "type": "array",
+            "title": "Study"
+          },
+          "study_source_url": {"type": "string", "title": "Study Source Url"},
+          "other_checks_hit_rate": {"type": "number", "title": "Other Checks Hit Rate"},
+          "common_problems": {
+            "items": {"$ref": "#/components/schemas/CommonProblem"},
+            "type": "array",
+            "title": "Common Problems"
+          },
+          "common_source_url": {"type": "string", "title": "Common Source Url"}
+        },
+        "type": "object",
+        "required": [
+          "wcag_version",
+          "scan_default_version",
+          "axe_version",
+          "criteria",
+          "study",
+          "study_source_url",
+          "other_checks_hit_rate",
+          "common_problems",
+          "common_source_url"
+        ],
+        "title": "CoverageChecksResponse"
+      },
       "CoverageNote": {
         "properties": {
           "text": {"type": "string", "title": "Text"},
@@ -1957,7 +2564,18 @@
         "properties": {
           "pipeline": {
             "type": "string",
-            "enum": ["axe", "alfa", "keyboard", "responsive", "focus", "visual", "semantic", "image"],
+            "enum": [
+              "axe",
+              "alfa",
+              "keyboard",
+              "responsive",
+              "focus",
+              "visual",
+              "forms",
+              "markup",
+              "semantic",
+              "image"
+            ],
             "title": "Pipeline"
           },
           "before": {"$ref": "#/components/schemas/MethodCoverage"},
@@ -1966,6 +2584,26 @@
         "type": "object",
         "required": ["pipeline", "before", "after"],
         "title": "CoveragePair"
+      },
+      "CriterionCount": {
+        "properties": {"sc": {"type": "string", "title": "Sc"}, "count": {"type": "integer", "title": "Count"}},
+        "type": "object",
+        "required": ["sc", "count"],
+        "title": "CriterionCount"
+      },
+      "CriterionEstimate": {
+        "properties": {
+          "sc": {"type": "string", "title": "Sc"},
+          "deque_share": {"type": "number", "title": "Deque Share"},
+          "axe_rate": {"type": "number", "title": "Axe Rate"},
+          "axe_found": {"type": "integer", "title": "Axe Found"},
+          "found": {"type": "integer", "title": "Found"},
+          "estimated_total": {"type": "number", "title": "Estimated Total"},
+          "method": {"type": "string", "enum": ["axe_rate", "issue_share"], "title": "Method"}
+        },
+        "type": "object",
+        "required": ["sc", "deque_share", "axe_rate", "axe_found", "found", "estimated_total", "method"],
+        "title": "CriterionEstimate"
       },
       "CurrentLocalSignInResponse": {
         "properties": {
@@ -1981,6 +2619,65 @@
         "enum": ["internal", "sensitive", "restricted"],
         "title": "DataClassification",
         "description": "Minimal data labels for protected scan approval records."
+      },
+      "DeveloperView": {
+        "properties": {
+          "explanation": {"type": "string", "maxLength": 800, "minLength": 1, "title": "Explanation"},
+          "after_html": {
+            "anyOf": [{"type": "string", "maxLength": 4000}, {"type": "null"}],
+            "title": "After Html"
+          },
+          "css": {"anyOf": [{"type": "string", "maxLength": 4000}, {"type": "null"}], "title": "Css"}
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["explanation"],
+        "title": "DeveloperView"
+      },
+      "EditorView": {
+        "properties": {
+          "steps": {"items": {"type": "string"}, "type": "array", "maxItems": 6, "title": "Steps"},
+          "paste_text": {
+            "items": {"$ref": "#/components/schemas/PasteText"},
+            "type": "array",
+            "maxItems": 4,
+            "title": "Paste Text"
+          },
+          "needs_developer": {"type": "boolean", "title": "Needs Developer", "default": false}
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "EditorView"
+      },
+      "EstimateShare": {
+        "properties": {
+          "available": {"type": "boolean", "title": "Available"},
+          "axe_sample": {"type": "integer", "title": "Axe Sample"},
+          "min_sample": {"type": "integer", "title": "Min Sample"},
+          "found": {"type": "integer", "title": "Found"},
+          "estimated_total": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Estimated Total"},
+          "share": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Share"},
+          "criteria": {
+            "items": {"$ref": "#/components/schemas/CriterionEstimate"},
+            "type": "array",
+            "title": "Criteria"
+          },
+          "source_title": {"type": "string", "title": "Source Title"},
+          "source_url": {"type": "string", "title": "Source Url"}
+        },
+        "type": "object",
+        "required": [
+          "available",
+          "axe_sample",
+          "min_sample",
+          "found",
+          "estimated_total",
+          "share",
+          "criteria",
+          "source_title",
+          "source_url"
+        ],
+        "title": "EstimateShare"
       },
       "EvaluationUpdate": {
         "properties": {
@@ -2032,7 +2729,11 @@
       },
       "ExportFormatOption": {
         "properties": {
-          "format": {"type": "string", "enum": ["xlsx", "audit", "brief", "csv", "json"], "title": "Format"},
+          "format": {
+            "type": "string",
+            "enum": ["xlsx", "its", "audit", "brief", "csv", "json"],
+            "title": "Format"
+          },
           "filename": {"type": "string", "title": "Filename"},
           "size_bytes": {"type": "integer", "title": "Size Bytes"}
         },
@@ -2058,6 +2759,18 @@
         "title": "ExportOptions",
         "description": "The Export panel's facts for one report."
       },
+      "FeedbackUpdate": {
+        "properties": {
+          "feedback": {
+            "anyOf": [{"type": "string", "enum": ["helpful", "not_helpful"]}, {"type": "null"}],
+            "title": "Feedback"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["feedback"],
+        "title": "FeedbackUpdate"
+      },
       "GroupTotals": {
         "properties": {
           "groups": {"type": "integer", "title": "Groups"},
@@ -2067,6 +2780,12 @@
         "required": ["groups", "occurrences"],
         "title": "GroupTotals",
         "description": "A report's issue groups and occurrences, counted as the Issues table does."
+      },
+      "Guidance": {
+        "properties": {"title": {"type": "string", "title": "Title"}, "url": {"type": "string", "title": "Url"}},
+        "type": "object",
+        "required": ["title", "url"],
+        "title": "Guidance"
       },
       "HTTPValidationError": {
         "properties": {
@@ -2091,6 +2810,65 @@
         "required": ["id", "started_at", "finished_at", "groups", "occurrences"],
         "title": "HistoryPoint"
       },
+      "IssueShareResponse": {
+        "properties": {
+          "scan_id": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "Scan Id"},
+          "scans": {"items": {"$ref": "#/components/schemas/ScanOption"}, "type": "array", "title": "Scans"},
+          "scans_included": {"type": "integer", "title": "Scans Included"},
+          "scans_completed": {"type": "integer", "title": "Scans Completed"},
+          "layers": {"$ref": "#/components/schemas/LayerShare"},
+          "axe_rules": {
+            "items": {"$ref": "#/components/schemas/RuleCount"},
+            "type": "array",
+            "title": "Axe Rules"
+          },
+          "found_by_criterion": {
+            "items": {"$ref": "#/components/schemas/CriterionCount"},
+            "type": "array",
+            "title": "Found By Criterion"
+          },
+          "estimate": {"$ref": "#/components/schemas/EstimateShare"},
+          "manual_review": {"$ref": "#/components/schemas/ManualReviewShare"}
+        },
+        "type": "object",
+        "required": [
+          "scan_id",
+          "scans",
+          "scans_included",
+          "scans_completed",
+          "layers",
+          "axe_rules",
+          "found_by_criterion",
+          "estimate",
+          "manual_review"
+        ],
+        "title": "IssueShareResponse"
+      },
+      "LayerCount": {
+        "properties": {
+          "layer": {
+            "type": "string",
+            "enum": ["axe_loaded", "axe_click_through", "alfa", "probes", "image", "semantic"],
+            "title": "Layer"
+          },
+          "count": {"type": "integer", "title": "Count"},
+          "share": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Share"}
+        },
+        "type": "object",
+        "required": ["layer", "count", "share"],
+        "title": "LayerCount"
+      },
+      "LayerShare": {
+        "properties": {
+          "total": {"type": "integer", "title": "Total"},
+          "layers": {"items": {"$ref": "#/components/schemas/LayerCount"}, "type": "array", "title": "Layers"},
+          "excluded_not_a_problem": {"type": "integer", "title": "Excluded Not A Problem"},
+          "excluded_records": {"type": "integer", "title": "Excluded Records"}
+        },
+        "type": "object",
+        "required": ["total", "layers", "excluded_not_a_problem", "excluded_records"],
+        "title": "LayerShare"
+      },
       "LocalLoginScanRequest": {
         "properties": {
           "seed_url": {"type": "string", "maxLength": 2048, "minLength": 12, "title": "Seed Url"},
@@ -2104,16 +2882,31 @@
           "authorization_acknowledged": {"type": "boolean", "title": "Authorization Acknowledged"},
           "max_pages": {
             "type": "integer",
-            "maximum": 2500.0,
+            "maximum": 10000.0,
             "minimum": 1.0,
             "title": "Max Pages",
-            "default": 2500
+            "default": 10000
           },
+          "all_pages": {"type": "boolean", "title": "All Pages", "default": false},
           "max_depth": {"type": "integer", "maximum": 20.0, "minimum": 1.0, "title": "Max Depth", "default": 10},
           "rps": {"type": "number", "maximum": 5.0, "minimum": 0.1, "title": "Rps", "default": 1.0},
-          "workers": {"type": "integer", "maximum": 4.0, "minimum": 1.0, "title": "Workers", "default": 2},
+          "workers": {"type": "integer", "maximum": 8.0, "minimum": 1.0, "title": "Workers", "default": 4},
           "show_browser": {"type": "boolean", "title": "Show Browser", "default": false},
           "whole_host": {"type": "boolean", "title": "Whole Host", "default": false},
+          "include_subdomain": {"type": "boolean", "title": "Include Subdomain", "default": false},
+          "ignore_robots": {"type": "boolean", "title": "Ignore Robots", "default": true},
+          "static_only": {"type": "boolean", "title": "Static Only", "default": false},
+          "skip_focus": {"type": "boolean", "title": "Skip Focus", "default": false},
+          "skip_markup": {"type": "boolean", "title": "Skip Markup", "default": false},
+          "skip_semantic": {"type": "boolean", "title": "Skip Semantic", "default": true},
+          "skip_visual": {"type": "boolean", "title": "Skip Visual", "default": true},
+          "skip_forms": {"type": "boolean", "title": "Skip Forms", "default": true},
+          "send_empty_forms": {"type": "boolean", "title": "Send Empty Forms", "default": false},
+          "user_agent_choice": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "User Agent Choice"},
+          "user_agent": {
+            "anyOf": [{"type": "string", "maxLength": 1024}, {"type": "null"}],
+            "title": "User Agent"
+          },
           "scan_engine": {
             "type": "string",
             "enum": ["axe", "alfa", "both"],
@@ -2183,6 +2976,33 @@
         "required": ["note"],
         "title": "ManualEvidenceCreate"
       },
+      "ManualReviewScan": {
+        "properties": {
+          "scan_id": {"type": "integer", "title": "Scan Id"},
+          "seed_url": {"type": "string", "title": "Seed Url"},
+          "failed": {"type": "integer", "title": "Failed"},
+          "found": {"type": "integer", "title": "Found"}
+        },
+        "type": "object",
+        "required": ["scan_id", "seed_url", "failed", "found"],
+        "title": "ManualReviewScan"
+      },
+      "ManualReviewShare": {
+        "properties": {
+          "evaluations": {"type": "integer", "title": "Evaluations"},
+          "failed": {"type": "integer", "title": "Failed"},
+          "found": {"type": "integer", "title": "Found"},
+          "share": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Share"},
+          "scans": {
+            "items": {"$ref": "#/components/schemas/ManualReviewScan"},
+            "type": "array",
+            "title": "Scans"
+          }
+        },
+        "type": "object",
+        "required": ["evaluations", "failed", "found", "share", "scans"],
+        "title": "ManualReviewShare"
+      },
       "MethodCoverage": {
         "properties": {
           "state": {
@@ -2196,6 +3016,52 @@
         "type": "object",
         "required": ["state", "checked", "total"],
         "title": "MethodCoverage"
+      },
+      "OccurrenceReviewRequest": {
+        "properties": {
+          "a11y_finding_ids": {
+            "items": {"type": "integer"},
+            "type": "array",
+            "maxItems": 50,
+            "title": "A11Y Finding Ids"
+          },
+          "page_image_ids": {"items": {"type": "integer"}, "type": "array", "maxItems": 50, "title": "Page Image Ids"},
+          "decision": {
+            "anyOf": [{"type": "string", "enum": ["report", "repeat"]}, {"type": "null"}],
+            "title": "Decision"
+          },
+          "notes": {"anyOf": [{"type": "string", "maxLength": 2000}, {"type": "null"}], "title": "Notes"}
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["decision"],
+        "title": "OccurrenceReviewRequest",
+        "description": "A person's review of the occurrences on one circled element."
+      },
+      "OccurrenceReviewResponse": {
+        "properties": {
+          "decision": {
+            "anyOf": [{"type": "string", "enum": ["report", "repeat"]}, {"type": "null"}],
+            "title": "Decision"
+          },
+          "notes": {"type": "string", "title": "Notes"},
+          "updated_at": {"type": "string", "title": "Updated At"}
+        },
+        "type": "object",
+        "required": ["decision", "notes", "updated_at"],
+        "title": "OccurrenceReviewResponse",
+        "description": "The review as stored: notes are trimmed and redacted."
+      },
+      "PasteText": {
+        "properties": {
+          "label": {"type": "string", "maxLength": 60, "minLength": 1, "title": "Label"},
+          "value": {"type": "string", "maxLength": 800, "minLength": 1, "title": "Value"}
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["label", "value"],
+        "title": "PasteText",
+        "description": "Text an editor can paste into a CMS field, with the field's name."
       },
       "ProtectedEnvironment": {
         "type": "string",
@@ -2373,6 +3239,32 @@
         "required": ["id", "seed_url", "started_at"],
         "title": "ReportIdentity"
       },
+      "RuleCount": {
+        "properties": {
+          "rule_id": {"type": "string", "title": "Rule Id"},
+          "help": {"type": "string", "title": "Help"},
+          "category": {"type": "string", "title": "Category"},
+          "criteria": {"items": {"type": "string"}, "type": "array", "title": "Criteria"},
+          "loaded": {"type": "integer", "title": "Loaded"},
+          "click_through": {"type": "integer", "title": "Click Through"}
+        },
+        "type": "object",
+        "required": ["rule_id", "help", "category", "criteria", "loaded", "click_through"],
+        "title": "RuleCount",
+        "description": "One axe-core rule's counted occurrences, split by page state."
+      },
+      "RuleInfo": {
+        "properties": {
+          "id": {"type": "string", "title": "Id"},
+          "help": {"type": "string", "title": "Help"},
+          "description": {"type": "string", "title": "Description"},
+          "url": {"type": "string", "title": "Url"}
+        },
+        "type": "object",
+        "required": ["id", "help", "description", "url"],
+        "title": "RuleInfo",
+        "description": "One axe-core rule a scan runs for a criterion."
+      },
       "ScanFormSettings": {
         "properties": {
           "url": {"type": "string", "title": "Url"},
@@ -2395,10 +3287,15 @@
           "skip_responsive": {"type": "boolean", "title": "Skip Responsive"},
           "skip_semantic": {"type": "boolean", "title": "Skip Semantic"},
           "skip_focus": {"type": "boolean", "title": "Skip Focus"},
+          "skip_markup": {"type": "boolean", "title": "Skip Markup", "default": false},
           "skip_visual": {"type": "boolean", "title": "Skip Visual"},
+          "skip_forms": {"type": "boolean", "title": "Skip Forms", "default": true},
+          "send_empty_forms": {"type": "boolean", "title": "Send Empty Forms", "default": false},
           "skip_rendered_storage": {"type": "boolean", "title": "Skip Rendered Storage"},
           "axe_level": {"type": "string", "enum": ["A", "AA", "AAA"], "title": "Axe Level"},
-          "wcag_version": {"type": "string", "enum": ["2.1", "2.2"], "title": "Wcag Version"}
+          "wcag_version": {"type": "string", "enum": ["2.1", "2.2"], "title": "Wcag Version"},
+          "user_agent_choice": {"type": "string", "title": "User Agent Choice", "default": "axcess"},
+          "user_agent": {"type": "string", "title": "User Agent", "default": ""}
         },
         "additionalProperties": false,
         "type": "object",
@@ -2428,6 +3325,85 @@
         ],
         "title": "ScanFormSettings",
         "description": "The New scan form's fields (``NewScanPayload`` in the SPA)."
+      },
+      "ScanOption": {
+        "properties": {
+          "id": {"type": "integer", "title": "Id"},
+          "seed_url": {"type": "string", "title": "Seed Url"},
+          "finished_at": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Finished At"}
+        },
+        "type": "object",
+        "required": ["id", "seed_url", "finished_at"],
+        "title": "ScanOption"
+      },
+      "ScanPageRow": {
+        "properties": {
+          "page_id": {"type": "integer", "title": "Page Id"},
+          "url": {"type": "string", "title": "Url"},
+          "title": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Title"},
+          "status_code": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "Status Code"},
+          "load_result": {
+            "type": "string",
+            "enum": ["loaded", "error_status", "not_loaded"],
+            "title": "Load Result"
+          },
+          "occurrence_count": {"type": "integer", "title": "Occurrence Count"},
+          "image_count": {"type": "integer", "title": "Image Count"},
+          "page_state_count": {"type": "integer", "title": "Page State Count"}
+        },
+        "type": "object",
+        "required": [
+          "page_id",
+          "url",
+          "title",
+          "status_code",
+          "load_result",
+          "occurrence_count",
+          "image_count",
+          "page_state_count"
+        ],
+        "title": "ScanPageRow",
+        "description": "One page the scan visited."
+      },
+      "ScanPagesResponse": {
+        "properties": {
+          "scan_id": {"type": "integer", "title": "Scan Id"},
+          "total": {"type": "integer", "title": "Total"},
+          "not_loaded_count": {"type": "integer", "title": "Not Loaded Count"},
+          "error_status_count": {"type": "integer", "title": "Error Status Count"},
+          "limit": {"type": "integer", "title": "Limit"},
+          "offset": {"type": "integer", "title": "Offset"},
+          "sort": {
+            "type": "string",
+            "enum": [
+              "load_desc",
+              "load_asc",
+              "url_asc",
+              "url_desc",
+              "occurrences_desc",
+              "occurrences_asc",
+              "images_desc",
+              "images_asc",
+              "states_desc",
+              "states_asc"
+            ],
+            "title": "Sort"
+          },
+          "pages": {"items": {"$ref": "#/components/schemas/ScanPageRow"}, "type": "array", "title": "Pages"}
+        },
+        "type": "object",
+        "required": [
+          "scan_id",
+          "total",
+          "not_loaded_count",
+          "error_status_count",
+          "limit",
+          "offset",
+          "sort",
+          "pages"
+        ],
+        "title": "ScanPagesResponse",
+        "description": "One page of a report's visited pages, with the report-wide totals."
       },
       "SearchConfig": {
         "properties": {
@@ -2513,7 +3489,7 @@
         "type": "object",
         "required": ["site_url", "total", "scans"],
         "title": "SiteHistory",
-        "description": "Completed public reports of one site, oldest first, for the trend."
+        "description": "Public reports of one site, oldest first, for the trend."
       },
       "Snapshot": {
         "properties": {
@@ -2538,6 +3514,159 @@
         "type": "object",
         "required": ["occurrences", "issue_occurrences", "pages", "statuses", "outcomes", "issues", "evidence"],
         "title": "Snapshot"
+      },
+      "StudyFigures": {
+        "properties": {
+          "sc": {"type": "string", "title": "Sc"},
+          "share": {"type": "number", "title": "Share"},
+          "rule_check": {"type": "number", "title": "Rule Check"},
+          "other_checks": {"type": "number", "title": "Other Checks"},
+          "checks": {
+            "items": {
+              "type": "string",
+              "enum": ["click_through", "image", "focus", "keyboard", "visual", "semantic", "responsive"]
+            },
+            "type": "array",
+            "title": "Checks"
+          }
+        },
+        "type": "object",
+        "required": ["sc", "share", "rule_check", "other_checks", "checks"],
+        "title": "StudyFigures",
+        "description": "One study row as shares of all problems (4.1.1 left out), each 0-1."
+      },
+      "SuggestionAvailability": {
+        "properties": {
+          "enabled": {"type": "boolean", "title": "Enabled"},
+          "reason": {
+            "type": "string",
+            "enum": ["ready", "turned_off", "database_update_needed", "model_unavailable", "model_missing"],
+            "title": "Reason"
+          },
+          "text_model": {"type": "string", "title": "Text Model"},
+          "vision_model": {"type": "string", "title": "Vision Model"},
+          "missing_models": {"items": {"type": "string"}, "type": "array", "title": "Missing Models"},
+          "queue_length": {"type": "integer", "title": "Queue Length", "default": 0},
+          "scan_running": {"type": "boolean", "title": "Scan Running", "default": false}
+        },
+        "type": "object",
+        "required": ["enabled", "reason", "text_model", "vision_model"],
+        "title": "SuggestionAvailability",
+        "description": "Whether the feature can be used, and why not."
+      },
+      "SuggestionCreate": {
+        "properties": {
+          "occurrence_kind": {"type": "string", "enum": ["a11y", "image"], "title": "Occurrence Kind"},
+          "occurrence_id": {"type": "integer", "minimum": 1.0, "title": "Occurrence Id"}
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["occurrence_kind", "occurrence_id"],
+        "title": "SuggestionCreate"
+      },
+      "SuggestionRecord": {
+        "properties": {
+          "id": {"type": "integer", "title": "Id"},
+          "scan_id": {"type": "integer", "title": "Scan Id"},
+          "page_id": {"type": "integer", "title": "Page Id"},
+          "occurrence_kind": {"type": "string", "enum": ["a11y", "image"], "title": "Occurrence Kind"},
+          "occurrence_id": {"type": "integer", "title": "Occurrence Id"},
+          "status": {
+            "type": "string",
+            "enum": ["queued", "running", "ready", "failed", "cancelled"],
+            "title": "Status"
+          },
+          "audience_default": {"type": "string", "enum": ["developer", "editor"], "title": "Audience Default"},
+          "text_model": {"type": "string", "title": "Text Model"},
+          "vision_model": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Vision Model"},
+          "result": {"anyOf": [{"$ref": "#/components/schemas/SuggestionResult"}, {"type": "null"}]},
+          "check_outcome": {
+            "anyOf": [{"type": "string", "enum": ["passed", "still_fails", "not_checked"]}, {"type": "null"}],
+            "title": "Check Outcome"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "model_unavailable",
+                  "model_missing",
+                  "model_not_local",
+                  "timeout",
+                  "bad_answer",
+                  "no_change",
+                  "restarted",
+                  "occurrence_gone",
+                  "internal"
+                ]
+              },
+              {"type": "null"}
+            ],
+            "title": "Error Code"
+          },
+          "error_detail": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Error Detail"},
+          "feedback": {
+            "anyOf": [{"type": "string", "enum": ["helpful", "not_helpful"]}, {"type": "null"}],
+            "title": "Feedback"
+          },
+          "created_at": {"type": "string", "title": "Created At"},
+          "finished_at": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Finished At"},
+          "queue_position": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "Queue Position"}
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "scan_id",
+          "page_id",
+          "occurrence_kind",
+          "occurrence_id",
+          "status",
+          "audience_default",
+          "text_model",
+          "vision_model",
+          "result",
+          "check_outcome",
+          "error_code",
+          "error_detail",
+          "feedback",
+          "created_at",
+          "finished_at"
+        ],
+        "title": "SuggestionRecord",
+        "description": "One suggestion as the browser sees it."
+      },
+      "SuggestionResult": {
+        "properties": {
+          "version": {"type": "integer", "enum": [1, 2], "title": "Version", "default": 1},
+          "summary": {"type": "string", "title": "Summary"},
+          "developer": {
+            "anyOf": [
+              {"$ref": "#/components/schemas/DeveloperView"},
+              {"$ref": "#/components/schemas/CheckedDeveloperViewV2"}
+            ],
+            "title": "Developer"
+          },
+          "editor": {"$ref": "#/components/schemas/EditorView"},
+          "before_html": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Before Html"},
+          "confidence": {"type": "string", "enum": ["likely", "guess"], "title": "Confidence"},
+          "needs_manual_check": {"type": "boolean", "title": "Needs Manual Check"},
+          "manual_check_reason": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Manual Check Reason"},
+          "check_rule_id": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Check Rule Id"},
+          "help_url": {"anyOf": [{"type": "string", "maxLength": 2000}, {"type": "null"}], "title": "Help Url"}
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "summary",
+          "developer",
+          "editor",
+          "before_html",
+          "confidence",
+          "needs_manual_check",
+          "manual_check_reason"
+        ],
+        "title": "SuggestionResult",
+        "description": "What Axcess stores: the model's answer plus facts Axcess adds itself.\n\n``before_html`` comes from the stored evidence, never from the model, so\nthe \"before\" side of the comparison is always what the scan saw.\n``confidence`` is set by Axcess from the kind of check, not by the model."
       },
       "ValidationError": {
         "properties": {

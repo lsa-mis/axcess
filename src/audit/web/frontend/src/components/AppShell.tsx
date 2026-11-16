@@ -2,6 +2,7 @@ import { Link, useLocation, useNavigate } from "react-router";
 import {
   Info,
   LayoutDashboard,
+  ListChecks,
   Menu,
   MessageSquarePlus,
   PanelLeftClose,
@@ -25,6 +26,7 @@ import { useSwipeNavigation } from "../hooks/useSwipeNavigation";
 import { setPreference, usePreferences } from "../hooks/usePreferences";
 import PreferenceEffects from "./PreferenceEffects";
 import ShortcutsDialog from "./ShortcutsDialog";
+import { OPENS_NEW_WINDOW } from "../lib/terms";
 
 /**
  * One sidebar entry. ``isActive`` decides whether the item should render
@@ -410,7 +412,7 @@ function FeedbackAction({ collapsed }: { collapsed: boolean }) {
       href={FEEDBACK_FORM_URL}
       target="_blank"
       rel="noopener noreferrer"
-      title="Give feedback (opens in a new tab)"
+      title={`Give feedback (${OPENS_NEW_WINDOW})`}
       className={cn(SIDEBAR_ROW, SIDEBAR_ROW_IDLE, collapsed ? "justify-center px-2" : "px-3")}
     >
       <MessageSquarePlus className="h-5 w-5 shrink-0" aria-hidden />
@@ -427,7 +429,7 @@ function FeedbackAction({ collapsed }: { collapsed: boolean }) {
 }
 
 /**
- * About and Settings are places, but reference ones: they sit at the foot of
+ * Coverage, About and Settings are places, but reference ones: they sit at the foot of
  * the sidebar with feedback rather than among the working sections, so the
  * nav above stays the places the work happens.
  *
@@ -439,6 +441,10 @@ function FeedbackAction({ collapsed }: { collapsed: boolean }) {
  * fixed foot group gives.
  */
 const FOOT_PLACES = [
+  // Coverage is a reference place too: what Axcess can check and what it has
+  // found, not a place where a report is worked on. One entry serves both of
+  // its parts (routes/Coverage.tsx); it is current on either of them.
+  { to: "/coverage", label: "Coverage", name: "Coverage", icon: ListChecks },
   { to: "/about", label: "About", name: "About Axcess", icon: Info },
   { to: "/settings", label: "Settings", name: "Settings", icon: Settings },
 ] as const;
@@ -600,7 +606,7 @@ function Sidebar({
       <div className={cn("space-y-1 border-t border-border py-3", collapsed ? "px-2" : "px-3")}>
         <FeedbackAction collapsed={collapsed} />
         {FOOT_PLACES.map((place) => (
-          <FootLink key={place.to} place={place} collapsed={collapsed} active={pathname === place.to} />
+          <FootLink key={place.to} place={place} collapsed={collapsed} active={pathname === place.to || pathname.startsWith(`${place.to}/`)} />
         ))}
       </div>
     </aside>
@@ -804,7 +810,7 @@ function MobileNav({ pathname, onSearch }: { pathname: string; onSearch: () => v
       <div className="mt-3 space-y-1 border-t border-border pt-3">
         <FeedbackAction collapsed={false} />
         {FOOT_PLACES.map((place) => (
-          <FootLink key={place.to} place={place} collapsed={false} active={pathname === place.to} />
+          <FootLink key={place.to} place={place} collapsed={false} active={pathname === place.to || pathname.startsWith(`${place.to}/`)} />
         ))}
       </div>
     </div>
@@ -826,23 +832,31 @@ function routeTitle(pathname: string): string {
     ],
     [/^\/scans\/\d+\/pages\/\d+\/inspect\/?$/, "Page inspector"],
     [/^\/scans\/\d+\/pages\/\d+\/?$/, "Page details"],
+    [/^\/scans\/\d+\/pages\/?$/, "Pages visited"],
     [/^\/scans\/\d+\/issues\/[^/]+\/pages\/\d+\/screenshots\/?$/, "Issue screenshots"],
     [/^\/scans\/\d+\/issues\/[^/]+\/pages\/?$/, "Pages with this issue type"],
     [/^\/scans\/\d+\/issues\/[^/]+\/?$/, "Issue evidence"],
     [/^\/scans\/\d+\/issues\/?$/, "Accessibility issues"],
+    [/^\/scans\/\d+\/images\/?$/, "Images and alt text"],
     [/^\/scans\/\d+\/findings\/grouped\/?$/, "Images, grouped by issue type"],
     [/^\/scans\/\d+\/findings\/?$/, "Images"],
     [/^\/scans\/\d+\/a11y\/by-rule\/?$/, "Rule check issues by rule"],
     [/^\/scans\/\d+\/a11y\/?$/, "Rule check issues by WCAG criterion"],
     [/^\/scans\/\d+\/compare\/?$/, "Compare reports"],
     [/^\/scans\/\d+\/compare\/changes\/?$/, "What changed"],
-    // Only running and failed scans render here; a completed report
-    // redirects to its issue table.
+    // Only running scans and scans that saved no page render here; a scan
+    // with saved pages redirects to its issue table, however it ended.
     [/^\/scans\/\d+\/?$/, "Scan status"],
     [/^\/findings\/\d+\/?$/, "Image details"],
     [/^\/tracking\/?$/, "Product roadmap"],
+    [/^\/coverage\/?$/, "What Axcess checks"],
+    [/^\/coverage\/found\/?$/, "What Axcess found"],
     [/^\/about\/?$/, "About"],
     [/^\/settings\/?$/, "Settings"],
+    [/^\/settings\/ai\/?$/, "AI features"],
+    // Match the welcome heading so route announcements use the same words
+    // (WCAG 2.2 SC 3.2.4 Consistent Identification, Level AA).
+    [/^\/welcome\/ai\/?$/, "Choose whether to use AI features"],
   ];
   for (const [pattern, title] of routes) {
     if (pattern.test(pathname)) return title;

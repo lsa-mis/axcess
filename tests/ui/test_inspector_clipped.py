@@ -17,7 +17,14 @@ from typing import Any
 
 import pytest
 
-from ._inspector_case import BOX_RECT, fact, open_inspector, rect_of, seed, settled
+from ._inspector_case import (
+    BOX_RECT,
+    box_note,
+    open_inspector,
+    rect_of,
+    seed,
+    settled,
+)
 
 pytestmark = [pytest.mark.ui, pytest.mark.asyncio(loop_scope="module")]
 
@@ -81,8 +88,8 @@ async def test_the_box_covers_only_what_a_clipping_part_shows(
         await playwright_async.expect(box).to_have_text("1 of 3")
 
         # The third slide: hidden by the carousel, so no box.
-        await playwright_async.expect(fact(page, "Where the box is")).to_have_text(
-            "No box. The part of the page around it hides it (overflow: hidden)."
+        await playwright_async.expect(box_note(page)).to_contain_text(
+            "Where the box is: No box. The part of the page around it hides it (overflow: hidden)."
         )
         await settled(page)
         assert await page.evaluate(f"({BOX_RECT})()") is None
@@ -92,7 +99,8 @@ async def test_the_box_covers_only_what_a_clipping_part_shows(
         await playwright_async.expect(box).to_have_text("2 of 3")
         await settled(page)
         assert await page.evaluate(_box_within(rect_of("#bar"), rect_of("#cut")))
-        await playwright_async.expect(fact(page, "Where the box is")).to_have_text(
+        await playwright_async.expect(box_note(page)).to_contain_text(
+            "Where the box is: "
             "Around the part that shows. The part of the page around it hides the rest "
             "(overflow: hidden)."
         )
@@ -102,6 +110,6 @@ async def test_the_box_covers_only_what_a_clipping_part_shows(
         await playwright_async.expect(box).to_have_text("3 of 3")
         await settled(page)
         assert await page.evaluate(_box_within(rect_of("#drop"), rect_of("#drop")))
-        await playwright_async.expect(fact(page, "Where the box is")).to_have_count(0)
+        await playwright_async.expect(box_note(page)).not_to_contain_text("Where the box is")
     finally:
         await page.context.close()

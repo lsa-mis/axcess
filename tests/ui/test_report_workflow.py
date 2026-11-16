@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, quote, urlparse
 import pytest
 
 from ._seed_evidence import SCREENSHOT_ISSUE_KEY, add_screenshot_finding
+from .conftest import ALL_HOW_SURE
 from .test_accessibility_axe import _render_violations, _run_axe
 
 # One browser per module (tests/ui/conftest.py), so the tests run on the
@@ -45,11 +46,12 @@ async def test_report_links_and_review_lanes(
     async def issues(route: Any) -> None:
         query = parse_qs(urlparse(route.request.url).query)
         needle = query.get("q", [""])[0].lower()
-        lane = query.get("review_lane", [""])[0]
+        # Comma-separated, as the page sends several checked values.
+        lanes = {lane for lane in query.get("review_lane", [""])[0].split(",") if lane}
         shown = [
             row
             for row in rows
-            if needle in row["title"].lower() and (not lane or row["review_lane"] == lane)
+            if needle in row["title"].lower() and (not lanes or row["review_lane"] in lanes)
         ]
         await asyncio.sleep(0.05)
         await route.fulfill(json={**payload, "rows": shown})
@@ -72,8 +74,22 @@ async def test_report_links_and_review_lanes(
     await page.keyboard.press("Enter")
     await page.wait_for_url("**/app/scans")
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
-    # Every issue group is a row of one table, whatever lane it is in.
     issues = page.get_by_role("table", name="Accessibility issue types")
+    # The table opens on every issue type (2026-11-13). What Not sure and For
+    # information mean opens from the "?" beside the How sure header
+    # (2026-11-16), not from a note over the rows.
+    await playwright_async.expect(
+        issues.get_by_role("rowheader").get_by_role("link", name="Named control failure")
+    ).to_be_visible()
+    await playwright_async.expect(issues.locator("tbody tr")).to_have_count(3)
+    await playwright_async.expect(page.get_by_role("note", name="Issue types shown")).to_have_count(
+        0
+    )
+    await playwright_async.expect(
+        issues.get_by_role("button", name="What does \u201cHow sure\u201d mean?", exact=True)
+    ).to_be_visible()
+    assert await page.evaluate("document.body.scrollWidth <= innerWidth")
+    # Every issue group is a row of one table, whatever lane it is in.
     # Scoped to the row header: the count link in the same row also
     # names the issue, because a link's purpose has to be clear from
     # its own name (SC 2.4.9).
@@ -503,15 +519,19 @@ async def test_finding_anchor_waits_for_scan_metadata(
     )
     await page.goto(f"{base}/app/scans/{scan_id}/pages/1#finding-77", wait_until="networkidle")
     await playwright_async.expect(page.locator("#finding-77")).to_be_focused()
-    # The finding's evidence says what is missing and where the element is.
-    # (These checks rode on the old Verify changes link to this page; Compare
-    # scans links to the issue instead, so they live here now.)
+    # The finding's evidence says what is missing, and shows the element's
+    # code where its locator used to be. This Alfa record saved no code, so
+    # it says so, and its locator-based description ("Text in the first
+    # paragraph") is gone with the locators (2026-11-10, ElementCode in
+    # components/ui.tsx). (These checks rode on the old Verify changes link
+    # to this page; Compare scans links to the issue instead.)
     await playwright_async.expect(
         page.get_by_text("Some details are missing.", exact=True)
     ).to_be_visible()
     await playwright_async.expect(
-        page.get_by_text("Text in the first paragraph", exact=False)
+        page.get_by_text("No element code was saved for this occurrence.", exact=True)
     ).to_be_visible()
+    await playwright_async.expect(page.get_by_text("Text in the first paragraph")).to_have_count(0)
     violations = await _run_axe(page)
     assert not violations, _render_violations(violations)
 
@@ -528,7 +548,8 @@ async def test_issue_filters_announce_results_and_keep_large_targets(
     """
     base, scan_id = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
-    await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+    # Every "How sure" value shown: the logo row is For information.
+    await page.goto(f"{base}/app/scans/{scan_id}/issues?{ALL_HOW_SURE}", wait_until="networkidle")
     # The sort line is a status region of its own; this one reports
     # how many groups the filters left.
     status = page.get_by_role("status").filter(has_text=re.compile(r"issue types? shown"))
@@ -559,11 +580,14 @@ async def test_issue_table_recommended_order_is_lane_first_and_headers_sort_flat
     """
     base, scan_id = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
-    await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+    # Every "How sure" value is checked here, because the order under test
+    # runs across all four. That is a filter, so the status line says
+    # "filtered".
+    await page.goto(f"{base}/app/scans/{scan_id}/issues?{ALL_HOW_SURE}", wait_until="networkidle")
     issues = page.get_by_role("table", name="Accessibility issue types")
     group_headers = issues.locator("tbody th[scope='rowgroup']")
     back = page.get_by_role("button", name="Back to recommended order")
-    lane_order = ["Mostly sure", "Not sure", "For information"]
+    lane_order = ["Mostly sure", "Measured", "Not sure", "For information"]
 
     async def assert_recommended() -> None:
         # Said to a screen reader, but no visible line over the table in the
@@ -587,7 +611,10 @@ async def test_issue_table_recommended_order_is_lane_first_and_headers_sort_flat
         await playwright_async.expect(
             page.get_by_role("status").filter(has_text=re.compile(r"issue types? shown"))
         ).to_have_text(
-            re.compile(r"issue types shown: Mostly sure \d+, Not sure \d+, For information \d+$")
+            re.compile(
+                r"issue types shown, filtered: Mostly sure \d+, Measured \d+, "
+                r"Not sure \d+, For information \d+$"
+            )
         )
         sorted_headers = issues.locator("thead th[aria-sort]:not([aria-sort='none'])")
         await playwright_async.expect(sorted_headers).to_have_count(0)
@@ -595,10 +622,11 @@ async def test_issue_table_recommended_order_is_lane_first_and_headers_sort_flat
     await assert_recommended()
     # A link saved before the change named the lane-first order this way.
     await page.goto(
-        f"{base}/app/scans/{scan_id}/issues?sort=priority_desc", wait_until="networkidle"
+        f"{base}/app/scans/{scan_id}/issues?sort=priority_desc&{ALL_HOW_SURE}",
+        wait_until="networkidle",
     )
     await assert_recommended()
-    await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+    await page.goto(f"{base}/app/scans/{scan_id}/issues?{ALL_HOW_SURE}", wait_until="networkidle")
 
     priority = issues.get_by_role("columnheader", name="Priority")
     await priority.get_by_role("button").click()
@@ -623,7 +651,7 @@ async def test_issue_table_recommended_order_is_lane_first_and_headers_sort_flat
             await page.wait_for_url("**sort=score_asc*")
 
     await back.click()
-    await page.wait_for_url(re.compile(r"/issues$"))
+    await page.wait_for_url(re.compile(r"/issues\?type=[^&]+$"))
     await assert_recommended()
     # The pressed button is gone; focus lands on the table it reordered.
     await playwright_async.expect(page.get_by_role("region", name="Issues table")).to_be_focused()
@@ -673,7 +701,7 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
         ]
     ]
     counts = {"wcag": 2, "click_through": 2, "alt_text": 2}
-    lanes = {"likely_barrier": 3, "expert_review": 1, "informational": 1}
+    lanes = {"likely_barrier": 3, "measured": 0, "expert_review": 1, "informational": 1}
 
     async def issues(route: Any) -> None:
         wanted = parse_qs(urlparse(route.request.url).query).get("finding_type", [""])[0]
@@ -689,10 +717,18 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
         )
 
     await page.route(f"**/api/scans/{scan_id}/issues*", issues)
-    await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+    # Every "How sure" value shown, to read rows of each kind.
+    await page.goto(f"{base}/app/scans/{scan_id}/issues?{ALL_HOW_SURE}", wait_until="networkidle")
     table = page.get_by_role("table", name="Accessibility issue types")
-    headers = await table.locator("thead th").all_inner_texts()
+    # Each header's sort button: How sure's header also holds a "?" (HelpTip),
+    # checked below.
+    headers = await table.locator("thead th button:not([popovertarget])").all_inner_texts()
     names = [re.sub(r"\s+", " ", text).strip() for text in headers]
+    await playwright_async.expect(
+        table.locator("thead th")
+        .nth(1)
+        .get_by_role("button", name="What does \u201cHow sure\u201d mean?")
+    ).to_have_count(1)
     # The Finding type column reads "Where it shows" ("finding" is not an interface word).
     # Check, beside it, names the check that found the row. How sure,
     # Priority and Issue occurrences come right after the name (the
@@ -761,7 +797,8 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
     # The glossary's terms, not the summary line's, which are terms too.
     definitions = page.get_by_role("term").filter(
         has_text=re.compile(
-            r"^(Mostly sure|Not sure|For information|At page load|After clicking|In an image)$"
+            r"^(Mostly sure|Measured|Not sure|For information"
+            r"|At page load|After clicking|In an image)$"
         )
     )
     await playwright_async.expect(definitions.first).to_be_hidden()
@@ -770,6 +807,7 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
     await playwright_async.expect(definitions).to_have_text(
         [
             "Mostly sure",
+            "Measured",
             "Not sure",
             "For information",
             "At page load",
@@ -799,6 +837,7 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
     meanings = page.get_by_role("definition")
     for meaning in (
         "A rule check (axe or Alfa) failed.",
+        "The browser measured this on the page. No AI was used.",
         "A person must decide whether it is a real problem",
         "This is not a problem to fix.",
     ):
@@ -863,14 +902,23 @@ async def test_pager_arrows_are_named_and_look_unavailable_at_either_end(
     page = await new_page(viewport={"width": 1280, "height": 900})
     payload = await (await page.request.get(f"{base}/api/scans/{scan_id}/issues")).json()
     template = payload["rows"][0]
-    rows = [{**template, "issue_key": f"k{n}", "title": f"Issue {n:02d}"} for n in range(12)]
+    # Mostly sure, so every row shows when the table opens.
+    rows = [
+        {
+            **template,
+            "issue_key": f"k{n}",
+            "title": f"Issue {n:02d}",
+            "review_lane": "likely_barrier",
+        }
+        for n in range(12)
+    ]
 
     async def issues(route: Any) -> None:
         await route.fulfill(json={**payload, "rows": rows, "total_unfiltered": len(rows)})
 
     await page.route(f"**/api/scans/{scan_id}/issues*", issues)
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
-    pager = page.get_by_role("navigation", name="Issues: page controls")
+    pager = page.get_by_role("navigation", name="Issues: page controls", exact=True)
     previous = pager.get_by_role("button", name="Previous page of issues", exact=True)
     next_page = pager.get_by_role("button", name="Next page of issues", exact=True)
 
@@ -900,6 +948,58 @@ async def test_pager_arrows_are_named_and_look_unavailable_at_either_end(
     assert "page=2" in page.url
     assert float((await look(next_page))["opacity"]) < 1
     assert float((await look(previous))["opacity"]) == 1
+    violations = await _run_axe(page)
+    assert not violations, _render_violations(violations)
+
+
+async def test_pager_under_the_table_turns_the_page_and_returns_focus_to_the_top(
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """A reader at the last row turns the page there, and lands at the new rows.
+
+    The pager is drawn again under the table (TablePagination, ``place="end"``)
+    with its own landmark name and no second live region, so the new range
+    is announced once. A page turn from it moves focus to the pager over the
+    table, so the reader is not left below rows they have not read.
+    """
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 600})
+    payload = await (await page.request.get(f"{base}/api/scans/{scan_id}/issues")).json()
+    template = payload["rows"][0]
+    rows = [{**template, "issue_key": f"k{n}", "title": f"Issue {n:02d}"} for n in range(12)]
+
+    async def issues(route: Any) -> None:
+        await route.fulfill(json={**payload, "rows": rows, "total_unfiltered": len(rows)})
+
+    await page.route(f"**/api/scans/{scan_id}/issues*", issues)
+    await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+    top = page.get_by_role("navigation", name="Issues: page controls", exact=True)
+    end = page.get_by_role("navigation", name="Issues: page controls under the table", exact=True)
+    region = page.get_by_role("region", name="Issues table")
+    await playwright_async.expect(end).to_have_count(1)
+
+    # Under the last row, and saying the same range in words.
+    region_box, end_box = await region.bounding_box(), await end.bounding_box()
+    assert region_box and end_box and end_box["y"] >= region_box["y"] + region_box["height"] - 1
+    await playwright_async.expect(top.get_by_role("status")).to_have_count(1)
+    await playwright_async.expect(end.get_by_role("status")).to_have_count(0)
+    await playwright_async.expect(end).to_contain_text(
+        "Showing 1\u201310 of 12 issue types · Page 1 of 2"
+    )
+
+    end_next = end.get_by_role("button", name="Next page of issues", exact=True)
+    await end_next.focus()
+    await page.keyboard.press("Enter")
+    await page.wait_for_url("**page=2*")
+    await playwright_async.expect(top).to_be_focused()
+    await playwright_async.expect(top.get_by_role("status")).to_have_text(
+        "Showing 11\u201312 of 12 issue types · Page 2 of 2"
+    )
+    top_box = await top.bounding_box()
+    # In view, below the 72 px sticky top bar (SC 2.4.11).
+    assert top_box and 72 <= top_box["y"] < 600, top_box
+    await playwright_async.expect(end).to_contain_text("Page 2 of 2")
     violations = await _run_axe(page)
     assert not violations, _render_violations(violations)
 
@@ -967,7 +1067,7 @@ async def test_report_breadcrumb_ends_at_the_report_on_its_views(
         _assert_current_is_plain_text(items)
     # The tabs are the report's two views; Overview is gone.
     tabs = page.get_by_role("navigation", name="Report views").get_by_role("link")
-    await playwright_async.expect(tabs).to_have_text(["Issues", "Compare reports"])
+    await playwright_async.expect(tabs).to_have_text(["Issues", "Images", "Compare reports"])
 
 
 async def test_issue_evidence_trail_names_the_issue(
@@ -1086,7 +1186,11 @@ async def test_report_crumb_returns_to_the_searched_list(
     response = await page.request.get(f"{base}/api/scans/{scan_id}/issues")
     row = (await response.json())["rows"][0]
     query = row["title"].split()[0]
-    await page.goto(f"{base}/app/scans/{scan_id}/issues?q={quote(query)}", wait_until="networkidle")
+    # Every "How sure" value shown: the seeded rows are held back otherwise.
+    await page.goto(
+        f"{base}/app/scans/{scan_id}/issues?q={quote(query)}&{ALL_HOW_SURE}",
+        wait_until="networkidle",
+    )
     table = page.get_by_role("table", name="Accessibility issue types")
     await table.get_by_role("rowheader").get_by_role("link", name=row["title"]).first.click()
     await page.wait_for_url(re.compile(rf"/app/scans/{scan_id}/issues/[^?]+\?"))
@@ -1095,7 +1199,10 @@ async def test_report_crumb_returns_to_the_searched_list(
     await playwright_async.expect(back).to_be_visible()
     await back.click()
     await page.wait_for_url(re.compile(rf"/app/scans/{scan_id}/issues\?q="))
-    assert parse_qs(urlparse(page.url).query)["q"] == [query]
+    returned = parse_qs(urlparse(page.url).query)
+    assert returned["q"] == [query]
+    # The "How sure" choice survives the round trip too.
+    assert returned["type"] == [ALL_HOW_SURE.removeprefix("type=")]
 
 
 async def test_first_report_has_no_compare_tab(live_server: tuple[str, int], new_page: Any) -> None:
@@ -1109,15 +1216,15 @@ async def test_first_report_has_no_compare_tab(live_server: tuple[str, int], new
     await playwright_async.expect(
         page.get_by_role("heading", name="Issues", exact=True, level=1)
     ).to_be_visible()
-    await playwright_async.expect(
-        page.get_by_role("navigation", name="Report views")
-    ).to_have_count(0)
+    # Its views without Compare reports: Issues and Images (2026-11-13).
+    first_tabs = page.get_by_role("navigation", name="Report views").get_by_role("link")
+    await playwright_async.expect(first_tabs).to_have_text(["Issues", "Images"])
     await page.goto(f"{base}/app/scans/{scan_id}/compare", wait_until="networkidle")
     await playwright_async.expect(
         page.get_by_role("heading", name="Nothing to compare with yet")
     ).to_be_visible()
     tabs = page.get_by_role("navigation", name="Report views").get_by_role("link")
-    await playwright_async.expect(tabs).to_have_text(["Issues", "Compare reports"])
+    await playwright_async.expect(tabs).to_have_text(["Issues", "Images", "Compare reports"])
 
 
 async def test_report_opens_keyboard_only_in_reading_order(
@@ -1133,6 +1240,18 @@ async def test_report_opens_keyboard_only_in_reading_order(
         conn.execute(
             "INSERT INTO scans(seed_url,status,started_at,config_json) "
             "VALUES('http://example.com/','completed','2000-01-01 00:00:00','{}')"
+        )
+        # One rule-check failure (Mostly sure), so the table has a row when it
+        # opens; the seeded image groups are held back behind the note.
+        page_id = conn.execute(
+            "SELECT id FROM pages WHERE scan_id = ? LIMIT 1", (seeded_db[2],)
+        ).fetchone()[0]
+        conn.execute(
+            "INSERT INTO page_a11y_findings (page_id, scan_id, rule_id, wcag_sc, wcag_level, "
+            "impact, help, target_selector, html_snippet, target_hash, status) "
+            "VALUES (?, ?, 'button-name', '4.1.2', 'A', 'critical', "
+            "'Buttons must have discernible text', '#b', '<button></button>', 'h-kbd', 'new')",
+            (page_id, seeded_db[2]),
         )
     base, scan_id = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
@@ -1610,7 +1729,8 @@ async def test_issues_never_shows_the_recommended_order_sentence(
         page.get_by_text(re.compile(r"^\d+ of \d+ shown$"))
     ).to_be_visible()
     await playwright_async.expect(visible_sentence).to_have_count(0)
-    await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+    # Every "How sure" value shown, so the table has rows and headers to sort.
+    await page.goto(f"{base}/app/scans/{scan_id}/issues?{ALL_HOW_SURE}", wait_until="networkidle")
     table = page.get_by_role("table", name="Accessibility issue types")
     await table.get_by_role("columnheader", name="Priority").get_by_role("button").click()
     await playwright_async.expect(
@@ -1629,7 +1749,7 @@ async def test_every_table_has_lines_between_its_columns(
     base, scan_id = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
     for path, name in (
-        (f"/app/scans/{scan_id}/issues", "Accessibility issue types"),
+        (f"/app/scans/{scan_id}/issues?{ALL_HOW_SURE}", "Accessibility issue types"),
         ("/app/scans", "Public reports by site"),
     ):
         await page.goto(f"{base}{path}", wait_until="networkidle")
@@ -1642,3 +1762,44 @@ async def test_every_table_has_lines_between_its_columns(
         assert len(shadows) > 2, shadows
         # Every cell but the last draws its line on its right.
         assert all("inset" in shadow for shadow in shadows[:-1]), (path, shadows)
+
+
+async def test_issue_page_says_how_many_occurrences_were_found_after_clicking(
+    live_server: tuple[str, int], new_page: Any
+) -> None:
+    """The Issue occurrences tile splits the count: "1 at page load, 7 after clicking".
+
+    WAVE checks a page with its menus closed, so an issue type Click-Through
+    found mostly in opened menus reads higher in Axcess. The split says why.
+    The table keeps its tags without counts (the developer's choice,
+    2026-11-10). With nothing found after clicking, no split shows.
+    """
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    row = (await (await page.request.get(f"{base}/api/scans/{scan_id}/issues")).json())["rows"][0]
+    key = quote(row["issue_key"], safe="")
+    detail = await (await page.request.get(f"{base}/api/scans/{scan_id}/issues/{key}")).json()
+    tile = page.locator("dl > div").filter(
+        has=page.locator("dt", has_text=re.compile(r"^Issue occurrences$"))
+    )
+
+    async def show(after_clicking: int) -> str:
+        body = {
+            **detail,
+            "row": {
+                **detail["row"],
+                "occurrence_count": 8,
+                "click_through_occurrence_count": after_clicking,
+            },
+        }
+
+        async def fulfil(route: Any) -> None:
+            await route.fulfill(json=body)
+
+        await page.unroute("**/api/scans/*/issues/**")
+        await page.route(f"**/api/scans/{scan_id}/issues/{key}*", fulfil)
+        await page.goto(f"{base}/app/scans/{scan_id}/issues/{key}", wait_until="networkidle")
+        return re.sub(r"\s+", " ", await tile.inner_text()).strip()
+
+    assert "1 at page load, 7 after clicking" in await show(7)
+    assert "after clicking" not in await show(0)

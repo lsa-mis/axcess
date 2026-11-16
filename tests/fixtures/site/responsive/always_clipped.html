@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Text cut off at every size fixture (not a resize or spacing failure)</title>
+  <style>
+    /* Visible text that is cut off the same way at every window size and
+       with or without WCAG's text spacing: a fixed 200px box, and a fixed
+       20px-high box around a line 40px tall.
+
+       It is a real fault in the page, but zooming does not cause it and
+       neither does text spacing, so it is not evidence for SC 1.4.4 Resize
+       Text or SC 1.4.12 Text Spacing. Both checks compare the test
+       condition with the normal one and must stay quiet here. The old
+       single reading reported these boxes under both rules. */
+    body { margin: 0; font-family: sans-serif; }
+    main { padding: 1rem; max-width: 100%; }
+    #fixed-box {
+      width: 200px; white-space: nowrap; overflow: hidden;
+      font-size: 16px; background: #f5f5f5;
+    }
+    #short-box {
+      width: 200px; height: 20px; line-height: 40px; overflow: hidden;
+      white-space: nowrap; font-size: 16px; background: #f5f5f5;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Cut off at every size</h1>
+    <p id="fixed-box">This single nowrap line is about four hundred pixels wide in total.</p>
+    <p id="short-box">Tall line</p>
+  </main>
+</body>
+</html>

@@ -23,6 +23,13 @@ import { ariaSort, nextSort, sortChip, type Sort, type SortKind } from "./sort";
  *   TableRegion    the keyboard-scrollable region
  *     Table, TableHead, SortHeader / ColumnHeader
  *     Row, RowHeader, Cell    striped rows, one target tall
+ *   TableFoot      the pager again, under the last row (../TablePagination,
+ *                  `place="end"`), so a reader who has read to the end
+ *                  turns the page there
+ *
+ * A paged table wraps everything from TableBar down in `PagedTable`
+ * (../TablePagination), which draws the pager in TableBar and in TableFoot
+ * as one pair, so no table can have one without the other.
  *
  * Tables compose these rather than restyling a <table>, so a change to the
  * design lands everywhere at once.
@@ -59,6 +66,28 @@ export function TableBar({
         {pager}
       </div>
       {footer}
+    </div>
+  );
+}
+
+/**
+ * The bar under a table's last row, styled like `TableBar` above it, with
+ * the pager on the right where it sits in the top bar. It holds only the
+ * end-of-table pager (`TablePagination` with `place="end"` draws it, and
+ * `PagedTable` draws that with the top pager), so it is there exactly when
+ * the top pager is: on a table with more than one page. Search and
+ * filters stay in the top bar only; they change what the table holds,
+ * which a reader decides before reading it, not after.
+ */
+export function TableFoot({ children }: { children: ReactNode }) {
+  return (
+    <div
+      className={cn(
+        "flex flex-wrap items-center justify-end border-t border-border bg-surface-subtle px-4 py-3",
+        CARD_EDGE,
+      )}
+    >
+      {children}
     </div>
   );
 }
@@ -363,6 +392,7 @@ export function SortHeader<K extends string>({
   chip,
   wrap = "chip",
   hint,
+  help,
   className,
   children,
   ...th
@@ -380,6 +410,14 @@ export function SortHeader<K extends string>({
    * reader and shows on focus in the "Always" hints setting.
    */
   hint?: string;
+  /**
+   * A ``HelpTip`` ("?") after the sort button, for a column whose values
+   * need explaining (Issues' "How sure"). Beside the button, not inside it:
+   * one control sorts and the other explains, so neither does two things.
+   * Bottom-aligned with the label, so the header's last line stays level
+   * with its neighbours'.
+   */
+  help?: ReactNode;
   className?: string;
   /** The header's label. Defaults to the column key. */
   children?: ReactNode;
@@ -419,6 +457,19 @@ export function SortHeader<K extends string>({
       )}
       {...th}
     >
+      {help ? (
+        <span className="inline-flex items-end justify-center">
+          {sortButton()}
+          {help}
+        </span>
+      ) : (
+        sortButton()
+      )}
+    </th>
+  );
+
+  function sortButton() {
+    return (
       <button
         type="button"
         title={hint}
@@ -455,8 +506,8 @@ export function SortHeader<K extends string>({
           </>
         )}
       </button>
-    </th>
-  );
+    );
+  }
 }
 
 /**

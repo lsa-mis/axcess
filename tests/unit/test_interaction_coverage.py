@@ -225,3 +225,46 @@ def test_interaction_ledger_is_scan_scoped_and_replaces_a_reprobed_page(
     tmp_db.executescript(migration.with_suffix(".rollback.sql").read_text())
     tmp_db.executescript(migration.with_suffix(".sql").read_text())
     assert tmp_db.execute("SELECT COUNT(*) FROM scan_interaction_runs").fetchone()[0] == 0
+
+
+def _forms_row(**scan: object) -> dict[str, object]:
+    """The form error check's row of "What was checked" for one scan."""
+    config = {"form_error_checks_enabled": scan.pop("selected", True)}
+    version = scan.pop("version", 1)
+    if version is not None:
+        config["form_check_coverage_version"] = version
+    row = {"status": "completed", "page_count": 2, "config_json": json.dumps(config), **scan}
+    methods = _methods_used(
+        row, {"rendered_pages": 2, "analyzed_images": 0, "discovered_images": 0}
+    )
+    return next(item for item in methods if item["key"] == "forms")
+
+
+def test_the_form_error_check_row_says_what_it_did_in_counts() -> None:
+    """Pages checked, then forms pressed, not pressed and not judged (migration 0036)."""
+    method = _forms_row(
+        forms_pages_checked=2, forms_pressed=3, forms_skipped=1, forms_not_checked=1
+    )
+    assert method["label"] == "Form error check"
+    assert method["state"] == "checked"
+    assert method["result"] == (
+        "2 pages checked; 3 forms pressed; "
+        "1 form not pressed, such as sign-in, payment or search forms; "
+        "1 form tried to send itself, so Axcess could not judge it"
+    )
+    assert "a person confirms each result" in str(method["caveat"])
+
+
+def test_the_form_error_check_row_off_unknown_and_empty() -> None:
+    assert _forms_row(selected=False)["state"] == "not_selected"
+    # A scan from before the counts were kept: its zero is not a count.
+    assert _forms_row(version=None)["state"] == "coverage_unknown"
+    # A scan that kept counts and checked no page says so.
+    assert _forms_row()["state"] == "not_run"
+    # One of two pages checked, every form skipped: still said in words.
+    method = _forms_row(forms_pages_checked=1, forms_skipped=2)
+    assert method["state"] == "partial"
+    assert method["result"] == (
+        "1 of 2 pages checked; 0 forms pressed; "
+        "2 forms not pressed, such as sign-in, payment or search forms"
+    )

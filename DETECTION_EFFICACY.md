@@ -47,6 +47,60 @@ efficacy claim requires a held-out, representative corpus labeled independently
 by at least two accessibility experts, with adjudication, inter-rater agreement,
 per-rule denominators, abstentions, and confidence intervals.
 
+### Form error check (WCAG 3.3.1)
+
+The form error check presses each form's submit control in a real browser, so
+it is measured on its own, not in the bundled corpus.
+
+**Its metric is the labelled real-page set** (`tests/real_pages/`, run on
+request with `make real-pages`, since it visits outside sites; AGENTS.md,
+"real pages first"). Each form judged in a full scan with the
+public-website defaults, labelled from an outside source or from a person's
+look at the screenshots. On 2026-11-05: 37 scored forms on 22 pages, 9 that
+fail SC 3.3.1 and 28 that do not; all 9 failed and none of the 28 did
+(precision 100%, recall 100%), with 2 more listed as disputed. Small and not
+independent: most of these pages were used to find and fix the check's
+gaps, labelled by the developer's agent, not by experts, and with 9
+failures the false-discovery rate could still be as high as 28% (95%
+upper bound). It measures what the check does on real forms; it is not a
+validation.
+
+Second, as regression tests only, on pages we wrote:
+`tests/integration/test_form_error_identification.py` runs the check on 146
+labelled synthetic pages served over HTTP (`form_error_cases.py`, and the
+independent batch in `form_error_cases_independent.py`). Its gates, in the
+check's own order of priority:
+
+| Gate | Rule |
+| --- | --- |
+| Safety | No form the check must skip (sign-in, payment, search, destructive, CAPTCHA) is ever pressed. Absolute. |
+| Corpus size | At least 20 positive and 5 negative scored cases. |
+| Efficacy | False-discovery rate below 5%, then recall of at least 80%. |
+
+On the current code, on these pages we wrote ourselves: precision 100% (no
+false positives) and recall 96.2%, over 52 positive and 90 negative scored
+cases.
+Four of them (`r01` to `r04`) are cut-down copies of real pages the check
+first got wrong. Most of these cases were written or
+tuned while the check was built; only the independent batch, scored before
+any change it led to, is an honest estimate (24 cases: precision 100%, recall
+80%). Like the bundled corpus these are regression evidence on synthetic pages,
+not a real-world accuracy estimate. The check is on by default for public
+scans (the developer's decision, 2026-11-02, after the safety review) but not
+yet validated on real forms labelled by experts. By the developer's
+decision (2026-11-05), a clear failure is Mostly sure and one with an
+undecided sign Not sure (`docs/internal/form-error-check.md`).
+On 54 real public pages, checked by hand on 2026-11-04 against screenshots
+(not by an expert), the check gave 41 verdicts and none was found wrong.
+Three were true failures: both Accessible University "before" pages (a
+general "Your form has errors" message that names no field) and one
+Foundation Abide example (labels turn red, no text). On 12 more pages that
+an outside source says fail 3.3.1, it failed all 4 it could press, passed
+the fixed version, and skipped the rest by its safety rules (payment and
+password forms) or because nothing could be pressed. Seven failures are
+still too few to measure recall on real forms.
+The detection-evals workflow runs it in its own job, with a browser.
+
 The efficiency and scale gates exercise the durable local evidence path:
 SQLite writes followed by the same unified issue projection used by the report
 UI. They do not yet measure network crawling, browser rendering, OCR latency, or
@@ -67,7 +121,9 @@ efficiency, scale, or integrity gate fails.
 
 The dedicated GitHub Actions workflow runs on relevant pull requests, pushes to
 `main`, weekly schedules, and manual dispatches. It publishes both reports as a
-workflow artifact and adds the Markdown report to the job summary.
+workflow artifact and adds the Markdown report to the job summary. A second
+job installs Chromium and runs the form error check's measurement
+(`uv run pytest tests/integration/test_form_error_identification.py`).
 
 Thresholds and workload sizes live in
 `tests/quality/detection_eval_config.json`. Changes to a threshold, workload,

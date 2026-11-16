@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Short-lived message fixture (nothing left to compare)</title>
+  <style>
+    /* A message that is on the page for a moment and then taken away, as a
+       status message is about a second after a filter button is pressed.
+
+       #passing-message is cut off at the 640px zoom viewport (55vw box,
+       like zoom_clipped.html), and the script below removes it as soon as
+       the window is wide again. The check compares the same element at the
+       normal viewport; with the element gone there is nothing to compare,
+       so it must report nothing and must not fail. */
+    body { margin: 0; font-family: sans-serif; }
+    main { padding: 1rem; max-width: 100%; }
+    #passing-message {
+      width: 55vw; white-space: nowrap; overflow: hidden;
+      font-size: 16px; background: #f5f5f5;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>A message that does not stay</h1>
+    <p id="passing-message">This single nowrap line is about four hundred pixels wide in total.</p>
+  </main>
+  <script>
+    let wasNarrow = false;
+    window.addEventListener('resize', () => {
+      if (window.innerWidth <= 700) { wasNarrow = true; return; }
+      if (wasNarrow) {
+        const message = document.getElementById('passing-message');
+        if (message) message.remove();
+      }
+    });
+  </script>
+</body>
+</html>

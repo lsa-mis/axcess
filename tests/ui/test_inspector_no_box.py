@@ -17,7 +17,16 @@ from typing import Any
 
 import pytest
 
-from ._inspector_case import BOX_RECT, DOC, fact, open_inspector, rect_of, seed, settled
+from ._inspector_case import (
+    BOX_RECT,
+    DOC,
+    box_note,
+    element_status,
+    open_inspector,
+    rect_of,
+    seed,
+    settled,
+)
 
 pytestmark = [pytest.mark.ui, pytest.mark.asyncio(loop_scope="module")]
 
@@ -99,8 +108,8 @@ async def test_the_box_goes_on_what_shows_for_an_element_without_a_box(
         await page.wait_for_function(_around(_BUTTONS))
         await settled(page)
         assert await page.evaluate(_around(_BUTTONS))
-        await playwright_async.expect(fact(page, "Where the box is")).to_have_text(
-            "Around what it holds. It has no box of its own (display: contents)."
+        await playwright_async.expect(box_note(page)).to_contain_text(
+            "Where the box is: Around what it holds. It has no box of its own (display: contents)."
         )
 
         # An option: on its list box.
@@ -109,13 +118,13 @@ async def test_the_box_goes_on_what_shows_for_an_element_without_a_box(
         await page.wait_for_function(_around(rect_of("#pick")))
         await settled(page)
         assert await page.evaluate(_around(rect_of("#pick")))
-        await playwright_async.expect(fact(page, "What it is")).to_have_text("<option> element")
-        await playwright_async.expect(fact(page, "Where the box is")).to_have_text(
-            "On its list box. An option has no box of its own."
+        await playwright_async.expect(element_status(page)).to_contain_text("<option> element")
+        await playwright_async.expect(box_note(page)).to_contain_text(
+            "Where the box is: On its list box. An option has no box of its own."
         )
-        # The size is the option's own; the row above says where the box is,
-        # so the "no visible size" hint does not contradict it.
-        await playwright_async.expect(fact(page, "Size")).not_to_contain_text("marks where it sits")
+        # Nothing on screen contradicts where the box is (the "no visible
+        # size" hint went with the facts table).
+        await playwright_async.expect(page.get_by_text("marks where it sits")).to_have_count(0)
 
         # An image map area: on the part of its image it covers, the left
         # 120 by 120 pixels of a 240 by 120 image.
@@ -124,7 +133,8 @@ async def test_the_box_goes_on_what_shows_for_an_element_without_a_box(
         await page.wait_for_function(_around(_AREA))
         await settled(page)
         assert await page.evaluate(_around(_AREA))
-        await playwright_async.expect(fact(page, "Where the box is")).to_have_text(
+        await playwright_async.expect(box_note(page)).to_contain_text(
+            "Where the box is: "
             "On the part of its image it covers. An area of an image map (<area>) has no "
             "box of its own."
         )

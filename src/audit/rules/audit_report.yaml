@@ -126,9 +126,9 @@ axe_rules:
       The rule check (axe) measured the contrast between the text color and
       its background color, and it is too low. Normal text needs a ratio of at
       least 4.5:1, and large text needs 3:1. Large text is at least 18pt
-      (24px), or at least 14pt (about 18.7px) and bold. The rule check does
-      not report text it cannot measure, such as text over an image or a
-      gradient.
+      (24px), or at least 14pt (about 18.7px) and bold. Text it cannot
+      measure, such as text over an image or a gradient, is not counted as a
+      failure here. It is listed separately as Not sure, for a person to check.
     why_matters: >-
       People with low vision or color blindness may not be able to read text
       that is too close in color to its background. Glare from bright sunlight
@@ -254,11 +254,11 @@ axe_rules:
         watch_out: >-
           The id must exist and be unique on the page. If two elements share
           the id, the link can get the wrong name.
+    screen_reader_check: links
     verify_manual: >-
-      Turn on a screen reader and open its list of links (VoiceOver:
-      Control+Option+U, then choose Links; NVDA: Insert+F7). Every link should
-      have a name that says where it goes. Then press Tab to each fixed link
-      and listen to what the screen reader says.
+      Open the list of links with a screen reader (steps for Mac and Windows
+      are below). Every link should have a name that says where it goes. Then
+      press Tab to each fixed link and listen to what the screen reader says.
     verify_automated: "Scan again and see if this link is still found."
     acceptance: >-
       Every link on the affected pages has a name a screen reader can read,
@@ -412,9 +412,6 @@ axe_rules:
 
   tabindex:
     title: "A tabindex above 0 changes the Tab order"
-    wcag_sc: "2.4.3"
-    wcag_name: "Focus Order"
-    wcag_level: "A"
     abilities_affected: [vision, motor, cognition]
     what_happening: >-
       The rule check (axe) flags every element with a <code>tabindex</code>
@@ -687,12 +684,11 @@ axe_rules:
           Prefer the native elements. A role on the wrong container, such as
           one that wraps both the menu and the content, misleads more than no
           role at all.
+    screen_reader_check: landmarks
     verify_manual: >-
-      Open the landmark list in a screen reader (VoiceOver on Mac:
-      Control+Option+U, then choose Landmarks; NVDA on Windows: Insert+F7,
-      then choose Landmarks). Every part of the page you can see should belong
-      to one of the listed regions. In NVDA you can also press D to jump from
-      landmark to landmark.
+      Open the list of landmarks with a screen reader (steps for Mac and
+      Windows are below). Every part of the page you can see should belong to
+      one of the listed landmarks.
     verify_automated: >-
       Scan again and see if content outside a landmark is still found on this
       page.
@@ -754,10 +750,10 @@ axe_rules:
           the page still fails. Moving a view off screen with CSS hides it
           only from sight, not from screen readers. Check what the browser
           passes to screen readers (accessibility tree), not just the screen.
+    screen_reader_check: landmarks
     verify_manual: >-
-      Open the landmark list in a screen reader (VoiceOver on Mac:
-      Control+Option+U, then choose Landmarks; NVDA on Windows: Insert+F7,
-      then choose Landmarks). There should be exactly one main region, and it
+      Open the list of landmarks with a screen reader (steps for Mac and
+      Windows are below). There should be exactly one main landmark, and it
       should hold the page's own content.
     verify_automated: "Scan again and see if this page is still found."
     acceptance: >-
@@ -820,10 +816,10 @@ axe_rules:
           Heading tags bring their own margins and font sizes, which can
           override your component library's spacing. Check the layout after
           the change.
+    screen_reader_check: headings
     verify_manual: >-
-      Open the heading list in a screen reader (VoiceOver on Mac:
-      Control+Option+U, then choose Headings; NVDA on Windows: Insert+F7, then
-      choose Headings). There should be one level 1 heading that names the
+      Open the list of headings with a screen reader (steps for Mac and
+      Windows are below). There should be one level 1 heading that names the
       page, and the levels below it should step down without gaps. Everything
       that looks like a heading should be in the list.
     verify_automated: "Scan again and see if this page is still found."
@@ -834,9 +830,6 @@ axe_rules:
 
   heading-order:
     title: "Heading levels skip a step"
-    wcag_sc: "1.3.1"
-    wcag_name: "Info and Relationships"
-    wcag_level: "A"
     abilities_affected: [vision, cognition, motor]
     what_happening: >-
       The rule check (axe) reads the page's headings in order, including those
@@ -900,11 +893,11 @@ axe_rules:
           Levels show how sections nest, not how big the text is. Pick the
           level the structure needs, then change the look with CSS. Do not
           pick a level for its font size.
+    screen_reader_check: headings
     verify_manual: >-
-      Open the heading list in a screen reader (VoiceOver on Mac:
-      Control+Option+U, then choose Headings; NVDA on Windows: Insert+F7, then
-      choose Headings). The list should read like a table of contents, with no
-      level skipped on the way down.
+      Open the list of headings with a screen reader (steps for Mac and
+      Windows are below). The list should read like a table of contents, with
+      no level skipped on the way down.
     verify_automated: "Scan again and see if this heading is still found."
     acceptance: >-
       Every heading on the affected pages is at most one level deeper than the
@@ -4015,11 +4008,11 @@ axe_rules:
           Equivalent means the same key content. Two "Contact us" links that
           lead to pages with different contact details still need different
           names.
+    screen_reader_check: links
     verify_manual: >-
-      Open the list of links in a screen reader (VoiceOver on Mac: VO+U, then
-      Links; NVDA on Windows: Insert+F7, then Links). Each link name should
-      say where it goes without the text around it. Links with the same name
-      should lead to the same content.
+      Open the list of links with a screen reader (steps for Mac and Windows
+      are below). Each link name should say where it goes without the text
+      around it. Links with the same name should lead to the same content.
     verify_automated: >-
       Scan again at Level AAA and see if links with the same name and
       different addresses are still found.
@@ -4346,12 +4339,12 @@ axe_rules:
           Keep one banner for the real site header. If every banner role is
           removed, screen reader users lose their quick way to the site
           header.
+    screen_reader_check: landmarks
     verify_manual: >-
       In developer tools, none of the banner's parent elements should be
-      another landmark, such as a menu, the footer or a named section. In a
-      screen reader's landmark list (VoiceOver on Mac: VO+U, then Landmarks;
-      NVDA on Windows: Insert+F7, then Landmarks), one banner should hold the
-      site header.
+      another landmark, such as a menu, the footer or a named section. Then
+      open the list of landmarks with a screen reader (steps for Mac and
+      Windows are below): one banner should hold the site header.
     verify_automated: >-
       Scan again and see if a banner inside another landmark is still found.
     acceptance: >-
@@ -4424,12 +4417,12 @@ axe_rules:
         watch_out: >-
           It disappears from the screen reader's landmark list. Without a
           heading, screen reader users lose their quick way to reach it.
+    screen_reader_check: landmarks
     verify_manual: >-
       In developer tools, the only landmark among its parent elements should
-      be the main content, or none. Check you can reach it from a screen
-      reader's landmark list (VoiceOver on Mac: VO+U, then Landmarks; NVDA on
-      Windows: Insert+F7, then Landmarks). If you made it plain content, find
-      it by its heading instead.
+      be the main content, or none. Then open the list of landmarks with a
+      screen reader (steps for Mac and Windows are below) and check you can
+      reach it. If you made it plain content, find it by its heading instead.
     verify_automated: >-
       Scan again and see if side content inside another landmark is still
       found.
@@ -4505,13 +4498,14 @@ axe_rules:
           Keep one site footer region for the real site-wide footer. If you
           strip the role from every footer and the site footer sits inside
           <main>, screen reader users lose the jump to it.
+    screen_reader_check: landmarks
     verify_manual: >-
-      Use a screen reader to move through the page regions (NVDA: press D;
-      VoiceOver on Mac: press VO+U, then choose Landmarks). The site footer
-      should be its own region, not part of main or another region. You can
-      also open the page structure a screen reader uses (accessibility tree)
-      in the browser. There, the contentinfo item should not sit inside main,
-      navigation, banner, region or any other landmark.
+      Open the list of landmarks with a screen reader (steps for Mac and
+      Windows are below). The site footer should be its own landmark, not part
+      of main or another landmark. You can also open the page structure a
+      screen reader uses (accessibility tree) in the browser. There, the
+      contentinfo item should not sit inside main, navigation, banner, region
+      or any other landmark.
     verify_automated: >-
       Scan again and see if a site footer inside another page region is still
       found.
@@ -4571,12 +4565,13 @@ axe_rules:
         watch_out: >-
           If that wrapper is a region people need, such as a search area, keep
           its role. Move the main content out of it instead.
+    screen_reader_check: landmarks
     verify_manual: >-
       In developer tools, none of the main element's parent elements should be
-      a landmark, such as the site header, a menu or a named section. In a
-      screen reader's landmark list (VoiceOver on Mac: VO+U, then Landmarks;
-      NVDA on Windows: Insert+F7, then Landmarks), choose the main landmark.
-      It should take you to the start of the main content.
+      a landmark, such as the site header, a menu or a named section. Then
+      open the list of landmarks with a screen reader (steps for Mac and
+      Windows are below) and choose the main landmark. It should take you to
+      the start of the main content.
     verify_automated: >-
       Scan again and see if a main content region inside another landmark is
       still found.
@@ -4646,12 +4641,12 @@ axe_rules:
           still leaves it for screen readers. Adding aria-hidden="true" to a
           header with links in it hides it from screen readers, but people can
           still reach those links by keyboard.
+    screen_reader_check: landmarks
     verify_manual: >-
-      Use a screen reader to move through the page regions (NVDA: press D;
-      VoiceOver on Mac: press VO+U, then choose Landmarks). The page should
-      have only one site header region (banner), and it should be the real
-      site header. If the site swaps headers, check at phone and desktop
-      widths.
+      Open the list of landmarks with a screen reader (steps for Mac and
+      Windows are below). The page should have only one site header landmark
+      (banner), and it should be the real site header. If the site swaps
+      headers, check at phone and desktop widths.
     verify_automated: >-
       Scan again and see if more than one site header region is still found.
     acceptance: >-
@@ -4719,12 +4714,12 @@ axe_rules:
           still leaves it for screen readers. Adding aria-hidden="true" to a
           footer with links in it hides it from screen readers, but people can
           still reach those links by keyboard.
+    screen_reader_check: landmarks
     verify_manual: >-
-      Use a screen reader to move through the page regions (NVDA: press D;
-      VoiceOver on Mac: press VO+U, then choose Landmarks). The page should
-      have only one site footer region (contentinfo), and it should be the
-      real site footer. If the site swaps footers, check at phone and desktop
-      widths.
+      Open the list of landmarks with a screen reader (steps for Mac and
+      Windows are below). The page should have only one site footer landmark
+      (contentinfo), and it should be the real site footer. If the site swaps
+      footers, check at phone and desktop widths.
     verify_automated: >-
       Scan again and see if more than one site footer region is still found.
     acceptance: >-
@@ -4782,12 +4777,12 @@ axe_rules:
           Moving a view off screen or making it see-through (opacity 0) does
           not hide it from screen readers. It still counts as a second main
           region. Use the hidden attribute instead.
+    screen_reader_check: landmarks
     verify_manual: >-
-      Open the list of landmarks (page regions) in a screen reader (VoiceOver
-      on Mac: VO+U, then Landmarks; NVDA on Windows: Insert+F7, then
-      Landmarks). It should show exactly one main landmark, and choosing it
-      should take you to the page's primary content. Check this on each view
-      of a single-page app.
+      Open the list of landmarks with a screen reader (steps for Mac and
+      Windows are below). It should show exactly one main landmark, and
+      choosing it should take you to the page's primary content. Check this on
+      each view of a single-page app.
     verify_automated: >-
       Scan again and see if more than one main content region is still found.
     acceptance: >-
@@ -4861,10 +4856,11 @@ axe_rules:
           Do not strip headers and footers from cards and sections. A header
           or footer inside an article, section, aside, menu or the main
           content is not a landmark. The rule check does not count it.
+    screen_reader_check: landmarks
     verify_manual: >-
-      Open a screen reader's landmark list (VoiceOver on Mac: VO+U, then
-      Landmarks; NVDA on Windows: Insert+F7, then Landmarks). Each entry's
-      type and name should be its own and say what the region holds.
+      Open the list of landmarks with a screen reader (steps for Mac and
+      Windows are below). Each landmark's type and name should be its own and
+      say what the landmark holds.
     verify_automated: >-
       Scan again and see if landmarks with the same type and name are still
       found.
@@ -8404,12 +8400,12 @@ semantic_criteria:
           This name replaces the visible text for screen readers. It must
           include the visible words, or people who use voice control cannot
           say the link's name to click it (WCAG 2.5.3 Label in Name).
+    screen_reader_check: links
     verify_manual: >-
-      Open the list of links in a screen reader (VoiceOver: VO+U, then Links;
-      NVDA: Insert+F7). For a link that is unclear on its own, read its
-      sentence, paragraph, list item or table cell, and the heading before it.
-      Each link should make clear where it goes, from its text or from that
-      context.
+      Open the list of links with a screen reader (steps for Mac and Windows
+      are below). For a link that is unclear on its own, read its sentence,
+      paragraph, list item or table cell, and the heading before it. Each link
+      should make clear where it goes, from its text or from that context.
     verify_automated: >-
       Scan again with AI review of wording turned on, and see if the link is
       still found.
@@ -9133,11 +9129,12 @@ semantic_criteria:
         watch_out: >-
           A heading that fits one page may not fit another. If the heading
           text comes from a field, check what each page fills in.
+    screen_reader_check: headings
     verify_manual: >-
       Read each flagged heading on the live page with the section below it.
       Mark the occurrence "Not a problem (false positive)" if the heading
-      predicts the section, even if it is short. Open the list of headings in
-      a screen reader (VoiceOver: VO+U, then Headings; NVDA: Insert+F7) and
+      predicts the section, even if it is short. Then open the list of
+      headings with a screen reader (steps for Mac and Windows are below) and
       check that each heading makes sense on its own.
     verify_automated: >-
       Scan again with AI review of wording turned on, and see if this heading
@@ -9146,6 +9143,70 @@ semantic_criteria:
       Every heading on the affected pages tells a reader what the section
       below it is about.
     confidence_default: low
+
+  "3.3.1":
+    title: "Form shows an error without describing it in text"
+    wcag_sc: "3.3.1"
+    wcag_name: "Error Identification"
+    wcag_level: "A"
+    abilities_affected: [vision, cognition]
+    what_happening: >-
+      The form error check presses each form's submit button once, with
+      nothing typed, and blocks anything the form tries to send. After the
+      press, this form marked one or more fields in error, with
+      <code>aria-invalid</code>, a red or orange colour, or an error class.
+      But no text appeared that says which field is wrong and what is wrong.
+      The check never presses sign-in, payment, delete or search forms, and it
+      cannot see errors that only the server would return. A person must
+      confirm it.
+    why_matters: >-
+      People who cannot see colour, who use a screen reader, or who have
+      cognitive disabilities may not notice a red border or an icon. Without
+      words, they do not know which field to fix or how, and may give up on
+      the form.
+    owner: dev
+    effort: under_2h
+    fix_steps:
+      - >-
+        Open the live page and press the form's submit button with the fields
+        empty. Look at what changes. Is there text that names each field in
+        error and says what is wrong?
+      - >-
+        Show a message next to each field in error, in words, and tie it to
+        the field: <code>&lt;input id="email" aria-invalid="true"
+        aria-describedby="email-error"&gt; &lt;p id="email-error"&gt;Enter
+        your email address&lt;/p&gt;</code>.
+      - >-
+        For a long form, also add a summary at the top that lists each error
+        as a link to its field, and move focus to the summary.
+      - >-
+        Keep colours and icons as an extra sign, not the only one.
+    fix_options:
+      - label: "Add a message tied to each field"
+        approach: >-
+          Put a short message next to the field, tie it with
+          aria-describedby, and set aria-invalid="true" on the field.
+        watch_out: >-
+          Remove the message and aria-invalid when the person corrects the
+          field.
+      - label: "Add an error summary at the top"
+        approach: >-
+          List every error as a link to its field, in a box with a heading,
+          and move focus to the box after the form is sent.
+        watch_out: >-
+          A summary that only says "There are errors" does not identify the
+          field. Name each one.
+    verify_manual: >-
+      Send the form empty and with wrong values, with a screen reader on and
+      without relying on colour. Each error must name its field and say what
+      is wrong, in text you can see.
+    verify_automated: >-
+      Scan again with Check that forms describe their errors turned on, and
+      see if the form is still found.
+    acceptance: >-
+      Every error the form detects is described in visible text that names the
+      field.
+    confidence_default: medium
 
   "3.3.2":
     title: "Form field may lack a clear label or instructions"
@@ -9844,11 +9905,12 @@ alfa_rules:
         watch_out: >-
           Check that the link you remove is not the only way to reach that
           place with a keyboard.
+    screen_reader_check: links
     verify_manual: >-
-      Press Tab to each affected link with a screen reader on (VoiceOver:
-      Cmd+F5 on macOS; NVDA on Windows). It should read a name that says where
-      the link goes, not just "link" or a web address. You can also open the
-      screen reader's list of links and check that no entry is blank.
+      Turn on a screen reader and press Tab to each affected link. It should
+      read a name that says where the link goes, not just "link" or a web
+      address. Then open the list of links (steps for Mac and Windows are
+      below) and check that no entry is blank.
     verify_automated: >-
       Scan again with Alfa or Both as the rule check tool, and see if this
       link is still found.
@@ -10910,12 +10972,13 @@ alfa_rules:
           Small differences, such as a #section or a tracking code, do not
           break WCAG if the content is the same. They do make the rule check
           mark the links Not sure again.
+    screen_reader_check: links
     verify_manual: >-
-      Open the screen reader's list of links, such as the NVDA Elements List
-      (Insert+F7) or the VoiceOver Rotor. Each name should say where the link
-      goes. Where links share a name, follow each one: if they lead to the
-      same content, it is not a problem; if not, it is. The next scan lists
-      the set again while the links' addresses differ.
+      Open the list of links with a screen reader (steps for Mac and Windows
+      are below). Each name should say where the link goes. Where links share
+      a name, follow each one: if they lead to the same content, it is not a
+      problem; if not, it is. The next scan lists the set again while the
+      links' addresses differ.
     verify_automated: >-
       Scan again at Level AAA, with Alfa or Both as the rule check tool, and
       see if this set of links is still found.
@@ -11596,12 +11659,13 @@ alfa_rules:
         watch_out: >-
           role="presentation" or alt="" on that image removes its text, so the
           heading stays empty.
+    screen_reader_check: headings
     verify_manual: >-
       Inspect the heading in the browser's accessibility panel and check that
       it has a name. Some screen readers leave empty headings out of their
-      heading list, so do not rely on that list alone. Then open the heading
-      list, for example with the rotor in VoiceOver or the elements list in
-      NVDA. Check that every heading has words that describe its section.
+      heading list, so do not rely on that list alone. Then open the list of
+      headings with a screen reader (steps for Mac and Windows are below).
+      Check that every heading has words that describe its section.
     verify_automated: >-
       Scan again with Alfa or Both as the rule check tool, and see if this
       heading is still found.
@@ -13283,3 +13347,260 @@ alfa_rules:
       Every show-and-hide section (details) has a first summary with a name
       that says what the section holds.
     confidence_default: high
+
+# ---------------------------------------------------------------------
+# Page code check cards, keyed on the rule id (audit.analyzer.markup.base).
+# One card per rule: two rules share WCAG 1.3.1 and one is a best practice,
+# so a card keyed by criterion could not tell them apart. A best-practice
+# rule's card has no wcag_* fields, so the issue shows Best practice.
+# ---------------------------------------------------------------------
+markup_rules:
+  markup-placeholder-only:
+    title: "Field is named only by its placeholder text"
+    wcag_sc: "3.3.2"
+    wcag_name: "Labels or Instructions"
+    wcag_level: "A"
+    abilities_affected: [cognition, vision]
+    what_happening: >-
+      The page code check found a form field, such as an
+      <code>&lt;input&gt;</code>, whose only name is its placeholder text: the
+      hint shown inside the field before anyone types. The field has no
+      <code>&lt;label&gt;</code>, no <code>aria-label</code>, no
+      <code>aria-labelledby</code> that points at text, and no
+      <code>title</code>. The placeholder disappears as soon as someone starts
+      typing, so the field then has no name on screen. The rule check (axe)
+      accepts a placeholder as a name, so it does not report this.
+    why_matters: >-
+      People with memory or attention difficulties can forget what the field
+      was for once the hint is gone, and cannot check their answer. Placeholder
+      text is often pale and hard to read, and it can look like a value that is
+      already filled in.
+    owner: dev
+    effort: under_15m
+    fix_steps:
+      - >-
+        Add a visible label and tie it to the field: <code>&lt;label
+        for="email"&gt;Email address&lt;/label&gt; &lt;input id="email"
+        type="email"&gt;</code>.
+      - >-
+        Keep the placeholder only for an extra hint, such as an example:
+        <code>placeholder="name@example.com"</code>. Do not repeat the label
+        in it.
+      - >-
+        If the design has no room for a visible label, ask the designer for
+        one. A label hidden from sight gives the field a name for screen
+        readers, but people who can see still lose the hint when they type.
+    fix_options:
+      - label: "Add a visible label tied to the field"
+        approach: >-
+          Use a label element whose for value matches the field's id, or wrap
+          the field inside the label.
+        watch_out: >-
+          Keep the label on screen while people type. A label that moves above
+          the field when it is selected is fine, if it stays readable.
+      - label: "Hide the label only when nearby text already names the field"
+        approach: >-
+          For a search box right next to a button that says Search, a label
+          that only screen readers get can be enough.
+        watch_out: >-
+          A hidden label does not help people who can see, so use it only when
+          the field's purpose is clear on screen without it.
+    verify_manual: >-
+      Open the page, type in the field, and check that you can still tell what
+      it is for. Then move to the field with a screen reader: you should hear
+      its label. Mark the occurrence "Not a problem (false positive)" only if
+      the field already has a label that stays on screen while you type.
+    verify_automated: >-
+      Scan again with the page code check turned on, and see if this field is
+      still found.
+    acceptance: >-
+      Every field on the affected pages has a label that stays on screen while
+      people type.
+    confidence_default: high
+
+  markup-label-for-missing:
+    title: "Label is tied to no field"
+    wcag_sc: "1.3.1"
+    wcag_name: "Info and Relationships"
+    wcag_level: "A"
+    abilities_affected: [vision, motor, cognition]
+    what_happening: >-
+      The page code check found a <code>&lt;label&gt;</code> whose
+      <code>for</code> value does not match the <code>id</code> of any field,
+      or matches an element a label cannot name, such as a
+      <code>&lt;div&gt;</code>. The browser then ties the label to nothing. The
+      label shows on screen next to its field, but the page code does not say
+      they belong together. The rule check (axe) reports the field this leaves
+      without a name, when there is one; this occurrence is the label itself,
+      where the fix usually goes.
+    why_matters: >-
+      A screen reader does not read the label when someone moves to the field,
+      so they hear only "edit text" and must guess what to type. Clicking the
+      label does not move to the field, which makes small fields such as
+      checkboxes harder to use for people with tremors. Voice control users
+      cannot say the label's words to reach the field.
+    owner: dev
+    effort: under_15m
+    fix_steps:
+      - >-
+        Read the occurrence: it gives the label's <code>for</code> value and,
+        when there is one, the <code>id</code> of the field right after it.
+      - >-
+        Make the two match. For example, change <code>&lt;label
+        for="phone-number"&gt;Phone&lt;/label&gt; &lt;input id="phone"&gt;</code>
+        to <code>&lt;label for="phone"&gt;Phone&lt;/label&gt; &lt;input
+        id="phone"&gt;</code>.
+      - >-
+        If the id is made by a script or a template, fix it there, so every page
+        that uses the template is fixed. Each id must be used only once on the
+        page.
+      - >-
+        If the label names something that is not a field, such as a group of
+        radio buttons, use a <code>&lt;fieldset&gt;</code> with a
+        <code>&lt;legend&gt;</code> instead.
+    fix_options:
+      - label: "Match the label's for value to the field's id"
+        approach: >-
+          Change the label's for value, or the field's id, so they are the
+          same.
+        watch_out: >-
+          An id that appears twice on a page ties the label to the first one
+          only.
+      - label: "Wrap the field inside the label"
+        approach: >-
+          Put the field inside the label element and remove the for value. The
+          browser then ties them together with no id needed.
+        watch_out: >-
+          A label with a for value that points elsewhere still wins, so remove
+          the for value when you wrap the field.
+    verify_manual: >-
+      Click the label's text: the cursor should move into its field. Then move
+      to the field with a screen reader: you should hear the label's words. Mark
+      the occurrence "Not a problem (false positive)" only if the label is not
+      meant for any field.
+    verify_automated: >-
+      Scan again with the page code check turned on, and see if this label is
+      still found. Check that the rule check (axe) no longer reports the field
+      as having no name.
+    acceptance: >-
+      Every label on the affected pages is tied to the field it names.
+    confidence_default: high
+
+  markup-title-repeats-text:
+    title: "Title repeats the text it is on"
+    abilities_affected: [vision]
+    what_happening: >-
+      The page code check found a link, button or field whose
+      <code>title</code> says exactly the same as its visible text, apart from
+      capital letters and spaces. For example: <code>&lt;a href="/contact"
+      title="Contact us"&gt;Contact us&lt;/a&gt;</code>. This is a best
+      practice, not a WCAG failure: no WCAG criterion requires a fix.
+    why_matters: >-
+      Some screen readers read the title as well as the text, so people hear
+      the same words twice. The title adds nothing for anyone else: it shows
+      only when someone rests a mouse pointer on the element, and never on a
+      touch screen or with the keyboard alone.
+    owner: dev
+    effort: under_15m
+    fix_steps:
+      - >-
+        Remove the <code>title</code>: <code>&lt;a
+        href="/contact"&gt;Contact us&lt;/a&gt;</code>.
+      - >-
+        If the title was meant to add something, such as where a link goes or
+        that it opens a new window, put those words in the visible text
+        instead.
+      - >-
+        If a template or component adds the title, fix it there, so every page
+        that uses it is fixed.
+    fix_options:
+      - label: "Remove the title"
+        approach: >-
+          Delete the title attribute. The visible text already names the
+          element.
+        watch_out: >-
+          Check that nothing else reads the title, such as a script or a test.
+      - label: "Put extra information in the visible text"
+        approach: >-
+          If the title said more than the text, move that information into the
+          text, such as "Annual report (PDF, 2 MB)".
+        watch_out: >-
+          Information only in a title is missed by most keyboard, touch screen
+          and screen reader users.
+    verify_manual: >-
+      Move to the element with a screen reader and listen: you should hear its
+      name once. Mark the occurrence "Not a problem (false positive)" if the
+      title and the text are different words.
+    verify_automated: >-
+      Scan again with the page code check turned on, and see if this element is
+      still found.
+    acceptance: >-
+      No link, button or field on the affected pages has a title that repeats
+      its visible text.
+    confidence_default: high
+
+  markup-styled-as-heading:
+    title: "Text may look like a heading but is not marked as one"
+    wcag_sc: "1.3.1"
+    wcag_name: "Info and Relationships"
+    wcag_level: "A"
+    abilities_affected: [vision, cognition]
+    what_happening: >-
+      The page code check found a short line of text that looks like a
+      heading: it is bold or larger than the body text, it is on a line of its
+      own, and more content comes after it. But it is not marked up as a
+      heading. For example: <code>&lt;p&gt;&lt;b&gt;Parking&lt;/b&gt;&lt;/p&gt;</code>
+      instead of <code>&lt;h2&gt;Parking&lt;/h2&gt;</code>. This is a guess
+      from the text's style: bold text is also used for emphasis, notes and
+      names, so a person decides. The check reports at most 20 a page.
+    why_matters: >-
+      Screen reader users move through a page by its headings, like a table of
+      contents. Text that only looks like a heading is not in that list, so
+      they miss the section it starts or must read everything to find it. W3C
+      documents this as a failure of WCAG 1.3.1 (failure F2).
+    owner: dev
+    effort: under_15m
+    fix_steps:
+      - >-
+        Look at the text on the live page. Does it start a section, with the
+        content after it about that topic? If not, it is not a heading: mark
+        the occurrence "Not a problem (false positive)".
+      - >-
+        If it is a heading, mark it up as one, at the right level for where
+        it sits: <code>&lt;h2&gt;Parking&lt;/h2&gt;</code>. Keep the look with
+        CSS if you need to.
+      - >-
+        In a content management system (CMS), choose the heading style from
+        the editor's list of styles instead of making text bold or bigger.
+      - >-
+        Check that the heading levels still go in order, without skipping a
+        level.
+    fix_options:
+      - label: "Use a heading element"
+        approach: >-
+          Replace the paragraph or div with h2 to h6, at the level that fits
+          the outline of the page.
+        watch_out: >-
+          Pick the level from the page's outline, not from how big the text
+          should look. Style the size with CSS.
+      - label: "Use role=heading when the element cannot change"
+        approach: >-
+          If a component library makes the element and you cannot change it,
+          add role="heading" and aria-level with the level number.
+        watch_out: >-
+          A real heading element is better: it works the same in every browser
+          and with every screen reader.
+    screen_reader_check: headings
+    verify_manual: >-
+      Open the list of headings with a screen reader (steps for Mac and Windows
+      are below). Every line that looks like a heading on the page should be in
+      the list, at a level that fits. Mark the occurrence "Not a problem (false
+      positive)" if the text does not start a section.
+    verify_automated: >-
+      Scan again with the page code check turned on, and see if this text is
+      still found.
+    acceptance: >-
+      Every line that looks like a heading on the affected pages is marked up
+      as a heading, and bold or large text that is not a heading is left as
+      it is.
+    confidence_default: low
