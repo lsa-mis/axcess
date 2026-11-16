@@ -271,6 +271,49 @@ def test_check_refuses_image_from_another_scan(app_and_ids: Any) -> None:
     assert all(r["image_id"] != foreign for r in rows)
 
 
+def test_one_image_lists_every_page_it_appears_on(app_and_ids: Any) -> None:
+    """``GET /api/scans/{id}/images/{image_id}``: the row and its pages, each
+    once, with the alt text the image has there (2026-11-16)."""
+    client, scan_id, photo, _ = app_and_ids
+    body = client.get(f"/api/scans/{scan_id}/images/{photo}").json()
+    assert body["image"]["image_id"] == photo
+    assert body["image"]["page_count"] == len(body["pages"]) == 1
+    page = body["pages"][0]
+    assert page["page_url"].startswith("http") and page["alt_texts"] == ["Campus"]
+    assert body["check_available"] is False
+
+
+def test_one_image_from_another_scan_is_404(app_and_ids: Any) -> None:
+    """A report cannot read another report's image, nor its pages."""
+    client, scan_id, _, db_path = app_and_ids
+    conn = connect(db_path)
+    try:
+        other = int(
+            conn.execute(
+                "INSERT INTO scans (seed_url, status, config_json) "
+                "VALUES ('http://other.test/', 'completed', '{}')"
+            ).lastrowid
+            or 0
+        )
+        repo.upsert_page(
+            conn,
+            scan_id=other,
+            url_normalized="http://other.test/",
+            status_code=200,
+            title="Other",
+            render_mode="static",
+            html_hash="8" * 64,
+        )
+        conn.commit()
+    finally:
+        conn.close()
+    blob_dir = Path(str(db_path)).parent / "blobs"
+    foreign = _photo(db_path, blob_dir, other, alt="Other", color=(10, 10, 200))
+    assert client.get(f"/api/scans/{scan_id}/images/{foreign}").status_code == 404
+    assert client.get(f"/api/scans/{other}/images/{foreign}").status_code == 200
+    assert client.get("/api/scans/999999/images/1").status_code == 404
+
+
 def test_check_refuses_scan_that_is_not_complete(app_and_ids: Any) -> None:
     client, scan_id, photo, db_path = app_and_ids
     conn = connect(db_path)

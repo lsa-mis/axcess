@@ -2992,6 +2992,21 @@ def create_app(
             )
         return JSONResponse(result.model_dump())
 
+    @app.get("/api/scans/{scan_id:int}/images/{image_id:int}")
+    def api_scan_image(scan_id: int, image_id: int) -> JSONResponse:
+        """One image of the report, and every page it appears on."""
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            detail = image_inventory.get_report_image_detail(
+                conn,
+                scan_id,
+                image_id,
+                check_available=app.state.alt_checker_factory is not None,
+            )
+        if detail is None:
+            raise HTTPException(status_code=404, detail="This image is not part of this report.")
+        return JSONResponse(detail.model_dump())
+
     @app.post("/api/scans/{scan_id:int}/images/{image_id:int}/alt-check")
     async def api_check_image_alt(scan_id: int, image_id: int) -> JSONResponse:
         """Ask the local model about one image's alt text, keep and return its answer.
