@@ -537,9 +537,9 @@ function StudyCard({
                 <TableHead>
                   <tr>
                     <ColumnHeader>WCAG criterion</ColumnHeader>
-                    <ColumnHeader>Share of all problems</ColumnHeader>
-                    <ColumnHeader>Found by the rule check</ColumnHeader>
-                    <ColumnHeader>Also found by other checks</ColumnHeader>
+                    <ColumnHeader numeric>Share of all problems</ColumnHeader>
+                    <ColumnHeader numeric>Found by the rule check</ColumnHeader>
+                    <ColumnHeader numeric>Also found by other checks</ColumnHeader>
                     <ColumnHeader>Which other checks</ColumnHeader>
                   </tr>
                 </TableHead>

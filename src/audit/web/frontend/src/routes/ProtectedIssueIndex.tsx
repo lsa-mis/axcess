@@ -143,8 +143,8 @@ export default function ProtectedIssueIndexRoute() {
                         <ColumnHeader>Rule</ColumnHeader>
                         <ColumnHeader>WCAG criterion</ColumnHeader>
                         <ColumnHeader>Result</ColumnHeader>
-                        <ColumnHeader>Issue occurrences</ColumnHeader>
-                        <ColumnHeader>Pages</ColumnHeader>
+                        <ColumnHeader numeric>Issue occurrences</ColumnHeader>
+                        <ColumnHeader numeric>Pages</ColumnHeader>
                       </tr>
                     </TableHead>
                     <tbody>

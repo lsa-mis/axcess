@@ -376,13 +376,13 @@ export default function FindingDetailRoute() {
                       <Cell className="min-w-[16rem]">
                         <AltTag value={o.alt_text} wrap />
                       </Cell>
-                      <Cell className="text-center text-fg-muted">
+                      <Cell className="text-fg-muted">
                         {o.above_fold ? "Yes" : "No"}
                       </Cell>
                       <Cell className="whitespace-nowrap">
                         <PageActionLinks
                           look="actions"
-                          className="justify-center"
+                          className="justify-start"
                           pageId={o.page_id}
                           scanId={data.scan_id}
                           pageUrl={o.page_url}

@@ -522,7 +522,7 @@ export default function ScansRoute() {
                       column="site"
                       kind="text"
                       wrap="words"
-                      className="sticky left-0 z-[2] bg-surface-muted align-bottom"
+                      className="sticky left-0 z-[2] bg-surface-muted"
                       {...sortProps}
                     >
                       {SORT_LABELS.site}
@@ -535,17 +535,16 @@ export default function ScansRoute() {
                         column={column}
                         kind={SORT_KINDS[column]}
                         wrap="words"
-                        className="align-bottom"
                         hint={column === "checks" ? RULE_CHECK_HELP : undefined}
                         {...sortProps}
                       >
                         {SORT_LABELS[column]}
                       </SortHeader>
                     ))}
-                    <ColumnHeader className="whitespace-nowrap px-3 py-1.5 align-bottom">
-                      {/* The height of a sort button, words at its foot like theirs,
+                    <ColumnHeader className="whitespace-nowrap px-3 py-1.5">
+                      {/* The height of a sort button, words in its middle like theirs,
                           so its label lines up with them. */}
-                      <span className="inline-flex min-h-target items-end px-1 pb-1.5">Actions</span>
+                      <span className="inline-flex min-h-target items-center px-1">Actions</span>
                     </ColumnHeader>
                   </tr>
                 </TableHead>
@@ -618,8 +617,8 @@ export default function ScansRoute() {
                         <ColumnHeader>Report</ColumnHeader>
                         <ColumnHeader>Status</ColumnHeader>
                         <ColumnHeader>Environment and data classification</ColumnHeader>
-                        <ColumnHeader>Pages</ColumnHeader>
-                        <ColumnHeader>Issue occurrences</ColumnHeader>
+                        <ColumnHeader numeric>Pages</ColumnHeader>
+                        <ColumnHeader numeric>Issue occurrences</ColumnHeader>
                         <ColumnHeader>Updated</ColumnHeader>
                         <ColumnHeader>Open</ColumnHeader>
                       </tr>
@@ -706,7 +705,7 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
         {completed ? (
           <>
             <Cell
-              className="whitespace-nowrap text-center text-fg"
+              className="whitespace-nowrap text-fg"
               title={completed.finished_at ?? completed.started_at ?? undefined}
             >
               {relativeTime(completed.finished_at ?? completed.started_at)}
@@ -878,7 +877,7 @@ function ScanRow({
         )}
       </RowHeader>
       <Cell
-        className={cn("whitespace-nowrap text-center text-xs text-fg-muted", piece())}
+        className={cn("whitespace-nowrap text-xs text-fg-muted", piece())}
         title={scan.finished_at ?? scan.started_at ?? undefined}
       >
         {relativeTime(scan.finished_at ?? scan.started_at)}
@@ -931,7 +930,7 @@ function ScanRow({
 function RuleChecksCell({ scan, className }: { scan: ScanSummary; className?: string }) {
   const checks = scan.rule_checks;
   return (
-    <Cell className={cn("whitespace-nowrap text-center", checks?.length ? "text-fg" : "text-fg-muted", className)}>
+    <Cell className={cn("whitespace-nowrap", checks?.length ? "text-fg" : "text-fg-muted", className)}>
       {checks ? ruleChecksText(checks) : "Not recorded"}
     </Cell>
   );
@@ -957,16 +956,16 @@ function ScanCountCells({ scan, className }: { scan: ScanSummary; className?: st
   if (!completed || counts.isError) {
     return (
       <>
-        <Cell className={cn("whitespace-nowrap text-center text-fg-muted", className)}>Not counted</Cell>
-        <Cell className={cn("whitespace-nowrap text-center text-fg-muted", className)}>Not counted</Cell>
+        <Cell className={cn("whitespace-nowrap text-right text-fg-muted", className)}>Not counted</Cell>
+        <Cell className={cn("whitespace-nowrap text-right text-fg-muted", className)}>Not counted</Cell>
       </>
     );
   }
   if (!counts.data) {
     return (
       <>
-        <Cell className={cn("whitespace-nowrap text-center text-fg-muted", className)}>Counting</Cell>
-        <Cell className={cn("whitespace-nowrap text-center text-fg-muted", className)}>Counting</Cell>
+        <Cell className={cn("whitespace-nowrap text-right text-fg-muted", className)}>Counting</Cell>
+        <Cell className={cn("whitespace-nowrap text-right text-fg-muted", className)}>Counting</Cell>
       </>
     );
   }
@@ -1018,8 +1017,8 @@ function ProtectedReportRow({ report, index }: { report: ProtectedScanSummary; i
       <Cell className="text-fg-muted">{report.environment} · {report.data_classification}</Cell>
       <Cell numeric className="text-fg">{report.page_count.toLocaleString()}</Cell>
       <Cell numeric className="text-fg">{report.issue_occurrences.toLocaleString()}</Cell>
-      <Cell className="text-center text-xs text-fg-muted" title={report.updated_at}>{relativeTime(report.updated_at)}</Cell>
-      <Cell className="py-1 text-center">
+      <Cell className="text-xs text-fg-muted" title={report.updated_at}>{relativeTime(report.updated_at)}</Cell>
+      <Cell className="py-1">
         <LinkButton to={`/scans/${report.scan_id}/protected`} variant="ghost" aria-label={`Open sign-in scan ${report.scan_id}`}>
           Open sign-in scan
         </LinkButton>

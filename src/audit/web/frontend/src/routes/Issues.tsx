@@ -837,6 +837,9 @@ function IssueTable({
                 column={column}
                 wrap="words"
                 kind={SORT_KINDS[column]}
+                // Priority sorts by score but shows High, Medium, Low: words,
+                // so its heading sits left over them.
+                align={column === "Priority" ? "left" : undefined}
                 sort={sort}
                 onSort={onSort}
                 className={cn(
@@ -906,9 +909,10 @@ const IssueTableRow = memo(function IssueTableRow({
   const isInformational = row.review_lane === "informational";
   const detailPath = `/scans/${scanId}/issues/${encodeURIComponent(row.issue_key)}`;
   // Body cells are padded 1.5 rather than the shared 2, which is what keeps
-  // all nine columns in view beside the expanded sidebar at 1280 px. Every
-  // cell but the title is short, so it centres under its centred heading.
-  const cell = "px-1.5 text-center";
+  // all nine columns in view beside the expanded sidebar at 1280 px. Words
+  // and tags sit left, the two counts right (Cell numeric), each under its
+  // heading (ColumnHeader, 2026-11-16; they were centred).
+  const cell = "px-1.5";
 
   return (
     <Row index={index}>
@@ -1022,10 +1026,10 @@ const IssueTableRow = memo(function IssueTableRow({
  * stays as the one place all the meanings can be read, searched and
  * printed together.
  *
- * The icon sits on the label's line, as the sort button's words sit at the
- * foot of their target (SortHeader, wrap="words"); centred in its target it
- * floated above the words (the developer's screenshots, 2026-11-16). 28px
- * wide, so the header reads as one centred group: allowed because "What
+ * The icon sits in the middle of the label's line, as the label sits in the
+ * middle of the header row (SortHeader; both moved there from the row's
+ * foot at the developer's request, 2026-11-16). 24px
+ * wide (``small``), so it sits close to its label: allowed because "What
  * the labels mean" (IssueGlossary) is a 44px control with the same
  * explanation (HelpTip, ``equivalent``).
  *
@@ -1047,8 +1051,9 @@ function ColumnHelp({
       question={`What does \u201c${column}\u201d mean`}
       equivalent="report-labels-button"
       small
-      // Centred on the label's line: 18px icon, 20px line, 6px under it.
-      className="items-end pb-1.5"
+      // Centred on the label's line, which sits in the middle of the
+      // header row (SortHeader).
+      className="items-center"
     >
       <p className="mb-2 font-semibold">
         {question.charAt(0).toUpperCase()}
