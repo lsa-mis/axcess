@@ -648,7 +648,8 @@ async def test_issue_table_recommended_order_is_lane_first_and_headers_sort_flat
         flags = [cell.strip() == "Does not apply" for cell in cells]
         assert flags == sorted(flags), (direction, cells)
         if direction == "desc":
-            await priority.get_by_role("button").click()
+            # The sort button, not the "?" beside it (2026-11-16).
+            await priority.get_by_role("button", name=re.compile(r"^Priority")).click()
             await page.wait_for_url("**sort=score_asc*")
 
     await back.click()
