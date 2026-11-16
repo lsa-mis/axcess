@@ -17,7 +17,8 @@ import { Button, Card, Disclosure, Select } from "../ui";
 import { Cell, ColumnHeader, Row, RowHeader, Table, TableHead, TableRegion, TableSearch } from "../table/Table";
 import {
   ExternalTextLink,
-  METHOD_EDGE,
+  METHOD_FILL,
+  METHOD_GLYPH,
   METHOD_ORDER,
   MethodLabel,
   MethodMark,
@@ -156,12 +157,11 @@ function Checks({
                   onClick={() => set({ type: on ? "" : m, criterion: "" })}
                   className={cn(
                     "h-auto flex-col items-start justify-start gap-1 px-4 py-3 text-left font-normal",
-                    METHOD_EDGE[m],
                     on && "border-2 border-umich-blue bg-surface-muted",
                   )}
                 >
                   <span className="flex items-center gap-2 text-sm font-semibold text-fg">
-                    <MethodMark method={m} />
+                    <MethodMark method={m} className="h-6 w-6 text-sm" />
                     <span className="sr-only">Show only </span>
                     {CHECK_METHOD_LABEL[m]}
                   </span>
@@ -221,7 +221,7 @@ function Checks({
                         technique C7), so the visible text stays short. Kept,
                         not removed, outside the filter, so the grid keeps its
                         shape and the reader keeps their place. Outside the
-                        filter a square loses its colour edge and fill and gets
+                        filter a square loses its fill (its symbol stays) and gets
                         a dashed border, but its text keeps full contrast: an
                         earlier version faded the whole square to 30% and failed
                         SC 1.4.3 Contrast (Minimum), Level AA (axe, 13 Nov 2026). */}
@@ -238,17 +238,24 @@ function Checks({
                             onClick={() => set({ criterion: c.sc })}
                             className={cn(
                               "relative h-auto min-h-16 flex-col items-start justify-start gap-1.5 border px-2.5 pb-2 pt-3 text-left",
+                              // Filled with its kind's step, the text in that
+                              // step's own ink (coverageParts.tsx). The border
+                              // keeps the near-white step visible on the card.
                               inFilter
-                                ? cn("border-border bg-surface-subtle", METHOD_EDGE[c.method])
-                                : "border-dashed border-border bg-transparent font-normal shadow-none",
-                              on && "border-solid border-fg ring-2 ring-fg",
+                                ? cn("border-border-strong", METHOD_FILL[c.method])
+                                : "border-dashed border-border bg-transparent font-normal text-fg-muted shadow-none",
+                              // A ring outside the square, so it shows on the
+                              // darkest fill as well as the lightest.
+                              on && "border-solid ring-2 ring-fg ring-offset-2 ring-offset-surface",
                             )}
                           >
-                            <span className={cn("text-sm", inFilter ? "font-bold text-fg" : "font-medium text-fg-muted")}>
-                              {c.sc}
-                            </span>
-                            <span className="flex items-center gap-1.5 text-xs font-semibold text-fg-muted">
-                              <MethodMark method={c.method} />
+                            <span className={cn("text-sm", inFilter ? "font-bold" : "font-medium")}>{c.sc}</span>
+                            <span className="flex items-center gap-1.5 text-xs font-semibold">
+                              {/* The symbol in the fill's own ink, larger than
+                                  before (it was 14px in a colour of its own). */}
+                              <span aria-hidden className="text-base leading-none">
+                                {METHOD_GLYPH[c.method]}
+                              </span>
                               {c.level}
                             </span>
                             {/* Sentences, so each part starts with a capital where a
