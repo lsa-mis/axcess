@@ -80,7 +80,7 @@ from audit.crawler.orchestrator import (
 )
 from audit.crawler.search import SearchConfig, search_url_allowed
 from audit.crawler.tab_pool import TabPool
-from audit.crawler.user_agent import chosen_user_agent
+from audit.crawler.user_agent import CHROME_CHOICE, chosen_user_agent
 from audit.db import repo
 from audit.db.reports import record_pages_found, scan_coverage
 from audit.db.schema import connect
@@ -270,7 +270,9 @@ class LocalLoginScanRequest(BaseModel):
     # form's submit button while signed in acts as the person signed in.
     skip_forms: bool = True
     send_empty_forms: bool = False
-    user_agent_choice: str | None = None
+    # Chrome's name, as the Chromium Axcess runs, unless the request chose
+    # otherwise (the default since 2026-11-16, as in a public scan).
+    user_agent_choice: str | None = CHROME_CHOICE
     user_agent: str | None = Field(default=None, max_length=1024)
     scan_engine: Literal["axe", "alfa", "both"] = "axe"
     axe_level: Literal["A", "AA", "AAA"] = "AA"
@@ -2170,7 +2172,10 @@ def create_app(
             "skip_rendered_storage": bool(body.get("skip_rendered_storage")),
             "axe_level": str(body.get("axe_level", "AA")),
             "wcag_version": wcag_version,
-            "user_agent_choice": body.get("user_agent_choice"),
+            # Chrome's name unless the request chose otherwise (2026-11-16):
+            # a request with no choice, such as one from an older New scan,
+            # gets the new default.
+            "user_agent_choice": body.get("user_agent_choice") or CHROME_CHOICE,
             "user_agent": body.get("user_agent"),
         }
         config = _build_crawl_config(form, settings)

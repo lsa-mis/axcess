@@ -2902,7 +2902,11 @@
           "skip_visual": {"type": "boolean", "title": "Skip Visual", "default": true},
           "skip_forms": {"type": "boolean", "title": "Skip Forms", "default": true},
           "send_empty_forms": {"type": "boolean", "title": "Send Empty Forms", "default": false},
-          "user_agent_choice": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "User Agent Choice"},
+          "user_agent_choice": {
+            "anyOf": [{"type": "string"}, {"type": "null"}],
+            "title": "User Agent Choice",
+            "default": "chrome"
+          },
           "user_agent": {
             "anyOf": [{"type": "string", "maxLength": 1024}, {"type": "null"}],
             "title": "User Agent"

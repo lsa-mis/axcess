@@ -520,8 +520,13 @@ def test_a_sign_in_scan_keeps_its_defaults_when_nothing_new_is_sent(
     assert config.visual_checks_enabled is False  # type: ignore[attr-defined]
     assert config.form_error_checks_enabled is False  # type: ignore[attr-defined]
     assert config.form_send_empty_forms is False  # type: ignore[attr-defined]
-    assert config.user_agent == get_settings().user_agent  # type: ignore[attr-defined]
-    assert browser["user_agent"] == get_settings().user_agent
+    # Chrome's name by default since 2026-11-16, while signing in and while
+    # scanning; robots.txt is still read for Axcess.
+    from audit.crawler.user_agent import chromium_user_agent
+
+    assert config.user_agent == chromium_user_agent()  # type: ignore[attr-defined]
+    assert config.robots_user_agent == get_settings().user_agent  # type: ignore[attr-defined]
+    assert browser["user_agent"] == chromium_user_agent()
 
 
 def test_a_sign_in_scan_takes_every_setting_the_public_form_has(

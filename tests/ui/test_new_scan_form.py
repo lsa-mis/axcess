@@ -954,11 +954,15 @@ async def test_a_browser_name_is_chosen_typed_checked_and_posted(
     summary = page.get_by_role("complementary", name="What this scan will do")
     await _open_groups(page)
     speed = page.locator("#speed")
-    # Axcess's own name by default, and the form says what that means.
-    await playwright_async.expect(
-        page.get_by_role("combobox", name=_BROWSER_NAME, exact=True)
-    ).to_contain_text("Axcess (default)")
+    # Chrome on this computer by default (2026-11-16), and the form says
+    # what that means; Axcess's own name is the next choice.
+    browser = page.get_by_role("combobox", name=_BROWSER_NAME, exact=True)
+    await playwright_async.expect(browser).to_contain_text("Chrome on this computer (default)")
+    await playwright_async.expect(speed).to_contain_text("the Chrome version Axcess runs")
+    await browser.select_option("axcess")
     await playwright_async.expect(speed).to_contain_text("so the site can see that a scanner")
+    await playwright_async.expect(summary).to_contain_text("Tells the site it is Axcess, a scanner")
+    await browser.select_option("chrome")
     # Both limits are stated beside the choice.
     await playwright_async.expect(speed).to_contain_text("Every page still opens in Chromium")
     await playwright_async.expect(speed).to_contain_text("robots.txt rules for Axcess still apply")
@@ -1014,7 +1018,7 @@ async def test_a_browser_name_is_chosen_typed_checked_and_posted(
     await page.locator("form").get_by_role("button", name="Reset to default settings").click()
     await playwright_async.expect(
         page.get_by_role("combobox", name=_BROWSER_NAME, exact=True)
-    ).to_contain_text("Axcess (default)")
+    ).to_contain_text("Chrome on this computer (default)")
 
 
 async def test_a_sign_in_scan_offers_the_browser_name(
@@ -1027,7 +1031,7 @@ async def test_a_sign_in_scan_offers_the_browser_name(
     await page.goto(f"{base}/app/scans/new?mode=login", wait_until="networkidle")
     await _open_groups(page)
     name = page.get_by_role("combobox", name=_BROWSER_NAME, exact=True)
-    await playwright_async.expect(name).to_contain_text("Axcess (default)")
+    await playwright_async.expect(name).to_contain_text("Chrome on this computer (default)")
     await playwright_async.expect(name).to_have_accessible_description(
         re.compile("the sign-in window sends this name too")
     )
