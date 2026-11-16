@@ -15,9 +15,12 @@ import { useScanQuery } from "../hooks/useScanQuery";
  * Dashboard | Sage Campus``: where you are in the app, which report you are reading (one
  * site can have several, so the number is part of the name), and the path
  * from the report down to this page. On the report's own views, Issues,
- * Compare reports and Documents, the trail ends at the report: the lit tab already says
- * which view, and "Issues" as a crumb, a tab and a heading was the same word
- * three times on one screen.
+ * Images, Compare reports and Documents, the trail ends at the report: the
+ * lit tab already says which view, and "Issues" as a crumb, a tab and a
+ * heading was the same word three times on one screen. Images joined the
+ * rule on 2026-11-16 (the developer's catch): it was added as a tab without
+ * it, and its trail ended "Report #65 › Images" under an "Images" tab and
+ * heading.
  *
  * Everything here is derived from the URL, so the trail is complete on the
  * first paint of a route rather than appearing once data lands. The scan
@@ -399,9 +402,9 @@ export function useReportTrail(): {
   return { match, trail: labelled };
 }
 
-/** The report's own views: its URL, the issue table, Compare reports and Documents. */
+/** The report's own views: its URL, the issue table, Images, Compare reports and Documents. */
 function isReportView(pathname: string): boolean {
-  return /^\/scans\/\d+(?:\/issues|\/compare|\/documents)?\/?$/.test(pathname);
+  return /^\/scans\/\d+(?:\/issues|\/images|\/compare|\/documents)?\/?$/.test(pathname);
 }
 
 /**

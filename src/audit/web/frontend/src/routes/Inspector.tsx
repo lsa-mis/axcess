@@ -101,6 +101,11 @@ export default function InspectorRoute() {
   // (the report's Documents tab), not an issue's occurrences.
   const fileParam = params.get("file");
   const fileId = fileParam && /^\d+$/.test(fileParam) ? Number(fileParam) : null;
+  // One image to outline, by its content hash: the Images tab's links
+  // (2026-11-16, the developer's request: opening an image's page from the
+  // Images tab showed the page with nothing marked). Most of those images
+  // have no issue type, so ``?issue=`` cannot name them.
+  const imageHash = params.get("image");
 
   const { data: scanData } = useScanQuery(scan);
 
@@ -144,18 +149,25 @@ export default function InspectorRoute() {
     );
   }, [pageEvidence, issueKey, directSelector, directSnippet]);
 
-  // An Images with text issue's occurrences on this page: images, which carry
-  // no selector. One row per occurrence (the evidence lists an image once per
+  // The images to outline on this page, which carry no selector: an Images
+  // with text issue's occurrences, or every place one image (``?image=``)
+  // appears. One row per occurrence (the evidence lists an image once per
   // analysis of it).
   const currentImages = useMemo(() => {
-    if (!pageEvidence || !issueKey?.startsWith("image:")) return [];
+    if (!pageEvidence) return [];
+    const wanted = imageHash
+      ? (image: { content_hash: string }) => image.content_hash === imageHash
+      : issueKey?.startsWith("image:")
+        ? (image: { issue_key: string | null }) => image.issue_key === issueKey
+        : null;
+    if (!wanted) return [];
     const seen = new Set<number>();
     return pageEvidence.image_occurrences.filter((image) => {
-      if (image.issue_key !== issueKey || seen.has(image.occurrence_id)) return false;
+      if (!wanted(image) || seen.has(image.occurrence_id)) return false;
       seen.add(image.occurrence_id);
       return true;
     });
-  }, [pageEvidence, issueKey]);
+  }, [pageEvidence, issueKey, imageHash]);
   // Copies inside <noscript> or <template> (in practice the no-script fallback
   // of a lazy-loaded image, whose shown twin is outlined): not in the saved
   // copy on screen, so they are said, not counted as missing.
@@ -255,7 +267,7 @@ export default function InspectorRoute() {
   const inspectEnabled =
     Number.isFinite(scan) &&
     Number.isFinite(page) &&
-    (!issueKey || !!pageEvidence || evidenceError);
+    (!(issueKey || imageHash) || !!pageEvidence || evidenceError);
 
   // Which state is on screen. In the URL like the view above it, so a link to
   // "the dialog on page 12" survives being sent to someone.
@@ -354,7 +366,7 @@ export default function InspectorRoute() {
             return count != null && count.missing < count.total;
           }) ?? checkedStates[0])
         : undefined;
-  const openingScope = [scan, page, issueKey, directSelector, directSnippet].join("\n");
+  const openingScope = [scan, page, issueKey, directSelector, directSnippet, imageHash].join("\n");
   const [opening, setOpening] = useState<{ scope: string; state: string | null } | null>(null);
   useEffect(() => {
     if (autoState !== undefined && opening?.scope !== openingScope) {

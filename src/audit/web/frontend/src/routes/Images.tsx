@@ -690,6 +690,9 @@ function ImageRow({
               pageUrl={image.sample_page_url}
               showUrlBelow={false}
               actions={false}
+              // The inspector outlines this image on the page (by its content
+              // hash; the developer's request, 2026-11-16).
+              image={image.content_hash}
               origin="Images"
             />
             {otherPages > 0 && (

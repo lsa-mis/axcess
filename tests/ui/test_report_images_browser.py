@@ -246,3 +246,61 @@ async def test_images_tab_numbers_and_help(images_server: tuple[str, int], new_p
         await playwright_async.expect(tip).to_be_focused()
     finally:
         await page.context.close()
+
+
+async def test_an_image_opens_in_the_inspector_outlined(
+    images_server: tuple[str, int],
+    seeded_db: tuple[Path, Path, int],
+    new_page: Any,
+) -> None:
+    """The page link in an image's row opens the inspector with that image
+    outlined (``?image=`` its content hash; 2026-11-16), and the Images tab's
+    trail ends at the report, like Issues (ReportCrumb.tsx)."""
+    import gzip
+    import sqlite3
+
+    base, scan_id = images_server
+    db_path = seeded_db[0]
+    conn = sqlite3.connect(db_path)
+    try:
+        page_id = conn.execute(
+            "SELECT id FROM pages WHERE scan_id = ? ORDER BY id LIMIT 1", (scan_id,)
+        ).fetchone()[0]
+        content_hash = conn.execute(
+            "SELECT content_hash FROM images WHERE src_url_canonical LIKE '%students.png'"
+        ).fetchone()[0]
+        capture = (
+            "<!doctype html><html><head><title>Campus</title></head><body>"
+            "<p>Our students</p>"
+            '<img src="http://example.com/students.png" alt="Campus" width="40" height="40">'
+            "</body></html>"
+        )
+        conn.execute(
+            "UPDATE pages SET rendered_html = ? WHERE id = ?",
+            (gzip.compress(capture.encode()), page_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    try:
+        await page.goto(
+            f"{base}/app/scans/{scan_id}/images?group=with_alt", wait_until="networkidle"
+        )
+        trail = page.get_by_role("navigation", name="Breadcrumb")
+        await playwright_async.expect(trail.locator("[aria-current=page]")).not_to_have_text(
+            "Images"
+        )
+        row = page.get_by_role("row").filter(has_text="students.png")
+        link = row.get_by_role("link", name=re.compile("opens in the page inspector"))
+        href = await link.get_attribute("href")
+        assert href and f"image={content_hash}" in href, href
+        await link.click()
+        await page.wait_for_url(f"**/pages/{page_id}/inspect?**")
+        frame = page.frame_locator("iframe[title^='Saved copy']")
+        await playwright_async.expect(frame.locator(".axcess-inspect-highlight")).to_have_count(1)
+        # From the inspector, the trail leads back to the Images tab.
+        await playwright_async.expect(trail.get_by_role("link", name="Images")).to_be_visible()
+    finally:
+        await page.context.close()

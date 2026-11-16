@@ -1362,6 +1362,7 @@ export function PageLink({
   occurrenceId = null,
   snippet = null,
   issue = null,
+  image = null,
   origin,
   context,
   contextTo,
@@ -1383,6 +1384,8 @@ export function PageLink({
   snippet?: string | null;
   /** Issue key to resolve the selector for (used when ``selector`` is absent). */
   issue?: string | null;
+  /** An image's content hash: the inspector outlines every place it appears. */
+  image?: string | null;
   /** Label of the view this link lives in (orientation breadcrumb). */
   origin?: string;
   /** Short context label (rule/issue/finding) shown on the inspector. */
@@ -1423,6 +1426,7 @@ export function PageLink({
     // it at 4000 chars, so mirror that, no point truncating below the source.
     if (snippet) params.set("snippet", snippet.slice(0, 4000));
     if (issue) params.set("issue", issue);
+    if (image) params.set("image", image);
     if (origin) params.set("origin", origin);
     if (context) params.set("context", context);
     if (contextTo) params.set("contextTo", contextTo);

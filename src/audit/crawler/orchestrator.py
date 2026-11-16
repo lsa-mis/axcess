@@ -55,7 +55,7 @@ from audit.analyzer.vlm.vision import OllamaVisionProvider
 from audit.blob_store import BlobStore
 from audit.config import get_settings
 from audit.crawler import live_progress, url_policy
-from audit.crawler.fetcher import FetchError, FetchResult, StaticFetcher
+from audit.crawler.fetcher import FetchError, FetchResult, PageFetcher, StaticFetcher
 from audit.crawler.js_fetcher import JsFetcher
 from audit.crawler.rate_limit import HostLimiter
 from audit.crawler.render_detect import (
@@ -441,8 +441,14 @@ async def run_crawl(
     vlm_provider: VlmProvider | None = None,
     image_downloader: ImageDownloaderProtocol | None = None,
     alfa_analyzer: AlfaPageAnalyzer | None = None,
+    static_fetcher: PageFetcher | None = None,
 ) -> CrawlSummary:
-    """Execute (or resume) a crawl for ``config.seed_url``."""
+    """Execute (or resume) a crawl for ``config.seed_url``.
+
+    ``static_fetcher`` replaces the anonymous static fetch: a sign-in scan
+    that loads pages without running scripts passes one that goes through
+    the signed-in browser (``AuthenticatedStaticFetcher``).
+    """
     # Path-auto-slash first (``/bicentennial`` → ``/bicentennial/``), then
     # the canonical normalize pass. Scope then reads the normalized path.
     seed_with_slash = url_policy.normalize_seed_url(config.seed_url)
@@ -514,7 +520,7 @@ async def run_crawl(
     owned_client = http_client is None
     client = http_client or _default_client(config)
     robots = RobotsChecker(client, user_agent=config.robots_user_agent or config.user_agent)
-    fetcher = StaticFetcher(client)
+    fetcher: PageFetcher = static_fetcher or StaticFetcher(client)
     blob_store = BlobStore(get_settings().blob_dir)
     downloader = image_downloader or ImageDownloader(client, blob_store)
     ocr_pool: OcrPool | None = None
@@ -599,7 +605,7 @@ async def run_crawl(
     if config.visual_checks_enabled:
         vision_provider = None
         if config.vlm_enabled:
-            vision_provider = await _build_vision_provider(config, client)
+            vision_provider = await build_vision_provider(config, client)
         visual_probe = VisualProbe(provider=vision_provider)
     # Interaction probe, opt-in. Shares the crawl's single AxeAnalyzer so
     # axe is injected once per page whether or not this probe runs.
@@ -1162,7 +1168,7 @@ class _WorkerContext:
     scan_id: int
     limiter: HostLimiter
     robots: RobotsChecker
-    static: StaticFetcher
+    static: PageFetcher
     js: _LazyJs | None
     downloader: ImageDownloaderProtocol
     # Shared content-addressed store. Used to persist per-finding element
@@ -1209,7 +1215,7 @@ async def _build_vlm(
     return VlmConfig(provider=ollama)
 
 
-async def _build_vision_provider(
+async def build_vision_provider(
     config: CrawlConfig,
     client: httpx.AsyncClient,
 ) -> OllamaVisionProvider | None:

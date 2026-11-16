@@ -641,9 +641,14 @@ class JsFetcher:
             form_screenshots: dict[str, tuple[bytes | None, bytes | None]] = {}
             form_check_ran = False
             form_outcomes: dict[str, int] = {}
+            # Runs in a sign-in scan too since 2026-11-16, when the scan asked
+            # for it (the developer's decision: the sign-in form offers every
+            # setting the public form does). Until then this refused any
+            # signed-in browser, because a press there acts as the person
+            # signed in; the form now says so beside the choice, and it is
+            # off by default in a sign-in scan.
             if (
                 self._form_error_probe is not None
-                and not self._private_context
                 and 200 <= status < 300
                 and "text/html" in headers.get("content-type", "text/html")
             ):

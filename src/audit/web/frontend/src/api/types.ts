@@ -482,11 +482,17 @@ export interface LocalLoginScanPayload {
   approved_auth_origins: string[];
   authorization_acknowledged: true;
   max_pages: number;
+  /** No page limit; `max_pages` then only keeps the form's value. */
+  all_pages: boolean;
   max_depth: number;
   rps: number;
-  /** Concurrent authenticated tabs; the local login API caps this at four. */
+  /** Concurrent authenticated tabs; the local login API caps this at eight. */
   workers: number;
   whole_host: boolean;
+  include_subdomain: boolean;
+  ignore_robots: boolean;
+  /** Load page code without scripts, through the signed-in browser. */
+  static_only: boolean;
   /** Keep the signed-in browser visible instead of transferring to headless Chromium. */
   show_browser?: boolean;
   /** DOM rule engines run against the signed-in application scope. */
@@ -497,6 +503,15 @@ export interface LocalLoginScanPayload {
   skip_interaction: boolean;
   skip_keyboard: boolean;
   skip_responsive: boolean;
+  skip_focus: boolean;
+  skip_markup: boolean;
+  skip_semantic: boolean;
+  skip_visual: boolean;
+  skip_forms: boolean;
+  send_empty_forms: boolean;
+  user_agent_choice: string;
+  /** The exact browser name to send; empty for Axcess's own. */
+  user_agent: string;
   skip_ocr: boolean;
   skip_vlm: boolean;
   /** Do not persist rendered-page snapshots; the Page inspector re-renders. */
