@@ -34,6 +34,8 @@ _NAMES = {
     "WCAG",
     "Alfa",
     "Excel",
+    # Microsoft Word, named beside Excel in the document check's hint.
+    "Word",
     "Markdown",
     "Ollama",
     "Chromium",
