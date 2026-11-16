@@ -852,6 +852,13 @@ function IssueTable({
                   // same line as the issue types (the developer's report,
                   // 2026-11-16).
                   column === "Issue" && "sticky left-0 z-[1] bg-surface-muted px-4",
+                  // A number column's right edge gets 12px, not 6: its
+                  // numbers and heading ended 2px from the column line
+                  // (the sort button is pulled out 4px). The body cells
+                  // below get the same, so the numbers end under the
+                  // heading's words. The left stays 6px (the developer's
+                  // direction, 2026-11-16: keep the 6px padding).
+                  SORT_KINDS[column] === "number" && column !== "Priority" && "pr-3",
                   // The two count columns are set narrow (6rem): their words
                   // wrap ("Issue / occurrences") and the numbers are short,
                   // so the width they took was blank space that pushed the
@@ -870,7 +877,7 @@ function IssueTable({
                   // region at 1280px (test_issue_table_fits_the_default_desktop_width).
                   // Their headings sit 2px left of the tags under them; at 6px
                   // the table is still 1px too wide (2026-11-16).
-                  (column === "Type" || column === "Finding type" || column === "Priority") && "px-1",
+                  (column === "Type" || column === "Finding type" || column === "Priority") && "px-1.5",
                 )}
                 hint={columnHint(column)}
                 help={columnHelp(column)}
@@ -963,10 +970,10 @@ const IssueTableRow = memo(function IssueTableRow({
           <span title={PRIORITY_HELP[priorityTier(row.priority)]}>{priorityTier(row.priority)}</span>
         )}
       </Cell>
-      <Cell numeric className={cell}>
+      <Cell numeric className={cn(cell, "pr-3")}>
         {row.occurrence_count}
       </Cell>
-      <Cell numeric className={cell}>
+      <Cell numeric className={cn(cell, "pr-3")}>
         {row.page_count}
       </Cell>
       <Cell className={cell}>
