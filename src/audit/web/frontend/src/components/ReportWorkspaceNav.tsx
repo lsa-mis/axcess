@@ -47,7 +47,7 @@ export interface ReportView {
  * asked for the reader to choose instead (2026-10-29).
  */
 /** Views a Compare reports panel does not offer (see ReportWorkspaceNav). */
-const PANEL_LEAVES_OUT: ReadonlySet<string> = new Set(["compare", "documents"]);
+const PANEL_LEAVES_OUT: ReadonlySet<string> = new Set(["compare"]);
 
 export const REPORT_VIEWS: readonly ReportView[] = [
   {
@@ -108,15 +108,14 @@ export default function ReportWorkspaceNav({
   const { pathname } = useLocation();
   const active = activeReportView(pathname);
   // The current view stays, so a saved link to it still has its tab. As a
-  // panel of Compare reports (lib/framed.ts) a panel offers its report's
-  // Issues and Images and switches between them like the whole window does
-  // (the developer's decision, 2026-11-16), so the two panels can show one
-  // report's issues beside the other's, or both reports' images. Compare
+  // panel of Compare reports (lib/framed.ts) a panel offers every view of
+  // its report but Compare reports, Issues, Images and Documents, and
+  // switches between them like the whole window does (the developer's
+  // decision, 2026-11-16), so the two panels can show one report's issues
+  // beside the other's, or both reports' images or documents. Compare
   // reports stays out of a panel: it would open the comparison inside one of
-  // its own panels. Documents stays out too: the developer chose Issues and
-  // Images for panels (tests/ui/test_compare_side_by_side.py), and offering
-  // the file list there is the developer's call. From 2026-11-13 to
-  // 2026-11-16 a panel kept only its current view, so it had no tab row.
+  // its own panels. From 2026-11-13 to 2026-11-16 a panel kept only its
+  // current view, so it had no tab row.
   const views = REPORT_VIEWS.filter(
     (view) =>
       view === active ||
