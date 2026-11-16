@@ -73,6 +73,7 @@ from audit.db.schema import write_batch
 from audit.extractor.downloader import ImageDownloader, ImageDownloaderProtocol
 from audit.extractor.pipeline import OcrConfig, VlmConfig, process_page
 from audit.linked_files import formats as linked_file_formats
+from audit.linked_files.fetch import FileFetcher
 from audit.linked_files.tracker import LinkedFileTracker
 from audit.logging import get_logger
 from audit.synthesizer.findings import synthesize_findings
@@ -343,11 +344,15 @@ class CrawlConfig:
     store_rendered_html: bool = True
     # Linked files, the report's Documents tab (``audit.linked_files``):
     # record every PDF, Office or Google file the scanned pages link to,
-    # where from, and check each PDF once at the end of the crawl, including
-    # a PDF on another host (one file, never a crawl of that host). Public
-    # scans only: a sign-in scan (``browser_only``) never records them,
-    # because their links and files can be private to the signed-in user.
+    # where from, and check each PDF during the crawl, including a PDF on
+    # another host (one file, never a crawl of that host).
     linked_files_enabled: bool = True
+    # A sign-in scan's document check (2026-11-16): its PDFs are downloaded
+    # only through the signed-in browser (``run_crawl``'s ``file_fetcher``),
+    # whose egress policy keeps them to the signed-in site. Without that
+    # fetcher the check does not run at all, never with anonymous requests.
+    # Other browser-only scans (the protected agent pipeline) never run it.
+    documents_signed_in: bool = False
     # The row this crawl must write into, when the caller already created it.
     # ``_prepare_scan_row`` and ``_ensure_scan`` each work out "which row is
     # this crawl" from the seed URL, and they do not work it out the same way.
@@ -442,13 +447,19 @@ async def run_crawl(
     image_downloader: ImageDownloaderProtocol | None = None,
     alfa_analyzer: AlfaPageAnalyzer | None = None,
     static_fetcher: PageFetcher | None = None,
+    file_fetcher: FileFetcher | None = None,
 ) -> CrawlSummary:
     """Execute (or resume) a crawl for ``config.seed_url``.
 
     ``static_fetcher`` replaces the anonymous static fetch: a sign-in scan
     that loads pages without running scripts passes one that goes through
-    the signed-in browser (``AuthenticatedStaticFetcher``).
+    the signed-in browser (``AuthenticatedStaticFetcher``). ``file_fetcher``
+    does the same for the document check's downloads
+    (``SignedInFileFetcher``); a scan with ``documents_signed_in`` must pass
+    it.
     """
+    if config.documents_signed_in and _linked_files_on(config) and file_fetcher is None:
+        raise ValueError("A sign-in scan's document check needs the signed-in file fetcher")
     # Path-auto-slash first (``/bicentennial`` → ``/bicentennial/``), then
     # the canonical normalize pass. Scope then reads the normalized path.
     seed_with_slash = url_policy.normalize_seed_url(config.seed_url)
@@ -701,6 +712,7 @@ async def run_crawl(
             # A picture of each readable PDF's first page, unless the scan
             # chose not to store rendered pages.
             thumbnails=blob_store if config.store_rendered_html else None,
+            fetch=file_fetcher,
         )
     try:
         try:
@@ -999,8 +1011,18 @@ _config_json = config_json_for_scan
 
 
 def _linked_files_on(config: CrawlConfig) -> bool:
-    """Linked files are recorded on public scans that did not turn them off."""
-    return config.linked_files_enabled and not config.browser_only
+    """Linked files are recorded unless turned off.
+
+    A public scan downloads with its own client. A sign-in scan
+    (``documents_signed_in``) downloads only through the signed-in browser,
+    and ``run_crawl`` refuses to start its check without that fetcher. Any
+    other browser-only scan never records them: their links and files can
+    be private to the signed-in user, and nothing would download them as
+    that user.
+    """
+    if not config.linked_files_enabled:
+        return False
+    return config.documents_signed_in or not config.browser_only
 
 
 def _purge_out_of_scope_jobs(

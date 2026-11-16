@@ -61,7 +61,7 @@ from audit.db import linked_files as store
 from audit.db.schema import write_batch
 from audit.linked_files import formats
 from audit.linked_files.discovery import FoundLink, find_links, resolve
-from audit.linked_files.fetch import MAX_FILE_BYTES, FetchedFile, fetch_file
+from audit.linked_files.fetch import MAX_FILE_BYTES, FetchedFile, FileFetcher, fetch_file
 from audit.linked_files.pdf_check import PdfCheck, check_pdf, looks_like_pdf
 from audit.linked_files.thumbnail import first_page_jpegs
 from audit.logging import get_logger
@@ -90,6 +90,9 @@ class _Downloads:
     # store rendered pages, and a picture of a document is the same kind of
     # stored copy).
     thumbnails: BlobStore | None = None
+    # A sign-in scan's download, through the signed-in browser
+    # (``SignedInFileFetcher``); None downloads with ``client``.
+    fetch: FileFetcher | None = None
 
 
 #: PDFs downloaded by ``check_pending`` per scan. The ones the crawler
@@ -148,8 +151,13 @@ class LinkedFileTracker:
         blocked_url_patterns: Sequence[str],
         excluded_scopes: Sequence[str],
         thumbnails: BlobStore | None = None,
+        fetch: FileFetcher | None = None,
     ) -> None:
-        """What ``check_page`` downloads with: the crawl's own client and limits."""
+        """What ``check_page`` downloads with: the crawl's own client and limits.
+
+        ``fetch`` replaces the download itself (a sign-in scan's signed-in
+        browser); the rate limit, robots.txt and the scan-wide cap still apply.
+        """
         self._downloads = _Downloads(
             client=client,
             limiter=limiter,
@@ -158,6 +166,7 @@ class LinkedFileTracker:
             blocked_url_patterns=tuple(blocked_url_patterns),
             excluded_scopes=tuple(excluded_scopes),
             thumbnails=thumbnails,
+            fetch=fetch,
         )
 
     # -- while the crawl runs ---------------------------------------------
@@ -423,7 +432,11 @@ class LinkedFileTracker:
                 self._store(file_id, store.CheckResult("could_not_check", "robots"))
                 return
             async with downloads.limiter.throttle(url):
-                fetched = await fetch_file(downloads.client, url)
+                fetched = (
+                    await downloads.fetch(url)
+                    if downloads.fetch is not None
+                    else await fetch_file(downloads.client, url)
+                )
             await self._check_fetched(file_id, fetched)
 
     # -- shared -----------------------------------------------------------
@@ -549,6 +562,8 @@ _FETCH_REASON: dict[str, formats.Reason] = {
     "broken_link": "broken_link",
     "too_large": "too_large",
     "timed_out": "timed_out",
+    # A sign-in scan's download refused by its egress policy (another site).
+    "blocked": "blocked",
 }
 _CHECK_REASON: dict[str, formats.Reason] = {
     "password": "password",
