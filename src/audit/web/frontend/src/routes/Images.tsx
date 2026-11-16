@@ -1,8 +1,18 @@
 import { useEffect, useRef, useState } from "react";
-import { useParams, useSearchParams } from "react-router";
-import { Check, Copy, Download, Sparkles, X } from "lucide-react";
+import { Link, useLocation, useParams, useSearchParams } from "react-router";
+import { Download } from "lucide-react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, blobUrl, ApiError } from "../api/client";
+import { api, ApiError } from "../api/client";
+import {
+  CurrentAlt,
+  IMAGE_PAGES_COLUMN,
+  IMAGES_VIEW,
+  ImageThumb,
+  SuggestionBox,
+  VerdictSummary,
+  imageName,
+  imagePath,
+} from "../components/ImageParts";
 import ReportHeader from "../components/ReportHeader";
 import { SummaryStat } from "../components/ReportSummary";
 import Tabs from "../components/Tabs";
@@ -21,12 +31,10 @@ import {
   TableStatus,
 } from "../components/table/Table";
 import { ActiveFilters, FilterMenu, activeFilterItems, type FilterGroup } from "../components/table/FilterMenu";
-import { AltTag, Button, Card, HelpTip, PageLink } from "../components/ui";
-import { useModalDialog } from "../hooks/useModalDialog";
+import { Button, Card, HelpTip, withReturnTrail } from "../components/ui";
 import { useScanQuery } from "../hooks/useScanQuery";
 import { cn } from "../lib/cn";
-import { copyText } from "../lib/clipboard";
-import { ALT_VERDICT_COUNT_LABEL, ALT_VERDICT_LABEL, ALT_VERDICT_SOURCE_LABEL, IMAGE_GROUP_LABEL } from "../lib/terms";
+import { ALT_VERDICT_COUNT_LABEL, ALT_VERDICT_LABEL, IMAGE_GROUP_LABEL } from "../lib/terms";
 import type { AltVerdict, ImageGroup, ImageGroupCounts, ReportImage, ReportImagesFilter } from "../api/types";
 
 /**
@@ -73,32 +81,12 @@ const PAGER_ID = "pager-report-images";
 const GROUPS: ImageGroup[] = ["with_text", "missing_alt", "with_alt"];
 const VERDICTS: AltVerdict[] = ["needs_alt", "needs_better", "not_checked", "good"];
 
-/** Verdict chip colours. The words carry the meaning; colour only repeats it. */
-const VERDICT_CHIP: Record<AltVerdict, string> = {
-  needs_alt: "border-sev-critical/40 bg-sev-critical-bg text-sev-critical",
-  needs_better: "border-sev-major/40 bg-sev-major-bg text-sev-major",
-  not_checked: "border-dashed border-border-strong bg-surface-muted text-fg-muted",
-  good: "border-ok/40 bg-ok-bg text-ok",
-};
-
 function isGroup(value: string | null): value is ImageGroup {
   return GROUPS.includes(value as ImageGroup);
 }
 
 function isVerdict(value: string | null): value is AltVerdict {
   return VERDICTS.includes(value as AltVerdict);
-}
-
-/** The image's file name, the row's name: "banner.png". */
-export function imageName(image: ReportImage): string {
-  try {
-    const path = new URL(image.image_url).pathname;
-    const last = decodeURIComponent(path.split("/").filter(Boolean).pop() ?? "");
-    if (last) return last.length > 60 ? `${last.slice(0, 57)}…` : last;
-  } catch {
-    // An inline SVG has no address of its own; fall through.
-  }
-  return image.has_svg_text ? "Inline SVG" : "Image";
 }
 
 function plural(n: number, one: string, many: string): string {
@@ -109,6 +97,9 @@ export default function ImagesRoute() {
   const { scanId } = useParams<{ scanId: string }>();
   const id = Number(scanId);
   const [params, setParams] = useSearchParams();
+  const location = useLocation();
+  // This list as it stands, for the image page's way back.
+  const here = `${location.pathname}${location.search}`;
   const scanQuery = useScanQuery(id);
   const queryClient = useQueryClient();
 
@@ -140,7 +131,6 @@ export default function ImagesRoute() {
   const [announcement, setAnnouncement] = useState("");
   const [errors, setErrors] = useState<Record<number, string>>({});
   const [focusId, setFocusId] = useState<number | null>(null);
-  const [viewing, setViewing] = useState<ReportImage | null>(null);
   const check = useMutation({
     mutationFn: (image: ReportImage) => api.checkImageAlt(id, image.image_id),
     onMutate: (image) => {
@@ -401,9 +391,9 @@ export default function ImagesRoute() {
                 <tr>
                   <ColumnHeader className="w-44 text-left">Image</ColumnHeader>
                   <ColumnHeader className="text-left">Text in the image</ColumnHeader>
-                  <ColumnHeader className="text-left">Where it appears</ColumnHeader>
                   <ColumnHeader className="text-left">Current alt text</ColumnHeader>
                   <ColumnHeader className="w-52 text-left">Alt text verdict</ColumnHeader>
+                  <ColumnHeader className="w-28">{IMAGE_PAGES_COLUMN}</ColumnHeader>
                   <ColumnHeader className="w-72 text-left">Suggested alt text</ColumnHeader>
                 </tr>
               </TableHead>
@@ -421,7 +411,7 @@ export default function ImagesRoute() {
                     focus={focusId === image.image_id}
                     onFocused={() => setFocusId(null)}
                     onCheck={() => check.mutate(image)}
-                    onView={() => setViewing(image)}
+                    backTo={here}
                   />
                 ))}
               </tbody>
@@ -430,7 +420,6 @@ export default function ImagesRoute() {
         )}
         </PagedTable>
       </Card>
-      <ImageViewer image={viewing} onClose={() => setViewing(null)} />
     </>
   );
 }
@@ -478,130 +467,6 @@ function ZipDownload({ scanId }: { scanId: number }) {
   );
 }
 
-/**
- * The image at full size, in a native modal ``<dialog>`` (useModalDialog), the
- * same pattern as the issue guidance dialog: the browser traps focus inside,
- * Escape closes it, and focus goes back to the thumbnail that opened it (WAI-ARIA
- * APG, Dialog (Modal) pattern, https://www.w3.org/WAI/ARIA/apg/patterns/dialog-modal/).
- * A click on the dimmed area around it also closes it, as people expect of an
- * image viewer; the close button is the way that works for everyone.
- *
- * The close button says "Close image viewer" in visible words, not an X with
- * an aria-label (the repo's control-text rule). The picture itself has
- * alt="": the dialog's heading names it, and its current alt text and the
- * text read from it are written out below, so a screen reader user gets the
- * same facts without the picture claiming one of them as its description.
- */
-function ImageViewer({ image, onClose }: { image: ReportImage | null; onClose: () => void }) {
-  const ref = useModalDialog(image != null);
-  const name = image ? imageName(image) : "";
-  return (
-    // The click handler only catches clicks on the dimmed backdrop, a mouse
-    // extra. Keyboard users close the dialog with Escape (native to a modal
-    // <dialog>) or the close button, so no key listener is needed here.
-    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- Keep: backdrop click; Escape and the close button cover keyboard
-    <dialog
-      ref={ref}
-      aria-labelledby="image-viewer-title"
-      onClose={onClose}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-      className="max-h-[92vh] w-[min(94vw,60rem)] overflow-y-auto rounded-xs border border-border bg-surface-raised p-0 text-fg shadow-raised backdrop:bg-black/60"
-    >
-      {image && (
-        <>
-          <div className="sticky top-0 z-[1] flex flex-wrap items-start justify-between gap-3 border-b border-border bg-surface px-5 py-3">
-            <h2 id="image-viewer-title" className="min-w-0 break-all text-lg font-semibold">
-              {name}
-            </h2>
-            <Button type="button" variant="secondary" onClick={onClose}>
-              <X className="h-4 w-4" aria-hidden />
-              Close image viewer
-            </Button>
-          </div>
-          <div className="px-5 py-4">
-            <img
-              src={blobUrl(image.content_hash)}
-              alt=""
-              className="mx-auto max-h-[65vh] max-w-full rounded-xs border border-border bg-white object-contain"
-            />
-            <dl className="mt-4 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[max-content_minmax(0,1fr)]">
-              <dt className="font-semibold text-fg-muted">Current alt text</dt>
-              <dd className="min-w-0">
-                <AltTag value={image.alt_text} wrap />
-              </dd>
-              <dt className="font-semibold text-fg-muted">Text in the image</dt>
-              <dd className="min-w-0 break-words">{image.image_text ?? "None found"}</dd>
-              <dt className="font-semibold text-fg-muted">Alt text verdict</dt>
-              <dd>
-                {ALT_VERDICT_LABEL[image.verdict]}. {image.verdict_reason}
-              </dd>
-            </dl>
-          </div>
-        </>
-      )}
-    </dialog>
-  );
-}
-
-/**
- * A suggested alt text, ready to paste: the text in a box of its own with
- * "Copy alt text" under it, then the caution about where it came from (the
- * developer's request, 2026-11-13).
- *
- * The box is a plain bordered panel, so the suggestion reads as the thing to
- * take. The caution sits below it as a separate note in the accent
- * colour, with a sparkle icon and in bold, so it is clearly seen and
- * cannot be mistaken for part of the alt text, nor for a verdict (the
- * verdict chips use the critical, major and ok colours). A dashed accent
- * border and italic text, not the information colours first tried: in the
- * dark theme those were nearly the box's own grey (2026-11-13 check). Its words carry
- * the meaning; the icon and colour only repeat it (SC 1.4.1 Use of Color,
- * Level A).
- *
- * The copy button follows the page code viewer's (components/DomSource.tsx):
- * its words change to "Copied" for two seconds and it is a polite live
- * region, so the result is heard. The repo has no shared copy button; this
- * is the second one, and a third should move both into components/ui.tsx.
- * Its name ends with the image's file name in screen-reader-only text, so
- * each row's button says which alt text it copies (WCAG technique C7). It
- * copies through lib/clipboard.ts, which also works on plain http. If the
- * browser still refuses, it says so and the text can be selected by hand.
- */
-function SuggestionBox({ text, name }: { text: string; name: string }) {
-  const [state, setState] = useState<"idle" | "copied" | "failed">("idle");
-  const copy = async () => {
-    if (await copyText(text)) {
-      setState("copied");
-      window.setTimeout(() => setState("idle"), 2000);
-    } else {
-      setState("failed");
-    }
-  };
-  return (
-    <div className="space-y-2">
-      <div className="rounded-xs border border-border-strong bg-surface p-2.5">
-        <p className="break-words text-sm leading-6 text-fg">{text}</p>
-        <Button size="sm" className="mt-2 min-h-target" onClick={() => void copy()} aria-live="polite">
-          {state === "copied" ? <Check className="h-3.5 w-3.5" aria-hidden /> : <Copy className="h-3.5 w-3.5" aria-hidden />}
-          {state === "copied" ? "Copied" : "Copy alt text"}
-          <span className="sr-only"> for {name}</span>
-        </Button>
-        {state === "failed" && (
-          <p className="mt-1 text-xs text-sev-critical">
-            Your browser did not allow copying. Select the text and copy it instead.
-          </p>
-        )}
-      </div>
-      <p className="flex items-start gap-1.5 rounded-xs border border-dashed border-umich-blue/70 bg-umich-blue/10 px-2 py-1.5 text-xs font-semibold italic leading-5 text-fg-accent">
-        <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-        Written by the local AI model. Check it before you use it.
-      </p>
-    </div>
-  );
-}
-
 function ImageRow({
   index,
   scanId,
@@ -613,7 +478,7 @@ function ImageRow({
   focus,
   onFocused,
   onCheck,
-  onView,
+  backTo,
 }: {
   index: number;
   scanId: number;
@@ -625,7 +490,8 @@ function ImageRow({
   focus: boolean;
   onFocused: () => void;
   onCheck: () => void;
-  onView: () => void;
+  /** This list, with its group, filter, search and page, for the image page's way back. */
+  backTo: string;
 }) {
   const name = imageName(image);
   const answerRef = useRef<HTMLDivElement>(null);
@@ -640,39 +506,30 @@ function ImageRow({
   // "Suggest". Both send the image to the model and get a suggestion back.
   const action =
     image.verdict === "not_checked" && image.alt_text ? "Check alt text" : "Suggest alt text";
-  const otherPages = image.page_count - 1;
 
   return (
     <Row index={index} className="align-top">
       <RowHeader className="align-top">
-        {image.has_svg_text || !image.content_hash ? (
-          <span className="flex h-12 w-[72px] items-center justify-center rounded-xs border border-border bg-surface-muted font-mono text-2xs font-semibold text-fg-muted">
-            SVG
+        {/* The thumbnail and the name are one link to the image's own page
+            (the developer's request, 2026-11-16, following the Documents
+            tab, where a file's name opens its page): one link per image,
+            not two that go to the same place (W3C COGA, "Making Content
+            Usable": one way to do one thing). The picture is decorative
+            (alt=""), so the link's name is the file name, with "full
+            details" for a screen reader (WCAG technique C7; SC 2.4.9 Link
+            Purpose (Link Only), Level AAA), as the Documents tab says it.
+            It opened the image viewer until then; the viewer is on the
+            image's page now. At least 44px tall (SC 2.5.5). */}
+        <Link
+          to={withReturnTrail(imagePath(scanId, image.image_id), IMAGES_VIEW, backTo)}
+          className="group flex min-h-target flex-col items-start gap-1 rounded-xs text-umich-blue focus-visible:outline-none focus-visible:shadow-focus"
+        >
+          <ImageThumb image={image} />
+          <span className="break-all text-xs font-semibold underline underline-offset-2 group-hover:text-umich-blue-600">
+            {name}
           </span>
-        ) : (
-          // The thumbnail is the button that opens the image viewer (the
-          // developer's request, 2026-11-13): a 72 by 48 picture is too small
-          // to judge alt text against. The picture is decorative (alt=""); the
-          // button's words, partly screen-reader-only (WCAG technique C7),
-          // say what it does and which image. A 44 px tall target (SC 2.5.5).
-          <Button
-            variant="ghost"
-            onClick={onView}
-            className="min-h-target p-0.5"
-          >
-            <img
-              src={blobUrl(image.content_hash)}
-              alt=""
-              loading="lazy"
-              decoding="async"
-              width={72}
-              height={48}
-              className="h-12 w-[72px] rounded-xs border border-border bg-white object-contain"
-            />
-            <span className="sr-only">View larger image: {name}</span>
-          </Button>
-        )}
-        <span className="mt-1 block break-all text-xs font-semibold">{name}</span>
+          <span className="sr-only">, full details</span>
+        </Link>
       </RowHeader>
       <Cell className="align-top text-sm">
         {image.image_text ? (
@@ -682,52 +539,20 @@ function ImageRow({
         )}
       </Cell>
       <Cell className="align-top">
-        {image.sample_page_id != null && image.sample_page_url ? (
-          <>
-            <PageLink
-              scanId={scanId}
-              pageId={image.sample_page_id}
-              pageUrl={image.sample_page_url}
-              showUrlBelow={false}
-              actions={false}
-              // The inspector outlines this image on the page (by its content
-              // hash; the developer's request, 2026-11-16).
-              image={image.content_hash}
-              origin="Images"
-            />
-            {otherPages > 0 && (
-              <span className="block text-xs text-fg-muted">
-                and on {plural(otherPages, "other page", "other pages")}
-              </span>
-            )}
-          </>
-        ) : (
-          <span className="text-fg-subtle">Does not apply</span>
-        )}
+        <CurrentAlt image={image} />
       </Cell>
       <Cell className="align-top">
-        <AltTag value={image.alt_text} wrap />
-        {image.alt_text_variants > 1 && (
-          <span className="mt-1 block text-xs text-fg-muted">
-            Differs between pages: this is the worst one.
-          </span>
-        )}
+        <VerdictSummary image={image} />
       </Cell>
-      <Cell className="align-top">
-        <span
-          className={cn(
-            "inline-flex items-center rounded-xs border px-2 py-0.5 text-xs font-semibold",
-            VERDICT_CHIP[image.verdict],
-          )}
-        >
-          {ALT_VERDICT_LABEL[image.verdict]}
-        </span>
-        <span className="mt-1 block text-xs text-fg-muted">{image.verdict_reason}</span>
-        {image.verdict_source && (
-          <span className="mt-0.5 block text-xs text-fg-subtle">
-            {ALT_VERDICT_SOURCE_LABEL[image.verdict_source]}
-          </span>
-        )}
+      {/* How many pages, as a plain number: the pages are listed on the
+          image's page. It was "Where it appears", the first page as a link
+          and "and on 5 other pages" as text, which named one page and hid
+          the rest (the developer's report, 2026-11-16). The Documents tab's
+          "Pages it appears on" is the same number in the same words, and
+          Issues' "Affected pages" is too (SC 3.2.4 Consistent
+          Identification, Level AA). */}
+      <Cell numeric className="align-top">
+        {image.page_count.toLocaleString()}
       </Cell>
       <Cell className="align-top">
         {image.suggestion ? (

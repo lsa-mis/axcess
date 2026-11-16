@@ -6,6 +6,7 @@ import { api } from "../api/client";
 import { cn } from "../lib/cn";
 import { ScanTag } from "./ui";
 import { useScanQuery } from "../hooks/useScanQuery";
+import { imageName } from "./ImageParts";
 
 /**
  * The topbar's orientation line for everything under a report, and the only
@@ -32,6 +33,7 @@ const VIEWS: Array<[RegExp, string]> = [
   [/^\/scans\/\d+\/issues\/[^/]+\/pages\/?$/, "Pages"],
   [/^\/scans\/\d+\/issues\/[^/]+\/?$/, "Issue evidence"],
   [/^\/scans\/\d+\/issues\/?$/, "Issues"],
+  [/^\/scans\/\d+\/images\/\d+\/?$/, "Image"],
   [/^\/scans\/\d+\/images\/?$/, "Images"],
   [/^\/scans\/\d+\/compare\/?$/, "Compare reports"],
   [/^\/scans\/\d+\/compare\/changes\/?$/, "What changed"],
@@ -74,7 +76,8 @@ export type CrumbSubject =
   | { kind: "issue"; scanId: number; key: string }
   | { kind: "issuePages"; scanId: number; key: string }
   | { kind: "issuePageScreenshots"; scanId: number; key: string; pageId: number }
-  | { kind: "page"; scanId: number; pageId: number; view: "inspect" | "evidence" };
+  | { kind: "page"; scanId: number; pageId: number; view: "inspect" | "evidence" }
+  | { kind: "image"; scanId: number; imageId: number };
 
 /** One link in the trail. `subject` is set when the label should name that thing. */
 export type Crumb = { label: string; to: string; subject?: CrumbSubject };
@@ -133,8 +136,16 @@ function issueScopeKey(pathname: string): string | null {
   return key ? decodeURIComponent(key) : null;
 }
 
+/** The image ID in a route scoped to one image of the Images tab, or null. */
+function imageScopeId(pathname: string): number | null {
+  const id = pathname.match(/^\/scans\/\d+\/images\/(\d+)(?:\/|$)/)?.[1];
+  return id ? Number(id) : null;
+}
+
 /** The thing a route itself names, from its path alone. */
 function subjectFor(pathname: string): CrumbSubject | undefined {
+  const image = pathname.match(/^\/scans\/(\d+)\/images\/(\d+)\/?$/);
+  if (image) return { kind: "image", scanId: Number(image[1]), imageId: Number(image[2]) };
   const page = pathname.match(/^\/scans\/(\d+)\/pages\/(\d+)(\/inspect)?\/?$/);
   if (page) {
     return {
@@ -168,6 +179,8 @@ function placeholderFor(subject: CrumbSubject): string {
       return subject.view === "inspect"
         ? `Page ${subject.pageId}`
         : `Page details for page ${subject.pageId}`;
+    case "image":
+      return "Image";
   }
 }
 
@@ -237,6 +250,13 @@ function trailFor(
     }
   }
 
+  // 2b. An image's page sits under the Images tab, as an issue type's record
+  // sits under Issues, so a bookmark still shows the way back (the
+  // Documents tab's document page does the same).
+  if (imageScopeId(pathname) != null && scanId != null) {
+    add({ label: "Images", to: `/scans/${scanId}/images` });
+  }
+
   // 3. What the inspector is outlining, when the chain did not pass through it.
   const contextTo = inAppPath(params.get("contextTo"));
   const contextLabel = params.get("context");
@@ -294,8 +314,11 @@ export function useReportTrail(): {
   const issueKeys = [
     ...new Map(
       subjects
-        .filter((subject) => subject.kind !== "page")
-        .map((subject) => [`${subject.scanId}:${subject.key}`, subject] as const),
+        .flatMap((subject) =>
+          subject.kind === "page" || subject.kind === "image"
+            ? []
+            : [[`${subject.scanId}:${subject.key}`, subject] as const],
+        ),
     ).values(),
   ];
   const issueQueries = useQueries({
@@ -319,6 +342,23 @@ export function useReportTrail(): {
       queryKey: ["page-evidence", subject.scanId, subject.pageId],
       queryFn: () => api.getPageEvidence(subject.scanId, subject.pageId),
       enabled: match != null,
+    })),
+  });
+  // Images the trail names: the same key the image's own page loads, so on
+  // that page this is read from cache.
+  const imageKeys = [
+    ...new Map(
+      subjects.flatMap((subject) =>
+        subject.kind === "image" ? [[`${subject.scanId}:${subject.imageId}`, subject] as const] : [],
+      ),
+    ).values(),
+  ];
+  const imageQueries = useQueries({
+    queries: imageKeys.map((subject) => ({
+      queryKey: ["report-image", subject.scanId, subject.imageId],
+      queryFn: () => api.getReportImage(subject.scanId, subject.imageId),
+      enabled: match != null,
+      retry: false,
     })),
   });
   const issueDetail = (scanId: number, key: string) =>
@@ -346,6 +386,12 @@ export function useReportTrail(): {
         const name = pageName(page?.title, page?.url_normalized);
         if (!name) return null;
         return subject.view === "inspect" ? name : `Page details for ${name}`;
+      }
+      case "image": {
+        const found =
+          imageQueries[imageKeys.findIndex((s) => s.scanId === subject.scanId && s.imageId === subject.imageId)]
+            ?.data?.image;
+        return found ? imageName(found) : null;
       }
     }
   };

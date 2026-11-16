@@ -26,6 +26,7 @@ import type {
   FindingDetail,
   ReportImage,
   ReportImagesFilter,
+  ReportImageDetail,
   ReportImagesResponse,
   FindingsFilter,
   FindingsPage,
@@ -521,6 +522,9 @@ export const api = {
     return request<FindingsPage>(`/api/scans/${scanId}/findings?${params}`);
   },
   /** One page of one group of the report's images (the Images tab). */
+  /** One image of the report, and every page it appears on (up to 2,000). */
+  getReportImage: (scanId: number, imageId: number) =>
+    request<ReportImageDetail>(`/api/scans/${scanId}/images/${imageId}`),
   listReportImages: (scanId: number, filter: ReportImagesFilter) => {
     const params = new URLSearchParams();
     params.set("group", filter.group);
