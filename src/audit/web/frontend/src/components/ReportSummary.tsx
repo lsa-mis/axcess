@@ -3,9 +3,9 @@ import { Link } from "react-router";
 import { AlertOctagon } from "lucide-react";
 import type { IssueRow, ScanDetail } from "../api/types";
 import MethodCoverageLedger, { methodsRan } from "./MethodCoverageLedger";
-import { Card, Disclosure } from "./ui";
+import { Card, Disclosure, HelpTip } from "./ui";
 import { cn } from "../lib/cn";
-import { CLICK_THROUGH_STATES, clickThroughStates } from "../lib/labels";
+import { CLICK_THROUGH_STATES, ISSUE_TYPE_HELP, OCCURRENCE_HELP, clickThroughStates } from "../lib/labels";
 import { SCAN_END_LABEL } from "../lib/terms";
 import { NUMBERS } from "./newScan/copy";
 
@@ -44,16 +44,22 @@ export function SummaryStat({
   label,
   value,
   outOf,
+  help,
   className,
 }: {
   label: string;
   value: number;
   outOf?: string;
+  /** A ``HelpTip`` after the label, for a counting term that needs explaining. */
+  help?: ReactNode;
   className?: string;
 }) {
   return (
     <div className={cn("flex flex-col gap-1", className)}>
-      <dt className="order-2 text-sm font-semibold text-fg">{label}</dt>
+      <dt className="order-2 flex items-center gap-0.5 text-sm font-semibold text-fg">
+        {label}
+        {help}
+      </dt>
       <dd className="order-1 mb-1 text-3xl font-semibold leading-none tabular-nums text-umich-blue">
         {value.toLocaleString()}
         {outOf && <span className="text-base font-semibold leading-none text-fg-muted"> {outOf}</span>}
@@ -295,10 +301,29 @@ export function ReportSummary({
           make a number look smaller, Interface language rule 4.) The
           Reports list counts the same way (routes/Scans.tsx). */}
       <dl className="mt-10 mb-6 grid grid-cols-2 gap-x-8 gap-y-8 sm:grid-cols-3 lg:gap-x-12">
-        <SummaryStat label={issueGroups === 1 ? "Issue type" : "Issue types"} value={issueGroups} />
+        {/* A "?" after each count's name, where the words "issue type" and
+            "occurrence" are first met (the developer's choice, 2026-11-16):
+            the same meanings as "What the labels mean" under the table
+            (ISSUE_TYPE_HELP, OCCURRENCE_HELP), which is why it may be 28px
+            wide (HelpTip, ``equivalent``). The negative margin keeps the
+            label's line its own height around the 44px-tall target. */}
+        <SummaryStat
+          label={issueGroups === 1 ? "Issue type" : "Issue types"}
+          value={issueGroups}
+          help={
+            <HelpTip question="What is an issue type" equivalent="report-labels-button" className="-my-3">
+              <p>{ISSUE_TYPE_HELP}</p>
+            </HelpTip>
+          }
+        />
         <SummaryStat
           label={occurrences === 1 ? "Issue occurrence" : "Issue occurrences"}
           value={occurrences}
+          help={
+            <HelpTip question="What is an issue occurrence" equivalent="report-labels-button" className="-my-3">
+              <p>{OCCURRENCE_HELP}</p>
+            </HelpTip>
+          }
         />
         <SummaryStat
           label="Pages visited"
