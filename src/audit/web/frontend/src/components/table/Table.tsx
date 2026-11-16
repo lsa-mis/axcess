@@ -1,11 +1,13 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type HTMLAttributes,
   type ReactNode,
   type Ref,
+  type RefObject,
   type TdHTMLAttributes,
   type ThHTMLAttributes,
 } from "react";
@@ -439,6 +441,18 @@ export function SortHeader<K extends string>({
    * need explaining (Issues' "How sure"). Beside the button, not inside it:
    * one control sorts and the other explains, so neither does two things.
    * In the middle of the label's line, on the column's side, like the label.
+   *
+   * With a "?", a label that wraps keeps the "?" beside its words: the sort
+   * button is shrunk to its longest line (``useFitToLines``). A wrapped
+   * button is otherwise as wide as the space it was given, not as its text,
+   * so the "?" after it floated apart from the words it explains
+   * ("Accessibility / problems? ⇅ … ?", the developer's screenshot,
+   * 2026-11-16). Proximity says what belongs together (W3C COGA, "Making
+   * Content Usable"). Here, not on one header, so every header with a "?"
+   * gets it; a label on one line looks the same either way. Rejected:
+   * aligning the lines to the "?" (it moved the heading off its column's
+   * side, the rule above) and keeping such a label on one line (it widened
+   * the column until the table scrolled sideways at 1280px).
    */
   help?: ReactNode;
   className?: string;
@@ -447,6 +461,8 @@ export function SortHeader<K extends string>({
 }) {
   const active = sort?.column === column;
   const right = (align ?? (kind === "number" ? "right" : "left")) === "right";
+  const button = useRef<HTMLButtonElement>(null);
+  useFitToLines(button, help != null, `${active}-${sort?.direction}-${typeof children === "string" ? children : column}`);
   const Arrow = !sort || !active ? ArrowUpDown : sort.direction === "asc" ? ArrowUp : ArrowDown;
   const words = wrap === "words";
   const label = children ?? column;
@@ -454,6 +470,7 @@ export function SortHeader<K extends string>({
     sort && active ? (
       <span
         key={`${sort.column}-${sort.direction}`}
+        data-sort-mark
         className={cn(
           "inline-flex items-center gap-0.5 whitespace-nowrap rounded-full bg-umich-blue px-1.5 py-px text-2xs font-semibold normal-case tracking-normal text-fg-inverse motion-safe:animate-sort-pop",
         )}
@@ -496,6 +513,7 @@ export function SortHeader<K extends string>({
   function sortButton() {
     return (
       <button
+        ref={button}
         type="button"
         title={hint}
         onClick={() => onSort(nextSort(sort, column, kind))}
@@ -534,6 +552,57 @@ export function SortHeader<K extends string>({
       </button>
     );
   }
+}
+
+/**
+ * Shrinks a sort button whose label wrapped to the width of its longest
+ * line, so a "?" after it sits beside the words (see SortHeader's ``help``).
+ * CSS has no width that fits wrapped lines: a box that wraps is as wide as
+ * the space it was given. So this measures the label's text and its sort
+ * mark (arrow or chip) after layout and caps the button at that width, and
+ * measures again whenever the header cell changes size (a window resized,
+ * a column re-laid out). Lines never change: they already fit inside it.
+ * A cap (``max-width``), not a ``width``: a set width would also be the
+ * narrowest the column could get, where a cap leaves that at the label's
+ * longest word, as without this step.
+ * Off without a "?". ``key`` changes when the button's content does.
+ */
+function useFitToLines(button: RefObject<HTMLButtonElement | null>, enabled: boolean, key: string) {
+  useLayoutEffect(() => {
+    const el = button.current;
+    if (!enabled || !el) return;
+    const fit = () => {
+      el.style.maxWidth = "";
+      const rects: DOMRect[] = [];
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      const range = document.createRange();
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (!node.textContent?.trim()) continue;
+        range.selectNodeContents(node);
+        rects.push(...Array.from(range.getClientRects()));
+      }
+      el.querySelectorAll("svg, [data-sort-mark]").forEach((mark) => rects.push(mark.getBoundingClientRect()));
+      const shown = rects.filter((rect) => rect.width > 0);
+      if (shown.length === 0) return;
+      const style = getComputedStyle(el);
+      const needed = Math.ceil(
+        Math.max(...shown.map((rect) => rect.right)) -
+          Math.min(...shown.map((rect) => rect.left)) +
+          parseFloat(style.paddingLeft) +
+          parseFloat(style.paddingRight),
+      );
+      if (needed < el.getBoundingClientRect().width - 1) el.style.maxWidth = `${needed}px`;
+    };
+    fit();
+    const cell = el.closest("th");
+    if (!cell || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(fit);
+    observer.observe(cell);
+    return () => {
+      observer.disconnect();
+      el.style.maxWidth = "";
+    };
+  }, [button, enabled, key]);
 }
 
 /**
