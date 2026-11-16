@@ -46,6 +46,9 @@ export interface ReportView {
  * EmptyPane). It used to open with the report before this one; the developer
  * asked for the reader to choose instead (2026-10-29).
  */
+/** Views a Compare reports panel does not offer (see ReportWorkspaceNav). */
+const PANEL_LEAVES_OUT: ReadonlySet<string> = new Set(["compare", "documents"]);
+
 export const REPORT_VIEWS: readonly ReportView[] = [
   {
     key: "issues",
@@ -105,18 +108,19 @@ export default function ReportWorkspaceNav({
   const { pathname } = useLocation();
   const active = activeReportView(pathname);
   // The current view stays, so a saved link to it still has its tab. As a
-  // panel of Compare reports (lib/framed.ts) every view but Compare reports
-  // is offered: a panel switches between its report's Issues, Images and
-  // Documents like the whole window does (the developer's decision,
-  // 2026-11-16, for Issues and Images; Documents follows the same rule), so
-  // the two panels can show one report's issues beside the other's, or both
-  // reports' images. Compare reports stays out of a panel: it would open the
-  // comparison inside one of its own panels. From 2026-11-13 to 2026-11-16 a
-  // panel kept only its current view, so it had no tab row at all.
+  // panel of Compare reports (lib/framed.ts) a panel offers its report's
+  // Issues and Images and switches between them like the whole window does
+  // (the developer's decision, 2026-11-16), so the two panels can show one
+  // report's issues beside the other's, or both reports' images. Compare
+  // reports stays out of a panel: it would open the comparison inside one of
+  // its own panels. Documents stays out too: the developer chose Issues and
+  // Images for panels (tests/ui/test_compare_side_by_side.py), and offering
+  // the file list there is the developer's call. From 2026-11-13 to
+  // 2026-11-16 a panel kept only its current view, so it had no tab row.
   const views = REPORT_VIEWS.filter(
     (view) =>
       view === active ||
-      (!(FRAMED && view.key === "compare") && (view.available?.(previousScanId) ?? true)),
+      (!(FRAMED && PANEL_LEAVES_OUT.has(view.key)) && (view.available?.(previousScanId) ?? true)),
   );
   // One view is not a choice; the heading already names it.
   if (views.length < 2) return null;
