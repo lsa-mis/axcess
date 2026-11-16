@@ -959,6 +959,15 @@ async def test_the_document_check_is_on_by_default_and_says_what_it_keeps(
             "keeps the result and a picture of the first page, not the file"
         )
     )
+    # Following robots.txt (the public default), it says Google Drive files
+    # will not be downloaded; set to ignore robots.txt, it does not
+    # (2026-11-16: Google's robots.txt asks scanners not to download them).
+    drive_note = re.compile("does not download files kept in Google Drive")
+    await playwright_async.expect(switch).to_have_accessible_description(drive_note)
+    robots = page.get_by_role("switch", name=re.compile("^Ignore the site\u2019s robots.txt rules"))
+    await robots.check()
+    await playwright_async.expect(switch).not_to_have_accessible_description(drive_note)
+    await robots.uncheck()
     summary = page.get_by_role("complementary", name="What this scan will do")
     assert "Document check" in await _rail_items(summary, "Checks that run")
     await page.get_by_role("textbox", name="Website address", exact=True).fill(

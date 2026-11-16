@@ -46,6 +46,8 @@ _NAMES = {
     "Android",
     "GitHub",
     "Google",
+    # Google Drive, named in the document check's hint (2026-11-16).
+    "Drive",
     "Siteimprove",
     "XPath",
     "Level",

@@ -115,6 +115,11 @@ export const SWITCHES = {
     // A sign-in scan's own hint, in place of the one above, not added to
     // it: the public hint says files on other sites are downloaded, which
     // is not true behind a sign-in (AGENTS.md, Interface language rule 5).
+    // Added to the public hint while robots.txt is followed (the
+    // developer's request, 2026-11-16): Google's robots.txt asks scanners
+    // not to download Drive files, so none is downloaded then.
+    driveRobotsNote:
+      "While Axcess follows robots.txt, it does not download files kept in Google Drive: Google asks scanners not to.",
     hintSignedIn:
       "Lists the PDF, Word, Excel and other files the pages link to, in the report’s list of documents, and checks each PDF during the scan. Axcess downloads each PDF on this website with your sign-in, as you (up to 200, each up to 10 MB). It lists files on other sites but does not download them. It keeps the result and a picture of the first page, not the file.",
   },
