@@ -6,7 +6,8 @@ The question was how to download the PDF or Word file behind a Google
 link: Google's download addresses, or Axcess's own browser finding and
 pressing the download button.
 
-Nothing here is built yet. Product decisions are open (end of this page).
+Decided and built for Drive files on 2026-11-16 (`linked_files/google.py`,
+"Decisions" at the end). Docs, Sheets and Slides are next.
 
 ## What was tested
 
@@ -89,18 +90,44 @@ So, while robots.txt is obeyed:
   Then there is nothing to download, and the row has to say so, not call
   it broken.
 
-## Open decisions
+## Decisions (the developer, 2026-11-16)
 
-1. **Drive files and robots.txt.** Obey Google's `Disallow: /` (Drive files
-   stay unchecked, "robots.txt asks scanners not to download them") unless
-   the person chose to ignore robots.txt? Or treat a download as a person's
-   click? The first is consistent with the rest of Axcess.
-2. **Private files.** On this site, 14 of 15 Drive files and 4 of 6 Docs
-   need a Google sign-in. Checking them would mean a signed-in Google
-   session. Sign-in scans keep to the signed-in site (egress policy), so
-   that is separate work.
-3. **Docs and Slides.** Check Google's PDF export, and say in the row that
-   it is the PDF Google makes from the document?
+1. **Drive files follow robots.txt.** A scan that follows robots.txt asks
+   about `drive.usercontent.google.com`, the host every Drive download comes
+   from, and lists the file as "Not checked, because the scan followed
+   robots.txt", telling the reader to scan again with "Ignore the site's
+   robots.txt rules" turned on. A scan set to ignore robots.txt downloads
+   them. New scan says so beside the document check while robots.txt is
+   followed.
+2. **Google's address first, the button as the fallback.** `fetch_drive_file`
+   asks the download address, passes the virus-scan page's form once, and
+   reports a sign-in redirect as HTTP 401 ("needs a sign-in"). If an HTML
+   page still comes back where a file should be, `download_with_button`
+   opens the file's page in Chromium and presses the button whose
+   accessible name starts with "Download". A Word or PowerPoint file kept
+   in Drive is downloaded and identified, and waits for a check of its
+   format.
+3. **Docs and Slides: export them as .docx and .pptx and check them with
+   another engine.** Not built yet. Axcess has no .docx or .pptx check, and
+   which engine to use is the next decision.
+4. **Not built, an option:** Google's Drive API
+   (`www.googleapis.com/drive/v3/files/ID?alt=media`) has no robots.txt, so
+   it could download public Drive files while robots.txt is followed. It
+   needs an API key that an administrator creates and configures.
+
+## Verified on real pages (2026-11-16)
+
+This was a real Axcess scan of one page,
+`https://rossweb.bus.umich.edu/ross-it/student-services/` (1 page), whose
+Drive links are 1 public file and 1 private one:
+
+| Scan setting | Public Drive file | Private Drive file |
+|---|---|---|
+| Follows robots.txt | Could not check, robots.txt | Could not check, robots.txt |
+| Ignores robots.txt | Downloaded (214 KB) and checked: Mostly sure (not tagged, no title, no language), with its first-page picture | Could not check, needs a sign-in (HTTP 401) |
+
+`/ross-it/faculty-services/` (1 page, robots.txt ignored): all 12 Drive
+files read "needs a sign-in (HTTP 401)".
 
 ## Sources
 

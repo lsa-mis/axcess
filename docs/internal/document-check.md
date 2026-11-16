@@ -58,6 +58,18 @@ robots.txt rules, and the scan-wide cap (`MAX_DOWNLOADS`, 200; each file at
 most 10 MB). A PDF linked from many pages is downloaded once: a file being
 checked for one page is awaited, not downloaded again, by another.
 
+## Google Drive files
+
+A link to a file kept in Google Drive (`drive.google.com/file/d/ID/...`) is
+downloaded from Google's download address, the one Drive's own Download
+button uses, with the button pressed in a browser as the fallback
+(`linked_files/google.py`). It follows robots.txt like every other
+download, and Google's robots.txt asks scanners not to download from that
+host, so Drive files are checked only in a scan set to ignore robots.txt.
+New scan says so beside the switch. A file shared only with signed-in
+accounts reads "needs a sign-in (HTTP 401)". Research, the real pages it
+was tested on, and the decisions: `docs/internal/google-files-research.md`.
+
 ## First-page pictures
 
 A PDF the check could read gets pictures of its first page
