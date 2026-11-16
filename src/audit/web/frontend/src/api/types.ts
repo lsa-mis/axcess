@@ -1482,6 +1482,8 @@ export interface LinkedFileRow {
   /** The first file at another address with the same bytes, whose result
    *  this one shares; null when it has no earlier copy. */
   same_as?: { file_id: number; name: string } | null;
+  /** A picture of the first page is stored (PDFs the check could read). */
+  has_thumbnail?: boolean;
 }
 
 /** One way a page reaches a file (`linked_files_queries.DocumentRefWay`). */

@@ -482,6 +482,16 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/documents/{file_id:int}/thumbnail",
+        "methods": ["GET"],
+        "name": "api_document_thumbnail",
+        "async": false,
+        "params": {"path": ["scan_id", "file_id"], "query": ["size"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/scans/{scan_id:int}/documents/{file_id:int}/pages/{page_id:int}",
         "methods": ["GET"],
         "name": "api_document_on_page",
@@ -1408,6 +1418,16 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/documents/{file_id:int}/thumbnail",
+        "methods": ["GET"],
+        "name": "api_document_thumbnail",
+        "async": false,
+        "params": {"path": ["scan_id", "file_id"], "query": ["size"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/scans/{scan_id:int}/documents/{file_id:int}/pages/{page_id:int}",
         "methods": ["GET"],
         "name": "api_document_on_page",
@@ -2315,6 +2335,16 @@
         "name": "api_scan_document",
         "async": false,
         "params": {"path": ["scan_id", "file_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/documents/{file_id:int}/thumbnail",
+        "methods": ["GET"],
+        "name": "api_document_thumbnail",
+        "async": false,
+        "params": {"path": ["scan_id", "file_id"], "query": ["size"]},
         "request_param": null,
         "background_tasks_param": null
       },
@@ -3240,6 +3270,16 @@
         "name": "api_scan_document",
         "async": false,
         "params": {"path": ["scan_id", "file_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/documents/{file_id:int}/thumbnail",
+        "methods": ["GET"],
+        "name": "api_document_thumbnail",
+        "async": false,
+        "params": {"path": ["scan_id", "file_id"], "query": ["size"]},
         "request_param": null,
         "background_tasks_param": null
       },

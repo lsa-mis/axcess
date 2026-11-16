@@ -698,6 +698,9 @@ async def run_crawl(
             ignore_robots=config.ignore_robots,
             blocked_url_patterns=config.blocked_url_patterns,
             excluded_scopes=config.excluded_scopes,
+            # A picture of each readable PDF's first page, unless the scan
+            # chose not to store rendered pages.
+            thumbnails=blob_store if config.store_rendered_html else None,
         )
     try:
         try:

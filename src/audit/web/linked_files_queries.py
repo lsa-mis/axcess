@@ -88,6 +88,9 @@ class LinkedFileRow(BaseModel):
     #: whose result this one shares; None for a file with no earlier copy.
     #: The address stays each file's identity: copies are separate rows.
     same_as: SameFile | None = None
+    #: A picture of the first page is stored (PDFs the check could read);
+    #: served by ``/api/scans/{scan}/documents/{file}/thumbnail``.
+    has_thumbnail: bool = False
 
 
 class LinkedFileCounts(BaseModel):
@@ -201,7 +204,8 @@ def _file_rows(
                CASE WHEN f.status = 'pending' THEN 'not_checked' ELSE f.reason END AS reason,
                f.failed_checks, f.http_status, f.is_form, f.page_count,
                (SELECT COUNT(DISTINCT r.page_id) FROM linked_file_refs r
-                 WHERE r.file_id = f.id AND r.scan_id = f.scan_id) AS referring
+                 WHERE r.file_id = f.id AND r.scan_id = f.scan_id) AS referring,
+               f.thumbnail_hash IS NOT NULL AS has_thumbnail
           FROM linked_files f
          WHERE f.scan_id = ? AND (? IS NULL OR f.id = ?)
          ORDER BY CASE {_SHOWN_STATUS_SQL}
@@ -242,9 +246,26 @@ def _file_rows(
                 is_form=None if row[8] is None else bool(row[8]),
                 page_count=row[9],
                 referring_page_count=int(row[10]),
+                has_thumbnail=bool(row[11]),
             )
         )
     return files
+
+
+def thumbnail_hash(
+    conn: sqlite3.Connection, scan_id: int, file_id: int, *, small: bool = False
+) -> str | None:
+    """A first-page picture of one file of ``scan_id``; None if it has none.
+
+    Looked up by the file and its report, never by a hash the browser
+    sends, so one report's address cannot reach another report's picture.
+    """
+    column = "thumbnail_small_hash" if small else "thumbnail_hash"
+    row = conn.execute(
+        f"SELECT {column} FROM linked_files WHERE id = ? AND scan_id = ?",  # noqa: S608 - fixed names
+        (file_id, scan_id),
+    ).fetchone()
+    return None if row is None or row[0] is None else str(row[0])
 
 
 def _first_copies(conn: sqlite3.Connection, scan_id: int) -> dict[int, int]:

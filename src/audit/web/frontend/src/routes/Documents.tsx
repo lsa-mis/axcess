@@ -4,6 +4,7 @@ import { Link, useLocation, useParams, useSearchParams } from "react-router";
 import { ApiError, api } from "../api/client";
 import type { LinkedFileRow, LinkedFileStatus } from "../api/types";
 import {
+  DocumentThumbnail,
   Found,
   HOSTED_COLUMN,
   PAGES_COLUMN,
@@ -806,8 +807,11 @@ function DocumentRow({
             opens its record on Issues; see DocumentsRoute. */}
         <Link
           to={withReturnTrail(documentPath(scanId, row.file_id), DOCUMENTS_VIEW, backTo)}
-          className="flex min-h-target items-center text-umich-blue underline underline-offset-2 hover:text-umich-blue-600"
+          className="flex min-h-target flex-col items-start gap-1 text-umich-blue underline underline-offset-2 hover:text-umich-blue-600"
         >
+          {/* The first page above the name, as on the Images tab; see
+              DocumentThumbnail for why it sits inside this one link. */}
+          <DocumentThumbnail scanId={scanId} row={row} />
           <span className="[overflow-wrap:anywhere]" data-scanned-content>
             {row.name}
           </span>

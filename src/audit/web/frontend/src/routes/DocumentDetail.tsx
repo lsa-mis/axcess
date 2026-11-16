@@ -5,6 +5,7 @@ import { ExternalLink, ScanEye } from "lucide-react";
 import { ApiError, api } from "../api/client";
 import type { DocumentPage, LinkedFileRow } from "../api/types";
 import {
+  DocumentPreview,
   Found,
   HOSTED_COLUMN,
   HowItAppears,
@@ -71,6 +72,9 @@ const DEFAULT_SORT: PagesSort = { column: "Page URL", direction: "asc" };
  * say it opens a new tab (SC 2.4.9 Link Purpose (Link Only), Level AAA; SC
  * 3.2.5 Change on Request, Level AAA). No ``aria-label``: the visible words
  * plus hidden text are the name (WCAG technique C7; AGENTS.md rule 8).
+ *
+ * A PDF the scan could draw shows its first page beside the facts
+ * (DocumentPreview), as the Images tab shows the image itself.
  *
  * The facts are the Documents row's, as tiles: the "Accessibility problems?"
  * value with its sentence ("Mostly sure" / "it has accessibility
@@ -166,20 +170,29 @@ export default function DocumentDetailRoute() {
         }
       />
 
-      <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <FactTile
-          label={RESULT_COLUMN}
-          value={<ResultTag status={row.status} />}
-          note={LINKED_FILE_STATUS_NOTE[row.status]}
-        />
-        <FactTile
-          label="Type"
-          value={LINKED_FILE_TYPE_LABEL[row.file_type]}
-          note={row.is_form ? "Has a form to fill in" : undefined}
-        />
-        <FactTile label={HOSTED_COLUMN} value={<SiteCell url={row.url} offSite={row.off_site} />} />
-        <FactTile label={PAGES_COLUMN} value={row.referring_page_count.toLocaleString()} />
-      </dl>
+      {/* The facts, then the first page when the scan drew one
+          (DocumentPreview): on its right on a wide screen, under it on a
+          narrow one. The same order on screen and in the page code, so a
+          screen reader and the keyboard meet the facts first (SC 2.4.3
+          Focus Order, Level A), and nothing scrolls sideways at 320px (SC
+          1.4.10 Reflow, Level AA). */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+        <dl className="grid flex-1 grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <FactTile
+            label={RESULT_COLUMN}
+            value={<ResultTag status={row.status} />}
+            note={LINKED_FILE_STATUS_NOTE[row.status]}
+          />
+          <FactTile
+            label="Type"
+            value={LINKED_FILE_TYPE_LABEL[row.file_type]}
+            note={row.is_form ? "Has a form to fill in" : undefined}
+          />
+          <FactTile label={HOSTED_COLUMN} value={<SiteCell url={row.url} offSite={row.off_site} />} />
+          <FactTile label={PAGES_COLUMN} value={row.referring_page_count.toLocaleString()} />
+        </dl>
+        <DocumentPreview scanId={scan.id} row={row} />
+      </div>
 
       <Card className="mt-8">
         <div className="flex flex-wrap items-baseline justify-between gap-3 rounded-t-[7px] border-b border-border bg-surface-muted px-4 py-3">

@@ -58,6 +58,41 @@ robots.txt rules, and the scan-wide cap (`MAX_DOWNLOADS`, 200; each file at
 most 10 MB). A PDF linked from many pages is downloaded once: a file being
 checked for one page is awaited, not downloaded again, by another.
 
+## First-page pictures
+
+A PDF the check could read gets pictures of its first page
+(`linked_files/thumbnail.py`, drawn with PDFium through `pypdfium2`, because
+pypdf cannot draw a page): one drawing saved in two sizes, a JPEG at most
+480 by 960 pixels for the document's own page and one that fits 144 by 96
+for the Documents table's 72 by 48 box, so a table page loads a few
+kilobytes per row, not tens. Both are kept in the scan's blob store by
+content hash (`thumbnail_hash`, `thumbnail_small_hash`, migration 0041).
+
+**When:** during the scan, right after the check and before the result is
+stored, because that is the only time the bytes exist: the scan keeps the
+result, not the file, so drawing after the scan would mean downloading every
+PDF again. A copy of the file reuses the first copy's pictures. Measured on
+the developer's machine: 40 ms for a text page, about 175 ms for a 300 dpi
+full-page photo, in a worker thread beside the downloads, which the site's
+rate limit (2 a second) already spaces out more than that. No pictures when
+the scan chose not to store rendered pages, for a file that is not a PDF, or
+for one PDFium cannot open or draw in 10 seconds.
+
+**Loading:** the table shows the small picture, lazily (`loading="lazy"`,
+only rows scrolled into view), with its size fixed so the rows do not jump;
+the document's own page shows the large one, captioned "First page". The
+pictures are served only through their report
+(`/api/scans/{scan}/documents/{file}/thumbnail`, `?size=small` for the
+table), never by a hash the browser sends, and cached by the browser for a
+day, since a picture never changes. The Documents tab does not update while
+a scan runs (neither do Issues and Images); the scanning page shows
+progress.
+
+PDFium is C code running inside the app's process, where pypdf is pure
+Python. It is the engine Chrome uses on PDFs from anywhere, but a file that
+crashes it would take the app down with it; running it in a separate
+process is the fix if that ever happens.
+
 ## The scanning page
 
 The progress table's **Document check** column (`live_progress` key

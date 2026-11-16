@@ -1,5 +1,7 @@
 import { Fragment } from "react";
-import type { DocumentRefWay, LinkedFileRow } from "../api/types";
+import { FileSpreadsheet, FileText, Presentation } from "lucide-react";
+import { documentThumbnailUrl } from "../api/client";
+import type { DocumentRefWay, LinkedFileRow, LinkedFileType } from "../api/types";
 import BreakableUrl from "./BreakableUrl";
 import HowSureTag from "./HowSureTag";
 import {
@@ -223,5 +225,86 @@ export function HowItAppears({ ways }: { ways: DocumentRefWay[] }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+const SHEETS: ReadonlySet<LinkedFileType> = new Set(["xlsx", "xls", "ods", "google_sheet"]);
+const SLIDES: ReadonlySet<LinkedFileType> = new Set(["pptx", "ppt", "odp", "google_slides"]);
+
+/**
+ * A small picture of the document's first page, above its name in the
+ * Documents table: the same 72 by 48 framed box, white behind the picture,
+ * as an image's thumbnail on the Images tab (routes/Images.tsx, ImageRow),
+ * the developer's request (2026-11-16), so the two lists of things found on
+ * the pages look alike (SC 3.2.4 Consistent Identification, Level AA).
+ *
+ * Only a PDF the check could read has a picture (the scan draws page 1;
+ * audit.linked_files.thumbnail). Any other file gets the same box with an
+ * icon for its kind (text, spreadsheet, slides), so a missing picture does
+ * not look like a broken one. Rejected: letters such as "DOCX" in the box,
+ * as the Images tab writes "SVG": an abbreviation a reader may not know
+ * (WCAG SC 3.1.4 Abbreviations, Level AAA), and the Type column already
+ * says the kind in words.
+ *
+ * Decorative (alt="", the icon aria-hidden): the file's name is right under
+ * it, inside the same link, and says which file it is; describing the
+ * picture would only repeat it (WCAG technique H2, image and text in one
+ * link; H67, decorative images). Inside the name's link, not a link of its
+ * own: one link per row (one way to do one thing; W3C COGA, "Making Content
+ * Usable"), and a bigger target. Not a button that opens a viewer as on
+ * Images: there the picture is what is judged; here the document's own page
+ * shows it larger (DocumentPreview).
+ *
+ * The Images tab draws its box inline; this is its own component because
+ * the Images tab is being changed elsewhere (2026-11-16). Both should use
+ * one shared thumbnail box once that work lands.
+ */
+export function DocumentThumbnail({ scanId, row }: { scanId: number; row: LinkedFileRow }) {
+  if (row.has_thumbnail) {
+    return (
+      <img
+        src={documentThumbnailUrl(scanId, row.file_id, "small")}
+        alt=""
+        loading="lazy"
+        decoding="async"
+        width={72}
+        height={48}
+        className="h-12 w-[72px] shrink-0 rounded-xs border border-border bg-white object-contain"
+      />
+    );
+  }
+  const Icon = SHEETS.has(row.file_type) ? FileSpreadsheet : SLIDES.has(row.file_type) ? Presentation : FileText;
+  return (
+    <span
+      aria-hidden="true"
+      className="flex h-12 w-[72px] shrink-0 items-center justify-center rounded-xs border border-border bg-surface-muted text-fg-muted"
+    >
+      <Icon className="h-5 w-5" />
+    </span>
+  );
+}
+
+/**
+ * The first page, larger, on the document's own page, beside its facts: a
+ * reader can tell the file at a glance before opening it. 160 CSS pixels
+ * wide (the picture is drawn 480 wide, so it stays sharp). A ``figure``
+ * whose caption says what the picture is, "First page", so the picture
+ * itself is alt="" (WCAG technique H67) rather than a made-up description
+ * of a page no one has read. Nothing is drawn for a file without a picture:
+ * the Type fact beside it already says what kind of file it is.
+ */
+export function DocumentPreview({ scanId, row }: { scanId: number; row: LinkedFileRow }) {
+  if (!row.has_thumbnail) return null;
+  return (
+    <figure className="w-40 shrink-0">
+      <img
+        src={documentThumbnailUrl(scanId, row.file_id)}
+        alt=""
+        decoding="async"
+        width={160}
+        className="w-40 rounded-xs border border-border bg-white"
+      />
+      <figcaption className="mt-1 text-2xs text-fg-muted">First page</figcaption>
+    </figure>
   );
 }

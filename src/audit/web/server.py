@@ -2475,6 +2475,30 @@ def create_app(
             raise HTTPException(status_code=404, detail="This report has no such document")
         return found
 
+    @app.get("/api/scans/{scan_id:int}/documents/{file_id:int}/thumbnail")
+    def api_document_thumbnail(
+        scan_id: int, file_id: int, size: Literal["large", "small"] = "large"
+    ) -> FileResponse:
+        """A JPEG of one file's first page (PDFs the check could read).
+
+        ``size=small`` is the Documents table's picture, ``large`` the one on
+        the document's own page.
+        """
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            content_hash = linked_files_queries.thumbnail_hash(
+                conn, scan_id, file_id, small=size == "small"
+            )
+        path = blob_store.path_of(content_hash, "image/jpeg") if content_hash else None
+        if path is None or not path.is_file():
+            raise HTTPException(status_code=404, detail="This document has no picture")
+        # The file never changes (its name is its content hash).
+        return FileResponse(
+            path,
+            media_type="image/jpeg",
+            headers={"Cache-Control": "private, max-age=86400"},
+        )
+
     @app.get(
         "/api/scans/{scan_id:int}/documents/{file_id:int}/pages/{page_id:int}",
         response_model=DocumentOnPage,

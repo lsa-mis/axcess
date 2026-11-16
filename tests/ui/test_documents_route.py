@@ -101,7 +101,24 @@ def _page_id(conn: sqlite3.Connection, scan_id: int, url: str) -> int:
     return int(row[0])
 
 
-def _seed_documents(db_path: Path, scan_id: int) -> None:
+FIXTURE_PDFS = Path(__file__).resolve().parents[1] / "fixtures" / "site" / "documents" / "files"
+
+
+def _first_page(blob_dir: Path) -> tuple[str, str]:
+    """Draw and store a real PDF's first page, as a scan does; (large, small)."""
+    from audit.blob_store import BlobStore
+    from audit.linked_files.thumbnail import first_page_jpegs
+
+    pictures = first_page_jpegs((FIXTURE_PDFS / "clean.pdf").read_bytes())
+    assert pictures is not None
+    blobs = BlobStore(blob_dir)
+    return blobs.store(pictures.large, "image/jpeg")[0], blobs.store(pictures.small, "image/jpeg")[
+        0
+    ]
+
+
+def _seed_documents(db_path: Path, scan_id: int, blob_dir: Path | None = None) -> None:
+    pictures = _first_page(blob_dir) if blob_dir else None
     with sqlite3.connect(db_path) as conn:
         conn.execute(
             "UPDATE scans SET config_json = json_set(config_json, '$.linked_files_enabled', "
@@ -139,7 +156,14 @@ def _seed_documents(db_path: Path, scan_id: int) -> None:
             scan_id,
             "http://example.com/files/map.pdf",
             "pdf",
-            store.CheckResult("not_sure", http_status=200),
+            # The one with a first-page picture, so every test of the
+            # populated tab (axe, AAA, keyboard) covers a thumbnail too.
+            store.CheckResult(
+                "not_sure",
+                http_status=200,
+                thumbnail_hash=pictures[0] if pictures else None,
+                thumbnail_small_hash=pictures[1] if pictures else None,
+            ),
             [(home, "iframe", "Course map", None)],
         )
         _file(
@@ -179,8 +203,8 @@ def _seed_documents(db_path: Path, scan_id: int) -> None:
 
 @pytest.fixture
 def documents(seeded_db: tuple[Path, Path, int]) -> int:
-    db_path, _, scan_id = seeded_db
-    _seed_documents(db_path, scan_id)
+    db_path, blob_dir, scan_id = seeded_db
+    _seed_documents(db_path, scan_id, blob_dir)
     return scan_id
 
 
@@ -1181,3 +1205,76 @@ async def test_a_copy_says_which_file_it_is_the_same_as(
     await first.click()
     await expect(page.get_by_role("heading", level=1)).to_have_text("no-title.pdf")
     await expect(page.get_by_text("Same file as")).to_have_count(0)
+
+
+def test_a_first_page_is_served_only_through_its_own_report(
+    client: TestClient, documents: int, seeded_db: tuple[Path, Path, int]
+) -> None:
+    """The picture is looked up by file and report, so another report's
+    address, or a file with no picture, gets a 404, never the image."""
+    listed = client.get(f"/api/scans/{documents}/documents").json()["files"]
+    with_picture = [row for row in listed if row["has_thumbnail"]]
+    assert [row["name"] for row in with_picture] == ["map.pdf"]
+    file_id = with_picture[0]["file_id"]
+
+    served = client.get(f"/api/scans/{documents}/documents/{file_id}/thumbnail")
+    assert served.status_code == 200
+    assert served.headers["content-type"] == "image/jpeg"
+    assert served.content[:3] == b"\xff\xd8\xff"
+    small = client.get(f"/api/scans/{documents}/documents/{file_id}/thumbnail?size=small")
+    assert small.status_code == 200
+    assert small.content[:3] == b"\xff\xd8\xff"
+    assert len(small.content) < len(served.content)
+    assert (
+        client.get(f"/api/scans/{documents}/documents/{file_id}/thumbnail?size=huge").status_code
+        == 422
+    )
+
+    without = next(row for row in listed if not row["has_thumbnail"])
+    assert (
+        client.get(f"/api/scans/{documents}/documents/{without['file_id']}/thumbnail").status_code
+        == 404
+    )
+    with sqlite3.connect(seeded_db[0]) as conn:
+        other = conn.execute(
+            "INSERT INTO scans (seed_url, status, config_json) "
+            "VALUES ('http://example.com/', 'completed', '{}')"
+        ).lastrowid
+    assert client.get(f"/api/scans/{other}/documents/{file_id}/thumbnail").status_code == 404
+
+
+@on_module_loop
+async def test_the_first_page_shows_above_the_name_and_on_its_own_page(
+    documents: int,
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """In the table the picture sits in the name's link and adds nothing to
+    its name (alt=""); a file with no picture gets the same box with an
+    icon. The document's own page shows it larger, captioned "First page"."""
+    from playwright.async_api import expect
+
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(f"{base}/app/scans/{scan_id}/documents", wait_until="networkidle")
+    link = page.get_by_role("link", name=re.compile(r"^map\.pdf\s*, full details$"))
+    picture = link.locator("img")
+    await expect(picture).to_have_attribute("alt", "")
+    # The table loads the small picture, not the one for the document's page.
+    await expect(picture).to_have_attribute("src", re.compile(r"/thumbnail\?size=small$"))
+    await expect(picture).to_have_js_property("complete", True)
+    assert await picture.evaluate("img => img.naturalWidth") > 0
+    # A Word file has no picture: an icon in the same box, hidden from
+    # screen readers, and still one link with the file's name.
+    word = page.get_by_role("link", name=re.compile(r"^report\.docx\s*, full details$"))
+    await expect(word.locator("img")).to_have_count(0)
+    await expect(word.locator("[aria-hidden=true] svg")).to_have_count(1)
+
+    await link.click()
+    figure = page.get_by_role("figure")
+    await expect(figure).to_contain_text("First page")
+    await expect(figure.locator("img")).to_have_attribute("alt", "")
+    # Facts first, then the picture, on screen and in reading order.
+    facts = await page.locator("dl").first.bounding_box()
+    shown = await figure.bounding_box()
+    assert facts and shown and shown["x"] >= facts["x"] + facts["width"] - 1

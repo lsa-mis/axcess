@@ -725,6 +725,16 @@ export const api = {
     request<CoverageFound>(scanId ? `/api/coverage/found?scan_id=${scanId}` : "/api/coverage/found"),
 };
 
+/**
+ * A document's first-page picture, for <img src=…> (has_thumbnail rows only):
+ * ``small`` for the Documents table's 72 by 48 box, ``large`` for its own page.
+ */
+export const documentThumbnailUrl = (
+  scanId: number,
+  fileId: number,
+  size: "small" | "large" = "large",
+): string => `/api/scans/${scanId}/documents/${fileId}/thumbnail${size === "small" ? "?size=small" : ""}`;
+
 /** Direct URL (bypass fetch) for image blobs, used in <img src=…>. */
 export const blobUrl = (contentHash: string): string =>
   `/blobs/${contentHash}`;

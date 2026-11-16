@@ -31,6 +31,7 @@ dependencies = [
     "openpyxl>=3.1",
     "cryptography>=43.0",
     "pypdf>=5.0",
+    "pypdfium2>=4.30",
 ]
 
 [dependency-groups]

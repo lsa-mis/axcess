@@ -1147,6 +1147,40 @@
         }
       }
     },
+    "/api/scans/{scan_id}/documents/{file_id}/thumbnail": {
+      "get": {
+        "summary": "Api Document Thumbnail",
+        "description": "A JPEG of one file's first page (PDFs the check could read).\n\n``size=small`` is the Documents table's picture, ``large`` the one on\nthe document's own page.",
+        "operationId": "api_document_thumbnail_api_scans__scan_id__documents__file_id__thumbnail_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "File Id"}
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {"enum": ["large", "small"], "type": "string", "default": "large", "title": "Size"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
     "/api/scans/{scan_id}/documents/{file_id}/pages/{page_id}": {
       "get": {
         "summary": "Api Document On Page",
@@ -3107,7 +3141,8 @@
           "is_form": {"anyOf": [{"type": "boolean"}, {"type": "null"}], "title": "Is Form"},
           "page_count": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "Page Count"},
           "referring_page_count": {"type": "integer", "title": "Referring Page Count"},
-          "same_as": {"anyOf": [{"$ref": "#/components/schemas/SameFile"}, {"type": "null"}]}
+          "same_as": {"anyOf": [{"$ref": "#/components/schemas/SameFile"}, {"type": "null"}]},
+          "has_thumbnail": {"type": "boolean", "title": "Has Thumbnail", "default": false}
         },
         "type": "object",
         "required": [

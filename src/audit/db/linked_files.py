@@ -46,6 +46,10 @@ class CheckResult:
     sha256: str | None = None
     is_form: bool | None = None
     page_count: int | None = None
+    # A JPEG of the first page in the blob store (migration 0041); PDFs only.
+    thumbnail_hash: str | None = None
+    # The same page, small, for the Documents table.
+    thumbnail_small_hash: str | None = None
 
 
 def file_count(conn: sqlite3.Connection, scan_id: int) -> int:
@@ -133,7 +137,8 @@ def set_result(
     cur = conn.execute(
         "UPDATE linked_files SET status = ?, reason = ?, failed_checks = ?, "
         "http_status = ?, content_type = ?, byte_size = ?, sha256 = ?, is_form = ?, "
-        "page_count = ?, checked_at = CURRENT_TIMESTAMP "
+        "page_count = ?, thumbnail_hash = ?, thumbnail_small_hash = ?, "
+        "checked_at = CURRENT_TIMESTAMP "
         "WHERE id = ? AND scan_id = ?",
         (
             result.status,
@@ -145,6 +150,8 @@ def set_result(
             result.sha256,
             None if result.is_form is None else int(result.is_form),
             result.page_count,
+            result.thumbnail_hash,
+            result.thumbnail_small_hash,
             file_id,
             scan_id,
         ),
@@ -163,7 +170,8 @@ def checked_copy(
     that may not repeat, so its copy is checked on its own.
     """
     row = conn.execute(
-        "SELECT status, failed_checks, is_form, page_count FROM linked_files "
+        "SELECT status, failed_checks, is_form, page_count, thumbnail_hash, "
+        "thumbnail_small_hash FROM linked_files "
         "WHERE scan_id = ? AND sha256 = ? AND id != ? "
         "AND status IN ('mostly_sure', 'not_sure') ORDER BY id LIMIT 1",
         (scan_id, sha256, file_id),
@@ -175,6 +183,8 @@ def checked_copy(
         failed_checks=tuple(json.loads(row[1] or "[]")),
         is_form=None if row[2] is None else bool(row[2]),
         page_count=row[3],
+        thumbnail_hash=row[4],
+        thumbnail_small_hash=row[5],
     )
 
 

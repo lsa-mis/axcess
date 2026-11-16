@@ -63,10 +63,12 @@ from audit.linked_files import formats
 from audit.linked_files.discovery import FoundLink, find_links, resolve
 from audit.linked_files.fetch import MAX_FILE_BYTES, FetchedFile, fetch_file
 from audit.linked_files.pdf_check import PdfCheck, check_pdf, looks_like_pdf
+from audit.linked_files.thumbnail import first_page_jpegs
 from audit.logging import get_logger
 
 if TYPE_CHECKING:
     from audit.analyzer.interaction.base import RevealedLink
+    from audit.blob_store import BlobStore
     from audit.crawler.rate_limit import HostLimiter
     from audit.crawler.robots import RobotsChecker
     from audit.crawler.url_policy import HostScope
@@ -84,6 +86,10 @@ class _Downloads:
     ignore_robots: bool
     blocked_url_patterns: tuple[str, ...]
     excluded_scopes: tuple[str, ...]
+    # Where first-page pictures go; None draws none (the scan chose not to
+    # store rendered pages, and a picture of a document is the same kind of
+    # stored copy).
+    thumbnails: BlobStore | None = None
 
 
 #: PDFs downloaded by ``check_pending`` per scan. The ones the crawler
@@ -94,6 +100,9 @@ DOWNLOAD_CONCURRENCY = 4
 #: Longest the checks may take on one PDF. pypdf is pure Python, so a hostile
 #: file can be slow; past this the file is "timed out" and the crawl moves on.
 CHECK_TIMEOUT_S = 20.0
+#: Longest the app waits for a first-page picture. PDFium is fast on a
+#: normal page; past this the file simply has no picture.
+THUMBNAIL_TIMEOUT_S = 10.0
 #: References held in memory while waiting to learn whether an address is a
 #: file (see the module docstring), across the whole crawl.
 MAX_HELD_REFS = 100_000
@@ -138,6 +147,7 @@ class LinkedFileTracker:
         ignore_robots: bool,
         blocked_url_patterns: Sequence[str],
         excluded_scopes: Sequence[str],
+        thumbnails: BlobStore | None = None,
     ) -> None:
         """What ``check_page`` downloads with: the crawl's own client and limits."""
         self._downloads = _Downloads(
@@ -147,6 +157,7 @@ class LinkedFileTracker:
             ignore_robots=ignore_robots,
             blocked_url_patterns=tuple(blocked_url_patterns),
             excluded_scopes=tuple(excluded_scopes),
+            thumbnails=thumbnails,
         )
 
     # -- while the crawl runs ---------------------------------------------
@@ -465,6 +476,8 @@ class LinkedFileTracker:
                     failed_checks=copy.failed_checks,
                     is_form=copy.is_form,
                     page_count=copy.page_count,
+                    thumbnail_hash=copy.thumbnail_hash,
+                    thumbnail_small_hash=copy.thumbnail_small_hash,
                 ),
             )
             return
@@ -479,6 +492,7 @@ class LinkedFileTracker:
                 self._store(file_id, replace(downloaded, reason="timed_out"))
                 return
             if result.outcome == "checked":
+                large, small = await self._thumbnails(body)
                 self._store(
                     file_id,
                     replace(
@@ -488,6 +502,8 @@ class LinkedFileTracker:
                         failed_checks=result.failed,
                         is_form=result.is_form,
                         page_count=result.page_count,
+                        thumbnail_hash=large,
+                        thumbnail_small_hash=small,
                     ),
                 )
                 return
@@ -497,6 +513,32 @@ class LinkedFileTracker:
                 del self._reading[digest]
             if not mine.done():
                 mine.set_result(None)
+
+    async def _thumbnails(self, body: bytes) -> tuple[str | None, str | None]:
+        """Draw and keep the first page of a PDF the check could read.
+
+        Before its result is stored, so a copy that waits for this read
+        (``_reading``) finds the pictures with the result and reuses them.
+        The (large, small) hashes; (None, None) when there is no picture.
+        """
+        blobs = self._downloads.thumbnails if self._downloads else None
+        if blobs is None:
+            return None, None
+        try:
+            pictures = await asyncio.wait_for(
+                asyncio.to_thread(first_page_jpegs, body), timeout=THUMBNAIL_TIMEOUT_S
+            )
+        except TimeoutError:
+            return None, None
+        if pictures is None:
+            return None, None
+        try:
+            large, _ = await asyncio.to_thread(blobs.store, pictures.large, "image/jpeg")
+            small, _ = await asyncio.to_thread(blobs.store, pictures.small, "image/jpeg")
+        except OSError as exc:
+            log.warning("linked_files.thumbnail_not_saved", error_type=type(exc).__name__)
+            return None, None
+        return large, small
 
     def _store(self, file_id: int, result: store.CheckResult) -> None:
         store.set_result(self._conn, scan_id=self._scan_id, file_id=file_id, result=result)
