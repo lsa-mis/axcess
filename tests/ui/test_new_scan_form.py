@@ -610,16 +610,26 @@ async def test_depth_dots_are_gone(live_server: tuple[str, int], new_page: Any) 
         ),
         (
             "login",
+            # Every check the public form has (2026-11-16); the form error
+            # check starts off in a sign-in scan.
             [
                 "Opens menus and pop-up windows (Click-Through)",
                 "Keyboard check",
+                "Focus check",
+                "Page code check",
                 "Zoom and layout check",
+                # On by default in a sign-in scan too, through the sign-in.
+                "Document check",
             ],
             [
                 "Pages on any other website",
                 "Whole signed-in website",
+                "Subdomains",
+                "Form error check",
                 "Image text check",
                 "Vision model review",
+                "AI review",
+                "Motion and reading-order check",
             ],
         ),
     ],
@@ -1082,51 +1092,43 @@ async def test_a_sign_in_scan_offers_the_browser_name(
     await page.goto(f"{base}/app/scans/new?mode=login", wait_until="networkidle")
     await _open_groups(page)
     name = page.get_by_role("combobox", name=_BROWSER_NAME, exact=True)
-    await playwright_async.expect(name).to_have_value("axcess")
+    await playwright_async.expect(name).to_contain_text("Axcess (default)")
     await playwright_async.expect(name).to_have_accessible_description(
         re.compile("the sign-in window sends this name too")
     )
 
 
 # Names a setting has only in the sign-in form, for the same setting.
-_DOCUMENTS = "Check the documents the pages link to"
-_DOCUMENTS_HINT = (
-    "Lists the PDF, Word, Excel and other files the pages link to, in the report\u2019s Documents "
-    "tab, and checks each PDF during the scan. Axcess downloads each PDF once to this computer "
-    "(up to 200, each up to 10 MB), also from other sites. It keeps the result and a picture of "
-    "the first page, not the file."
-)
-_DOCUMENTS_HINT_SIGNED_IN = (
-    "Lists the PDF, Word, Excel and other files the pages link to, in the report\u2019s Documents "
-    "tab, and checks each PDF during the scan. Axcess downloads each PDF on this website with "
-    "your sign-in, as you (up to 200, each up to 10 MB). It lists files on other sites but does "
-    "not download them. It keeps the result and a picture of the first page, not the file."
-)
 _SIGN_IN_NAME = {
-    ("textbox", "Website address"): ("textbox", "Website address to scan after you sign in"),
-    ("switch", "Scan the whole website"): ("switch", "Scan the whole signed-in website"),
-    # The same switch, with the sign-in scan's own hint in its name (copy.ts,
-    # SWITCHES.documents.hintSignedIn): signed in, other sites' files are
-    # listed, not downloaded.
-    ("switch", f"{_DOCUMENTS} {_DOCUMENTS_HINT}"): (
-        "switch",
-        f"{_DOCUMENTS} {_DOCUMENTS_HINT_SIGNED_IN}",
-    ),
+    "Website address": "Website address to scan after you sign in",
+    "Scan the whole website": "Scan the whole signed-in website",
 }
-_CONTROL_LINE = re.compile(
-    r'^\s*- (switch|checkbox|radio|combobox|spinbutton|textbox|group) "([^"]+)"'
-)
+# Each field's own name: its label's title line, without the hint under it
+# (a hint may differ between the two forms, and should), and each question
+# by its legend.
+_SETTING_NAMES = r"""
+() => {
+  const form = document.querySelector('form#scan-form');
+  const firstLine = (text) => (text || '').split('\n')[0].trim();
+  const out = [];
+  for (const el of form.querySelectorAll('input, select, textarea, [role=combobox]')) {
+    if (el.type === 'hidden') continue;
+    const label = el.labels && el.labels[0];
+    const title = label && label.querySelector('.font-semibold');
+    const name = title ? title.textContent.trim() : firstLine(label ? label.innerText : '')
+      || el.getAttribute('aria-label') || '';
+    if (name) out.push(name);
+  }
+  for (const legend of form.querySelectorAll('legend')) out.push(firstLine(legend.innerText));
+  return out;
+}
+"""
 
 
-async def _settings(page: Any) -> set[tuple[str, str]]:
-    """Every named control and question in the scan form, as (role, name)."""
+async def _settings(page: Any) -> set[str]:
+    """Every setting's name and every question in the scan form."""
     await _open_groups(page)
-    tree = await page.locator("form#scan-form").aria_snapshot()
-    return {
-        (match.group(1), match.group(2))
-        for line in tree.splitlines()
-        if (match := _CONTROL_LINE.match(line))
-    }
+    return set(await page.evaluate(_SETTING_NAMES))
 
 
 async def test_the_sign_in_form_offers_every_setting_the_public_form_does(

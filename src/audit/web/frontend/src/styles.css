@@ -40,6 +40,26 @@
      icons to as well as text. The contrast settings below set it back to
      umich-blue. */
   --c-umich-blue-soft: 42 85 126;
+  /* Coverage's five kinds of check, one blue stepped from near black to
+     near white by how much Axcess does (the developer's request, 2026-11-16:
+     five hues read as one, and colour alone told them apart). The order is
+     the data's own, so one hue in lightness steps, not five hues
+     (sequential, not categorical). Each step has its own ink at 7:1 or more
+     (SC 1.4.6 Contrast (Enhanced), Level AAA): white on the two dark steps
+     (17:1, 8.4:1), near black on the three light ones (7.6:1, 12:1, 16:1).
+     No mid blue reaches 7:1 with either ink, so the steps jump between the
+     second and third. The dark theme turns the ramp round (below): the most
+     automated kind stays the one that stands out most from the page. */
+  --c-method-automated: 9 29 52;
+  --c-method-automated-ink: 255 255 255;
+  --c-method-partial: 37 79 126;
+  --c-method-partial-ink: 255 255 255;
+  --c-method-ai: 136 173 215;
+  --c-method-ai-ink: 17 24 39;
+  --c-method-manual: 196 214 235;
+  --c-method-manual-ink: 17 24 39;
+  --c-method-not-needed: 240 244 249;
+  --c-method-not-needed-ink: 17 24 39;
   --c-umich-maize: 255 203 5;
   --c-umich-maize-600: 230 183 4;
   --c-sev-critical: 122 0 0;
@@ -146,6 +166,19 @@
   --c-umich-blue-700: 134 179 230;
   /* 7.1:1 on surface-muted (dark), 9.5:1 on surface-subtle. */
   --c-umich-blue-soft: 157 187 218;
+  /* Coverage's ramp turned round: the most automated kind is the lightest,
+     the one that stands out most on a dark page. The same five colours and
+     inks as the light theme, so each keeps its 7:1. */
+  --c-method-automated: 240 244 249;
+  --c-method-automated-ink: 17 24 39;
+  --c-method-partial: 196 214 235;
+  --c-method-partial-ink: 17 24 39;
+  --c-method-ai: 136 173 215;
+  --c-method-ai-ink: 17 24 39;
+  --c-method-manual: 37 79 126;
+  --c-method-manual-ink: 255 255 255;
+  --c-method-not-needed: 9 29 52;
+  --c-method-not-needed-ink: 255 255 255;
   --c-sev-critical: 255 180 180;
   --c-sev-critical-bg: 63 20 20;
   --c-sev-major: 255 201 153;

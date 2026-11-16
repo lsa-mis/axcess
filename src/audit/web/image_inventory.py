@@ -122,6 +122,31 @@ class ReportImage(BaseModel):
     finding_id: int | None
 
 
+class ImagePage(BaseModel):
+    """One page an image appears on, for the image's own page."""
+
+    page_id: int
+    page_url: str
+    page_title: str | None
+    # The alt text of each place the image is on this page, in page order,
+    # once each: None is no alt attribute, "" is alt="".
+    alt_texts: list[str | None]
+
+
+class ReportImageDetail(BaseModel):
+    """One image of one report, and every page it appears on."""
+
+    image: ReportImage
+    pages: list[ImagePage]
+    # Whether a local model is set up to check alt text and suggest some.
+    check_available: bool
+
+
+#: Pages one image's page lists; ``ReportImage.page_count`` says how many
+#: there are when the list is cut.
+MAX_IMAGE_PAGES = 2000
+
+
 class ReportImagesResponse(BaseModel):
     """One page of the Images tab."""
 
@@ -414,6 +439,49 @@ def get_report_image(conn: sqlite3.Connection, scan_id: int, image_id: int) -> R
         if row.image_id == image_id:
             return row
     return None
+
+
+def get_report_image_detail(
+    conn: sqlite3.Connection,
+    scan_id: int,
+    image_id: int,
+    *,
+    check_available: bool = False,
+) -> ReportImageDetail | None:
+    """One image's row and the pages of this scan it appears on, or None
+    when the image is not on a page of this scan."""
+    image = get_report_image(conn, scan_id, image_id)
+    if image is None:
+        return None
+    rows = conn.execute(
+        """
+        SELECT pi.page_id, pi.alt_text, p.url_normalized AS page_url, p.title AS page_title
+          FROM page_images pi
+          JOIN pages p ON p.id = pi.page_id
+         WHERE p.scan_id = ? AND pi.image_id = ?
+         ORDER BY p.url_normalized, pi.position
+        """,
+        (scan_id, image_id),
+    ).fetchall()
+    pages: dict[int, ImagePage] = {}
+    for r in rows:
+        page_id = int(r["page_id"])
+        page = pages.get(page_id)
+        if page is None:
+            if len(pages) >= MAX_IMAGE_PAGES:
+                continue
+            page = pages[page_id] = ImagePage(
+                page_id=page_id,
+                page_url=str(r["page_url"]),
+                page_title=r["page_title"],
+                alt_texts=[],
+            )
+        alt = _clip(r["alt_text"]) if r["alt_text"] is not None else None
+        if alt not in page.alt_texts:
+            page.alt_texts.append(alt)
+    return ReportImageDetail(
+        image=image, pages=list(pages.values()), check_available=check_available
+    )
 
 
 def check_target(conn: sqlite3.Connection, scan_id: int, image_id: int) -> CheckTarget | None:

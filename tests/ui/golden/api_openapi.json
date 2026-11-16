@@ -1897,6 +1897,34 @@
         }
       }
     },
+    "/api/scans/{scan_id}/images/{image_id}": {
+      "get": {
+        "summary": "Api Scan Image",
+        "description": "One image of the report, and every page it appears on.",
+        "operationId": "api_scan_image_api_scans__scan_id__images__image_id__get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Image Id"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
     "/api/scans/{scan_id}/images/{image_id}/alt-check": {
       "post": {
         "summary": "Api Check Image Alt",

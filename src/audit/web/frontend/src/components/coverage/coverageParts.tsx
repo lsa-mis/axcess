@@ -7,13 +7,21 @@ import { CHECK_METHOD_LABEL } from "../../lib/terms";
 /**
  * Small parts shared by the two Coverage views (routes/Coverage.tsx).
  *
- * How a criterion is checked is shown three ways at once: a colour (a top edge
- * or a dot), a symbol, and the words. Colour alone would fail SC 1.4.1 Use of
- * Color (Level A); the symbol keeps the five kinds apart in a dense grid and
- * in greyscale; the words are what a screen reader reads. Each colour is a
- * theme token that keeps at least 3:1 against the card in both themes (SC
- * 1.4.11 Non-text Contrast, Level AA): ok green, UMich blue, the "major" amber,
- * and two greys.
+ * How a criterion is checked is shown three ways at once: a fill, a symbol,
+ * and the words. The fill is one blue in five lightness steps, near black
+ * for "Axcess checks" down to near white for "No longer needed", the order
+ * of how much Axcess does (styles.css, --c-method-*; the developer's request,
+ * 2026-11-16). It replaced five hues on a thin top edge (green, blue, amber
+ * and two greys), which read as one colour, and told the kinds apart by
+ * colour alone. Lightness steps survive greyscale and every colour-vision
+ * setting; the symbol (a filled circle, a half circle, a diamond, an empty
+ * circle, a crossed circle) keeps them apart by shape too, so colour is
+ * never the only sign (SC 1.4.1 Use of Color, Level A); the words are what a
+ * screen reader reads. Every step's text is 7:1 or more on its own fill (SC
+ * 1.4.6 Contrast (Enhanced), Level AAA).
+ *
+ * The filter cards over the grid show the same filled square as the grid,
+ * so the legend looks like what it explains.
  */
 export const METHOD_ORDER: CheckMethod[] = ["automated", "partial", "ai-assisted", "manual", "not_needed"];
 
@@ -25,27 +33,40 @@ export const METHOD_GLYPH: Record<CheckMethod, string> = {
   not_needed: "⊘",
 };
 
-export const METHOD_TEXT: Record<CheckMethod, string> = {
-  automated: "text-ok",
-  partial: "text-umich-blue",
-  "ai-assisted": "text-sev-major",
-  manual: "text-fg-subtle",
-  not_needed: "text-border-strong",
+/**
+ * The method's fill and the ink on it. Written out whole, so Tailwind sees
+ * each class. The hover fill is the same, so a square does not change colour
+ * under the pointer (the shared Button's hover would otherwise replace it).
+ */
+export const METHOD_FILL: Record<CheckMethod, string> = {
+  automated:
+    "bg-[rgb(var(--c-method-automated))] hover:bg-[rgb(var(--c-method-automated))] text-[rgb(var(--c-method-automated-ink))]",
+  partial:
+    "bg-[rgb(var(--c-method-partial))] hover:bg-[rgb(var(--c-method-partial))] text-[rgb(var(--c-method-partial-ink))]",
+  "ai-assisted":
+    "bg-[rgb(var(--c-method-ai))] hover:bg-[rgb(var(--c-method-ai))] text-[rgb(var(--c-method-ai-ink))]",
+  manual:
+    "bg-[rgb(var(--c-method-manual))] hover:bg-[rgb(var(--c-method-manual))] text-[rgb(var(--c-method-manual-ink))]",
+  not_needed:
+    "bg-[rgb(var(--c-method-not-needed))] hover:bg-[rgb(var(--c-method-not-needed))] text-[rgb(var(--c-method-not-needed-ink))]",
 };
 
-/** The top edge of a tile or square, in the method's colour. */
-export const METHOD_EDGE: Record<CheckMethod, string> = {
-  automated: "shadow-[inset_0_4px_0_rgb(var(--c-ok))]",
-  partial: "shadow-[inset_0_4px_0_rgb(var(--c-umich-blue))]",
-  "ai-assisted": "shadow-[inset_0_4px_0_rgb(var(--c-sev-major))]",
-  manual: "shadow-[inset_0_4px_0_rgb(var(--c-fg-subtle))]",
-  not_needed: "shadow-[inset_0_4px_0_rgb(var(--c-border-strong))]",
-};
-
-/** The method's symbol, hidden from screen readers, which read the words beside it. */
+/**
+ * The method's symbol on its fill, a small square: the grid's square in
+ * little, for the filter cards and the criterion's chip. Hidden from screen
+ * readers, which read the words beside it. Its border keeps the near-white
+ * (or, dark theme, near-black) step visible against the card.
+ */
 export function MethodMark({ method, className }: { method: CheckMethod; className?: string }) {
   return (
-    <span aria-hidden className={cn("text-sm leading-none", METHOD_TEXT[method], className)}>
+    <span
+      aria-hidden
+      className={cn(
+        "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-2xs border border-border-strong text-xs leading-none",
+        METHOD_FILL[method],
+        className,
+      )}
+    >
       {METHOD_GLYPH[method]}
     </span>
   );

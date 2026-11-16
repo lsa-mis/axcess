@@ -50,6 +50,13 @@ export interface Preferences {
   motion: Motion;
   rowsPerPage: RowsPerPage;
   sidebar: SidebarState;
+  /**
+   * The message on the Images tab and an image's page that says the local AI
+   * check is off and links to Settings > AI features. "off" after "Don’t
+   * show again" (ImageParts.tsx, AltCheckOff); Settings > Workspace turns it
+   * back on.
+   */
+  aiOffNotice: OnOff;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -77,6 +84,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   motion: "system",
   rowsPerPage: "10",
   sidebar: "open",
+  aiOffNotice: "on",
 };
 
 /** Every allowed value per key, so a stored value from another build is checked, not trusted. */
@@ -101,6 +109,7 @@ const ALLOWED: { [K in keyof Preferences]: ReadonlyArray<Preferences[K]> } = {
   motion: ["system", "on", "off"],
   rowsPerPage: ["10", "25", "50"],
   sidebar: ["open", "collapsed"],
+  aiOffNotice: ["on", "off"],
 };
 
 export interface Preset {

@@ -54,6 +54,7 @@ from audit import __version__, coverage_matrix, evaluation, occurrence_reviews
 from audit.ai.manager import AIManager
 from audit.ai.state import AIConfig, ai_enabled, initialize_preferences
 from audit.ai.state import effective_settings as effective_ai_settings
+from audit.ai.state import load_config as load_ai_config
 from audit.ai.state import semantic_model as ai_semantic_model
 from audit.analyzer.alfa import AlfaAnalyzer, AlfaResult, chromium_executable_path
 from audit.analyzer.alfa import availability as alfa_availability
@@ -1129,6 +1130,8 @@ def create_app(
         try:
             await _stop_worker()
             settings = next_settings
+            # The Images tab's alt text check follows AI features too.
+            app.state.alt_checker_factory = _alt_checker_factory_for(settings)
             await _start_worker()
         except (Exception, asyncio.CancelledError):
             # Do not leave a half-applied setting after a worker failure or
@@ -3019,32 +3022,14 @@ def create_app(
     # sign-in scans; a remote AUDIT_OLLAMA_BASE_URL leaves the check off.
     # An Ollama cloud model (tag "cloud" or "...-cloud") runs on Ollama's
     # servers even through the local daemon, so it leaves the check off too.
-    from audit.analyzer.ollama_base import is_cloud_model
-
-    alt_check_url = (
-        None
-        if is_cloud_model(settings.alt_check_model)
-        else _local_login_ollama_url(settings.ollama_base_url)
-    )
-
-    def _default_alt_checker_factory(client: httpx.AsyncClient) -> Any:
-        from audit.analyzer.vlm.alt_check import OllamaAltChecker
-
-        # Only installed when alt_check_url is a loopback address (below).
-        return OllamaAltChecker(
-            client,
-            model=settings.alt_check_model.strip(),
-            base_url=str(alt_check_url),
-            timeout_s=settings.alt_check_timeout_s,
-        )
-
-    # None when no model is set, or the model is not on this computer: the
-    # tab then says the check is off. Tests replace this with a stub.
-    app.state.alt_checker_factory = (
-        _default_alt_checker_factory
-        if settings.alt_check_model.strip() and alt_check_url is not None
-        else None
-    )
+    #
+    # The model: AUDIT_ALT_CHECK_MODEL when the administrator set one, else
+    # in the desktop app the vision model chosen in Settings > AI features
+    # (2026-11-16, the developer's request: turning AI features on is how a
+    # person turns this check on). With AI features off in the desktop app,
+    # the check is off. Worked out again whenever the AI setup changes
+    # (_apply_ai_setup), so turning AI features on needs no restart.
+    app.state.alt_checker_factory = _alt_checker_factory_for(settings)
 
     @app.get("/api/scans/{scan_id:int}/images")
     def api_scan_images(
@@ -3073,6 +3058,21 @@ def create_app(
                 check_available=app.state.alt_checker_factory is not None,
             )
         return JSONResponse(result.model_dump())
+
+    @app.get("/api/scans/{scan_id:int}/images/{image_id:int}")
+    def api_scan_image(scan_id: int, image_id: int) -> JSONResponse:
+        """One image of the report, and every page it appears on."""
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            detail = image_inventory.get_report_image_detail(
+                conn,
+                scan_id,
+                image_id,
+                check_available=app.state.alt_checker_factory is not None,
+            )
+        if detail is None:
+            raise HTTPException(status_code=404, detail="This image is not part of this report.")
+        return JSONResponse(detail.model_dump())
 
     @app.post("/api/scans/{scan_id:int}/images/{image_id:int}/alt-check")
     async def api_check_image_alt(scan_id: int, image_id: int) -> JSONResponse:
@@ -4441,6 +4441,41 @@ def _canonical_scan_seed(seed_url: str) -> str:
     """Return the same seed identity used by the crawler orchestrator."""
 
     return url_policy.normalize(url_policy.normalize_seed_url(seed_url))
+
+
+def _alt_checker_factory_for(settings: Settings) -> Any:
+    """The Images tab's alt text checker for these settings, or None when off.
+
+    The check sends the saved image, its text and nearby page text to the
+    model, and the Images tab says that stays on this computer. So it runs
+    only against a literal loopback Ollama address and never with an Ollama
+    cloud model (tag "cloud" or "...-cloud"), which runs on Ollama's servers
+    even through the local daemon.
+    """
+    from audit.analyzer.ollama_base import is_cloud_model
+
+    model = settings.alt_check_model.strip()
+    if settings.desktop:
+        if not ai_enabled(settings):
+            return None
+        # effective_ai_settings put the AI setup's vision model here when
+        # there is one; a model the administrator named still comes first.
+        model = model or (
+            settings.vlm_model.strip() if load_ai_config(settings) is not None else ""
+        )
+    if not model or is_cloud_model(model):
+        return None
+    url = _local_login_ollama_url(settings.ollama_base_url)
+    if url is None:
+        return None
+    timeout_s = settings.alt_check_timeout_s
+
+    def factory(client: httpx.AsyncClient) -> Any:
+        from audit.analyzer.vlm.alt_check import OllamaAltChecker
+
+        return OllamaAltChecker(client, model=model, base_url=str(url), timeout_s=timeout_s)
+
+    return factory
 
 
 async def _run_local_login_background(

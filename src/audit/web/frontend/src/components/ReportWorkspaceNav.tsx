@@ -20,7 +20,8 @@ import { FRAMED } from "../lib/framed";
  * overview's numbers above the table, and ``/scans/:id`` redirects there.
  *
  * Only the views themselves render this (see ``ReportHeader``), so the
- * active tab is read from the path alone.
+ * active tab is read from the path alone. In a panel of Compare reports the
+ * row is the same, without Compare reports (below).
  *
  * The views are data (``REPORT_VIEWS``), not markup: a further view of the
  * report's findings, such as findings by page or by component, is one entry
@@ -104,20 +105,18 @@ export default function ReportWorkspaceNav({
   const { pathname } = useLocation();
   const active = activeReportView(pathname);
   // The current view stays, so a saved link to it still has its tab. As a
-  // panel of Compare reports (lib/framed.ts) there is no Compare reports tab:
-  // it would open the comparison inside one of its own panels. With one view
-  // left, the row is not drawn at all (below).
-  // In a panel, only the current view stays (2026-11-13, when Images was
-  // added): a panel is the page alone. Letting a panel switch to Images
-  // would bring a tab row back into panels; that is a separate decision for
-  // the developer, not part of adding the Images view. It also keeps
-  // Documents out of a panel: a panel compares two reports' issues, and one
-  // that could wander off to a file list would no longer be side by side
-  // with its neighbour.
+  // panel of Compare reports (lib/framed.ts) every view but Compare reports
+  // is offered: a panel switches between its report's Issues, Images and
+  // Documents like the whole window does (the developer's decision,
+  // 2026-11-16, for Issues and Images; Documents follows the same rule), so
+  // the two panels can show one report's issues beside the other's, or both
+  // reports' images. Compare reports stays out of a panel: it would open the
+  // comparison inside one of its own panels. From 2026-11-13 to 2026-11-16 a
+  // panel kept only its current view, so it had no tab row at all.
   const views = REPORT_VIEWS.filter(
     (view) =>
-      !(FRAMED && view !== active) &&
-      (view === active || (view.available?.(previousScanId) ?? true)),
+      view === active ||
+      (!(FRAMED && view.key === "compare") && (view.available?.(previousScanId) ?? true)),
   );
   // One view is not a choice; the heading already names it.
   if (views.length < 2) return null;

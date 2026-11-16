@@ -1913,6 +1913,23 @@ export interface ReportImage {
   finding_id: number | null;
 }
 
+/** One page an image appears on (`ImagePage` in image_inventory.py). */
+export interface ImagePage {
+  page_id: number;
+  page_url: string;
+  page_title: string | null;
+  /** Each place's alt text on this page, once each: null is no alt attribute, "" is alt="". */
+  alt_texts: Array<string | null>;
+}
+
+/** One image and the pages it appears on, from `GET /api/scans/{id}/images/{imageId}`. */
+export interface ReportImageDetail {
+  image: ReportImage;
+  /** Up to 2,000 pages; `image.page_count` says how many there are. */
+  pages: ImagePage[];
+  check_available: boolean;
+}
+
 export interface ReportImagesResponse {
   scan_id: number;
   group: ImageGroup;

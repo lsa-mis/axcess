@@ -707,6 +707,16 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/images/{image_id:int}",
+        "methods": ["GET"],
+        "name": "api_scan_image",
+        "async": false,
+        "params": {"path": ["scan_id", "image_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/scans/{scan_id:int}/images/{image_id:int}/alt-check",
         "methods": ["POST"],
         "name": "api_check_image_alt",
@@ -1643,6 +1653,16 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/images/{image_id:int}",
+        "methods": ["GET"],
+        "name": "api_scan_image",
+        "async": false,
+        "params": {"path": ["scan_id", "image_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/scans/{scan_id:int}/images/{image_id:int}/alt-check",
         "methods": ["POST"],
         "name": "api_check_image_alt",
@@ -2560,6 +2580,16 @@
         "name": "api_scan_images",
         "async": false,
         "params": {"path": ["scan_id"], "query": ["group", "verdict", "q", "limit", "offset"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/images/{image_id:int}",
+        "methods": ["GET"],
+        "name": "api_scan_image",
+        "async": false,
+        "params": {"path": ["scan_id", "image_id"]},
         "request_param": null,
         "background_tasks_param": null
       },
@@ -3495,6 +3525,16 @@
         "name": "api_scan_images",
         "async": false,
         "params": {"path": ["scan_id"], "query": ["group", "verdict", "q", "limit", "offset"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/images/{image_id:int}",
+        "methods": ["GET"],
+        "name": "api_scan_image",
+        "async": false,
+        "params": {"path": ["scan_id", "image_id"]},
         "request_param": null,
         "background_tasks_param": null
       },
