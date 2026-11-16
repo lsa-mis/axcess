@@ -541,6 +541,10 @@ export default function DocumentsRoute() {
                         sort={sort}
                         onSort={onSort}
                         help={column === "status" ? <StatusColumnHelp /> : undefined}
+                        // Sorted by how many problems, shown in words: its
+                        // heading sits on the left with its cells
+                        // (SortHeader ``align``; the table's side rule).
+                        align={column === "found" ? "left" : undefined}
                       >
                         {COLUMN_LABEL[column]}
                       </SortHeader>

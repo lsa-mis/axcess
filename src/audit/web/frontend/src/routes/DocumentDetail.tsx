@@ -391,7 +391,7 @@ function DocumentPagesTable({
           <Table className="min-w-[44rem]" caption={`Pages ${name} appears on`}>
             <TableHead>
               <tr>
-                <ColumnHeader className="w-10 whitespace-nowrap">
+                <ColumnHeader numeric className="w-10 whitespace-nowrap">
                   <span aria-hidden="true">#</span>
                   <span className="sr-only">Row number</span>
                 </ColumnHeader>
@@ -451,7 +451,7 @@ const DocumentPageRow = memo(function DocumentPageRow({
 }) {
   return (
     <Row index={index} className="align-top">
-      <RowHeader className="text-center font-normal tabular-nums text-fg-muted">{index + 1}</RowHeader>
+      <RowHeader className="text-right font-normal tabular-nums text-fg-muted">{index + 1}</RowHeader>
       <Cell className="min-w-[12rem] font-semibold text-fg">
         {/* Laid out as the issue type's page title link is (IssuePagesTable):
             44 px tall, the negative margin using the cell's own padding. */}
