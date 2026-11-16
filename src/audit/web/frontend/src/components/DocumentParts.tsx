@@ -4,6 +4,7 @@ import { documentThumbnailUrl } from "../api/client";
 import type { DocumentRefWay, LinkedFileRow, LinkedFileType } from "../api/types";
 import BreakableUrl from "./BreakableUrl";
 import HowSureTag from "./HowSureTag";
+import ColumnHelp from "./table/ColumnHelp";
 import {
   LINKED_FILE_CHECK_PROBLEM,
   LINKED_FILE_REF_LABEL,
@@ -79,13 +80,40 @@ export function hostOf(url: string): string | null {
   }
 }
 
-/** The file's "Accessibility problems?" value, as the Issues table's tag. */
-export function ResultTag({ status }: { status: LinkedFileRow["status"] }) {
+/**
+ * The file's "Accessibility problems?" value, as the Issues table's tag.
+ * ``hint={false}`` drops its hover hint where the meaning is already written
+ * beside it (the column's "?", StatusColumnHelp), as Issues' LaneTag does.
+ */
+export function ResultTag({ status, hint = true }: { status: LinkedFileRow["status"]; hint?: boolean }) {
   return (
     <HowSureTag
       label={LINKED_FILE_STATUS_LABEL[status]}
-      help={LINKED_FILE_STATUS_HELP[status]}
+      help={hint ? LINKED_FILE_STATUS_HELP[status] : undefined}
       quiet={status === "could_not_check"}
+    />
+  );
+}
+
+const STATUS_ORDER = ["mostly_sure", "not_sure", "could_not_check"] as const;
+
+/**
+ * The "?" on the Documents table's "Accessibility problems?" header (the
+ * developer's request, 2026-11-16, like Issues' How sure): what the column
+ * asks and what each value means, in the words the tags' hints and "What
+ * the labels mean" use (LINKED_FILE_STATUS_HELP). The shared ColumnHelp
+ * says why only some headers have one.
+ */
+export function StatusColumnHelp() {
+  return (
+    <ColumnHelp
+      question={`What does \u201c${RESULT_COLUMN}\u201d mean`}
+      answers="how sure Axcess is that the file has accessibility problems"
+      items={STATUS_ORDER.map((status) => ({
+        key: status,
+        term: <ResultTag status={status} hint={false} />,
+        help: LINKED_FILE_STATUS_HELP[status],
+      }))}
     />
   );
 }

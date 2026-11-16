@@ -11,6 +11,7 @@ import {
   RESULT_COLUMN,
   ResultTag,
   SiteCell,
+  StatusColumnHelp,
   TypeCell,
   documentPath,
   hostOf,
@@ -539,6 +540,7 @@ export default function DocumentsRoute() {
                         kind={SORT_KINDS[column]}
                         sort={sort}
                         onSort={onSort}
+                        help={column === "status" ? <StatusColumnHelp /> : undefined}
                       >
                         {COLUMN_LABEL[column]}
                       </SortHeader>

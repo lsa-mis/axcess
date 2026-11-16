@@ -632,7 +632,12 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
     texts = [stop["text"] for stop in stops]
     assert texts[0] == "Filter documents", texts
     first_file = next(i for i, t in enumerate(texts) if t.startswith("permit-form.pdf"))
-    assert texts[1].startswith("Document") and first_file == 7, texts
+    # The six sort buttons, with the "?" right after its own header's
+    # (Accessibility problems?), then the first file.
+    assert texts[1].startswith("Document") and first_file == 8, texts
+    assert texts[texts.index("Accessibility problems?") + 1] == (
+        "What does \u201cAccessibility problems?\u201d mean?"
+    ), texts
     assert texts[first_file + 1].startswith("no-title.pdf"), texts
     assert all(stop["ring"] for stop in stops), stops
 
@@ -1281,3 +1286,39 @@ async def test_the_first_page_shows_above_the_name_and_on_its_own_page(
     facts = await page.locator("dl").first.bounding_box()
     shown = await figure.bounding_box()
     assert facts and shown and shown["x"] >= facts["x"] + facts["width"] - 1
+
+
+@on_module_loop
+async def test_the_accessibility_problems_header_explains_its_values(
+    documents: int,
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """A "?" on the "Accessibility problems?" header, as on Issues' How sure:
+    by keyboard it opens what the column asks and what each value means,
+    and Escape closes it with focus back on the "?"."""
+    from playwright.async_api import expect
+
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(f"{base}/app/scans/{scan_id}/documents", wait_until="networkidle")
+    header = page.get_by_role("columnheader", name=re.compile(r"^Accessibility problems\?"))
+    tip = header.get_by_role("button", name="What does “Accessibility problems?” mean?")
+    await expect(tip).to_have_attribute("data-target-equivalent", "report-labels-button")
+    await tip.focus()
+    await page.keyboard.press("Enter")
+    panel = page.get_by_text("How sure Axcess is that the file has accessibility problems.")
+    await expect(panel).to_be_visible()
+    for meaning in (
+        "A machine check found a problem",
+        "The file passed the machine checks.",
+        "Axcess could not check the file.",
+    ):
+        await expect(page.get_by_text(meaning).first).to_be_visible()
+    await page.keyboard.press("Escape")
+    await expect(panel).to_be_hidden()
+    await expect(tip).to_be_focused()
+    # Sorting by the column still works: the header's sort button is its own.
+    await header.get_by_role("button", name=re.compile(r"^Accessibility problems\?")).click()
+    sorted_by = page.get_by_text(re.compile(r"^Sorted by Accessibility problems\?"))
+    await expect(sorted_by.first).to_be_attached()
