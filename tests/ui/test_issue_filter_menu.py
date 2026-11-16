@@ -460,6 +460,39 @@ async def test_how_sure_help_opens_by_keyboard_and_says_what_each_value_means(
     assert "sort" not in _params(page)
 
 
+async def test_every_explained_word_has_the_same_help_button(
+    enriched, live_server, new_page
+) -> None:
+    """A "?" after each word that needs explaining (the developer's choice,
+    2026-11-16): the How sure, Priority and Where it shows headers, and the
+    two counts over the table. Each opens the glossary's own words, and the
+    table still fits at 1280px."""
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await _open(page, base, scan_id)
+    panel = page.locator("[popover]:popover-open")
+    expected = {
+        "What does \u201cHow sure\u201d mean?": "A person must decide whether it is a real problem",
+        "What does \u201cPriority\u201d mean?": "Look at these first among issue types",
+        "What does \u201cWhere it shows\u201d mean?": "Found when the page first loads",
+        "What is an issue type?": "All the occurrences one check found for the same reason.",
+        "What is an issue occurrence?": "One place a problem appears",
+    }
+    for name, words in expected.items():
+        tip = page.get_by_role("button", name=name, exact=True)
+        box = await tip.bounding_box()
+        assert box and box["height"] >= 44 and box["width"] >= 24, (name, box)
+        await tip.click()
+        await pw.expect(panel).to_contain_text(words)
+        await page.keyboard.press("Escape")
+        await pw.expect(panel).to_have_count(0)
+    # No other header has one: the rest need no explaining.
+    region = page.get_by_role("region", name="Issues table")
+    await pw.expect(region.locator("thead [popovertarget]")).to_have_count(3)
+    width, room = await region.evaluate("el => [el.scrollWidth, el.clientWidth]")
+    assert width <= room, (width, room)
+
+
 async def test_how_sure_help_fits_at_320(enriched, live_server, new_page) -> None:
     base, scan_id = live_server
     page = await new_page(viewport={"width": 320, "height": 800})

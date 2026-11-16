@@ -215,3 +215,24 @@ export const isReviewLane = (value: string): value is ReviewLane =>
 
 /** One page state reached by operating a control (singular). */
 export const CLICK_THROUGH_STATE = "page state opened by clicking";
+
+/**
+ * What the report's two counts mean: the glossary under the Issues table
+ * ("What the labels mean") and the "?" beside each big number over it say
+ * the same words (W3C COGA, "Making Content Usable": the same words for the
+ * same thing).
+ */
+export const OCCURRENCE_HELP =
+  'One place a problem appears: one element on one page, or in one page state. "Issue occurrences" counts them all.';
+export const ISSUE_TYPE_HELP =
+  "All the occurrences one check found for the same reason. Each is one row in the Issues table.";
+
+/**
+ * The question each explained Issues column answers, in the glossary's
+ * headings and in the column's "?" (Issues.tsx, ColumnHelp).
+ */
+export const COLUMN_QUESTION = {
+  "How sure": "how sure Axcess is that an issue type is a real problem",
+  "Where it shows": "where the problem shows up",
+  Priority: "which issue types to look at first",
+} as const;

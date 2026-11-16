@@ -55,6 +55,9 @@ import {
   FINDING_TYPE_LABELS,
   ISSUE_COLUMN_HELP,
   PRIORITY_HELP,
+  COLUMN_QUESTION,
+  ISSUE_TYPE_HELP,
+  OCCURRENCE_HELP,
   DEFAULT_REVIEW_LANES,
   REVIEW_LANES,
   REVIEW_LANE_HELP,
@@ -845,10 +848,11 @@ function IssueTable({
                   // the column's full width, so "sure ⇅" sat centred in it
                   // with a wide gap before the "?" (the developer's
                   // screenshots, 2026-11-16).
-                  column === "Type" && "whitespace-nowrap",
+                  // Where it shows too, once it had its "?" (2026-11-16).
+                  (column === "Type" || column === "Finding type") && "whitespace-nowrap",
                 )}
                 hint={columnHint(column)}
-                help={column === "Type" ? <HowSureHelp /> : undefined}
+                help={columnHelp(column)}
               >
                 {column === "WCAG" ? (
                   <>
@@ -998,48 +1002,92 @@ const IssueTableRow = memo(function IssueTableRow({
 });
 
 /**
- * The "?" beside the How sure header: what the column says and what each of
- * its four values means, the glossary's own words (REVIEW_LANE_HELP), so
- * the two never disagree (W3C COGA, "Making Content Usable": the same words
- * for the same thing).
+ * The "?" beside an explained column's header (How sure, Where it shows,
+ * Priority): the question the column answers and what each of its values
+ * means, in the glossary's own words (REVIEW_LANE_HELP, FINDING_TYPE_HELP,
+ * PRIORITY_HELP, COLUMN_QUESTION), so the two never disagree (W3C COGA,
+ * "Making Content Usable": the same words for the same thing).
  *
- * In the header, the one place every row's value is explained from (the
- * developer's choice, 2026-11-16). Rejected: a "?" on each row's tag, one
- * more Tab stop per row for the same four sentences; and a "?" in the note
- * over the rows, which the developer removed.
+ * Which headers have one (the developer's choice, 2026-11-16, option 1 of
+ * three): those whose values need explaining, not every header. One rule,
+ * one look, one behaviour: a "?" is wherever a word needs explaining, as on
+ * the big numbers over the table and the Images heading (SC 3.2.4
+ * Consistent Identification, Level AA). Rejected: a "?" on all eight
+ * headers, which added about 224px (the table then scrolled sideways at
+ * 1280px), eight more Tab stops, and a question in every column's name for
+ * words that need no explaining; and a "?" on each row's tag, one Tab stop
+ * per row for the same sentences. "What the labels mean" under the table
+ * stays as the one place all the meanings can be read, searched and
+ * printed together.
+ *
+ * The icon sits on the label's line, as the sort button's words sit at the
+ * foot of their target (SortHeader, wrap="words"); centred in its target it
+ * floated above the words (the developer's screenshots, 2026-11-16). 28px
+ * wide, so the header reads as one centred group: allowed because "What
+ * the labels mean" (IssueGlossary) is a 44px control with the same
+ * explanation (HelpTip, ``equivalent``).
  *
  * Known cost: the button's words sit inside the header cell, so a screen
  * reader that names the column for each cell may read "How sure, What does
- * How sure mean?" there. Kept short for that reason.
+ * How sure mean?" there. Kept short for that reason, and on three headers,
+ * not eight.
  */
-function HowSureHelp() {
+function ColumnHelp({
+  column,
+  items,
+}: {
+  column: keyof typeof COLUMN_QUESTION;
+  items: { key: string; term: ReactNode; help: string }[];
+}) {
+  const question = COLUMN_QUESTION[column];
   return (
     <HelpTip
-      question={`What does \u201c${COLUMN_LABEL.Type}\u201d mean`}
-      // The icon sits on the label's line, as the sort button's words sit at
-      // the foot of their target (SortHeader, wrap="words"); centred in its
-      // target it floated above the words (the developer's screenshots,
-      // 2026-11-16). 28px wide: the icon then has the same space on its
-      // right as "How sure" has on its left, so the header reads as one
-      // centred group. Allowed because "What the labels mean" under the
-      // table (IssueGlossary) is a 44px control with the same explanation
-      // (HelpTip, ``equivalent``).
+      question={`What does \u201c${column}\u201d mean`}
       equivalent="report-labels-button"
-      className="items-end pb-[0.3125rem]"
+      small
+      // Centred on the label's line: 18px icon, 20px line, 6px under it.
+      className="items-end pb-1.5"
     >
-      <p className="mb-2 font-semibold">How sure Axcess is that an issue type is a real problem.</p>
+      <p className="mb-2 font-semibold">
+        {question.charAt(0).toUpperCase()}
+        {question.slice(1)}.
+      </p>
       <dl className="space-y-2">
-        {REVIEW_LANES.map((key) => (
-          <div key={key}>
-            <dt>
-              <LaneTag lane={key} hint={false} />
-            </dt>
-            <dd className="mt-0.5 text-fg-muted">{REVIEW_LANE_HELP[key]}</dd>
+        {items.map((item) => (
+          <div key={item.key}>
+            <dt>{item.term}</dt>
+            <dd className="mt-0.5 text-fg-muted">{item.help}</dd>
           </div>
         ))}
       </dl>
     </HelpTip>
   );
+}
+
+/** Each explained column's values, as its "?" and the glossary list them. */
+const HOW_SURE_ITEMS = () =>
+  REVIEW_LANES.map((key) => ({ key, term: <LaneTag lane={key} hint={false} />, help: REVIEW_LANE_HELP[key] }));
+const WHERE_IT_SHOWS_ITEMS = () =>
+  FINDING_TYPES.map((key) => ({ key, term: <FindingTypePill type={key} hint={false} />, help: FINDING_TYPE_HELP[key] }));
+const PRIORITY_ITEMS = () =>
+  (["High", "Medium", "Low"] as const).map((key) => ({
+    key,
+    term: <span className="font-semibold text-fg">{key}</span>,
+    help: PRIORITY_HELP[key],
+  }));
+
+/** The "?" for a header, or none for a column that needs no explaining. */
+function columnHelp(column: SortColumn): ReactNode {
+  switch (column) {
+    case "Type":
+      return <ColumnHelp column="How sure" items={HOW_SURE_ITEMS()} />;
+    case "Finding type":
+      return <ColumnHelp column="Where it shows" items={WHERE_IT_SHOWS_ITEMS()} />;
+    case "Priority":
+      return <ColumnHelp column="Priority" items={PRIORITY_ITEMS()} />;
+    default:
+      return undefined;
+  }
 }
 
 /**
@@ -1125,36 +1173,28 @@ function IssueGlossary() {
             {
               key: "occurrence",
               term: <span className="font-semibold text-fg">Occurrence</span>,
-              help: "One place a problem appears: one element on one page, or in one page state. \"Issue occurrences\" counts them all.",
+              help: OCCURRENCE_HELP,
             },
             {
               key: "kind",
               term: <span className="font-semibold text-fg">Issue type</span>,
-              help: "All the occurrences one check found for the same reason. Each is one row in the Issues table.",
+              help: ISSUE_TYPE_HELP,
             },
           ]}
         />
         <GlossaryList
-          heading={`${COLUMN_LABEL.Type}: how sure Axcess is that an issue type is a real problem`}
-          items={REVIEW_LANES.map((key) => ({ key, term: <LaneTag lane={key} hint={false} />, help: REVIEW_LANE_HELP[key] }))}
+          heading={`${COLUMN_LABEL.Type}: ${COLUMN_QUESTION["How sure"]}`}
+          items={HOW_SURE_ITEMS()}
         />
         <GlossaryList
-          heading={`${COLUMN_LABEL["Finding type"]}: where the problem shows up`}
-          items={FINDING_TYPES.map((key) => ({
-            key,
-            term: <FindingTypePill type={key} hint={false} />,
-            help: FINDING_TYPE_HELP[key],
-          }))}
+          heading={`${COLUMN_LABEL["Finding type"]}: ${COLUMN_QUESTION["Where it shows"]}`}
+          items={WHERE_IT_SHOWS_ITEMS()}
         />
         {/* The bands' meaning, such as Not sure never being High, in words
             everyone can reach, not only in a hover hint. */}
         <GlossaryList
-          heading={`${COLUMN_LABEL.Priority}: which issue types to look at first`}
-          items={(["High", "Medium", "Low"] as const).map((key) => ({
-            key,
-            term: <span className="font-semibold text-fg">{key}</span>,
-            help: PRIORITY_HELP[key],
-          }))}
+          heading={`${COLUMN_LABEL.Priority}: ${COLUMN_QUESTION.Priority}`}
+          items={PRIORITY_ITEMS()}
         />
       </div>
     </ReportNote>
