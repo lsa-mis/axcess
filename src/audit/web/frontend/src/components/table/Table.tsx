@@ -432,6 +432,16 @@ export function SortHeader<K extends string>({
    * one control sorts and the other explains, so neither does two things.
    * Bottom-aligned with the label, so the header's last line stays level
    * with its neighbours'.
+   *
+   * With a "?", a label that wraps aligns its lines to the end, so its last
+   * line (and the sort arrow on it) ends right beside the "?". Centred, the
+   * short last line sat in the middle of a box as wide as the longest one,
+   * and the "?" floated apart from the words it explains ("Accessibility /
+   * problems? ⇅ … ?", the developer's screenshot, 2026-11-16). Proximity
+   * says what belongs together (W3C COGA, "Making Content Usable"). Here,
+   * not on one header, so every header with a "?" gets it (Issues' How
+   * sure, Where it shows and Priority wrap too in a narrow window). A label
+   * on one line looks the same either way.
    */
   help?: ReactNode;
   className?: string;
@@ -498,7 +508,8 @@ export function SortHeader<K extends string>({
           // label takes. The target keeps its full height (SC 2.5.5).
           words ? "items-end pb-1.5" : "items-center",
           !words && "flex-wrap justify-center gap-x-1.5 gap-y-0.5",
-          "text-center",
+          // Lines end at the "?" when there is one (see ``help``).
+          help ? "text-right" : "text-center",
           active ? "text-umich-blue" : "text-fg-muted",
         )}
       >
@@ -510,7 +521,7 @@ export function SortHeader<K extends string>({
           active ? (
             <span>
               {label}
-              <span className="mt-0.5 flex justify-center">{indicator}</span>
+              <span className={cn("mt-0.5 flex", help ? "justify-end" : "justify-center")}>{indicator}</span>
             </span>
           ) : (
             <span>{withLastWord(label, indicator)}</span>

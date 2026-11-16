@@ -1305,6 +1305,15 @@ async def test_the_accessibility_problems_header_explains_its_values(
     header = page.get_by_role("columnheader", name=re.compile(r"^Accessibility problems\?"))
     tip = header.get_by_role("button", name="What does “Accessibility problems?” mean?")
     await expect(tip).to_have_attribute("data-target-equivalent", "report-labels-button")
+    # Wrapped onto two lines at this width, the label's last line (and its
+    # sort arrow) ends right beside the "?", not centred apart from it.
+    sort_button = header.get_by_role("button", name=re.compile(r"^Accessibility problems\?"))
+    label_box = await sort_button.bounding_box()
+    arrow_box = await sort_button.locator("svg").last.bounding_box()
+    tip_box = await tip.bounding_box()
+    assert label_box and arrow_box and tip_box
+    assert label_box["height"] > 44, label_box  # two lines (one is 44px), or this proves nothing
+    assert 0 <= tip_box["x"] - (arrow_box["x"] + arrow_box["width"]) <= 12, (arrow_box, tip_box)
     await tip.focus()
     await page.keyboard.press("Enter")
     panel = page.get_by_text("How sure Axcess is that the file has accessibility problems.")
