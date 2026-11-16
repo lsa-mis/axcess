@@ -17,22 +17,22 @@
       "id": "small",
       "label": "Small",
       "min_memory_gb": 8,
-      "text": {"tag": "qwen3:4b-instruct-2507-q4_K_M", "size": 2500000000, "licence": "Apache-2.0"},
-      "vision": {"tag": "qwen3-vl:2b-instruct", "size": 1890000000, "licence": "Apache-2.0"}
+      "text": {"tag": "qwen3:4b-instruct-2507-q4_K_M", "manifest": "sha256:0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0", "size": 2500000000, "licence": "Apache-2.0"},
+      "vision": {"tag": "qwen3-vl:2b-instruct", "manifest": "sha256:afc393e3572c07db0bc84aa460d928a16c75f3fbb9ca9e0dccc4fbd2dafb573e", "size": 1890000000, "licence": "Apache-2.0"}
     },
     {
       "id": "standard",
       "label": "Standard",
       "min_memory_gb": 16,
-      "text": {"tag": "qwen2.5-coder:7b-instruct", "size": 4680000000, "licence": "Apache-2.0"},
-      "vision": {"tag": "qwen3-vl:4b-instruct", "size": 3300000000, "licence": "Apache-2.0"}
+      "text": {"tag": "qwen2.5-coder:7b-instruct", "manifest": "sha256:dae161e27b0e90dd1856c8bb3209201fd6736d8eb66298e75ed87571486f4364", "size": 4680000000, "licence": "Apache-2.0"},
+      "vision": {"tag": "qwen3-vl:4b-instruct", "manifest": "sha256:84f7ed8042fa7cdbd902f7dcb7d0370e032095047cc3244179f263b77b5bc318", "size": 3300000000, "licence": "Apache-2.0"}
     },
     {
       "id": "large",
       "label": "Large",
       "min_memory_gb": 32,
-      "text": {"tag": "qwen2.5-coder:14b-instruct", "size": 8990000000, "licence": "Apache-2.0"},
-      "vision": {"tag": "qwen3-vl:8b-instruct", "size": 6140000000, "licence": "Apache-2.0"}
+      "text": {"tag": "qwen2.5-coder:14b-instruct", "manifest": "sha256:9ec8897f747e246e970bc5cfdda85d22f1123dc2e3d34978a010a75968716849", "size": 8990000000, "licence": "Apache-2.0"},
+      "vision": {"tag": "qwen3-vl:8b-instruct", "manifest": "sha256:70e58e37beb15464e19aa903dedb2cba828b89c0fb186f75ff2738c7347b96eb", "size": 6140000000, "licence": "Apache-2.0"}
     }
   ]
 }

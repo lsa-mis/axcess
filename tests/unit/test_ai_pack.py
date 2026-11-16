@@ -181,7 +181,7 @@ def test_install_keeps_system_ollama_separate_and_saves_private_setup(tmp_path: 
     changes: list[AIConfig | None] = []
     pulled: list[str] = []
 
-    def fake_pull(models_dir, tag, progress, cancel):  # type: ignore[no-untyped-def]
+    def fake_pull(models_dir, tag, progress, cancel, **_):  # type: ignore[no-untyped-def]
         assert models_dir == tmp_path / "ai" / "models"
         pulled.append(tag)
         progress(1, 1)
@@ -221,7 +221,7 @@ def test_install_keeps_system_ollama_separate_and_saves_private_setup(tmp_path: 
 def test_install_failure_is_reported_in_plain_words(tmp_path: Path) -> None:
     settings = Settings(data_dir=tmp_path, desktop=True)
 
-    def failing_pull(*_args):  # type: ignore[no-untyped-def]
+    def failing_pull(*_args, **_kwargs):  # type: ignore[no-untyped-def]
         raise RuntimeSetupError("Ollama could not download m: no space")
 
     installer = Installer(

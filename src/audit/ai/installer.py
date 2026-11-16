@@ -115,7 +115,9 @@ class Installer:
                 raise PausedError
             for name, model in (("text_model", tier.text), ("vision_model", tier.vision)):
                 report = step(name)  # type: ignore[arg-type]
-                self.pull(self.runtime.models_dir, model.tag, report, cancel)
+                self.pull(
+                    self.runtime.models_dir, model.tag, report, cancel, manifest=model.manifest
+                )
                 base += model.size
                 self.status.done_bytes = min(base, self.status.total_bytes)
             step("starting")
