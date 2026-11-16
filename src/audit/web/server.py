@@ -223,7 +223,7 @@ class LocalLoginScanRequest(BaseModel):
     seed_url: str = Field(min_length=12, max_length=2048)
     approved_auth_origins: tuple[str, ...] = Field(default=(), max_length=32)
     authorization_acknowledged: bool
-    max_pages: int = Field(default=2500, ge=1, le=2500)
+    max_pages: int = Field(default=10_000, ge=1, le=10_000)
     max_depth: int = Field(default=10, ge=1, le=20)
     rps: float = Field(default=1.0, ge=0.1, le=5.0)
     # "Pages at once (workers)": one signed-in tab per worker. Each tab after
@@ -2071,7 +2071,7 @@ def create_app(
         form = {
             "url": url,
             "search": search,
-            "max_pages": None if all_pages else int(body.get("max_pages") or 5000),
+            "max_pages": None if all_pages else int(body.get("max_pages") or 10_000),
             "max_depth": int(body.get("max_depth") or 10),
             "rps": float(body.get("rps") or 2.0),
             "workers": int(body.get("workers") or 8),

@@ -243,7 +243,7 @@ def crawl(
     url: Annotated[str, typer.Argument(help="Seed URL to crawl.")],
     max_pages: Annotated[
         int, typer.Option("--max-pages", "-n", min=1, help="Maximum pages to fetch.")
-    ] = 5000,
+    ] = 10_000,
     max_depth: Annotated[
         int, typer.Option("--max-depth", "-d", min=1, help="Maximum crawl depth.")
     ] = 10,

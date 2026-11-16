@@ -43,7 +43,7 @@ from audit.wcag_version import WcagVersion, stored_wcag_version
 # Inclusive bounds for a public scan's two limits. The login endpoint's
 # request model carries its own (lower) page cap.
 MIN_LIMIT = 1
-PUBLIC_MAX_PAGES = 10_000
+PUBLIC_MAX_PAGES = 20_000
 MAX_DEPTH = 20
 
 ScanMode = Literal["public", "login"]
