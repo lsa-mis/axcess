@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import functools
 import gzip
 import hashlib
 import json
@@ -74,6 +75,7 @@ from audit.extractor.downloader import ImageDownloader, ImageDownloaderProtocol
 from audit.extractor.pipeline import OcrConfig, VlmConfig, process_page
 from audit.linked_files import formats as linked_file_formats
 from audit.linked_files.fetch import FileFetcher
+from audit.linked_files.google import download_with_button
 from audit.linked_files.tracker import LinkedFileTracker
 from audit.logging import get_logger
 from audit.synthesizer.findings import synthesize_findings
@@ -713,6 +715,10 @@ async def run_crawl(
             # chose not to store rendered pages.
             thumbnails=blob_store if config.store_rendered_html else None,
             fetch=file_fetcher,
+            # A Drive file whose download address stops giving the file:
+            # press its download button in a browser of its own, with the
+            # scan's browser name.
+            drive_button=functools.partial(download_with_button, user_agent=config.user_agent),
         )
     try:
         try:

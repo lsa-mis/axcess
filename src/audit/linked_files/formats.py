@@ -180,10 +180,15 @@ def classify_content_type(content_type: str | None) -> FileType | None:
 def initial_status(file_type: FileType) -> tuple[Status, Reason | None]:
     """The status a file of this type gets before anything is downloaded.
 
-    A PDF waits to be checked. Every other type is "Could not check" at
-    once, with the reason that says whether a later build may check it.
+    A PDF, and a Google Drive file (which may be one), waits to be checked.
+    Every other type is "Could not check" at once, with the reason that says
+    whether a later build may check it.
     """
     if file_type == "pdf":
+        return "pending", None
+    # A Google Drive file can be a PDF: it is downloaded to find out
+    # (google.fetch_drive_file). Docs, Sheets and Slides are not, yet.
+    if file_type == "google_drive":
         return "pending", None
     if file_type in GOOGLE_TYPES:
         return "could_not_check", "google_file"

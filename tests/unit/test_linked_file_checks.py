@@ -142,7 +142,7 @@ def test_classify_content_type(content_type: str | None, expected: str | None) -
         ("google_doc", "could_not_check", "google_file"),
         ("google_sheet", "could_not_check", "google_file"),
         ("google_slides", "could_not_check", "google_file"),
-        ("google_drive", "could_not_check", "google_file"),
+        ("google_drive", "pending", None),
     ],
 )
 def test_initial_status_by_type(

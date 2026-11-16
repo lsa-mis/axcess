@@ -62,6 +62,8 @@ from audit.db.schema import write_batch
 from audit.linked_files import formats
 from audit.linked_files.discovery import FoundLink, find_links, resolve
 from audit.linked_files.fetch import MAX_FILE_BYTES, FetchedFile, FileFetcher, fetch_file
+from audit.linked_files.google import DOWNLOAD_URL as DRIVE_DOWNLOAD_URL
+from audit.linked_files.google import ButtonDownload, fetch_drive_file
 from audit.linked_files.pdf_check import PdfCheck, check_pdf, looks_like_pdf
 from audit.linked_files.thumbnail import first_page_jpegs
 from audit.logging import get_logger
@@ -93,6 +95,9 @@ class _Downloads:
     # A sign-in scan's download, through the signed-in browser
     # (``SignedInFileFetcher``); None downloads with ``client``.
     fetch: FileFetcher | None = None
+    # A Drive file's fallback: press its download button in a browser
+    # (``google.download_with_button``); None leaves the fallback out.
+    drive_button: ButtonDownload | None = None
 
 
 #: PDFs downloaded by ``check_pending`` per scan. The ones the crawler
@@ -152,6 +157,7 @@ class LinkedFileTracker:
         excluded_scopes: Sequence[str],
         thumbnails: BlobStore | None = None,
         fetch: FileFetcher | None = None,
+        drive_button: ButtonDownload | None = None,
     ) -> None:
         """What ``check_page`` downloads with: the crawl's own client and limits.
 
@@ -167,6 +173,7 @@ class LinkedFileTracker:
             excluded_scopes=tuple(excluded_scopes),
             thumbnails=thumbnails,
             fetch=fetch,
+            drive_button=drive_button,
         )
 
     # -- while the crawl runs ---------------------------------------------
@@ -427,16 +434,45 @@ class LinkedFileTracker:
             self._store(file_id, store.CheckResult("could_not_check", "blocked"))
             return
         self._started += 1
+        # A Google Drive file, in a public scan: Google's download address,
+        # not the link (google.fetch_drive_file). robots.txt is asked about
+        # that address, the one actually downloaded from. Google's says
+        # "Disallow: /" there (2026-11-16), so a scan that follows robots.txt
+        # lists Drive files as not checked, and one set to ignore it
+        # downloads them (the developer's decision, 2026-11-16). A sign-in
+        # scan keeps its own fetcher, whose egress policy refuses a file on
+        # another site.
+        drive = downloads.fetch is None and formats.classify_url(url) == "google_drive"
         async with self._semaphore:
-            if not downloads.ignore_robots and not await downloads.robots.allowed(url):
+            if not downloads.ignore_robots and not await downloads.robots.allowed(
+                DRIVE_DOWNLOAD_URL if drive else url
+            ):
                 self._store(file_id, store.CheckResult("could_not_check", "robots"))
                 return
-            async with downloads.limiter.throttle(url):
-                fetched = (
-                    await downloads.fetch(url)
-                    if downloads.fetch is not None
-                    else await fetch_file(downloads.client, url)
+            async with downloads.limiter.throttle(DRIVE_DOWNLOAD_URL if drive else url):
+                if drive:
+                    fetched = await fetch_drive_file(
+                        downloads.client, url, button=downloads.drive_button
+                    )
+                elif downloads.fetch is not None:
+                    fetched = await downloads.fetch(url)
+                else:
+                    fetched = await fetch_file(downloads.client, url)
+            if drive and fetched.outcome == "ok" and _is_office_file(fetched.body):
+                # A Word, PowerPoint or Excel file kept in Drive: downloaded
+                # and identified, checked once Axcess checks that format.
+                self._store(
+                    file_id,
+                    store.CheckResult(
+                        "could_not_check",
+                        "type_not_checked_yet",
+                        http_status=fetched.http_status,
+                        content_type=fetched.content_type,
+                        byte_size=len(fetched.body),
+                        sha256=hashlib.sha256(fetched.body).hexdigest(),
+                    ),
                 )
+                return
             await self._check_fetched(file_id, fetched)
 
     # -- shared -----------------------------------------------------------
@@ -555,6 +591,11 @@ class LinkedFileTracker:
 
     def _store(self, file_id: int, result: store.CheckResult) -> None:
         store.set_result(self._conn, scan_id=self._scan_id, file_id=file_id, result=result)
+
+
+def _is_office_file(body: bytes) -> bool:
+    """A Word, PowerPoint or Excel file (.docx, .pptx, .xlsx: a ZIP of XML parts)."""
+    return body[:4] == b"PK\x03\x04" and b"[Content_Types].xml" in body[:4096]
 
 
 _FETCH_REASON: dict[str, formats.Reason] = {
