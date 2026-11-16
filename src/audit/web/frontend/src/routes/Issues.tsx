@@ -852,6 +852,13 @@ function IssueTable({
                   // same line as the issue types (the developer's report,
                   // 2026-11-16).
                   column === "Issue" && "sticky left-0 z-[1] bg-surface-muted px-4",
+                  // The two count columns are set narrow (6rem): their words
+                  // wrap ("Issue / occurrences") and the numbers are short,
+                  // so the width they took was blank space that pushed the
+                  // table past 1280px (the developer's request, 2026-11-16).
+                  // A width is only a preference in an auto-layout table: it
+                  // can never go below the longest word.
+                  (column === "Occurrences" || column === "Pages") && "w-24",
                   // "How sure ⇅ ?" on one line. Wrapped, the label's box kept
                   // the column's full width, so "sure ⇅" sat centred in it
                   // with a wide gap before the "?" (the developer's
