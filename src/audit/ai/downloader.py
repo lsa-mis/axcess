@@ -55,13 +55,26 @@ def download_model(
     progress: Callable[[int, int], None],
     cancel: threading.Event,
     client: httpx.Client | None = None,
+    *,
+    manifest: str,
 ) -> None:
     """Verify the registry manifest and every blob before publishing an offline model.
 
-    A verified manifest is pinned locally so retries never switch model contents.
-    The catalogue currently pins tags, not manifest digests; HTTPS and the registry's
-    content digest authenticate first acquisition, not an independent release pin.
+    ``manifest`` is the SHA-256 the catalogue pins for this tag's manifest
+    (catalog.json). The manifest is accepted only when its bytes hash to it,
+    and every blob only when it hashes to the digest the manifest lists, so
+    what is installed is exactly the model the catalogue names.
+
+    Until 2026-11-16 the manifest was checked against the registry's
+    ``Docker-Content-Digest`` response header instead. registry.ollama.ai
+    sends no such header, so every download stopped with "The AI model list
+    did not match its checksum" before anything was installed; the tests'
+    pretend registry sent one, which hid it. A verified manifest is still
+    kept locally so retries never switch model contents, and it is checked
+    against the pin again before use.
     """
+    if not _DIGEST.fullmatch(manifest):
+        raise RuntimeSetupError("The AI model list has no valid checksum in the catalogue.")
     path, name, version = model_path(models, tag)
     if cancel.is_set():
         raise PausedError
@@ -76,21 +89,17 @@ def download_model(
     )
     try:
         pin = path.with_name(path.name + ".verified")
-        if pin.exists():
-            body = pin.read_bytes()
-        else:
+        body = pin.read_bytes() if pin.exists() else b""
+        # A kept manifest from another catalogue (or a damaged one) is fetched
+        # again, never trusted.
+        if not body or hashlib.sha256(body).hexdigest() != manifest[7:]:
             response = http.get(
                 f"{REGISTRY}/v2/library/{name}/manifests/{version}",
                 headers={"Accept": "application/vnd.docker.distribution.manifest.v2+json"},
             )
             response.raise_for_status()
             body = response.content
-            digest = response.headers.get("Docker-Content-Digest", "")
-            if (
-                len(body) > 1_000_000
-                or not _DIGEST.fullmatch(digest)
-                or hashlib.sha256(body).hexdigest() != digest[7:]
-            ):
+            if len(body) > 1_000_000 or hashlib.sha256(body).hexdigest() != manifest[7:]:
                 raise RuntimeSetupError(
                     "The AI model list did not match its checksum. Nothing was installed."
                 )
@@ -99,8 +108,8 @@ def download_model(
             staged_pin = pin.with_suffix(pin.suffix + ".ready")
             staged_pin.write_bytes(body)
             staged_pin.replace(pin)
-        manifest = Manifest.model_validate_json(body)
-        descriptors = {d.digest: d for d in [manifest.config, *manifest.layers]}
+        parsed = Manifest.model_validate_json(body)
+        descriptors = {d.digest: d for d in [parsed.config, *parsed.layers]}
         total = sum(d.size for d in descriptors.values())
         done = 0
         blobs = models / "blobs"

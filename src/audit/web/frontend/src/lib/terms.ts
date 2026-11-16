@@ -11,6 +11,11 @@ import type {
   FindingStatus,
   FoundLayer,
   ImageGroup,
+  LinkedFileCheck,
+  LinkedFileReason,
+  LinkedFileRefKind,
+  LinkedFileStatus,
+  LinkedFileType,
   ReviewDecision,
   ReviewLane,
   RuleCheck,
@@ -98,6 +103,176 @@ export const REVIEW_TYPE_LABEL: Record<ReviewLane, string> = {
   measured: "Measured",
   expert_review: "Not sure",
   informational: "For information",
+};
+
+/**
+ * The Documents tab's three "How sure" values: how sure Axcess is that a
+ * linked file (a PDF, Word, Excel or Google file) has accessibility
+ * problems.
+ *
+ * The first two are the same words as the Issues table's (REVIEW_TYPE_LABEL)
+ * because they mean the same thing: "Mostly sure" is a machine check that
+ * proves a problem, "Not sure" needs a person. One word for one thing (W3C
+ * COGA "Making Content Usable", https://www.w3.org/TR/coga-usable/,
+ * paraphrased: use the same word for the same thing). The third differs on
+ * purpose: Issues' "For information" is a result, and here Axcess has no
+ * result at all, so the words say that. There is no "Accessible" value: a
+ * machine check cannot prove a file is accessible (AGENTS.md, Interface
+ * language rule 4).
+ */
+export const LINKED_FILE_STATUS_LABEL: Record<LinkedFileStatus, string> = {
+  mostly_sure: "Mostly sure",
+  not_sure: "Not sure",
+  could_not_check: "Could not check",
+};
+
+/**
+ * Each value finished as a sentence about the file, for the summary numbers
+ * on the Documents tab, where the value stands without its column's
+ * question ("Accessibility problems?"): "Mostly sure" / "it has
+ * accessibility problems". Each phrase fits its value's grammar, so the
+ * pair reads as one plain statement.
+ */
+export const LINKED_FILE_STATUS_NOTE: Record<LinkedFileStatus, string> = {
+  mostly_sure: "it has accessibility problems",
+  not_sure: "if it has accessibility problems",
+  could_not_check: "for accessibility problems",
+};
+
+/** What each value means, in one sentence: the hover hint and the page's key. */
+export const LINKED_FILE_STATUS_HELP: Record<LinkedFileStatus, string> = {
+  mostly_sure: "A machine check found a problem that makes the file hard or impossible to use with a screen reader.",
+  not_sure:
+    "The file passed the machine checks. A person must still check it: the reading order, the image descriptions (alt text) and the table headers.",
+  could_not_check: "Axcess could not check the file. The row says why.",
+};
+
+/** The Documents tab's Type filter groups: one per program, every format of it together. */
+export type LinkedFileKind = "pdf" | "word" | "excel" | "powerpoint" | "opendocument" | "rtf" | "google";
+
+/**
+ * Each Type filter group's name. The program's plain name, without the
+ * extensions the table's Type column adds (a filter for "Word" takes both
+ * .docx and .doc). Google's four kinds of file are one group: Axcess cannot
+ * check any of them, for the same reason.
+ */
+export const LINKED_FILE_KIND_LABEL: Record<LinkedFileKind, string> = {
+  pdf: "PDF",
+  word: "Word",
+  excel: "Excel",
+  powerpoint: "PowerPoint",
+  opendocument: "OpenDocument",
+  rtf: "Rich Text Format (RTF)",
+  google: "Google Docs, Sheets, Slides and Drive",
+};
+
+/** A linked file's type: the plain name first, the file extension after. */
+export const LINKED_FILE_TYPE_LABEL: Record<LinkedFileType, string> = {
+  pdf: "PDF",
+  docx: "Word (.docx)",
+  doc: "Word, old format (.doc)",
+  pptx: "PowerPoint (.pptx)",
+  ppt: "PowerPoint, old format (.ppt)",
+  xlsx: "Excel (.xlsx)",
+  xls: "Excel, old format (.xls)",
+  odt: "OpenDocument text (.odt)",
+  odp: "OpenDocument slides (.odp)",
+  ods: "OpenDocument spreadsheet (.ods)",
+  rtf: "Rich Text Format (.rtf)",
+  google_doc: "Google Docs",
+  google_sheet: "Google Sheets",
+  google_slides: "Google Slides",
+  google_drive: "Google Drive file",
+};
+
+/**
+ * Why a file could not be checked. Two groups read differently on purpose,
+ * as the developer asked: "does not check this file type yet" (a later
+ * version may) and "cannot check" (no machine check can read it). A
+ * reason that names a server answer gets its status code added by
+ * ``linkedFileReasonText``.
+ */
+export const LINKED_FILE_REASON_TEXT: Record<LinkedFileReason, string> = {
+  type_not_checked_yet: "Axcess does not check this file type yet. Only PDF files are checked.",
+  old_format:
+    "Axcess cannot check this file type. Old Office files (.doc, .xls, .ppt) do not store the structure that a check needs.",
+  google_file: "Axcess cannot check files kept in Google Docs, Sheets, Slides or Drive. It cannot download them.",
+  broken_link: "Broken link: the file could not be downloaded.",
+  http_error: "Broken link: the site answered with an error",
+  password: "The file needs a password to open.",
+  too_large: "The file is larger than 10 MB, the most Axcess downloads.",
+  timed_out: "Downloading or checking the file took too long.",
+  not_a_pdf: "The link did not lead to a PDF file. The site sent something else, such as a web page.",
+  damaged: "Axcess could not read the file. It may be damaged.",
+  robots: "The site asks scanners not to open this file (in its robots.txt file).",
+  blocked: "The scan's settings say not to visit this address.",
+  limit: "The scan reached its limit of 200 files to download.",
+  not_checked: "The scan stopped before Axcess checked this file.",
+};
+
+/** The reason in words, with the server's status code where there is one. */
+export function linkedFileReasonText(reason: LinkedFileReason, httpStatus: number | null): string {
+  if (reason === "http_error") {
+    return `${LINKED_FILE_REASON_TEXT.http_error}${httpStatus != null ? ` (HTTP ${httpStatus})` : ""}.`;
+  }
+  return LINKED_FILE_REASON_TEXT[reason];
+}
+
+/**
+ * The five machine checks Axcess runs on every PDF it can open, most
+ * serious first: the order the report ranks them in (SEVERE_CHECKS in
+ * audit/linked_files/formats.py) and the order the server returns a file's
+ * failed checks in (ALL_CHECKS in pdf_check.py). Every check runs on every
+ * PDF Axcess opens, so a check a file did not fail found no problem.
+ */
+export const LINKED_FILE_CHECKS: readonly LinkedFileCheck[] = [
+  "not_tagged",
+  "no_text",
+  "blocks_assistive_tech",
+  "no_title",
+  "no_language",
+];
+
+/**
+ * A failed check, as a short name for the Documents table's "What Axcess
+ * found" column: a few words, so a column of hundreds of files can be
+ * scanned. Why each one matters is on the document's own page
+ * (LINKED_FILE_CHECK_WHY). Until 2026-11-14 the cell held name and reason
+ * in one sentence ("Not tagged: a screen reader cannot tell…"), which was
+ * hard to scan in a narrow column (the developer's choice).
+ */
+export const LINKED_FILE_CHECK_PROBLEM: Record<LinkedFileCheck, string> = {
+  not_tagged: "Not tagged",
+  no_text: "No text a screen reader can read",
+  blocks_assistive_tech: "Security settings block screen readers",
+  no_title: "No document title",
+  no_language: "No language set",
+};
+
+/** What each check looks at, for the "Check" column on a document's page. */
+export const LINKED_FILE_CHECK_NAME: Record<LinkedFileCheck, string> = {
+  not_tagged: "Tags",
+  no_text: "Text a screen reader can read",
+  blocks_assistive_tech: "Security settings",
+  no_title: "Document title",
+  no_language: "Language",
+};
+
+/** Why each check matters to a reader, in one sentence, for a document's page. */
+export const LINKED_FILE_CHECK_WHY: Record<LinkedFileCheck, string> = {
+  not_tagged: "Tags mark the headings, lists and tables, so a screen reader can tell them apart.",
+  no_text:
+    "A file whose pages are only pictures, as in a scan, has no text a screen reader can read. Axcess looks at the first 50 pages.",
+  blocks_assistive_tech: "Some security settings stop screen readers from reading the file.",
+  no_title: "A title tells people which file they have open.",
+  no_language: "The language tells a screen reader which voice to read the file in.",
+};
+
+/** How a page shows a file other than by a plain link. A plain link needs no note. */
+export const LINKED_FILE_REF_LABEL: Record<Exclude<LinkedFileRefKind, "link" | "revealed_link">, string> = {
+  iframe: "Shown inside the page (in a frame)",
+  object: "Shown inside the page (as an object)",
+  embed: "Shown inside the page (embedded)",
 };
 
 /**

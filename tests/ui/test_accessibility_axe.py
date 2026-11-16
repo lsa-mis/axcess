@@ -722,7 +722,7 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     ).to_be_visible()
     workspace = page.get_by_role("navigation", name="Report views")
     await playwright_async.expect(workspace.get_by_role("link")).to_have_text(
-        ["Issues", "Images", "Compare reports"]
+        ["Issues", "Images", "Documents", "Compare reports"]
     )
     await playwright_async.expect(
         workspace.get_by_role("link", name="Issues", exact=True)
@@ -736,8 +736,10 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     summary = page.locator("dl").filter(has_text="Pages visited").first
     await playwright_async.expect(summary.get_by_role("term")).to_have_text(
         [
-            re.compile(r"^Issue types?$"),
-            re.compile(r"^Issue occurrences?$"),
+            # Each count's term starts with its name; a "?" follows it
+            # (2026-11-16), whose words are part of the term's text.
+            re.compile(r"^Issue types?(What is|$)"),
+            re.compile(r"^Issue occurrences?(What is|$)"),
             "Pages visited",
         ]
     )
@@ -886,12 +888,22 @@ async def test_running_scan_shows_factual_pipeline_progress(
                     {
                         "url": "https://example.test/admissions/apply/",
                         "state": "checking",
-                        "checks": {"axe": "done", "alfa": "waiting", "keyboard": "running"},
+                        "checks": {
+                            "axe": "done",
+                            "alfa": "waiting",
+                            "keyboard": "running",
+                            "documents": "waiting",
+                        },
                     },
                     {
                         "url": "https://example.test/admissions/",
                         "state": "checked",
-                        "checks": {"axe": "done", "alfa": "done", "keyboard": "not_run"},
+                        "checks": {
+                            "axe": "done",
+                            "alfa": "done",
+                            "keyboard": "not_run",
+                            "documents": "done",
+                        },
                     },
                     {
                         "url": "https://example.test/admissions/visit/",
@@ -948,8 +960,26 @@ async def test_running_scan_shows_factual_pipeline_progress(
 
         table = page.get_by_role("table", name="Each page and where each check stands on it")
         await playwright_async.expect(table.get_by_role("columnheader")).to_have_text(
-            ["Page", "Status", "Rule check (axe)", "Rule check (Alfa)", "Keyboard check"]
+            [
+                "Page",
+                "Status",
+                "Rule check (axe)",
+                "Rule check (Alfa)",
+                "Keyboard check",
+                "Document check",
+            ]
         )
+        # The document check's column finds links; the line over the table
+        # says each PDF is checked once, and that pages do not wait for them.
+        await playwright_async.expect(
+            page.get_by_text(
+                "Document check finds the documents each page links to and checks "
+                "its PDFs, each PDF once. The next page starts while a page\u2019s "
+                "PDFs download, so a page marked Checked can still show Checking "
+                "under Document check.",
+                exact=False,
+            )
+        ).to_be_visible()
 
         def row(path: str) -> Any:
             return table.get_by_role("row").filter(
@@ -957,14 +987,14 @@ async def test_running_scan_shows_factual_pipeline_progress(
             )
 
         await playwright_async.expect(row("/admissions/apply/").get_by_role("cell")).to_have_text(
-            ["Being checked", "Done", "Waiting", "Checking"]
+            ["Being checked", "Done", "Waiting", "Checking", "Waiting"]
         )
         await playwright_async.expect(row("/admissions/").get_by_role("cell")).to_have_text(
-            ["Checked", "Done", "Done", "Not run"]
+            ["Checked", "Done", "Done", "Not run", "Done"]
         )
         # A waiting page has started no check.
         await playwright_async.expect(row("/admissions/visit/").get_by_role("cell")).to_have_text(
-            ["Waiting", "Waiting", "Waiting", "Waiting"]
+            ["Waiting", "Waiting", "Waiting", "Waiting", "Waiting"]
         )
 
         # Each check's totals are details: closed at first, then one click away.
@@ -1107,6 +1137,7 @@ async def test_every_spa_route_has_an_accurate_document_title(
         (f"/app/scans/{scan_id}/a11y/by-rule", "Rule check issues by rule"),
         (f"/app/scans/{scan_id}/compare", "Compare reports"),
         (f"/app/scans/{scan_id}/compare/changes", "What changed"),
+        (f"/app/scans/{scan_id}/documents", "Documents"),
         ("/app/findings/1", "Image details"),
         ("/app/tracking", "Product roadmap"),
         ("/app/coverage", "What Axcess checks"),

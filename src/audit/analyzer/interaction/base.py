@@ -98,6 +98,23 @@ class StateCapture:
 
 
 @dataclass(frozen=True)
+class RevealedLink:
+    """A link present on the page only after a click.
+
+    Kept for the report's Documents tab, which says which control a reader
+    must press before a file's link exists. ``url`` is as the browser
+    resolved it; ``name`` is the link's accessible name, approximated in the
+    page (aria-labelledby, aria-label, text, image alt, title).
+    """
+
+    url: str
+    name: str
+    #: Accessible name of the control whose click revealed it, as in
+    #: ``page_a11y_findings.revealed_by``.
+    revealed_by: str
+
+
+@dataclass(frozen=True)
 class InteractionResult:
     """What one page's interaction pass produced.
 
@@ -125,6 +142,11 @@ class InteractionResult:
     #: bounded, or failed.
     captures: tuple[StateCapture, ...] = ()
     urls: tuple[str, ...] = ()
+    #: Links seen after a click, each with the control that revealed it. The
+    #: first click to show a link names it, as for findings. Includes links
+    #: that were on the page all along; the reader of this field removes
+    #: those by comparing with the load-state HTML.
+    revealed_links: tuple[RevealedLink, ...] = ()
     #: False when exploration could not start with its required safety guard.
     evaluated: bool = True
     #: Distinct controls this page exposed, counting the ones a click

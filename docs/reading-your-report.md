@@ -17,6 +17,7 @@ it never proves [WCAG](glossary.md#wcag) conformance or legal compliance.
 - [Find a problem and fix it (for developers)](#find-a-problem-and-fix-it-for-developers)
 - [The report summary](#the-report-summary)
 - [The Issues tab](#the-issues-tab)
+- [The Documents tab](#the-documents-tab)
 - [The full evidence record](#the-full-evidence-record)
 - [The note that shows which button revealed a problem](#the-note-that-shows-which-button-revealed-a-problem)
 - [Recording decisions](#recording-decisions)
@@ -241,6 +242,98 @@ sure 3, Measured 2, Not sure 5, For information 2".
 The name of each issue type opens [its page](#the-full-evidence-record).
 **Delete report**, at the end of the Issues page, is described under
 [Delete a report](#delete-a-report).
+
+## The Documents tab
+
+**Documents**, the third tab, lists the files the scanned pages link to or
+show inside the page: PDF, Word, Excel, PowerPoint, OpenDocument, Rich Text
+Format (RTF), and Google Docs, Sheets, Slides and Drive files. Use it to decide
+which file to fix first. Axcess checks only the PDF files; see
+[Document check](glossary.md#document-check) for what it checks.
+
+The tab is laid out like the Issues tab. Four numbers above the table count
+the documents, then how many are Mostly sure (it has accessibility problems),
+Not sure (if it has accessibility problems) and Could not check (for
+accessibility problems).
+Under the table, two closed rows open more detail. **What was checked** shows
+"Only PDFs checked" and opens what the list covers, what Axcess downloaded and
+kept, and what the list can miss (the same facts as below). **What "Mostly
+sure", "Not sure" and the other labels mean** explains a document, the
+values of the "Accessibility problems?" column, and the order. A report that did not look for documents shows no
+numbers, and its empty table says so.
+
+Each row shows:
+
+- **Document**: the file's name, which opens the document's own page (see
+  below).
+- **Type**: such as "PDF" or "Word, old format (.doc)", with "Has a form to
+  fill in" under it for a PDF with form fields.
+- **Hosted on**: the site the file itself is kept on, such as
+  "docs.google.com", and whether that is "This site" or "Another site". Not
+  the pages that link to it, which are in "Pages it appears on".
+- **Accessibility problems?**: how sure Axcess is that the file has
+  accessibility problems. The values are the same words as the Issues table's
+  How sure column.
+  - **Mostly sure**: a machine check found a problem, such as a PDF with no
+    tags or no text a screen reader can read.
+  - **Not sure**: the PDF passed the machine checks. A person must still check
+    the reading order, the image descriptions (alt text) and the table headers.
+    Not sure never means the file is accessible.
+  - **Could not check**: the row says why. "Axcess does not check this file
+    type yet" (Word .docx, Excel .xlsx, PowerPoint .pptx, OpenDocument, RTF)
+    is different from "Axcess cannot check" (old .doc, .xls and .ppt files,
+    and Google files). A broken link, a password, a file over 10 MB, or a slow
+    download are reasons too.
+- **What Axcess found**: each problem the checks found, by a short name, most
+  serious first ("Not tagged", "No language set"); for a Not sure file, what a
+  person must still check; for a file Axcess could not check, why. Why each
+  problem matters is on the document's own page. A file with the same contents as
+  one earlier in the list (the same PDF at another address) says "Same file
+  as …" and shares that file's result.
+- **Pages it appears on**: how many pages link to the file or show it inside
+  the page. The pages are listed on the document's own page.
+
+The table opens in the recommended order: Mostly sure, then Not sure, then
+Could not check. Within each, files that appear on more pages come first, then
+files with a form to fill in, then files with more serious problems. There is
+no single score.
+
+As on the Issues tab, every column header sorts the table (What Axcess found
+sorts by how many problems the checks found), and **Back to recommended
+order** above the table undoes it. **Filter documents** narrows the list by
+Accessibility problems?, Type (PDF, Word, Excel and so on) and Hosted on (this
+site or another site), with how many documents have each value. What is
+filtered is written under the bar, with **Clear filters**. The numbers above
+the table always count the whole report.
+
+A document's own page works like an issue type's page. At the top right,
+**Open the file** opens it in a new tab. Under the heading are its facts
+(Accessibility problems?, Type, Hosted on, Pages it appears on). **What Axcess
+found** is a table of the five checks Axcess runs on every PDF it opens (Tags,
+Text a screen reader can read, Security settings, Document title, Language),
+each with its result ("Problem found" or "No problem found") and why it
+matters. "No problem found" is not a pass: a person must still check the file.
+For a file Axcess could not check, it says why instead. Then a table lists
+every page the file appears on, one row per page (up to 2,000), with a search
+box and sortable columns:
+
+- **Page title**: opens the page inspector with the link to this file
+  outlined on the page.
+- **Page URL**: the page's address.
+- **How it appears**: "Link" with the link's own words, "Shown inside the
+  page" for a frame or embedded file, and "Appears only after pressing" a
+  named button for a link that shows only after a click. A page that reaches
+  the file in more than one way has one line for each.
+
+To check a PDF, Axcess downloads it once to your computer, checks it, and
+keeps only the result, not the file. A PDF on another site is downloaded once;
+that site is not scanned. Nothing is sent to any other service.
+
+Limits: a link that appears only after pressing a button is found only if the
+scan pressed that button, and the scan never presses buttons that may
+download, buy or delete something. A file whose address has no file extension
+is found only on the scanned site. Sign-in scans, and reports made before this
+tab existed, do not list documents.
 
 ## The full evidence record
 

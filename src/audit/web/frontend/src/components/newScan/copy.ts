@@ -109,6 +109,15 @@ export const SWITCHES = {
     label: "Check the page code for problems the rule check misses",
     hint: "Reads each page’s code (HTML) for problems the rule check (axe) does not look for, such as a field named only by its placeholder text. It only reads the page and changes nothing.",
   },
+  documents: {
+    label: "Check the documents the pages link to",
+    hint: "Lists the PDF, Word, Excel and other files the pages link to, in the report’s list of documents, and checks each PDF during the scan. Axcess downloads each PDF once to this computer (up to 200, each up to 10 MB), also from other sites. It keeps the result and a picture of the first page, not the file.",
+    // A sign-in scan's own hint, in place of the one above, not added to
+    // it: the public hint says files on other sites are downloaded, which
+    // is not true behind a sign-in (AGENTS.md, Interface language rule 5).
+    hintSignedIn:
+      "Lists the PDF, Word, Excel and other files the pages link to, in the report’s list of documents, and checks each PDF during the scan. Axcess downloads each PDF on this website with your sign-in, as you (up to 200, each up to 10 MB). It lists files on other sites but does not download them. It keeps the result and a picture of the first page, not the file.",
+  },
   forms: {
     label: "Check that forms describe their errors",
     hint:
@@ -164,9 +173,12 @@ export const USER_AGENT = {
   label: "Browser the site sees (user agent)",
   hint:
     "Some sites show a different page, or block scans, depending on which browser they think is visiting. This changes only the browser name Axcess sends. Every page still opens in Chromium, so a site that checks what the browser can do may still tell. The site’s robots.txt rules for Axcess still apply.",
-  defaultOption: "Axcess (default)",
+  chromeOption: "Chrome on this computer (default)",
+  axcessOption: "Axcess (names itself)",
   customOption: "Type your own…",
-  sendsDefault: "Sends Axcess’s own name, so the site can see that a scanner is visiting.",
+  sendsChrome:
+    "Sends Chrome’s name, with the Chrome version Axcess runs and this computer’s system, so the site serves the page a visitor in Chrome gets.",
+  sendsAxcess: "Sends Axcess’s own name, so the site can see that a scanner is visiting.",
   sends: "Sends:",
   phone:
     "The scanning window stays computer-sized. The site may send its phone layout to that wide window.",
@@ -405,6 +417,8 @@ export const SUMMARY = {
   userAgent: (browser: string) => `Tells the site it is ${browser}`,
   /** The same line for a name the person typed. */
   userAgentCustom: "Tells the site it is the browser you typed",
+  /** A Pages to scan line when the scan sends Axcess's own name, not the default Chrome. */
+  userAgentAxcess: "Tells the site it is Axcess, a scanner",
   /** A Pages to scan line during a Fast scan. */
   htmlOnly: "Page code (HTML) only, no browser",
   loginPrivacy: "Axcess uploads nothing. It deletes the sign-in cookie (session cookie) when the scan ends.",
@@ -432,6 +446,9 @@ export const RAIL_LABELS = {
   markup: CHECK_LABEL.markup,
   forms: CHECK_LABEL.forms,
   responsive: CHECK_LABEL.responsive,
+  // The glossary's name for it ("Document check", docs/glossary.md), as the
+  // other checks use their report names here.
+  documents: "Document check",
   ocr: CHECK_LABEL.image,
   vision: "Vision model review",
   semantic: CHECK_LABEL.semantic,

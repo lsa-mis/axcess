@@ -101,6 +101,8 @@ Use the word in the first column, and never the words in the last.
 | panel | One of the two reports on Compare reports, each in its own frame: "Go back in the report #24 panel". Never "left" or "right": on a narrow screen the panels are one above the other. | pane, side, left, right |
 | What changed | The page that lists what is new, still found and no longer found between two reports. | Compare reports (for this page), diff, verify changes |
 | Does not apply | A table cell with no value for this row. | n/a |
+| document | A PDF, Word, Excel, PowerPoint, OpenDocument, RTF or Google file that a scanned page links to or shows: the **Documents** tab. In code, a "linked file". | attachment, asset, download (as a noun), linked file (in the interface) |
+| Could not check | The Documents tab's third "Accessibility problems?" value: Axcess has no result for the file, and the row says why. Keep "does not check this file type yet" (a later version may) apart from "cannot check" (no machine check can). | Unknown, Error, Skipped, Not applicable, Accessible, Passed |
 | remove private details (redact) | Replace likely private details in a download with "[redacted]". The choice is "Remove private details (redact)"; the file is a "redacted copy". | sanitize, scrub, anonymize, mask, PII |
 
 ### Why "occurrence" and "issue type"
@@ -182,6 +184,8 @@ issue type is a real problem? Each word was chosen against these alternatives.
 | Choice | Rejected | Why |
 | --- | --- | --- |
 | "How sure" (column) | "Type" | "Type" names no question, so the badges under it had nothing to answer. |
+| "Accessibility problems?" (the Documents column) | "How sure" | On Documents, "How sure" did not say of what, so "0 Mostly sure" told readers nothing about the files. The values stay the same words; only the column names the question they answer. |
+| "Hosted on" (the Documents column) | "Site", "What hosts it" | "Site" could be read as the page of our site the file is on, which is "Pages it appears on". "What hosts it" is a question where the other headers are names. |
 | "Mostly sure" | "Barrier" | Jargon, and it sounds certain. |
 | "Mostly sure" | "Very sure", "Sure" | A fixed rule gives the same result every time, but it can still misjudge a page, such as contrast on text over a picture. We tell people to check each one on the page first ("Zero false positive goal" in the glossary). "Very sure" invites them to skip that check, and AGENTS.md says never to claim more than the evidence shows. |
 | "Mostly sure" | "Fairly certain", "Pretty certain", "High chance" | Longer words. "Fairly" and "pretty" have other meanings that confuse translation, and "High chance" does not say of what. |
@@ -192,6 +196,12 @@ issue type is a real problem? Each word was chosen against these alternatives.
 | "hidden" (issue types the table holds back when it opens) | "filtered out", "suppressed", "low confidence" | "Hidden" is the short, common word, and the note beside it says how to show them. Nothing is deleted, and the exports include them. |
 | "For information" | "Informational" | A longer word for the same idea. |
 | "For information" | "Not a problem" | Already the status for a false positive. One phrase names one thing. |
+
+The Documents tab uses "Mostly sure" and "Not sure" with the same meaning:
+proved by a machine check, or needing a person. Its third value is "Could not
+check", not "For information": Axcess has no result for the file at all. It
+has no "Accessible" or "Passed" value, because a machine check cannot prove a
+file is accessible.
 
 ### Check names
 
@@ -207,6 +217,7 @@ issue type is a real problem? Each word was chosen against these alternatives.
 | Visual order, motion, and autoplay | Motion and reading-order check |
 | Semantic (local language model) | AI review |
 | Image text (OCR and vision model) | Image text check |
+| Linked files (PDF checks) | Document check |
 
 Name the tool only when it matters to the reader, and in parentheses.
 

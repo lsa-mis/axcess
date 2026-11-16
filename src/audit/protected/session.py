@@ -48,6 +48,7 @@ from audit.crawler.fetcher import AuthenticatedStaticFetcher
 from audit.crawler.js_fetcher import JsFetcher
 from audit.crawler.search import SearchExplorer
 from audit.extractor.downloader import AuthenticatedImageDownloader
+from audit.linked_files.fetch import SignedInFileFetcher
 from audit.logging import get_logger
 from audit.protected.egress import (
     EgressViolation,
@@ -976,6 +977,23 @@ class ManualAuthenticationSession:
             return self._policies.scan.validate_url(url).url
 
         return AuthenticatedStaticFetcher(self.context.request, validate_url=validate_page_url)
+
+    def create_authenticated_file_fetcher(self) -> SignedInFileFetcher:
+        """Download the document check's PDFs through the signed-in context.
+
+        The same egress policy as pages: a file on another site is refused,
+        never downloaded anonymously instead.
+        """
+
+        if self._state is not ManualAuthState.AUTHENTICATED:
+            raise ManualAuthenticationError(
+                "Complete and verify manual sign-in before starting a protected crawl."
+            )
+
+        def validate_file_url(url: str) -> str:
+            return self._policies.scan.validate_url(url).url
+
+        return SignedInFileFetcher(self.context.request, validate_url=validate_file_url)
 
     def create_authenticated_image_downloader(
         self, blob_store: BlobStore

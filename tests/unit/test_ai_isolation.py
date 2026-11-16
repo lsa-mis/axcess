@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import subprocess
 import threading
 from pathlib import Path
@@ -137,24 +138,37 @@ def test_linux_builder_binds_the_executables_folder(tmp_path, monkeypatch) -> No
     assert str(app.resolve()) in binds
 
 
-def registry_client(payload: bytes, *, wrong_blob: bool = False, wrong_manifest: bool = False):
+def _manifest_body(payload: bytes) -> bytes:
     digest = "sha256:" + hashlib.sha256(payload).hexdigest()
-    body = json.dumps(
+    return json.dumps(
         {
             "schemaVersion": 2,
             "config": {"digest": digest, "size": len(payload)},
             "layers": [{"digest": digest, "size": len(payload)}],
         }
     ).encode()
+
+
+def manifest_pin(payload: bytes = b"a model!") -> str:
+    """The catalogue's pin for the pretend registry's manifest of ``payload``."""
+    return "sha256:" + hashlib.sha256(_manifest_body(payload)).hexdigest()
+
+
+def registry_client(payload: bytes, *, wrong_blob: bool = False):
+    """A pretend registry.ollama.ai that answers as the real one does: the
+    manifest with no ``Docker-Content-Digest`` header (checked against the
+    real registry on 2026-11-16), so a check that needs one fails here too."""
+    body = _manifest_body(payload)
     seen = []
 
     def respond(request):
         seen.append((request.method, str(request.url)))
         assert request.url.scheme == "https" and request.url.host == "registry.ollama.ai"
         if "/manifests/" in request.url.path:
-            checksum = "0" * 64 if wrong_manifest else hashlib.sha256(body).hexdigest()
             return httpx.Response(
-                200, content=body, headers={"Docker-Content-Digest": "sha256:" + checksum}
+                200,
+                content=body,
+                headers={"Content-Type": "application/vnd.docker.distribution.manifest.v2+json"},
             )
         return httpx.Response(200, content=b"bad-data" if wrong_blob else payload)
 
@@ -165,7 +179,12 @@ def test_downloader_imports_checksum_verified_offline_model_without_pull(tmp_pat
     client, seen = registry_client(b"a model!")
     progress = []
     download_model(
-        tmp_path, "text:test", lambda d, t: progress.append((d, t)), threading.Event(), client
+        tmp_path,
+        "text:test",
+        lambda d, t: progress.append((d, t)),
+        threading.Event(),
+        client,
+        manifest=manifest_pin(),
     )
     assert model_present(tmp_path, "text:test")
     assert progress[-1] == (8, 8)
@@ -173,7 +192,9 @@ def test_downloader_imports_checksum_verified_offline_model_without_pull(tmp_pat
     assert (tmp_path / "manifests/registry.ollama.ai/library/text/test").exists()
     # The verified local manifest and blob are reused without asking the registry again.
     seen.clear()
-    download_model(tmp_path, "text:test", lambda d, t: None, threading.Event(), client)
+    download_model(
+        tmp_path, "text:test", lambda d, t: None, threading.Event(), client, manifest=manifest_pin()
+    )
     assert seen == []
 
 
@@ -183,7 +204,9 @@ def test_downloader_imports_checksum_verified_offline_model_without_pull(tmp_pat
 )
 def test_downloader_supports_every_catalog_model(tmp_path, tag) -> None:
     client, seen = registry_client(b"a model!")
-    download_model(tmp_path, tag, lambda d, t: None, threading.Event(), client)
+    download_model(
+        tmp_path, tag, lambda d, t: None, threading.Event(), client, manifest=manifest_pin()
+    )
     assert model_present(tmp_path, tag)
     name, version = tag.split(":")
     path, parsed_name, parsed_version = model_path(tmp_path, tag)
@@ -194,11 +217,36 @@ def test_downloader_supports_every_catalog_model(tmp_path, tag) -> None:
 
 @pytest.mark.parametrize("wrong_manifest,wrong_blob", [(True, False), (False, True)])
 def test_downloader_rejects_wrong_checksums(tmp_path, wrong_manifest, wrong_blob) -> None:
-    client, _ = registry_client(b"a model!", wrong_blob=wrong_blob, wrong_manifest=wrong_manifest)
+    client, _ = registry_client(b"a model!", wrong_blob=wrong_blob)
+    # A manifest that is not the one the catalogue pins (a tag that moved).
+    pin = "sha256:" + "0" * 64 if wrong_manifest else manifest_pin()
     with pytest.raises(Exception, match="checksum"):
-        download_model(tmp_path, "text:test", lambda d, t: None, threading.Event(), client)
+        download_model(
+            tmp_path, "text:test", lambda d, t: None, threading.Event(), client, manifest=pin
+        )
     assert not model_present(tmp_path, "text:test")
     assert not list(tmp_path.rglob("*.part"))
+
+
+def test_a_kept_manifest_that_is_not_the_pinned_one_is_fetched_again(tmp_path) -> None:
+    """A manifest kept from an earlier catalogue is checked against the pin,
+    not trusted because it is on disk."""
+    client, seen = registry_client(b"a model!")
+    path, _, _ = model_path(tmp_path, "text:test")
+    path.parent.mkdir(parents=True)
+    path.with_name(path.name + ".verified").write_bytes(b'{"stale": true}')
+    download_model(
+        tmp_path, "text:test", lambda d, t: None, threading.Event(), client, manifest=manifest_pin()
+    )
+    assert model_present(tmp_path, "text:test")
+    assert any("/manifests/" in url for _, url in seen)
+
+
+def test_every_catalog_model_pins_its_manifest() -> None:
+    """Each model the setup offers names the exact manifest it accepts."""
+    for tier in load_catalog().tiers:
+        for model in (tier.text, tier.vision):
+            assert re.fullmatch(r"sha256:[a-f0-9]{64}", model.manifest), model.tag
 
 
 @pytest.mark.parametrize(
@@ -215,7 +263,7 @@ def test_downloader_rejects_wrong_checksums(tmp_path, wrong_manifest, wrong_blob
 )
 def test_downloader_rejects_paths_and_external_registry_names(tmp_path, tag) -> None:
     with pytest.raises(Exception, match="model name"):
-        download_model(tmp_path, tag, lambda d, t: None, threading.Event())
+        download_model(tmp_path, tag, lambda d, t: None, threading.Event(), manifest=manifest_pin())
 
 
 def manager_for(tmp_path, *, enabled=True, desktop=True, source="private"):

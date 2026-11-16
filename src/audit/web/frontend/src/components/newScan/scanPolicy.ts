@@ -74,6 +74,7 @@ const SETTING_KEYS = [
   "skip_semantic",
   "skip_focus",
   "skip_markup",
+  "skip_documents",
   "skip_visual",
   "skip_forms",
   "send_empty_forms",
@@ -114,6 +115,10 @@ export const PUBLIC_DEFAULTS: ScanSettings = {
   skip_focus: false,
   // On by default: it only reads the page code, after the rule check.
   skip_markup: false,
+  // On by default (the developer's request, 2026-11-14): it lists the files
+  // the pages link to and checks each PDF, downloading it once to this
+  // computer and keeping the result, not the file.
+  skip_documents: false,
   skip_visual: true,
   // On for public websites (2026-11-02, the developer's decision, after the
   // safety review): it presses submit buttons, with nothing typed, and
@@ -132,7 +137,8 @@ export const PUBLIC_DEFAULTS: ScanSettings = {
   // The current U-M standard. 2.2 is a deliberate choice, and marks the
   // settings Customized.
   wcag_version: "2.1",
-  // Axcess names itself unless the person chooses a browser's name.
+  // Chrome's name, as the Chromium Axcess runs, unless the person chooses
+  // otherwise (2026-11-16; userAgents.ts). Axcess's own name is a choice.
   user_agent_choice: DEFAULT_USER_AGENT_CHOICE,
   user_agent: "",
 };
@@ -213,6 +219,10 @@ export const LOGIN_POLICY: ScanPolicy = {
   // checks, and the browser name. Where a setting means something more
   // behind a sign-in, its hint says so (SIGN_IN_NOTES in copy.ts). Defaults
   // may still differ (LOGIN_DEFAULTS).
+  // The document check too, since 2026-11-16 (the developer's decision):
+  // in a sign-in scan its PDFs download through the signed-in browser, and
+  // files on other sites are listed but not downloaded (copy.ts, the
+  // switch's signed-in hint).
   fixed: {},
   fixedNote: null,
   urlLabel: URL_COPY.login.label,
@@ -367,6 +377,7 @@ export function toLocalLoginPayload(
     skip_responsive: settings.skip_responsive,
     skip_focus: settings.skip_focus,
     skip_markup: settings.skip_markup,
+    skip_documents: settings.skip_documents,
     skip_semantic: settings.skip_semantic,
     skip_visual: settings.skip_visual,
     skip_forms: settings.skip_forms,
@@ -394,6 +405,7 @@ export type SwitchKey =
   | "keyboard"
   | "focus"
   | "markup"
+  | "documents"
   | "forms"
   | "responsive"
   | "skip_rendered_storage"
@@ -412,6 +424,7 @@ const SWITCH_FIELDS: Record<SwitchKey, { field: keyof ScanSettings; inverted: bo
   keyboard: { field: "skip_keyboard", inverted: true },
   focus: { field: "skip_focus", inverted: true },
   markup: { field: "skip_markup", inverted: true },
+  documents: { field: "skip_documents", inverted: true },
   forms: { field: "skip_forms", inverted: true },
   responsive: { field: "skip_responsive", inverted: true },
   skip_rendered_storage: { field: "skip_rendered_storage", inverted: false },
@@ -469,6 +482,9 @@ const CHECKS: ReadonlyArray<{ key: SwitchKey; group: CheckGroup; label: string; 
   { key: "markup", group: "checks", label: "Page code", needsBrowser: true },
   { key: "forms", group: "checks", label: "Form errors", needsBrowser: true },
   { key: "responsive", group: "checks", label: "Responsive & zoom", needsBrowser: true },
+  // Last of the checks, as its switch is; it needs no browser (finding a
+  // page's links works in Fast scan too).
+  { key: "documents", group: "checks", label: "Documents" },
   { key: "ocr", group: "localAi", label: "Image text (OCR)" },
   { key: "vision", group: "localAi", label: "Vision model" },
   { key: "semantic", group: "localAi", label: "Wording review" },
@@ -527,8 +543,8 @@ export function quickRetrySettings(url: string, wcagVersion: ScanSettings["wcag_
  */
 export function settingsFromSnapshot(snapshot: ScanSettingsSnapshot, policy: ScanPolicy): ScanSettings {
   const settings = { ...policy.defaults, ...snapshot.settings };
-  // A browser this form no longer lists falls back to Axcess's own name
-  // rather than to a choice the Select cannot show.
+  // A browser this form no longer lists falls back to the default (Chrome
+  // on this computer) rather than to a choice the Select cannot show.
   if (!knownChoice(settings.user_agent_choice)) {
     settings.user_agent_choice = DEFAULT_USER_AGENT_CHOICE;
     settings.user_agent = "";

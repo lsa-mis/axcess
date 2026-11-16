@@ -92,13 +92,14 @@ async def test_two_panels_show_their_reports_without_the_app_chrome(
     for report in (third, second):
         frame = await _frame(page, report)
         # A panel is the page alone: no sidebar, no top bar, no skip link.
-        # It keeps its report's tabs, Issues and Images, without Compare
-        # reports (2026-11-16), so it switches views like the whole window.
+        # It keeps every tab of its report but Compare reports: Issues,
+        # Images and Documents (2026-11-16), so it switches views like the
+        # whole window.
         await expect(frame.get_by_role("complementary", name="Primary")).to_have_count(0)
         await expect(frame.get_by_role("banner")).to_have_count(0)
         await expect(frame.get_by_role("link", name="Skip to main content")).to_have_count(0)
         views = frame.get_by_role("navigation", name="Report views")
-        await expect(views.get_by_role("link")).to_have_text(["Issues", "Images"])
+        await expect(views.get_by_role("link")).to_have_text(["Issues", "Images", "Documents"])
         await expect(frame.get_by_role("main")).to_have_count(1)
 
     # Images in one panel; the other stays on Issues, and the panel's title
@@ -115,6 +116,16 @@ async def test_two_panels_show_their_reports_without_the_app_chrome(
     )
     await expect(right.locator("iframe")).to_have_attribute(
         "title", f"Report #{second}, Accessibility issues"
+    )
+    # Documents opens in a panel too, and the panel's title names it.
+    await (
+        left_frame.get_by_role("navigation", name="Report views")
+        .get_by_role("link", name="Documents")
+        .click()
+    )
+    await expect(left_frame.get_by_role("heading", level=1, name="Documents")).to_be_visible()
+    await expect(left.locator("iframe")).to_have_attribute(
+        "title", re.compile(rf"^Report #{third}, Documents")
     )
     await (
         left_frame.get_by_role("navigation", name="Report views")

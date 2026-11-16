@@ -224,7 +224,7 @@ export default function IssuePagesTable({
             <Table className="min-w-[44rem]" caption={`Pages with ${row.title}`}>
               <TableHead>
                 <tr>
-                  <ColumnHeader className="w-10 whitespace-nowrap">
+                  <ColumnHeader numeric className="w-10 whitespace-nowrap">
                     <span aria-hidden="true">#</span>
                     <span className="sr-only">Row number</span>
                   </ColumnHeader>
@@ -237,11 +237,12 @@ export default function IssuePagesTable({
                   <SortHeader column="Occurrences" kind="number" {...sortProps}>
                     {COLUMN_LABEL.Occurrences}
                   </SortHeader>
-                  <SortHeader column="Issue screenshots" kind="number" {...sortProps}>
+                  {/* Sorted by a count, shown as words ("3 screenshots"): left. */}
+                  <SortHeader column="Issue screenshots" kind="number" align="left" {...sortProps}>
                     {COLUMN_LABEL["Issue screenshots"]}
                   </SortHeader>
                   {!isInformational && (
-                    <SortHeader column="Status" kind="number" {...sortProps}>
+                    <SortHeader column="Status" kind="number" align="left" {...sortProps}>
                       Status
                     </SortHeader>
                   )}
@@ -259,7 +260,7 @@ export default function IssuePagesTable({
                       information too, since any of them can be reviewed. Its
                       label wraps (wrap="words"), so the table still fits a
                       1280 px screen without clipping the column. */}
-                  <SortHeader column="Checked by a person" kind="number" wrap="words" {...sortProps}>
+                  <SortHeader column="Checked by a person" kind="number" align="left" wrap="words" {...sortProps}>
                     Checked by a person
                   </SortHeader>
                 </tr>
@@ -318,7 +319,7 @@ const IssuePageRow = memo(function IssuePageRow({
   );
   return (
     <Row index={index}>
-      <RowHeader className="text-center font-normal tabular-nums text-fg-muted">{index + 1}</RowHeader>
+      <RowHeader className="text-right font-normal tabular-nums text-fg-muted">{index + 1}</RowHeader>
       <Cell className="min-w-[12rem] font-semibold text-fg">
         {/* The title opens the inspector with this issue outlined on the page.
             At least 44 px tall, and laid out as the shared PageLink is (see
@@ -339,7 +340,7 @@ const IssuePageRow = memo(function IssuePageRow({
       <Cell numeric>
         {page.occurrence_count}
       </Cell>
-      <Cell className="whitespace-nowrap text-center">
+      <Cell className="whitespace-nowrap">
         {shots > 0 ? (
           <Link to={screenshotsPath} className="inline-flex min-h-target items-center text-umich-blue underline underline-offset-2">
             {shots} screenshot{shots === 1 ? "" : "s"}
@@ -350,7 +351,7 @@ const IssuePageRow = memo(function IssuePageRow({
         )}
       </Cell>
       {!isInformational && (
-        <Cell className="text-center">
+        <Cell>
           <div className="flex flex-wrap gap-1">
             {STATUS_LABELS_ORDER.map((s) => {
               const n = page.status_summary[s] ?? 0;
@@ -375,7 +376,7 @@ const IssuePageRow = memo(function IssuePageRow({
       )}
       {/* Wide enough that its chip takes two lines at most, as the Status
           chips do; the URL column already wraps, so it gives up the room. */}
-      <Cell className="min-w-[8.5rem] text-center">
+      <Cell className="min-w-[8.5rem]">
         <CheckedChip checked={page.checked_count} total={page.occurrence_count} />
       </Cell>
     </Row>

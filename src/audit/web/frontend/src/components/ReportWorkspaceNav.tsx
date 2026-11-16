@@ -3,11 +3,11 @@ import Tabs from "./Tabs";
 import { FRAMED } from "../lib/framed";
 
 /**
- * Report navigation: the issue table, the Images tab (every image and its
- * alt text), and Compare reports, which shows this
- * report and another of the site side by side. (What changed between the
- * two, the older comparison page, opens from Compare reports and keeps this
- * tab lit: it is part of that view.)
+ * Report navigation: the issue table; the Images tab (every image and its
+ * alt text); Documents, the files the report's pages link to; and Compare
+ * reports, which shows this report and another of the site side by side.
+ * (What changed between two reports, the older comparison page, opens from
+ * Compare reports and keeps that tab lit: it is part of that view.)
  *
  * These are two *views of the same report*, not two steps of a task. An
  * early numbered-pill treatment read as a wizard ("1 Overview → 2 Issues →
@@ -46,6 +46,9 @@ export interface ReportView {
  * EmptyPane). It used to open with the report before this one; the developer
  * asked for the reader to choose instead (2026-10-29).
  */
+/** Views a Compare reports panel does not offer (see ReportWorkspaceNav). */
+const PANEL_LEAVES_OUT: ReadonlySet<string> = new Set(["compare"]);
+
 export const REPORT_VIEWS: readonly ReportView[] = [
   {
     key: "issues",
@@ -61,6 +64,23 @@ export const REPORT_VIEWS: readonly ReportView[] = [
     label: "Images",
     segment: "images",
     path: (scanId) => `/scans/${scanId}/images`,
+  },
+  // The files the report's pages link to (PDF, Word, Excel, Google), with
+  // what the PDF checks found (routes/Documents.tsx). After Images and
+  // before Compare reports (the developer's decision, 2026-11-16): like
+  // Images it looks into this report, and Compare reports looks across two,
+  // so the views of this report come first. It also keeps the tab in the
+  // same place on every report: Compare reports appears only when there is
+  // an earlier report, and Documents after it was the 3rd tab on a site's
+  // first report and the 4th on later ones (SC 3.2.3 Consistent
+  // Navigation, Level AA). A reader still looks at the page issues first. Always shown, even for a report
+  // that did not look for documents: the tab then says why there is no
+  // list, which a missing tab could not.
+  {
+    key: "documents",
+    label: "Documents",
+    segment: "documents",
+    path: (scanId) => `/scans/${scanId}/documents`,
   },
   {
     key: "compare",
@@ -88,17 +108,18 @@ export default function ReportWorkspaceNav({
   const { pathname } = useLocation();
   const active = activeReportView(pathname);
   // The current view stays, so a saved link to it still has its tab. As a
-  // panel of Compare reports (lib/framed.ts) every view but Compare reports
-  // is offered: a panel switches between its report's Issues and Images
-  // like the whole window does (the developer's decision, 2026-11-16), so
-  // the two panels can show one report's issues beside the other's, or both
-  // reports' images. Compare reports stays out of a panel: it would open the
-  // comparison inside one of its own panels. From 2026-11-13 to 2026-11-16 a
-  // panel kept only its current view, so it had no tab row at all.
+  // panel of Compare reports (lib/framed.ts) a panel offers every view of
+  // its report but Compare reports, Issues, Images and Documents, and
+  // switches between them like the whole window does (the developer's
+  // decision, 2026-11-16), so the two panels can show one report's issues
+  // beside the other's, or both reports' images or documents. Compare
+  // reports stays out of a panel: it would open the comparison inside one of
+  // its own panels. From 2026-11-13 to 2026-11-16 a panel kept only its
+  // current view, so it had no tab row.
   const views = REPORT_VIEWS.filter(
     (view) =>
       view === active ||
-      (!(FRAMED && view.key === "compare") && (view.available?.(previousScanId) ?? true)),
+      (!(FRAMED && PANEL_LEAVES_OUT.has(view.key)) && (view.available?.(previousScanId) ?? true)),
   );
   // One view is not a choice; the heading already names it.
   if (views.length < 2) return null;

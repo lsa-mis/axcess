@@ -369,7 +369,9 @@ async def test_table_opens_on_every_group_and_the_filter_shows_the_surest(
 
     # The numbers over the table count every row under it; nothing is hidden.
     summary = page.locator("dl").first
-    await pw.expect(summary).to_contain_text(re.compile(rf"Issue types\s*{_ALL_COUNT}"))
+    # The count follows its term, and the term's "?" (2026-11-16).
+    await pw.expect(summary.get_by_role("definition").first).to_have_text(str(_ALL_COUNT))
+    await pw.expect(summary.get_by_role("term").first).to_contain_text("Issue types")
     await pw.expect(summary).not_to_contain_text("hidden")
 
     # No filter was set by the reader, so none is shown as set.
@@ -418,11 +420,11 @@ async def test_how_sure_help_opens_by_keyboard_and_says_what_each_value_means(
     await _open(page, base, scan_id)
     header = page.get_by_role("columnheader", name=re.compile(r"^How sure"))
     tip = header.get_by_role("button", name=_HOW_SURE_HELP, exact=True)
-    # 44px tall and 28px wide (HelpTip ``equivalent``): SC 2.5.5's "Equivalent"
+    # 44px tall and 24px wide (HelpTip ``equivalent``): SC 2.5.5's "Equivalent"
     # exception, because "What the labels mean" under the table is a 44px
     # control that shows the same explanation.
     box = await tip.bounding_box()
-    assert box and box["height"] >= 44 and box["width"] >= 28, box
+    assert box and box["height"] >= 44 and box["width"] >= 24, box
     glossary = page.get_by_role("button", name=re.compile(r"^What .*labels mean"))
     glossary_box = await glossary.bounding_box()
     assert glossary_box and glossary_box["height"] >= 44 and glossary_box["width"] >= 44
@@ -458,6 +460,39 @@ async def test_how_sure_help_opens_by_keyboard_and_says_what_each_value_means(
     await pw.expect(panel).to_have_count(0)
     # Pressing the "?" does not sort the column.
     assert "sort" not in _params(page)
+
+
+async def test_every_explained_word_has_the_same_help_button(
+    enriched, live_server, new_page
+) -> None:
+    """A "?" after each word that needs explaining (the developer's choice,
+    2026-11-16): the How sure, Priority and Where it shows headers, and the
+    two counts over the table. Each opens the glossary's own words, and the
+    table still fits at 1280px."""
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await _open(page, base, scan_id)
+    panel = page.locator("[popover]:popover-open")
+    expected = {
+        "What does \u201cHow sure\u201d mean?": "A person must decide whether it is a real problem",
+        "What does \u201cPriority\u201d mean?": "Look at these first among issue types",
+        "What does \u201cWhere it shows\u201d mean?": "Found when the page first loads",
+        "What is an issue type?": "All the occurrences one check found for the same reason.",
+        "What is an issue occurrence?": "One place a problem appears",
+    }
+    for name, words in expected.items():
+        tip = page.get_by_role("button", name=name, exact=True)
+        box = await tip.bounding_box()
+        assert box and box["height"] >= 44 and box["width"] >= 24, (name, box)
+        await tip.click()
+        await pw.expect(panel).to_contain_text(words)
+        await page.keyboard.press("Escape")
+        await pw.expect(panel).to_have_count(0)
+    # No other header has one: the rest need no explaining.
+    region = page.get_by_role("region", name="Issues table")
+    await pw.expect(region.locator("thead [popovertarget]")).to_have_count(3)
+    width, room = await region.evaluate("el => [el.scrollWidth, el.clientWidth]")
+    assert width <= room, (width, room)
 
 
 async def test_how_sure_help_fits_at_320(enriched, live_server, new_page) -> None:

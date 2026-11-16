@@ -10,6 +10,7 @@ from audit.config import Settings
 from audit.crawler.user_agent import (
     MAX_USER_AGENT_LENGTH,
     chosen_user_agent,
+    chromium_user_agent,
     user_agent_problem,
 )
 
@@ -72,10 +73,51 @@ def test_a_chosen_name_is_sent_but_robots_txt_is_read_for_axcess() -> None:
     assert config.robots_user_agent == settings.user_agent
     assert config.user_agent_choice == "safari_mac"
 
+    # A stored scan with no choice (from before 2026-11-16) sent Axcess's
+    # own name, and running it again keeps that.
     default = _build_crawl_config(_form(), settings)
     assert default.user_agent == settings.user_agent
     assert default.robots_user_agent is None
     assert default.user_agent_choice is None
+
+    # "Chrome on this computer", the default since 2026-11-16: the server
+    # builds the name; robots.txt is still read for Axcess.
+    chrome = _build_crawl_config(_form(user_agent_choice="chrome", user_agent=""), settings)
+    assert chrome.user_agent == chromium_user_agent()
+    assert chrome.robots_user_agent == settings.user_agent
+    assert chrome.user_agent_choice == "chrome"
+
+
+@pytest.mark.parametrize(
+    ("system", "platform"),
+    [
+        ("win32", "(Windows NT 10.0; Win64; x64)"),
+        ("darwin", "(Macintosh; Intel Mac OS X 10_15_7)"),
+        ("linux", "(X11; Linux x86_64)"),
+    ],
+)
+def test_chrome_on_this_computer_is_the_engines_version_and_this_system(
+    system: str, platform: str
+) -> None:
+    """The engine's own major version, as Chrome reduces it, never a fixed
+    newer one: Chromium's Client Hints report the real version."""
+    import json
+    from pathlib import Path
+
+    import playwright
+
+    record = Path(playwright.__file__).parent / "driver" / "package" / "browsers.json"
+    chromium = next(
+        b for b in json.loads(record.read_text())["browsers"] if b["name"] == "chromium"
+    )
+    major = chromium["browserVersion"].split(".")[0]
+    name = chromium_user_agent(system)
+    assert name == (
+        f"Mozilla/5.0 {platform} AppleWebKit/537.36 (KHTML, like Gecko) "
+        f"Chrome/{major}.0.0.0 Safari/537.36"
+    )
+    assert user_agent_problem(name) is None
+    assert chosen_user_agent({"user_agent_choice": "chrome"}) == chromium_user_agent()
 
 
 async def test_robots_rules_for_axcess_apply_under_a_browser_name() -> None:

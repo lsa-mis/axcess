@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from audit.analyzer.focus import FocusFinding
     from audit.analyzer.forms import FormFinding
     from audit.analyzer.interaction import RevealedViolation, StateCapture
+    from audit.analyzer.interaction.base import RevealedLink
     from audit.analyzer.keyboard import KeyboardTrap
     from audit.analyzer.markup import MarkupFinding
     from audit.analyzer.responsive import ResponsiveFinding
@@ -108,6 +109,10 @@ class FetchResult:
     interaction_dialogs_stuck: int = 0
     interaction_detail: str = ""
     discovered_urls: tuple[str, ...] = ()
+    # Links that appeared after a click, with the control that revealed each,
+    # for the Documents tab (``audit.linked_files``). JsFetcher only, when
+    # the interaction probe ran.
+    revealed_links: tuple[RevealedLink, ...] = ()
     search_result: SearchResult | None = None
     # The page's CSS and style fingerprint, read right after ``body`` was
     # serialized (see ``audit.crawler.style_snapshot``). Every JsFetcher

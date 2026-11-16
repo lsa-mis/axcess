@@ -80,7 +80,7 @@ from audit.crawler.orchestrator import (
 )
 from audit.crawler.search import SearchConfig, search_url_allowed
 from audit.crawler.tab_pool import TabPool
-from audit.crawler.user_agent import chosen_user_agent
+from audit.crawler.user_agent import CHROME_CHOICE, chosen_user_agent
 from audit.db import repo
 from audit.db.reports import record_pages_found, scan_coverage
 from audit.db.schema import connect
@@ -134,7 +134,7 @@ from audit.wcag_version import (
     is_wcag_version,
     stored_wcag_version,
 )
-from audit.web import image_inventory, local_sign_in, pages_queries
+from audit.web import image_inventory, linked_files_queries, local_sign_in, pages_queries
 from audit.web.ai_api import build_ai_router
 from audit.web.comparison import (
     MAX_PAGE_SIZE,
@@ -158,6 +158,11 @@ from audit.web.export_readiness import (
     public_export_filename,
 )
 from audit.web.issue_share import IssueShareError, IssueShareResponse, issue_share
+from audit.web.linked_files_queries import (
+    DocumentOnPage,
+    ScanDocumentResponse,
+    ScanDocumentsResponse,
+)
 from audit.web.local_sign_in import (
     SIGN_IN_KEEP_MINUTES,
     EndedReason,
@@ -264,13 +269,17 @@ class LocalLoginScanRequest(BaseModel):
     static_only: bool = False
     skip_focus: bool = False
     skip_markup: bool = False
+    # The document check, through the signed-in browser (2026-11-16).
+    skip_documents: bool = False
     skip_semantic: bool = True
     skip_visual: bool = True
     # Off by default in a sign-in scan, unlike a public one: pressing a
     # form's submit button while signed in acts as the person signed in.
     skip_forms: bool = True
     send_empty_forms: bool = False
-    user_agent_choice: str | None = None
+    # Chrome's name, as the Chromium Axcess runs, unless the request chose
+    # otherwise (the default since 2026-11-16, as in a public scan).
+    user_agent_choice: str | None = CHROME_CHOICE
     user_agent: str | None = Field(default=None, max_length=1024)
     scan_engine: Literal["axe", "alfa", "both"] = "axe"
     axe_level: Literal["A", "AA", "AAA"] = "AA"
@@ -1799,6 +1808,12 @@ def create_app(
             # it off, every page is rendered in the signed-in browser.
             js_eager=not body.static_only,
             browser_only=not body.static_only,
+            # The document check downloads through the signed-in browser
+            # only (file_fetcher in _run_local_login_background), also when
+            # pages load without scripts; files on other sites are listed,
+            # not downloaded (the sign-in scan's egress policy).
+            linked_files_enabled=not body.skip_documents,
+            documents_signed_in=True,
             image_extraction_enabled=not body.skip_ocr,
             axe_enabled=body.scan_engine in {"axe", "both"},
             axe_level=body.axe_level,
@@ -2160,6 +2175,9 @@ def create_app(
             "skip_focus": bool(body.get("skip_focus")),
             # On unless asked off, like the other checks that only read.
             "skip_markup": bool(body.get("skip_markup")),
+            # On unless asked off: the Documents tab lists the files the
+            # pages link to and checks each PDF.
+            "skip_documents": bool(body.get("skip_documents")),
             "skip_visual": bool(body.get("skip_visual")),
             # Off unless asked for: an older client that sends nothing never
             # starts the form error check, which presses submit buttons.
@@ -2170,7 +2188,10 @@ def create_app(
             "skip_rendered_storage": bool(body.get("skip_rendered_storage")),
             "axe_level": str(body.get("axe_level", "AA")),
             "wcag_version": wcag_version,
-            "user_agent_choice": body.get("user_agent_choice"),
+            # Chrome's name unless the request chose otherwise (2026-11-16):
+            # a request with no choice, such as one from an older New scan,
+            # gets the new default.
+            "user_agent_choice": body.get("user_agent_choice") or CHROME_CHOICE,
             "user_agent": body.get("user_agent"),
         }
         config = _build_crawl_config(form, settings)
@@ -2438,6 +2459,72 @@ def create_app(
             return pages_queries.list_scan_pages(
                 conn, scan_id, limit=limit, offset=offset, sort=sort
             )
+
+    @app.get("/api/scans/{scan_id:int}/documents", response_model=ScanDocumentsResponse)
+    def api_scan_documents(
+        scan_id: int,
+        limit: int = Query(
+            default=linked_files_queries.DEFAULT_LIMIT, ge=1, le=linked_files_queries.MAX_LIMIT
+        ),
+        offset: int = Query(default=0, ge=0),
+    ) -> ScanDocumentsResponse:
+        """The files this report's pages link to (the Documents tab), in report order."""
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            return linked_files_queries.list_scan_documents(
+                conn, scan_id, limit=limit, offset=offset
+            )
+
+    @app.get(
+        "/api/scans/{scan_id:int}/documents/{file_id:int}", response_model=ScanDocumentResponse
+    )
+    def api_scan_document(scan_id: int, file_id: int) -> ScanDocumentResponse:
+        """One file of this report and every page it appears on (its own page)."""
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            found = linked_files_queries.get_scan_document(conn, scan_id, file_id)
+        if found is None:
+            raise HTTPException(status_code=404, detail="This report has no such document")
+        return found
+
+    @app.get("/api/scans/{scan_id:int}/documents/{file_id:int}/thumbnail")
+    def api_document_thumbnail(
+        scan_id: int, file_id: int, size: Literal["large", "small"] = "large"
+    ) -> FileResponse:
+        """A JPEG of one file's first page (PDFs the check could read).
+
+        ``size=small`` is the Documents table's picture, ``large`` the one on
+        the document's own page.
+        """
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            content_hash = linked_files_queries.thumbnail_hash(
+                conn, scan_id, file_id, small=size == "small"
+            )
+        path = blob_store.path_of(content_hash, "image/jpeg") if content_hash else None
+        if path is None or not path.is_file():
+            raise HTTPException(status_code=404, detail="This document has no picture")
+        # The file never changes (its name is its content hash).
+        return FileResponse(
+            path,
+            media_type="image/jpeg",
+            headers={"Cache-Control": "private, max-age=86400"},
+        )
+
+    @app.get(
+        "/api/scans/{scan_id:int}/documents/{file_id:int}/pages/{page_id:int}",
+        response_model=DocumentOnPage,
+    )
+    def api_document_on_page(scan_id: int, file_id: int, page_id: int) -> DocumentOnPage:
+        """Where one file of this report is linked on one of its pages, for the inspector."""
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            found = linked_files_queries.document_on_page(conn, scan_id, file_id, page_id)
+        if found is None:
+            raise HTTPException(
+                status_code=404, detail="This page of the report does not link to that file"
+            )
+        return found
 
     @app.get("/api/scans/{scan_id:int}/pages/{page_id:int}")
     def api_page_evidence(scan_id: int, page_id: int) -> JSONResponse:
@@ -4249,6 +4336,7 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
         responsive_checks_enabled=not bool(form.get("skip_responsive")),
         focus_checks_enabled=not bool(form.get("skip_focus")),
         markup_checks_enabled=not bool(form.get("skip_markup")),
+        linked_files_enabled=not bool(form.get("skip_documents")),
         visual_checks_enabled=not bool(form.get("skip_visual")),
         form_error_checks_enabled=not bool(form.get("skip_forms", True)),
         form_send_empty_forms=not bool(form.get("skip_forms", True))
@@ -4565,6 +4653,12 @@ async def _run_local_login_background(
             # through the signed-in browser, never an anonymous request.
             static_fetcher=(
                 None if config.js_eager else run.session.create_authenticated_static_fetcher()
+            ),
+            # The document check's PDFs, through the signed-in browser too.
+            file_fetcher=(
+                run.session.create_authenticated_file_fetcher()
+                if config.linked_files_enabled
+                else None
             ),
         )
         run.status, run.error = _local_login_completion(summary)

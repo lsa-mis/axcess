@@ -216,6 +216,7 @@ export function StatCard({
 export function HelpTip({
   question,
   equivalent,
+  small = false,
   children,
   className,
 }: {
@@ -227,6 +228,14 @@ export function HelpTip({
    * "Equivalent" exception; above).
    */
   equivalent?: string;
+  /**
+   * An 18px icon in a 24px-wide target (still 44px tall), for a table
+   * header, where the 22px icon outweighed the 14px label beside it (the
+   * developer's suggestion, 2026-11-16). Only with ``equivalent``: 24px is
+   * SC 2.5.8 Target Size (Minimum)'s floor, and the 44px of SC 2.5.5 is
+   * met by the equivalent control.
+   */
+  small?: boolean;
   children: ReactNode;
   className?: string;
 }) {
@@ -291,14 +300,19 @@ export function HelpTip({
           // styles.css), full strength on hover and while open, so the icon
           // never competes with the words it explains but answers a pointer.
           open ? "text-umich-blue" : "text-umich-blue-soft hover:text-umich-blue",
-          equivalent ? "w-7" : "min-w-target",
+          equivalent ? (small ? "w-6" : "w-7") : "min-w-target",
           className,
         )}
       >
         {/* The whole question, "?" included: a screen reader reads it as
             the button's name. */}
         <span className="sr-only">{question}?</span>
-        <svg aria-hidden viewBox="0 0 24 24" className="h-[1.375rem] w-[1.375rem] shrink-0" fill="currentColor">
+        <svg
+          aria-hidden
+          viewBox="0 0 24 24"
+          className={cn("shrink-0", equivalent && small ? "h-[1.125rem] w-[1.125rem]" : "h-[1.375rem] w-[1.375rem]")}
+          fill="currentColor"
+        >
           <path d={open ? HELP_FILLED : HELP_OUTLINED} />
         </svg>
       </button>

@@ -520,8 +520,13 @@ def test_a_sign_in_scan_keeps_its_defaults_when_nothing_new_is_sent(
     assert config.visual_checks_enabled is False  # type: ignore[attr-defined]
     assert config.form_error_checks_enabled is False  # type: ignore[attr-defined]
     assert config.form_send_empty_forms is False  # type: ignore[attr-defined]
-    assert config.user_agent == get_settings().user_agent  # type: ignore[attr-defined]
-    assert browser["user_agent"] == get_settings().user_agent
+    # Chrome's name by default since 2026-11-16, while signing in and while
+    # scanning; robots.txt is still read for Axcess.
+    from audit.crawler.user_agent import chromium_user_agent
+
+    assert config.user_agent == chromium_user_agent()  # type: ignore[attr-defined]
+    assert config.robots_user_agent == get_settings().user_agent  # type: ignore[attr-defined]
+    assert browser["user_agent"] == chromium_user_agent()
 
 
 def test_a_sign_in_scan_takes_every_setting_the_public_form_has(
@@ -1974,6 +1979,11 @@ async def test_login_handoff_starts_the_crawl_where_sign_in_landed(
             # worker); None means no pool, as for one worker.
             return SimpleNamespace(tab_pool=None)
 
+        def create_authenticated_file_fetcher(self):  # type: ignore[no-untyped-def]
+            # The document check's downloads go through the signed-in
+            # browser (2026-11-16); this test never downloads one.
+            return None
+
         async def close(self):  # type: ignore[no-untyped-def]
             return None
 
@@ -2838,3 +2848,19 @@ def test_quitting_axcess_ends_a_waiting_sign_in(
     session = fake_sign_in.instances[0]
     assert session.closed and session.kept is None
     assert app.state.local_sign_ins.current() is None  # type: ignore[attr-defined]
+
+
+@pytest.mark.parametrize("skip", [False, True])
+def test_a_sign_in_scan_checks_documents_only_through_the_signed_in_browser(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch, skip: bool
+) -> None:
+    """The document check is a sign-in setting too (2026-11-16): on unless
+    turned off, marked as signed in, so the crawl downloads its PDFs only
+    through the signed-in browser and refuses to start the check without
+    it."""
+    from audit.crawler.orchestrator import _linked_files_on
+
+    config, _ = _sign_in_config(seeded_db, monkeypatch, {"skip_documents": skip})
+    assert config.documents_signed_in is True  # type: ignore[attr-defined]
+    assert config.linked_files_enabled is (not skip)  # type: ignore[attr-defined]
+    assert _linked_files_on(config) is (not skip)  # type: ignore[arg-type]

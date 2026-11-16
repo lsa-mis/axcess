@@ -176,7 +176,7 @@ function ByCheck({ data }: { data: CoverageFound }) {
             <TableHead>
               <tr>
                 <ColumnHeader>Check</ColumnHeader>
-                <ColumnHeader>Occurrences</ColumnHeader>
+                <ColumnHeader numeric>Occurrences</ColumnHeader>
                 <ColumnHeader className="w-[38%]">Share of all found</ColumnHeader>
               </tr>
             </TableHead>
@@ -299,9 +299,9 @@ function AxeBreakdown({ rules }: { rules: AxeRule[] }) {
           <TableHead>
             <tr>
               <ColumnHeader>{groupBy === "kind" ? "Kind of problem (rule)" : groupBy === "criterion" ? "WCAG criterion (rule)" : "Rule"}</ColumnHeader>
-              <ColumnHeader>Page as loaded</ColumnHeader>
-              <ColumnHeader>After Click-Through</ColumnHeader>
-              <ColumnHeader>Total</ColumnHeader>
+              <ColumnHeader numeric>Page as loaded</ColumnHeader>
+              <ColumnHeader numeric>After Click-Through</ColumnHeader>
+              <ColumnHeader numeric>Total</ColumnHeader>
               <ColumnHeader className="w-[22%]">Share of rule check</ColumnHeader>
             </tr>
           </TableHead>
@@ -446,9 +446,9 @@ function ManualReview({ data }: { data: CoverageFound }) {
               <TableHead>
                 <tr>
                   <ColumnHeader>Report</ColumnHeader>
-                  <ColumnHeader>Criteria failed</ColumnHeader>
-                  <ColumnHeader>Axcess found an occurrence</ColumnHeader>
-                  <ColumnHeader>Share</ColumnHeader>
+                  <ColumnHeader numeric>Criteria failed</ColumnHeader>
+                  <ColumnHeader numeric>Axcess found an occurrence</ColumnHeader>
+                  <ColumnHeader numeric>Share</ColumnHeader>
                 </tr>
               </TableHead>
               <tbody>

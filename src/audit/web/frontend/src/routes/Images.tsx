@@ -393,12 +393,14 @@ export default function ImagesRoute() {
             <Table caption={`${IMAGE_GROUP_LABEL[group]}, with a verdict on each image's alt text`} className="min-w-[60rem]">
               <TableHead>
                 <tr>
-                  <ColumnHeader className="w-44 text-left">Image</ColumnHeader>
-                  <ColumnHeader className="text-left">Text in the image</ColumnHeader>
-                  <ColumnHeader className="text-left">Current alt text</ColumnHeader>
-                  <ColumnHeader className="w-52 text-left">Alt text verdict</ColumnHeader>
-                  <ColumnHeader className="w-72 text-left">Suggested alt text</ColumnHeader>
-                  <ColumnHeader className="w-28">{IMAGE_PAGES_COLUMN}</ColumnHeader>
+                  <ColumnHeader className="w-44">Image</ColumnHeader>
+                  <ColumnHeader>Text in the image</ColumnHeader>
+                  <ColumnHeader>Current alt text</ColumnHeader>
+                  <ColumnHeader className="w-52">Alt text verdict</ColumnHeader>
+                  <ColumnHeader className="w-72">Suggested alt text</ColumnHeader>
+                  <ColumnHeader numeric className="w-28">
+                    {IMAGE_PAGES_COLUMN}
+                  </ColumnHeader>
                 </tr>
               </TableHead>
               <tbody>

@@ -34,6 +34,8 @@ _NAMES = {
     "WCAG",
     "Alfa",
     "Excel",
+    # Microsoft Word, named beside Excel in the document check's hint.
+    "Word",
     "Markdown",
     "Ollama",
     "Chromium",
@@ -78,6 +80,9 @@ _PHRASES = (
     "Not sure",  # issue type, lib/terms.ts
     "For information",  # issue type, lib/terms.ts
     "How sure",  # the Issues column those four values fill, COLUMN_LABEL.Type
+    # The other Issues columns with a "?" that names them (Issues.tsx, ColumnHelp).
+    "Where it shows",
+    "Priority",
     "Best practice",  # level, docs/plain-language.md
     "Rule check",  # check name: Rule check (axe), Rule check (Alfa)
     "Page inspector",  # the tool's name
@@ -214,6 +219,7 @@ async def _labels_on(new_page: Any, url: str, *, open_groups: bool = False) -> l
         "/app/scans/{scan_id}",
         "/app/scans/{scan_id}/issues",
         "/app/scans/{scan_id}/pages",
+        "/app/scans/{scan_id}/documents",
         "/app/scans/{scan_id}/compare",
         "/app/scans/{scan_id}/compare/changes",
         "/app/tracking",

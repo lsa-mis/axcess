@@ -35,8 +35,17 @@ export type UserAgentPreset = {
   phone?: true;
 };
 
-/** Sends Axcess's own name, the server's `user_agent` setting. */
-export const DEFAULT_USER_AGENT_CHOICE = "axcess";
+/**
+ * Chrome's name, as the Chromium Axcess runs on this computer: the server
+ * builds the string (audit.crawler.user_agent.chromium_user_agent), so it
+ * follows the engine's real version and this computer's system. The default
+ * since 2026-11-16 (the developer's decision): bot filters block or
+ * challenge a scanner's own name, and some sites serve it a cut-down page.
+ */
+export const CHROME_USER_AGENT_CHOICE = "chrome";
+/** Sends Axcess's own name, the server's `user_agent` setting. The default until 2026-11-16. */
+export const AXCESS_USER_AGENT_CHOICE = "axcess";
+export const DEFAULT_USER_AGENT_CHOICE = CHROME_USER_AGENT_CHOICE;
 /** The person types the string. */
 export const CUSTOM_USER_AGENT_CHOICE = "custom";
 
@@ -99,12 +108,18 @@ export function presetFor(choice: string): UserAgentPreset | undefined {
 
 /** True for a choice this version of the form can show. */
 export function knownChoice(choice: string): boolean {
-  return choice === DEFAULT_USER_AGENT_CHOICE || choice === CUSTOM_USER_AGENT_CHOICE || Boolean(presetFor(choice));
+  return (
+    choice === CHROME_USER_AGENT_CHOICE ||
+    choice === AXCESS_USER_AGENT_CHOICE ||
+    choice === CUSTOM_USER_AGENT_CHOICE ||
+    Boolean(presetFor(choice))
+  );
 }
 
 /**
- * The string a scan will send, or null for Axcess's own name (which only
- * the server knows: it is a server setting).
+ * The string a scan will send, or null for Chrome on this computer or
+ * Axcess's own name, which only the server knows (the engine's version, a
+ * server setting).
  */
 export function userAgentToSend(choice: string, typed: string): string | null {
   if (choice === CUSTOM_USER_AGENT_CHOICE) return typed.trim();
