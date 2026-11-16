@@ -109,6 +109,15 @@ export const SWITCHES = {
     label: "Check the page code for problems the rule check misses",
     hint: "Reads each page’s code (HTML) for problems the rule check (axe) does not look for, such as a field named only by its placeholder text. It only reads the page and changes nothing.",
   },
+  documents: {
+    label: "Check the documents the pages link to",
+    hint: "Lists the PDF, Word, Excel and other files the pages link to, in the report’s list of documents, and checks each PDF during the scan. Axcess downloads each PDF once to this computer (up to 200, each up to 10 MB), also from other sites. It keeps the result and a picture of the first page, not the file.",
+    // A sign-in scan's own hint, in place of the one above, not added to
+    // it: the public hint says files on other sites are downloaded, which
+    // is not true behind a sign-in (AGENTS.md, Interface language rule 5).
+    hintSignedIn:
+      "Lists the PDF, Word, Excel and other files the pages link to, in the report’s list of documents, and checks each PDF during the scan. Axcess downloads each PDF on this website with your sign-in, as you (up to 200, each up to 10 MB). It lists files on other sites but does not download them. It keeps the result and a picture of the first page, not the file.",
+  },
   forms: {
     label: "Check that forms describe their errors",
     hint:
@@ -437,6 +446,9 @@ export const RAIL_LABELS = {
   markup: CHECK_LABEL.markup,
   forms: CHECK_LABEL.forms,
   responsive: CHECK_LABEL.responsive,
+  // The glossary's name for it ("Document check", docs/glossary.md), as the
+  // other checks use their report names here.
+  documents: "Document check",
   ocr: CHECK_LABEL.image,
   vision: "Vision model review",
   semantic: CHECK_LABEL.semantic,

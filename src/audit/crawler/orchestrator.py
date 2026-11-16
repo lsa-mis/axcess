@@ -72,6 +72,9 @@ from audit.db.reports import record_pages_found
 from audit.db.schema import write_batch
 from audit.extractor.downloader import ImageDownloader, ImageDownloaderProtocol
 from audit.extractor.pipeline import OcrConfig, VlmConfig, process_page
+from audit.linked_files import formats as linked_file_formats
+from audit.linked_files.fetch import FileFetcher
+from audit.linked_files.tracker import LinkedFileTracker
 from audit.logging import get_logger
 from audit.synthesizer.findings import synthesize_findings
 from audit.wcag_version import (
@@ -339,6 +342,17 @@ class CrawlConfig:
     # inspector then always re-renders on demand. Finding evidence,
     # screenshots, and image blobs are unaffected.
     store_rendered_html: bool = True
+    # Linked files, the report's Documents tab (``audit.linked_files``):
+    # record every PDF, Office or Google file the scanned pages link to,
+    # where from, and check each PDF during the crawl, including a PDF on
+    # another host (one file, never a crawl of that host).
+    linked_files_enabled: bool = True
+    # A sign-in scan's document check (2026-11-16): its PDFs are downloaded
+    # only through the signed-in browser (``run_crawl``'s ``file_fetcher``),
+    # whose egress policy keeps them to the signed-in site. Without that
+    # fetcher the check does not run at all, never with anonymous requests.
+    # Other browser-only scans (the protected agent pipeline) never run it.
+    documents_signed_in: bool = False
     # The row this crawl must write into, when the caller already created it.
     # ``_prepare_scan_row`` and ``_ensure_scan`` each work out "which row is
     # this crawl" from the seed URL, and they do not work it out the same way.
@@ -433,13 +447,19 @@ async def run_crawl(
     image_downloader: ImageDownloaderProtocol | None = None,
     alfa_analyzer: AlfaPageAnalyzer | None = None,
     static_fetcher: PageFetcher | None = None,
+    file_fetcher: FileFetcher | None = None,
 ) -> CrawlSummary:
     """Execute (or resume) a crawl for ``config.seed_url``.
 
     ``static_fetcher`` replaces the anonymous static fetch: a sign-in scan
     that loads pages without running scripts passes one that goes through
-    the signed-in browser (``AuthenticatedStaticFetcher``).
+    the signed-in browser (``AuthenticatedStaticFetcher``). ``file_fetcher``
+    does the same for the document check's downloads
+    (``SignedInFileFetcher``); a scan with ``documents_signed_in`` must pass
+    it.
     """
+    if config.documents_signed_in and _linked_files_on(config) and file_fetcher is None:
+        raise ValueError("A sign-in scan's document check needs the signed-in file fetcher")
     # Path-auto-slash first (``/bicentennial`` → ``/bicentennial/``), then
     # the canonical normalize pass. Scope then reads the normalized path.
     seed_with_slash = url_policy.normalize_seed_url(config.seed_url)
@@ -669,20 +689,59 @@ async def run_crawl(
         in_flight=0,
         summary=summary,
         semantic_analyzers=semantic_analyzers,
+        linked_files=(
+            LinkedFileTracker(
+                conn, scan_id=scan_id, scope=scope, allow_subdomains=config.allow_subdomains
+            )
+            if _linked_files_on(config)
+            else None
+        ),
     )
 
     interrupted = False
+    if ctx.linked_files is not None:
+        # Each page checks the PDFs it links to (check_page), with the
+        # crawl's own client, rate limit and robots rules.
+        ctx.linked_files.attach_downloads(
+            client=client,
+            limiter=limiter,
+            robots=robots,
+            ignore_robots=config.ignore_robots,
+            blocked_url_patterns=config.blocked_url_patterns,
+            excluded_scopes=config.excluded_scopes,
+            # A picture of each readable PDF's first page, unless the scan
+            # chose not to store rendered pages.
+            thumbnails=blob_store if config.store_rendered_html else None,
+            fetch=file_fetcher,
+        )
     try:
         try:
             async with asyncio.TaskGroup() as tg:
                 for _ in range(config.workers):
                     tg.create_task(_worker(ctx))
+            # After the last page and before synthesis: the PDF checks the
+            # pages queued and still running, then anything still waiting.
+            # Inside this block so a stop during it is an interrupted scan
+            # like any other.
+            if ctx.linked_files is not None:
+                await ctx.linked_files.check_pending(
+                    client=client,
+                    limiter=limiter,
+                    robots=robots,
+                    ignore_robots=config.ignore_robots,
+                    blocked_url_patterns=config.blocked_url_patterns,
+                    excluded_scopes=config.excluded_scopes,
+                )
         except* asyncio.CancelledError:
             interrupted = True
     except asyncio.CancelledError:
         interrupted = True
         raise
     finally:
+        # A stop or a failure ends the PDF checks the pages queued; the ones
+        # not finished stay "not checked" in the report.
+        if ctx.linked_files is not None:
+            await ctx.linked_files.cancel_background()
         if interrupted:
             summary.status = "interrupted"
             summary.notes.append("crawl interrupted")
@@ -930,6 +989,10 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             # was allowed to collect cannot explain the evidence it lacks.
             "capture_screenshots": config.capture_screenshots,
             "store_rendered_html": config.store_rendered_html,
+            # Whether this scan looked for linked files (migration 0039). Older
+            # reports omit it: their Documents tab says the scan predates it
+            # rather than showing an empty list as "none found".
+            "linked_files_enabled": _linked_files_on(config),
             # Read back by the row-discovery predicate, not just by the UI.
             "resumable": config.resumable,
             "search": config.search.model_dump(mode="json") if config.search else None,
@@ -945,6 +1008,21 @@ def config_json_for_scan(config: CrawlConfig) -> str:
 
 # Backwards-compatible private alias (existing call sites/tests).
 _config_json = config_json_for_scan
+
+
+def _linked_files_on(config: CrawlConfig) -> bool:
+    """Linked files are recorded unless turned off.
+
+    A public scan downloads with its own client. A sign-in scan
+    (``documents_signed_in``) downloads only through the signed-in browser,
+    and ``run_crawl`` refuses to start its check without that fetcher. Any
+    other browser-only scan never records them: their links and files can
+    be private to the signed-in user, and nothing would download them as
+    that user.
+    """
+    if not config.linked_files_enabled:
+        return False
+    return config.documents_signed_in or not config.browser_only
 
 
 def _purge_out_of_scope_jobs(
@@ -1130,6 +1208,8 @@ class _WorkerContext:
     # page. Empty when ``config.semantic_enabled`` is False, the
     # provider can't reach Ollama, or no SC is registered.
     semantic_analyzers: list[Any] = field(default_factory=list)
+    # The report's Documents tab; None when the scan does not record them.
+    linked_files: LinkedFileTracker | None = None
 
 
 async def _build_vlm(
@@ -1303,6 +1383,10 @@ def _tracked_checks(ctx: _WorkerContext) -> list[str]:
         checks.append("image")
     if ctx.semantic_analyzers:
         checks.append("semantic")
+    # The document check: each page's document links, and the PDFs among
+    # them not checked yet, checked with the page.
+    if ctx.linked_files is not None:
+        checks.append("documents")
     return checks
 
 
@@ -1430,6 +1514,21 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
             states=0,
             screenshots={},
             count_page=False,
+        )
+    # A linked file the crawler fetched itself: an in-scope PDF or Office
+    # file, or an address with no extension that answered with a file's
+    # Content-Type. HTML answers too: a ".pdf" address that answers with an
+    # error page or a sign-in page is a file that could not be checked. The
+    # crawl's own handling of the response does not change.
+    if ctx.linked_files is not None:
+        await ctx.linked_files.record_response(
+            url=url,
+            status_code=result.status_code,
+            content_type=result.content_type,
+            body=result.body,
+            # Only a plain HTTP response carries the file's own bytes; a
+            # browser's is the page it rendered around them.
+            complete=render_mode == "static",
         )
     redirected = bool(result.url and result.url != url)
     if redirected:
@@ -1652,6 +1751,22 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
 
     if not result.is_html or not result.is_ok:
         return
+    # Before the depth and page limits: a page at the last depth still links
+    # to files, and its files are checked even though its pages are not.
+    if ctx.linked_files is not None and page_id is not None:
+        # "documents" on the progress page (Document check): this page's
+        # document links found now, and the PDFs among them that no earlier
+        # page had checked, downloaded and checked in the background. The
+        # worker does not wait for them; the check is marked done when they
+        # are (live_progress.later).
+        documents_done = live_progress.later("documents")
+        ctx.linked_files.record_page(
+            page_id=page_id,
+            base_url=result.url,
+            body=result.body,
+            revealed=result.revealed_links,
+        )
+        ctx.linked_files.queue_page(page_id, documents_done)
     if depth >= ctx.config.max_depth:
         return
     if _page_limit_reached(ctx):
@@ -1805,6 +1920,17 @@ def _enqueue_children(
         if normalized in seen:
             continue
         seen.add(normalized)
+        # A link whose address names a document (a .pdf, .docx, a Google
+        # file) is not a page: the crawl does not fetch it. The document
+        # check (when on) downloads and checks it in the background, and it
+        # never takes a slot of the page cap or a line in Pages visited
+        # (2026-11-14, the developer's decision: a 50-page cap means 50 web
+        # pages). With the document check off, it is not downloaded at all.
+        # An address with no extension that answers with a file's
+        # Content-Type is still fetched, and recognised then.
+        if linked_file_formats.classify_url(normalized) is not None:
+            log.debug("crawl.link_refused", url=normalized, source=base_url, reason="document")
+            continue
         if not url_policy.is_in_scope(
             normalized, ctx.scope, allow_subdomains=ctx.config.allow_subdomains
         ):

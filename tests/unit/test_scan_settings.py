@@ -51,6 +51,7 @@ _CUSTOM_FORM: dict[str, Any] = {
     "skip_semantic": False,
     "skip_focus": True,
     "skip_markup": True,
+    "skip_documents": True,
     "skip_visual": False,
     "skip_forms": False,
     "send_empty_forms": True,
@@ -116,6 +117,7 @@ def test_the_form_defaults_round_trip() -> None:
         "skip_semantic": True,
         "skip_focus": False,
         "skip_markup": False,
+        "skip_documents": False,
         "skip_visual": True,
         "skip_forms": True,
         "send_empty_forms": False,
@@ -301,3 +303,19 @@ def test_an_old_or_unreadable_config_falls_back_to_form_defaults(
 def test_limit_refusal(body: dict[str, Any], field: str | None) -> None:
     refusal = limit_refusal(body)
     assert (refusal[0] if refusal else None) == field
+
+
+def test_the_document_check_is_on_unless_turned_off() -> None:
+    """A client that sends nothing gets the Documents tab, and a scan made
+    before the switch existed runs it again when scanned again."""
+    sent = {key: value for key, value in _CUSTOM_FORM.items() if key != "skip_documents"}
+    config = server._build_crawl_config(sent, Settings())
+    assert config.linked_files_enabled is True
+    off = server._build_crawl_config({**sent, "skip_documents": True}, Settings())
+    assert off.linked_files_enabled is False
+    stored = json.loads(config_json_for_scan(config))
+    stored.pop("linked_files_enabled", None)
+    snapshot = snapshot_from_config(
+        scan_id=7, seed_url="https://example.test/", config_json=json.dumps(stored)
+    )
+    assert snapshot.settings.skip_documents is False

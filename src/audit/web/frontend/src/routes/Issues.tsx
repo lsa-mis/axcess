@@ -2,7 +2,8 @@ import { Fragment, memo, useMemo, useRef, type ReactNode, type Ref } from "react
 import { Link, useLocation, useParams, useSearchParams } from "react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
-import { Card, HelpTip, withReturnTrail } from "../components/ui";
+import { Card, withReturnTrail } from "../components/ui";
+import SharedColumnHelp from "../components/table/ColumnHelp";
 // The same helper the topbar trail uses.
 import { siteLabel } from "../components/ReportCrumb";
 import ConformanceBadge from "../components/ConformanceBadge";
@@ -36,8 +37,10 @@ import {
   type SortKind,
 } from "../components/table/sort";
 import ReportHeader from "../components/ReportHeader";
+import HowSureTag from "../components/HowSureTag";
 import ReportDangerZone from "../components/ReportDangerZone";
 import {
+  GlossaryList,
   ReportCoverageNote,
   ReportNote,
   ReportNotes,
@@ -1014,35 +1017,9 @@ const IssueTableRow = memo(function IssueTableRow({
 });
 
 /**
- * The "?" beside an explained column's header (How sure, Where it shows,
- * Priority): the question the column answers and what each of its values
- * means, in the glossary's own words (REVIEW_LANE_HELP, FINDING_TYPE_HELP,
- * PRIORITY_HELP, COLUMN_QUESTION), so the two never disagree (W3C COGA,
- * "Making Content Usable": the same words for the same thing).
- *
- * Which headers have one (the developer's choice, 2026-11-16, option 1 of
- * three): those whose values need explaining, not every header. One rule,
- * one look, one behaviour: a "?" is wherever a word needs explaining, as on
- * the big numbers over the table and the Images heading (SC 3.2.4
- * Consistent Identification, Level AA). Rejected: a "?" on all eight
- * headers, which added about 224px (the table then scrolled sideways at
- * 1280px), eight more Tab stops, and a question in every column's name for
- * words that need no explaining; and a "?" on each row's tag, one Tab stop
- * per row for the same sentences. "What the labels mean" under the table
- * stays as the one place all the meanings can be read, searched and
- * printed together.
- *
- * The icon sits in the middle of the label's line, as the label sits in the
- * middle of the header row (SortHeader; both moved there from the row's
- * foot at the developer's request, 2026-11-16). 24px
- * wide (``small``), so it sits close to its label: allowed because "What
- * the labels mean" (IssueGlossary) is a 44px control with the same
- * explanation (HelpTip, ``equivalent``).
- *
- * Known cost: the button's words sit inside the header cell, so a screen
- * reader that names the column for each cell may read "How sure, What does
- * How sure mean?" there. Kept short for that reason, and on three headers,
- * not eight.
+ * The "?" beside an explained Issues header, in the shared form
+ * (components/table/ColumnHelp, where the rationale is): the question each
+ * column answers comes from COLUMN_QUESTION.
  */
 function ColumnHelp({
   column,
@@ -1051,29 +1028,12 @@ function ColumnHelp({
   column: keyof typeof COLUMN_QUESTION;
   items: { key: string; term: ReactNode; help: string }[];
 }) {
-  const question = COLUMN_QUESTION[column];
   return (
-    <HelpTip
+    <SharedColumnHelp
       question={`What does \u201c${column}\u201d mean`}
-      equivalent="report-labels-button"
-      small
-      // Centred on the label's line, which sits in the middle of the
-      // header row (SortHeader).
-      className="items-center"
-    >
-      <p className="mb-2 font-semibold">
-        {question.charAt(0).toUpperCase()}
-        {question.slice(1)}.
-      </p>
-      <dl className="space-y-2">
-        {items.map((item) => (
-          <div key={item.key}>
-            <dt>{item.term}</dt>
-            <dd className="mt-0.5 text-fg-muted">{item.help}</dd>
-          </div>
-        ))}
-      </dl>
-    </HelpTip>
+      answers={COLUMN_QUESTION[column]}
+      items={items}
+    />
   );
 }
 
@@ -1109,18 +1069,14 @@ function columnHelp(column: SortColumn): ReactNode {
  * glossary, where the meaning is printed beside it.
  */
 function LaneTag({ lane, hint = true }: { lane: ReviewLane; hint?: boolean }) {
+  // The shared tag (components/HowSureTag.tsx), so Documents shows its "How
+  // sure" values the same way.
   return (
-    <span
-      title={hint ? REVIEW_LANE_HELP[lane] : undefined}
-      className={cn(
-        "inline-flex items-center rounded-2xs px-2 py-0.5 text-2xs font-semibold",
-        lane === "informational"
-          ? "border border-border bg-surface-muted text-fg-muted"
-          : "bg-sev-major-bg text-sev-major",
-      )}
-    >
-      {REVIEW_TYPE_LABEL[lane]}
-    </span>
+    <HowSureTag
+      label={REVIEW_TYPE_LABEL[lane]}
+      help={hint ? REVIEW_LANE_HELP[lane] : undefined}
+      quiet={lane === "informational"}
+    />
   );
 }
 
@@ -1215,34 +1171,6 @@ function IssueGlossary() {
         />
       </div>
     </ReportNote>
-  );
-}
-
-/**
- * One glossary list under a real heading (an h3 under the note's h2), so a
- * screen-reader user can jump between the two lists. Each term is the same
- * chip the table draws, above its definition rather than run into one line,
- * so an entry reads on its own and reflows cleanly when zoomed.
- */
-function GlossaryList({
-  heading,
-  items,
-}: {
-  heading: string;
-  items: { key: string; term: ReactNode; help: string }[];
-}) {
-  return (
-    <div>
-      <h3 className="text-sm font-semibold text-fg">{heading}</h3>
-      <dl className="mt-2 space-y-3">
-        {items.map(({ key, term, help }) => (
-          <div key={key}>
-            <dt>{term}</dt>
-            <dd className="mt-1">{help}</dd>
-          </div>
-        ))}
-      </dl>
-    </div>
   );
 }
 

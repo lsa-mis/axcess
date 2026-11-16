@@ -508,6 +508,40 @@ It looks for:
   is a guess from the text's style, so it is marked [Not sure](#not-sure),
   and at most 20 are reported a page.
 
+### Document check
+
+The check behind the report's **Documents** tab. While the scan runs, Axcess
+records every PDF, Word, Excel, PowerPoint, OpenDocument, RTF and Google file
+the scanned pages link to or show inside the page (in a frame, object or
+embed), including links that appear only after a click, and files on other
+sites. During the scan it downloads each PDF once (at most 10 MB, at most 200
+downloads a scan), checks it on your computer with no AI, and keeps only the
+result, in the background while the scan goes on to the next page. A link to
+a document is never visited as a page, so documents take no part of the page
+limit and do not appear in Pages visited. A scan stopped part way keeps the
+results for the PDFs it reached. In code these are called *linked files*, because in the crawler a
+"document" means a web page.
+
+A PDF is marked [Mostly sure](#mostly-sure) when it fails one of these:
+
+- not tagged: it has no structure tree, so a screen reader cannot tell
+  headings, lists and tables apart (WCAG 1.3.1);
+- no text a screen reader can read: no page of the first 50 has text, as in a
+  scan saved as pictures (WCAG 1.1.1);
+- its security settings forbid copying text for accessibility;
+- no document title (WCAG 2.4.2, technique PDF18);
+- no language set (WCAG 3.1.1, technique PDF16).
+
+A PDF that passes all five is [Not sure](#not-sure): a person must still check
+its reading order, alt text and table headers. Every other file, and any PDF
+Axcess could not open, is "Could not check", with the reason. It is on by
+default for every scan that does not sign in (**Check the documents the pages
+link to**, under Checks on the New scan page), and a sign-in scan never runs
+it. While a scan runs, the scanning page's **Document check** column shows it
+on each page: the page's document links are found and its PDFs are checked,
+each PDF once; a PDF on this site that a page links to is checked in its own
+row.
+
 ### Local AI model
 
 An optional AI model that reads text (a language model) or looks at images (a

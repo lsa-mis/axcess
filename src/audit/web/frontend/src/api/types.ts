@@ -393,6 +393,10 @@ export interface NewScanPayload {
   /** Skip the page code check, which reads the rendered page code after axe.
    *  On unless chosen off; the server treats a missing value as on. */
   skip_markup: boolean;
+  /** Skip the document check: listing the files the pages link to (the
+   *  Documents tab) and checking each PDF. On unless chosen off; the server
+   *  treats a missing value as on. Never in a sign-in scan. */
+  skip_documents: boolean;
   /** Skip motion and vision-assisted visual probes. */
   skip_visual: boolean;
   /** Skip the form error check (WCAG 3.3.1). Off unless chosen. */
@@ -501,6 +505,7 @@ export interface LocalLoginScanPayload {
   skip_responsive: boolean;
   skip_focus: boolean;
   skip_markup: boolean;
+  skip_documents: boolean;
   skip_semantic: boolean;
   skip_visual: boolean;
   skip_forms: boolean;
@@ -1396,6 +1401,141 @@ export interface ScanPagesResponse {
   offset: number;
   sort: ScanPagesSort;
   pages: ScanPageRow[];
+}
+
+/** A linked file's type (`linked_files.formats.FileType`). */
+export type LinkedFileType =
+  | "pdf"
+  | "docx"
+  | "doc"
+  | "pptx"
+  | "ppt"
+  | "xlsx"
+  | "xls"
+  | "odt"
+  | "odp"
+  | "ods"
+  | "rtf"
+  | "google_doc"
+  | "google_sheet"
+  | "google_slides"
+  | "google_drive";
+
+/** The three statuses the Documents tab shows (`linked_files_queries.ShownStatus`). */
+export type LinkedFileStatus = "mostly_sure" | "not_sure" | "could_not_check";
+
+/** Why a file could not be checked (`linked_files.formats.Reason`). */
+export type LinkedFileReason =
+  | "type_not_checked_yet"
+  | "old_format"
+  | "google_file"
+  | "broken_link"
+  | "http_error"
+  | "password"
+  | "too_large"
+  | "timed_out"
+  | "not_a_pdf"
+  | "damaged"
+  | "robots"
+  | "blocked"
+  | "limit"
+  | "not_checked";
+
+/** A machine check a PDF failed (`linked_files.formats.FailedCheck`). */
+export type LinkedFileCheck =
+  | "not_tagged"
+  | "no_text"
+  | "blocks_assistive_tech"
+  | "no_title"
+  | "no_language";
+
+/** How a page reaches a file (`linked_files.formats.RefKind`). */
+export type LinkedFileRefKind = "link" | "revealed_link" | "iframe" | "object" | "embed";
+
+/** One place a page of the report reaches a file (`linked_files_queries.LinkedFileRef`). */
+export interface LinkedFileRef {
+  page_id: number;
+  page_url: string;
+  page_title: string | null;
+  how: LinkedFileRefKind;
+  /** The link's accessible name, or the frame's or embed's title. */
+  link_text: string;
+  /** The control a reader presses before the link exists, if any. */
+  revealed_by: string | null;
+}
+
+/** One file in the Documents tab (`linked_files_queries.LinkedFileRow`). */
+export interface LinkedFileRow {
+  file_id: number;
+  url: string;
+  /** Its file name, else the first link's text. */
+  name: string;
+  file_type: LinkedFileType;
+  off_site: boolean;
+  status: LinkedFileStatus;
+  reason: LinkedFileReason | null;
+  failed_checks: LinkedFileCheck[];
+  http_status: number | null;
+  is_form: boolean | null;
+  page_count: number | null;
+  /** Distinct pages of the report that reach the file; the pages are on its own page. */
+  referring_page_count: number;
+  /** The first file at another address with the same bytes, whose result
+   *  this one shares; null when it has no earlier copy. */
+  same_as?: { file_id: number; name: string } | null;
+  /** A picture of the first page is stored (PDFs the check could read). */
+  has_thumbnail?: boolean;
+}
+
+/** One way a page reaches a file (`linked_files_queries.DocumentRefWay`). */
+export interface DocumentRefWay {
+  how: LinkedFileRefKind;
+  link_text: string;
+  revealed_by: string | null;
+}
+
+/** One page a file appears on, and every way it does (`linked_files_queries.DocumentPage`). */
+export interface DocumentPage {
+  page_id: number;
+  page_url: string;
+  page_title: string | null;
+  ways: DocumentRefWay[];
+}
+
+/** `GET /api/scans/{id}/documents/{file}` (`linked_files_queries.ScanDocumentResponse`). */
+export interface ScanDocumentResponse {
+  scan_id: number;
+  file: LinkedFileRow;
+  /** At most 2,000, in address order; `file.referring_page_count` is the total. */
+  pages: DocumentPage[];
+}
+
+/**
+ * `GET /api/scans/{id}/documents/{file}/pages/{page}`
+ * (`linked_files_queries.DocumentOnPage`): where one file is linked on one
+ * page, for the inspector to mark.
+ */
+export interface DocumentOnPage {
+  file_id: number;
+  page_id: number;
+  name: string;
+  refs: LinkedFileRef[];
+  /** False when the scan kept no copy of the page. */
+  saved_copy: boolean;
+  /** Each element of the saved copy that reaches the file, in page order. */
+  places: ElementPlace[];
+}
+
+/** `GET /api/scans/{id}/documents` (`linked_files_queries.ScanDocumentsResponse`). */
+export interface ScanDocumentsResponse {
+  scan_id: number;
+  /** False when the scan did not look for documents at all. */
+  recorded: boolean;
+  total: number;
+  counts: Record<LinkedFileStatus, number>;
+  limit: number;
+  offset: number;
+  files: LinkedFileRow[];
 }
 
 /** What a person decided about an occurrence: a problem to report, or a

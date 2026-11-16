@@ -1,4 +1,6 @@
 import type {
+  DocumentOnPage,
+  ScanDocumentResponse,
   ScanSettingsSnapshot,
   A11yByRuleResponse,
   A11yDrillFinding,
@@ -17,6 +19,7 @@ import type {
   PageEvidence,
   ScanPagesResponse,
   ScanPagesSort,
+  ScanDocumentsResponse,
   PageInspection,
   DiffReport,
   ExportFormat,
@@ -329,6 +332,15 @@ export const api = {
     });
     return request<ScanPagesResponse>(`/api/scans/${scanId}/pages?${params}`);
   },
+  /** One page of the files a report's pages link to; `limit` is at most 200. */
+  listScanDocuments: (scanId: number, { limit, offset }: { limit: number; offset: number }) => {
+    const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+    return request<ScanDocumentsResponse>(`/api/scans/${scanId}/documents?${params}`);
+  },
+  getScanDocument: (scanId: number, fileId: number) =>
+    request<ScanDocumentResponse>(`/api/scans/${scanId}/documents/${fileId}`),
+  getDocumentOnPage: (scanId: number, fileId: number, pageId: number) =>
+    request<DocumentOnPage>(`/api/scans/${scanId}/documents/${fileId}/pages/${pageId}`),
   getPageEvidence: (scanId: number, pageId: number) =>
     request<PageEvidence>(`/api/scans/${scanId}/pages/${pageId}`),
   /** Desktop only: this computer, the AI sizes it can run, and the current setup. 404 elsewhere. */
@@ -716,6 +728,16 @@ export const api = {
   getCoverageFound: (scanId?: number) =>
     request<CoverageFound>(scanId ? `/api/coverage/found?scan_id=${scanId}` : "/api/coverage/found"),
 };
+
+/**
+ * A document's first-page picture, for <img src=…> (has_thumbnail rows only):
+ * ``small`` for the Documents table's 72 by 48 box, ``large`` for its own page.
+ */
+export const documentThumbnailUrl = (
+  scanId: number,
+  fileId: number,
+  size: "small" | "large" = "large",
+): string => `/api/scans/${scanId}/documents/${fileId}/thumbnail${size === "small" ? "?size=small" : ""}`;
 
 /** Direct URL (bypass fetch) for image blobs, used in <img src=…>. */
 export const blobUrl = (contentHash: string): string =>

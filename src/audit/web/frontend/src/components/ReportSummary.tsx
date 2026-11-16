@@ -36,29 +36,47 @@ function endText(coverage: ScanDetail["coverage"]): string {
  * Consistent Identification, Level AA; W3C COGA, "Making Content Usable":
  * the same pattern for the same kind of thing).
  *
- * Exported for the Images tab's numbers, so a report's numbers look the
- * same on every tab (SC 3.2.4 Consistent Identification, Level AA). Put it
- * in a ``dl``.
+ * Exported for the other report views' numbers (Images, Documents), so a
+ * report's numbers look the same on every tab (SC 3.2.4 Consistent
+ * Identification, Level AA). Put it in a ``dl`` (``SummaryNumbers``).
+ *
+ * ``note`` finishes a label that is not a whole idea alone, on a smaller
+ * line under it, inside the same ``dt``: "Mostly sure" / "it has
+ * accessibility problems". On the Documents tab the bare value left the
+ * reader asking "mostly sure of what?" (the developer's report,
+ * 2026-11-14). In the ``dt``, so a screen reader hears it as part of the
+ * name, before the number. Rejected: a longer label, which put the value's
+ * own words (the ones the table's tags show) out of view; and one heading
+ * over the three counts, which the grid would place over "Documents" too.
+ * Not for facts about the number (those are ``outOf``, or ScanFacts).
  */
 export function SummaryStat({
   label,
   value,
   outOf,
+  note,
   help,
   className,
 }: {
   label: string;
   value: number;
   outOf?: string;
+  /** The rest of the label's sentence, on its own line under it. */
+  note?: string;
   /** A ``HelpTip`` after the label, for a counting term that needs explaining. */
   help?: ReactNode;
   className?: string;
 }) {
   return (
     <div className={cn("flex flex-col gap-1", className)}>
-      <dt className="order-2 flex items-center gap-0.5 text-sm font-semibold text-fg">
-        {label}
-        {help}
+      <dt className="order-2 text-sm font-semibold text-fg">
+        {/* The label and its "?" on one line; a note, when there is one,
+            on its own line under them. */}
+        <span className="flex items-center gap-0.5">
+          {label}
+          {help}
+        </span>
+        {note && <span className="block font-normal text-fg-muted">{note}</span>}
       </dt>
       <dd className="order-1 mb-1 text-3xl font-semibold leading-none tabular-nums text-umich-blue">
         {value.toLocaleString()}
@@ -300,7 +318,10 @@ export function ReportSummary({
           out again, say so here, because a limitation is never dropped to
           make a number look smaller, Interface language rule 4.) The
           Reports list counts the same way (routes/Scans.tsx). */}
-      <dl className="mt-10 mb-6 grid grid-cols-2 gap-x-8 gap-y-8 sm:grid-cols-3 lg:gap-x-12">
+      {/* mb-6, not the shared row's mb-5: 24px down to the facts line
+          (ScanFacts), which belongs to the numbers. Views with no facts line
+          (Documents) keep the shared spacing to their table. */}
+      <SummaryNumbers className="mb-6">
         {/* A "?" after each count's name, where the words "issue type" and
             "occurrence" are first met (the developer's choice, 2026-11-16):
             the same meanings as "What the labels mean" under the table
@@ -335,9 +356,26 @@ export function ReportSummary({
           }
           className="col-span-2 sm:col-span-1"
         />
-      </dl>
+      </SummaryNumbers>
       <ScanFacts scan={scan} />
     </>
+  );
+}
+
+/**
+ * The row of summary numbers over a report view's table: a ``dl`` of
+ * ``SummaryStat``s, with no panel, border or fill. The spacing, the columns
+ * and why there is no frame are explained on the Issues numbers above
+ * (ReportSummary); this is the same row, so every report view that counts
+ * its table's rows shows them in the same place and the same form (SC 3.2.4
+ * Consistent Identification, Level AA). ``className`` may change the column
+ * count for a view with more or fewer numbers; nothing else should differ.
+ */
+export function SummaryNumbers({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <dl className={cn("mt-10 mb-5 grid grid-cols-2 gap-x-8 gap-y-8 sm:grid-cols-3 lg:gap-x-12", className)}>
+      {children}
+    </dl>
   );
 }
 
@@ -476,6 +514,40 @@ export function ReportNote({
     >
       {children}
     </Disclosure>
+  );
+}
+
+/**
+ * One glossary list under a real heading (an h3 under the note's h2), so a
+ * screen-reader user can jump between the lists. Each term is the same chip
+ * the table draws, above its definition rather than run into one line, so
+ * an entry reads on its own and reflows cleanly when zoomed.
+ *
+ * The part every report view's "What … labels mean" note is built from
+ * (Issues, Documents), so the notes look and read the same on each tab (SC
+ * 3.2.4 Consistent Identification, Level AA). It was local to the Issues
+ * route until Documents needed the same note; moved here unchanged rather
+ * than copied, so the two cannot drift.
+ */
+export function GlossaryList({
+  heading,
+  items,
+}: {
+  heading: string;
+  items: { key: string; term: ReactNode; help: string }[];
+}) {
+  return (
+    <div>
+      <h3 className="text-sm font-semibold text-fg">{heading}</h3>
+      <dl className="mt-2 space-y-3">
+        {items.map(({ key, term, help }) => (
+          <div key={key}>
+            <dt>{term}</dt>
+            <dd className="mt-1">{help}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
   );
 }
 

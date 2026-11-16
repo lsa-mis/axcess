@@ -34,6 +34,8 @@ _NAMES = {
     "WCAG",
     "Alfa",
     "Excel",
+    # Microsoft Word, named beside Excel in the document check's hint.
+    "Word",
     "Markdown",
     "Ollama",
     "Chromium",
@@ -217,6 +219,7 @@ async def _labels_on(new_page: Any, url: str, *, open_groups: bool = False) -> l
         "/app/scans/{scan_id}",
         "/app/scans/{scan_id}/issues",
         "/app/scans/{scan_id}/pages",
+        "/app/scans/{scan_id}/documents",
         "/app/scans/{scan_id}/compare",
         "/app/scans/{scan_id}/compare/changes",
         "/app/tracking",

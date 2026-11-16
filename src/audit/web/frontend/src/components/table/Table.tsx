@@ -1,11 +1,13 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type HTMLAttributes,
   type ReactNode,
   type Ref,
+  type RefObject,
   type TdHTMLAttributes,
   type ThHTMLAttributes,
 } from "react";
@@ -49,6 +51,18 @@ const CARD_EDGE = "[[data-card]>&:first-child]:rounded-t-[7px] [[data-card]>&:la
  * rows (search, the Filter menu) on the left, the pager on the right, and
  * `footer` (the active filters) under both. It wraps on a narrow screen
  * rather than clipping: the pager drops under the search.
+ *
+ * The left group asks for 20rem only when it holds a search box, the room
+ * the box needs to be usable before the pager wraps under it. Without one
+ * (the Documents tab: only "Filter documents") it asks for its controls'
+ * own width. A fixed 20rem there pushed a wide pager (909 documents, 91
+ * pages) onto a second line under a lone button at 1440px, leaving the
+ * bar's right half empty on the first line (the developer's report,
+ * 2026-11-16). Rejected: a prop on TableBar for "no search", which every
+ * caller would have to remember; the bar can see whether it has a search
+ * box itself (CSS ``:has()``). The pager still wraps under the controls
+ * when the row is too narrow for both, so nothing scrolls sideways at
+ * 320px (SC 1.4.10 Reflow, Level AA).
  */
 export function TableBar({
   children,
@@ -62,7 +76,11 @@ export function TableBar({
   return (
     <div className={cn("border-b border-border bg-surface-subtle", CARD_EDGE)}>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 py-3">
-        {children && <div className="flex min-w-0 flex-[1_1_20rem] flex-wrap items-center gap-2">{children}</div>}
+        {children && (
+          <div className="flex min-w-0 flex-[1_1_auto] flex-wrap items-center gap-2 has-[[type=search]]:basis-80">
+            {children}
+          </div>
+        )}
         {pager}
       </div>
       {footer}
@@ -422,8 +440,19 @@ export function SortHeader<K extends string>({
    * A ``HelpTip`` ("?") after the sort button, for a column whose values
    * need explaining (Issues' "How sure"). Beside the button, not inside it:
    * one control sorts and the other explains, so neither does two things.
-   * Bottom-aligned with the label, so the header's last line stays level
-   * with its neighbours'.
+   * In the middle of the label's line, on the column's side, like the label.
+   *
+   * With a "?", a label that wraps keeps the "?" beside its words: the sort
+   * button is shrunk to its longest line (``useFitToLines``). A wrapped
+   * button is otherwise as wide as the space it was given, not as its text,
+   * so the "?" after it floated apart from the words it explains
+   * ("Accessibility / problems? ⇅ … ?", the developer's screenshot,
+   * 2026-11-16). Proximity says what belongs together (W3C COGA, "Making
+   * Content Usable"). Here, not on one header, so every header with a "?"
+   * gets it; a label on one line looks the same either way. Rejected:
+   * aligning the lines to the "?" (it moved the heading off its column's
+   * side, the rule above) and keeping such a label on one line (it widened
+   * the column until the table scrolled sideways at 1280px).
    */
   help?: ReactNode;
   className?: string;
@@ -432,6 +461,8 @@ export function SortHeader<K extends string>({
 }) {
   const active = sort?.column === column;
   const right = (align ?? (kind === "number" ? "right" : "left")) === "right";
+  const button = useRef<HTMLButtonElement>(null);
+  useFitToLines(button, help != null, `${active}-${sort?.direction}-${typeof children === "string" ? children : column}`);
   const Arrow = !sort || !active ? ArrowUpDown : sort.direction === "asc" ? ArrowUp : ArrowDown;
   const words = wrap === "words";
   const label = children ?? column;
@@ -439,6 +470,7 @@ export function SortHeader<K extends string>({
     sort && active ? (
       <span
         key={`${sort.column}-${sort.direction}`}
+        data-sort-mark
         className={cn(
           "inline-flex items-center gap-0.5 whitespace-nowrap rounded-full bg-umich-blue px-1.5 py-px text-2xs font-semibold normal-case tracking-normal text-fg-inverse motion-safe:animate-sort-pop",
         )}
@@ -491,6 +523,7 @@ export function SortHeader<K extends string>({
   function sortButton() {
     return (
       <button
+        ref={button}
         type="button"
         title={hint}
         onClick={() => onSort(nextSort(sort, column, kind))}
@@ -531,6 +564,57 @@ export function SortHeader<K extends string>({
       </button>
     );
   }
+}
+
+/**
+ * Shrinks a sort button whose label wrapped to the width of its longest
+ * line, so a "?" after it sits beside the words (see SortHeader's ``help``).
+ * CSS has no width that fits wrapped lines: a box that wraps is as wide as
+ * the space it was given. So this measures the label's text and its sort
+ * mark (arrow or chip) after layout and caps the button at that width, and
+ * measures again whenever the header cell changes size (a window resized,
+ * a column re-laid out). Lines never change: they already fit inside it.
+ * A cap (``max-width``), not a ``width``: a set width would also be the
+ * narrowest the column could get, where a cap leaves that at the label's
+ * longest word, as without this step.
+ * Off without a "?". ``key`` changes when the button's content does.
+ */
+function useFitToLines(button: RefObject<HTMLButtonElement | null>, enabled: boolean, key: string) {
+  useLayoutEffect(() => {
+    const el = button.current;
+    if (!enabled || !el) return;
+    const fit = () => {
+      el.style.maxWidth = "";
+      const rects: DOMRect[] = [];
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      const range = document.createRange();
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (!node.textContent?.trim()) continue;
+        range.selectNodeContents(node);
+        rects.push(...Array.from(range.getClientRects()));
+      }
+      el.querySelectorAll("svg, [data-sort-mark]").forEach((mark) => rects.push(mark.getBoundingClientRect()));
+      const shown = rects.filter((rect) => rect.width > 0);
+      if (shown.length === 0) return;
+      const style = getComputedStyle(el);
+      const needed = Math.ceil(
+        Math.max(...shown.map((rect) => rect.right)) -
+          Math.min(...shown.map((rect) => rect.left)) +
+          parseFloat(style.paddingLeft) +
+          parseFloat(style.paddingRight),
+      );
+      if (needed < el.getBoundingClientRect().width - 1) el.style.maxWidth = `${needed}px`;
+    };
+    fit();
+    const cell = el.closest("th");
+    if (!cell || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(fit);
+    observer.observe(cell);
+    return () => {
+      observer.disconnect();
+      el.style.maxWidth = "";
+    };
+  }, [button, enabled, key]);
 }
 
 /**
@@ -669,7 +753,19 @@ export function Cell({
   );
 }
 
-/** What a table shows in place of rows when none match or none exist. */
+/**
+ * What a table shows in place of rows when none match or none exist.
+ *
+ * Centred in a column about 72 characters wide (52ch, the measure the
+ * report's short paragraphs use), not the card's full width. An empty table
+ * often says why it is empty and where to look next, in two or three
+ * sentences (Issues: "That does not mean the site meets WCAG… See “What was
+ * checked”, below this table."); across a 1280px card those ran to about 150
+ * characters a line. SC 1.4.8 Visual Presentation (Level AAA) asks for no
+ * more than 80. Rejected: keeping each message to one short sentence, which
+ * is how Documents worked around it and which pushed the caveat out of the
+ * empty table. A one-line message looks the same as before.
+ */
 export function TableEmpty({ children }: { children: ReactNode }) {
-  return <p className="px-4 py-8 text-center text-sm text-fg-muted">{children}</p>;
+  return <p className="mx-auto max-w-[52ch] px-4 py-8 text-center text-sm text-fg-muted">{children}</p>;
 }

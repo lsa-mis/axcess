@@ -1079,6 +1079,145 @@
         }
       }
     },
+    "/api/scans/{scan_id}/documents": {
+      "get": {
+        "summary": "Api Scan Documents",
+        "description": "The files this report's pages link to (the Documents tab), in report order.",
+        "operationId": "api_scan_documents_api_scans__scan_id__documents_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "integer", "maximum": 5000, "minimum": 1, "default": 50, "title": "Limit"}
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "integer", "minimum": 0, "default": 0, "title": "Offset"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ScanDocumentsResponse"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/documents/{file_id}": {
+      "get": {
+        "summary": "Api Scan Document",
+        "description": "One file of this report and every page it appears on (its own page).",
+        "operationId": "api_scan_document_api_scans__scan_id__documents__file_id__get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "File Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ScanDocumentResponse"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/documents/{file_id}/thumbnail": {
+      "get": {
+        "summary": "Api Document Thumbnail",
+        "description": "A JPEG of one file's first page (PDFs the check could read).\n\n``size=small`` is the Documents table's picture, ``large`` the one on\nthe document's own page.",
+        "operationId": "api_document_thumbnail_api_scans__scan_id__documents__file_id__thumbnail_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "File Id"}
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {"enum": ["large", "small"], "type": "string", "default": "large", "title": "Size"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/documents/{file_id}/pages/{page_id}": {
+      "get": {
+        "summary": "Api Document On Page",
+        "description": "Where one file of this report is linked on one of its pages, for the inspector.",
+        "operationId": "api_document_on_page_api_scans__scan_id__documents__file_id__pages__page_id__get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "File Id"}
+          },
+          {
+            "name": "page_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Page Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DocumentOnPage"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
     "/api/scans/{scan_id}/pages/{page_id}": {
       "get": {
         "summary": "Api Page Evidence",
@@ -2634,6 +2773,59 @@
         "required": ["explanation"],
         "title": "DeveloperView"
       },
+      "DocumentOnPage": {
+        "properties": {
+          "file_id": {"type": "integer", "title": "File Id"},
+          "page_id": {"type": "integer", "title": "Page Id"},
+          "name": {"type": "string", "title": "Name"},
+          "refs": {
+            "items": {"$ref": "#/components/schemas/LinkedFileRef"},
+            "type": "array",
+            "title": "Refs"
+          },
+          "saved_copy": {"type": "boolean", "title": "Saved Copy"},
+          "places": {
+            "items": {"$ref": "#/components/schemas/ElementPlaceModel"},
+            "type": "array",
+            "title": "Places"
+          }
+        },
+        "type": "object",
+        "required": ["file_id", "page_id", "name", "refs", "saved_copy", "places"],
+        "title": "DocumentOnPage",
+        "description": "Where one file of a report is reached on one page of that report."
+      },
+      "DocumentPage": {
+        "properties": {
+          "page_id": {"type": "integer", "title": "Page Id"},
+          "page_url": {"type": "string", "title": "Page Url"},
+          "page_title": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Page Title"},
+          "ways": {
+            "items": {"$ref": "#/components/schemas/DocumentRefWay"},
+            "type": "array",
+            "title": "Ways"
+          }
+        },
+        "type": "object",
+        "required": ["page_id", "page_url", "page_title", "ways"],
+        "title": "DocumentPage",
+        "description": "One page of the report the file appears on, and every way it does."
+      },
+      "DocumentRefWay": {
+        "properties": {
+          "how": {
+            "type": "string",
+            "enum": ["link", "revealed_link", "iframe", "object", "embed"],
+            "title": "How"
+          },
+          "link_text": {"type": "string", "title": "Link Text"},
+          "revealed_by": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Revealed By"}
+        },
+        "type": "object",
+        "required": ["how", "link_text", "revealed_by"],
+        "title": "DocumentRefWay",
+        "description": "One way a page reaches the file: a link, a revealed link, a frame…"
+      },
       "EditorView": {
         "properties": {
           "steps": {"items": {"type": "string"}, "type": "array", "maxItems": 6, "title": "Steps"},
@@ -2648,6 +2840,17 @@
         "additionalProperties": false,
         "type": "object",
         "title": "EditorView"
+      },
+      "ElementPlaceModel": {
+        "properties": {
+          "selector": {"type": "string", "title": "Selector"},
+          "index": {"type": "integer", "title": "Index"},
+          "total": {"type": "integer", "title": "Total"}
+        },
+        "type": "object",
+        "required": ["selector", "index", "total"],
+        "title": "ElementPlaceModel",
+        "description": "The ``index``th of ``total`` elements a plain tag selector matches.\n\nThe inspector's ``ElementPlace``: it outlines that element only when its\nown count of ``selector`` is ``total``."
       },
       "EstimateShare": {
         "properties": {
@@ -2869,6 +3072,123 @@
         "required": ["total", "layers", "excluded_not_a_problem", "excluded_records"],
         "title": "LayerShare"
       },
+      "LinkedFileCounts": {
+        "properties": {
+          "mostly_sure": {"type": "integer", "title": "Mostly Sure", "default": 0},
+          "not_sure": {"type": "integer", "title": "Not Sure", "default": 0},
+          "could_not_check": {"type": "integer", "title": "Could Not Check", "default": 0}
+        },
+        "type": "object",
+        "title": "LinkedFileCounts",
+        "description": "Files per status, across the whole report."
+      },
+      "LinkedFileRef": {
+        "properties": {
+          "page_id": {"type": "integer", "title": "Page Id"},
+          "page_url": {"type": "string", "title": "Page Url"},
+          "page_title": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Page Title"},
+          "how": {
+            "type": "string",
+            "enum": ["link", "revealed_link", "iframe", "object", "embed"],
+            "title": "How"
+          },
+          "link_text": {"type": "string", "title": "Link Text"},
+          "revealed_by": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Revealed By"}
+        },
+        "type": "object",
+        "required": ["page_id", "page_url", "page_title", "how", "link_text", "revealed_by"],
+        "title": "LinkedFileRef",
+        "description": "One place a page of this report reaches the file."
+      },
+      "LinkedFileRow": {
+        "properties": {
+          "file_id": {"type": "integer", "title": "File Id"},
+          "url": {"type": "string", "title": "Url"},
+          "name": {"type": "string", "title": "Name"},
+          "file_type": {
+            "type": "string",
+            "enum": [
+              "pdf",
+              "docx",
+              "doc",
+              "pptx",
+              "ppt",
+              "xlsx",
+              "xls",
+              "odt",
+              "odp",
+              "ods",
+              "rtf",
+              "google_doc",
+              "google_sheet",
+              "google_slides",
+              "google_drive"
+            ],
+            "title": "File Type"
+          },
+          "off_site": {"type": "boolean", "title": "Off Site"},
+          "status": {
+            "type": "string",
+            "enum": ["mostly_sure", "not_sure", "could_not_check"],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "type_not_checked_yet",
+                  "old_format",
+                  "google_file",
+                  "broken_link",
+                  "http_error",
+                  "password",
+                  "too_large",
+                  "timed_out",
+                  "not_a_pdf",
+                  "damaged",
+                  "robots",
+                  "blocked",
+                  "limit",
+                  "not_checked"
+                ]
+              },
+              {"type": "null"}
+            ],
+            "title": "Reason"
+          },
+          "failed_checks": {
+            "items": {
+              "type": "string",
+              "enum": ["not_tagged", "no_text", "blocks_assistive_tech", "no_title", "no_language"]
+            },
+            "type": "array",
+            "title": "Failed Checks"
+          },
+          "http_status": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "Http Status"},
+          "is_form": {"anyOf": [{"type": "boolean"}, {"type": "null"}], "title": "Is Form"},
+          "page_count": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "Page Count"},
+          "referring_page_count": {"type": "integer", "title": "Referring Page Count"},
+          "same_as": {"anyOf": [{"$ref": "#/components/schemas/SameFile"}, {"type": "null"}]},
+          "has_thumbnail": {"type": "boolean", "title": "Has Thumbnail", "default": false}
+        },
+        "type": "object",
+        "required": [
+          "file_id",
+          "url",
+          "name",
+          "file_type",
+          "off_site",
+          "status",
+          "reason",
+          "failed_checks",
+          "http_status",
+          "is_form",
+          "page_count",
+          "referring_page_count"
+        ],
+        "title": "LinkedFileRow"
+      },
       "LocalLoginScanRequest": {
         "properties": {
           "seed_url": {"type": "string", "maxLength": 2048, "minLength": 12, "title": "Seed Url"},
@@ -2898,6 +3218,7 @@
           "static_only": {"type": "boolean", "title": "Static Only", "default": false},
           "skip_focus": {"type": "boolean", "title": "Skip Focus", "default": false},
           "skip_markup": {"type": "boolean", "title": "Skip Markup", "default": false},
+          "skip_documents": {"type": "boolean", "title": "Skip Documents", "default": false},
           "skip_semantic": {"type": "boolean", "title": "Skip Semantic", "default": true},
           "skip_visual": {"type": "boolean", "title": "Skip Visual", "default": true},
           "skip_forms": {"type": "boolean", "title": "Skip Forms", "default": true},
@@ -3269,6 +3590,49 @@
         "title": "RuleInfo",
         "description": "One axe-core rule a scan runs for a criterion."
       },
+      "SameFile": {
+        "properties": {
+          "file_id": {"type": "integer", "title": "File Id"},
+          "name": {"type": "string", "title": "Name"}
+        },
+        "type": "object",
+        "required": ["file_id", "name"],
+        "title": "SameFile",
+        "description": "The first file of the report with the same bytes as this one."
+      },
+      "ScanDocumentResponse": {
+        "properties": {
+          "scan_id": {"type": "integer", "title": "Scan Id"},
+          "file": {"$ref": "#/components/schemas/LinkedFileRow"},
+          "pages": {
+            "items": {"$ref": "#/components/schemas/DocumentPage"},
+            "type": "array",
+            "title": "Pages"
+          }
+        },
+        "type": "object",
+        "required": ["scan_id", "file", "pages"],
+        "title": "ScanDocumentResponse",
+        "description": "One file of a report, for its own page in the Documents tab."
+      },
+      "ScanDocumentsResponse": {
+        "properties": {
+          "scan_id": {"type": "integer", "title": "Scan Id"},
+          "recorded": {"type": "boolean", "title": "Recorded"},
+          "total": {"type": "integer", "title": "Total"},
+          "counts": {"$ref": "#/components/schemas/LinkedFileCounts"},
+          "limit": {"type": "integer", "title": "Limit"},
+          "offset": {"type": "integer", "title": "Offset"},
+          "files": {
+            "items": {"$ref": "#/components/schemas/LinkedFileRow"},
+            "type": "array",
+            "title": "Files"
+          }
+        },
+        "type": "object",
+        "required": ["scan_id", "recorded", "total", "counts", "limit", "offset", "files"],
+        "title": "ScanDocumentsResponse"
+      },
       "ScanFormSettings": {
         "properties": {
           "url": {"type": "string", "title": "Url"},
@@ -3292,6 +3656,7 @@
           "skip_semantic": {"type": "boolean", "title": "Skip Semantic"},
           "skip_focus": {"type": "boolean", "title": "Skip Focus"},
           "skip_markup": {"type": "boolean", "title": "Skip Markup", "default": false},
+          "skip_documents": {"type": "boolean", "title": "Skip Documents", "default": false},
           "skip_visual": {"type": "boolean", "title": "Skip Visual"},
           "skip_forms": {"type": "boolean", "title": "Skip Forms", "default": true},
           "send_empty_forms": {"type": "boolean", "title": "Send Empty Forms", "default": false},
