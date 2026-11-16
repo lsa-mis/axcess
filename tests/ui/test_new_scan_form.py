@@ -1024,10 +1024,10 @@ async def test_a_browser_name_is_chosen_typed_checked_and_posted(
     browser = page.get_by_role("combobox", name=_BROWSER_NAME, exact=True)
     await playwright_async.expect(browser).to_contain_text("Chrome on this computer (default)")
     await playwright_async.expect(speed).to_contain_text("the Chrome version Axcess runs")
-    await browser.select_option("axcess")
+    await choose_option(page, _BROWSER_NAME, "axcess")
     await playwright_async.expect(speed).to_contain_text("so the site can see that a scanner")
     await playwright_async.expect(summary).to_contain_text("Tells the site it is Axcess, a scanner")
-    await browser.select_option("chrome")
+    await choose_option(page, _BROWSER_NAME, "chrome")
     # Both limits are stated beside the choice.
     await playwright_async.expect(speed).to_contain_text("Every page still opens in Chromium")
     await playwright_async.expect(speed).to_contain_text("robots.txt rules for Axcess still apply")
