@@ -40,6 +40,17 @@ def test_the_first_page_is_drawn_in_two_sizes() -> None:
     assert len(pictures.small) < len(pictures.large)
 
 
+def test_many_threads_can_draw_at_once_without_crashing() -> None:
+    """PDFium is not thread-safe; the tracker draws in worker threads. Before
+    the lock, this crashed the test process (a segmentation fault)."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    bodies = [(FILES / name).read_bytes() for name in ("clean.pdf", "form.pdf", "no-title.pdf")]
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        drawn = list(pool.map(first_page_jpegs, bodies * 16))
+    assert all(pictures is not None for pictures in drawn)
+
+
 @pytest.mark.parametrize(
     "body",
     [b"", b"not a pdf", b"%PDF-1.7\n" + b"\x00" * 200],

@@ -88,6 +88,12 @@ day, since a picture never changes. The Documents tab does not update while
 a scan runs (neither do Issues and Images); the scanning page shows
 progress.
 
+PDFium is not thread-safe: two drawings at once crashed the process (a
+segmentation fault, caught by the crawl tests before release). Every PDFium
+call runs under one process-wide lock (`thumbnail._PDFIUM`), every PDFium
+object is closed inside it, and a drawing that cannot get the lock within 10
+seconds is skipped (no picture). Keep any new PDFium call under that lock.
+
 PDFium is C code running inside the app's process, where pypdf is pure
 Python. It is the engine Chrome uses on PDFs from anywhere, but a file that
 crashes it would take the app down with it; running it in a separate
