@@ -354,7 +354,8 @@ page, or block scans, depending on this name.
 
 Only the name changes. Every page still opens in Chromium, so a site that
 checks what the browser can do may still tell. The site's robots.txt rules
-for Axcess still apply. Sign-in scans always send Axcess's own name.
+for Axcess still apply. In a sign-in scan, the sign-in window sends the
+same name, so the site sees one browser throughout.
 
 ## Accuracy
 

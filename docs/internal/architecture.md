@@ -95,8 +95,10 @@ it accepts requests.
 2. **Fetch.** A plain HTTP fetch, then a render in Chromium. By default
    (`js_eager=True`) every HTML page is rendered. With `--static-only`, only
    pages that look like a script-only shell or a bot challenge are rendered.
-   `skip_static_when_rendering` (off by default) skips the plain fetch, and
-   login scans are always browser-only.
+   `skip_static_when_rendering` (off by default) skips the plain fetch. A
+   login scan is browser-only, except when it loads pages without running
+   scripts: then the plain fetch goes through the signed-in browser's own
+   request client (`AuthenticatedStaticFetcher`), never an anonymous one.
 3. **Record the page** with `_record_page`. The rendered HTML is stored
    gzipped, up to 2,000,000 uncompressed bytes, unless rendered storage is off.
 4. **Images.** `process_page` extracts images, stores them, and runs OCR and
