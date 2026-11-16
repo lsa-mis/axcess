@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, api, blobUrl } from "../api/client";
 import type { ImagePage, ReportImage, ReportImageDetail } from "../api/types";
 import {
+  AltCheckOff,
   CurrentAlt,
   IMAGE_PAGES_COLUMN,
   ImageViewer,
@@ -86,6 +87,7 @@ export default function ImageDetailRoute() {
   const [announcement, setAnnouncement] = useState("");
   const [checkError, setCheckError] = useState("");
   const answerRef = useRef<HTMLDivElement>(null);
+  const offRef = useRef<HTMLDivElement>(null);
 
   const scanQuery = useScanQuery(id);
   const imageQuery = useQuery({
@@ -238,10 +240,9 @@ export default function ImageDetailRoute() {
                     <SuggestionBox text={row.suggestion} name={name} />
                   </div>
                 ) : !checkAvailable ? (
-                  <span className="text-fg-subtle">
-                    The local AI check is off, so no alt text can be suggested here. The person who runs Axcess can
-                    turn it on by choosing a local model.
-                  </span>
+                  <div ref={offRef} tabIndex={-1} className="rounded-xs focus:outline-none">
+                    <AltCheckOff onHidden={() => offRef.current?.focus()} />
+                  </div>
                 ) : !row.can_check ? (
                   <span className="text-fg-subtle">
                     Check by hand: the model cannot look at an image drawn in the page code (SVG).

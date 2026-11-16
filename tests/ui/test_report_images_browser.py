@@ -157,7 +157,7 @@ async def _photo_page(page: Any, base: str, scan_id: int) -> None:
     """Open the photo's own page from its row in the Images table."""
     await page.goto(f"{base}/app/scans/{scan_id}/images?group=with_alt", wait_until="networkidle")
     row = page.get_by_role("row").filter(has_text="students.png")
-    await row.get_by_role("link", name="students.png, full details").click()
+    await row.get_by_role("link", name=re.compile(r"^students\.png\s*, full details$")).click()
     await page.wait_for_url(re.compile(r"/images/\d+\?"))
     await playwright_async.expect(
         page.get_by_role("heading", level=1, name="students.png")
@@ -185,12 +185,23 @@ async def test_the_images_table_counts_pages_and_links_each_image(
         row = table.get_by_role("row").filter(has_text="students.png")
         # One link per image: the thumbnail and the name together.
         await playwright_async.expect(row.get_by_role("link")).to_have_count(1)
-        await playwright_async.expect(row.get_by_role("cell").nth(3)).to_have_text("1")
+        # The last column (2026-11-16), as on the Documents tab.
+        await playwright_async.expect(row.get_by_role("cell").last).to_have_text("1")
+        headers = await table.get_by_role("columnheader").all_inner_texts()
+        assert headers[-1].strip() == "Pages it appears on", headers
         await _photo_page(page, base, scan_id)
-        await playwright_async.expect(page.get_by_text("Text in the image")).to_be_visible()
-        await playwright_async.expect(page.get_by_text("Current alt text")).to_be_visible()
-        await playwright_async.expect(page.get_by_text("Alt text verdict")).to_be_visible()
-        await playwright_async.expect(page.get_by_text("Suggested alt text")).to_be_visible()
+        await playwright_async.expect(
+            page.get_by_text("Text in the image", exact=True)
+        ).to_be_visible()
+        await playwright_async.expect(
+            page.get_by_text("Current alt text", exact=True)
+        ).to_be_visible()
+        await playwright_async.expect(
+            page.get_by_text("Alt text verdict", exact=True)
+        ).to_be_visible()
+        await playwright_async.expect(
+            page.get_by_text("Suggested alt text", exact=True)
+        ).to_be_visible()
         await playwright_async.expect(
             page.get_by_role("heading", level=2, name=re.compile(r"^Pages it appears on\s*1 page$"))
         ).to_be_visible()
@@ -326,6 +337,13 @@ async def test_an_image_opens_in_the_inspector_outlined(
             "UPDATE pages SET rendered_html = ? WHERE id = ?",
             (gzip.compress(capture.encode()), page_id),
         )
+        # The saved copy holds this one image, so it is the first: the
+        # inspector finds an image by its place among the page's images.
+        conn.execute(
+            "UPDATE page_images SET position = 0 WHERE page_id = ? AND image_id = "
+            "(SELECT id FROM images WHERE content_hash = ?)",
+            (page_id, content_hash),
+        )
         conn.commit()
     finally:
         conn.close()
@@ -353,5 +371,51 @@ async def test_an_image_opens_in_the_inspector_outlined(
         await playwright_async.expect(frame.locator(".axcess-inspect-highlight")).to_have_count(1)
         # From the inspector, the trail leads back to the Images tab.
         await playwright_async.expect(trail.get_by_role("link", name="Images")).to_be_visible()
+    finally:
+        await page.context.close()
+
+
+async def test_with_the_check_off_a_shared_server_says_who_can_turn_it_on(
+    live_server: tuple[str, int], new_page: Any
+) -> None:
+    """No model set: the tab says the check is off. On a shared server there
+    is no Settings > AI features page, so it offers no link to one."""
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    try:
+        await page.goto(f"{base}/app/scans/{scan_id}/images", wait_until="networkidle")
+        await playwright_async.expect(
+            page.get_by_text("The local AI check is off, so no alt text can be suggested here.")
+        ).to_be_visible()
+        await playwright_async.expect(
+            page.get_by_text("The person who runs Axcess can turn it on.")
+        ).to_be_visible()
+        await playwright_async.expect(
+            page.get_by_role("link", name=re.compile(r"local AI|AI features"))
+        ).to_have_count(0)
+
+        # "Don't show again" hides the message, here and after a reload; the
+        # rows still say the check is off, and focus lands on the table.
+        hide = page.get_by_role("button", name=re.compile("^Don\u2019t show again"))
+        await hide.click()
+        message = page.get_by_text(
+            "The local AI check is off, so no alt text can be suggested here."
+        )
+        await playwright_async.expect(message).to_have_count(0)
+        await playwright_async.expect(page.locator("#report-images-table")).to_be_focused()
+        await playwright_async.expect(
+            page.get_by_text("Local AI check is off").first
+        ).to_be_visible()
+        await page.reload(wait_until="networkidle")
+        await playwright_async.expect(message).to_have_count(0)
+
+        # Settings shows it again.
+        await page.goto(f"{base}/app/settings", wait_until="networkidle")
+        group = page.get_by_role(
+            "radiogroup", name=re.compile("^Message that the local AI check is off")
+        )
+        await group.get_by_role("radio", name="Show").check()
+        await page.goto(f"{base}/app/scans/{scan_id}/images", wait_until="networkidle")
+        await playwright_async.expect(message).to_be_visible()
     finally:
         await page.context.close()

@@ -4,6 +4,7 @@ import { Download } from "lucide-react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "../api/client";
 import {
+  AltCheckOff,
   CurrentAlt,
   IMAGE_PAGES_COLUMN,
   IMAGES_VIEW,
@@ -32,6 +33,7 @@ import {
 } from "../components/table/Table";
 import { ActiveFilters, FilterMenu, activeFilterItems, type FilterGroup } from "../components/table/FilterMenu";
 import { Button, Card, HelpTip, withReturnTrail } from "../components/ui";
+import { usePreferences } from "../hooks/usePreferences";
 import { useScanQuery } from "../hooks/useScanQuery";
 import { cn } from "../lib/cn";
 import { ALT_VERDICT_COUNT_LABEL, ALT_VERDICT_LABEL, IMAGE_GROUP_LABEL } from "../lib/terms";
@@ -98,6 +100,8 @@ export default function ImagesRoute() {
   const id = Number(scanId);
   const [params, setParams] = useSearchParams();
   const location = useLocation();
+  const { aiOffNotice } = usePreferences();
+  const tableCard = useRef<HTMLDivElement>(null);
   // This list as it stands, for the image page's way back.
   const here = `${location.pathname}${location.search}`;
   const scanQuery = useScanQuery(id);
@@ -318,7 +322,9 @@ export default function ImagesRoute() {
         {announcement}
       </p>
 
-      <Card id="report-images-table">
+      {/* Focusable from script only (tabIndex -1), for "Don't show again":
+          the button goes, and focus lands on the table it was above. */}
+      <Card id="report-images-table" ref={tableCard} tabIndex={-1} className="focus:outline-none">
         {/* PagedTable draws the pager over the table and again under its last
             row, as on every paged table (components/TablePagination.tsx). The
             search and filter bar is drawn whether or not there is a pager, so
@@ -371,15 +377,13 @@ export default function ImagesRoute() {
               : `${plural(data.total, "image", "images")}. The ones that need alt text come first.`
             : "Loading images…"}
         </TableStatus>
-        {data && !data.check_available && (
+        {data && !data.check_available && aiOffNotice === "on" && (
           // The line under the note spans the table; only the text is held to
           // a reading width (SC 1.4.8 Visual Presentation, Level AAA), so the
-          // line is not cut short where the text ends.
+          // line is not cut short where the text ends. Hidden by "Don't show
+          // again", the line goes; each row still says the check is off.
           <div className="border-b border-border px-4 py-2">
-            <p className="max-w-measure text-sm text-fg-muted">
-              The local AI check is off, so no alt text can be suggested here. The person who runs
-              Axcess can turn it on by choosing a local model.
-            </p>
+            <AltCheckOff onHidden={() => tableCard.current?.focus()} />
           </div>
         )}
         {data && data.rows.length === 0 ? (
@@ -393,8 +397,8 @@ export default function ImagesRoute() {
                   <ColumnHeader className="text-left">Text in the image</ColumnHeader>
                   <ColumnHeader className="text-left">Current alt text</ColumnHeader>
                   <ColumnHeader className="w-52 text-left">Alt text verdict</ColumnHeader>
-                  <ColumnHeader className="w-28">{IMAGE_PAGES_COLUMN}</ColumnHeader>
                   <ColumnHeader className="w-72 text-left">Suggested alt text</ColumnHeader>
+                  <ColumnHeader className="w-28">{IMAGE_PAGES_COLUMN}</ColumnHeader>
                 </tr>
               </TableHead>
               <tbody>
@@ -544,16 +548,6 @@ function ImageRow({
       <Cell className="align-top">
         <VerdictSummary image={image} />
       </Cell>
-      {/* How many pages, as a plain number: the pages are listed on the
-          image's page. It was "Where it appears", the first page as a link
-          and "and on 5 other pages" as text, which named one page and hid
-          the rest (the developer's report, 2026-11-16). The Documents tab's
-          "Pages it appears on" is the same number in the same words, and
-          Issues' "Affected pages" is too (SC 3.2.4 Consistent
-          Identification, Level AA). */}
-      <Cell numeric className="align-top">
-        {image.page_count.toLocaleString()}
-      </Cell>
       <Cell className="align-top">
         {image.suggestion ? (
           // Focus lands here when the model answers (see the route comment).
@@ -588,6 +582,17 @@ function ImageRow({
             )}
           </>
         )}
+      </Cell>
+      {/* How many pages, as a plain number: the pages are listed on the
+          image's page. It was "Where it appears", the first page as a link
+          and "and on 5 other pages" as text, which named one page and hid
+          the rest (the developer's report, 2026-11-16). The Documents tab's
+          "Pages it appears on" is the same number in the same words, and
+          Issues' "Affected pages" is too (SC 3.2.4 Consistent
+          Identification, Level AA). The last column, as on the Documents
+          tab (the developer's request, 2026-11-16). */}
+      <Cell numeric className="align-top">
+        {image.page_count.toLocaleString()}
       </Cell>
     </Row>
   );

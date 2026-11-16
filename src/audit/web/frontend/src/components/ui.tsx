@@ -99,6 +99,8 @@ export function Card({
 }: {
   children: ReactNode;
   className?: string;
+  /** React 19 passes a ref as a prop; it reaches the card's div. */
+  ref?: React.Ref<HTMLDivElement>;
 } & React.HTMLAttributes<HTMLDivElement>) {
   // `data-card` lets a part that fills the card's edge (a table's bar, its
   // scrolling rows) round its own corners to match (see CARD_EDGE in
