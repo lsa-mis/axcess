@@ -1,5 +1,5 @@
 import { Select } from "../ui";
-import { GROUPS, NUMBERS, SWITCHES, USER_AGENT } from "./copy";
+import { GROUPS, NUMBERS, SIGN_IN_NOTES, SWITCHES, USER_AGENT } from "./copy";
 import type { GroupProps } from "./groupProps";
 import NumberField from "./NumberField";
 import { isFixed, switchOn, switchPatch } from "./scanPolicy";
@@ -98,7 +98,7 @@ export default function SpeedGroup({ settings, update, policy, errors, fieldIds 
             checked={switchOn(settings, "static_only")}
             onChange={(on) => update(switchPatch(settings, "static_only", on))}
             label={SWITCHES.static_only.label}
-            hint={SWITCHES.static_only.hint}
+            hint={login ? `${SWITCHES.static_only.hint} ${SIGN_IN_NOTES.staticOnly}` : SWITCHES.static_only.hint}
             error={staticError}
           />
         )}
@@ -122,7 +122,7 @@ export default function SpeedGroup({ settings, update, policy, errors, fieldIds 
             id="scan-user-agent-choice"
             label={USER_AGENT.label}
             stacked
-            hint={USER_AGENT.hint}
+            hint={login ? `${USER_AGENT.hint} ${SIGN_IN_NOTES.userAgent}` : USER_AGENT.hint}
             value={settings.user_agent_choice}
             onChange={(value) => update({ user_agent_choice: value })}
             options={USER_AGENT_OPTIONS}

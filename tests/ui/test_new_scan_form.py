@@ -520,7 +520,8 @@ async def test_limits_are_validated_by_name_with_their_range(
 async def test_scan_every_page_it_finds(live_server: tuple[str, int], new_page: Any) -> None:
     """No page limit: Maximum pages goes off, the rail says so, and it is what posts.
 
-    A sign-in scan keeps its cap, so its form does not offer the switch.
+    A sign-in scan offers the switch too since 2026-11-16 (the two forms
+    offer the same settings), and posts it to the sign-in API.
     """
     base, _ = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
@@ -563,7 +564,7 @@ async def test_scan_every_page_it_finds(live_server: tuple[str, int], new_page: 
     ).to_be_visible()
     await playwright_async.expect(
         page.get_by_role("switch", name=re.compile(r"^Scan every page it finds"))
-    ).to_have_count(0)
+    ).not_to_be_checked()
 
 
 async def test_depth_dots_are_gone(live_server: tuple[str, int], new_page: Any) -> None:
@@ -856,8 +857,9 @@ async def test_the_form_error_check_is_on_for_public_websites_and_absent_when_si
     new_page: Any,
 ) -> None:
     """On by default for a public website (2026-11-02), without sending
-    anything; sending empty forms is a choice of its own (2026-11-04); no
-    question at all for a sign-in scan."""
+    anything; sending empty forms is a choice of its own (2026-11-04). A
+    sign-in scan asks the same question since 2026-11-16, off by default,
+    and says a form is pressed as the person signed in."""
     base, _ = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
     posted: list[dict[str, Any]] = []
@@ -902,9 +904,16 @@ async def test_the_form_error_check_is_on_for_public_websites_and_absent_when_si
 
     await page.goto(f"{base}/app/scans/new?mode=login", wait_until="networkidle")
     await _open_groups(page)
+    forms = page.get_by_role("group", name="Check that forms describe their errors")
     await playwright_async.expect(
-        page.get_by_role("group", name="Check that forms describe their errors")
-    ).to_have_count(0)
+        forms.get_by_role("radio", name="Don\u2019t check forms")
+    ).to_be_checked()
+    await playwright_async.expect(forms).to_contain_text(
+        "In a sign-in scan, Axcess presses each form as you, the person signed in."
+    )
+    await playwright_async.expect(
+        forms.get_by_role("radio", name="Check forms, and send empty ones to this site")
+    ).to_have_accessible_description(re.compile("from your account"))
 
 
 _CHROME_WINDOWS = (
@@ -1000,19 +1009,64 @@ async def test_a_browser_name_is_chosen_typed_checked_and_posted(
     ).to_contain_text("Axcess (default)")
 
 
-async def test_a_sign_in_scan_offers_no_browser_name(
+async def test_a_sign_in_scan_offers_the_browser_name(
     live_server: tuple[str, int],
     new_page: Any,
 ) -> None:
+    """Offered since 2026-11-16; the sign-in window sends the same name."""
     base, _ = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
     await page.goto(f"{base}/app/scans/new?mode=login", wait_until="networkidle")
-    if not await page.locator("form#scan-form").count():
-        pytest.skip("Sign-in scans are not available on this server.")
     await _open_groups(page)
-    await playwright_async.expect(
-        page.get_by_role("combobox", name=_BROWSER_NAME, exact=True)
-    ).to_have_count(0)
+    name = page.get_by_role("combobox", name=_BROWSER_NAME, exact=True)
+    await playwright_async.expect(name).to_have_value("axcess")
+    await playwright_async.expect(name).to_have_accessible_description(
+        re.compile("the sign-in window sends this name too")
+    )
+
+
+# Names a setting has only in the sign-in form, for the same setting.
+_SIGN_IN_NAME = {
+    ("textbox", "Website address"): ("textbox", "Website address to scan after you sign in"),
+    ("switch", "Scan the whole website"): ("switch", "Scan the whole signed-in website"),
+}
+_CONTROL_LINE = re.compile(
+    r'^\s*- (switch|checkbox|radio|combobox|spinbutton|textbox|group) "([^"]+)"'
+)
+
+
+async def _settings(page: Any) -> set[tuple[str, str]]:
+    """Every named control and question in the scan form, as (role, name)."""
+    await _open_groups(page)
+    tree = await page.locator("form#scan-form").aria_snapshot()
+    return {
+        (match.group(1), match.group(2))
+        for line in tree.splitlines()
+        if (match := _CONTROL_LINE.match(line))
+    }
+
+
+async def test_the_sign_in_form_offers_every_setting_the_public_form_does(
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """The two forms offer the same settings, 1:1 (2026-11-16, the developer's
+    rule). A sign-in scan may add its own (the permission and image boxes),
+    may start from other defaults, and may say more in a hint, but no public
+    setting may be missing from it. A setting renamed for a sign-in scan is
+    listed in ``_SIGN_IN_NAME``."""
+    base, _ = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(f"{base}/app/scans/new", wait_until="networkidle")
+    public = await _settings(page)
+    await page.goto(f"{base}/app/scans/new?mode=login", wait_until="networkidle")
+    sign_in = await _settings(page)
+    # The check reads enough of the form to mean something.
+    assert len(public) >= 25, sorted(public)
+    missing = sorted(
+        setting for setting in public if _SIGN_IN_NAME.get(setting, setting) not in sign_in
+    )
+    assert not missing, f"The sign-in form is missing: {missing}"
 
 
 @pytest.mark.parametrize("choice", ["chrome_windows", "custom"])

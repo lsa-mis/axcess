@@ -80,7 +80,7 @@ export const SWITCHES = {
   },
   whole_host_login: {
     label: "Scan the whole signed-in website",
-    hint: "Ignores the path in the address above, but never leaves the website you sign in to.",
+    hint: "Ignores the path in the address above. Every signed-in page on this host is included.",
   },
   include_subdomain: {
     label: "Follow links to subdomains",
@@ -239,8 +239,20 @@ export const ENGINE = {
   },
 } as const;
 
-export const FIXED_NOTE_LOGIN =
-  "Sign-in scans always work this way: they stay on this exact website, respect robots.txt, open every page in a real browser, and ask for 1 page per second.";
+/**
+ * What a setting means in addition behind a sign-in, added to its hint in
+ * the sign-in form. The sign-in form offers every setting the public form
+ * does (2026-11-16); these keep the extra risk or limit in words (AGENTS.md,
+ * Interface language rule 4: never drop a safety fact).
+ */
+export const SIGN_IN_NOTES = {
+  forms: "In a sign-in scan, Axcess presses each form as you, the person signed in.",
+  sendForms:
+    "In a sign-in scan, the site receives each empty form from your account and may act on it as if you sent it.",
+  staticOnly:
+    "In a sign-in scan, Axcess loads each page with your sign-in cookies. A site that keeps your sign-in only inside the page (session storage) shows its signed-out pages instead.",
+  userAgent: "In a sign-in scan, the sign-in window sends this name too, so the site sees one browser throughout.",
+} as const;
 
 export const AUTHORIZATION = {
   label:

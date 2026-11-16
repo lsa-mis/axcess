@@ -1,6 +1,6 @@
 import type { LocalLoginScanPayload, NewScanPayload, ScanSettingsSnapshot } from "../../api/types";
 import { withScheme } from "../../lib/webAddress";
-import { ERRORS, FIXED_NOTE_LOGIN, NUMBERS, SUBMIT, URL_COPY } from "./copy";
+import { ERRORS, NUMBERS, SUBMIT, URL_COPY } from "./copy";
 import {
   CUSTOM_USER_AGENT_CHOICE,
   DEFAULT_USER_AGENT_CHOICE,
@@ -120,8 +120,8 @@ export const PUBLIC_DEFAULTS: ScanSettings = {
   // nothing leaves the page meanwhile (the guard's strict mode and the socket
   // hold, docs/internal/form-error-check.md). A clear failure is Mostly
   // sure and an unclear one Not sure (2026-11-05, the developer's decision);
-  // it is not yet validated on real forms. Never in a sign-in scan
-  // (LOGIN_POLICY below).
+  // it is not yet validated on real forms. Off by default in a sign-in scan
+  // (LOGIN_DEFAULTS below).
   skip_forms: false,
   // Sending an empty form to the site is never a default: the site may act
   // on it (a blank message emailed to someone). Chosen per scan, on a site
@@ -155,6 +155,10 @@ export const LOGIN_DEFAULTS: ScanSettings = {
   // Protected images are only read after the reviewer acknowledges where
   // the evidence is stored, so image text reading starts off.
   skip_ocr: true,
+  // Offered since 2026-11-16 (every setting the public form has), but off by
+  // default here: pressing a form's submit button while signed in acts as
+  // the person signed in. The public default checks forms.
+  skip_forms: true,
 };
 
 // The address as it will be scanned: a scheme typed or not, it is completed
@@ -201,32 +205,16 @@ export const LOGIN_POLICY: ScanPolicy = {
   // (src/audit/protected/companion.py, repository.py).
   caps: { max_pages: 10000, max_depth: 20, rps: 5, workers: 8 },
   defaults: LOGIN_DEFAULTS,
-  fixed: {
-    // A signed-in session keeps its page cap: an unbounded crawl behind a
-    // sign-in is a load the session and the site owner did not agree to.
-    all_pages: false,
-    include_subdomain: false,
-    static_only: false,
-    ignore_robots: true,
-    // Not offered for signed-in scans; the login payload has no field for
-    // them, so they stay at their defaults and are dropped at submit.
-    skip_semantic: true,
-    skip_focus: false,
-    // Always on in a signed-in scan (the server runs it); it only reads the
-    // page, so it is as safe there as the rule check.
-    skip_markup: false,
-    skip_visual: true,
-    // Never in a signed-in session: pressing submit there could act as the
-    // person signed in, even with requests blocked.
-    skip_forms: true,
-    send_empty_forms: false,
-    // A sign-in scan always sends Axcess's own name: the sign-in API has no
-    // field for another, and a site that ties a session to the browser
-    // would see the name change between signing in and scanning.
-    user_agent_choice: DEFAULT_USER_AGENT_CHOICE,
-    user_agent: "",
-  },
-  fixedNote: FIXED_NOTE_LOGIN,
+  // Nothing is fixed (2026-11-16, the developer's decision): the sign-in
+  // form offers every setting the public form does, 1:1, and
+  // tests/ui/test_new_scan_form.py checks that no setting is missing. Until
+  // then it held back the page limit's "no limit", subdomains, robots.txt,
+  // the fast scan, the focus, page code, AI review, visual and form error
+  // checks, and the browser name. Where a setting means something more
+  // behind a sign-in, its hint says so (SIGN_IN_NOTES in copy.ts). Defaults
+  // may still differ (LOGIN_DEFAULTS).
+  fixed: {},
+  fixedNote: null,
   urlLabel: URL_COPY.login.label,
   urlHelp: URL_COPY.login.help,
   urlPlaceholder: URL_COPY.login.placeholder,
@@ -362,10 +350,14 @@ export function toLocalLoginPayload(
     approved_auth_origins: [],
     authorization_acknowledged: true,
     max_pages: settings.max_pages,
+    all_pages: settings.all_pages,
     max_depth: settings.max_depth,
     rps: settings.rps,
     workers: settings.workers,
     whole_host: settings.whole_host,
+    include_subdomain: settings.include_subdomain,
+    ignore_robots: settings.ignore_robots,
+    static_only: settings.static_only,
     show_browser: settings.show_browser,
     scan_engine: settings.scan_engine,
     axe_level: settings.axe_level,
@@ -373,6 +365,14 @@ export function toLocalLoginPayload(
     skip_interaction: settings.skip_interaction,
     skip_keyboard: settings.skip_keyboard,
     skip_responsive: settings.skip_responsive,
+    skip_focus: settings.skip_focus,
+    skip_markup: settings.skip_markup,
+    skip_semantic: settings.skip_semantic,
+    skip_visual: settings.skip_visual,
+    skip_forms: settings.skip_forms,
+    send_empty_forms: !settings.skip_forms && settings.send_empty_forms,
+    user_agent_choice: settings.user_agent_choice,
+    user_agent: userAgentToSend(settings.user_agent_choice, settings.user_agent) ?? "",
     skip_ocr: settings.skip_ocr,
     skip_vlm: settings.skip_vlm,
     skip_rendered_storage: settings.skip_rendered_storage,
