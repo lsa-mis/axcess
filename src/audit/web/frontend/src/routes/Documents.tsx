@@ -698,9 +698,18 @@ function DocumentsCoverageNote({ recorded }: { recorded: boolean }) {
           delete something.
         </p>
         <p>
-          Some reports do not look for documents: reports made before Axcess could find
-          documents, and scans that sign in to a site. A new scan of the site that does not sign
-          in lists its documents.
+          Some reports do not look for documents: reports made before Axcess could find them,
+          reports from a sign-in scan made before 16 November 2026, and scans with the document
+          check turned off. A new scan with the document check on lists the site’s documents.
+        </p>
+        {/* Sign-in scans check documents since 2026-11-16, through the
+            person's sign-in and only on the signed-in site (the developer's
+            decision). Said here because a file on another site then reads
+            "could not check" with the scan's-settings reason, which alone
+            would not tell the reader why. */}
+        <p>
+          A scan that signs in to a site downloads PDFs only from that site, with the sign-in. It
+          lists files on other sites but does not download them.
         </p>
       </div>
     </ReportNote>

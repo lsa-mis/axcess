@@ -93,6 +93,21 @@ Python. It is the engine Chrome uses on PDFs from anywhere, but a file that
 crashes it would take the app down with it; running it in a separate
 process is the fix if that ever happens.
 
+## Sign-in scans
+
+Since 2026-11-16 a sign-in scan offers the document check too (the
+developer's decision), on by default. Its PDFs download only through the
+signed-in browser's request client (`SignedInFileFetcher` in `fetch.py`,
+made by `ManualAuthenticationSession.create_authenticated_file_fetcher`), with
+the person's cookies, and every address and redirect goes through the
+sign-in scan's egress policy first. A file on another site is refused, never
+downloaded anonymously instead, and reads "Could not check" with the reason
+`blocked`. The crawl will not start the check without that fetcher
+(`CrawlConfig.documents_signed_in`, `run_crawl`'s `file_fetcher`); the
+protected agent pipeline never runs it. Playwright reads a response whole,
+so the 10 MB limit is checked from a HEAD request's declared size first and
+from the body after.
+
 ## The scanning page
 
 The progress table's **Document check** column (`live_progress` key

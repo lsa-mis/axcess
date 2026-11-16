@@ -687,7 +687,8 @@ async def test_a_report_that_did_not_look_says_so_once(
     await expect(page.get_by_text("This report did not look for documents")).to_have_count(1)
     await expect(page.get_by_role("region", name=CHECKED)).to_contain_text(
         "Some reports do not look for documents: reports made before Axcess could find "
-        "documents, and scans that sign in to a site."
+        "them, reports from a sign-in scan made before 16 November 2026, and scans with the "
+        "document check turned off."
     )
     for tags in (_AXE_TAGS_AA, None):
         violations = await _run_axe(page, tags)

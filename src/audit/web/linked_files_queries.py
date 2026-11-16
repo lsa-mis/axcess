@@ -104,7 +104,8 @@ class LinkedFileCounts(BaseModel):
 class ScanDocumentsResponse(BaseModel):
     scan_id: int
     #: False when the scan did not look for linked files at all: a report
-    #: made before this feature, a sign-in scan, or one with it turned off.
+    #: made before this feature, a sign-in scan made before 2026-11-16, or
+    #: one with it turned off.
     #: An empty list then means "not looked for", never "none found".
     recorded: bool
     #: Every file the scan found, whatever the limit and offset.
