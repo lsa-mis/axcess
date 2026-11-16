@@ -848,6 +848,10 @@ function IssueTable({
                   // screenshots, 2026-11-16).
                   // Where it shows too, once it had its "?" (2026-11-16).
                   (column === "Type" || column === "Finding type") && "whitespace-nowrap",
+                  // 4px a side, not 6, on the three headers with a "?": with
+                  // a sort chip showing the table was 2px wider than its
+                  // region at 1280px (test_issue_table_fits_the_default_desktop_width).
+                  (column === "Type" || column === "Finding type" || column === "Priority") && "px-1",
                 )}
                 hint={columnHint(column)}
                 help={columnHelp(column)}
