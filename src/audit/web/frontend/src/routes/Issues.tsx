@@ -2,7 +2,8 @@ import { Fragment, memo, useMemo, useRef, type ReactNode, type Ref } from "react
 import { Link, useLocation, useParams, useSearchParams } from "react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
-import { Card, HelpTip, withReturnTrail } from "../components/ui";
+import { Card, withReturnTrail } from "../components/ui";
+import SharedColumnHelp from "../components/table/ColumnHelp";
 // The same helper the topbar trail uses.
 import { siteLabel } from "../components/ReportCrumb";
 import ConformanceBadge from "../components/ConformanceBadge";
@@ -1002,35 +1003,9 @@ const IssueTableRow = memo(function IssueTableRow({
 });
 
 /**
- * The "?" beside an explained column's header (How sure, Where it shows,
- * Priority): the question the column answers and what each of its values
- * means, in the glossary's own words (REVIEW_LANE_HELP, FINDING_TYPE_HELP,
- * PRIORITY_HELP, COLUMN_QUESTION), so the two never disagree (W3C COGA,
- * "Making Content Usable": the same words for the same thing).
- *
- * Which headers have one (the developer's choice, 2026-11-16, option 1 of
- * three): those whose values need explaining, not every header. One rule,
- * one look, one behaviour: a "?" is wherever a word needs explaining, as on
- * the big numbers over the table and the Images heading (SC 3.2.4
- * Consistent Identification, Level AA). Rejected: a "?" on all eight
- * headers, which added about 224px (the table then scrolled sideways at
- * 1280px), eight more Tab stops, and a question in every column's name for
- * words that need no explaining; and a "?" on each row's tag, one Tab stop
- * per row for the same sentences. "What the labels mean" under the table
- * stays as the one place all the meanings can be read, searched and
- * printed together.
- *
- * The icon sits on the label's line, as the sort button's words sit at the
- * foot of their target (SortHeader, wrap="words"); centred in its target it
- * floated above the words (the developer's screenshots, 2026-11-16). 28px
- * wide, so the header reads as one centred group: allowed because "What
- * the labels mean" (IssueGlossary) is a 44px control with the same
- * explanation (HelpTip, ``equivalent``).
- *
- * Known cost: the button's words sit inside the header cell, so a screen
- * reader that names the column for each cell may read "How sure, What does
- * How sure mean?" there. Kept short for that reason, and on three headers,
- * not eight.
+ * The "?" beside an explained Issues header, in the shared form
+ * (components/table/ColumnHelp, where the rationale is): the question each
+ * column answers comes from COLUMN_QUESTION.
  */
 function ColumnHelp({
   column,
@@ -1039,28 +1014,12 @@ function ColumnHelp({
   column: keyof typeof COLUMN_QUESTION;
   items: { key: string; term: ReactNode; help: string }[];
 }) {
-  const question = COLUMN_QUESTION[column];
   return (
-    <HelpTip
+    <SharedColumnHelp
       question={`What does \u201c${column}\u201d mean`}
-      equivalent="report-labels-button"
-      small
-      // Centred on the label's line: 18px icon, 20px line, 6px under it.
-      className="items-end pb-1.5"
-    >
-      <p className="mb-2 font-semibold">
-        {question.charAt(0).toUpperCase()}
-        {question.slice(1)}.
-      </p>
-      <dl className="space-y-2">
-        {items.map((item) => (
-          <div key={item.key}>
-            <dt>{item.term}</dt>
-            <dd className="mt-0.5 text-fg-muted">{item.help}</dd>
-          </div>
-        ))}
-      </dl>
-    </HelpTip>
+      answers={COLUMN_QUESTION[column]}
+      items={items}
+    />
   );
 }
 
