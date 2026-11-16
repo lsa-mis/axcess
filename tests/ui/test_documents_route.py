@@ -1260,6 +1260,8 @@ async def test_the_first_page_shows_above_the_name_and_on_its_own_page(
     await page.goto(f"{base}/app/scans/{scan_id}/documents", wait_until="networkidle")
     link = page.get_by_role("link", name=re.compile(r"^map\.pdf\s*, full details$"))
     picture = link.locator("img")
+    # Lazy-loaded: it loads only once its row is on screen.
+    await link.scroll_into_view_if_needed()
     await expect(picture).to_have_attribute("alt", "")
     # The table loads the small picture, not the one for the document's page.
     await expect(picture).to_have_attribute("src", re.compile(r"/thumbnail\?size=small$"))
