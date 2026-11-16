@@ -11,6 +11,8 @@ from typing import Any
 
 import pytest
 
+from .conftest import ALL_HOW_SURE
+
 pytestmark = [pytest.mark.ui, pytest.mark.asyncio(loop_scope="module")]
 playwright_async = pytest.importorskip("playwright.async_api")
 
@@ -50,7 +52,9 @@ async def _point_at_heading(page: Any) -> None:
 
 
 async def _open_issue_from_list(page: Any, base: str, scan_id: int) -> tuple[str, str]:
-    await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+    # The seeded report has no Mostly sure or Measured row, so open it with
+    # every "How sure" value shown to have a row to follow.
+    await page.goto(f"{base}/app/scans/{scan_id}/issues?{ALL_HOW_SURE}", wait_until="networkidle")
     issues_url = page.url
     table = page.get_by_role("table", name="Accessibility issue types")
     await table.get_by_role("rowheader").get_by_role("link").first.click()
@@ -105,6 +109,10 @@ async def test_swipe_over_a_wide_table_scrolls_it_instead(
         .click()
     )
     await page.wait_for_url(f"**/app/scans/{scan_id}/issues")
+    # The table opens on every issue type, so it has rows to scroll.
+    await playwright_async.expect(
+        page.get_by_role("table").locator("tbody tr").first
+    ).to_be_visible()
     issues_url = page.url
 
     region = page.get_by_role("region", name="Issues table")

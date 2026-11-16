@@ -87,6 +87,7 @@ from audit.exports.redaction import (
 )
 from audit.labels import REVIEW_LANE_LABELS
 from audit.web import issues as issues_mod
+from audit.web.screen_reader_checks import check_for, plain_text
 
 #: Most issue types in one brief. A coding agent works best on a short list,
 #: and the order puts the most important first.
@@ -608,6 +609,21 @@ def _check_lines(row: issues_mod.IssueRow, meta: dict[str, Any]) -> list[str]:
     acceptance = meta.get("acceptance") or row.acceptance
     if manual:
         lines.append(f"- **By hand:** {_prose(manual)}")
+        # The card's sentence promises the steps for Mac and Windows; print
+        # them, the same shared steps the app and the spreadsheet show.
+        check = check_for(meta.get("screen_reader_check"))
+        if check is not None:
+            for platform in check.platforms:
+                lines.append(f"  - {platform.name}:")
+                if platform.intro:
+                    lines.append(f"    {_prose(plain_text(platform.intro))}")
+                if platform.link_url:
+                    label = platform.link_text or platform.link_url
+                    lines.append(f"    {_prose(label)}: {platform.link_url}")
+                lines.extend(
+                    f"    {i}. {_prose(plain_text(step))}"
+                    for i, step in enumerate(platform.steps, 1)
+                )
     if automated:
         lines.append(f"- **With a tool:** {_prose(automated)}")
     if acceptance:

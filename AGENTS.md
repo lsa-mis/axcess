@@ -100,6 +100,15 @@ on 130 of them, then got every verdict wrong on its first real pages
    scored 100% precision and 96.2% recall on 142 of them, while its real
    set, the number that counts, had only 9 failing forms, most of them
    used to tune it. Say how small and how independent the real set is.
+## Project management (Asana)
+
+All project management for this repo lives in one Asana project:
+**"Axcess – Feature & Development Tracker"** (project GID `1218150267797869`,
+https://app.asana.com/1/939514425027676/project/1218150267797869).
+
+When reading or writing Asana tasks for this project, scope every query and
+update to that project only. Do not pull tasks from, or create tasks in, any
+other Asana project on behalf of this repo.
 
 ## Code map
 
@@ -401,8 +410,17 @@ the task. Report them.
 
 ## Verification
 
-Run the narrowest relevant tests during development, then the appropriate
-project gates before handoff:
+**Run tests only before a merge the developer asks for.** Do not run
+`pytest`, the UI suites, or `make test` while iterating on a change, even
+for one file: a UI run takes minutes and the developer reviews the change
+in the running app instead. Fast build steps that the running app needs
+(`make frontend-build`) and `make lint` / `make typecheck` are fine at any
+time. Update or add the tests a change needs as you go, without running
+them, and when you report a change, say plainly that its tests have not
+been run yet. When the developer asks to merge, run the gates below first,
+fix what fails, and only then merge.
+
+The gates, run before a requested merge:
 
 ```bash
 uv run pytest tests/unit
@@ -435,7 +453,8 @@ If you cannot verify an action is reversible, treat it as irreversible.
 **If any premise in your task turns out to be wrong or impossible, stop and
 report that instead of working around it.** State what you **verified** (ran it,
 saw the output) separately from what you **assumed**. Do not report a task
-complete on the basis of code you did not run.
+complete on the basis of code you did not run. Until the tests run before a
+merge (see Verification), report a change as built but not yet tested.
 
 ## Session hygiene
 

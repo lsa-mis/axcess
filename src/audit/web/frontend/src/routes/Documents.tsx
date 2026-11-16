@@ -23,7 +23,7 @@ import {
   SummaryNumbers,
   SummaryStat,
 } from "../components/ReportSummary";
-import { TablePagination, usePagedRows } from "../components/TablePagination";
+import { PagedTable, usePagedRows } from "../components/TablePagination";
 import {
   ActiveFilters,
   FilterMenu,
@@ -296,9 +296,8 @@ const ORDER_WORDS = "Mostly sure first, then Not sure, then Could not check";
  *
  * Paged here (Settings > Rows per page, usePagedRows), with the page in
  * the URL so Back and reload return to the same rows. The pager is over the table
- * and again under its last row, as on every paged table (TablePagination,
- * place="end"); the copy under the table was missing here until
- * 2026-11-14. A table wider than the screen
+ * and again under its last row, as on every paged table (PagedTable draws
+ * the pair); the copy under the table was missing here until 2026-11-14. A table wider than the screen
  * scrolls sideways in its own named region, never the page (TableRegion; SC
  * 1.4.10 Reflow, Level AA, allows this for a data table).
  */
@@ -449,111 +448,117 @@ export default function DocumentsRoute() {
 
       {/* No overflow-hidden: it would clip the Filter menu's panel, as on Issues. */}
       <Card>
-        {data.recorded && data.total > 0 && (
-          <DocumentsToolbar
-            files={all}
-            status={status}
-            kind={kind}
-            hosted={hosted}
-            onParam={setParam}
-            onResetFilters={resetFilters}
-            onClearFilters={() =>
-              setParams(
-                () => {
-                  const next = liveSearchParams();
-                  for (const key of ["status", "kind", "hosted", "page"]) next.delete(key);
-                  return next;
-                },
-                { replace: true },
-              )
-            }
-            pager={<TablePagination label={DOCUMENTS_VIEW} noun="documents" {...paged} />}
-          />
-        )}
-        {/* What the order is, the filtered count and the way back to the
-            recommended order: Issues' line over its table, shown, as there,
-            only while the table is sorted by a column or filtered. Not a
-            live region (the line above the card says the order). */}
-        {(sort || hasFilter || cut) && (
-          <TableStatus
-            announce={false}
-            actions={
-              <>
-                {hasFilter && (
-                  <span className="tabular-nums">
-                    {rows.length.toLocaleString()} of {all.length.toLocaleString()} shown
-                  </span>
-                )}
-                {sort && (
-                  // eslint-disable-next-line react/forbid-elements -- Convert: a text-link styled button; needs a link variant on Button (as on Issues)
-                  <button
-                    type="button"
-                    onClick={recommend}
-                    className="min-h-target rounded-xs px-1 font-semibold text-umich-blue underline underline-offset-2 hover:text-umich-blue-600 focus-visible:outline-none focus-visible:shadow-focus"
-                  >
-                    Back to recommended order
-                  </button>
-                )}
-              </>
-            }
-          >
-            {cut && `Showing the first ${all.length.toLocaleString()} of ${data.total.toLocaleString()} documents. `}
-            {sort && `${describeSort(sort)}.`}
-          </TableStatus>
-        )}
-        {/* An empty table says what it means and points down to the note
-            that says why, as Issues' does ("That does not mean the site
-            meets WCAG… See “What was checked”, below this table."): an empty
-            list must never read as a clean result. */}
-        {!data.recorded ? (
-          <TableEmpty>
-            This report did not look for documents. See why in “What was checked”, below this
-            table.
-          </TableEmpty>
-        ) : data.total === 0 ? (
-          <TableEmpty>
-            The scan found no links to documents on the pages it visited. That does not mean the
-            site has none, because the list can miss files. See “What was checked”, below this
-            table.
-          </TableEmpty>
-        ) : rows.length === 0 ? (
-          <TableEmpty>No documents match these filters. Clear a filter to see more results.</TableEmpty>
-        ) : (
-          <TableRegion label="Documents table" regionRef={region}>
-            <Table caption={`Documents linked from report #${scan.id}, ${describeSort(sort)}`}>
-              <TableHead>
-                <tr>
-                  {SORT_COLUMNS.map((column) => (
-                    <SortHeader
-                      key={column}
-                      column={column}
-                      wrap="words"
-                      kind={SORT_KINDS[column]}
-                      sort={sort}
-                      onSort={onSort}
+        {/* PagedTable draws the pager over the table (in the toolbar) and
+            again under its last row, as on every paged table. */}
+        <PagedTable
+          pagination={{ label: DOCUMENTS_VIEW, noun: "documents", ...paged }}
+          top={(pager) =>
+            data.recorded &&
+            data.total > 0 && (
+              <DocumentsToolbar
+                files={all}
+                status={status}
+                kind={kind}
+                hosted={hosted}
+                onParam={setParam}
+                onResetFilters={resetFilters}
+                onClearFilters={() =>
+                  setParams(
+                    () => {
+                      const next = liveSearchParams();
+                      for (const key of ["status", "kind", "hosted", "page"]) next.delete(key);
+                      return next;
+                    },
+                    { replace: true },
+                  )
+                }
+                pager={pager}
+              />
+            )
+          }
+        >
+          {/* What the order is, the filtered count and the way back to the
+              recommended order: Issues' line over its table, shown, as there,
+              only while the table is sorted by a column or filtered. Not a
+              live region (the line above the card says the order). */}
+          {(sort || hasFilter || cut) && (
+            <TableStatus
+              announce={false}
+              actions={
+                <>
+                  {hasFilter && (
+                    <span className="tabular-nums">
+                      {rows.length.toLocaleString()} of {all.length.toLocaleString()} shown
+                    </span>
+                  )}
+                  {sort && (
+                    // eslint-disable-next-line react/forbid-elements -- Convert: a text-link styled button; needs a link variant on Button (as on Issues)
+                    <button
+                      type="button"
+                      onClick={recommend}
+                      className="min-h-target rounded-xs px-1 font-semibold text-umich-blue underline underline-offset-2 hover:text-umich-blue-600 focus-visible:outline-none focus-visible:shadow-focus"
                     >
-                      {COLUMN_LABEL[column]}
-                    </SortHeader>
+                      Back to recommended order
+                    </button>
+                  )}
+                </>
+              }
+            >
+              {cut && `Showing the first ${all.length.toLocaleString()} of ${data.total.toLocaleString()} documents. `}
+              {sort && `${describeSort(sort)}.`}
+            </TableStatus>
+          )}
+          {/* An empty table says what it means and points down to the note
+              that says why, as Issues' does ("That does not mean the site
+              meets WCAG… See “What was checked”, below this table."): an empty
+              list must never read as a clean result. */}
+          {!data.recorded ? (
+            <TableEmpty>
+              This report did not look for documents. See why in “What was checked”, below this
+              table.
+            </TableEmpty>
+          ) : data.total === 0 ? (
+            <TableEmpty>
+              The scan found no links to documents on the pages it visited. That does not mean the
+              site has none, because the list can miss files. See “What was checked”, below this
+              table.
+            </TableEmpty>
+          ) : rows.length === 0 ? (
+            <TableEmpty>No documents match these filters. Clear a filter to see more results.</TableEmpty>
+          ) : (
+            <TableRegion label="Documents table" regionRef={region}>
+              <Table caption={`Documents linked from report #${scan.id}, ${describeSort(sort)}`}>
+                <TableHead>
+                  <tr>
+                    {SORT_COLUMNS.map((column) => (
+                      <SortHeader
+                        key={column}
+                        column={column}
+                        wrap="words"
+                        kind={SORT_KINDS[column]}
+                        sort={sort}
+                        onSort={onSort}
+                      >
+                        {COLUMN_LABEL[column]}
+                      </SortHeader>
+                    ))}
+                  </tr>
+                </TableHead>
+                <tbody>
+                  {paged.pageRows.map((row, index) => (
+                    <DocumentRow
+                      key={row.file_id}
+                      row={row}
+                      index={offset + index}
+                      scanId={scan.id}
+                      backTo={here}
+                    />
                   ))}
-                </tr>
-              </TableHead>
-              <tbody>
-                {paged.pageRows.map((row, index) => (
-                  <DocumentRow
-                    key={row.file_id}
-                    row={row}
-                    index={offset + index}
-                    scanId={scan.id}
-                    backTo={here}
-                  />
-                ))}
-              </tbody>
-            </Table>
-          </TableRegion>
-        )}
-        {/* The same pager again under the last row, as on every paged
-            table (TablePagination, place="end"). */}
-        <TablePagination label={DOCUMENTS_VIEW} noun="documents" place="end" {...paged} />
+                </tbody>
+              </Table>
+            </TableRegion>
+          )}
+        </PagedTable>
       </Card>
 
       {/* Under the table, as on Issues: the table follows the numbers with

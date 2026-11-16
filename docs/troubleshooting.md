@@ -35,7 +35,7 @@ and the page title.
   a path, such as `https://site.example/blog/`, and leave that switch off.
   Before you start, the line under the address says what will be scanned.
 - **Too little.** The path leaves out pages you want. Enter a shorter path, or
-  turn on **Crawl the entire host**. Also check **Max pages** (5,000 by default) and **Max link depth** (10 by default).
+  turn on **Crawl the entire host**. Also check **Max pages** (10,000 by default) and **Max link depth** (10 by default).
 - **A new scan continued an old one.** If an earlier scan of the same address
   ended early, starting that address again in the app continues the earlier
   report instead of making a new one. That includes a scan you stopped with

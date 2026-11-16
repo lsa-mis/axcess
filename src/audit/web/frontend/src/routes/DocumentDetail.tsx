@@ -16,7 +16,7 @@ import {
 } from "../components/DocumentParts";
 import { FactTile } from "../components/IssueEvidence";
 import ReportHeader from "../components/ReportHeader";
-import { TablePagination, usePagedRows } from "../components/TablePagination";
+import { PagedTable, usePagedRows } from "../components/TablePagination";
 import {
   Cell,
   ColumnHeader,
@@ -358,10 +358,14 @@ function DocumentPagesTable({
     );
   }
   return (
-    <>
-      <TableBar pager={<TablePagination label={PAGES_COLUMN} noun="pages" {...paged} />}>
-        <TableSearch label="Search pages" placeholder="Search by page title or URL" value={query} onChange={setQuery} />
-      </TableBar>
+    <PagedTable
+      pagination={{ label: PAGES_COLUMN, noun: "pages", ...paged }}
+      top={(pager) => (
+        <TableBar pager={pager}>
+          <TableSearch label="Search pages" placeholder="Search by page title or URL" value={query} onChange={setQuery} />
+        </TableBar>
+      )}
+    >
       <TableStatus>
         {cut ? `Showing the first ${pages.length.toLocaleString()} of ${total.toLocaleString()} pages. ` : ""}
         {needle ? `${visible.length} of ${pages.length} page${pages.length === 1 ? "" : "s"} match. ` : ""}
@@ -403,8 +407,7 @@ function DocumentPagesTable({
           </Table>
         </TableRegion>
       )}
-      <TablePagination label={PAGES_COLUMN} noun="pages" place="end" {...paged} />
-    </>
+    </PagedTable>
   );
 }
 

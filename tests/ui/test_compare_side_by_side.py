@@ -160,6 +160,11 @@ async def test_each_panel_moves_on_its_own_and_goes_back_in_itself(
         arg=third,
     )
 
+    # The table opens on every issue type, so the seeded report's Not sure
+    # and For information rows are there already; nothing was navigated.
+    await expect(left_frame.locator("table a[href*='/issues/']").first).to_be_visible()
+    await expect(back).to_have_attribute("aria-disabled", "true")
+
     # Scroll the panel's page to the issue, then open it.
     inner = next(f for f in page.frames if f"/scans/{third}/issues" in f.url)
     issue = left_frame.locator("table a[href*='/issues/']").first
@@ -191,6 +196,7 @@ async def test_each_panel_moves_on_its_own_and_goes_back_in_itself(
     # With nothing left to go back to, pressing it does nothing.
     await page.keyboard.press("Enter")
     await page.wait_for_timeout(200)
+    # Back in the panel's own Issues table, as it opened.
     assert re.search(rf"/scans/{third}/issues$", _frame_url(page, third))
     assert page.url == f"{base}/app{address}"
 

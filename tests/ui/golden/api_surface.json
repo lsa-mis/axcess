@@ -472,6 +472,26 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/documents/{file_id:int}",
+        "methods": ["GET"],
+        "name": "api_scan_document",
+        "async": false,
+        "params": {"path": ["scan_id", "file_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/documents/{file_id:int}/pages/{page_id:int}",
+        "methods": ["GET"],
+        "name": "api_document_on_page",
+        "async": false,
+        "params": {"path": ["scan_id", "file_id", "page_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/scans/{scan_id:int}/pages/{page_id:int}",
         "methods": ["GET"],
         "name": "api_page_evidence",
@@ -667,6 +687,36 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/images",
+        "methods": ["GET"],
+        "name": "api_scan_images",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["group", "verdict", "q", "limit", "offset"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/images/{image_id:int}/alt-check",
+        "methods": ["POST"],
+        "name": "api_check_image_alt",
+        "async": true,
+        "params": {"path": ["scan_id", "image_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/images/export.zip",
+        "methods": ["GET"],
+        "name": "api_scan_images_zip",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/findings/{finding_id:int}/status",
         "methods": ["POST"],
         "name": "api_set_finding_status",
@@ -752,6 +802,26 @@
         "name": "api_tracking",
         "async": false,
         "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/coverage/checks",
+        "methods": ["GET"],
+        "name": "api_coverage_checks",
+        "async": false,
+        "params": {"query": ["version"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/coverage/found",
+        "methods": ["GET"],
+        "name": "api_coverage_found",
+        "async": false,
+        "params": {"query": ["scan_id"]},
         "request_param": null,
         "background_tasks_param": null
       },
@@ -1328,6 +1398,26 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/documents/{file_id:int}",
+        "methods": ["GET"],
+        "name": "api_scan_document",
+        "async": false,
+        "params": {"path": ["scan_id", "file_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/documents/{file_id:int}/pages/{page_id:int}",
+        "methods": ["GET"],
+        "name": "api_document_on_page",
+        "async": false,
+        "params": {"path": ["scan_id", "file_id", "page_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/scans/{scan_id:int}/pages/{page_id:int}",
         "methods": ["GET"],
         "name": "api_page_evidence",
@@ -1523,6 +1613,36 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/images",
+        "methods": ["GET"],
+        "name": "api_scan_images",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["group", "verdict", "q", "limit", "offset"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/images/{image_id:int}/alt-check",
+        "methods": ["POST"],
+        "name": "api_check_image_alt",
+        "async": true,
+        "params": {"path": ["scan_id", "image_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/images/export.zip",
+        "methods": ["GET"],
+        "name": "api_scan_images_zip",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/findings/{finding_id:int}/status",
         "methods": ["POST"],
         "name": "api_set_finding_status",
@@ -1608,6 +1728,26 @@
         "name": "api_tracking",
         "async": false,
         "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/coverage/checks",
+        "methods": ["GET"],
+        "name": "api_coverage_checks",
+        "async": false,
+        "params": {"query": ["version"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/coverage/found",
+        "methods": ["GET"],
+        "name": "api_coverage_found",
+        "async": false,
+        "params": {"query": ["scan_id"]},
         "request_param": null,
         "background_tasks_param": null
       },
@@ -2170,6 +2310,26 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/documents/{file_id:int}",
+        "methods": ["GET"],
+        "name": "api_scan_document",
+        "async": false,
+        "params": {"path": ["scan_id", "file_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/documents/{file_id:int}/pages/{page_id:int}",
+        "methods": ["GET"],
+        "name": "api_document_on_page",
+        "async": false,
+        "params": {"path": ["scan_id", "file_id", "page_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/scans/{scan_id:int}/pages/{page_id:int}",
         "methods": ["GET"],
         "name": "api_page_evidence",
@@ -2365,6 +2525,36 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/images",
+        "methods": ["GET"],
+        "name": "api_scan_images",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["group", "verdict", "q", "limit", "offset"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/images/{image_id:int}/alt-check",
+        "methods": ["POST"],
+        "name": "api_check_image_alt",
+        "async": true,
+        "params": {"path": ["scan_id", "image_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/images/export.zip",
+        "methods": ["GET"],
+        "name": "api_scan_images_zip",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/findings/{finding_id:int}/status",
         "methods": ["POST"],
         "name": "api_set_finding_status",
@@ -2450,6 +2640,26 @@
         "name": "api_tracking",
         "async": false,
         "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/coverage/checks",
+        "methods": ["GET"],
+        "name": "api_coverage_checks",
+        "async": false,
+        "params": {"query": ["version"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/coverage/found",
+        "methods": ["GET"],
+        "name": "api_coverage_found",
+        "async": false,
+        "params": {"query": ["scan_id"]},
         "request_param": null,
         "background_tasks_param": null
       },
@@ -3025,6 +3235,26 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/documents/{file_id:int}",
+        "methods": ["GET"],
+        "name": "api_scan_document",
+        "async": false,
+        "params": {"path": ["scan_id", "file_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/documents/{file_id:int}/pages/{page_id:int}",
+        "methods": ["GET"],
+        "name": "api_document_on_page",
+        "async": false,
+        "params": {"path": ["scan_id", "file_id", "page_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/scans/{scan_id:int}/pages/{page_id:int}",
         "methods": ["GET"],
         "name": "api_page_evidence",
@@ -3220,6 +3450,36 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/images",
+        "methods": ["GET"],
+        "name": "api_scan_images",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["group", "verdict", "q", "limit", "offset"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/images/{image_id:int}/alt-check",
+        "methods": ["POST"],
+        "name": "api_check_image_alt",
+        "async": true,
+        "params": {"path": ["scan_id", "image_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/images/export.zip",
+        "methods": ["GET"],
+        "name": "api_scan_images_zip",
+        "async": false,
+        "params": {"path": ["scan_id"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/findings/{finding_id:int}/status",
         "methods": ["POST"],
         "name": "api_set_finding_status",
@@ -3305,6 +3565,26 @@
         "name": "api_tracking",
         "async": false,
         "params": {},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/coverage/checks",
+        "methods": ["GET"],
+        "name": "api_coverage_checks",
+        "async": false,
+        "params": {"query": ["version"]},
+        "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/coverage/found",
+        "methods": ["GET"],
+        "name": "api_coverage_found",
+        "async": false,
+        "params": {"query": ["scan_id"]},
         "request_param": null,
         "background_tasks_param": null
       },

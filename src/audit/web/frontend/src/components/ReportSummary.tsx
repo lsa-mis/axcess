@@ -36,6 +36,10 @@ function endText(coverage: ScanDetail["coverage"]): string {
  * Consistent Identification, Level AA; W3C COGA, "Making Content Usable":
  * the same pattern for the same kind of thing).
  *
+ * Exported for the other report views' numbers (Images, Documents), so a
+ * report's numbers look the same on every tab (SC 3.2.4 Consistent
+ * Identification, Level AA). Put it in a ``dl`` (``SummaryNumbers``).
+ *
  * ``note`` finishes a label that is not a whole idea alone, on a smaller
  * line under it, inside the same ``dt``: "Mostly sure" / "it has
  * accessibility problems". On the Documents tab the bare value left the
@@ -165,6 +169,7 @@ export function ReportSummary({
   occurrences,
 }: {
   scan: ScanDetail;
+  /** Issue types and occurrences the Issues table shows when it opens. */
   issueGroups: number;
   occurrences: number;
 }) {
@@ -294,7 +299,17 @@ export function ReportSummary({
           across from 640px; below that the two problem numbers (Issue types
           and Issue occurrences) share a row, as the pair they are, and the
           pages take the row under them, so nothing is squeezed at 320px (SC
-          1.4.10 Reflow, Level AA). */}
+          1.4.10 Reflow, Level AA).
+
+          The two problem numbers count what the Issues table shows when it
+          opens, so the number over the table is the number of rows under it
+          (SC 3.2.4 Consistent Identification, Level AA). Since 2026-11-13
+          that is every issue type, so they are the whole report. (From
+          2026-11-10 it opened on Mostly sure and Measured only, and a "Plus
+          12 hidden" line counted the rest; if the default ever leaves rows
+          out again, say so here, because a limitation is never dropped to
+          make a number look smaller, Interface language rule 4.) The
+          Reports list counts the same way (routes/Scans.tsx). */}
       {/* mb-6, not the shared row's mb-5: 24px down to the facts line
           (ScanFacts), which belongs to the numbers. Views with no facts line
           (Documents) keep the shared spacing to their table. */}

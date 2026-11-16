@@ -159,7 +159,7 @@ def test_create_scans_every_page_when_asked(
     ("overrides", "field"),
     [
         ({"max_pages": 0}, "max_pages"),
-        ({"max_pages": 10_001}, "max_pages"),
+        ({"max_pages": 20_001}, "max_pages"),
         ({"max_pages": 2.5}, "max_pages"),
         ({"max_depth": 0}, "max_depth"),
         ({"max_depth": 21}, "max_depth"),

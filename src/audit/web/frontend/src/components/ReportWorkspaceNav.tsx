@@ -3,11 +3,11 @@ import Tabs from "./Tabs";
 import { FRAMED } from "../lib/framed";
 
 /**
- * Report navigation: the issue table; Compare reports, which shows this
- * report and another of the site side by side; and Documents, the files the
- * report's pages link to. (What changed between two reports, the older
- * comparison page, opens from Compare reports and keeps that tab lit: it is
- * part of that view.)
+ * Report navigation: the issue table; the Images tab (every image and its
+ * alt text); Compare reports, which shows this report and another of the
+ * site side by side; and Documents, the files the report's pages link to.
+ * (What changed between two reports, the older comparison page, opens from
+ * Compare reports and keeps that tab lit: it is part of that view.)
  *
  * These are two *views of the same report*, not two steps of a task. An
  * early numbered-pill treatment read as a wizard ("1 Overview → 2 Issues →
@@ -52,6 +52,15 @@ export const REPORT_VIEWS: readonly ReportView[] = [
     segment: "issues",
     path: (scanId) => `/scans/${scanId}/issues`,
   },
+  // Images (2026-11-13): every image with a verdict on its alt text. After
+  // Issues, so the report still opens on its issues, and before Compare
+  // reports, which looks across two reports rather than into this one.
+  {
+    key: "images",
+    label: "Images",
+    segment: "images",
+    path: (scanId) => `/scans/${scanId}/images`,
+  },
   {
     key: "compare",
     label: "Compare reports",
@@ -61,9 +70,9 @@ export const REPORT_VIEWS: readonly ReportView[] = [
     path: (scanId) => `/scans/${scanId}/compare`,
   },
   // The files the report's pages link to (PDF, Word, Excel, Google), with
-  // what the PDF checks found (routes/Documents.tsx). Third, after the two
-  // views of the report's issues: it is a separate kind of result, and a
-  // reader looks at the page issues first. Always shown, even for a report
+  // what the PDF checks found (routes/Documents.tsx). Last, after the views
+  // of the report's issues and images: it is a separate kind of result, and
+  // a reader looks at the page issues first. Always shown, even for a report
   // that did not look for documents: the tab then says why there is no
   // list, which a missing tab could not.
   {
@@ -91,13 +100,18 @@ export default function ReportWorkspaceNav({
   const active = activeReportView(pathname);
   // The current view stays, so a saved link to it still has its tab. As a
   // panel of Compare reports (lib/framed.ts) there is no Compare reports tab:
-  // it would open the comparison inside one of its own panels. No Documents
-  // tab there either: a panel compares two reports' issues, and a panel that
-  // could wander off to a file list would no longer be side by side with its
-  // neighbour. With one view left, the row is not drawn at all (below).
+  // it would open the comparison inside one of its own panels. With one view
+  // left, the row is not drawn at all (below).
+  // In a panel, only the current view stays (2026-11-13, when Images was
+  // added): a panel is the page alone. Letting a panel switch to Images
+  // would bring a tab row back into panels; that is a separate decision for
+  // the developer, not part of adding the Images view. It also keeps
+  // Documents out of a panel: a panel compares two reports' issues, and one
+  // that could wander off to a file list would no longer be side by side
+  // with its neighbour.
   const views = REPORT_VIEWS.filter(
     (view) =>
-      !(FRAMED && (view.key === "compare" || view.key === "documents")) &&
+      !(FRAMED && view !== active) &&
       (view === active || (view.available?.(previousScanId) ?? true)),
   );
   // One view is not a choice; the heading already names it.

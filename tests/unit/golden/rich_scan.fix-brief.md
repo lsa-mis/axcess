@@ -927,7 +927,22 @@ A link (`<a href>`) has no name that a screen reader can read (accessible name).
 
 #### How to check the fix
 
-- **By hand:** Turn on a screen reader and open its list of links (VoiceOver: Control+Option+U, then choose Links; NVDA: Insert+F7). Every link should have a name that says where it goes. Then press Tab to each fixed link and listen to what the screen reader says.
+- **By hand:** Open the list of links with a screen reader (steps for Mac and Windows are below). Every link should have a name that says where it goes. Then press Tab to each fixed link and listen to what the screen reader says.
+  - Mac, with VoiceOver:
+    VoiceOver is built into every Mac.
+    1. Turn VoiceOver on: press Command + F5. On some keyboards: Fn + Command + F5.
+    2. Open the rotor (VoiceOver's list of page parts): press Control + Option + U.
+    3. Press Right Arrow until you hear "Links".
+    4. Press Up Arrow or Down Arrow to hear each link. Press Return to go to one.
+    5. When you are done: Escape closes the rotor, and Command + F5 turns VoiceOver off.
+  - Windows, with NVDA:
+    NVDA is a free screen reader. Below, "NVDA key" means Insert, or Caps Lock if you chose the laptop keyboard layout.
+    Get NVDA from NV Access: https://www.nvaccess.org/download/
+    1. Turn NVDA on: press Control + Alt + N. Then go to the page in your browser.
+    2. Open the Elements List (NVDA's list of page parts): press NVDA key + F7.
+    3. Choose Links: press Alt + K.
+    4. Press Tab to reach the list, then Up Arrow or Down Arrow to hear each link. Press Enter to go to one. Or close the list and press K to jump from link to link.
+    5. When you are done: Escape closes the list, and NVDA key + Q, then Enter, turns NVDA off.
 - **With a tool:** Scan again and see if this link is still found.
 - **Done when:** Every link on the affected pages has a name a screen reader can read, and the name says where the link goes.
 - **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/link-name
@@ -1230,7 +1245,22 @@ The rule check (axe) looks for a level-one heading (`<h1>`, or `role="heading"` 
 
 #### How to check the fix
 
-- **By hand:** Open the heading list in a screen reader (VoiceOver on Mac: Control+Option+U, then choose Headings; NVDA on Windows: Insert+F7, then choose Headings). There should be one level 1 heading that names the page, and the levels below it should step down without gaps. Everything that looks like a heading should be in the list.
+- **By hand:** Open the list of headings with a screen reader (steps for Mac and Windows are below). There should be one level 1 heading that names the page, and the levels below it should step down without gaps. Everything that looks like a heading should be in the list.
+  - Mac, with VoiceOver:
+    VoiceOver is built into every Mac.
+    1. Turn VoiceOver on: press Command + F5. On some keyboards: Fn + Command + F5.
+    2. Open the rotor (VoiceOver's list of page parts): press Control + Option + U.
+    3. Press Right Arrow until you hear "Headings".
+    4. Press Up Arrow or Down Arrow to hear each heading. Press Return to go to one.
+    5. When you are done: Escape closes the rotor, and Command + F5 turns VoiceOver off.
+  - Windows, with NVDA:
+    NVDA is a free screen reader. Below, "NVDA key" means Insert, or Caps Lock if you chose the laptop keyboard layout.
+    Get NVDA from NV Access: https://www.nvaccess.org/download/
+    1. Turn NVDA on: press Control + Alt + N. Then go to the page in your browser.
+    2. Open the Elements List (NVDA's list of page parts): press NVDA key + F7.
+    3. Choose Headings: press Alt + H.
+    4. Press Tab to reach the list, then Up Arrow or Down Arrow to hear each heading. Press Enter to go to one. Or close the list and press H to jump from heading to heading.
+    5. When you are done: Escape closes the list, and NVDA key + Q, then Enter, turns NVDA off.
 - **With a tool:** Scan again and see if this page is still found.
 - **Done when:** Every page has one level-one heading that names the page, and screen readers can reach it.
 - **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/page-has-heading-one
@@ -1454,7 +1484,22 @@ The rule check (axe) found content outside every landmark. A landmark is a page 
 
 #### How to check the fix
 
-- **By hand:** Open the landmark list in a screen reader (VoiceOver on Mac: Control+Option+U, then choose Landmarks; NVDA on Windows: Insert+F7, then choose Landmarks). Every part of the page you can see should belong to one of the listed regions. In NVDA you can also press D to jump from landmark to landmark.
+- **By hand:** Open the list of landmarks with a screen reader (steps for Mac and Windows are below). Every part of the page you can see should belong to one of the listed landmarks.
+  - Mac, with VoiceOver:
+    VoiceOver is built into every Mac.
+    1. Turn VoiceOver on: press Command + F5. On some keyboards: Fn + Command + F5.
+    2. Open the rotor (VoiceOver's list of page parts): press Control + Option + U.
+    3. Press Right Arrow until you hear "Landmarks".
+    4. Press Up Arrow or Down Arrow to hear each landmark. Press Return to go to one.
+    5. When you are done: Escape closes the rotor, and Command + F5 turns VoiceOver off.
+  - Windows, with NVDA:
+    NVDA is a free screen reader. Below, "NVDA key" means Insert, or Caps Lock if you chose the laptop keyboard layout.
+    Get NVDA from NV Access: https://www.nvaccess.org/download/
+    1. Turn NVDA on: press Control + Alt + N. Then go to the page in your browser.
+    2. Open the Elements List (NVDA's list of page parts): press NVDA key + F7.
+    3. Choose Landmarks: press Alt + D.
+    4. Press Tab to reach the list, then Up Arrow or Down Arrow to hear each landmark. Press Enter to go to one. Or close the list and press D to jump from landmark to landmark.
+    5. When you are done: Escape closes the list, and NVDA key + Q, then Enter, turns NVDA off.
 - **With a tool:** Scan again and see if content outside a landmark is still found on this page.
 - **Done when:** Every piece of visible content on the page sits inside a landmark, such as the header, menu, main content or footer.
 - **Rule guide:** https://dequeuniversity.com/rules/axe/4.10/region

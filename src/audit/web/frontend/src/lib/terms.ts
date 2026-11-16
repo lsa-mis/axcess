@@ -2,10 +2,15 @@ import type {
   AiInstallState,
   AiInstallStep,
   AiTierId,
+  AltVerdict,
+  AltVerdictSource,
   AxeImpact,
+  CheckMethod,
   DetectionPipeline,
   ExportFormat,
   FindingStatus,
+  FoundLayer,
+  ImageGroup,
   LinkedFileCheck,
   LinkedFileReason,
   LinkedFileRefKind,
@@ -16,6 +21,7 @@ import type {
   RuleCheck,
   ScanEndReason,
   ScanStatus,
+  StudyCheck,
   SuggestionAudience,
   SuggestionCheckOutcome,
   SuggestionErrorCode,
@@ -81,9 +87,20 @@ export const STATUS_OPTION_LABEL: Record<FindingStatus, string> = {
  * https://www.w3.org/TR/coga-usable/: use the same word for the same thing;
  * docs/plain-language.md). The full reasoning is in docs/plain-language.md,
  * "Why Mostly sure, Not sure, and For information".
+ *
+ * "Measured" (2026-11-10) is the level between Mostly sure and Not sure: a
+ * browser check measured the page and no AI model judged it. The word says
+ * what happened, not how likely the problem is, so it cannot be confused
+ * with the two "sure" words. Rejected: "Likely", which the pair "Likely
+ * problem" / "Possible problem" above already showed readers cannot rank
+ * against "Mostly sure"; and "Sure" for the rule checks with "Mostly sure"
+ * here, which claims more than a rule check can show (the developer chose
+ * to keep "Mostly sure" on top). A Measured row still says "check before
+ * you report" wherever it is shown (REVIEW_LANE_HELP in labels.ts).
  */
 export const REVIEW_TYPE_LABEL: Record<ReviewLane, string> = {
   likely_barrier: "Mostly sure",
+  measured: "Measured",
   expert_review: "Not sure",
   informational: "For information",
 };
@@ -428,6 +445,132 @@ export const SCAN_STATUS_LABEL: Record<ScanStatus, string> = {
   interrupted: "Stopped",
 };
 
+/**
+ * The Images tab's groups (routes/Images.tsx). Each is a question asked of
+ * the report's images, so an image can be in two: "Images with text" and
+ * one of the other two.
+ */
+export const IMAGE_GROUP_LABEL: Record<ImageGroup, string> = {
+  with_text: "Images with text",
+  missing_alt: "Images without alt text",
+  with_alt: "Images with alt text",
+};
+
+/**
+ * One verdict on an image's alt text (the text a screen reader reads for
+ * an image). "Needs alt text" and "Needs better alt text" are two verdicts,
+ * not one (the developer's call, 2026-11-13): an image with no alt text has
+ * nothing to improve, it needs alt text written. "Needs a person to check",
+ * not "Adequate": the text match cannot judge an image with no text in it, and
+ * a word that sounds like a pass would claim a check that did not run. It
+ * was "Not checked yet" until 2026-11-16, when the developer renamed it to
+ * say who acts: most of a report's images land here, and "not checked yet"
+ * read as Axcess still working on them. The new words also part it from the
+ * "Checked by a person" value "Not checked yet" (REVIEW_DECISION_LABEL),
+ * which is about an occurrence, not an image.
+ * Rejected: "Bad alt text", which blames, and says less than "needs better".
+ */
+export const ALT_VERDICT_LABEL: Record<AltVerdict, string> = {
+  needs_alt: "Needs alt text",
+  needs_better: "Needs better alt text",
+  not_checked: "Needs a person to check",
+  good: "Good alt text",
+};
+
+/**
+ * The same verdicts under a count of more than one image, as the Images
+ * tab's numbers show them ("41 / Need alt text"): the verb agrees with the
+ * number. One image takes ``ALT_VERDICT_LABEL``.
+ */
+export const ALT_VERDICT_COUNT_LABEL: Record<AltVerdict, string> = {
+  needs_alt: "Need alt text",
+  needs_better: "Need better alt text",
+  not_checked: "Need a person to check",
+  good: "Good alt text",
+};
+
+/** What decided a verdict, said plainly, for the line under the verdict. */
+export const ALT_VERDICT_SOURCE_LABEL: Record<AltVerdictSource, string> = {
+  page_code: "From the page code",
+  text_match: "Compared with the text in the image",
+  local_model: "Local AI model: check before you rely on it",
+};
+
+/**
+ * How Axcess checks a WCAG criterion (Coverage page), said as what it means
+ * for the person testing. The technical name follows in CHECK_METHOD_TECH, in
+ * smaller text, for developers (docs/plain-language.md rule 3).
+ */
+export const CHECK_METHOD_LABEL: Record<CheckMethod, string> = {
+  automated: "Axcess checks",
+  partial: "Axcess partly checks",
+  "ai-assisted": "AI gives hints",
+  manual: "You check",
+  not_needed: "No longer needed",
+};
+
+export const CHECK_METHOD_TECH: Record<CheckMethod, string> = {
+  automated: "Automated",
+  partial: "Partly automated",
+  "ai-assisted": "AI-assisted",
+  manual: "Manual only",
+  not_needed: "4.1.1 Parsing",
+};
+
+export const CHECK_METHOD_BLURB: Record<CheckMethod, string> = {
+  // Not "a full test": each of these still has a part only a person can
+  // judge (a title's meaning, nothing lost at 200% zoom), shown in the
+  // criterion's "You check" line (AGENTS.md, Interface language rule 4).
+  automated: "Tests it on every page. You still confirm the result.",
+  partial: "Finds some problems. You test the rest.",
+  "ai-assisted": "Points to possible problems. You decide.",
+  // "No proven check", not "can't test": a trial check may run but not count
+  // yet (3.3.1's form error check).
+  manual: "No proven check yet. You test these.",
+  not_needed: "Removed in WCAG 2.2. Today's HTML always meets it.",
+};
+
+/** Where an occurrence came from, for the Coverage page's count by check. */
+export const FOUND_LAYER_LABEL: Record<FoundLayer, string> = {
+  axe_loaded: "Rule check (axe), page as loaded",
+  axe_click_through: "Rule check (axe), after Click-Through",
+  alfa: "Rule check (Alfa)",
+  probes: "Browser checks: keyboard, zoom, focus, motion, forms and page code",
+  image: "Image text check",
+  semantic: "AI review",
+};
+
+/** The checks a study row credits beyond the rule check (Coverage page). */
+export const STUDY_CHECK_LABEL: Record<StudyCheck, string> = {
+  click_through: "Click-Through",
+  image: CHECK_LABEL.image,
+  focus: CHECK_LABEL.focus,
+  keyboard: CHECK_LABEL.keyboard,
+  visual: CHECK_LABEL.visual,
+  semantic: CHECK_LABEL.semantic,
+  responsive: CHECK_LABEL.responsive,
+};
+
+/**
+ * axe-core's own kinds of problem (its ``cat.*`` rule tags), in plain words.
+ * An unknown kind falls back to "Other" where it is read.
+ */
+export const AXE_CATEGORY_LABEL: Record<string, string> = {
+  color: "Colour and contrast",
+  "name-role-value": "Names, roles and values",
+  aria: "ARIA attributes and roles",
+  forms: "Forms",
+  "text-alternatives": "Text alternatives",
+  structure: "Page structure",
+  semantics: "Headings and landmarks",
+  keyboard: "Keyboard",
+  language: "Language",
+  tables: "Tables",
+  parsing: "Page code errors",
+  "time-and-media": "Time and media",
+  "sensory-and-visual-cues": "Size, zoom and visual cues",
+  other: "Other",
+};
 /** The feature's one name, on its button and in its heading. */
 export const AI_SUGGESTION = "AI suggestion";
 
@@ -497,6 +640,10 @@ export const AI_TIER_LABEL: Record<AiTierId, string> = {
 export const SUGGESTION_ERROR_LABEL: Record<SuggestionErrorCode, string> = {
   model_unavailable: "The local AI service (Ollama) is not running. Start it, then try again.",
   model_missing: "The AI model is not installed in Ollama. Install it with ollama pull, then try again.",
+  // A cloud model, or one Ollama's model list cannot confirm is on this
+  // computer. Says nothing was sent, because that is the privacy fact.
+  model_not_local:
+    "The AI model may run off this computer, so Axcess sent nothing. Choose a model installed on this computer in Settings.",
   timeout: "The AI model took too long to answer. Try again when the computer is less busy.",
   no_change: "The AI did not suggest a real change to the code, even when asked twice, so nothing is shown. A bigger AI model in Settings may do better. You can also fix it by hand with the rule guidance.",
   bad_answer: "The AI wrote an answer Axcess could not show safely, even when asked twice, so nothing is shown. A bigger AI model in Settings may do better. You can also fix it by hand with the rule guidance.",

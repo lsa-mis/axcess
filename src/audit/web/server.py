@@ -125,7 +125,7 @@ from audit.wcag_version import (
     is_wcag_version,
     stored_wcag_version,
 )
-from audit.web import linked_files_queries, local_sign_in, pages_queries
+from audit.web import image_inventory, linked_files_queries, local_sign_in, pages_queries
 from audit.web.ai_api import build_ai_router
 from audit.web.comparison import (
     MAX_PAGE_SIZE,
@@ -138,6 +138,7 @@ from audit.web.comparison import (
     previous_scan_id,
     site_history,
 )
+from audit.web.coverage_checks import CoverageChecksResponse, coverage_checks
 from audit.web.coverage_status import ROADMAP, SHIPPED, roadmap_counts
 from audit.web.export_options import ExportOptions, PanelFormat, build_export_options
 from audit.web.export_readiness import (
@@ -147,6 +148,7 @@ from audit.web.export_readiness import (
     label_draft_export,
     public_export_filename,
 )
+from audit.web.issue_share import IssueShareError, IssueShareResponse, issue_share
 from audit.web.linked_files_queries import (
     DocumentOnPage,
     ScanDocumentResponse,
@@ -226,7 +228,7 @@ class LocalLoginScanRequest(BaseModel):
     seed_url: str = Field(min_length=12, max_length=2048)
     approved_auth_origins: tuple[str, ...] = Field(default=(), max_length=32)
     authorization_acknowledged: bool
-    max_pages: int = Field(default=2500, ge=1, le=2500)
+    max_pages: int = Field(default=10_000, ge=1, le=10_000)
     max_depth: int = Field(default=10, ge=1, le=20)
     rps: float = Field(default=1.0, ge=0.1, le=5.0)
     # "Pages at once (workers)": one signed-in tab per worker. Each tab after
@@ -2074,7 +2076,7 @@ def create_app(
         form = {
             "url": url,
             "search": search,
-            "max_pages": None if all_pages else int(body.get("max_pages") or 5000),
+            "max_pages": None if all_pages else int(body.get("max_pages") or 10_000),
             "max_depth": int(body.get("max_depth") or 10),
             "rps": float(body.get("rps") or 2.0),
             "workers": int(body.get("workers") or 8),
@@ -2724,7 +2726,7 @@ def create_app(
         """JSON form of the unified Issues list, used by the SPA."""
         from dataclasses import asdict
 
-        from audit.labels import FINDING_TYPES
+        from audit.labels import FINDING_TYPES, REVIEW_LANES
         from audit.web import issues as issues_mod
 
         with get_conn() as conn:
@@ -2744,11 +2746,7 @@ def create_app(
                 # Comma-separated like ``conformance``; a single value reads
                 # as before, and an unknown one is ignored rather than
                 # emptying the table.
-                review_lane=[
-                    lane
-                    for lane in _split_csv(review_lane)
-                    if lane in {"likely_barrier", "expert_review", "informational"}
-                ],
+                review_lane=[lane for lane in _split_csv(review_lane) if lane in REVIEW_LANES],
                 finding_type=[kind for kind in _split_csv(finding_type) if kind in FINDING_TYPES],
                 sort=sort,
             )
@@ -2767,6 +2765,10 @@ def create_app(
                     ),
                 },
                 "total_unfiltered": len(unfiltered),
+                # What the Issues page shows when it opens (Mostly sure and
+                # Measured) and what it leaves one click away. The totals
+                # above still describe every row.
+                "default_view_counts": issues_mod.default_view_counts(unfiltered),
             }
         )
 
@@ -2910,6 +2912,201 @@ def create_app(
                 conn, scan_id, status=status if status else None
             )
         return JSONResponse({"coverage": cov, "groups": groups})
+
+    # The report's Images tab: every image the scan saw, in three groups, with
+    # a verdict on its alt text (audit/web/image_inventory.py). Asking the
+    # local model about one image is a separate POST a person makes with a
+    # button; nothing here calls a model on its own.
+    # The check sends the saved image, its OCR text and nearby page text to
+    # the model, and the Images tab says that stays on this computer. So it
+    # runs only against a literal loopback Ollama address, the same rule as
+    # sign-in scans; a remote AUDIT_OLLAMA_BASE_URL leaves the check off.
+    # An Ollama cloud model (tag "cloud" or "...-cloud") runs on Ollama's
+    # servers even through the local daemon, so it leaves the check off too.
+    from audit.analyzer.ollama_base import is_cloud_model
+
+    alt_check_url = (
+        None
+        if is_cloud_model(settings.alt_check_model)
+        else _local_login_ollama_url(settings.ollama_base_url)
+    )
+
+    def _default_alt_checker_factory(client: httpx.AsyncClient) -> Any:
+        from audit.analyzer.vlm.alt_check import OllamaAltChecker
+
+        # Only installed when alt_check_url is a loopback address (below).
+        return OllamaAltChecker(
+            client,
+            model=settings.alt_check_model.strip(),
+            base_url=str(alt_check_url),
+            timeout_s=settings.alt_check_timeout_s,
+        )
+
+    # None when no model is set, or the model is not on this computer: the
+    # tab then says the check is off. Tests replace this with a stub.
+    app.state.alt_checker_factory = (
+        _default_alt_checker_factory
+        if settings.alt_check_model.strip() and alt_check_url is not None
+        else None
+    )
+
+    @app.get("/api/scans/{scan_id:int}/images")
+    def api_scan_images(
+        scan_id: int,
+        group: str = Query(default="with_text"),
+        verdict: str = Query(default=""),
+        q: str = Query(default="", max_length=200),
+        limit: int = Query(default=25, ge=1, le=image_inventory.MAX_LIMIT),
+        offset: int = Query(default=0, ge=0, le=1_000_000),
+    ) -> JSONResponse:
+        """One page of one group of the report's images, worst verdict first."""
+        if group not in image_inventory.GROUPS:
+            raise HTTPException(status_code=400, detail="Unknown image group")
+        if verdict and verdict not in image_inventory.VERDICTS:
+            raise HTTPException(status_code=400, detail="Unknown alt text verdict")
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            result = image_inventory.list_report_images(
+                conn,
+                scan_id,
+                group=group,
+                verdict=verdict or None,
+                q=q,
+                limit=limit,
+                offset=offset,
+                check_available=app.state.alt_checker_factory is not None,
+            )
+        return JSONResponse(result.model_dump())
+
+    @app.post("/api/scans/{scan_id:int}/images/{image_id:int}/alt-check")
+    async def api_check_image_alt(scan_id: int, image_id: int) -> JSONResponse:
+        """Ask the local model about one image's alt text, keep and return its answer.
+
+        A person's explicit request from the Images tab. Refused while the
+        scan is still running, for a protected scan (its images do not leave
+        the protected store), and when no model is set. A timeout or an
+        unusable answer saves nothing and says so; the tab keeps working.
+        """
+        from audit.analyzer.vlm.alt_check import AltCheckInput, OllamaError
+
+        with get_conn() as conn:
+            scan = _load_scan_or_404(conn, scan_id)
+            _require_ended_report(scan)
+            target = image_inventory.check_target(conn, scan_id, image_id)
+        if _protected_scan_owner(resolved_db, scan_id) is not None:
+            raise HTTPException(
+                status_code=403,
+                detail="Images in a protected report are not sent to a model.",
+            )
+        if target is None:
+            raise HTTPException(status_code=404, detail="This image is not in this report")
+        factory = app.state.alt_checker_factory
+        if factory is None:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "No local model is set up to check alt text. "
+                    "Ask the person who runs Axcess to set one."
+                ),
+            )
+        if not target.can_check:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "The model cannot look at this image: it is drawn in the page code (SVG) "
+                    "or was not saved. Check its alt text by hand."
+                ),
+            )
+        full = blob_store.path_for(str(target.blob_path)).resolve()
+        try:
+            full.relative_to(blob_store.root.resolve())
+            image_bytes = full.read_bytes()
+        except (ValueError, OSError) as exc:
+            raise HTTPException(
+                status_code=422, detail="The saved copy of this image is missing."
+            ) from exc
+        given = AltCheckInput(
+            alt_text=target.alt_text,
+            image_text=target.image_text,
+            context_snippet=target.context_snippet,
+        )
+        try:
+            # trust_env=False: proxy settings in the environment
+            # (HTTP_PROXY, ALL_PROXY) must not route the image and page text
+            # through another computer; the address is loopback only.
+            async with httpx.AsyncClient(trust_env=False) as client:
+                checker = factory(client)
+                answer = await asyncio.wait_for(
+                    checker.check(image_bytes, given),
+                    timeout=settings.alt_check_timeout_s,
+                )
+        except TimeoutError as exc:
+            raise HTTPException(
+                status_code=504,
+                detail="The local model took too long to answer. Try again later.",
+            ) from exc
+        except (OllamaError, httpx.HTTPError) as exc:
+            log.warning("alt_check.failed", scan_id=scan_id, image_id=image_id, error=str(exc))
+            raise HTTPException(
+                status_code=502,
+                detail="The local model did not give a usable answer. Nothing was saved.",
+            ) from exc
+        with get_conn() as conn:
+            image_inventory.save_check(
+                conn,
+                scan_id=scan_id,
+                image_id=image_id,
+                verdict=answer.verdict,
+                reason=answer.reason,
+                suggestion=answer.suggestion,
+                model=answer.model,
+                prompt_version=answer.prompt_version,
+            )
+            row = image_inventory.get_report_image(conn, scan_id, image_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="This image is not in this report")
+        return JSONResponse(row.model_dump())
+
+    @app.get("/api/scans/{scan_id:int}/images/export.zip")
+    def api_scan_images_zip(scan_id: int) -> Response:
+        """The report's images in folders by group and verdict, with a sheet.
+
+        A download a person asks for from the Images tab. Only for a completed,
+        non-protected report: a protected report's images stay in its store.
+        Built in a temporary file, not in memory, because a report can hold
+        thousands of images; the file is removed once it has been sent.
+        """
+        import os
+        import tempfile
+
+        from audit.exports.images_zip import images_zip_filename, write_images_zip
+
+        if _protected_scan_owner(resolved_db, scan_id) is not None:
+            raise HTTPException(
+                status_code=403,
+                detail="A protected report's images cannot be downloaded.",
+            )
+        fd, zip_path = tempfile.mkstemp(prefix="axcess-images-", suffix=".zip")
+        try:
+            with os.fdopen(fd, "wb") as out, get_conn() as conn:
+                scan = _load_scan_or_404(conn, scan_id)
+                _require_ended_report(scan)
+                write_images_zip(
+                    conn,
+                    scan_id=scan_id,
+                    seed_url=str(scan.get("seed_url") or ""),
+                    blob_store=blob_store,
+                    out=out,
+                )
+        except BaseException:
+            os.unlink(zip_path)
+            raise
+        return FileResponse(
+            zip_path,
+            media_type="application/zip",
+            filename=images_zip_filename(scan_id),
+            background=BackgroundTask(os.unlink, zip_path),
+        )
 
     @app.post("/api/findings/{finding_id:int}/status")
     async def api_set_finding_status(
@@ -3214,6 +3411,30 @@ def create_app(
                 },
             }
         )
+
+    @app.get("/api/coverage/checks", response_model=CoverageChecksResponse)
+    def api_coverage_checks(
+        wcag_version: Annotated[WcagVersion, Query(alias="version")] = DEFAULT_WCAG_VERSION,
+    ) -> CoverageChecksResponse:
+        """What Axcess checks for each WCAG criterion, built from its own code.
+
+        Describes Axcess, not a scan, so it holds no report data
+        (audit/web/coverage_checks.py).
+        """
+        return coverage_checks(wcag_version)
+
+    @app.get("/api/coverage/found", response_model=IssueShareResponse)
+    def api_coverage_found(scan_id: int | None = Query(default=None, ge=1)) -> IssueShareResponse:
+        """What Axcess found, counted on request from this computer's completed reports.
+
+        Across the most recent completed reports, or one of them. Nothing is
+        sent anywhere (audit/web/issue_share.py).
+        """
+        with get_conn() as conn:
+            try:
+                return issue_share(conn, scan_id)
+            except IssueShareError as exc:
+                raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
 
     @app.get("/", include_in_schema=False)
     def root() -> RedirectResponse:
@@ -5171,6 +5392,21 @@ def _saved_page_count(conn: sqlite3.Connection, scan_id: int) -> int:
     """How many pages this scan has saved so far, counted from ``pages``."""
     row = conn.execute("SELECT COUNT(*) AS n FROM pages WHERE scan_id = ?", (scan_id,)).fetchone()
     return int(row["n"]) if row is not None else 0
+
+
+def _require_ended_report(scan: dict[str, Any]) -> None:
+    """Guard the Images tab's alt check and ZIP: a report, not a live crawl.
+
+    A report is a completed scan or one that ended with saved pages, however
+    it ended (the rule since 2026-11-14, ``sites.group_scans``). A running
+    scan is still adding images, so it is refused until it ends.
+    """
+    ended = scan["status"] != "running"
+    if not (scan["status"] == "completed" or (ended and int(scan.get("page_count") or 0) > 0)):
+        raise HTTPException(
+            status_code=409,
+            detail="This works once the scan has ended and saved pages.",
+        )
 
 
 def _load_scan_or_404(conn: sqlite3.Connection, scan_id: int) -> dict[str, Any]:

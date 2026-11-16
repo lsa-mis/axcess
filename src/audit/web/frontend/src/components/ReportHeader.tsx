@@ -15,9 +15,9 @@ import ReportWorkspaceNav from "./ReportWorkspaceNav";
  * it is the only trail -- a page inside a report is one location, and two
  * trails for it disagreed about where it sat.
  *
- * Only the report's three views, Issues, Compare reports and Documents,
- * pass ``tabs``, and What changed, which is part of Compare reports and
- * keeps its tab lit.
+ * Only the report's four views, Issues, Images, Compare reports and
+ * Documents, pass ``tabs``, and What changed, which is part of Compare
+ * reports and keeps its tab lit.
  * An issue, its pages and the inspector sit *inside* the report rather than
  * beside those views, so a tab row there claimed a sibling relationship
  * they do not have; the breadcrumb carries the way back instead.
@@ -26,6 +26,7 @@ export default function ReportHeader({
   scanId,
   previousScanId,
   title,
+  help,
   meta,
   actions,
   tabs = false,
@@ -33,11 +34,22 @@ export default function ReportHeader({
   scanId: number;
   previousScanId: number | null;
   title: ReactNode;
+  /**
+   * A ``HelpTip`` ("?") that explains the view, right after the heading
+   * (Images). After it, not inside it: inside, its words would join the
+   * heading's name in a screen reader's list of headings.
+   */
+  help?: ReactNode;
   meta?: ReactNode;
   actions?: ReactNode;
-  /** Show the report's view tabs. Only the report's three views (see above). */
+  /** Show the report's view tabs. Only the report's own views (see above). */
   tabs?: boolean;
 }) {
+  const heading = (
+    <h1 className="text-2xl font-semibold leading-tight tracking-[-0.025em] text-fg sm:text-[1.75rem]">
+      {title}
+    </h1>
+  );
   return (
     <header className="mb-5">
       {/* Tabs first, title second. The tabs are the report's own navigation
@@ -49,9 +61,14 @@ export default function ReportHeader({
       )}
       <div className="mt-5 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="text-2xl font-semibold leading-tight tracking-[-0.025em] text-fg sm:text-[1.75rem]">
-            {title}
-          </h1>
+          {help ? (
+            <div className="flex items-center gap-1">
+              {heading}
+              {help}
+            </div>
+          ) : (
+            heading
+          )}
           {meta && (
             <p className="mt-1 max-w-4xl text-sm leading-6 text-fg-muted">{meta}</p>
           )}

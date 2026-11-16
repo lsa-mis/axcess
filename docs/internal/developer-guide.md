@@ -221,7 +221,7 @@ The command line differs from the app's New scan form in a few ways:
   reachable, the model-based passes are skipped with a warning and the crawl
   continues.
 - There is no option for Siteimprove Alfa. Choose it in the app instead.
-- It uses 4 workers where the form uses 8. Both default to a 5,000 page limit.
+- It uses 4 workers where the form uses 8. Both default to a 10,000 page limit.
 - Ctrl-C interrupts the crawl. Run the same command again to resume it.
 
 ## Common extension tasks

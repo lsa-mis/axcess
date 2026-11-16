@@ -198,7 +198,7 @@ def test_list_issues_priority_sort_default(tmp_db: sqlite3.Connection) -> None:
     """
     scan_id = _seed_two_pipelines(tmp_db)
     rows = issues_mod.list_issues(tmp_db, scan_id)
-    lane_rank = {"likely_barrier": 0, "expert_review": 1, "informational": 2}
+    lane_rank = {"likely_barrier": 0, "measured": 1, "expert_review": 2, "informational": 3}
     keys = [(lane_rank[r.review_lane], -r.priority) for r in rows]
     assert keys == sorted(keys)
 
@@ -506,7 +506,7 @@ def test_legacy_keyboard_heuristic_is_informational_not_a_barrier(
     assert "do not report it as a barrier" in row.evidence_summary.lower()
 
 
-def test_bidirectional_keyboard_measurement_remains_an_expert_review_lead(
+def test_bidirectional_keyboard_measurement_is_measured_not_a_barrier(
     tmp_db: sqlite3.Connection,
 ) -> None:
     scan_id = _seed_two_pipelines(tmp_db)
@@ -523,8 +523,13 @@ def test_bidirectional_keyboard_measurement_remains_an_expert_review_lead(
     )
 
     row = next(r for r in issues_mod.list_issues(tmp_db, scan_id) if r.pipeline == "keyboard")
-    assert row.review_lane == "expert_review"
+    # Shown by default under its own level, but never counted as a rule
+    # failure: no high-confidence occurrences, and the words still send a
+    # person to the page.
+    assert row.review_lane == "measured"
     assert row.evidence_confidence == "medium"
+    assert row.high_confidence_occurrence_count == 0
+    assert "by hand" in row.evidence_summary
     assert row.wcag_sc == "2.1.2"
     assert row.conformance == "A"
     assert row.title == issues_mod._load_rules()["semantic_criteria"]["2.1.2"]["title"]
@@ -577,7 +582,7 @@ def test_legacy_autoplay_markup_is_informational_not_a_barrier(
     assert "playback not verified" in row.title.lower()
 
 
-def test_runtime_motion_measurement_remains_an_expert_review_lead(
+def test_runtime_motion_measurement_is_measured_not_a_barrier(
     tmp_db: sqlite3.Connection,
 ) -> None:
     scan_id = _seed_two_pipelines(tmp_db)
@@ -597,8 +602,9 @@ def test_runtime_motion_measurement_remains_an_expert_review_lead(
     )
 
     row = next(r for r in issues_mod.list_issues(tmp_db, scan_id) if r.pipeline == "visual")
-    assert row.review_lane == "expert_review"
+    assert row.review_lane == "measured"
     assert row.evidence_confidence == "medium"
+    assert row.high_confidence_occurrence_count == 0
     assert row.wcag_sc == "2.2.2"
     assert row.wcag_name == "Pause, Stop, Hide"
 

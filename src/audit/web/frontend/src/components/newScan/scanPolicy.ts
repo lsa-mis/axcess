@@ -88,10 +88,11 @@ const SETTING_KEYS = [
 
 export const PUBLIC_DEFAULTS: ScanSettings = {
   url: "",
-  // 5,000 pages unless the person chooses otherwise (2026-11-14, the
-  // developer's decision). It was 2,500. A scan that reaches the limit says
-  // so in its report, with the pages it found, so the limit is never hidden.
-  max_pages: 5000,
+  // 10,000 pages unless the person chooses otherwise (2026-11-16, the
+  // developer's decision). It was 5,000 from 2026-11-14, and 2,500 before
+  // that. A scan that reaches the limit says so in its report, with the
+  // pages it found, so the limit is never hidden.
+  max_pages: 10000,
   all_pages: false,
   max_depth: 10,
   rps: 2.0,
@@ -144,8 +145,10 @@ export const PUBLIC_DEFAULTS: ScanSettings = {
 /** The login form's own defaults, on the shared shape. */
 export const LOGIN_DEFAULTS: ScanSettings = {
   ...PUBLIC_DEFAULTS,
-  // A signed-in scan keeps its own lower cap (LOGIN_POLICY.caps below).
-  max_pages: 2500,
+  // 10,000 pages, the same default as a public scan (2026-11-16, the
+  // developer's decision; it was 2,500). It is also the sign-in scan's
+  // maximum (LOGIN_POLICY.caps below), which stays under the public one.
+  max_pages: 10000,
   rps: 1,
   // One signed-in tab per worker; a tab the site signs out sends the scan
   // back to one tab (audit.crawler.tab_pool), so 4 costs speed at worst.
@@ -172,7 +175,9 @@ function parseUrl(raw: string): URL | null {
 
 export const PUBLIC_POLICY: ScanPolicy = {
   mode: "public",
-  caps: { max_pages: 10000, max_depth: 20, rps: 50, workers: 32 },
+  // 20,000 pages at most (2026-11-16, the developer's decision; it was
+  // 10,000). Mirrors PUBLIC_MAX_PAGES in src/audit/web/scan_settings.py.
+  caps: { max_pages: 20000, max_depth: 20, rps: 50, workers: 32 },
   defaults: PUBLIC_DEFAULTS,
   fixed: {},
   fixedNote: null,
@@ -194,7 +199,12 @@ export const PUBLIC_POLICY: ScanPolicy = {
 
 export const LOGIN_POLICY: ScanPolicy = {
   mode: "login",
-  caps: { max_pages: 2500, max_depth: 20, rps: 5, workers: 8 },
+  // 10,000 pages at most (2026-11-16; it was 2,500): the developer raised
+  // the sign-in default to 10,000, so the cap rose with it. Kept at 10,000,
+  // under the public 20,000: it mirrors LocalLoginScanRequest in
+  // src/audit/web/server.py and the sign-in index's own 10,000-page limit
+  // (src/audit/protected/companion.py, repository.py).
+  caps: { max_pages: 10000, max_depth: 20, rps: 5, workers: 8 },
   defaults: LOGIN_DEFAULTS,
   fixed: {
     // A signed-in session keeps its page cap: an unbounded crawl behind a

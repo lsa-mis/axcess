@@ -23,7 +23,7 @@ import { RULE_CHECK_HELP } from "../lib/labels";
 import { isReport, ruleChecksText } from "../lib/terms";
 import { liveSearchParams } from "../lib/liveSearchParams";
 import { useRememberedParams } from "../hooks/useRememberedParams";
-import { TablePagination, usePagedRows } from "../components/TablePagination";
+import { PagedTable, usePagedRows } from "../components/TablePagination";
 import type { ProtectedScanStatus, ProtectedScanSummary, ScanSummary, SiteGroup } from "../api/types";
 import { confirmDestructive } from "../hooks/usePreferences";
 import BreakableUrl from "../components/BreakableUrl";
@@ -141,6 +141,8 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  *   appears. They are the words and the order the Issues page summary
  *   uses (ReportSummary), so the list and the report name the same
  *   numbers the same way (SC 3.2.4 Consistent Identification, Level AA).
+ *   Both count what the Issues table shows when it opens, with "plus N
+ *   hidden" under the number (ShownCount, 2026-11-10).
  *   The developer set this order and these words on 2026-10-30: what was
  *   found, then how much of the site it came from. History: these columns
  *   were "Issues" (the rows) and "Occurrences" (the places) until
@@ -292,9 +294,9 @@ function sortValue(site: SiteGroup, key: SortKey): number | string | null {
     case "pages":
       return completed ? completed.page_count : null;
     case "issues":
-      return site.most_recent_report_occurrence_count;
+      return site.most_recent_report_shown_occurrence_count ?? site.most_recent_report_occurrence_count;
     case "kinds":
-      return site.most_recent_report_issue_count;
+      return site.most_recent_report_shown_issue_count ?? site.most_recent_report_issue_count;
     case "checks":
       return completed?.rule_checks ? ruleChecksText(completed.rule_checks).toLowerCase() : null;
     case "completed":
@@ -488,85 +490,90 @@ export default function ScansRoute() {
           {/* One small search, in the table's own bar: it filters the rows
               below by site address. The ⌘K palette still finds anything
               anywhere; this is for narrowing a long list in place. */}
-          <TableBar pager={<TablePagination label="Public reports" noun="sites" {...sitePages} />}>
-            <TableSearch label="Search sites" id="site-search" value={search} onChange={setSearch} />
-            {/* Always mounted, so the count is announced when it changes;
-                empty, and so invisible, while there is no search. */}
-            <p role="status" className="text-xs text-fg-muted">
-              {query &&
-                `${matchingSites.length} of ${sites.length} ${sites.length === 1 ? "site matches" : "sites match"} “${search.trim()}”.`}
+          <PagedTable
+            pagination={{ label: "Public reports", noun: "sites", ...sitePages }}
+            top={(pager) => (
+              <TableBar pager={pager}>
+                <TableSearch label="Search sites" id="site-search" value={search} onChange={setSearch} />
+                {/* Always mounted, so the count is announced when it changes;
+                    empty, and so invisible, while there is no search. */}
+                <p role="status" className="text-xs text-fg-muted">
+                  {query &&
+                    `${matchingSites.length} of ${sites.length} ${sites.length === 1 ? "site matches" : "sites match"} “${search.trim()}”.`}
+                </p>
+              </TableBar>
+            )}
+          >
+            {/* The order, for screen readers only: the sorted header's chip
+                shows it (SC 4.1.3, see the comment on this route). */}
+            <p role="status" className="sr-only">
+              Sorted by {SORT_LABELS[sort.column]}, {sortWords(SORT_KINDS[sort.column], sort.direction)}.
             </p>
-          </TableBar>
-          {/* The order, for screen readers only: the sorted header's chip
-              shows it (SC 4.1.3, see the comment on this route). */}
-          <p role="status" className="sr-only">
-            Sorted by {SORT_LABELS[sort.column]}, {sortWords(SORT_KINDS[sort.column], sort.direction)}.
-          </p>
-          <TableRegion label="Public reports table">
-            <Table
-              ruled
-              className="min-w-[48rem]"
-              caption="Public reports by site. A site’s row shows its most recent report. Open a site to list each of its scans under it."
-            >
-              <TableHead>
-                {/* One header row (H63): see the comment on this route. */}
-                <tr>
-                  <SortHeader
-                    column="site"
-                    kind="text"
-                    wrap="words"
-                    className="sticky left-0 z-[2] bg-surface-muted align-bottom"
-                    {...sortProps}
-                  >
-                    {SORT_LABELS.site}
-                  </SortHeader>
-                  {/* The columns after Site, in the order the cells are drawn
-                      (SiteRows, ScanRow): SORT_COLUMNS without "site". */}
-                  {SORT_COLUMNS.filter((column) => column !== "site").map((column) => (
+            <TableRegion label="Public reports table">
+              <Table
+                ruled
+                className="min-w-[48rem]"
+                caption="Public reports by site. A site’s row shows its most recent report. Open a site to list each of its scans under it."
+              >
+                <TableHead>
+                  {/* One header row (H63): see the comment on this route. */}
+                  <tr>
                     <SortHeader
-                      key={column}
-                      column={column}
-                      kind={SORT_KINDS[column]}
+                      column="site"
+                      kind="text"
                       wrap="words"
-                      className="align-bottom"
-                      hint={column === "checks" ? RULE_CHECK_HELP : undefined}
+                      className="sticky left-0 z-[2] bg-surface-muted align-bottom"
                       {...sortProps}
                     >
-                      {SORT_LABELS[column]}
+                      {SORT_LABELS.site}
                     </SortHeader>
-                  ))}
-                  <ColumnHeader className="whitespace-nowrap px-3 py-1.5 align-bottom">
-                    {/* The height of a sort button, words at its foot like theirs,
-                        so its label lines up with them. */}
-                    <span className="inline-flex min-h-target items-end px-1 pb-1.5">Actions</span>
-                  </ColumnHeader>
-                </tr>
-              </TableHead>
-              <tbody>
-                {sortedSites.length === 0 && (
-                  <tr className="border-t border-border">
-                    <td colSpan={TOTAL_COLUMNS} className="p-6 text-center text-fg-muted">
-                      {query ? `No sites match “${search.trim()}”.` : "No public reports yet."}
-                    </td>
+                    {/* The columns after Site, in the order the cells are drawn
+                        (SiteRows, ScanRow): SORT_COLUMNS without "site". */}
+                    {SORT_COLUMNS.filter((column) => column !== "site").map((column) => (
+                      <SortHeader
+                        key={column}
+                        column={column}
+                        kind={SORT_KINDS[column]}
+                        wrap="words"
+                        className="align-bottom"
+                        hint={column === "checks" ? RULE_CHECK_HELP : undefined}
+                        {...sortProps}
+                      >
+                        {SORT_LABELS[column]}
+                      </SortHeader>
+                    ))}
+                    <ColumnHeader className="whitespace-nowrap px-3 py-1.5 align-bottom">
+                      {/* The height of a sort button, words at its foot like theirs,
+                          so its label lines up with them. */}
+                      <span className="inline-flex min-h-target items-end px-1 pb-1.5">Actions</span>
+                    </ColumnHeader>
                   </tr>
-                )}
-                {sitePages.pageRows.map((site, index) => {
-                  const position = (sitePages.page - 1) * sitePages.pageSize + index;
-                  return (
-                    <SiteRows
-                      key={site.site_url}
-                      site={site}
-                      index={position}
-                      rowId={`site-row-${position}`}
-                      expanded={expanded.has(site.site_url)}
-                      onToggle={toggleSite}
-                    />
-                  );
-                })}
-              </tbody>
-            </Table>
-          </TableRegion>
-          <TablePagination label="Public reports" noun="sites" place="end" {...sitePages} />
+                </TableHead>
+                <tbody>
+                  {sortedSites.length === 0 && (
+                    <tr className="border-t border-border">
+                      <td colSpan={TOTAL_COLUMNS} className="p-6 text-center text-fg-muted">
+                        {query ? `No sites match “${search.trim()}”.` : "No public reports yet."}
+                      </td>
+                    </tr>
+                  )}
+                  {sitePages.pageRows.map((site, index) => {
+                    const position = (sitePages.page - 1) * sitePages.pageSize + index;
+                    return (
+                      <SiteRows
+                        key={site.site_url}
+                        site={site}
+                        index={position}
+                        rowId={`site-row-${position}`}
+                        expanded={expanded.has(site.site_url)}
+                        onToggle={toggleSite}
+                      />
+                    );
+                  })}
+                </tbody>
+              </Table>
+            </TableRegion>
+          </PagedTable>
         </Card>
       )}
 
@@ -603,34 +610,32 @@ export default function ScansRoute() {
             </Card>
           ) : (
             <Card>
-              {protectedPages.pages > 1 && (
-                <TableBar pager={<TablePagination label="Sign-in scans" noun="sign-in scans" {...protectedPages} />} />
-              )}
-              <TableRegion label="Sign-in scans table">
-                <Table className="min-w-[58rem]" caption="Your sign-in scans, most recently updated first">
-                  <TableHead>
-                    <tr>
-                      <ColumnHeader>Report</ColumnHeader>
-                      <ColumnHeader>Status</ColumnHeader>
-                      <ColumnHeader>Environment and data classification</ColumnHeader>
-                      <ColumnHeader>Pages</ColumnHeader>
-                      <ColumnHeader>Issue occurrences</ColumnHeader>
-                      <ColumnHeader>Updated</ColumnHeader>
-                      <ColumnHeader>Open</ColumnHeader>
-                    </tr>
-                  </TableHead>
-                  <tbody>
-                    {protectedPages.pageRows.map((report, index) => (
-                      <ProtectedReportRow
-                        key={report.scan_id}
-                        report={report}
-                        index={(protectedPages.page - 1) * protectedPages.pageSize + index}
-                      />
-                    ))}
-                  </tbody>
-                </Table>
-              </TableRegion>
-              <TablePagination label="Sign-in scans" noun="sign-in scans" place="end" {...protectedPages} />
+              <PagedTable pagination={{ label: "Sign-in scans", noun: "sign-in scans", ...protectedPages }}>
+                <TableRegion label="Sign-in scans table">
+                  <Table className="min-w-[58rem]" caption="Your sign-in scans, most recently updated first">
+                    <TableHead>
+                      <tr>
+                        <ColumnHeader>Report</ColumnHeader>
+                        <ColumnHeader>Status</ColumnHeader>
+                        <ColumnHeader>Environment and data classification</ColumnHeader>
+                        <ColumnHeader>Pages</ColumnHeader>
+                        <ColumnHeader>Issue occurrences</ColumnHeader>
+                        <ColumnHeader>Updated</ColumnHeader>
+                        <ColumnHeader>Open</ColumnHeader>
+                      </tr>
+                    </TableHead>
+                    <tbody>
+                      {protectedPages.pageRows.map((report, index) => (
+                        <ProtectedReportRow
+                          key={report.scan_id}
+                          report={report}
+                          index={(protectedPages.page - 1) * protectedPages.pageSize + index}
+                        />
+                      ))}
+                    </tbody>
+                  </Table>
+                </TableRegion>
+              </PagedTable>
             </Card>
           )}
         </section>
@@ -707,10 +712,16 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
               {relativeTime(completed.finished_at ?? completed.started_at)}
             </Cell>
             <Cell numeric className="text-fg">
-              {(site.most_recent_report_issue_count ?? 0).toLocaleString()}
+              <ShownCount
+                shown={site.most_recent_report_shown_issue_count}
+                total={site.most_recent_report_issue_count ?? 0}
+              />
             </Cell>
             <Cell numeric className="text-fg">
-              {(site.most_recent_report_occurrence_count ?? 0).toLocaleString()}
+              <ShownCount
+                shown={site.most_recent_report_shown_occurrence_count}
+                total={site.most_recent_report_occurrence_count ?? 0}
+              />
             </Cell>
             <Cell numeric className="text-fg">
               {completed.page_count.toLocaleString()}
@@ -962,11 +973,39 @@ function ScanCountCells({ scan, className }: { scan: ScanSummary; className?: st
   return (
     <>
       <Cell numeric className={cn("text-fg", className)}>
-        {counts.data.issue_count.toLocaleString()}
+        <ShownCount shown={counts.data.shown_issue_count} total={counts.data.issue_count} />
       </Cell>
       <Cell numeric className={cn("text-fg", className)}>
-        {counts.data.occurrence_count.toLocaleString()}
+        <ShownCount shown={counts.data.shown_occurrence_count} total={counts.data.occurrence_count} />
       </Cell>
+    </>
+  );
+}
+
+/**
+ * A report's count as its Issues page shows it when it opens. Since
+ * 2026-11-13 that is every issue type, so the count is the whole report and
+ * the second line never shows. (From 2026-11-10 the page opened on Mostly
+ * sure and Measured only.) If the default view leaves rows out again, a
+ * second line ("plus 12 hidden") counts them, in the Issues page's words:
+ * one number for one thing on both screens (SC 3.2.4 Consistent
+ * Identification, Level AA), and a held-back count is never dropped
+ * (Interface language rule 4). Rejected then: the total alone, which would
+ * not match the table a reader lands on; and the shown number alone, which
+ * hides a limitation.
+ *
+ * `shown` is absent from a response cached before the field existed; the
+ * total then stands alone, as it did before, until the next fetch.
+ */
+function ShownCount({ shown, total }: { shown: number | null | undefined; total: number }) {
+  const visible = shown ?? total;
+  const hidden = total - visible;
+  return (
+    <>
+      {visible.toLocaleString()}
+      {hidden > 0 && (
+        <span className="block text-xs font-normal text-fg-muted">plus {hidden.toLocaleString()} hidden</span>
+      )}
     </>
   );
 }

@@ -20,7 +20,7 @@ from typing import Any, Protocol
 import httpx
 from pydantic import ValidationError
 
-from audit.analyzer.ollama_base import prompt_content_version
+from audit.analyzer.ollama_base import prompt_content_version, why_not_local
 from audit.suggest.context import EvidenceBundle
 from audit.suggest.models import ErrorCode, ModelAnswer, ModelAnswerV2
 
@@ -188,6 +188,11 @@ class OllamaSuggestionProvider:
         return {str(m.get("name")) for m in data.get("models", []) if m.get("name")}
 
     async def generate(self, prompt: str, *, model: str, image: bytes | None) -> str:
+        # A cloud model runs on Ollama's servers, so the evidence would leave
+        # this computer (audit.analyzer.ollama_base.is_cloud_model).
+        reason = await why_not_local(self._client, f"{self._base_url}/api/tags", model)
+        if reason is not None:
+            raise SuggestionError("model_not_local", reason)
         payload: dict[str, object] = {
             "model": model,
             "prompt": prompt,

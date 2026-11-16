@@ -77,6 +77,10 @@ _ENDPOINTS: tuple[tuple[str, str], ...] = (
         "GET /api/scans/{scan_id}/issues/{issue_key} (alfa issue)",
         "/api/scans/{scan}/issues/{alfa_issue}",
     ),
+    (
+        "GET /api/scans/{scan_id}/issues/{issue_key} (landmark issue)",
+        "/api/scans/{scan}/issues/axe%3Aregion",
+    ),
     # The form error check's issue: its pages carry the before screenshots.
     (
         "GET /api/scans/{scan_id}/issues/{issue_key} (form error issue)",
@@ -104,6 +108,13 @@ _ENDPOINTS: tuple[tuple[str, str], ...] = (
     ("GET /api/scans/{scan_id}/evaluation (not saved)", "/api/scans/{baseline}/evaluation"),
     ("GET /api/scans/{scan_id}/manual-checks", "/api/scans/{scan}/manual-checks"),
     ("GET /api/scans/{scan_id}/comparison", "/api/scans/{scan}/comparison"),
+    # Image groups only: the first rows of the unfiltered list are axe and
+    # Alfa groups, so the image group with a "reviewing" status sits past
+    # the skeleton's sample there.
+    (
+        "GET /api/scans/{scan_id}/comparison (image groups)",
+        "/api/scans/{scan}/comparison?pipeline=image",
+    ),
     ("GET /api/scans/{scan_id}/history", "/api/scans/{scan}/history"),
     (
         "GET /api/scans/{scan_id}/diff?compare_to={baseline_id}",
@@ -113,14 +124,21 @@ _ENDPOINTS: tuple[tuple[str, str], ...] = (
     ("GET /api/capabilities/local-analysis", "/api/capabilities/local-analysis"),
     ("GET /api/capabilities/protected-scans", "/api/capabilities/protected-scans"),
     ("GET /api/tracking", "/api/tracking"),
+    ("GET /api/coverage/checks", "/api/coverage/checks"),
+    ("GET /api/coverage/checks (WCAG 2.2)", "/api/coverage/checks?version=2.2"),
+    ("GET /api/coverage/found", "/api/coverage/found"),
+    ("GET /api/coverage/found (one report)", "/api/coverage/found?scan_id={scan}"),
     ("GET /api/scope-preview (empty)", "/api/scope-preview"),
     ("GET /api/scope-preview (valid url)", "/api/scope-preview?url=https://example.com/docs"),
     ("GET /api/scope-preview (invalid url)", "/api/scope-preview?url=ftp://example.com/"),
 )
 
 # Enough elements to merge the variants a list mixes (e.g. axe and image
-# issue rows) without letting a long list dominate the run time.
-_LIST_SAMPLE = 5
+# issue rows) without letting a long list dominate the run time. Six since
+# the merge of UX-Nov-6 (2026-11-13): a page's evidence list gained a landmark
+# row and a form error row ahead of the seeded Alfa row, whose evidence fields
+# the golden pins.
+_LIST_SAMPLE = 6
 _ABSENT = "absent"
 _SCALAR_NAMES: tuple[tuple[type, str], ...] = (
     # bool before int: ``True`` is an ``int`` too.
@@ -145,6 +163,14 @@ _OTHER_SITE_SCAN = (
     "same ScanSummary field is pinned through body[].scans[].rule_checks."
 )
 _UNPINNED_PATHS: dict[tuple[str, str], str] = {
+    **{
+        ("GET /api/coverage/found", f"body.estimate.{field}"): (
+            "The seed has fewer rule check occurrences than the estimate's sample gate "
+            "(issue_share.MIN_ESTIMATE_SAMPLE); tests/unit/test_issue_share.py pins the "
+            "estimate's values."
+        )
+        for field in ("criteria", "estimated_total", "share")
+    },
     ("GET /api/scans/{scan_id}/issues/{issue_key}", "body.row.also_wcag"): (
         "The detail is read for the first axe issue type, which maps to one criterion; "
         "the issues list pins the same IssueRow field from the seeded link-name row."
@@ -430,6 +456,25 @@ def _add_a11y_evidence(conn: sqlite3.Connection, blob_dir: Path, scan_id: int) -
         screenshot_hash=screenshot_hash,
         revealed_by="Opened the Menu button",
         revealed_state_key="menu-open",
+    )
+    # Content outside a landmark: its card names the shared screen reader
+    # steps, so the issue detail carries ``screen_reader_check``.
+    repo.upsert_axe_violation(
+        conn,
+        page_id=home,
+        scan_id=scan_id,
+        rule_id="region",
+        # A best practice: axe maps it to no WCAG criterion.
+        wcag_sc=None,
+        wcag_scs=None,
+        wcag_level=None,
+        impact="moderate",
+        help="All page content should be contained by landmarks",
+        help_url="https://dequeuniversity.com/rules/axe/4.10/region",
+        target_selector="div.promo",
+        failure_summary="Put this content inside a landmark.",
+        html_snippet='<div class="promo">',
+        target_hash="api-contract-region",
     )
     repo.upsert_alfa_finding(
         conn,

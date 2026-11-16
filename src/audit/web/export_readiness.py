@@ -99,7 +99,7 @@ def _unreviewed_actionable_evidence_blockers(
     actionable_rows = [
         row
         for row in issues.list_issues(conn, scan_id)
-        if row.review_lane in {"likely_barrier", "expert_review"}
+        if row.review_lane in {"likely_barrier", "measured", "expert_review"}
     ]
     for row in actionable_rows:
         resolved_count = sum(
