@@ -844,7 +844,11 @@ function IssueTable({
                 onSort={onSort}
                 className={cn(
                   "px-1.5",
-                  column === "Issue" && "sticky left-0 z-[1] bg-surface-muted",
+                  // The row header under it (RowHeader) keeps the shared 16px,
+                  // so the heading does too, and "Issue type" starts on the
+                  // same line as the issue types (the developer's report,
+                  // 2026-11-16).
+                  column === "Issue" && "sticky left-0 z-[1] bg-surface-muted px-4",
                   // "How sure ⇅ ?" on one line. Wrapped, the label's box kept
                   // the column's full width, so "sure ⇅" sat centred in it
                   // with a wide gap before the "?" (the developer's
@@ -854,6 +858,8 @@ function IssueTable({
                   // 4px a side, not 6, on the three headers with a "?": with
                   // a sort chip showing the table was 2px wider than its
                   // region at 1280px (test_issue_table_fits_the_default_desktop_width).
+                  // Their headings sit 2px left of the tags under them; at 6px
+                  // the table is still 1px too wide (2026-11-16).
                   (column === "Type" || column === "Finding type" || column === "Priority") && "px-1",
                 )}
                 hint={columnHint(column)}

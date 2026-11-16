@@ -518,11 +518,19 @@ export default function ScansRoute() {
                 <TableHead>
                   {/* One header row (H63): see the comment on this route. */}
                   <tr>
+                    {/* "Site" starts where the site's name does, not where its
+                        row's button does: the name follows the expand arrow,
+                        a target-wide box (min-w-target, which Settings >
+                        Target size can raise) and a 4px gap (gap-1), inside
+                        the cell's 16px (SiteRows). The heading names the
+                        words under it, so it lines up with them (the
+                        developer's request, 2026-11-16; the rows are
+                        unchanged). */}
                     <SortHeader
                       column="site"
                       kind="text"
                       wrap="words"
-                      className="sticky left-0 z-[2] bg-surface-muted"
+                      className="sticky left-0 z-[2] bg-surface-muted pl-[calc(1rem+var(--target,44px)+0.25rem)]"
                       {...sortProps}
                     >
                       {SORT_LABELS.site}

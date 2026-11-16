@@ -460,7 +460,17 @@ export function SortHeader<K extends string>({
       scope="col"
       aria-sort={sort ? ariaSort(active, sort.direction) : "none"}
       className={cn(
-        "px-3 py-1.5 font-semibold",
+        // 16px at the sides, as the body cells (Cell, RowHeader), with the
+        // sort button pulled out by its own 4px padding (-mx-1 below), so
+        // the heading's words start on the same line as the words under it.
+        // A table that pads its cells otherwise (Issues: px-1.5) gives its
+        // headers the same class, and the two still line up. They were 12px
+        // plus the button's 4px, which matched only the default: with any
+        // other padding the heading sat 4px in from its column's words, and
+        // further where a row header kept the default (the developer's
+        // report, 2026-11-16: "Issue type" was not left-aligned with the
+        // issue types under it).
+        "px-4 py-1.5 font-semibold",
         right ? "text-right" : "text-left",
         active && "shadow-[inset_0_-3px_0_theme(colors.umich.blue)]",
         className,
@@ -485,7 +495,9 @@ export function SortHeader<K extends string>({
         title={hint}
         onClick={() => onSort(nextSort(sort, column, kind))}
         className={cn(
-          "group inline-flex min-h-target min-w-target rounded-xs px-1 text-sm font-semibold normal-case tracking-normal hover:bg-border/50 focus-visible:outline-none focus-visible:shadow-focus",
+          // -mx-1: its padding (the hover fill and focus ring's room) sits
+          // outside the words, not in front of them (see the cell above).
+          "group -mx-1 inline-flex min-h-target min-w-target rounded-xs px-1 text-sm font-semibold normal-case tracking-normal hover:bg-border/50 focus-visible:outline-none focus-visible:shadow-focus",
           right ? "justify-end text-right" : "justify-start text-left",
           // Words in the middle of the target, so every label sits in the
           // middle of the header row (the developer's request, 2026-11-16).
