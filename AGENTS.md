@@ -401,8 +401,17 @@ the task. Report them.
 
 ## Verification
 
-Run the narrowest relevant tests during development, then the appropriate
-project gates before handoff:
+**Run tests only before a merge the developer asks for.** Do not run
+`pytest`, the UI suites, or `make test` while iterating on a change, even
+for one file: a UI run takes minutes and the developer reviews the change
+in the running app instead. Fast build steps that the running app needs
+(`make frontend-build`) and `make lint` / `make typecheck` are fine at any
+time. Update or add the tests a change needs as you go, without running
+them, and when you report a change, say plainly that its tests have not
+been run yet. When the developer asks to merge, run the gates below first,
+fix what fails, and only then merge.
+
+The gates, run before a requested merge:
 
 ```bash
 uv run pytest tests/unit
@@ -435,7 +444,8 @@ If you cannot verify an action is reversible, treat it as irreversible.
 **If any premise in your task turns out to be wrong or impossible, stop and
 report that instead of working around it.** State what you **verified** (ran it,
 saw the output) separately from what you **assumed**. Do not report a task
-complete on the basis of code you did not run.
+complete on the basis of code you did not run. Until the tests run before a
+merge (see Verification), report a change as built but not yet tested.
 
 ## Session hygiene
 
