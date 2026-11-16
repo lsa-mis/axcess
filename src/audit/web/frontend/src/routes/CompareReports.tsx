@@ -36,7 +36,8 @@ import { serverDate } from "../lib/serverTime";
  *   found, no longer found) is its own page, What changed
  *   (routes/Compare.tsx), one link away.
  * - **Inside a frame the app knows it is a panel** (lib/framed.ts): no
- *   sidebar or top bar, no Compare reports tab, its own history. If this
+ *   sidebar or top bar, its own history, and the report's own tabs (Issues,
+ *   Images) without Compare reports (2026-11-16, ReportWorkspaceNav). If this
  *   route itself is opened inside a panel, it offers a link to open it in the
  *   whole window instead of nesting panels in panels.
  * - **Each frame has a title naming its report and page**, "Report #24,
