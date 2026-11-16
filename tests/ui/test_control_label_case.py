@@ -77,6 +77,7 @@ _PHRASES = (
     "Measured",  # issue type, lib/terms.ts
     "Not sure",  # issue type, lib/terms.ts
     "For information",  # issue type, lib/terms.ts
+    "How sure",  # the Issues column those four values fill, COLUMN_LABEL.Type
     "Best practice",  # level, docs/plain-language.md
     "Rule check",  # check name: Rule check (axe), Rule check (Alfa)
     "Page inspector",  # the tool's name

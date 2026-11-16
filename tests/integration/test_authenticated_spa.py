@@ -84,7 +84,9 @@ async def test_headless_handoff_restores_storage_without_replaying_old_tokens(
         try:
             landed = session.enter_scan_mode()
             pages = await session.switch_to_headless(4)
-            assert len(pages) == 1
+            # One signed-in tab per worker since d147cee: each tab after the
+            # first holds a copy of the sign-in.
+            assert len(pages) == 4
             assert page.is_closed()
             scan_page = pages[0]
             await scan_page.goto(landed)

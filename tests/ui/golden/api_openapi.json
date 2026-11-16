@@ -1758,6 +1758,34 @@
         }
       }
     },
+    "/api/scans/{scan_id}/images/{image_id}": {
+      "get": {
+        "summary": "Api Scan Image",
+        "description": "One image of the report, and every page it appears on.",
+        "operationId": "api_scan_image_api_scans__scan_id__images__image_id__get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Image Id"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
     "/api/scans/{scan_id}/images/{image_id}/alt-check": {
       "post": {
         "summary": "Api Check Image Alt",
@@ -2854,16 +2882,31 @@
           "authorization_acknowledged": {"type": "boolean", "title": "Authorization Acknowledged"},
           "max_pages": {
             "type": "integer",
-            "maximum": 2500.0,
+            "maximum": 10000.0,
             "minimum": 1.0,
             "title": "Max Pages",
-            "default": 2500
+            "default": 10000
           },
+          "all_pages": {"type": "boolean", "title": "All Pages", "default": false},
           "max_depth": {"type": "integer", "maximum": 20.0, "minimum": 1.0, "title": "Max Depth", "default": 10},
           "rps": {"type": "number", "maximum": 5.0, "minimum": 0.1, "title": "Rps", "default": 1.0},
           "workers": {"type": "integer", "maximum": 8.0, "minimum": 1.0, "title": "Workers", "default": 4},
           "show_browser": {"type": "boolean", "title": "Show Browser", "default": false},
           "whole_host": {"type": "boolean", "title": "Whole Host", "default": false},
+          "include_subdomain": {"type": "boolean", "title": "Include Subdomain", "default": false},
+          "ignore_robots": {"type": "boolean", "title": "Ignore Robots", "default": true},
+          "static_only": {"type": "boolean", "title": "Static Only", "default": false},
+          "skip_focus": {"type": "boolean", "title": "Skip Focus", "default": false},
+          "skip_markup": {"type": "boolean", "title": "Skip Markup", "default": false},
+          "skip_semantic": {"type": "boolean", "title": "Skip Semantic", "default": true},
+          "skip_visual": {"type": "boolean", "title": "Skip Visual", "default": true},
+          "skip_forms": {"type": "boolean", "title": "Skip Forms", "default": true},
+          "send_empty_forms": {"type": "boolean", "title": "Send Empty Forms", "default": false},
+          "user_agent_choice": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "User Agent Choice"},
+          "user_agent": {
+            "anyOf": [{"type": "string", "maxLength": 1024}, {"type": "null"}],
+            "title": "User Agent"
+          },
           "scan_engine": {
             "type": "string",
             "enum": ["axe", "alfa", "both"],

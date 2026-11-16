@@ -1540,25 +1540,29 @@ async def test_login_scan_is_visible_and_explains_login_before_crawl(
     await playwright_async.expect(
         page.get_by_role("checkbox", name=re.compile(r"^The site owner allows this scan"))
     ).to_be_visible()
-    # No disabled-for-parity controls: what a login scan pins is said
-    # once, in the Pages to scan group, and the switches are simply absent.
+    # Every setting the public form has, nothing pinned (2026-11-16): no
+    # note about fixed settings, and the switches it used to leave out are
+    # there, off by default.
     await _open_scan_groups(page)
     await playwright_async.expect(
         page.get_by_role("note").filter(has_text="Sign-in scans always work this way")
-    ).to_be_visible()
-    await playwright_async.expect(
-        page.get_by_role("switch", name=re.compile(r"^Follow links to subdomains"))
     ).to_have_count(0)
+    for name in (r"^Follow links to subdomains", r"^Fast scan"):
+        await playwright_async.expect(
+            page.get_by_role("switch", name=re.compile(name))
+        ).not_to_be_checked()
+    # A disabled switch is a dependency, never a sign-in rule: the vision
+    # model waits for image text reading, which a sign-in scan starts with
+    # off, and the AI review waits for a local model, as in a public scan.
     await playwright_async.expect(
-        page.get_by_role("switch", name=re.compile(r"^Fast scan"))
-    ).to_have_count(0)
-    # The one disabled switch is a dependency, not parity: the vision
-    # model waits for image text reading, which a login scan starts with off.
+        page.get_by_role(
+            "switch", name=re.compile(r"^Compare image text with alt text"), disabled=True
+        )
+    ).to_have_count(1)
     disabled = page.get_by_role("switch", disabled=True)
-    await playwright_async.expect(disabled).to_have_count(1)
-    await playwright_async.expect(disabled).to_have_accessible_name(
-        re.compile(r"^Compare image text with alt text")
-    )
+    for switch in await disabled.all():
+        name = await switch.evaluate("el => el.closest('label').innerText")
+        assert name.startswith(("Compare image text with alt text", "AI review of wording")), name
     dom_discovery = page.get_by_role("switch", name=re.compile(r"^Open menus, tabs"))
     await playwright_async.expect(dom_discovery).to_be_checked()
 
