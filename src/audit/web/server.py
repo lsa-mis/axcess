@@ -268,6 +268,8 @@ class LocalLoginScanRequest(BaseModel):
     static_only: bool = False
     skip_focus: bool = False
     skip_markup: bool = False
+    # The document check, through the signed-in browser (2026-11-16).
+    skip_documents: bool = False
     skip_semantic: bool = True
     skip_visual: bool = True
     # Off by default in a sign-in scan, unlike a public one: pressing a
@@ -1801,10 +1803,12 @@ def create_app(
             # it off, every page is rendered in the signed-in browser.
             js_eager=not body.static_only,
             browser_only=not body.static_only,
-            # Off in every sign-in scan, also when pages load without
-            # scripts (browser_only False): its downloads would be anonymous
-            # requests to addresses found behind the sign-in.
-            linked_files_enabled=False,
+            # The document check downloads through the signed-in browser
+            # only (file_fetcher in _run_local_login_background), also when
+            # pages load without scripts; files on other sites are listed,
+            # not downloaded (the sign-in scan's egress policy).
+            linked_files_enabled=not body.skip_documents,
+            documents_signed_in=True,
             image_extraction_enabled=not body.skip_ocr,
             axe_enabled=body.scan_engine in {"axe", "both"},
             axe_level=body.axe_level,
@@ -4609,6 +4613,12 @@ async def _run_local_login_background(
             # through the signed-in browser, never an anonymous request.
             static_fetcher=(
                 None if config.js_eager else run.session.create_authenticated_static_fetcher()
+            ),
+            # The document check's PDFs, through the signed-in browser too.
+            file_fetcher=(
+                run.session.create_authenticated_file_fetcher()
+                if config.linked_files_enabled
+                else None
             ),
         )
         run.status, run.error = _local_login_completion(summary)

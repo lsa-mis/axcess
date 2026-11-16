@@ -218,13 +218,11 @@ export const LOGIN_POLICY: ScanPolicy = {
   // checks, and the browser name. Where a setting means something more
   // behind a sign-in, its hint says so (SIGN_IN_NOTES in copy.ts). Defaults
   // may still differ (LOGIN_DEFAULTS).
-  //
-  // One exception for now: the document check. Its downloads use an
-  // anonymous request, so behind a sign-in they would miss the files only a
-  // signed-in person can open. The developer chose (2026-11-16) to offer it
-  // signed in, downloading through the signed-in browser; until that is
-  // built, it stays off here and on the server.
-  fixed: { skip_documents: true },
+  // The document check too, since 2026-11-16 (the developer's decision):
+  // in a sign-in scan its PDFs download through the signed-in browser, and
+  // files on other sites are listed but not downloaded (copy.ts, the
+  // switch's signed-in hint).
+  fixed: {},
   fixedNote: null,
   urlLabel: URL_COPY.login.label,
   urlHelp: URL_COPY.login.help,
@@ -378,6 +376,7 @@ export function toLocalLoginPayload(
     skip_responsive: settings.skip_responsive,
     skip_focus: settings.skip_focus,
     skip_markup: settings.skip_markup,
+    skip_documents: settings.skip_documents,
     skip_semantic: settings.skip_semantic,
     skip_visual: settings.skip_visual,
     skip_forms: settings.skip_forms,

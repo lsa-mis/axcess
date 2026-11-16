@@ -191,14 +191,15 @@ export default function ChecksGroup({ settings, update, policy, capabilities }: 
             what is downloaded and kept, and that files on other sites are
             downloaded too, since this is the one check that reaches beyond
             the scanned site (AGENTS.md, Interface language rule 4: never
-            drop a privacy fact). Hidden in a sign-in scan, which never looks
-            for documents (fixed in the login policy), like the form check. */}
+            drop a privacy fact). In a sign-in scan its own hint replaces
+            that one: there the PDFs download with the person's sign-in,
+            and files on other sites are not downloaded (2026-11-16). */}
         {!isFixed(policy, "skip_documents") && (
           <SwitchRow
             checked={switchOn(settings, "documents")}
             onChange={(on) => update(switchPatch(settings, "documents", on))}
             label={SWITCHES.documents.label}
-            hint={SWITCHES.documents.hint}
+            hint={login ? SWITCHES.documents.hintSignedIn : SWITCHES.documents.hint}
           />
         )}
       </SwitchList>

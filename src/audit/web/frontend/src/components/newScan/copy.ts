@@ -111,7 +111,12 @@ export const SWITCHES = {
   },
   documents: {
     label: "Check the documents the pages link to",
-    hint: "Lists the PDF, Word, Excel and other files the pages link to, in the report’s Documents tab, and checks each PDF during the scan. Axcess downloads each PDF once to this computer (up to 200, each up to 10 MB), also from other sites, and keeps the result, not the file."
+    hint: "Lists the PDF, Word, Excel and other files the pages link to, in the report’s Documents tab, and checks each PDF during the scan. Axcess downloads each PDF once to this computer (up to 200, each up to 10 MB), also from other sites. It keeps the result and a picture of the first page, not the file.",
+    // A sign-in scan's own hint, in place of the one above, not added to
+    // it: the public hint says files on other sites are downloaded, which
+    // is not true behind a sign-in (AGENTS.md, Interface language rule 5).
+    hintSignedIn:
+      "Lists the PDF, Word, Excel and other files the pages link to, in the report’s Documents tab, and checks each PDF during the scan. Axcess downloads each PDF on this website with your sign-in, as you (up to 200, each up to 10 MB). It lists files on other sites but does not download them. It keeps the result and a picture of the first page, not the file.",
   },
   forms: {
     label: "Check that forms describe their errors",

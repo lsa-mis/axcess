@@ -918,13 +918,14 @@ async def test_the_form_error_check_is_on_for_public_websites_and_absent_when_si
     ).to_have_accessible_description(re.compile("from your account"))
 
 
-async def test_the_document_check_is_on_by_default_and_absent_when_signed_in(
+async def test_the_document_check_is_on_by_default_and_says_what_it_keeps(
     live_server: tuple[str, int],
     new_page: Any,
 ) -> None:
-    """On for a public website (2026-11-14), named in the summary, sent as
-    skip_documents, and not offered for a sign-in scan, which never looks
-    for documents. It needs no browser, so Fast scan leaves it on."""
+    """On for a public website (2026-11-14), named in the summary and sent
+    as skip_documents. Offered for a sign-in scan too (2026-11-16), with its
+    own hint: there it downloads with the person's sign-in and does not
+    download files on other sites."""
     base, _ = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
     posted: list[dict[str, Any]] = []
@@ -943,7 +944,10 @@ async def test_the_document_check_is_on_by_default_and_absent_when_signed_in(
     await playwright_async.expect(switch).to_be_enabled()
     # The privacy facts are read with it, as its description.
     await playwright_async.expect(switch).to_have_accessible_description(
-        re.compile("downloads each PDF once to this computer.*keeps the result, not the file")
+        re.compile(
+            "downloads each PDF once to this computer.*also from other sites.*"
+            "keeps the result and a picture of the first page, not the file"
+        )
     )
     summary = page.get_by_role("complementary", name="What this scan will do")
     assert "Document check" in await _rail_items(summary, "Checks that run")
@@ -965,9 +969,14 @@ async def test_the_document_check_is_on_by_default_and_absent_when_signed_in(
 
     await page.goto(f"{base}/app/scans/new?mode=login", wait_until="networkidle")
     await _open_groups(page)
-    await playwright_async.expect(
-        page.get_by_text("Check the documents the pages link to", exact=True)
-    ).to_have_count(0)
+    signed_in = page.get_by_role("switch", name="Check the documents the pages link to")
+    await playwright_async.expect(signed_in).to_be_checked()
+    await playwright_async.expect(signed_in).to_have_accessible_description(
+        re.compile(
+            "downloads each PDF on this website with your sign-in, as you.*"
+            "lists files on other sites but does not download them"
+        )
+    )
 
 
 _CHROME_WINDOWS = (
@@ -1080,16 +1089,30 @@ async def test_a_sign_in_scan_offers_the_browser_name(
 
 
 # Names a setting has only in the sign-in form, for the same setting.
+_DOCUMENTS = "Check the documents the pages link to"
+_DOCUMENTS_HINT = (
+    "Lists the PDF, Word, Excel and other files the pages link to, in the report\u2019s Documents "
+    "tab, and checks each PDF during the scan. Axcess downloads each PDF once to this computer "
+    "(up to 200, each up to 10 MB), also from other sites. It keeps the result and a picture of "
+    "the first page, not the file."
+)
+_DOCUMENTS_HINT_SIGNED_IN = (
+    "Lists the PDF, Word, Excel and other files the pages link to, in the report\u2019s Documents "
+    "tab, and checks each PDF during the scan. Axcess downloads each PDF on this website with "
+    "your sign-in, as you (up to 200, each up to 10 MB). It lists files on other sites but does "
+    "not download them. It keeps the result and a picture of the first page, not the file."
+)
 _SIGN_IN_NAME = {
     ("textbox", "Website address"): ("textbox", "Website address to scan after you sign in"),
     ("switch", "Scan the whole website"): ("switch", "Scan the whole signed-in website"),
+    # The same switch, with the sign-in scan's own hint in its name (copy.ts,
+    # SWITCHES.documents.hintSignedIn): signed in, other sites' files are
+    # listed, not downloaded.
+    ("switch", f"{_DOCUMENTS} {_DOCUMENTS_HINT}"): (
+        "switch",
+        f"{_DOCUMENTS} {_DOCUMENTS_HINT_SIGNED_IN}",
+    ),
 }
-# Public settings a sign-in scan does not offer yet, with the reason. The
-# document check's downloads are anonymous requests; the developer chose
-# (2026-11-16) to offer it signed in once it downloads through the
-# signed-in browser.
-# Matched by the start of the name: a switch's name here includes its hint.
-_NOT_ON_SIGN_IN_YET = ("Check the documents the pages link to",)
 _CONTROL_LINE = re.compile(
     r'^\s*- (switch|checkbox|radio|combobox|spinbutton|textbox|group) "([^"]+)"'
 )
@@ -1124,10 +1147,7 @@ async def test_the_sign_in_form_offers_every_setting_the_public_form_does(
     # The check reads enough of the form to mean something.
     assert len(public) >= 25, sorted(public)
     missing = sorted(
-        setting
-        for setting in public
-        if not setting[1].startswith(_NOT_ON_SIGN_IN_YET)
-        and _SIGN_IN_NAME.get(setting, setting) not in sign_in
+        setting for setting in public if _SIGN_IN_NAME.get(setting, setting) not in sign_in
     )
     assert not missing, f"The sign-in form is missing: {missing}"
 

@@ -505,6 +505,7 @@ export interface LocalLoginScanPayload {
   skip_responsive: boolean;
   skip_focus: boolean;
   skip_markup: boolean;
+  skip_documents: boolean;
   skip_semantic: boolean;
   skip_visual: boolean;
   skip_forms: boolean;

@@ -3190,6 +3190,7 @@
           "static_only": {"type": "boolean", "title": "Static Only", "default": false},
           "skip_focus": {"type": "boolean", "title": "Skip Focus", "default": false},
           "skip_markup": {"type": "boolean", "title": "Skip Markup", "default": false},
+          "skip_documents": {"type": "boolean", "title": "Skip Documents", "default": false},
           "skip_semantic": {"type": "boolean", "title": "Skip Semantic", "default": true},
           "skip_visual": {"type": "boolean", "title": "Skip Visual", "default": true},
           "skip_forms": {"type": "boolean", "title": "Skip Forms", "default": true},
