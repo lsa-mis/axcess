@@ -83,10 +83,11 @@ def test_a_browser_crawl_records_each_check_on_each_page(
             focus_checks_enabled=False,
             visual_checks_enabled=False,
             interaction_checks_enabled=True,
-            # Both on by default since this test was written; off here, as
-            # this test follows the browser checks' order. The document
-            # check's own marks are tested in test_linked_files_crawl.py.
-            markup_checks_enabled=False,
+            # On by default since this test was written, and off here: this
+            # test follows the page's own checks, and the document check
+            # finishes after the page (its marks are tested in
+            # test_linked_files_crawl.py). The page code check stays on: the
+            # expected order includes it.
             linked_files_enabled=False,
             capture_screenshots=False,
         )
