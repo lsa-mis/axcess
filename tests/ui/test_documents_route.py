@@ -987,6 +987,53 @@ async def test_a_long_list_has_the_pager_under_the_table_too(
 
 
 @on_module_loop
+async def test_a_wide_pager_shares_the_row_with_filter_documents(
+    documents: int,
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """With no search box in the bar, "Filter documents" takes only its own
+    width, so a long list's pager sits beside it rather than on a line of
+    its own (the developer's report, 2026-11-16: 909 documents, the pager
+    under a lone button). 1400px: wide enough for the button and a 30-page
+    pager side by side, too narrow for the 20rem a search box keeps, so
+    the old layout fails here. At 320px it still wraps, and nothing scrolls
+    sideways (SC 1.4.10 Reflow)."""
+    from playwright.async_api import expect
+
+    with sqlite3.connect(seeded_db[0]) as conn:
+        home = _page_id(conn, documents, HOME)
+        for n in range(300):
+            _file(
+                conn,
+                documents,
+                f"http://example.com/files/many-{n:03d}.pdf",
+                "pdf",
+                store.CheckResult("not_sure", http_status=200),
+                [(home, "link", f"Many {n}", None)],
+            )
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1400, "height": 900})
+    await page.goto(f"{base}/app/scans/{scan_id}/documents", wait_until="networkidle")
+    filter_button = page.get_by_role("button", name="Filter documents")
+    pager = page.get_by_role("navigation", name="Documents: page controls", exact=True)
+    await expect(pager.get_by_role("button", name="Page 5 of documents")).to_be_visible()
+    button_box = await filter_button.bounding_box()
+    pager_box = await pager.bounding_box()
+    assert button_box and pager_box
+    assert pager_box["y"] < button_box["y"] + button_box["height"], (button_box, pager_box)
+    assert pager_box["x"] > button_box["x"] + button_box["width"], (button_box, pager_box)
+
+    await page.set_viewport_size({"width": 320, "height": 900})
+    await expect(pager).to_be_visible()
+    overflow = await page.evaluate(
+        "document.documentElement.scrollWidth - document.documentElement.clientWidth"
+    )
+    assert overflow <= 0, overflow
+
+
+@on_module_loop
 async def test_the_table_sorts_by_any_column_and_goes_back(
     documents: int, live_server: tuple[str, int], new_page: Any
 ) -> None:

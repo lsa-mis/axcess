@@ -49,6 +49,18 @@ const CARD_EDGE = "[[data-card]>&:first-child]:rounded-t-[7px] [[data-card]>&:la
  * rows (search, the Filter menu) on the left, the pager on the right, and
  * `footer` (the active filters) under both. It wraps on a narrow screen
  * rather than clipping: the pager drops under the search.
+ *
+ * The left group asks for 20rem only when it holds a search box, the room
+ * the box needs to be usable before the pager wraps under it. Without one
+ * (the Documents tab: only "Filter documents") it asks for its controls'
+ * own width. A fixed 20rem there pushed a wide pager (909 documents, 91
+ * pages) onto a second line under a lone button at 1440px, leaving the
+ * bar's right half empty on the first line (the developer's report,
+ * 2026-11-16). Rejected: a prop on TableBar for "no search", which every
+ * caller would have to remember; the bar can see whether it has a search
+ * box itself (CSS ``:has()``). The pager still wraps under the controls
+ * when the row is too narrow for both, so nothing scrolls sideways at
+ * 320px (SC 1.4.10 Reflow, Level AA).
  */
 export function TableBar({
   children,
@@ -62,7 +74,11 @@ export function TableBar({
   return (
     <div className={cn("border-b border-border bg-surface-subtle", CARD_EDGE)}>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 py-3">
-        {children && <div className="flex min-w-0 flex-[1_1_20rem] flex-wrap items-center gap-2">{children}</div>}
+        {children && (
+          <div className="flex min-w-0 flex-[1_1_auto] flex-wrap items-center gap-2 has-[[type=search]]:basis-80">
+            {children}
+          </div>
+        )}
         {pager}
       </div>
       {footer}
