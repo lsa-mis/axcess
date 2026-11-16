@@ -37,12 +37,14 @@ from audit.analyzer.alfa import AlfaAnalyzer, AlfaResult
 from audit.analyzer.axe import AxeAnalyzer
 from audit.analyzer.axe import Level as AxeLevel
 from audit.analyzer.focus import FocusProbe
+from audit.analyzer.forms import ErrorIdentificationProbe
 from audit.analyzer.interaction import InteractionProbe
 from audit.analyzer.keyboard import KeyboardProbe
 from audit.analyzer.markup import MarkupProbe
 from audit.analyzer.responsive import ResponsiveProbe
 from audit.analyzer.visual import VisualProbe
 from audit.blob_store import BlobStore
+from audit.crawler.fetcher import AuthenticatedStaticFetcher
 from audit.crawler.js_fetcher import JsFetcher
 from audit.crawler.search import SearchExplorer
 from audit.extractor.downloader import AuthenticatedImageDownloader
@@ -197,6 +199,13 @@ class ManualAuthPolicies:
     scan: ProtectedEgressPolicy
     setup_navigation_origins: frozenset[str] | None
     setup_write_origins: frozenset[str] | None
+
+
+def _with_origin(origins: tuple[str, ...], url: str) -> tuple[str, ...]:
+    """``origins`` plus the origin of ``url``, once."""
+    parts = urlsplit(url)
+    origin = f"{parts.scheme}://{parts.netloc}".lower()
+    return origins if origin in origins else (*origins, origin)
 
 
 def build_manual_auth_policies(
@@ -911,6 +920,9 @@ class ManualAuthenticationSession:
         # enabled in its config, recorded every page as probed, and reached
         # zero DOM states, because the fetcher had no probe to run.
         interaction_probe: InteractionProbe | None = None,
+        # The form error check (SC 3.3.1), offered in sign-in scans since
+        # 2026-11-16; off unless the scan asked for it.
+        form_error_probe: ErrorIdentificationProbe | None = None,
         capture_screenshots: bool = False,
         max_rendered_html_chars: int | None = None,
         shared_pages: tuple[Page, ...] = (),
@@ -938,6 +950,7 @@ class ManualAuthenticationSession:
             visual_probe=visual_probe,
             copied_session=self.scan_tabs_copied,
             interaction_probe=interaction_probe,
+            form_error_probe=form_error_probe,
             capture_screenshots=capture_screenshots,
             shared_context=self.context,
             shared_pages=shared_pages,
@@ -945,6 +958,24 @@ class ManualAuthenticationSession:
             max_rendered_html_chars=max_rendered_html_chars,
             search_explorer=search_explorer,
         )
+
+    def create_authenticated_static_fetcher(self) -> AuthenticatedStaticFetcher:
+        """Fetch page code without scripts, through the signed-in context.
+
+        For a sign-in scan's "Load pages without running scripts": every
+        address and redirect is checked by the scan policy, and the request
+        carries the context's own cookies, never an anonymous request.
+        """
+
+        if self._state is not ManualAuthState.AUTHENTICATED:
+            raise ManualAuthenticationError(
+                "Complete and verify manual sign-in before starting a protected crawl."
+            )
+
+        def validate_page_url(url: str) -> str:
+            return self._policies.scan.validate_url(url).url
+
+        return AuthenticatedStaticFetcher(self.context.request, validate_url=validate_page_url)
 
     def create_authenticated_image_downloader(
         self, blob_store: BlobStore
@@ -1003,8 +1034,11 @@ class ManualAuthenticationSession:
                 # dropped, handing it an empty set would block every
                 # subresource. Give it the approved targets so it behaves as
                 # it did before; lifting Alfa's own gates is separate work.
-                allowed_origins=self._policies.target.allowed_origins,
-                target_origins=self._policies.target.allowed_origins,
+                # The page's own origin too: a sign-in scan may follow links
+                # to subdomains (2026-11-16), and a page there needs its own
+                # resources. The scan policy has already checked the URL.
+                allowed_origins=_with_origin(self._policies.target.allowed_origins, validated.url),
+                target_origins=_with_origin(self._policies.target.allowed_origins, validated.url),
             )
         except EgressViolation as exc:
             raise ManualAuthenticationError("Alfa URL is outside the approved scan scope.") from exc

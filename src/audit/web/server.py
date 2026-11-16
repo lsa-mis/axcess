@@ -59,16 +59,24 @@ from audit.analyzer.alfa import AlfaAnalyzer, AlfaResult, chromium_executable_pa
 from audit.analyzer.alfa import availability as alfa_availability
 from audit.analyzer.axe import AxeAnalyzer
 from audit.analyzer.focus import FocusProbe
+from audit.analyzer.forms import ErrorIdentificationProbe
 from audit.analyzer.interaction import DEFAULT_BLOCKED_LABELS, InteractionProbe
 from audit.analyzer.keyboard import KeyboardProbe
 from audit.analyzer.markup import MarkupProbe
 from audit.analyzer.model_registry import get_pick
 from audit.analyzer.responsive import ResponsiveProbe
 from audit.analyzer.semantic.registry import supported_criteria
+from audit.analyzer.visual import VisualProbe
 from audit.blob_store import BlobStore
 from audit.config import Settings, get_settings
 from audit.crawler import live_progress, url_policy
-from audit.crawler.orchestrator import CrawlConfig, CrawlSummary, build_search_explorer, run_crawl
+from audit.crawler.orchestrator import (
+    CrawlConfig,
+    CrawlSummary,
+    build_search_explorer,
+    build_vision_provider,
+    run_crawl,
+)
 from audit.crawler.search import SearchConfig, search_url_allowed
 from audit.crawler.tab_pool import TabPool
 from audit.crawler.user_agent import chosen_user_agent
@@ -224,6 +232,11 @@ class LocalLoginScanRequest(BaseModel):
     approved_auth_origins: tuple[str, ...] = Field(default=(), max_length=32)
     authorization_acknowledged: bool
     max_pages: int = Field(default=10_000, ge=1, le=10_000)
+    # "Scan every page it finds": no page limit. ``max_pages`` then only
+    # keeps the form's value. Offered in sign-in scans since 2026-11-16
+    # (the developer's decision: the sign-in form offers every setting the
+    # public form does).
+    all_pages: bool = False
     max_depth: int = Field(default=10, ge=1, le=20)
     rps: float = Field(default=1.0, ge=0.1, le=5.0)
     # "Pages at once (workers)": one signed-in tab per worker. Each tab after
@@ -233,6 +246,31 @@ class LocalLoginScanRequest(BaseModel):
     workers: int = Field(default=4, ge=1, le=8)
     show_browser: bool = False
     whole_host: bool = False
+    # The settings below joined the sign-in scan on 2026-11-16, so its form
+    # offers every setting the public form does (the developer's decision).
+    # Before that a sign-in scan stayed on the exact host, ignored
+    # robots.txt, always rendered, always ran the focus and page code
+    # checks, never ran the AI review, the visual check or the form error
+    # check, and always sent Axcess's own browser name.
+    include_subdomain: bool = False
+    # A sign-in scan ignores robots.txt unless asked not to: robots.txt is
+    # written for anonymous crawlers, and the authorization box is the
+    # consent that replaces it.
+    ignore_robots: bool = True
+    # Load each page's code without running its scripts, through the
+    # signed-in browser's own request client (its cookies), never an
+    # anonymous request (``AuthenticatedStaticFetcher``).
+    static_only: bool = False
+    skip_focus: bool = False
+    skip_markup: bool = False
+    skip_semantic: bool = True
+    skip_visual: bool = True
+    # Off by default in a sign-in scan, unlike a public one: pressing a
+    # form's submit button while signed in acts as the person signed in.
+    skip_forms: bool = True
+    send_empty_forms: bool = False
+    user_agent_choice: str | None = None
+    user_agent: str | None = Field(default=None, max_length=1024)
     scan_engine: Literal["axe", "alfa", "both"] = "axe"
     axe_level: Literal["A", "AA", "AAA"] = "AA"
     wcag_version: WcagVersion = DEFAULT_WCAG_VERSION
@@ -273,6 +311,13 @@ class LocalLoginScanRequest(BaseModel):
             raise ValueError("seed URL must be HTTPS with no credentials, query, or fragment")
         if not self.skip_vlm and self.skip_ocr:
             raise ValueError("VLM classification requires OCR image analysis")
+        from audit.web.scan_settings import user_agent_refusal
+
+        refusal_ua = user_agent_refusal(
+            {"user_agent_choice": self.user_agent_choice, "user_agent": self.user_agent}
+        )
+        if refusal_ua is not None:
+            raise ValueError(refusal_ua[1])
         if (not self.skip_ocr or not self.skip_vlm) and not self.image_analysis_acknowledged:
             raise ValueError("local protected-image storage acknowledgement is required")
         if self.search:
@@ -293,6 +338,13 @@ class LocalLoginScanRequest(BaseModel):
     def target_origin(self) -> str:
         parsed = urlsplit(self.seed_url)
         return normalize_exact_https_origin(f"{parsed.scheme}://{parsed.netloc}")
+
+    @property
+    def chosen_user_agent(self) -> str | None:
+        """The browser name to send, or None for Axcess's own."""
+        return chosen_user_agent(
+            {"user_agent_choice": self.user_agent_choice, "user_agent": self.user_agent}
+        )
 
 
 @dataclass
@@ -1699,13 +1751,19 @@ def create_app(
                     status_code=400,
                 )
 
+        # The browser name the person chose, sent while signing in and while
+        # scanning, so a site that ties a session to the browser sees one
+        # name throughout. robots.txt rules are still matched against
+        # Axcess's own name, as in a public scan.
+        login_user_agent = body.chosen_user_agent
         config = CrawlConfig(
             seed_url=body.seed_url,
             search=body.search,
-            max_pages=body.max_pages,
+            max_pages=None if body.all_pages else body.max_pages,
             max_depth=body.max_depth,
             rps=body.rps,
             whole_host=body.whole_host,
+            allow_subdomains=body.include_subdomain,
             # Login scans reuse an authenticated BrowserContext and a fixed
             # pool of signed-in tabs, one per worker (each later tab holds a
             # copy of a sessionStorage sign-in). The cap stays small so
@@ -1714,7 +1772,9 @@ def create_app(
             concurrency_per_host=body.workers,
             workers=body.workers,
             browser_headless=not body.show_browser,
-            user_agent=settings.user_agent,
+            user_agent=login_user_agent or settings.user_agent,
+            robots_user_agent=settings.user_agent if login_user_agent else None,
+            user_agent_choice=body.user_agent_choice if login_user_agent else None,
             request_timeout_s=settings.request_timeout_s,
             # Optional protected-image analysis uses the same authenticated
             # browser context and never falls back to anonymous downloads.
@@ -1728,10 +1788,14 @@ def create_app(
             vlm_base_url=local_vlm_url or "http://127.0.0.1:11434",
             vlm_prompt_name=settings.vlm_prompt_name,
             vlm_concurrency=1,
-            semantic_enabled=False,
+            semantic_enabled=not body.skip_semantic and ai_enabled(settings),
             js_enabled=True,
-            js_eager=True,
-            browser_only=True,
+            # "Load pages without running scripts": each page's code comes
+            # from the signed-in browser's request client instead
+            # (_run_local_login_background), never an anonymous request. With
+            # it off, every page is rendered in the signed-in browser.
+            js_eager=not body.static_only,
+            browser_only=not body.static_only,
             image_extraction_enabled=not body.skip_ocr,
             axe_enabled=body.scan_engine in {"axe", "both"},
             axe_level=body.axe_level,
@@ -1742,11 +1806,11 @@ def create_app(
             ),
             keyboard_probe_enabled=not body.skip_keyboard,
             responsive_checks_enabled=not body.skip_responsive,
-            focus_checks_enabled=True,
-            # Reads the page code and changes nothing, so it is as safe
-            # behind a sign-in as the rule check (axe).
-            markup_checks_enabled=True,
-            visual_checks_enabled=False,
+            focus_checks_enabled=not body.skip_focus,
+            markup_checks_enabled=not body.skip_markup,
+            visual_checks_enabled=not body.skip_visual,
+            form_error_checks_enabled=not body.skip_forms,
+            form_send_empty_forms=not body.skip_forms and body.send_empty_forms,
             # A marked element screenshot is what makes a finding reviewable
             # without re-running the sign-in, so an authenticated scan needs
             # them at least as much as an anonymous one. It is also the same
@@ -1758,7 +1822,7 @@ def create_app(
             # docs/protected-scans.md.
             capture_screenshots=not body.skip_rendered_storage,
             store_rendered_html=not body.skip_rendered_storage,
-            ignore_robots=True,
+            ignore_robots=body.ignore_robots,
             # The signed-in context lives in this process's memory and dies
             # with it, so nothing can continue this scan later. Say so on the
             # row: an ordinary crawl of the same seed used to adopt it while
@@ -1770,7 +1834,7 @@ def create_app(
             seed_url=body.seed_url,
             approved_target_origins=(body.target_origin,),
             approved_auth_origins=body.approved_auth_origins,
-            user_agent=settings.user_agent,
+            user_agent=login_user_agent or settings.user_agent,
             # A local human-controlled login may cross dynamically assigned
             # public SSO/MFA origins. Scan mode still tightens to the exact
             # target origin before any page evidence is collected.
@@ -4316,6 +4380,10 @@ async def _run_local_login_background(
 
     conn: sqlite3.Connection | None = None
     tab_pool: TabPool | None = None
+    # Used only for the optional loopback model provider (the AI review and
+    # the visual check's vision model); browser_only or the authenticated
+    # static fetcher keeps it from fetching protected documents.
+    local_client = httpx.AsyncClient(trust_env=False)
     try:
         run.status = "verifying_authentication"
         if not config.browser_headless and not run.session.window_open:
@@ -4398,9 +4466,30 @@ async def _run_local_login_background(
                 if config.responsive_checks_enabled
                 else None
             ),
-            focus_probe=FocusProbe(suppress_diagnostics=True),
+            focus_probe=(
+                FocusProbe(suppress_diagnostics=True) if config.focus_checks_enabled else None
+            ),
             markup_probe=(
                 MarkupProbe(suppress_diagnostics=True) if config.markup_checks_enabled else None
+            ),
+            # The visual check and the form error check, offered in sign-in
+            # scans since 2026-11-16 and built here the way the orchestrator
+            # builds them for a public scan (this fetcher is built by hand).
+            visual_probe=(
+                VisualProbe(
+                    provider=(
+                        await build_vision_provider(config, local_client)
+                        if config.vlm_enabled
+                        else None
+                    )
+                )
+                if config.visual_checks_enabled
+                else None
+            ),
+            form_error_probe=(
+                ErrorIdentificationProbe(send_empty=config.form_send_empty_forms, private=True)
+                if config.form_error_checks_enabled
+                else None
             ),
             interaction_probe=login_interaction,
             # Follow the scan's own setting rather than hardcoding it off.
@@ -4430,17 +4519,19 @@ async def _run_local_login_background(
             else None
         )
         conn = connect(db_path)
-        # This client is used only for the optional loopback model provider;
-        # browser_only prevents it from fetching protected documents.
-        async with httpx.AsyncClient(trust_env=False) as local_client:
-            summary = await run_crawl(
-                conn,
-                config,
-                http_client=local_client,
-                js_fetcher=fetcher,
-                image_downloader=image_downloader,
-                alfa_analyzer=authenticated_alfa,
-            )
+        summary = await run_crawl(
+            conn,
+            config,
+            http_client=local_client,
+            js_fetcher=fetcher,
+            image_downloader=image_downloader,
+            alfa_analyzer=authenticated_alfa,
+            # "Load pages without running scripts": the page code comes
+            # through the signed-in browser, never an anonymous request.
+            static_fetcher=(
+                None if config.js_eager else run.session.create_authenticated_static_fetcher()
+            ),
+        )
         run.status, run.error = _local_login_completion(summary)
         # run_crawl historically records an exhausted queue as completed even
         # when every page job failed.  That is useful for general best-effort
@@ -4464,6 +4555,7 @@ async def _run_local_login_background(
         _finish_local_login_scan(db_path, run.scan_id, "failed")
         log.warning("web.local_login_scan_failed", scan_id=run.scan_id)
     finally:
+        await local_client.aclose()
         if conn is not None:
             conn.close()
         if tab_pool is not None and tab_pool.fell_back:

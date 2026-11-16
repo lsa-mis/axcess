@@ -461,6 +461,137 @@ def test_local_login_scan_starts_from_same_loopback_origin(
     assert config.capture_screenshots is True
 
 
+def _sign_in_config(
+    seeded_db: tuple[Path, Path, int],
+    monkeypatch: pytest.MonkeyPatch,
+    extra: dict[str, object],
+) -> tuple[object, dict[str, object]]:
+    """The crawl config a sign-in scan starts with, and the sign-in browser's
+    arguments, for a request with ``extra`` settings."""
+    from audit.web import server
+
+    db_path, blob_dir, _ = seeded_db
+    captured: dict[str, object] = {}
+
+    async def _no_browser_run(
+        _db_path: object, _blob_dir: object, config: object, _run: object
+    ) -> None:
+        captured["config"] = config
+
+    FakeSignInSession.instances.clear()
+    monkeypatch.setattr(server, "_run_local_login_background", _no_browser_run)
+    monkeypatch.setattr(server, "ManualAuthenticationSession", FakeSignInSession)
+    app = server.create_app(db_path=db_path, blob_dir=blob_dir)
+    with TestClient(
+        app, base_url="http://127.0.0.1:8765", client=("127.0.0.1", 45678)
+    ) as local_client:
+        response = local_client.post(
+            "/api/local-login-scans",
+            headers={"origin": "http://127.0.0.1:8765"},
+            json={
+                "seed_url": "https://app.example.test/secure/",
+                "authorization_acknowledged": True,
+                **extra,
+            },
+        )
+        assert response.status_code == 201, response.text
+        sign_in_id = response.json()["sign_in_id"]
+        assert wait_for_sign_in(local_client, sign_in_id)["status"] == "awaiting_authentication"
+        started = start_sign_in_scan(local_client, sign_in_id)
+        assert started.status_code == 201, started.text
+    return captured["config"], FakeSignInSession.instances[-1].kwargs
+
+
+def test_a_sign_in_scan_keeps_its_defaults_when_nothing_new_is_sent(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An older client that sends none of the settings added on 2026-11-16
+    gets what a sign-in scan always did."""
+    from audit.config import get_settings
+
+    config, browser = _sign_in_config(seeded_db, monkeypatch, {})
+    assert config.max_pages == 10_000  # type: ignore[attr-defined]
+    assert config.allow_subdomains is False  # type: ignore[attr-defined]
+    assert config.ignore_robots is True  # type: ignore[attr-defined]
+    assert config.browser_only is True and config.js_eager is True  # type: ignore[attr-defined]
+    assert config.focus_checks_enabled is True  # type: ignore[attr-defined]
+    assert config.markup_checks_enabled is True  # type: ignore[attr-defined]
+    assert config.semantic_enabled is False  # type: ignore[attr-defined]
+    assert config.visual_checks_enabled is False  # type: ignore[attr-defined]
+    assert config.form_error_checks_enabled is False  # type: ignore[attr-defined]
+    assert config.form_send_empty_forms is False  # type: ignore[attr-defined]
+    assert config.user_agent == get_settings().user_agent  # type: ignore[attr-defined]
+    assert browser["user_agent"] == get_settings().user_agent
+
+
+def test_a_sign_in_scan_takes_every_setting_the_public_form_has(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The settings the sign-in form offers since 2026-11-16 reach the crawl,
+    and the chosen browser name reaches the sign-in window too."""
+    from audit.config import get_settings
+
+    chrome = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36"
+    )
+    config, browser = _sign_in_config(
+        seeded_db,
+        monkeypatch,
+        {
+            "all_pages": True,
+            "include_subdomain": True,
+            "ignore_robots": False,
+            "static_only": True,
+            "skip_focus": True,
+            "skip_markup": True,
+            "skip_visual": False,
+            "skip_forms": False,
+            "send_empty_forms": True,
+            "user_agent_choice": "chrome_windows",
+            "user_agent": chrome,
+        },
+    )
+    assert config.max_pages is None  # type: ignore[attr-defined]
+    assert config.allow_subdomains is True  # type: ignore[attr-defined]
+    assert config.ignore_robots is False  # type: ignore[attr-defined]
+    # Without scripts, through the signed-in browser's request client.
+    assert config.js_eager is False and config.browser_only is False  # type: ignore[attr-defined]
+    assert config.focus_checks_enabled is False  # type: ignore[attr-defined]
+    assert config.markup_checks_enabled is False  # type: ignore[attr-defined]
+    assert config.visual_checks_enabled is True  # type: ignore[attr-defined]
+    assert config.form_error_checks_enabled is True  # type: ignore[attr-defined]
+    assert config.form_send_empty_forms is True  # type: ignore[attr-defined]
+    assert config.user_agent == chrome  # type: ignore[attr-defined]
+    assert config.robots_user_agent == get_settings().user_agent  # type: ignore[attr-defined]
+    # One name while signing in and while scanning.
+    assert browser["user_agent"] == chrome
+
+
+def test_a_sign_in_scan_refuses_a_browser_name_it_cannot_send(
+    seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from audit.web import server
+
+    db_path, blob_dir, _ = seeded_db
+    monkeypatch.setattr(server, "ManualAuthenticationSession", FakeSignInSession)
+    app = server.create_app(db_path=db_path, blob_dir=blob_dir)
+    with TestClient(
+        app, base_url="http://127.0.0.1:8765", client=("127.0.0.1", 45678)
+    ) as local_client:
+        response = local_client.post(
+            "/api/local-login-scans",
+            headers={"origin": "http://127.0.0.1:8765"},
+            json={
+                "seed_url": "https://app.example.test/secure/",
+                "authorization_acknowledged": True,
+                "user_agent_choice": "custom",
+                "user_agent": "two\nlines",
+            },
+        )
+    assert response.status_code == 422, response.text
+
+
 def test_local_login_screenshots_follow_the_rendered_storage_opt_out(
     seeded_db: tuple[Path, Path, int], monkeypatch: pytest.MonkeyPatch
 ) -> None:
