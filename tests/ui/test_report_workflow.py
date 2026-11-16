@@ -1068,7 +1068,7 @@ async def test_report_breadcrumb_ends_at_the_report_on_its_views(
     # The tabs are the report's four views; Overview is gone.
     tabs = page.get_by_role("navigation", name="Report views").get_by_role("link")
     await playwright_async.expect(tabs).to_have_text(
-        ["Issues", "Images", "Compare reports", "Documents"]
+        ["Issues", "Images", "Documents", "Compare reports"]
     )
 
 
@@ -1229,7 +1229,7 @@ async def test_first_report_has_no_compare_tab(live_server: tuple[str, int], new
     ).to_be_visible()
     tabs = page.get_by_role("navigation", name="Report views").get_by_role("link")
     await playwright_async.expect(tabs).to_have_text(
-        ["Issues", "Images", "Compare reports", "Documents"]
+        ["Issues", "Images", "Documents", "Compare reports"]
     )
 
 

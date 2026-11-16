@@ -4,8 +4,8 @@ import { FRAMED } from "../lib/framed";
 
 /**
  * Report navigation: the issue table; the Images tab (every image and its
- * alt text); Compare reports, which shows this report and another of the
- * site side by side; and Documents, the files the report's pages link to.
+ * alt text); Documents, the files the report's pages link to; and Compare
+ * reports, which shows this report and another of the site side by side.
  * (What changed between two reports, the older comparison page, opens from
  * Compare reports and keeps that tab lit: it is part of that view.)
  *
@@ -61,18 +61,15 @@ export const REPORT_VIEWS: readonly ReportView[] = [
     segment: "images",
     path: (scanId) => `/scans/${scanId}/images`,
   },
-  {
-    key: "compare",
-    label: "Compare reports",
-    segment: "compare",
-    // A site's first report has nothing earlier to compare with.
-    available: (previousScanId) => previousScanId != null,
-    path: (scanId) => `/scans/${scanId}/compare`,
-  },
   // The files the report's pages link to (PDF, Word, Excel, Google), with
-  // what the PDF checks found (routes/Documents.tsx). Last, after the views
-  // of the report's issues and images: it is a separate kind of result, and
-  // a reader looks at the page issues first. Always shown, even for a report
+  // what the PDF checks found (routes/Documents.tsx). After Images and
+  // before Compare reports (the developer's decision, 2026-11-16): like
+  // Images it looks into this report, and Compare reports looks across two,
+  // so the views of this report come first. It also keeps the tab in the
+  // same place on every report: Compare reports appears only when there is
+  // an earlier report, and Documents after it was the 3rd tab on a site's
+  // first report and the 4th on later ones (SC 3.2.3 Consistent
+  // Navigation, Level AA). A reader still looks at the page issues first. Always shown, even for a report
   // that did not look for documents: the tab then says why there is no
   // list, which a missing tab could not.
   {
@@ -80,6 +77,14 @@ export const REPORT_VIEWS: readonly ReportView[] = [
     label: "Documents",
     segment: "documents",
     path: (scanId) => `/scans/${scanId}/documents`,
+  },
+  {
+    key: "compare",
+    label: "Compare reports",
+    segment: "compare",
+    // A site's first report has nothing earlier to compare with.
+    available: (previousScanId) => previousScanId != null,
+    path: (scanId) => `/scans/${scanId}/compare`,
   },
 ];
 

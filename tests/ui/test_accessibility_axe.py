@@ -722,7 +722,7 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     ).to_be_visible()
     workspace = page.get_by_role("navigation", name="Report views")
     await playwright_async.expect(workspace.get_by_role("link")).to_have_text(
-        ["Issues", "Images", "Compare reports", "Documents"]
+        ["Issues", "Images", "Documents", "Compare reports"]
     )
     await playwright_async.expect(
         workspace.get_by_role("link", name="Issues", exact=True)

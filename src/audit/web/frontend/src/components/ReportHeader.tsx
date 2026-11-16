@@ -15,8 +15,8 @@ import ReportWorkspaceNav from "./ReportWorkspaceNav";
  * it is the only trail -- a page inside a report is one location, and two
  * trails for it disagreed about where it sat.
  *
- * Only the report's four views, Issues, Images, Compare reports and
- * Documents, pass ``tabs``, and What changed, which is part of Compare
+ * Only the report's four views, Issues, Images, Documents and Compare
+ * reports, pass ``tabs``, and What changed, which is part of Compare
  * reports and keeps its tab lit.
  * An issue, its pages and the inspector sit *inside* the report rather than
  * beside those views, so a tab row there claimed a sibling relationship
