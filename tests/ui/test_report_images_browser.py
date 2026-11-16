@@ -180,3 +180,69 @@ async def test_image_viewer_opens_and_closes(images_server: tuple[str, int], new
         await playwright_async.expect(viewer).to_be_hidden()
     finally:
         await page.context.close()
+
+
+_IMAGES_HELP = "What does the Images tab show?"
+# The numbers' labels for more than one image; one image takes the verdict's
+# own label ("Needs alt text").
+_VERDICT_NUMBER_LABELS = {
+    "needs_alt": ("Needs alt text", "Need alt text"),
+    "needs_better": ("Needs better alt text", "Need better alt text"),
+    "not_checked": ("Needs a person to check", "Need a person to check"),
+    "good": ("Good alt text", "Good alt text"),
+}
+
+
+async def test_images_tab_numbers_and_help(images_server: tuple[str, int], new_page: Any) -> None:
+    """The Images tab's numbers in the Issues tab's style, and its explanation
+    behind a "?" after the heading (2026-11-16)."""
+    base, scan_id = images_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    try:
+        await page.goto(f"{base}/app/scans/{scan_id}/images", wait_until="networkidle")
+        body = await (
+            await page.request.get(f"{base}/api/scans/{scan_id}/images?group=with_text")
+        ).json()
+        groups = (body["counts"]["missing_alt"], body["counts"]["with_alt"])
+        total = sum(g["total"] for g in groups)
+        assert total > 0, body["counts"]
+
+        # One number per verdict that has any, after the images found, in the
+        # verdict filter's order; every number is the whole report's.
+        expected = [("Image found" if total == 1 else "Images found", total)]
+        for key in ("needs_alt", "needs_better", "not_checked", "good"):
+            n = sum(g[key] for g in groups)
+            if n:
+                expected.append((_VERDICT_NUMBER_LABELS[key][0 if n == 1 else 1], n))
+        numbers = page.locator("main dl").first
+        await playwright_async.expect(numbers.get_by_role("term")).to_have_text(
+            [label for label, _ in expected]
+        )
+        await playwright_async.expect(numbers.get_by_role("definition")).to_have_text(
+            [f"{n:,}" for _, n in expected]
+        )
+        # The explanation is no longer on screen until asked for.
+        await playwright_async.expect(page.get_by_text("Each verdict is a lead")).to_be_hidden()
+
+        tip = page.get_by_role("button", name=_IMAGES_HELP, exact=True)
+        box = await tip.bounding_box()
+        assert box and box["height"] >= 44 and box["width"] >= 44, box
+        # After the heading, not inside it.
+        await playwright_async.expect(
+            page.get_by_role("heading", level=1, name="Images", exact=True)
+        ).to_be_visible()
+        await tip.focus()
+        await page.keyboard.press("Enter")
+        await playwright_async.expect(tip).to_have_attribute("aria-expanded", "true")
+        panel = page.locator("[popover]:popover-open")
+        await playwright_async.expect(panel).to_contain_text("One image can be in two groups")
+        await playwright_async.expect(panel).to_contain_text(
+            "No verdict proves that the site meets accessibility standards."
+        )
+        violations = await _run_axe(page)
+        assert not violations, _render_violations(violations)
+        await page.keyboard.press("Escape")
+        await playwright_async.expect(panel).to_have_count(0)
+        await playwright_async.expect(tip).to_be_focused()
+    finally:
+        await page.context.close()

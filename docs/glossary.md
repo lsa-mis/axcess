@@ -259,9 +259,13 @@ On a report's Images tab, one verdict on each image's alt text:
   image with no text in it, the local AI model said so when a person asked.
 - **Good alt text**: it matches the text in the image, or the local AI model
   said it is good when a person asked.
-- **Not checked yet**: the image has no text to compare, and no one has
-  asked the local AI model. Empty alt text on such an image means the author
-  marked it decorative; a person checks that it adds nothing.
+- **Needs a person to check**: Axcess could not judge the alt text, so a
+  person must. This happens when the image has no text to compare and no one
+  has asked the local AI model, or when the local AI model said one alt text
+  is good but the image has other alt text on other pages. Empty alt text on
+  an image with no text means the author marked it decorative; a person
+  checks that it adds nothing. (Called "Not checked yet" until November
+  2026.)
 
 A verdict from the local AI model, and its suggested alt text, is a lead for
 a person to confirm. No verdict proves that the site meets WCAG.

@@ -363,7 +363,8 @@ def test_zip_puts_images_in_group_and_verdict_folders(app_and_ids: Any) -> None:
         for n in names
     )
     assert any(
-        n.startswith(root + "Images with alt text/Not checked yet/") and n.endswith("students.png")
+        n.startswith(root + "Images with alt text/Needs a person to check/")
+        and n.endswith("students.png")
         for n in names
     )
 
@@ -381,7 +382,7 @@ def test_zip_puts_images_in_group_and_verdict_folders(app_and_ids: Any) -> None:
     cell = ws.cell(row=rows.index(photo_row) + 2, column=alt_col + 1)
     assert cell.data_type == "s" and cell.value.startswith("=HYPERLINK")
     files_col = header.index("Files in this ZIP")
-    assert "Images with alt text/Not checked yet/" in photo_row[files_col]
+    assert "Images with alt text/Needs a person to check/" in photo_row[files_col]
     about = " ".join(str(c.value) for c in wb["About"]["A"] if c.value)
     assert "does not prove" in about
 

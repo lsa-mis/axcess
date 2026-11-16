@@ -14,7 +14,7 @@ Layout::
       Images without alt text/
         Needs alt text/...
       Images with alt text/
-        Not checked yet/...
+        Needs a person to check/...
       images.xlsx
 
 The folders follow the tab: a group, then a verdict. An image in two groups
@@ -57,7 +57,7 @@ GROUP_FOLDER = {
 VERDICT_FOLDER = {
     "needs_alt": "Needs alt text",
     "needs_better": "Needs better alt text",
-    "not_checked": "Not checked yet",
+    "not_checked": "Needs a person to check",
     "good": "Good alt text",
 }
 SOURCE_LABEL = {
@@ -170,8 +170,8 @@ def _workbook(
         "screen reader reads for an image.",
         "Needs alt text: there is none, or it is empty on an image that has text in it.",
         "Needs better alt text: there is some, but it falls short.",
-        "Not checked yet: there is no text in the image to compare, and no one asked "
-        "the local AI model.",
+        "Needs a person to check: Axcess could not judge the alt text, most often "
+        "because there is no text in the image to compare.",
         "",
         "Each verdict is a lead for a person to confirm. Suggested alt text from the "
         "local AI model must be checked before use. This list does not prove that the "

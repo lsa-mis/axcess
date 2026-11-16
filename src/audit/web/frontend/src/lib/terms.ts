@@ -285,15 +285,32 @@ export const IMAGE_GROUP_LABEL: Record<ImageGroup, string> = {
  * One verdict on an image's alt text (the text a screen reader reads for
  * an image). "Needs alt text" and "Needs better alt text" are two verdicts,
  * not one (the developer's call, 2026-11-13): an image with no alt text has
- * nothing to improve, it needs alt text written. "Not checked yet", not
- * "Adequate": the text match cannot judge an image with no text in it, and
- * a word that sounds like a pass would claim a check that did not run.
+ * nothing to improve, it needs alt text written. "Needs a person to check",
+ * not "Adequate": the text match cannot judge an image with no text in it, and
+ * a word that sounds like a pass would claim a check that did not run. It
+ * was "Not checked yet" until 2026-11-16, when the developer renamed it to
+ * say who acts: most of a report's images land here, and "not checked yet"
+ * read as Axcess still working on them. The new words also part it from the
+ * "Checked by a person" value "Not checked yet" (REVIEW_DECISION_LABEL),
+ * which is about an occurrence, not an image.
  * Rejected: "Bad alt text", which blames, and says less than "needs better".
  */
 export const ALT_VERDICT_LABEL: Record<AltVerdict, string> = {
   needs_alt: "Needs alt text",
   needs_better: "Needs better alt text",
-  not_checked: "Not checked yet",
+  not_checked: "Needs a person to check",
+  good: "Good alt text",
+};
+
+/**
+ * The same verdicts under a count of more than one image, as the Images
+ * tab's numbers show them ("41 / Need alt text"): the verb agrees with the
+ * number. One image takes ``ALT_VERDICT_LABEL``.
+ */
+export const ALT_VERDICT_COUNT_LABEL: Record<AltVerdict, string> = {
+  needs_alt: "Need alt text",
+  needs_better: "Need better alt text",
+  not_checked: "Need a person to check",
   good: "Good alt text",
 };
 

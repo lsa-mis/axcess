@@ -35,8 +35,12 @@ function endText(coverage: ScanDetail["coverage"]): string {
  * checked" and "7 of 60 pages found so far" while a scan runs (SC 3.2.4
  * Consistent Identification, Level AA; W3C COGA, "Making Content Usable":
  * the same pattern for the same kind of thing).
+ *
+ * Exported for the Images tab's numbers, so a report's numbers look the
+ * same on every tab (SC 3.2.4 Consistent Identification, Level AA). Put it
+ * in a ``dl``.
  */
-function SummaryStat({
+export function SummaryStat({
   label,
   value,
   outOf,

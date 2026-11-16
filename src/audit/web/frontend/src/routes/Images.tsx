@@ -3,7 +3,8 @@ import { useParams, useSearchParams } from "react-router";
 import { Check, Copy, Download, Sparkles, X } from "lucide-react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, blobUrl, ApiError } from "../api/client";
-import ReportHeader, { ReportMeta } from "../components/ReportHeader";
+import ReportHeader from "../components/ReportHeader";
+import { SummaryStat } from "../components/ReportSummary";
 import Tabs from "../components/Tabs";
 import { PagedTable } from "../components/TablePagination";
 import {
@@ -20,13 +21,13 @@ import {
   TableStatus,
 } from "../components/table/Table";
 import { ActiveFilters, FilterMenu, activeFilterItems, type FilterGroup } from "../components/table/FilterMenu";
-import { AltTag, Button, Card, PageLink } from "../components/ui";
+import { AltTag, Button, Card, HelpTip, PageLink } from "../components/ui";
 import { useModalDialog } from "../hooks/useModalDialog";
 import { useScanQuery } from "../hooks/useScanQuery";
 import { cn } from "../lib/cn";
 import { copyText } from "../lib/clipboard";
-import { ALT_VERDICT_LABEL, ALT_VERDICT_SOURCE_LABEL, IMAGE_GROUP_LABEL } from "../lib/terms";
-import type { AltVerdict, ImageGroup, ReportImage, ReportImagesFilter } from "../api/types";
+import { ALT_VERDICT_COUNT_LABEL, ALT_VERDICT_LABEL, ALT_VERDICT_SOURCE_LABEL, IMAGE_GROUP_LABEL } from "../lib/terms";
+import type { AltVerdict, ImageGroup, ImageGroupCounts, ReportImage, ReportImagesFilter } from "../api/types";
 
 /**
  * The report's Images tab: every image the scan saw, grouped by what to
@@ -41,15 +42,16 @@ import type { AltVerdict, ImageGroup, ReportImage, ReportImagesFilter } from "..
  * Compare reports, in that order: Issues stays the landing view.
  *
  * The three groups are questions asked of the list, so an image can be in
- * two ("Images with text" and one of the other two); the page says so
- * under the group row. They are the shared `Tabs` in filter mode
+ * two ("Images with text" and one of the other two); the "?" after the
+ * heading says so. They are the shared `Tabs` in filter mode
  * (aria-pressed toggle buttons over one table), not three tables and not
  * links: the choice narrows this table in place. The Claude Design draft
  * (2026-11-13) drew them as large cards with the verdict split in each;
  * the shared chips were kept instead, one control for one kind of choice
  * across the app (SC 3.2.4 Consistent Identification, Level AA; W3C COGA
  * "Making Content Usable", https://www.w3.org/TR/coga-usable/), and the
- * split moved to the line under the row.
+ * split moved to the counts on the verdict filter's choices (2026-11-16;
+ * before that, a line under the row).
  *
  * Verdicts come from the most direct evidence (src/audit/web/image_inventory.py):
  * the page code, then the text match, then the local model when a person
@@ -182,16 +184,24 @@ export default function ImagesRoute() {
       label: "Alt text verdict",
       value: verdict,
       options: [
-        { value: "", label: "All" },
-        ...VERDICTS.map((value) => ({ value, label: ALT_VERDICT_LABEL[value] })),
+        { value: "", label: "All", count: data?.counts[group].total ?? 0 },
+        ...VERDICTS.map((value) => ({ value, label: ALT_VERDICT_LABEL[value], count: data?.counts[group][value] ?? 0 })),
       ],
     },
   ];
-  const counts = data?.counts[group];
   const pages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1;
   const scan = scanQuery.data;
-  // Every image is in exactly one of these two groups.
-  const allImages = data ? data.counts.missing_alt.total + data.counts.with_alt.total : null;
+  // Every image is in exactly one of these two groups, so their counts add
+  // up to the whole report.
+  const totals: ImageGroupCounts | null = data
+    ? {
+        total: data.counts.missing_alt.total + data.counts.with_alt.total,
+        needs_alt: data.counts.missing_alt.needs_alt + data.counts.with_alt.needs_alt,
+        needs_better: data.counts.missing_alt.needs_better + data.counts.with_alt.needs_better,
+        not_checked: data.counts.missing_alt.not_checked + data.counts.with_alt.not_checked,
+        good: data.counts.missing_alt.good + data.counts.with_alt.good,
+      }
+    : null;
 
   return (
     <>
@@ -208,31 +218,80 @@ export default function ImagesRoute() {
         // plain link: a plain link did nothing in some windows (2026-11-13).
         // Only a completed report offers it; the server refuses the rest.
         actions={scan?.status === "completed" ? <ZipDownload scanId={id} /> : undefined}
-        meta={
-          <ReportMeta
-            counts={allImages == null ? "Loading images…" : plural(allImages, "image", "images")}
-            note=""
-          />
+        // What the tab shows, behind the "?" after the heading (the
+        // developer's request, 2026-11-16). These two paragraphs were on
+        // screen under the heading until then. Lines kept to the shared
+        // measure inside the panel (SC 1.4.8 Visual Presentation, Level AAA).
+        //
+        // The tradeoff, told to the developer before building it, who chose
+        // to move all of it: "No verdict proves that the site meets
+        // accessibility standards" is no longer on screen until someone
+        // opens the "?", although AGENTS.md keeps that caveat in view
+        // (Interface language rule 4). Each verdict cell still names its
+        // source in words (page code, text match, local AI model), so a
+        // model's view is never shown as a measured fact.
+        help={
+          <HelpTip
+            question="What does the Images tab show"
+            // The icon at the start of its 44px target, not its middle, so it
+            // sits about 8px after the heading rather than 15px (the
+            // developer's request, 2026-11-16). The target keeps its full
+            // size (SC 2.5.5 Target Size (Enhanced), Level AAA) and reaches
+            // right, into empty space.
+            className="justify-start pl-1"
+          >
+            <div className="max-w-measure space-y-2">
+              <p>
+                Every image this scan found, grouped by what to check. Alt text is the text a
+                screen reader reads for an image. One image can be in two groups: &ldquo;Images
+                with text&rdquo; and one of the other two.
+              </p>
+              <p>
+                Each verdict is a lead for a person to confirm. No verdict proves that the site
+                meets accessibility standards.
+              </p>
+            </div>
+          </HelpTip>
         }
       />
 
-      {/* Lines kept to the shared measure (max-w-measure, 35em) (SC 1.4.8 Visual Presentation,
-          Level AAA: 80 or fewer). The caveat sits here, not on the meta line,
-          where it ran past 80. */}
-      <div className="mb-3 max-w-measure space-y-2 text-sm leading-6 text-fg-muted">
-        <p>
-          Every image this scan found, grouped by what to check. Alt text is the text a
-          screen reader reads for an image. One image can be in two groups: &ldquo;Images
-          with text&rdquo; and one of the other two.
-        </p>
-        <p>
-          Each verdict is a lead for a person to confirm. No verdict proves that the site
-          meets accessibility standards.
-        </p>
-      </div>
+      {/* The report's numbers for its images, in the Issues tab's style
+          (SummaryStat; the developer's request, 2026-11-16), replacing the
+          "1,076 images" meta line under the heading: all the images, then
+          one number per verdict, worst first, in the order the verdict
+          filter and the line under the groups use (SC 3.2.4 Consistent
+          Identification, Level AA).
+
+          "Need a person to check" is shown too, though the request listed only
+          found, need alt text, need better alt text and good: without it the
+          verdicts add up to far fewer than the images found, and the rest
+          read as fine (AGENTS.md, Interface language rule 4: never drop a
+          limitation). It is left out only at zero, like every verdict.
+
+          Whole-report counts: every image is in exactly one of "without alt
+          text" and "with alt text", so the two groups' counts add up to the
+          report without counting an image twice. They do not change with the
+          group, filter or search, like the group buttons' numbers.
+
+          The grid is the Issues strip's spacing: two across below 640px so
+          nothing is squeezed at 320px (SC 1.4.10 Reflow, Level AA), then as
+          many as there are numbers. */}
+      {totals && (
+        <dl className="mt-10 mb-8 grid grid-cols-2 gap-x-8 gap-y-8 sm:grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] lg:gap-x-12">
+          <SummaryStat label={totals.total === 1 ? "Image found" : "Images found"} value={totals.total} />
+          {VERDICTS.filter((key) => totals[key] > 0).map((key) => (
+            <SummaryStat
+              key={key}
+              label={totals[key] === 1 ? ALT_VERDICT_LABEL[key] : ALT_VERDICT_COUNT_LABEL[key]}
+              value={totals[key]}
+            />
+          ))}
+        </dl>
+      )}
 
       <Tabs
         mode="filter"
+        className="mb-4"
         label="Image groups"
         controls="report-images-table"
         value={group}
@@ -250,20 +309,11 @@ export default function ImagesRoute() {
         }))}
       />
 
-      {counts && (
-        <p className="mb-4 mt-3 text-sm text-fg-muted">
-          <span className="font-semibold text-fg">{IMAGE_GROUP_LABEL[group]}:</span>{" "}
-          {[
-            counts.needs_alt && `${counts.needs_alt.toLocaleString()} need alt text`,
-            counts.needs_better && `${counts.needs_better.toLocaleString()} need better alt text`,
-            counts.not_checked && `${counts.not_checked.toLocaleString()} not checked yet`,
-            counts.good && `${counts.good.toLocaleString()} good`,
-          ]
-            .filter(Boolean)
-            .join(", ") || "none"}
-          .
-        </p>
-      )}
+      {/* The line that split the chosen group by verdict ("Images with text:
+          41 need alt text, …") was removed (the developer's request,
+          2026-11-16): the numbers above say it for the whole report, and the
+          split for the chosen group is on the verdict filter's choices, as
+          counts, the way the Issues Filter menu counts its choices. */}
 
       {imagesQuery.error && (
         <Card className="mb-4 border-sev-critical/30 bg-sev-critical-bg p-4 text-sm text-sev-critical">
@@ -317,9 +367,18 @@ export default function ImagesRoute() {
             </TableBar>
           )}
         >
+        {/* The order, and the count only when no pager shows it. The pager's
+            "Showing 1–25 of 98 images" says the count, so repeating it here
+            was one fact twice (the developer's catch, 2026-11-16). But the
+            pager is drawn only when there is more than one page, so with 25
+            or fewer images (a search, a small report) this line is the only
+            place that says, and announces, how many match (SC 4.1.3 Status
+            Messages, Level AA). It stays mounted, as a live region must. */}
         <TableStatus>
           {data
-            ? `${plural(data.total, "image", "images")}, the ones that need alt text first.`
+            ? pages > 1
+              ? "The ones that need alt text come first."
+              : `${plural(data.total, "image", "images")}. The ones that need alt text come first.`
             : "Loading images…"}
         </TableStatus>
         {data && !data.check_available && (
