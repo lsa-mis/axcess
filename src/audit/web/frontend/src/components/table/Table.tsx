@@ -405,6 +405,7 @@ export function SortHeader<K extends string>({
   sort,
   onSort,
   kind = "text",
+  align,
   chip,
   wrap = "chip",
   hint,
@@ -417,6 +418,13 @@ export function SortHeader<K extends string>({
   sort: Sort<K> | null;
   onSort: (next: Sort<K>) => void;
   kind?: SortKind;
+  /**
+   * Which side the heading sits on: its column's content's side (see
+   * ``ColumnHeader``). Defaults from ``kind``: right for a number column,
+   * left otherwise. Set it for a column that sorts by a number but shows
+   * words (Issues' Priority sorts by score and shows High, Medium, Low).
+   */
+  align?: "left" | "right";
   /** Words for the chip when the column's order is not plain text, number or date. */
   chip?: (sort: Sort<K>) => string;
   wrap?: "chip" | "words";
@@ -430,18 +438,7 @@ export function SortHeader<K extends string>({
    * A ``HelpTip`` ("?") after the sort button, for a column whose values
    * need explaining (Issues' "How sure"). Beside the button, not inside it:
    * one control sorts and the other explains, so neither does two things.
-   * Bottom-aligned with the label, so the header's last line stays level
-   * with its neighbours'.
-   *
-   * With a "?", a label that wraps aligns its lines to the end, so its last
-   * line (and the sort arrow on it) ends right beside the "?". Centred, the
-   * short last line sat in the middle of a box as wide as the longest one,
-   * and the "?" floated apart from the words it explains ("Accessibility /
-   * problems? ⇅ … ?", the developer's screenshot, 2026-11-16). Proximity
-   * says what belongs together (W3C COGA, "Making Content Usable"). Here,
-   * not on one header, so every header with a "?" gets it (Issues' How
-   * sure, Where it shows and Priority wrap too in a narrow window). A label
-   * on one line looks the same either way.
+   * In the middle of the label's line, on the column's side, like the label.
    */
   help?: ReactNode;
   className?: string;
@@ -449,6 +446,7 @@ export function SortHeader<K extends string>({
   children?: ReactNode;
 }) {
   const active = sort?.column === column;
+  const right = (align ?? (kind === "number" ? "right" : "left")) === "right";
   const Arrow = !sort || !active ? ArrowUpDown : sort.direction === "asc" ? ArrowUp : ArrowDown;
   const words = wrap === "words";
   const label = children ?? column;
@@ -477,14 +475,15 @@ export function SortHeader<K extends string>({
       scope="col"
       aria-sort={sort ? ariaSort(active, sort.direction) : "none"}
       className={cn(
-        "px-3 py-1.5 text-center font-semibold",
+        "px-3 py-1.5 font-semibold",
+        right ? "text-right" : "text-left",
         active && "shadow-[inset_0_-3px_0_theme(colors.umich.blue)]",
         className,
       )}
       {...th}
     >
       {help ? (
-        <span className="inline-flex items-end justify-center">
+        <span className={cn("inline-flex items-center", right ? "justify-end" : "justify-start")}>
           {sortButton()}
           {help}
         </span>
@@ -501,15 +500,15 @@ export function SortHeader<K extends string>({
         title={hint}
         onClick={() => onSort(nextSort(sort, column, kind))}
         className={cn(
-          "group inline-flex min-h-target min-w-target justify-center rounded-xs px-1 text-sm font-semibold normal-case tracking-normal hover:bg-border/50 focus-visible:outline-none focus-visible:shadow-focus",
-          // Words at the foot of the target, not its middle: with the cell
-          // bottom-aligned, the last line of every label then sits on one
-          // line, right over the column's data, however many lines each
-          // label takes. The target keeps its full height (SC 2.5.5).
-          words ? "items-end pb-1.5" : "items-center",
-          !words && "flex-wrap justify-center gap-x-1.5 gap-y-0.5",
-          // Lines end at the "?" when there is one (see ``help``).
-          help ? "text-right" : "text-center",
+          "group inline-flex min-h-target min-w-target rounded-xs px-1 text-sm font-semibold normal-case tracking-normal hover:bg-border/50 focus-visible:outline-none focus-visible:shadow-focus",
+          right ? "justify-end text-right" : "justify-start text-left",
+          // Words in the middle of the target, so every label sits in the
+          // middle of the header row (the developer's request, 2026-11-16).
+          // They were at its foot, to keep the last line of a two-line label
+          // level with its one-line neighbours, but a one-line label then
+          // sat visibly low. The target keeps its full height (SC 2.5.5).
+          "items-center",
+          !words && "flex-wrap gap-x-1.5 gap-y-0.5",
           active ? "text-umich-blue" : "text-fg-muted",
         )}
       >
@@ -521,7 +520,7 @@ export function SortHeader<K extends string>({
           active ? (
             <span>
               {label}
-              <span className={cn("mt-0.5 flex", help ? "justify-end" : "justify-center")}>{indicator}</span>
+              <span className={cn("mt-0.5 flex", right ? "justify-end" : "justify-start")}>{indicator}</span>
             </span>
           ) : (
             <span>{withLastWord(label, indicator)}</span>
@@ -563,24 +562,39 @@ function withLastWord(label: ReactNode, after: ReactNode): ReactNode {
 }
 
 /**
- * A column header that does not sort. Every heading, sorting or not, is
- * centred over its column, so a row of headings reads as one even line
- * whatever the widths of the columns under them.
+ * A column header that does not sort.
+ *
+ * Every heading, sorting or not, sits on the side its column's content
+ * does: left over words, links and tags, right over numbers (``numeric``
+ * here, ``Cell numeric`` under it). The developer's rule, 2026-11-16,
+ * replacing centred headings (e905267, 2026-09-26), which floated away
+ * from the left edge of the text under them, more so in wide columns, so a
+ * reader using screen magnification, or anyone tracking a dense table,
+ * could lose which heading went with which column (W3C COGA, "Making
+ * Content Usable", https://www.w3.org/TR/coga-usable/: keep related things
+ * visibly together). Numbers sit right so they line up by place value.
+ * The GOV.UK Design System, the U.S. Web Design System and Material align
+ * headings with their data the same way (paraphrased). WCAG has no
+ * criterion on it; a screen reader is unaffected, since it reads
+ * ``th``/``scope``. tests/ui/test_table_alignment.py checks every screen.
  */
 export function ColumnHeader({
   className,
   children,
   scope = "col",
+  numeric = false,
   ...th
 }: HeaderProps & {
   scope?: "col" | "colgroup";
   className?: string;
+  /** The column holds numbers: the heading sits right, over them. */
+  numeric?: boolean;
   children: ReactNode;
 }) {
   return (
     <th
       scope={scope}
-      className={cn("px-4 py-3 text-center font-semibold", className)}
+      className={cn("px-4 py-3 font-semibold", numeric ? "text-right" : "text-left", className)}
       {...th}
     >
       {children}
@@ -633,9 +647,10 @@ export function RowHeader({
 }
 
 /**
- * A body cell. `numeric` sets it in tabular figures, on one line, centred
- * under its centred heading. Other cells stay left-aligned: running text
- * such as a title or an address reads best from a straight left edge.
+ * A body cell. `numeric` sets it in tabular figures, on one line, on the
+ * right, so numbers line up by place value under their right-aligned
+ * heading. Other cells are left-aligned: running text such as a title or an
+ * address reads best from a straight left edge (see ``ColumnHeader``).
  */
 export function Cell({
   numeric = false,
@@ -647,7 +662,7 @@ export function Cell({
     <td
       className={cn(
         "px-4 py-3.5 align-middle leading-6",
-        numeric && "whitespace-nowrap text-center tabular-nums",
+        numeric && "whitespace-nowrap text-right tabular-nums",
         className,
       )}
       {...td}

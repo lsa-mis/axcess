@@ -231,7 +231,9 @@ export default function TrackingRoute() {
               <Table caption="What Axcess checks for each WCAG 2.2 Level A and AA criterion, and planned AI reviews">
                 <TableHead>
                   <tr>
-                    <SortHeader column="sc" kind={SORT_KINDS.sc} {...sortProps}>
+                    {/* Sorted as numbers, but a criterion number ("1.4.3") is a
+                        name, not a quantity: left, over its cells. */}
+                    <SortHeader column="sc" kind={SORT_KINDS.sc} align="left" {...sortProps}>
                       Number
                     </SortHeader>
                     <SortHeader column="name" kind={SORT_KINDS.name} {...sortProps}>

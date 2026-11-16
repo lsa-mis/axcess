@@ -37,7 +37,7 @@ from urllib.parse import urlsplit, urlunsplit
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from audit.crawler.search import SearchConfig
-from audit.crawler.user_agent import DEFAULT_CHOICE, is_choice, user_agent_problem
+from audit.crawler.user_agent import CHROME_CHOICE, DEFAULT_CHOICE, is_choice, user_agent_problem
 from audit.wcag_version import WcagVersion, stored_wcag_version
 
 # Inclusive bounds for a public scan's two limits. The login endpoint's
@@ -264,7 +264,8 @@ def user_agent_refusal(body: Mapping[str, Any]) -> tuple[str, str] | None:
     with the string to send.
     """
     choice = body.get("user_agent_choice")
-    if choice is None or choice == DEFAULT_CHOICE:
+    # Axcess's own name and Chrome's (worked out by the server) need no string.
+    if choice is None or choice in (DEFAULT_CHOICE, CHROME_CHOICE):
         return None
     if not is_choice(choice):
         return "user_agent_choice", "Choose a browser name from the list."

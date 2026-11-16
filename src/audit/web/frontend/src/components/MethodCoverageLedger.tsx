@@ -165,7 +165,7 @@ function MethodRow({
       <RowHeader className={cn(top, "w-[12rem]")}>
         <span className={ran ? "text-fg" : "text-fg-muted"}>{method.label}</span>
       </RowHeader>
-      <Cell className={cn(top, "whitespace-nowrap text-center")}>
+      <Cell className={cn(top, "whitespace-nowrap")}>
         <StateChip state={method.state} />
       </Cell>
       {/* What it ran on, then what it found: one column, since a check

@@ -840,6 +840,9 @@ function IssueTable({
                 column={column}
                 wrap="words"
                 kind={SORT_KINDS[column]}
+                // Priority sorts by score but shows High, Medium, Low: words,
+                // so its heading sits left over them.
+                align={column === "Priority" ? "left" : undefined}
                 sort={sort}
                 onSort={onSort}
                 className={cn(
@@ -851,6 +854,10 @@ function IssueTable({
                   // screenshots, 2026-11-16).
                   // Where it shows too, once it had its "?" (2026-11-16).
                   (column === "Type" || column === "Finding type") && "whitespace-nowrap",
+                  // 4px a side, not 6, on the three headers with a "?": with
+                  // a sort chip showing the table was 2px wider than its
+                  // region at 1280px (test_issue_table_fits_the_default_desktop_width).
+                  (column === "Type" || column === "Finding type" || column === "Priority") && "px-1",
                 )}
                 hint={columnHint(column)}
                 help={columnHelp(column)}
@@ -905,9 +912,10 @@ const IssueTableRow = memo(function IssueTableRow({
   const isInformational = row.review_lane === "informational";
   const detailPath = `/scans/${scanId}/issues/${encodeURIComponent(row.issue_key)}`;
   // Body cells are padded 1.5 rather than the shared 2, which is what keeps
-  // all nine columns in view beside the expanded sidebar at 1280 px. Every
-  // cell but the title is short, so it centres under its centred heading.
-  const cell = "px-1.5 text-center";
+  // all nine columns in view beside the expanded sidebar at 1280 px. Words
+  // and tags sit left, the two counts right (Cell numeric), each under its
+  // heading (ColumnHeader, 2026-11-16; they were centred).
+  const cell = "px-1.5";
 
   return (
     <Row index={index}>

@@ -517,14 +517,14 @@ function PagesTable({
                       {pagePath(row.url, seedUrl)}
                     </span>
                   </RowHeader>
-                  <Cell className="whitespace-nowrap text-center text-sm font-semibold text-fg">{PAGE_WORD[row.state]}</Cell>
+                  <Cell className="whitespace-nowrap text-sm font-semibold text-fg">{PAGE_WORD[row.state]}</Cell>
                   {checks.map((key) => {
                       // A waiting page has started no check; any other page
                       // without a state for a check was not tracked for it
                       // (checked before a restart, say), which says so.
                       const state = row.checks[key] ?? (row.state === "waiting" ? "waiting" : undefined);
                       return (
-                        <Cell key={key} className="text-center">
+                        <Cell key={key}>
                           {state ? (
                             <Chip tone={state}>{CELL_WORD[state]}</Chip>
                           ) : (

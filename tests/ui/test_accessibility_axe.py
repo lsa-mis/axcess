@@ -736,8 +736,10 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     summary = page.locator("dl").filter(has_text="Pages visited").first
     await playwright_async.expect(summary.get_by_role("term")).to_have_text(
         [
-            re.compile(r"^Issue types?$"),
-            re.compile(r"^Issue occurrences?$"),
+            # Each count's term starts with its name; a "?" follows it
+            # (2026-11-16), whose words are part of the term's text.
+            re.compile(r"^Issue types?(What is|$)"),
+            re.compile(r"^Issue occurrences?(What is|$)"),
             "Pages visited",
         ]
     )

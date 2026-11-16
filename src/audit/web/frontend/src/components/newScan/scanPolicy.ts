@@ -137,7 +137,8 @@ export const PUBLIC_DEFAULTS: ScanSettings = {
   // The current U-M standard. 2.2 is a deliberate choice, and marks the
   // settings Customized.
   wcag_version: "2.1",
-  // Axcess names itself unless the person chooses a browser's name.
+  // Chrome's name, as the Chromium Axcess runs, unless the person chooses
+  // otherwise (2026-11-16; userAgents.ts). Axcess's own name is a choice.
   user_agent_choice: DEFAULT_USER_AGENT_CHOICE,
   user_agent: "",
 };
@@ -542,8 +543,8 @@ export function quickRetrySettings(url: string, wcagVersion: ScanSettings["wcag_
  */
 export function settingsFromSnapshot(snapshot: ScanSettingsSnapshot, policy: ScanPolicy): ScanSettings {
   const settings = { ...policy.defaults, ...snapshot.settings };
-  // A browser this form no longer lists falls back to Axcess's own name
-  // rather than to a choice the Select cannot show.
+  // A browser this form no longer lists falls back to the default (Chrome
+  // on this computer) rather than to a choice the Select cannot show.
   if (!knownChoice(settings.user_agent_choice)) {
     settings.user_agent_choice = DEFAULT_USER_AGENT_CHOICE;
     settings.user_agent = "";

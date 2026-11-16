@@ -331,6 +331,8 @@ export default function PagesVisitedRoute() {
                     <SortHeader
                       column="load"
                       kind="number"
+                      // Sorted by how it loaded, shown as words: left.
+                      align="left"
                       chip={(current) => loadWords(current.direction)}
                       {...sortProps}
                     >

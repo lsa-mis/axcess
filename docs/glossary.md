@@ -346,11 +346,14 @@ default. On the New scan form it is **Open menus, tabs, and pop-up windows
 ### Browser the site sees
 
 The browser name a scan sends to the site with every page request. Developers
-call it the user agent. By default Axcess sends its own name, so the site can
-see that a scanner is visiting. On the New scan form, under **Speed and
-browser window**, you can choose a current browser instead, such as Chrome on
-Windows or Safari on iPhone, or type your own. Some sites show a different
-page, or block scans, depending on this name.
+call it the user agent. By default Axcess sends Chrome's name, with the
+version of Chrome it runs and this computer's system ("Chrome on this
+computer"), so the site serves the page a visitor in Chrome gets. Some sites
+show a different page, or block scans, when a scanner names itself. On the
+New scan form, under **Speed and browser window**, you can choose Axcess's
+own name instead, so the site can see that a scanner is visiting, or another
+browser, such as Safari on iPhone, or type your own. (Until November 2026
+Axcess sent its own name by default.)
 
 Only the name changes. Every page still opens in Chromium, so a site that
 checks what the browser can do may still tell. The site's robots.txt rules

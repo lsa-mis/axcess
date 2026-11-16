@@ -369,7 +369,9 @@ async def test_table_opens_on_every_group_and_the_filter_shows_the_surest(
 
     # The numbers over the table count every row under it; nothing is hidden.
     summary = page.locator("dl").first
-    await pw.expect(summary).to_contain_text(re.compile(rf"Issue types\s*{_ALL_COUNT}"))
+    # The count follows its term, and the term's "?" (2026-11-16).
+    await pw.expect(summary.get_by_role("definition").first).to_have_text(str(_ALL_COUNT))
+    await pw.expect(summary.get_by_role("term").first).to_contain_text("Issue types")
     await pw.expect(summary).not_to_contain_text("hidden")
 
     # No filter was set by the reader, so none is shown as set.
@@ -418,11 +420,11 @@ async def test_how_sure_help_opens_by_keyboard_and_says_what_each_value_means(
     await _open(page, base, scan_id)
     header = page.get_by_role("columnheader", name=re.compile(r"^How sure"))
     tip = header.get_by_role("button", name=_HOW_SURE_HELP, exact=True)
-    # 44px tall and 28px wide (HelpTip ``equivalent``): SC 2.5.5's "Equivalent"
+    # 44px tall and 24px wide (HelpTip ``equivalent``): SC 2.5.5's "Equivalent"
     # exception, because "What the labels mean" under the table is a 44px
     # control that shows the same explanation.
     box = await tip.bounding_box()
-    assert box and box["height"] >= 44 and box["width"] >= 28, box
+    assert box and box["height"] >= 44 and box["width"] >= 24, box
     glossary = page.get_by_role("button", name=re.compile(r"^What .*labels mean"))
     glossary_box = await glossary.bounding_box()
     assert glossary_box and glossary_box["height"] >= 44 and glossary_box["width"] >= 44

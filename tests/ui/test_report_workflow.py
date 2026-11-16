@@ -629,7 +629,8 @@ async def test_issue_table_recommended_order_is_lane_first_and_headers_sort_flat
     await page.goto(f"{base}/app/scans/{scan_id}/issues?{ALL_HOW_SURE}", wait_until="networkidle")
 
     priority = issues.get_by_role("columnheader", name="Priority")
-    await priority.get_by_role("button").click()
+    # The sort button by name: the header also holds a "?" (2026-11-16).
+    await priority.get_by_role("button", name="Priority", exact=True).click()
     await page.wait_for_url("**sort=score_desc*")
     await playwright_async.expect(priority).to_have_attribute("aria-sort", "descending")
     await playwright_async.expect(group_headers).to_have_count(0)
@@ -1738,7 +1739,11 @@ async def test_issues_never_shows_the_recommended_order_sentence(
     # Every "How sure" value shown, so the table has rows and headers to sort.
     await page.goto(f"{base}/app/scans/{scan_id}/issues?{ALL_HOW_SURE}", wait_until="networkidle")
     table = page.get_by_role("table", name="Accessibility issue types")
-    await table.get_by_role("columnheader", name="Priority").get_by_role("button").click()
+    await (
+        table.get_by_role("columnheader", name="Priority")
+        .get_by_role("button", name="Priority", exact=True)
+        .click()
+    )
     await playwright_async.expect(
         page.locator("main p").filter(has_text="Sorted by Priority")
     ).to_have_count(2)

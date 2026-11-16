@@ -504,11 +504,11 @@ function CoverageNotes({ data }: { data: ComparisonReport }) {
             >
               <thead className="bg-surface-muted text-fg-muted">
                 <tr>
-                  <th scope="col" className="border border-border-strong px-4 py-3 text-center font-semibold">Check</th>
-                  <th scope="col" className="border border-border-strong px-4 py-3 text-center font-semibold">
+                  <th scope="col" className="border border-border-strong px-4 py-3 text-left font-semibold">Check</th>
+                  <th scope="col" className="border border-border-strong px-4 py-3 text-left font-semibold">
                     Report #{before} <span className="font-normal text-fg-muted">(before)</span>
                   </th>
-                  <th scope="col" className="border border-border-strong px-4 py-3 text-center font-semibold">
+                  <th scope="col" className="border border-border-strong px-4 py-3 text-left font-semibold">
                     Report #{after} <span className="font-normal text-fg-muted">(after)</span>
                   </th>
                 </tr>
@@ -529,8 +529,8 @@ function CoverageNotes({ data }: { data: ComparisonReport }) {
                           </>
                         )}
                       </th>
-                      <td className="border border-border px-4 py-3 text-center align-top tabular-nums">{coverageText(pair.before)}</td>
-                      <td className="border border-border px-4 py-3 text-center align-top tabular-nums">{coverageText(pair.after)}</td>
+                      <td className="border border-border px-4 py-3 text-left align-top tabular-nums">{coverageText(pair.before)}</td>
+                      <td className="border border-border px-4 py-3 text-left align-top tabular-nums">{coverageText(pair.after)}</td>
                     </tr>
                   );
                 })}

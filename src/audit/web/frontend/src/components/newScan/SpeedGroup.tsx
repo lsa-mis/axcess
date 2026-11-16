@@ -7,14 +7,19 @@ import SettingsGroup, { SwitchList } from "./SettingsGroup";
 import SwitchRow from "./SwitchRow";
 import TextField from "./TextField";
 import {
+  AXCESS_USER_AGENT_CHOICE,
+  CHROME_USER_AGENT_CHOICE,
   CUSTOM_USER_AGENT_CHOICE,
-  DEFAULT_USER_AGENT_CHOICE,
   presetFor,
   USER_AGENT_PRESETS,
 } from "./userAgents";
 
+// Chrome on this computer first, as the default; Axcess's own name next,
+// for a site owner who wants the scanner told apart in their logs; then the
+// other browsers and "Type your own" (2026-11-16).
 const USER_AGENT_OPTIONS = [
-  { value: DEFAULT_USER_AGENT_CHOICE, label: USER_AGENT.defaultOption },
+  { value: CHROME_USER_AGENT_CHOICE, label: USER_AGENT.chromeOption },
+  { value: AXCESS_USER_AGENT_CHOICE, label: USER_AGENT.axcessOption },
   ...USER_AGENT_PRESETS.map((preset) => ({ value: preset.id, label: preset.label })),
   { value: CUSTOM_USER_AGENT_CHOICE, label: USER_AGENT.customOption },
 ];
@@ -144,7 +149,9 @@ export default function SpeedGroup({ settings, update, policy, errors, fieldIds 
               {preset.phone && <p>{USER_AGENT.phone}</p>}
             </div>
           ) : (
-            <p className="text-xs text-fg-muted">{USER_AGENT.sendsDefault}</p>
+            <p className="text-xs text-fg-muted">
+              {settings.user_agent_choice === AXCESS_USER_AGENT_CHOICE ? USER_AGENT.sendsAxcess : USER_AGENT.sendsChrome}
+            </p>
           )}
         </div>
       )}

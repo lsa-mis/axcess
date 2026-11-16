@@ -13,7 +13,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 CATALOG_PATH = Path(__file__).with_name("catalog.json")
 TierId = Literal["small", "standard", "large"]
@@ -42,6 +42,11 @@ class OllamaRelease(_Frozen):
 
 class ModelEntry(_Frozen):
     tag: str
+    # The SHA-256 of the tag's manifest, as registry.ollama.ai serves it. The
+    # downloader accepts that manifest and no other: the registry sends no
+    # checksum header of its own, and a tag that moved is refused, not
+    # installed (2026-11-16; downloader.py).
+    manifest: str = Field(pattern=r"^sha256:[a-f0-9]{64}$")
     size: int
     licence: str
 

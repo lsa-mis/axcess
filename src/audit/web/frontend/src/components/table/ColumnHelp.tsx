@@ -23,13 +23,13 @@ import { HelpTip } from "../ui";
  * table stays as the one place all the meanings can be read, searched and
  * printed together.
  *
- * The icon sits on the label's line, as the sort button's words sit at the
- * foot of their target (SortHeader, wrap="words"); centred in its target it
- * floated above the words (the developer's screenshots, 2026-11-16). 28px
- * wide, so the header reads as one centred group: allowed because "What
- * the labels mean" (``report-labels-button``, a 44px control on the same
- * page) gives the same explanation (HelpTip, ``equivalent``; SC 2.5.5
- * Target Size (Enhanced), Level AAA, "Equivalent" exception).
+ * The icon sits in the middle of the label's line, as the label sits in the
+ * middle of the header row (SortHeader; both moved there from the row's
+ * foot at the developer's request, 2026-11-16). 24px wide (``small``), so
+ * it sits close to its label: allowed because "What the labels mean"
+ * (``report-labels-button``, a 44px control on the same page) gives the
+ * same explanation (HelpTip, ``equivalent``; SC 2.5.5 Target Size
+ * (Enhanced), Level AAA, "Equivalent" exception).
  *
  * Known cost: the button's words sit inside the header cell, so a screen
  * reader that names the column for each cell may read "How sure, What does
@@ -52,8 +52,9 @@ export default function ColumnHelp({
       question={question}
       equivalent="report-labels-button"
       small
-      // Centred on the label's line: 18px icon, 20px line, 6px under it.
-      className="items-end pb-1.5"
+      // Centred on the label's line, which sits in the middle of the
+      // header row (SortHeader).
+      className="items-center"
     >
       <p className="mb-2 font-semibold">
         {answers.charAt(0).toUpperCase()}

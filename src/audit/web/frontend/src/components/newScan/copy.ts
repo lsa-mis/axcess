@@ -173,9 +173,12 @@ export const USER_AGENT = {
   label: "Browser the site sees (user agent)",
   hint:
     "Some sites show a different page, or block scans, depending on which browser they think is visiting. This changes only the browser name Axcess sends. Every page still opens in Chromium, so a site that checks what the browser can do may still tell. The site’s robots.txt rules for Axcess still apply.",
-  defaultOption: "Axcess (default)",
+  chromeOption: "Chrome on this computer (default)",
+  axcessOption: "Axcess (names itself)",
   customOption: "Type your own…",
-  sendsDefault: "Sends Axcess’s own name, so the site can see that a scanner is visiting.",
+  sendsChrome:
+    "Sends Chrome’s name, with the Chrome version Axcess runs and this computer’s system, so the site serves the page a visitor in Chrome gets.",
+  sendsAxcess: "Sends Axcess’s own name, so the site can see that a scanner is visiting.",
   sends: "Sends:",
   phone:
     "The scanning window stays computer-sized. The site may send its phone layout to that wide window.",
@@ -414,6 +417,8 @@ export const SUMMARY = {
   userAgent: (browser: string) => `Tells the site it is ${browser}`,
   /** The same line for a name the person typed. */
   userAgentCustom: "Tells the site it is the browser you typed",
+  /** A Pages to scan line when the scan sends Axcess's own name, not the default Chrome. */
+  userAgentAxcess: "Tells the site it is Axcess, a scanner",
   /** A Pages to scan line during a Fast scan. */
   htmlOnly: "Page code (HTML) only, no browser",
   loginPrivacy: "Axcess uploads nothing. It deletes the sign-in cookie (session cookie) when the scan ends.",

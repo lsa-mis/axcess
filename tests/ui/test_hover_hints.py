@@ -113,7 +113,9 @@ async def test_issue_tags_headers_and_bands_explain_themselves(
             await playwright_async.expect(button).to_have_attribute("title", hint)
             await playwright_async.expect(button).to_have_accessible_description(hint)
         await playwright_async.expect(
-            table.get_by_role("columnheader", name="Priority", exact=False).get_by_role("button")
+            table.get_by_role("columnheader", name="Priority", exact=False).get_by_role(
+                "button", name="Priority", exact=True
+            )
         ).to_have_attribute(
             "title",
             re.compile(r"^High, Medium, or Low, from the impact rating of this issue type"),
