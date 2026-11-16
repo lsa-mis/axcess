@@ -2,7 +2,7 @@ import { Fragment, memo, useMemo, useRef, type ReactNode, type Ref } from "react
 import { Link, useLocation, useParams, useSearchParams } from "react-router";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { api } from "../api/client";
-import { Button, Card, withReturnTrail } from "../components/ui";
+import { Card, HelpTip, withReturnTrail } from "../components/ui";
 // The same helper the topbar trail uses.
 import { siteLabel } from "../components/ReportCrumb";
 import ConformanceBadge from "../components/ConformanceBadge";
@@ -55,7 +55,6 @@ import {
   PRIORITY_HELP,
   DEFAULT_REVIEW_LANES,
   REVIEW_LANES,
-  SUREST_REVIEW_LANES,
   REVIEW_LANE_HELP,
   isFindingType,
 } from "../lib/labels";
@@ -178,10 +177,22 @@ export default function IssuesRoute() {
   // The default view: with nothing chosen under "How sure", the table shows
   // every issue type. From 2026-11-10 it held back Not sure and For
   // information behind a "hidden" note; on 2026-11-13 the developer asked for
-  // all of them in the table instead, with a note over it that counts each
-  // "How sure" value, says what Not sure and For information mean, and offers
-  // one button to narrow to the surest (``AllIssuesNote``). Nothing is held
-  // back, so the numbers above the table, the table and the exports agree.
+  // all of them in the table instead. Nothing is held back, so the numbers
+  // above the table, the table and the exports agree.
+  //
+  // From 2026-11-13 to 2026-11-16 a note over the rows counted each "How
+  // sure" value, said what Not sure and For information mean, and had a
+  // "Show only Mostly sure and Measured" button. The developer removed it
+  // (2026-11-16): the button did what the Filter menu's How sure group
+  // already does, with the counts (W3C COGA, "Making Content Usable": no
+  // two controls for one job), and the sentences now open from the "?"
+  // beside the How sure header (``HowSureHelp``). The tradeoff, told to the
+  // developer before building it: "A person must check a Not sure issue
+  // type before you report it" is no longer on screen until someone opens
+  // the "?" or "What the labels mean" under the table, so a Not sure row can
+  // be read as a confirmed problem by someone who opens neither (AGENTS.md,
+  // Interface language rule 4). What still says it: the tag's own words
+  // ("Not sure"), the "?", and the glossary under the table.
   //
   // Kept from before: the Filter menu opens with nothing checked, its rule
   // being "nothing checked is all" (FilterMenu.tsx), and its How sure group
@@ -194,11 +205,6 @@ export default function IssuesRoute() {
       : all;
     return sortRows(visible, sort);
   }, [issuesQuery.data, sort, shownByDefault]);
-  // The note over the table: in the default view, when it holds an issue
-  // type a person must judge or one kept for information.
-  const needsNote =
-    shownByDefault &&
-    rows.some((row) => !(SUREST_REVIEW_LANES as readonly ReviewLane[]).includes(row.review_lane));
   // The pager sits in the bar over the table, so the rows are paged here,
   // before the table is drawn, and the bar shows even when no row matches.
   // A new filter, search or sort starts over at page 1; the key is built
@@ -239,13 +245,6 @@ export default function IssuesRoute() {
   // moves to the table it just reordered rather than falling to the page.
   const recommend = () => {
     onSort(null);
-    region.current?.focus();
-  };
-  // Narrows to the surest values, so the URL says exactly what is shown and
-  // "Clear filters" is the way back. The button goes away with the note, so
-  // focus moves to the table it just narrowed (SC 2.4.3 Focus Order, Level A).
-  const showSurest = () => {
-    setParam("type", SUREST_REVIEW_LANES.join(","));
     region.current?.focus();
   };
   // ``default_view_counts`` is absent from a response cached before the
@@ -372,7 +371,6 @@ export default function IssuesRoute() {
               {sort && `${describeSort(sort)}.`}
             </TableStatus>
           )}
-          {needsNote && <AllIssuesNote rows={rows} narrowed={hasFilter} onShowSurest={showSurest} />}
           {rows.length === 0 ? (
             <TableEmpty>
               {hasFilter
@@ -838,8 +836,17 @@ function IssueTable({
                 kind={SORT_KINDS[column]}
                 sort={sort}
                 onSort={onSort}
-                className={cn("px-1.5", column === "Issue" && "sticky left-0 z-[1] bg-surface-muted")}
+                className={cn(
+                  "px-1.5",
+                  column === "Issue" && "sticky left-0 z-[1] bg-surface-muted",
+                  // "How sure ⇅ ?" on one line. Wrapped, the label's box kept
+                  // the column's full width, so "sure ⇅" sat centred in it
+                  // with a wide gap before the "?" (the developer's
+                  // screenshots, 2026-11-16).
+                  column === "Type" && "whitespace-nowrap",
+                )}
                 hint={columnHint(column)}
+                help={column === "Type" ? <HowSureHelp /> : undefined}
               >
                 {column === "WCAG" ? (
                   <>
@@ -989,63 +996,47 @@ const IssueTableRow = memo(function IssueTableRow({
 });
 
 /**
- * The line over the table that says the table shows every issue type,
- * counts each "How sure" value, says what Not sure and For information mean,
- * and has one button that narrows the table to the surest.
+ * The "?" beside the How sure header: what the column says and what each of
+ * its four values means, the glossary's own words (REVIEW_LANE_HELP), so
+ * the two never disagree (W3C COGA, "Making Content Usable": the same words
+ * for the same thing).
  *
- * It sits inside the table's card, right over the rows it speaks about and
- * after the Filter menu in reading and Tab order, because it is about what
- * the table shows (W3C COGA, "Making Content Usable",
- * https://www.w3.org/TR/coga-usable/: keep related things together).
- * Rejected: a line in the page header, far from the table; and no line at
- * all, which would leave Not sure and For information rows looking like
- * confirmed problems (AGENTS.md, Interface language rule 4).
+ * In the header, the one place every row's value is explained from (the
+ * developer's choice, 2026-11-16). Rejected: a "?" on each row's tag, one
+ * more Tab stop per row for the same four sentences; and a "?" in the note
+ * over the rows, which the developer removed.
  *
- * A ``role="note"`` paragraph like the other report notes, not an alert:
- * nothing went wrong. The counts are words and numbers, never colour alone
- * (SC 1.4.1 Use of Color, Level A). The button names what it shows (rule 8)
- * and is the shared ``Button``, a full 44px target (SC 2.5.5 Target Size
- * (Enhanced), Level AAA). It wraps under the text at 320px (SC 1.4.10
- * Reflow, Level AA).
+ * Known cost: the button's words sit inside the header cell, so a screen
+ * reader that names the column for each cell may read "How sure, What does
+ * How sure mean?" there. Kept short for that reason.
  */
-function AllIssuesNote({
-  rows,
-  narrowed,
-  onShowSurest,
-}: {
-  rows: IssueRow[];
-  /** Search, Level or Where it shows has narrowed the rows. */
-  narrowed: boolean;
-  onShowSurest: () => void;
-}) {
-  const counts = REVIEW_LANES.map((key) => ({ key, count: rows.filter((row) => row.review_lane === key).length })).filter(
-    (entry) => entry.count > 0,
-  );
-  const has = (key: ReviewLane) => counts.some((entry) => entry.key === key);
+function HowSureHelp() {
   return (
-    <div
-      role="note"
-      aria-label="Issue types shown"
-      className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-border bg-surface-muted px-4 py-2 text-sm text-fg"
+    <HelpTip
+      question={`What does \u201c${COLUMN_LABEL.Type}\u201d mean`}
+      // The icon sits on the label's line, as the sort button's words sit at
+      // the foot of their target (SortHeader, wrap="words"); centred in its
+      // target it floated above the words (the developer's screenshots,
+      // 2026-11-16). 28px wide: the icon then has the same space on its
+      // right as "How sure" has on its left, so the header reads as one
+      // centred group. Allowed because "What the labels mean" under the
+      // table (IssueGlossary) is a 44px control with the same explanation
+      // (HelpTip, ``equivalent``).
+      equivalent="report-labels-button"
+      className="items-end pb-[0.3125rem]"
     >
-      <p className="max-w-measure">
-        {/* With another filter on, the rows are not the whole report, so the
-            heading says so rather than claim "every" (AGENTS.md, Interface
-            language rule 5: text matches what the table shows). */}
-        <span className="font-semibold">
-          {narrowed ? "Showing every issue type that matches your filters" : "Showing every issue type"}
-        </span>
-        {": "}
-        {counts.map((entry) => `${REVIEW_TYPE_LABEL[entry.key]} ${entry.count.toLocaleString()}`).join(", ")}.
-        {/* One sentence per value that needs one, because the two differ and
-            the text must match the rows (AGENTS.md, Interface language rule 5). */}
-        {has("expert_review") && ` A person must check a ${REVIEW_TYPE_LABEL.expert_review} issue type before you report it.`}
-        {has("informational") && ` A ${REVIEW_TYPE_LABEL.informational} issue type is not a problem to fix.`}
-      </p>
-      <Button type="button" variant="secondary" onClick={onShowSurest}>
-        Show only {SUREST_REVIEW_LANES.map((key) => REVIEW_TYPE_LABEL[key]).join(" and ")}
-      </Button>
-    </div>
+      <p className="mb-2 font-semibold">How sure Axcess is that an issue type is a real problem.</p>
+      <dl className="space-y-2">
+        {REVIEW_LANES.map((key) => (
+          <div key={key}>
+            <dt>
+              <LaneTag lane={key} hint={false} />
+            </dt>
+            <dd className="mt-0.5 text-fg-muted">{REVIEW_LANE_HELP[key]}</dd>
+          </div>
+        ))}
+      </dl>
+    </HelpTip>
   );
 }
 

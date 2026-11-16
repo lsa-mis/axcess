@@ -75,16 +75,19 @@ async def test_report_links_and_review_lanes(
     await page.wait_for_url("**/app/scans")
     await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
     issues = page.get_by_role("table", name="Accessibility issue types")
-    # The table opens on every issue type, with a note that counts each How
-    # sure value and says what Not sure and For information mean (2026-11-13).
+    # The table opens on every issue type (2026-11-13). What Not sure and For
+    # information mean opens from the "?" beside the How sure header
+    # (2026-11-16), not from a note over the rows.
     await playwright_async.expect(
         issues.get_by_role("rowheader").get_by_role("link", name="Named control failure")
     ).to_be_visible()
     await playwright_async.expect(issues.locator("tbody tr")).to_have_count(3)
-    note = page.get_by_role("note", name="Issue types shown")
-    await playwright_async.expect(note).to_contain_text(
-        "Showing every issue type: Mostly sure 1, Not sure 1, For information 1."
+    await playwright_async.expect(page.get_by_role("note", name="Issue types shown")).to_have_count(
+        0
     )
+    await playwright_async.expect(
+        issues.get_by_role("button", name="What does \u201cHow sure\u201d mean?", exact=True)
+    ).to_be_visible()
     assert await page.evaluate("document.body.scrollWidth <= innerWidth")
     # Every issue group is a row of one table, whatever lane it is in.
     # Scoped to the row header: the count link in the same row also
@@ -717,8 +720,15 @@ async def test_issue_table_finding_types_help_text_and_middle_alignment(
     # Every "How sure" value shown, to read rows of each kind.
     await page.goto(f"{base}/app/scans/{scan_id}/issues?{ALL_HOW_SURE}", wait_until="networkidle")
     table = page.get_by_role("table", name="Accessibility issue types")
-    headers = await table.locator("thead th").all_inner_texts()
+    # Each header's sort button: How sure's header also holds a "?" (HelpTip),
+    # checked below.
+    headers = await table.locator("thead th button:not([popovertarget])").all_inner_texts()
     names = [re.sub(r"\s+", " ", text).strip() for text in headers]
+    await playwright_async.expect(
+        table.locator("thead th")
+        .nth(1)
+        .get_by_role("button", name="What does \u201cHow sure\u201d mean?")
+    ).to_have_count(1)
     # The Finding type column reads "Where it shows" ("finding" is not an interface word).
     # Check, beside it, names the check that found the row. How sure,
     # Priority and Issue occurrences come right after the name (the
@@ -1290,9 +1300,6 @@ async def test_report_opens_keyboard_only_in_reading_order(
         first(lambda s: s["name"] == "Search issues"),
         # One Filter menu holds Level, How sure and Where it shows.
         first(lambda s: s["tag"] == "BUTTON" and s["name"] == "Filter issues"),
-        # The note over the rows says what the table shows; its button comes
-        # after the Filter menu and before the rows, as it reads.
-        first(lambda s: s["tag"] == "BUTTON" and s["name"] == "Show only Mostly sure and Measured"),
         first(lambda s: s["group"] == "table"),
     ]
     assert order == sorted(order), names

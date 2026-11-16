@@ -106,7 +106,10 @@ async def test_issue_tags_headers_and_bands_explain_themselves(
         # On the sort button, the header's focusable part, so a screen reader
         # reads it as the button's description.
         for name, hint in headers.items():
-            button = table.get_by_role("columnheader", name=name, exact=False).get_by_role("button")
+            # The sort button by its own name: How sure's header also holds a "?".
+            button = table.get_by_role("columnheader", name=name, exact=False).get_by_role(
+                "button", name=name, exact=True
+            )
             await playwright_async.expect(button).to_have_attribute("title", hint)
             await playwright_async.expect(button).to_have_accessible_description(hint)
         await playwright_async.expect(
@@ -182,8 +185,9 @@ async def test_keyboard_focus_keeps_the_hint_as_the_description(
             f"{base}/app/scans/{scan_id}/issues?{ALL_HOW_SURE}", wait_until="networkidle"
         )
         table = page.get_by_role("table", name="Accessibility issue types")
+        # The sort button; the header also holds the "?" (HelpTip) since 2026-11-16.
         button = table.get_by_role("columnheader", name="How sure", exact=False).get_by_role(
-            "button"
+            "button", name="How sure", exact=True
         )
         hint = (
             "How sure Axcess is that this issue type is a real problem: "
@@ -215,8 +219,9 @@ async def test_hovering_keeps_the_hint_as_the_description(
             f"{base}/app/scans/{scan_id}/issues?{ALL_HOW_SURE}", wait_until="networkidle"
         )
         table = page.get_by_role("table", name="Accessibility issue types")
+        # The sort button; the header also holds the "?" (HelpTip) since 2026-11-16.
         button = table.get_by_role("columnheader", name="How sure", exact=False).get_by_role(
-            "button"
+            "button", name="How sure", exact=True
         )
         hint = (
             "How sure Axcess is that this issue type is a real problem: "

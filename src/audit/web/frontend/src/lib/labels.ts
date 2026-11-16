@@ -87,9 +87,6 @@ export const DEFAULT_REVIEW_LANES = [
   "informational",
 ] as const satisfies readonly ReviewLane[];
 
-/** The surest "How sure" values: what "Show only the surest" narrows the Issues table to. */
-export const SUREST_REVIEW_LANES = ["likely_barrier", "measured"] as const satisfies readonly ReviewLane[];
-
 /** The "How sure" values' names: `REVIEW_TYPE_LABEL` from terms.ts, under the name this module used. */
 export const REVIEW_LANE_LABELS: Record<ReviewLane, string> = REVIEW_TYPE_LABEL;
 

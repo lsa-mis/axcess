@@ -40,6 +40,7 @@ const config: Config = {
           blue: v("umich-blue"),
           "blue-600": v("umich-blue-600"),
           "blue-700": v("umich-blue-700"),
+          "blue-soft": v("umich-blue-soft"),
           maize: v("umich-maize"),
           "maize-600": v("umich-maize-600"),
         },

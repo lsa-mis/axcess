@@ -32,6 +32,14 @@
   --c-umich-blue: 0 39 76;
   --c-umich-blue-600: 0 58 108;
   --c-umich-blue-700: 0 30 60;
+  /* A lighter blue for a quiet icon that must not compete with the words
+     beside it (the "?" of HelpTip; the developer's request, 2026-11-16):
+     the lightest blue in this hue that keeps 7:1 on surface-muted, the
+     darkest surface it sits on (7.05:1; 7.4:1 on surface-subtle, 7.8:1 on
+     white), SC 1.4.6 Contrast (Enhanced), Level AAA, the bar this app holds
+     icons to as well as text. The contrast settings below set it back to
+     umich-blue. */
+  --c-umich-blue-soft: 42 85 126;
   --c-umich-maize: 255 203 5;
   --c-umich-maize-600: 230 183 4;
   --c-sev-critical: 122 0 0;
@@ -71,6 +79,7 @@
 }
 
 :root[data-contrast="more"] {
+  --c-umich-blue-soft: 0 39 76;
   --c-fg-muted: 31 41 55; /* 14.7:1 on white */
   --c-fg-subtle: 43 53 68; /* 12.6:1 */
   --c-border: 184 196 210;
@@ -79,6 +88,7 @@
 
 /* High: near-black on white, no tinted panels. */
 :root[data-contrast="high"] {
+  --c-umich-blue-soft: 0 39 76;
   --c-fg: 0 0 0;
   --c-fg-muted: 11 15 22;
   --c-fg-subtle: 17 24 39;
@@ -134,6 +144,8 @@
   --c-umich-blue: 158 197 238;
   --c-umich-blue-600: 184 213 243;
   --c-umich-blue-700: 134 179 230;
+  /* 7.1:1 on surface-muted (dark), 9.5:1 on surface-subtle. */
+  --c-umich-blue-soft: 157 187 218;
   --c-sev-critical: 255 180 180;
   --c-sev-critical-bg: 63 20 20;
   --c-sev-major: 255 201 153;
@@ -168,6 +180,7 @@
   --c-sidebar-3: 22 32 45;
 }
 :root[data-theme="dark"][data-contrast="more"] {
+  --c-umich-blue-soft: 158 197 238;
   --c-fg-muted: 221 227 234;
   --c-fg-subtle: 203 211 221;
   --c-border: 91 110 134;
@@ -175,6 +188,7 @@
 }
 :root[data-theme="dark"][data-contrast="high"] {
   --c-umich-blue: 184 213 243;
+  --c-umich-blue-soft: 184 213 243;
   --c-fg: 255 255 255;
   --c-fg-muted: 245 247 250;
   --c-fg-subtle: 232 236 241;

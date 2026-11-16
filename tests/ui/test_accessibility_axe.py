@@ -791,11 +791,19 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     # Under the table since user testing (2026-10-28), not between it and
     # the numbers. The seeded report has only Not sure and For information
     # issue types; the table opens on every issue type (2026-11-13), so it
-    # shows both, and the note over it says what they mean.
-    note = page.get_by_role("note", name="Issue types shown")
-    await playwright_async.expect(note).to_contain_text("Showing every issue type")
+    # shows both. What they mean opens from the "?" beside the How sure
+    # header (2026-11-16); the note that said it over the rows is gone.
+    table = page.get_by_role("table", name="Accessibility issue types")
+    await playwright_async.expect(table.locator("tbody tr")).to_have_count(2)
+    await playwright_async.expect(table.locator("tbody")).to_contain_text("Not sure")
+    await playwright_async.expect(table.locator("tbody")).to_contain_text("For information")
     await playwright_async.expect(summary.get_by_text("hidden", exact=False)).to_have_count(0)
-    await playwright_async.expect(note).to_contain_text("Not sure 1, For information 1")
+    await playwright_async.expect(page.get_by_role("note", name="Issue types shown")).to_have_count(
+        0
+    )
+    await playwright_async.expect(
+        table.get_by_role("button", name="What does \u201cHow sure\u201d mean?", exact=True)
+    ).to_have_attribute("aria-expanded", "false")
     table_box = await page.get_by_role("region", name="Issues table").bounding_box()
     coverage_box = await coverage.bounding_box()
     assert table_box and coverage_box and coverage_box["y"] > table_box["y"], (

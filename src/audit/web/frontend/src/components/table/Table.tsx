@@ -392,6 +392,7 @@ export function SortHeader<K extends string>({
   chip,
   wrap = "chip",
   hint,
+  help,
   className,
   children,
   ...th
@@ -409,6 +410,14 @@ export function SortHeader<K extends string>({
    * reader and shows on focus in the "Always" hints setting.
    */
   hint?: string;
+  /**
+   * A ``HelpTip`` ("?") after the sort button, for a column whose values
+   * need explaining (Issues' "How sure"). Beside the button, not inside it:
+   * one control sorts and the other explains, so neither does two things.
+   * Bottom-aligned with the label, so the header's last line stays level
+   * with its neighbours'.
+   */
+  help?: ReactNode;
   className?: string;
   /** The header's label. Defaults to the column key. */
   children?: ReactNode;
@@ -448,6 +457,19 @@ export function SortHeader<K extends string>({
       )}
       {...th}
     >
+      {help ? (
+        <span className="inline-flex items-end justify-center">
+          {sortButton()}
+          {help}
+        </span>
+      ) : (
+        sortButton()
+      )}
+    </th>
+  );
+
+  function sortButton() {
+    return (
       <button
         type="button"
         title={hint}
@@ -484,8 +506,8 @@ export function SortHeader<K extends string>({
           </>
         )}
       </button>
-    </th>
-  );
+    );
+  }
 }
 
 /**

@@ -233,19 +233,13 @@ async def test_several_in_a_group_and_across_groups_match_the_api(
     await _box(page, "Where it shows", "alt_text").check()
     await page.wait_for_url(re.compile(r"finding_type=click_through(%2C|,)alt_text"))
     # Image groups are never Mostly sure or Measured; with nothing checked
-    # under How sure the table shows them too, and the note says what they are.
+    # under How sure the table shows them too.
     both = await _assert_matches_api(page, base, scan_id)
     assert ct < both and any(key.startswith("image%3A") for key in both), both
-    # Other filters narrowed the rows, so the note does not say "every" alone.
-    await pw.expect(page.get_by_role("note", name="Issue types shown")).to_contain_text(
-        "Showing every issue type that matches your filters"
-    )
     await _box(page, "How sure", "informational").check()
     narrowed = await _assert_matches_api(page, base, scan_id)
     assert narrowed and narrowed.isdisjoint(ct), narrowed
     assert all(key.startswith("image%3A") for key in narrowed), narrowed
-    # A How sure box is checked, so the table shows exactly that and no note.
-    await pw.expect(page.get_by_role("note", name="Issue types shown")).to_have_count(0)
 
     # The badge counts groups in use; the line under the bar names them.
     await pw.expect(_filter_button(page)).to_contain_text("2")
@@ -359,11 +353,12 @@ async def test_clear_all_and_clear_filters_reset_every_group(
     await pw.expect(page.get_by_text("Filtered by", exact=False)).to_have_count(0)
 
 
-async def test_table_opens_on_every_group_and_one_button_shows_the_surest(
+async def test_table_opens_on_every_group_and_the_filter_shows_the_surest(
     enriched, live_server, new_page
 ) -> None:
-    """The default view shows every issue type, says what each How sure value means,
-    and offers one way to narrow to the surest (2026-11-13)."""
+    """The default view shows every issue type (2026-11-13). The Filter menu is
+    the one way to narrow to the surest: the note's "Show only Mostly sure and
+    Measured" button did the same job and was removed (2026-11-16)."""
     base, scan_id = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
     await _open(page, base, scan_id)
@@ -388,51 +383,94 @@ async def test_table_opens_on_every_group_and_one_button_shows_the_surest(
     assert await boxes.count() == 4
     for i in range(await boxes.count()):
         await pw.expect(boxes.nth(i)).not_to_be_checked()
-    await page.keyboard.press("Escape")
-
-    note = page.get_by_role("note", name="Issue types shown")
-    await pw.expect(note).to_contain_text("Showing every issue type")
-    await pw.expect(note).not_to_contain_text("matches your filters")
-    await pw.expect(note).to_contain_text("Not sure 1, For information 1")
-    await pw.expect(note).to_contain_text(
-        "A person must check a Not sure issue type before you report it."
-    )
-    await pw.expect(note).to_contain_text("A For information issue type is not a problem to fix.")
-    assert await _run_axe(page) == []
-
-    # By keyboard: the button is reachable, at least one target tall, and
-    # focus lands on the table it narrowed.
-    surest = note.get_by_role("button", name="Show only Mostly sure and Measured", exact=True)
-    box = await surest.bounding_box()
-    assert box and box["height"] >= 44, box
-    await surest.focus()
-    await page.keyboard.press("Enter")
+    # The surest, from the How sure group: the URL says what is shown.
+    await _box(page, "How sure", "likely_barrier").check()
+    await _box(page, "How sure", "measured").check()
     await page.wait_for_url(re.compile(r"type=likely_barrier(%2C|,)measured"))
     assert _params(page)["type"] == _SUREST_LANES
     assert len(await _assert_matches_api(page, base, scan_id)) == _SUREST_COUNT
-    await pw.expect(note).to_have_count(0)
-    await pw.expect(page.get_by_role("region", name="Issues table")).to_be_focused()
+    await page.keyboard.press("Escape")
     filtered = page.get_by_text("Filtered by", exact=False).locator("xpath=..")
     await pw.expect(filtered).to_contain_text("How sure: Mostly sure, Measured")
     # The way back is the same one every filter has.
     await page.get_by_role("button", name="Clear filters", exact=True).click()
     await page.wait_for_url(lambda url: "type=" not in url)
     assert len(await _assert_matches_api(page, base, scan_id)) == _ALL_COUNT
-    await pw.expect(page.get_by_role("note", name="Issue types shown")).to_be_visible()
+
+    # No second control for the same job, and no note over the rows.
+    await pw.expect(
+        page.get_by_role("button", name=re.compile(r"^Show only Mostly sure"))
+    ).to_have_count(0)
+    await pw.expect(page.get_by_role("note", name="Issue types shown")).to_have_count(0)
 
 
-async def test_issue_types_note_reflows_at_320(enriched, live_server, new_page) -> None:
+_HOW_SURE_HELP = "What does \u201cHow sure\u201d mean?"
+
+
+async def test_how_sure_help_opens_by_keyboard_and_says_what_each_value_means(
+    enriched, live_server, new_page
+) -> None:
+    """The "?" beside the How sure header (2026-11-16): a real button, one
+    target big, that opens and closes by keyboard, keeps focus, says whether
+    it is open, and holds the glossary's words for every value."""
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await _open(page, base, scan_id)
+    header = page.get_by_role("columnheader", name=re.compile(r"^How sure"))
+    tip = header.get_by_role("button", name=_HOW_SURE_HELP, exact=True)
+    # 44px tall and 28px wide (HelpTip ``equivalent``): SC 2.5.5's "Equivalent"
+    # exception, because "What the labels mean" under the table is a 44px
+    # control that shows the same explanation.
+    box = await tip.bounding_box()
+    assert box and box["height"] >= 44 and box["width"] >= 28, box
+    glossary = page.get_by_role("button", name=re.compile(r"^What .*labels mean"))
+    glossary_box = await glossary.bounding_box()
+    assert glossary_box and glossary_box["height"] >= 44 and glossary_box["width"] >= 44
+    await pw.expect(tip).to_have_attribute("aria-expanded", "false")
+    panel = page.locator("[popover]:popover-open")
+    await pw.expect(panel).to_have_count(0)
+
+    await tip.focus()
+    await page.keyboard.press("Enter")
+    await pw.expect(tip).to_have_attribute("aria-expanded", "true")
+    await pw.expect(panel).to_have_count(1)
+    await pw.expect(tip).to_be_focused()
+    await pw.expect(panel).to_contain_text(
+        "How sure Axcess is that an issue type is a real problem."
+    )
+    for label in ("Mostly sure", "Measured", "Not sure", "For information"):
+        await pw.expect(panel).to_contain_text(label)
+    await pw.expect(panel).to_contain_text(
+        "A person must decide whether it is a real problem before you report it."
+    )
+    await pw.expect(panel).to_contain_text("This is not a problem to fix.")
+    assert await _run_axe(page) == []
+
+    # Escape closes it and focus stays on the button.
+    await page.keyboard.press("Escape")
+    await pw.expect(panel).to_have_count(0)
+    await pw.expect(tip).to_have_attribute("aria-expanded", "false")
+    await pw.expect(tip).to_be_focused()
+    # A second press of Space opens it again; a press elsewhere closes it.
+    await page.keyboard.press("Space")
+    await pw.expect(panel).to_have_count(1)
+    await page.mouse.click(5, 5)
+    await pw.expect(panel).to_have_count(0)
+    # Pressing the "?" does not sort the column.
+    assert "sort" not in _params(page)
+
+
+async def test_how_sure_help_fits_at_320(enriched, live_server, new_page) -> None:
     base, scan_id = live_server
     page = await new_page(viewport={"width": 320, "height": 800})
     await _open(page, base, scan_id)
-    note = page.get_by_role("note", name="Issue types shown")
-    await pw.expect(note).to_be_visible()
-    box = await note.bounding_box()
+    tip = page.get_by_role("button", name=_HOW_SURE_HELP, exact=True)
+    await tip.scroll_into_view_if_needed()
+    await tip.click()
+    panel = page.locator("[popover]:popover-open")
+    await pw.expect(panel).to_have_count(1)
+    box = await panel.bounding_box()
     assert box and box["x"] >= 0 and box["x"] + box["width"] <= 320, box
-    button = await note.get_by_role(
-        "button", name="Show only Mostly sure and Measured"
-    ).bounding_box()
-    assert button and button["x"] + button["width"] <= 320 and button["height"] >= 44, button
 
 
 async def test_closing_by_clicking_outside_keeps_the_choice(

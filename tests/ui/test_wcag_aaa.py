@@ -175,6 +175,16 @@ _SMALL_TARGETS = """() => {
     }
     const r = box.getBoundingClientRect();
     if (r.width >= 43.5 && r.height >= 43.5) continue;
+    // SC 2.5.5's "Equivalent" exception: a smaller target whose job a 44px
+    // control on the same page also does names that control
+    // (HelpTip's ``equivalent``). It passes only when that control is there,
+    // shown, and big enough.
+    const twinId = el.dataset.targetEquivalent;
+    const twin = twinId && document.getElementById(twinId);
+    if (twin && shown(twin)) {
+      const t = twin.getBoundingClientRect();
+      if (t.width >= 43.5 && t.height >= 43.5) continue;
+    }
     const block = el.closest('p');
     const inSentence = el.tagName === 'A' && block
       && block.innerText.trim().length > el.innerText.trim().length + 15;
