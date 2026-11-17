@@ -21,6 +21,7 @@ import { OPENS_NEW_WINDOW,
   AI_RUNTIME_START_LABEL,
 } from "../lib/terms";
 import { useAiSetup } from "../hooks/useAiSetup";
+import { AiRuntimeControls } from "./AiRuntimeControls";
 import Tabs from "./Tabs";
 import { Button, Card, ExternalLinkButton, LinkButton, relativeTime } from "./ui";
 
@@ -782,12 +783,21 @@ export function SuggestionsBlockedNote({
     );
   }
   if (status.service === "private") {
+    // The service stopped (a crash, a refused start): the same Start control
+    // as Settings, here, so the person does not leave the report or reload
+    // it. When it runs, the suggestion status is fetched again and this note
+    // gives way to the Suggest buttons (end-to-end test, 2026-11-17: the
+    // note said "start it in Settings, then reload this page"). The shared
+    // control, not a second one (WCAG 2.2 SC 3.2.4 Consistent
+    // Identification, Level AA); its own link to AI features is left out
+    // because the note already has one (repo rule "One control, one job").
     return (
       <Card className={`${className} p-4 text-sm text-fg-muted`}>
         <p className="max-w-measure">
           AI fix suggestions are turned on, but the private AI service on this computer is not
-          running. Start it in Settings → AI features, then reload this page.
+          running. Start it here. It never downloads anything.
         </p>
+        {aiSetup ? <AiRuntimeControls setupPage /> : null}
         {setupLink}
       </Card>
     );

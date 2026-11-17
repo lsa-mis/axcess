@@ -3137,6 +3137,22 @@ def create_app(
                     "Ask the person who runs Axcess to set one."
                 ),
             )
+        manager = ai_state.get("manager")
+        if (
+            manager is not None
+            and (ai_config := load_ai_config(settings)) is not None
+            and ai_config.source == "private"
+            and not manager.runtime.running()
+        ):
+            # Said plainly, not as "did not give a usable answer": nothing
+            # was asked, because the service is not running.
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "The private AI service is not running. Start it in Settings → "
+                    "AI features, then try again."
+                ),
+            )
         if not target.can_check:
             raise HTTPException(
                 status_code=422,

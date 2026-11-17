@@ -137,14 +137,18 @@ function AiSetupPage({
       null,
   );
   const [confirmRemove, setConfirmRemove] = useState(false);
-  // Two status lines, each under the buttons it reports on: the on/off card
-  // and the models card. One line at the page top was out of sight when a
-  // button far down the page was pressed (developer, 2026-11-17).
+  // Each message is shown directly under the button it reports on: Turn AI
+  // on/off, Download and set up, Copy and use this model. One line at the
+  // page top was out of sight when a button further down was pressed, and a
+  // refusal for low memory read as unrelated (developer, 2026-11-17).
   const [message, setMessage] = useState("");
   const [modelsMessage, setModelsMessage] = useState("");
   const confirmRef = useRef<HTMLButtonElement>(null);
 
   const refresh = () => {
+    // The service's own line ("AI service is running") too: without it, it
+    // kept the old state for up to 5 s after Turn AI off or on.
+    void queryClient.invalidateQueries({ queryKey: ["ai-runtime"] });
     void queryClient.invalidateQueries({ queryKey: ["ai-plan"] });
     void queryClient.invalidateQueries({ queryKey: ["ai-install"] });
     void queryClient.invalidateQueries({ queryKey: ["suggestion-status"] });
@@ -303,15 +307,19 @@ function AiSetupPage({
             >
               {enabled ? "Turn AI off" : "Turn AI on"}
             </Button>}
+            {/* Right under the button it reports on, a refusal for low
+                memory included (developer, 2026-11-17: "the error ... should
+                appear right above or under the button"; SC 3.3.1 Error
+                Identification, Level A; SC 4.1.3 Status Messages, Level AA). */}
+            <p role="status" className={message ? "mt-2 font-semibold" : "sr-only"}>
+              {message}
+            </p>
             {!enabled && current && <p className="mt-2 text-fg-muted">
               Turning AI on reuses these models. It does not download them again.
             </p>}
             {enabled && <p className="mt-2 text-fg-muted">
               Turning AI off keeps the models and stops only Axcess’s private AI service. Finish current work first.
             </p>}
-            <p role="status" className={message ? "mt-2 font-semibold" : "sr-only"}>
-              {message}
-            </p>
           </Card>
 
         <Card className="px-4 py-4">
@@ -359,7 +367,12 @@ function AiSetupPage({
           </fieldset>
 
           {chosen === "custom" ? (
-            <MyModelPanel plan={plan} disabled={running} onMessage={setModelsMessage} />
+            <MyModelPanel
+              plan={plan}
+              disabled={running}
+              message={modelsMessage}
+              onMessage={setModelsMessage}
+            />
           ) : (
           <>
 
@@ -474,6 +487,9 @@ function AiSetupPage({
               )
             )}
           </div>
+          <p role="status" className={modelsMessage ? "mt-2 text-sm font-semibold text-fg" : "sr-only"}>
+            {modelsMessage}
+          </p>
           </>
           )}
 
@@ -527,9 +543,6 @@ function AiSetupPage({
               </div>
             </div>
           )}
-          <p role="status" className={modelsMessage ? "mt-4 text-sm font-semibold text-fg" : "sr-only"}>
-            {modelsMessage}
-          </p>
         </Card>
 
         <p className="text-sm text-fg-muted">
@@ -620,10 +633,12 @@ type FieldKey = "model" | "addon" | (typeof SAMPLING_FIELDS)[number]["key"];
 function MyModelPanel({
   plan,
   disabled,
+  message,
   onMessage,
 }: {
   plan: AiPlan;
   disabled: boolean;
+  message: string;
   onMessage: (text: string) => void;
 }) {
   const queryClient = useQueryClient();
@@ -884,6 +899,9 @@ function MyModelPanel({
         <Button type="submit" variant="primary" aria-disabled={busy || undefined}>
           Copy and use this model
         </Button>
+        <p role="status" className={message ? "font-semibold" : "sr-only"}>
+          {message}
+        </p>
       </form>
 
       {models.length > 0 && (

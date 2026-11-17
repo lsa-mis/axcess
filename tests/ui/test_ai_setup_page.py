@@ -8,6 +8,7 @@ temporary data folder.
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -586,5 +587,37 @@ async def test_your_own_model_in_use_is_the_chosen_option(
         assert await page.get_by_text("In use now", exact=True).count() == 1
         violations = await _run_axe(page)
         assert not violations, _render_violations(violations)
+    finally:
+        await page.context.close()
+
+
+async def test_a_refusal_for_low_memory_appears_right_under_its_button(
+    new_page: Any, server_set_up: str
+) -> None:
+    """Developer, 2026-11-17: the error ... should appear right above or under
+    the button, not at the top of the page (SC 3.3.1, SC 4.1.3)."""
+    page = await new_page()
+    refusal = (
+        "The AI models need about 8.7 GB of free memory, and 5.1 GB is free now. AI was not "
+        "started. Close other programs and try again, or choose a smaller size."
+    )
+    try:
+
+        async def preferences(route):
+            if route.request.method == "PUT":
+                await route.fulfill(status=503, json={"detail": refusal})
+            else:
+                await route.continue_()
+
+        await page.route("**/api/ai/preferences", preferences)
+        await page.goto(f"{server_set_up}/app/settings/ai", wait_until="networkidle")
+        button = page.get_by_role("button", name=re.compile("^Turn AI (on|off)$"))
+        await button.click()
+        await page.get_by_text(refusal, exact=True).wait_for()
+        # The very next element after the button is the message.
+        follows = await button.evaluate(
+            "b => b.nextElementSibling && b.nextElementSibling.textContent"
+        )
+        assert follows == refusal
     finally:
         await page.context.close()

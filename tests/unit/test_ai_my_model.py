@@ -163,3 +163,38 @@ def test_answer_settings_out_of_range_are_refused() -> None:
     for bad in ({"temp": 3.0}, {"top-p": 1.5}, {"top-k": 20.5}, {"presence-penalty": -3.0}):
         with pytest.raises(ValidationError):
             UseMyModelRequest(model="a" * 64, sampling=bad, confirm=True)
+
+
+def test_start_ai_service_works_with_your_own_model(tmp_path: Path) -> None:
+    """Start AI service raised KeyError('custom') with your own model in use."""
+    from unittest.mock import Mock
+
+    from audit.ai.manager import AIManager
+    from audit.ai.state import AIPreferences, save_config, save_preferences
+    from audit.config import Settings
+
+    settings = Settings(data_dir=tmp_path, desktop=True)
+    entry = custom.model_entry(
+        custom.MyModelFile(sha256="b" * 64, file="m.gguf", size=10, kind="model", name="M"), None
+    )
+    save_preferences(settings, AIPreferences(enabled=True, choice_recorded=True))
+    save_config(
+        settings,
+        AIConfig(
+            source="private",
+            base_url="http://localhost",
+            backend="llama_cpp",
+            tier="custom",
+            text_model=entry.served_name,
+            vision_model="",
+            custom_model=entry,
+        ),
+    )
+    runtime = Mock()
+    runtime.running.return_value = False
+    runtime.installed.return_value = True
+    runtime.has_model.return_value = True
+    runtime.service_fields.return_value = {"socket_path": str(tmp_path / "s.sock"), "routes": None}
+    manager = AIManager(settings, lambda _c: None, runtime=runtime)
+    assert manager.start_runtime().state == "started"
+    runtime.start.assert_called_once_with((entry,))

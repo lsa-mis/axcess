@@ -456,7 +456,10 @@ class AIManager:
                 self.runtime.require_isolation()
             except IsolationError as exc:
                 return AiRuntimeStartResponse(state="not_isolated", reason=exc.reason)
-            tier = self.catalog.tier(config.tier) if config else None
+            # None for your own model ("custom") or a size no longer offered:
+            # neither is in the catalogue (end-to-end test, 2026-11-17: Start
+            # AI service crashed with your own model in use).
+            tier = next((t for t in self.catalog.tiers if config and t.id == config.tier), None)
             models = self._models(config) if config else None
             if (
                 not self.runtime.installed()
