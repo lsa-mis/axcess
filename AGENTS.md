@@ -400,6 +400,32 @@ Examples of real gaps: `aria-expanded` on a disclosure button,
 own (`role="button"` on a `<button>`), and never use ARIA to hide a
 problem that better markup would fix.
 
+**One control, one job.** Each control does one thing, and no two
+controls on a screen do the same thing or overlap in what they do. Two
+controls overlap when both narrow, sort, move through or change the same
+thing, so a reader has two ways to reach one result and two settings to
+understand and reset. Example: the Images tab has group buttons ("Images
+without alt text") over the table and a "Filter images" menu ("Needs alt
+text") that narrow the same list, two filters for one job (raised
+2026-11-17; the developer is still deciding whether to remove the group
+buttons). Before you design or build a control:
+
+1. Name its one job in a sentence.
+2. Search the screen, and the shared components it uses, for a control
+   that already does that job or part of it. Extend that one (a new
+   choice in an existing menu, a prop) instead of adding a second.
+3. If the developer asks for a control, a design or a copy of a pattern
+   whose job overlaps one that exists, you **must** warn them before you
+   build it: name both controls, say what they both do, and propose the
+   single-control design. Build the overlapping one only after they
+   confirm, and record their decision and the overlap in the rationale
+   comment. Never build an overlap silently.
+
+The standard: W3C COGA, "Making Content Usable"
+(https://www.w3.org/TR/coga-usable/), on one way to do one thing and no
+duplicate controls for one function, and WCAG 2.2 SC 3.2.4 Consistent
+Identification (Level AA).
+
 **Stay in scope.** When asked to fix or adjust X, change only X. If you
 see something else worth changing, report it and ask first. A vague
 request means ask what the problem is, not guess. This holds for padding,

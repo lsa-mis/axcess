@@ -83,7 +83,7 @@
   --c-surface-inverse-fg-subtle: 201 212 224;
   --c-border: 220 227 236;
   --c-border-strong: 184 196 210;
-  /* The scroll bar over a wide table (.table-scrollbar): just over the 3:1
+  /* The app's scroll bars (.ax-scrollbar): just over the 3:1
      that SC 1.4.11 Non-text Contrast asks, on the card surface (3.07:1 on
      white). The more and high contrast themes use their border-strong. */
   --c-scrollbar: 137 148 164;
@@ -578,10 +578,13 @@
   overflow: visible;
 }
 
-/* The bar over a wide table (TableRegion's top scroll bar, Table.tsx).
+/* The app's scroll bar style (.ax-scrollbar), first made for the bar over a
+   wide table (TableRegion's top scroll bar, Table.tsx) and also on the
+   zoomed image in the image viewer (ImageViewer, ImageParts.tsx), sideways
+   and up and down (the developer's request, 2026-11-17).
    Always shown, so it does not fade away as overlay scroll bars do on a Mac.
    - Target: the strip is 24px tall and the thumb fills it, so the part a
-     pointer grabs is 24px tall (SC 2.5.8 Target Size (Minimum), Level AA);
+     pointer grabs is 24px tall, or 24px wide when it runs up and down (SC 2.5.8 Target Size (Minimum), Level AA);
      an 8px clear border inside it leaves an 8px pill showing.
    - Contrast: the pill is --c-scrollbar, just over the 3:1 that SC 1.4.11
      Non-text Contrast (Level AA) asks: 3.07:1 on the card surface in the
@@ -599,22 +602,26 @@
    Chromium and Safari take the ::-webkit-scrollbar parts; Firefox shows
    its own bar at its normal size (it has no way to set a 24px one). */
 @media not (forced-colors: active) {
-  .table-scrollbar::-webkit-scrollbar {
+  .ax-scrollbar::-webkit-scrollbar {
     height: 24px;
+    width: 24px;
   }
-  .table-scrollbar::-webkit-scrollbar-track {
+  .ax-scrollbar::-webkit-scrollbar-corner {
     background: transparent;
   }
-  .table-scrollbar::-webkit-scrollbar-thumb {
+  .ax-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .ax-scrollbar::-webkit-scrollbar-thumb {
     border: 8px solid transparent;
     border-radius: 999px;
     background: rgb(var(--c-scrollbar)) padding-box;
   }
-  .table-scrollbar::-webkit-scrollbar-thumb:hover {
+  .ax-scrollbar::-webkit-scrollbar-thumb:hover {
     background: rgb(var(--c-fg-subtle)) padding-box;
   }
   @supports not selector(::-webkit-scrollbar) {
-    .table-scrollbar {
+    .ax-scrollbar {
       scrollbar-color: rgb(var(--c-scrollbar)) transparent;
     }
   }
