@@ -203,3 +203,26 @@ stock llama.cpp b12284, text only (no image add-ons). All Apache-2.0.
   address.
 - The fork (PrismML-Eng/llama.cpp, MIT, latest prism-b12128) is not
   needed for Q2_0, which stock b12284 runs.
+
+With their image add-ons (mmproj Q8_0, one model for both jobs), same
+sampling, same tasks:
+
+| Model + add-on | Download | Usable | Partly | Nonsense or wrong | Time per answer |
+| --- | --- | --- | --- | --- | --- |
+| Ternary-Bonsai-2-9B + mmproj Q8_0 | 2.56 + 0.62 GB | 5 | 1 | 4 | 40–163 s |
+| Ternary-Bonsai-2-4B + mmproj Q8_0 | 1.21 + 0.37 GB | 3 | 4 | 3 | 26–95 s |
+
+- Bonsai-2-9B, seeing the infographic, described what is in it (rainfall
+  bars, a smartphone market-share pie chart, website visitors, a
+  satisfaction rating chart); checked against the image by Claude: the
+  first image answer of the day that improves the alt text. Both colour
+  fixes pass (black text on the blue button, about 7.3:1; #b70000, about
+  7:1, still red). Wrong: an invented "Introduction to Accessibility"
+  heading, labels on the wrong regions for the landmark, the
+  screen-reader-only false alarm, and the colour-dot legend cut to three
+  words.
+- Text-only versus with the add-on, the totals moved by about one task each
+  way: within the noise of one run.
+- Memory: Bonsai-2-9B with its add-on needs about 5.7 GB by Axcess's
+  estimate (one model), against about 8.7 GB for today's Standard (two
+  models), for the same score on these tasks.
