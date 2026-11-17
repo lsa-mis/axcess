@@ -97,7 +97,7 @@ export default function ScanProgressView({
     <>
       <ReportHeader
         scanId={scan.id}
-        previousScanId={null}
+        canCompare={false}
         title="Scan in progress"
         meta={
           <>

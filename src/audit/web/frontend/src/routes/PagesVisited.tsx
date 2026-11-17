@@ -243,7 +243,7 @@ export default function PagesVisitedRoute() {
     <>
       <ReportHeader
         scanId={scan.id}
-        previousScanId={scan.previous_scan_id}
+        canCompare={scan.has_other_reports}
         title={PAGES_VISITED_VIEW}
         // The counts only, without ReportMeta's standing caveat beside them:
         // the header's line runs to 4xl, and the two-sentence caveat made it

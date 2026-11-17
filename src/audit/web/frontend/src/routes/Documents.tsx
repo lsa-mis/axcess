@@ -408,7 +408,7 @@ export default function DocumentsRoute() {
     <>
       {/* The heading and the tabs only, as on Issues: no line under the
           heading. The counts are the numbers row below it. */}
-      <ReportHeader scanId={scan.id} previousScanId={scan.previous_scan_id} title={DOCUMENTS_VIEW} tabs />
+      <ReportHeader scanId={scan.id} canCompare={scan.has_other_reports} title={DOCUMENTS_VIEW} tabs />
 
       {/* The counts as Issues shows its own: the shared row of summary
           numbers over the table (SummaryNumbers, SummaryStat), how many

@@ -137,7 +137,7 @@ export default function CompareRoute() {
       <ReportHeader
         tabs
         scanId={id}
-        previousScanId={scanQuery.data?.previous_scan_id ?? null}
+        canCompare={scanQuery.data?.has_other_reports ?? false}
         title="What changed"
         meta="What changed since an earlier report of this site: which issue types are new, still found, or no longer found. The trend shows how the site changed over time."
         actions={

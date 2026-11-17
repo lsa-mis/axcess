@@ -155,7 +155,12 @@ export interface ScanDetail extends ScanSummary {
    *  say. */
   scan_note: string | null;
   by_severity: Record<Severity, number>;
+  /** The latest earlier report of the same site: What changed's default
+   *  baseline. Null on a site's first report. */
   previous_scan_id: number | null;
+  /** Another report of the same site exists, earlier or later, so this
+   *  report offers Compare reports. */
+  has_other_reports: boolean;
   /** How much of the site this scan covered, as facts rather than a
    *  "partial" or "full" label (src/audit/db/reports.py, ScanCoverage). */
   coverage: ScanCoverage;
