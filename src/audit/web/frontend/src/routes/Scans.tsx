@@ -847,11 +847,13 @@ function ScanRow({
     // The open site's shade, and no rule above: it reads as part of the site row.
     <tr id={id} className={OPEN_SITE_SHADE}>
       {/* Indented into the box, which starts under the site's name (see
-          scanCardCell). "Report #" keeps the 44px it had inside the box's
-          left edge before the box moved in, so the whole block shifts
-          right rather than the padding shrinking (the developer's
-          correction, 2026-10-29). The rows read as the site's own (W3C
-          COGA, "Making Content Usable": group related content).
+          scanCardCell). "Report #" had 44px inside the box's left edge
+          (6.25rem in all, 2026-10-29); it is now 16px (4.75rem in all,
+          the developer's request, 2026-11-16). The 100px made this column
+          about 20px wider when a site was open, which moved every column
+          line (the table's columns size to their widest row). The rows
+          read as the site's own (W3C COGA, "Making Content Usable": group
+          related content).
 
           "Report #N" is the one way into a scan's report. A scan that saved
           pages goes straight to its Issues page, however it ended; any other
@@ -867,7 +869,7 @@ function ScanRow({
           row's header. */}
       <RowHeader
         sticky
-        className={cn("whitespace-nowrap py-1 pl-[6.25rem] text-xs font-normal tabular-nums text-fg-muted", piece("start"))}
+        className={cn("whitespace-nowrap py-1 pl-[4.75rem] text-xs font-normal tabular-nums text-fg-muted", piece("start"))}
       >
         <Link
           to={isReport(scan) ? `/scans/${scan.id}/issues` : `/scans/${scan.id}`}
