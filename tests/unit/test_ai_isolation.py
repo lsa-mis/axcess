@@ -383,7 +383,7 @@ def test_every_catalog_model_is_pinned_to_a_commit_over_https(tmp_path, model) -
 
 # -- the manager and the service ---------------------------------------------
 
-STANDARD = load_catalog().tier("standard")
+TWO_MODEL = load_catalog().tier("extra_large")
 
 
 def manager_for(tmp_path, *, enabled=True, desktop=True, source="private", backend="llama_cpp"):
@@ -396,9 +396,9 @@ def manager_for(tmp_path, *, enabled=True, desktop=True, source="private", backe
             base_url="http://localhost" if source == "private" else "http://127.0.0.1:12345",
             backend=backend,
             socket_path=socket if backend == "llama_cpp" else None,
-            tier="standard",
-            text_model=STANDARD.text.served_name,
-            vision_model=STANDARD.vision.served_name,
+            tier="extra_large",
+            text_model=TWO_MODEL.text.served_name,
+            vision_model=TWO_MODEL.vision.served_name,
         ),
     )
     save_preferences(settings, AIPreferences(enabled=enabled, choice_recorded=True))
@@ -437,7 +437,7 @@ def test_start_states_and_download_size(tmp_path) -> None:
     missing = manager.start_runtime()
     assert (
         missing.state == "model_missing"
-        and missing.download_bytes == load_catalog().tier("standard").size
+        and missing.download_bytes == load_catalog().tier("extra_large").size
     )
     runtime.start.assert_not_called()
     runtime.has_model.return_value = True
@@ -451,7 +451,7 @@ def test_start_states_and_download_size(tmp_path) -> None:
         "download_bytes": None,
         "tier": None,
     }
-    runtime.start.assert_called_with((STANDARD.text, STANDARD.vision))
+    runtime.start.assert_called_with((TWO_MODEL.text, TWO_MODEL.vision))
     runtime.running.return_value = True
     assert manager.start_runtime().state == "already_running"
     assert manager.runtime_status().isolated
@@ -485,7 +485,7 @@ def test_runtime_refuses_unisolated_start_before_spawning(tmp_path, monkeypatch)
     popen = Mock()
     monkeypatch.setattr("audit.ai.runtime.subprocess.Popen", popen)
     with pytest.raises(IsolationError):
-        runtime.start((STANDARD.text, STANDARD.vision))
+        runtime.start((TWO_MODEL.text, TWO_MODEL.vision))
     popen.assert_not_called()
     assert not runtime.running()
 
@@ -536,11 +536,11 @@ def test_runtime_uses_same_sandbox_for_probe_and_serve_with_clean_environment(
     monkeypatch.setattr("audit.ai.runtime.subprocess.Popen", popen)
     monkeypatch.setattr(
         "audit.ai.runtime._model_states",
-        lambda http: {STANDARD.text.served_name: "loaded", STANDARD.vision.served_name: "loaded"},
+        lambda http: {TWO_MODEL.text.served_name: "loaded", TWO_MODEL.vision.served_name: "loaded"},
     )
     monkeypatch.setenv("UNTRUSTED_MODEL_KEY", "not-inherited")
 
-    path = runtime.start((STANDARD.text, STANDARD.vision), wait_s=5)
+    path = runtime.start((TWO_MODEL.text, TWO_MODEL.vision), wait_s=5)
 
     assert path == str(sock)
     probe.assert_called_once_with(sandbox)
@@ -565,7 +565,7 @@ def test_runtime_uses_same_sandbox_for_probe_and_serve_with_clean_environment(
     # A socket in the sandbox's scratch folder, never a TCP port.
     assert "--port" not in argv
     text = preset.read_text()
-    assert f"[{STANDARD.text.served_name}]" in text and f"[{STANDARD.vision.served_name}]" in text
+    assert f"[{TWO_MODEL.text.served_name}]" in text and f"[{TWO_MODEL.vision.served_name}]" in text
     env = popen.call_args.kwargs["env"]
     assert "UNTRUSTED_MODEL_KEY" not in env
     assert set(env) == {"PATH", "HOME", "TMPDIR", "LLAMA_CACHE", "LD_LIBRARY_PATH"}
@@ -612,12 +612,12 @@ def test_runtime_falls_back_to_the_cpu_build_when_the_gpu_build_cannot_load(
         return process
 
     monkeypatch.setattr("audit.ai.runtime.subprocess.Popen", Mock(side_effect=spawn))
-    tags = (STANDARD.text.served_name, STANDARD.vision.served_name)
+    tags = (TWO_MODEL.text.served_name, TWO_MODEL.vision.served_name)
     monkeypatch.setattr(
         "audit.ai.runtime._model_states",
         lambda http: {t: ("failed" if len(spawned) == 1 else "loaded") for t in tags},
     )
-    path = runtime.start((STANDARD.text, STANDARD.vision), wait_s=5)
+    path = runtime.start((TWO_MODEL.text, TWO_MODEL.vision), wait_s=5)
     assert path == str(sock)
     assert spawned == [str(s.resolve()) for _, s in servers]
     # Only the GPU build is given the graphics devices.
@@ -656,14 +656,14 @@ def test_stop_makes_a_start_still_loading_models_give_up(tmp_path, monkeypatch) 
 
     def states(_http):
         loading.set()
-        return {STANDARD.text.served_name: "loading", STANDARD.vision.served_name: "loading"}
+        return {TWO_MODEL.text.served_name: "loading", TWO_MODEL.vision.served_name: "loading"}
 
     sock, process = _fake_service(tmp_path, monkeypatch, states)
     errors: list[BaseException] = []
 
     def start() -> None:
         try:
-            runtime.start((STANDARD.text, STANDARD.vision), wait_s=10)
+            runtime.start((TWO_MODEL.text, TWO_MODEL.vision), wait_s=10)
         except BaseException as exc:
             errors.append(exc)
 
@@ -681,9 +681,9 @@ def test_stop_makes_a_start_still_loading_models_give_up(tmp_path, monkeypatch) 
     # The stop request does not linger: the next start works.
     monkeypatch.setattr(
         "audit.ai.runtime._model_states",
-        lambda http: {STANDARD.text.served_name: "loaded", STANDARD.vision.served_name: "loaded"},
+        lambda http: {TWO_MODEL.text.served_name: "loaded", TWO_MODEL.vision.served_name: "loaded"},
     )
-    assert runtime.start((STANDARD.text, STANDARD.vision), wait_s=5) == str(sock)
+    assert runtime.start((TWO_MODEL.text, TWO_MODEL.vision), wait_s=5) == str(sock)
 
 
 @pytest.mark.skipif(sys.platform.startswith("win"), reason="no UNIX socket service on Windows")
@@ -733,7 +733,7 @@ def test_desktop_model_addresses_cannot_send_evidence_off_host(url):
         AIConfig(
             source="private",
             base_url=url,
-            tier="standard",
+            tier="extra_large",
             text_model="text:test",
             vision_model="vision:test",
         )
@@ -766,7 +766,7 @@ def test_the_linux_sandbox_ends_every_process_in_it(
 def test_memory_needed_counts_files_only_without_a_graphics_card() -> None:
     from audit.ai.runtime import MEMORY_MARGIN_BYTES, WORKING_BYTES_PER_MODEL, memory_needed
 
-    models = list(load_catalog().tier("standard").models)
+    models = list(load_catalog().tier("extra_large").models)
     files = sum(m.size for m in models)
     working = WORKING_BYTES_PER_MODEL * len(models) + MEMORY_MARGIN_BYTES
     assert memory_needed(models, dedicated_gpu=False) == files + working
@@ -786,7 +786,7 @@ def test_a_start_that_would_not_fit_in_free_memory_is_refused(
     monkeypatch.setattr(hardware, "available_memory_bytes", lambda: 2_000_000_000)
     monkeypatch.setattr(hardware, "dedicated_gpu", lambda: False)
     with pytest.raises(NotEnoughMemoryError, match="free memory"):
-        runtime._require_memory(list(load_catalog().tier("standard").models))
+        runtime._require_memory(list(load_catalog().tier("extra_large").models))
     assert runtime.isolation_reason == "not_enough_memory"
     # Unknown free memory never blocks a start.
     monkeypatch.setattr(hardware, "available_memory_bytes", lambda: None)
@@ -826,4 +826,4 @@ def test_a_start_waits_briefly_for_memory_a_stop_gives_back(
     monkeypatch.setattr(hardware, "dedicated_gpu", lambda: False)
     monkeypatch.setattr(runtime_module.time, "sleep", lambda _s: None)
     runtime = LlamaRuntime(tmp_path / "ai", load_catalog())
-    runtime._require_memory(list(load_catalog().tier("standard").models))
+    runtime._require_memory(list(load_catalog().tier("extra_large").models))

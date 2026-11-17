@@ -54,7 +54,7 @@ def test_catalog_pins_every_platform_and_only_open_licences() -> None:
         for asset in builds:
             assert len(asset.sha256) == 64
             assert catalog.llama_cpp.version in asset.name
-    assert [t.id for t in catalog.tiers] == ["standard", "large", "extra_large"]
+    assert [t.id for t in catalog.tiers] == ["small", "standard", "large", "extra_large"]
     for tier in catalog.tiers:
         assert tier.text.licence == tier.vision.licence == "Apache-2.0"
         # Image models need their add-on; a text-only model has none. One
@@ -98,11 +98,11 @@ def test_preset_names_each_model_by_its_served_name_and_turns_reasoning_off(tmp_
     ("memory", "apple", "gpu", "expected"),
     [
         (4, True, None, None),
-        (8, True, None, None),
+        (8, True, None, "small"),
         (16, True, None, "standard"),
         (24, True, None, "standard"),
         (36, True, None, "extra_large"),
-        (64, False, None, "standard"),  # no GPU: bigger models are too slow
+        (64, False, None, "small"),  # no GPU: bigger models are too slow
         (64, False, "NVIDIA", "extra_large"),
     ],
 )
@@ -371,6 +371,7 @@ def test_plan_marks_a_size_installed_only_when_every_file_is_here(tmp_path: Path
 
     manager.runtime.installed = lambda: True  # type: ignore[method-assign]
     assert {t.id: t.installed for t in manager.plan().tiers} == {
+        "small": False,
         "standard": True,
         "large": False,
         "extra_large": False,
@@ -405,18 +406,23 @@ def test_a_setup_saved_before_the_rename_keeps_its_models_under_the_new_name(
     assert manager._models(config) == standard.models
 
 
-def test_standards_text_model_runs_with_its_recommended_settings(tmp_path: Path) -> None:
-    """Qwen3.8-4B distill is Standard's text model (developer, 2026-11-17), with
-    the sampling its page recommends; Axcess then sends no temperature."""
-
+def test_standard_runs_bonsai_2_9b_with_its_recommended_settings(tmp_path: Path) -> None:
+    """Standard is Ternary-Bonsai-2-9B with its image add-on, one model for both
+    jobs (developer, 2026-11-17), with its card's non-thinking sampling; Axcess
+    then sends no temperature of its own."""
     standard = load_catalog().tier("standard")
-    assert standard.text.gguf.repo == "empero-ai/Qwen3.8-4B-Distill-GGUF"
-    assert standard.text.sampling == {"temp": 0.6, "top-p": 0.95, "top-k": 20}
-    assert standard.vision.sampling == {"temp": 0}
-    text = preset_text(
-        [(m, tmp_path / f"{i}.gguf", None) for i, m in enumerate(standard.models)], gpu=False
-    )
-    assert "temp = 0.6\ntop-k = 20\ntop-p = 0.95" in text
+    assert standard.text == standard.vision and len(standard.models) == 1
+    assert standard.text.gguf.repo == "prism-ml/Ternary-Bonsai-2-9B-gguf"
+    assert standard.text.mmproj is not None
+    assert standard.text.sampling == {
+        "temp": 0.7,
+        "top-p": 0.8,
+        "top-k": 20,
+        "min-p": 0.0,
+        "presence-penalty": 1.5,
+    }
+    text = preset_text([(standard.text, tmp_path / "m.gguf", tmp_path / "p.gguf")], gpu=False)
+    assert "temp = 0.7\ntop-k = 20\ntop-p = 0.8" in text
     settings = Settings(data_dir=tmp_path, desktop=True)
     save_preferences(settings, AIPreferences(enabled=True, choice_recorded=True))
     save_config(

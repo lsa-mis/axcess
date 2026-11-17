@@ -262,6 +262,9 @@ class LlamaRuntime:
         self._lock = threading.Lock()
         # Set by stop() so a start still waiting for models gives up at once.
         self._abort = threading.Event()
+        # True while a start loads its models (the app starts the service in
+        # the background at launch), so the interface can say "starting".
+        self.starting = False
         self.socket_path: str | None = None
         # Windows: model name -> the launcher's port for that model.
         self.routes: dict[str, str] | None = None
@@ -477,6 +480,13 @@ class LlamaRuntime:
         """
         # Each model once: one model can do both jobs (the Small size).
         models = list({m.served_name: m for m in models}.values())
+        self.starting = True
+        try:
+            return self._start(models, wait_s)
+        finally:
+            self.starting = False
+
+    def _start(self, models: list[ModelEntry], wait_s: float) -> str:
         with self._lock:
             if self.running() and (self.socket_path or self.routes):
                 return self.socket_path or json.dumps(self.routes, sort_keys=True)

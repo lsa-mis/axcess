@@ -795,7 +795,7 @@ export function SuggestionsBlockedNote({
       <Card className={`${className} p-4 text-sm text-fg-muted`}>
         <p className="max-w-measure">
           AI fix suggestions are turned on, but the private AI service on this computer is not
-          running. Start it here. It never downloads anything.
+          ready yet. Starting it never downloads anything.
         </p>
         {aiSetup ? <AiRuntimeControls setupPage /> : null}
         {setupLink}

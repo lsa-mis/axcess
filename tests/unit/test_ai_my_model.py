@@ -238,3 +238,22 @@ def test_a_switch_that_cannot_start_brings_back_the_model_used_before(tmp_path: 
         with pytest.raises(NotEnoughMemoryError, match="The model used before is running again"):
             manager.use_my_model(new.sha256, None)
     assert runtime.start.call_args_list[-1].args == ((before,),)
+
+
+def test_status_says_starting_while_a_start_loads(tmp_path: Path) -> None:
+    """Right after launch the service loads in the background; the page said
+    "not running" and offered Start (developer, 2026-11-17)."""
+    from unittest.mock import Mock
+
+    from audit.ai.manager import AIManager
+    from audit.config import Settings
+
+    runtime = Mock()
+    runtime.running.return_value = False
+    runtime.isolation_reason = None
+    runtime.starting = True
+    manager = AIManager(Settings(data_dir=tmp_path, desktop=True), lambda _c: None, runtime=runtime)
+    status = manager.runtime_status()
+    assert status.starting and not status.running and status.reason is None
+    runtime.starting = False
+    assert not manager.runtime_status().starting

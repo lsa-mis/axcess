@@ -24,7 +24,7 @@ from audit.ai.state import (
 from audit.config import Settings
 from audit.web.server import _build_crawl_config
 
-STANDARD = load_catalog().tier("standard")
+TWO_MODEL = load_catalog().tier("extra_large")
 
 
 def socket_path(settings: Settings) -> str:
@@ -38,9 +38,9 @@ def configured(settings: Settings, source: str = "private") -> AIConfig:
         base_url="http://localhost" if private else "http://127.0.0.1:1234",
         backend="llama_cpp" if private else "ollama",
         socket_path=socket_path(settings) if private else None,
-        tier="standard",
-        text_model=STANDARD.text.served_name,
-        vision_model=STANDARD.vision.served_name,
+        tier="extra_large",
+        text_model=TWO_MODEL.text.served_name,
+        vision_model=TWO_MODEL.vision.served_name,
     )
     save_config(settings, config)
     return config
@@ -107,7 +107,7 @@ def test_off_keeps_models_and_on_reuses_them(tmp_path: Path, source: str) -> Non
     runtime.remove.assert_not_called()
     runtime.download.assert_not_called()
     if source == "private":
-        runtime.start.assert_called_once_with((STANDARD.text, STANDARD.vision))
+        runtime.start.assert_called_once_with((TWO_MODEL.text, TWO_MODEL.vision))
         assert load_config(settings) == config
     else:
         runtime.start.assert_not_called()
@@ -133,9 +133,9 @@ def test_turning_on_a_private_ollama_setup_asks_for_a_new_download(tmp_path: Pat
         AIConfig(
             source="private",
             base_url="http://127.0.0.1:1234",
-            tier="standard",
-            text_model=STANDARD.text.served_name,
-            vision_model=STANDARD.vision.served_name,
+            tier="extra_large",
+            text_model=TWO_MODEL.text.served_name,
+            vision_model=TWO_MODEL.vision.served_name,
             ollama_version="0.33.0",
         ),
     )
@@ -199,7 +199,7 @@ def test_failed_setup_stops_private_runtime_while_ai_is_off(tmp_path: Path) -> N
     )
     runtime.download_remaining.return_value = 0
     manager.installer.pull = Mock(side_effect=RuntimeSetupError("download stopped"))
-    manager.install("standard")
+    manager.install("extra_large")
     assert manager.installer._thread is not None
     manager.installer._thread.join(3)
     assert not manager.installer.running

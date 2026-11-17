@@ -105,8 +105,9 @@ Choosing to continue keeps AI off. You can change your choice in Settings.
 
    | Size | Needs at least | Text model | Image model | Download |
    | --- | --- | --- | --- | --- |
-   | Standard | 16 GB memory | `qwen3.8:4b-distill-q4_K_M` | `qwen3-vl:2b-instruct` | about 4.7 GB |
-   | Large | 32 GB memory | `qwen2.5-coder:7b-instruct` | `qwen3-vl:4b-instruct` | about 8 GB |
+   | Small | 8 GB memory | `bonsai2:4b-ternary-q2_0` (one model reads text and images) | the same model | about 1.6 GB |
+   | Standard | 16 GB memory | `bonsai2:9b-ternary-q2_0` (one model reads text and images) | the same model | about 3.2 GB |
+   | Large | 32 GB memory | `bonsai2:27b-ternary-q2_0` (one model reads text and images) | the same model | about 8.3 GB |
    | Extra large | 32 GB memory | `qwen2.5-coder:14b-instruct` | `qwen3-vl:8b-instruct` | about 15 GB |
 
    Both models stay loaded at once, and each needs working memory beyond its

@@ -30,20 +30,19 @@ React workbench in a sandboxed Electron window.
   is the included AI program (llama.cpp). The optional AI models are not silently
   downloaded. **Settings > AI features** (on because `desktopEnvironment`
   sets `AUDIT_DESKTOP=1`) checks memory, disk and graphics chip, and
-  suggests a size: Standard, Large or Extra large. Only after the person selects
+  suggests a size: Small, Standard, Large or Extra large. Only after the person selects
   **Download and set up** does it download the AI models for that size
   (GGUF files) from Hugging Face. Each file is pinned to an exact version
   and checked against its SHA-256 before use.
-- The AI models, all under the Apache 2.0 licence, are a text model and an
-  image model for each size. Standard: Qwen3.8-4B distill (empero-ai, a
-  community distillation, not an official Qwen release; temperature 0.6,
-  top-p 0.95, top-k 20 as its page recommends) and Qwen3-VL-2B. Large: Qwen2.5-Coder-7B and Qwen3-VL-4B. Extra large:
-  Qwen2.5-Coder-14B and Qwen3-VL-8B. The sizes were renamed on 2026-11-17
-  (each moved up one name: Small is now Standard); a setup saved before
-  keeps its models under the new name. There is no 2B size: none of the
-  2B models tried wrote usable fixes on real pages (see
-  `docs/internal/model-trials-2026-11.md`). To try another model, use
-  **Use your own model**.
+- The AI models are all under the Apache 2.0 licence. Small, Standard and
+  Large are PrismML's Ternary Bonsai 2 models (4B, 9B, 27B; weights of -1, 0
+  or +1, file type Q2_0, which stock llama.cpp runs), each with its image
+  add-on (mmproj Q8_0), so one model does both jobs. They run with their
+  maker's non-thinking settings (temperature 0.7, top-p 0.8, top-k 20,
+  presence penalty 1.5; min-p 0.05 for the 27B). Extra large is
+  Qwen2.5-Coder-14B with Qwen3-VL-8B. Chosen 2026-11-17 from real-page trials
+  (`docs/internal/model-trials-2026-11.md`); a setup saved before keeps its
+  models under the size whose models it names.
 - The private AI service runs in an operating-system sandbox with no
   internet access: Bubblewrap with no network on Linux (Bubblewrap must be
   installed, or AI does not start), and a deny-by-default `sandbox-exec`

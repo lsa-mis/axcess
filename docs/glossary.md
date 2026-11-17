@@ -548,7 +548,7 @@ An optional AI model that reads text (a language model) or looks at images (a
 vision model), running on your own computer. The desktop app runs it in its
 own private AI service: the AI program (llama.cpp), which comes with the app,
 kept away from the internet. It downloads the models only from **Settings >
-AI features**, after you choose a size (Standard, Large or Extra large). If you [run Axcess from source
+AI features**, after you choose a size (Small, Standard, Large or Extra large). If you [run Axcess from source
 code](https://github.com/lsa-mis/axcess#run-from-source) or on a server, it can
 use an Ollama you run instead. AI results are never marked [Mostly sure](#mostly-sure)
 or [Measured](#measured).

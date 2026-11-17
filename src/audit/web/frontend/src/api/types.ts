@@ -2159,4 +2159,6 @@ export interface AiRuntimeStatus {
   running: boolean;
   isolated: boolean;
   reason: string | null;
+  /** A start is loading the models (at launch it runs in the background). */
+  starting: boolean;
 }

@@ -262,13 +262,13 @@ async def test_choose_a_size_by_keyboard_without_downloading(new_page: Any, serv
         group = page.get_by_role("group", name="Choose the AI models")
         await group.wait_for()
         radios = group.get_by_role("radio")
-        # Standard, Large, Extra large, and your own model: one choice.
-        assert await radios.count() == 4
+        # Small, Standard, Large, Extra large, and your own model: one choice.
+        assert await radios.count() == 5
         await radios.first.focus()
         await page.keyboard.press("Home")
         await page.keyboard.press("ArrowDown")
         checked = await group.locator("input:checked").get_attribute("value")
-        assert checked == "large"
+        assert checked == "standard"
         button = page.get_by_role("button", name="Download and set up")
         assert await button.count() == 1
         # The button says how big the download is before anything starts.

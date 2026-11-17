@@ -658,6 +658,8 @@ export const SUGGESTION_ERROR_LABEL: Record<SuggestionErrorCode, string> = {
 
 // The AI service's state while it runs, where the Start button was.
 export const AI_RUNTIME_RUNNING = "AI service is running. It is isolated and stays on this computer.";
+// While the service loads its models, for example right after the app opens.
+export const AI_RUNTIME_STARTING = "AI service is starting. This can take a minute.";
 
 export const AI_RUNTIME_START_LABEL: Record<import("../api/types").AiRuntimeStartState, string> = {
   started: "AI service started. It is isolated and stays on this computer.",

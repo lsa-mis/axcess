@@ -39,7 +39,7 @@ def test_plan_describes_this_computer_and_every_size(
     monkeypatch.setenv("AUDIT_DESKTOP", "1")
     with TestClient(create_app(db_path=db, blob_dir=tmp_path / "blobs")) as client:
         plan = client.get("/api/ai/plan").json()
-        assert [t["id"] for t in plan["tiers"]] == ["standard", "large", "extra_large"]
+        assert [t["id"] for t in plan["tiers"]] == ["small", "standard", "large", "extra_large"]
         assert plan["current"] is None
         assert plan["install"]["state"] == "idle"
         assert plan["program"]["licence"] == "MIT"
@@ -275,7 +275,7 @@ def test_runtime_start_requires_explicit_boolean_confirmation(
             "download_bytes": None,
             "tier": None,
         }
-        assert set(client.get("/api/ai/runtime").json()) == {"running", "isolated", "reason"}
+        assert set(client.get("/api/ai/runtime").json()) == {"running", "isolated", "reason", "starting"}
 
 
 def test_runtime_routes_stay_desktop_only(db: Path, tmp_path: Path) -> None:
@@ -359,5 +359,5 @@ def test_runtime_start_states(
         if state not in {"started", "not_isolated"}:
             runtime.start.assert_not_called()
         else:
-            runtime.start.assert_called_once_with((small.text, small.vision))
+            runtime.start.assert_called_once_with(small.models)
         runtime.download.assert_not_called()

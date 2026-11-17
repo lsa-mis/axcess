@@ -93,6 +93,8 @@ class AiRuntimeStatus(BaseModel):
     running: bool = False
     isolated: bool = False
     reason: str | None = None
+    # A start is loading the models (at launch it runs in the background).
+    starting: bool = False
 
 
 class AiRuntimeStartResponse(BaseModel):
@@ -446,10 +448,12 @@ class AIManager:
                 self.runtime.require_isolation()
             except IsolationError as exc:
                 reason = exc.reason
+        running = self.runtime.running()
         return AiRuntimeStatus(
-            running=self.runtime.running(),
-            isolated=self.runtime.running(),
-            reason=reason,
+            running=running,
+            isolated=running,
+            reason=None if self.runtime.starting else reason,
+            starting=self.runtime.starting and not running,
         )
 
     def start_runtime(self) -> AiRuntimeStartResponse:
