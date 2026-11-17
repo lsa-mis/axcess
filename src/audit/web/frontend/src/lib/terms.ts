@@ -213,7 +213,10 @@ export const LINKED_FILE_REASON_TEXT: Record<LinkedFileReason, string> = {
     "Not checked, because the scan followed robots.txt: the file’s site asks scanners not to download it. To check it, scan again with “Ignore the site’s robots.txt rules” turned on.",
   blocked: "The scan's settings say not to visit this address.",
   limit: "The scan reached its limit of 200 files to download.",
-  not_checked: "The scan stopped before Axcess checked this file.",
+  // True however the scan ended (2026-11-17): a file is left "not checked"
+  // when the scan stops first, and also when its check fails, which a
+  // completed scan's report had wrongly called a stop.
+  not_checked: "Axcess did not finish checking this file. The scan stopped first, or the check ran into an error.",
 };
 
 /** The reason in words, with the server's status code where there is one. */

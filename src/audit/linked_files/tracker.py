@@ -418,8 +418,17 @@ class LinkedFileTracker:
         for result in results:
             if isinstance(result, asyncio.CancelledError):
                 raise result
-            if isinstance(result, (sqlite3.Error, ValueError)):
-                log.warning("linked_files.check_failed", error_type=type(result).__name__)
+            # Every failure is logged with what it said, not only its type:
+            # a file whose check failed stays "not checked", and the log is
+            # the only place the reason is kept. Only the type was logged
+            # for a database error until 2026-11-17, which hid a missing
+            # column for a whole scan (migration 0043).
+            if isinstance(result, BaseException):
+                log.warning(
+                    "linked_files.check_failed",
+                    error_type=type(result).__name__,
+                    error=str(result)[:300],
+                )
 
     def _done(self, file_id: int, _task: asyncio.Task[None]) -> None:
         self._in_flight.pop(file_id, None)
