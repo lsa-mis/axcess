@@ -165,3 +165,10 @@ Two more, same setup (developer's own files, nothing downloaded):
   Qwen3-4B's infographic answer added the chart titles from the image
   (partly) where Qwen3.8's was unusable. One run each with random
   sampling: a two-task difference can flip on a rerun.
+| Qwen3.8-2B distill (empero-ai, Apache-2.0), Q4_K_M, text only (temp 0.6, top-p 0.95, top-k 20) | 0 | 2 | 8 | 23–105 s |
+
+- Qwen3.8-2B: deleted the "Red = Urgent" line, removed a heading as a
+  "duplicate", dropped `role="search"` from the landmark, escaped the copy
+  link's icon into visible text, and pasted the guidance example ("Free
+  workshop, Tuesday 3 pm, Room 204") into both images' alt text. Same
+  pattern as every 2B model tried: none is usable for fix suggestions.
