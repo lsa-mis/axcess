@@ -3,7 +3,7 @@ import { Check, RotateCcw } from "lucide-react";
 import { Button, Card, LinkButton, PageHeader } from "../components/ui";
 import { AiRuntimeControls } from "../components/AiRuntimeControls";
 import { useAiSetup } from "../hooks/useAiSetup";
-import { AI_FEATURE_STATE_LABEL, AI_TIER_LABEL } from "../lib/terms";
+import { AI_FEATURE_STATE_LABEL, AI_MY_MODEL_LABEL, AI_TIER_LABEL } from "../lib/terms";
 import { cn } from "../lib/cn";
 import { PRESETS, presetIsOn, presetOffValues, type Preferences } from "../lib/preferences";
 import { SETTING_SECTIONS, type Setting } from "../lib/settingsCatalog";
@@ -110,7 +110,9 @@ export default function SettingsRoute() {
             <p className="mt-0.5 text-xs leading-5 text-fg-muted">
               {AI_FEATURE_STATE_LABEL[aiSetup.preferences.enabled ? "on" : "off"]}.
               {aiSetup.current
-                ? ` Size: ${AI_TIER_LABEL[aiSetup.current.tier]}. Models are kept on this computer.`
+                ? aiSetup.current.tier === "custom"
+                  ? ` Model: ${AI_MY_MODEL_LABEL}. Models are kept on this computer.`
+                  : ` Size: ${AI_TIER_LABEL[aiSetup.current.tier]}. Models are kept on this computer.`
                 : " Optional AI that suggests fixes and checks images and wording. It runs on this computer."}
             </p>
             <AiRuntimeControls setupPage />
