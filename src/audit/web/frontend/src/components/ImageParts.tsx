@@ -236,9 +236,16 @@ export function CurrentAlt({ image }: { image: ReportImage }) {
  * Zoomed, the picture scrolls inside its own box, sideways and up and down,
  * with the app's scroll bars (.ax-scrollbar in styles.css: 24px, always
  * shown, 3:1 contrast), the style first made for wide tables. While it
- * scrolls, the box is a named region in the Tab order, so the arrow keys
- * scroll it (SC 2.1.1 Keyboard, Level A), as a wide table's region does;
- * fitted, it is neither. Each step keeps the middle of the view in the
+ * scrolls, the box is a region named "…, zoomed in" in the Tab order, so
+ * the arrow keys scroll it (SC 2.1.1 Keyboard, Level A), as a wide table's
+ * region does. Fitted, it is a plain box with no role, name or Tab stop: a
+ * landmark named "zoomed in" at 100% would tell a screen reader something
+ * untrue.
+ *
+ * The dialog's header (name and Close) stays at the top while the dialog
+ * scrolls, so the dialog keeps 5rem of scroll padding under it: a control
+ * that takes focus is scrolled to below the header, never under it (SC
+ * 2.4.11 Focus Not Obscured (Minimum), Level AA). Each step keeps the middle of the view in the
  * middle. Browser zoom still works as well: this enlarges only the picture.
  */
 const ZOOM_STEPS = [1, 1.5, 2, 3, 4] as const;
@@ -270,7 +277,8 @@ export function ImageViewer({ image, onClose }: { image: ReportImage | null; onC
       };
     }
     // Leaving 100%: take the fitted width now, as the reader sees it.
-    if (step === 0 && picture.current) setFitWidth(picture.current.clientWidth);
+    // Its outer width, border included, as the width set below includes it.
+    if (step === 0 && picture.current) setFitWidth(picture.current.getBoundingClientRect().width);
     setStep(next);
   };
   useLayoutEffect(() => {
@@ -293,7 +301,7 @@ export function ImageViewer({ image, onClose }: { image: ReportImage | null; onC
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
-      className="max-h-[92vh] w-[min(94vw,60rem)] overflow-y-auto rounded-xs border border-border bg-surface-raised p-0 text-fg shadow-raised backdrop:bg-black/60"
+      className="max-h-[92vh] w-[min(94vw,60rem)] scroll-pt-20 overflow-y-auto rounded-xs border border-border bg-surface-raised p-0 text-fg shadow-raised backdrop:bg-black/60"
     >
       {image && (
         <>
@@ -334,10 +342,9 @@ export function ImageViewer({ image, onClose }: { image: ReportImage | null; onC
             </div>
             <div
               ref={view}
-              role="region"
-              aria-label={`${name}, zoomed in`}
+              role={zoomed ? "region" : undefined}
+              aria-label={zoomed ? `${name}, zoomed in` : undefined}
               // In the Tab order only while it scrolls (see the comment above).
-              // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
               tabIndex={zoomed ? 0 : -1}
               className="ax-scrollbar max-h-[65vh] overflow-auto rounded-xs focus:outline-none focus-visible:shadow-focus"
             >

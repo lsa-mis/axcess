@@ -8,12 +8,14 @@ local model is a stub: these tests never contact Ollama.
 
 from __future__ import annotations
 
+import io
 import os
 import re
 from pathlib import Path
 from typing import Any
 
 import pytest
+from PIL import Image
 
 from audit.analyzer.vlm import alt_check
 from audit.analyzer.vlm.alt_check import AltCheckInput, AltCheckResult
@@ -249,6 +251,14 @@ async def test_image_viewer_zooms_and_scrolls_by_keyboard(
     base, scan_id = images_server
     page = await new_page(viewport={"width": 1280, "height": 900})
     try:
+        # The saved photo is 4 by 4 pixels, too small to need scrolling even
+        # at 400%, so the viewer is given a 1200 by 900 picture instead.
+        large = io.BytesIO()
+        Image.new("RGB", (1200, 900), (90, 120, 160)).save(large, format="PNG")
+        await page.route(
+            "**/blobs/**",
+            lambda route: route.fulfill(body=large.getvalue(), content_type="image/png"),
+        )
         await _photo_page(page, base, scan_id)
         await page.get_by_role("button", name=re.compile(r"^View larger image")).click()
         viewer = page.get_by_role("dialog")
@@ -258,10 +268,12 @@ async def test_image_viewer_zooms_and_scrolls_by_keyboard(
         zoom_out = viewer.get_by_role("button", name="Zoom out of the image")
         await playwright_async.expect(status).to_have_text("Shown at 100%")
         await playwright_async.expect(zoom_out).to_have_attribute("aria-disabled", "true")
+        # Fitted: no region named "zoomed in", and no Tab stop.
         region = viewer.get_by_role("region", name=re.compile(r", zoomed in$"))
-        await playwright_async.expect(region).to_have_attribute("tabindex", "-1")
-        assert "ax-scrollbar" in (await region.get_attribute("class") or "")
+        await playwright_async.expect(region).to_have_count(0)
 
+        picture = viewer.locator("img")
+        fitted = await picture.evaluate("el => el.getBoundingClientRect().width")
         await zoom_in.focus()
         for shown in ("150%", "200%", "300%", "400%"):
             await page.keyboard.press("Enter")
@@ -271,9 +283,13 @@ async def test_image_viewer_zooms_and_scrolls_by_keyboard(
         await page.keyboard.press("Enter")
         await playwright_async.expect(status).to_have_text("Shown at 400%")
         assert await zoom_in.evaluate("el => el === document.activeElement")
+        # Four times the fitted width.
+        width = await picture.evaluate("el => el.getBoundingClientRect().width")
+        assert abs(width - 4 * fitted) <= 2, (fitted, width)
 
         # Zoomed: the region scrolls both ways and takes a Tab stop.
         await playwright_async.expect(region).to_have_attribute("tabindex", "0")
+        assert "ax-scrollbar" in (await region.get_attribute("class") or "")
         sizes = await region.evaluate(
             "el => [el.scrollWidth > el.clientWidth, el.scrollHeight > el.clientHeight]"
         )
