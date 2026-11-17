@@ -11,7 +11,13 @@ from pathlib import Path
 from typing import Literal
 
 IsolationReason = Literal[
-    "sandbox_unavailable", "network_test_failed", "namespace_unreachable", "runtime_failed"
+    "sandbox_unavailable",
+    "network_test_failed",
+    "namespace_unreachable",
+    "runtime_failed",
+    # Not isolation: the models would not fit in the memory free now, so
+    # the service was not started (``runtime.memory_needed``).
+    "not_enough_memory",
 ]
 
 
@@ -118,6 +124,11 @@ def build_sandbox(
             args = [
                 tool,
                 "--unshare-net",
+                # Its own process space: when the sandbox ends, the kernel
+                # ends every process in it, the per-model servers llama.cpp's
+                # router starts included. Without it a stopped or crashed
+                # service left those running, each holding a model in memory.
+                "--unshare-pid",
                 "--die-with-parent",
                 "--new-session",
                 "--proc",

@@ -82,6 +82,67 @@ def _memory_bytes() -> int:
     return 0
 
 
+def dedicated_gpu() -> bool:
+    """A separate graphics card with its own memory (NVIDIA, AMD)."""
+    return _gpu() in ("NVIDIA", "AMD")
+
+
+def available_memory_bytes() -> int | None:
+    """Memory free for a new program right now, or None when unknown.
+
+    Linux: ``MemAvailable``. Windows: ``ullAvailPhys``. macOS: free,
+    inactive, speculative and purgeable pages from ``vm_stat`` (the pages
+    the system gives to a new program without swapping).
+    """
+    platform = _platform()
+    try:
+        if platform.startswith("linux"):
+            for line in Path("/proc/meminfo").read_text().splitlines():
+                if line.startswith("MemAvailable:"):
+                    return int(line.split()[1]) * 1024
+        elif platform == "darwin":
+            out = subprocess.run(
+                ["vm_stat"],  # noqa: S607 - system tool, fixed argv
+                capture_output=True,
+                text=True,
+                timeout=5,
+            ).stdout
+            page = int(out.split("page size of", 1)[1].split()[0])
+            pages = 0
+            for line in out.splitlines():
+                key, _, value = line.partition(":")
+                if key.strip() in (
+                    "Pages free",
+                    "Pages inactive",
+                    "Pages speculative",
+                    "Pages purgeable",
+                ):
+                    pages += int(value.strip().rstrip("."))
+            return pages * page
+        elif platform.startswith("win"):
+
+            class _Status(ctypes.Structure):
+                _fields_ = [
+                    ("dwLength", ctypes.c_ulong),
+                    ("dwMemoryLoad", ctypes.c_ulong),
+                    ("ullTotalPhys", ctypes.c_ulonglong),
+                    ("ullAvailPhys", ctypes.c_ulonglong),
+                    ("ullTotalPageFile", ctypes.c_ulonglong),
+                    ("ullAvailPageFile", ctypes.c_ulonglong),
+                    ("ullTotalVirtual", ctypes.c_ulonglong),
+                    ("ullAvailVirtual", ctypes.c_ulonglong),
+                    ("sullAvailExtendedVirtual", ctypes.c_ulonglong),
+                ]
+
+            status = _Status()
+            status.dwLength = ctypes.sizeof(_Status)
+            if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):  # type: ignore[attr-defined]
+                return int(status.ullAvailPhys)
+    except (OSError, ValueError, IndexError, subprocess.SubprocessError):
+        pass
+    return None
+
+
 def _gpu() -> str | None:
     platform = _platform()
     if platform == "darwin":

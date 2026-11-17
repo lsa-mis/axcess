@@ -18,7 +18,7 @@ from audit.ai import custom
 from audit.ai import hardware as hw
 from audit.ai.catalog import Catalog, ModelEntry, Tier, TierId, load_catalog
 from audit.ai.installer import Installer, InstallStatus
-from audit.ai.runtime import LlamaRuntime, RuntimeSetupError
+from audit.ai.runtime import LlamaRuntime, NotEnoughMemoryError, RuntimeSetupError
 from audit.ai.sandbox import IsolationError
 from audit.ai.state import (
     SOCKET_BASE_URL,
@@ -470,6 +470,8 @@ class AIManager:
                 self.runtime.start(models)
             except IsolationError as exc:
                 return AiRuntimeStartResponse(state="not_isolated", reason=exc.reason)
+            except NotEnoughMemoryError:
+                return AiRuntimeStartResponse(state="not_isolated", reason="not_enough_memory")
             except RuntimeSetupError:
                 return AiRuntimeStartResponse(state="not_isolated", reason="runtime_failed")
             previous = config

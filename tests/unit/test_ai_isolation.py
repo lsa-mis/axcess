@@ -14,6 +14,7 @@ import pytest
 from pydantic import ValidationError
 
 from audit.ai import downloader
+from audit.ai import sandbox as sandbox_module
 from audit.ai.catalog import GgufFile, ModelEntry, load_catalog, platform_key
 from audit.ai.downloader import download_model, file_path, model_present, model_remaining
 from audit.ai.manager import AIManager
@@ -730,3 +731,64 @@ def test_enabling_without_setup_never_silently_selects_system_ollama(tmp_path):
     assert manager.config() is None
     assert effective_settings(settings).ollama_base_url == settings.ollama_base_url
     assert effective_settings(settings).model_backend == settings.model_backend
+
+
+# -- never two services, never more than fits in memory (2026-11-17) ----------
+
+
+def test_the_linux_sandbox_ends_every_process_in_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """--unshare-pid: when the sandbox ends, so do llama.cpp's per-model
+    servers. Before, a stop or crash left them holding models in memory."""
+    monkeypatch.setattr(sandbox_module.shutil, "which", lambda name: f"/usr/bin/{name}")
+    sandbox = build_sandbox(tmp_path, tmp_path, tmp_path, platform="linux")
+    assert "--unshare-pid" in sandbox.prefix and "--die-with-parent" in sandbox.prefix
+
+
+def test_memory_needed_counts_files_only_without_a_graphics_card() -> None:
+    from audit.ai.runtime import MEMORY_MARGIN_BYTES, WORKING_BYTES_PER_MODEL, memory_needed
+
+    models = list(load_catalog().tier("standard").models)
+    files = sum(m.size for m in models)
+    working = WORKING_BYTES_PER_MODEL * len(models) + MEMORY_MARGIN_BYTES
+    assert memory_needed(models, dedicated_gpu=False) == files + working
+    assert memory_needed(models, dedicated_gpu=True) == working
+
+
+def test_a_start_that_would_not_fit_in_free_memory_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from audit.ai import hardware
+    from audit.ai.runtime import NotEnoughMemoryError
+
+    runtime = LlamaRuntime(tmp_path / "ai", load_catalog())
+    monkeypatch.setattr(hardware, "available_memory_bytes", lambda: 2_000_000_000)
+    monkeypatch.setattr(hardware, "dedicated_gpu", lambda: False)
+    with pytest.raises(NotEnoughMemoryError, match="free memory"):
+        runtime._require_memory(list(load_catalog().tier("standard").models))
+    assert runtime.isolation_reason == "not_enough_memory"
+    # Unknown free memory never blocks a start.
+    monkeypatch.setattr(hardware, "available_memory_bytes", lambda: None)
+    runtime._require_memory(list(load_catalog().tier("extra_large").models))
+
+
+def test_a_service_left_running_is_ended_before_a_new_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from audit.ai import runtime as runtime_module
+
+    runtime = LlamaRuntime(tmp_path / "ai", load_catalog())
+    runtime.scratch.mkdir(parents=True)
+    (runtime.scratch / runtime_module.GROUP_FILE).write_text("4242", encoding="ascii")
+    ended: list[int] = []
+    monkeypatch.setattr(runtime_module, "_group_alive", lambda pgid: True)
+    monkeypatch.setattr(runtime_module, "_group_runs_llama", lambda pgid: pgid == 4242)
+    monkeypatch.setattr(runtime_module, "_end_group", lambda pgid, process=None: ended.append(pgid))
+    runtime._end_leftovers()
+    assert ended == [4242]
+    assert not (runtime.scratch / runtime_module.GROUP_FILE).exists()
+    # A group that no longer runs llama-server (its number reused) is left alone.
+    (runtime.scratch / runtime_module.GROUP_FILE).write_text("777", encoding="ascii")
+    runtime._end_leftovers()
+    assert ended == [4242]

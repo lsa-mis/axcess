@@ -28,6 +28,7 @@ import hashlib
 import json
 import os
 import shutil
+import signal
 import stat
 import subprocess
 import sys
@@ -42,6 +43,7 @@ from typing import TypedDict
 
 import httpx
 
+from audit.ai import hardware
 from audit.ai.catalog import Catalog, ModelEntry, RuntimeAsset, platform_key
 from audit.ai.sandbox import IsolationError, build_sandbox, test_network_boundary
 from audit.ai.state import SOCKET_BASE_URL
@@ -71,6 +73,78 @@ SERVER_NAMES = ("llama-server", "llama-server.exe")
 
 class RuntimeSetupError(Exception):
     """A plain-language reason the AI service could not be set up."""
+
+
+class NotEnoughMemoryError(RuntimeSetupError):
+    """The models would not fit in the memory free now; nothing started."""
+
+
+# Memory a running model needs beyond its file: the 8,192-token context
+# (its KV cache) and compute buffers. About 1-2.5 GB for the catalogue's
+# models by their published shapes; 1.5 GB per model plus a 1 GB margin.
+WORKING_BYTES_PER_MODEL = 1_500_000_000
+MEMORY_MARGIN_BYTES = 1_000_000_000
+# The service's process group, kept so a later start can end what an
+# earlier run left behind (a crash, a killed app).
+GROUP_FILE = "service.group"
+
+
+def memory_needed(models: Iterable[ModelEntry], *, dedicated_gpu: bool) -> int:
+    """Free memory the service needs to start ``models`` without swapping.
+
+    A separate graphics card (NVIDIA, AMD) holds the model files in its own
+    memory; Apple chips and integrated graphics use the computer's memory,
+    as does the processor-only build.
+    """
+    models = list(models)
+    files = 0 if dedicated_gpu else sum(m.size for m in models)
+    return files + WORKING_BYTES_PER_MODEL * len(models) + MEMORY_MARGIN_BYTES
+
+
+def _group_alive(pgid: int) -> bool:
+    try:
+        os.killpg(pgid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def _end_group(pgid: int, process: subprocess.Popen[bytes] | None = None) -> None:
+    """End a process group: politely, then for sure.
+
+    The group holds the service and every per-model server it started, so
+    none of them keeps a model in memory after a stop.
+    """
+    for sig, wait_s in ((signal.SIGTERM, 10.0), (signal.SIGKILL, 5.0)):
+        with contextlib.suppress(ProcessLookupError, PermissionError):
+            os.killpg(pgid, sig)
+        deadline = time.monotonic() + wait_s
+        while time.monotonic() < deadline:
+            if process is not None:
+                process.poll()
+            if not _group_alive(pgid):
+                return
+            time.sleep(0.1)
+
+
+def _group_runs_llama(pgid: int) -> bool:
+    """True when a process in group ``pgid`` is a llama-server (POSIX ``ps``)."""
+    try:
+        out = subprocess.run(
+            ["ps", "-axo", "pgid=,comm="],  # noqa: S607 - system tool, fixed argv
+            capture_output=True,
+            text=True,
+            timeout=5,
+        ).stdout
+    except (OSError, subprocess.SubprocessError):
+        return False
+    for line in out.splitlines():
+        group, _, command = line.strip().partition(" ")
+        if group == str(pgid) and "llama-server" in command:
+            return True
+    return False
 
 
 class PausedError(Exception):
@@ -412,6 +486,8 @@ class LlamaRuntime:
                 raise RuntimeSetupError("The AI program is not installed yet.")
             if not all(self.has_model(m) for m in models):
                 raise RuntimeSetupError("The AI models are not downloaded yet.")
+            self._end_leftovers()
+            self._require_memory(models)
             last: RuntimeSetupError | None = None
             start = (
                 self._start_windows_locked if sys.platform.startswith("win") else self._start_locked
@@ -556,8 +632,11 @@ class LlamaRuntime:
                         stdout=log,
                         stderr=subprocess.STDOUT,
                         stdin=subprocess.DEVNULL,
+                        # Its own process group, which a stop ends whole.
+                        start_new_session=True,
                     )
                 ).result()
+                (self.scratch / GROUP_FILE).write_text(str(self._process.pid), encoding="ascii")
             except OSError as exc:
                 self.isolation_reason = "runtime_failed"
                 raise RuntimeSetupError("The isolated AI service could not start.") from exc
@@ -629,15 +708,61 @@ class LlamaRuntime:
         self.isolated = False
         if windows is not None:
             windows.stop()
-        if process is not None and process.poll() is None:
-            process.terminate()
-            try:
-                process.wait(timeout=15)
-            except subprocess.TimeoutExpired:
-                process.kill()
+        if process is not None:
+            # The whole group, even when its first process already ended:
+            # the per-model servers can outlive it.
+            _end_group(process.pid, process)
+            with contextlib.suppress(subprocess.TimeoutExpired):
                 process.wait(timeout=5)
+            with contextlib.suppress(OSError):
+                (self.scratch / GROUP_FILE).unlink(missing_ok=True)
         with contextlib.suppress(OSError):
             self._socket().unlink(missing_ok=True)
+
+    def _end_leftovers(self) -> None:
+        """End a service an earlier run of Axcess left running.
+
+        A crash or a killed app skips the stop. The group it ran in is kept
+        in scratch; if a llama-server still runs in that group, it is ended
+        before a new service starts, so two never hold models at once.
+        Windows ends the job's processes itself when the launcher exits.
+        """
+        if sys.platform.startswith("win") or self._process is not None:
+            return
+        marker = self.scratch / GROUP_FILE
+        try:
+            pgid = int(marker.read_text(encoding="ascii").strip())
+        except (OSError, ValueError):
+            return
+        if pgid > 1 and _group_alive(pgid) and _group_runs_llama(pgid):
+            note(self.ai_dir / "llama-server.log", f"ending a service left running (group {pgid})")
+            _end_group(pgid)
+        with contextlib.suppress(OSError):
+            marker.unlink(missing_ok=True)
+
+    def _require_memory(self, models: list[ModelEntry]) -> None:
+        """Refuse to start models that would not fit in the memory free now.
+
+        Starting them anyway makes the computer swap or stop responding;
+        a plain refusal leaves everything else working.
+        """
+        free = hardware.available_memory_bytes()
+        if free is None:
+            return
+        need = memory_needed(models, dedicated_gpu=hardware.dedicated_gpu())
+        if free >= need:
+            return
+        self.isolation_reason = "not_enough_memory"
+        note(
+            self.ai_dir / "llama-server.log",
+            f"not started: the models need about {need / 1e9:.1f} GB of free memory, "
+            f"{free / 1e9:.1f} GB is free",
+        )
+        raise NotEnoughMemoryError(
+            f"The AI models need about {need / 1e9:.1f} GB of free memory, and "
+            f"{free / 1e9:.1f} GB is free now. AI was not started. Close other programs "
+            "and try again, or choose a smaller size."
+        )
 
     def remove(self) -> None:
         """Stop the service and delete the downloaded program and models.
