@@ -275,7 +275,8 @@ const SORT_KINDS: Record<SortKey, SortKind> = {
  * minimum: on a narrow window the columns still shrink toward their longest
  * word, as they did, so nothing scrolls sideways sooner than before (SC 1.4.10
  * Reflow, Level AA). Two columns also have a minimum, the width each had
- * with a site open: Site 241px (15.0625rem; a closed row's long address
+ * with a site open: Site 241px (15.0625rem, from 768px wide; see
+ * SizerRows for why not on a phone; a closed row's long address
  * wraps, an open site's "Report #N" and badge do not) and Issue types 109px
  * (6.8125rem; "Not counted" does not wrap), so they do not jump when a site
  * opens in a window too narrow for the widths above (the developer's
@@ -556,7 +557,7 @@ export default function ScansRoute() {
                       column="site"
                       kind="text"
                       wrap="words"
-                      className="sticky left-0 z-[2] min-w-[15.0625rem] bg-surface-muted pl-[calc(1rem+var(--target,44px)+0.25rem)]"
+                      className="sticky left-0 z-[2] bg-surface-muted md:min-w-[15.0625rem] pl-[calc(1rem+var(--target,44px)+0.25rem)]"
                       {...sortProps}
                     >
                       {SORT_LABELS.site}
@@ -576,11 +577,7 @@ export default function ScansRoute() {
                         {SORT_LABELS[column]}
                       </SortHeader>
                     ))}
-                    {/* min-w-[17rem]: the Actions column is at least 272px wide, about 8px
-                        more than the buttons need in the test data, so Delete's hover
-                        fill clears the box's right edge (the developer's request,
-                        2026-11-16: make the column wider). */}
-                    <ColumnHeader className="w-[22rem] min-w-[17rem] whitespace-nowrap px-3 py-1.5">
+                    <ColumnHeader className="w-[22rem] whitespace-nowrap px-3 py-1.5">
                       {/* The height of a sort button, words in its middle like theirs,
                           so its label lines up with them. */}
                       <span className="inline-flex min-h-target items-center px-1">Actions</span>
@@ -1008,14 +1005,23 @@ function RuleChecksCell({ scan, className }: { scan: ScanSummary; className?: st
  * cell's words), hidden (``invisible``, which also keeps it out of the tab
  * order) and ``aria-hidden``, so it is never seen, heard or reached. Its
  * stand-ins for links and buttons are plain text with their classes, not
- * controls. The minimum widths on Site and Issue types (COLUMN_WIDTHS) came
+ * controls.
+ *
+ * From 768px wide (md) only, as is Site's minimum width. Site is the column
+ * that stays put while the table scrolls, and on a phone a Site column wide
+ * enough for "Report #N" and its badge covered most of the table, with the
+ * sort buttons under it (CI, 2026-11-17: a click on "Pages" at 320px landed
+ * on Site). A phone's table scrolls sideways anyway, so there the columns
+ * still grow when a site opens, as they did before.
+ *
+ * The minimum widths on Site and Issue types (COLUMN_WIDTHS) came
  * first and stay; alone they held only for the fonts and report numbers they
  * were measured with.
  */
 function SizerRows({ sites }: { sites: readonly SiteGroup[] }) {
   const sized = (children: ReactNode) => <div className="h-0 overflow-hidden">{children}</div>;
   return (
-    <tfoot aria-hidden="true" className="invisible">
+    <tfoot aria-hidden="true" className="invisible hidden md:table-footer-group">
       {sites.flatMap((site) => {
         const reports = site.scans.filter(isReport);
         return site.scans.map((scan) => {
@@ -1047,8 +1053,15 @@ function SizerRows({ sites }: { sites: readonly SiteGroup[] }) {
                 {sized(scan.rule_checks ? ruleChecksText(scan.rule_checks) : "Not recorded")}
               </Cell>
               <Cell className="whitespace-nowrap py-0">
+                {/* pr-2: the Actions column is 8px wider than its buttons, so
+                    Delete's hover fill clears the box's right edge (the
+                    developer's request, 2026-11-16: make the column wider).
+                    Here, not on the real cells: the extra width follows the
+                    buttons in any font, and these rows hold no real buttons
+                    whose spacing a touch-target check would measure. It
+                    replaces a 17rem minimum, which overshot in some fonts. */}
                 {sized(
-                  <div className={SCAN_ACTIONS}>
+                  <div className={cn(SCAN_ACTIONS, "pr-2")}>
                     {compare && (
                       <span className={cn(buttonClasses("ghost"), LINK_MENU_TRIGGER_CLASS)}>
                         Compare with
