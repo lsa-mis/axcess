@@ -88,6 +88,9 @@ class Settings(BaseSettings):
     suggestion_text_model: str = "qwen2.5-coder:7b-instruct"
     suggestion_vision_model: str = "qwen2.5vl:7b"
     suggestion_timeout_s: float = Field(default=120.0, ge=10.0, le=600.0)
+    # Sent with each fix-suggestion request. None: not sent, so the model's
+    # own sampling applies (your own model with recommended settings).
+    suggestion_temperature: float | None = 0.0
     suggestion_queue_max: int = Field(default=20, ge=1, le=200)
 
     # Set by the desktop app (``AUDIT_DESKTOP=1``). Turns on the optional AI

@@ -194,7 +194,9 @@ class OllamaSuggestionProvider:
         base_url: str,
         timeout_s: float,
         backend: str = DEFAULT_BACKEND,
+        temperature: float | None = 0,
     ) -> None:
+        self._temperature = temperature
         self._client = client
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout_s
@@ -224,7 +226,8 @@ class OllamaSuggestionProvider:
             json_schema=ANSWER_SCHEMA,
             # Stays loaded between clicks, then frees the memory (Ollama).
             keep_alive=KEEP_ALIVE,
-            temperature=0,
+            # None: the model's own recommended sampling (your own model).
+            temperature=self._temperature,
             # Room for the largest evidence bundle plus the answer, so a
             # long prompt is never cut off silently. Ollama takes it per
             # request; llama-server must be started with at least this.

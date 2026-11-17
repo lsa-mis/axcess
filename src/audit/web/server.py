@@ -1075,6 +1075,7 @@ def create_app(
                 base_url=endpoint.base_url,
                 timeout_s=settings.suggestion_timeout_s,
                 backend=endpoint.backend,
+                temperature=settings.suggestion_temperature,
             )
             suggestion_state["provider"] = provider
         worker = SuggestionWorker(

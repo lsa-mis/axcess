@@ -31,7 +31,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from audit.ai.catalog import GgufFile, ModelEntry
+from audit.ai.catalog import GgufFile, ModelEntry, SamplingKey
 from audit.ai.downloader import file_path, file_present
 
 FileKind = Literal["model", "image_addon"]
@@ -261,7 +261,11 @@ def find(models: Path, sha256: str, kind: FileKind) -> MyModelFile:
     raise MyModelError("That file is no longer in the AI folder. Choose it again.")
 
 
-def model_entry(model: MyModelFile, addon: MyModelFile | None) -> ModelEntry:
+def model_entry(
+    model: MyModelFile,
+    addon: MyModelFile | None,
+    sampling: dict[SamplingKey, float] | None = None,
+) -> ModelEntry:
     """The catalogue-shaped entry the private service runs.
 
     Its name is made from the file's name and checksum, with no colon
@@ -276,6 +280,7 @@ def model_entry(model: MyModelFile, addon: MyModelFile | None) -> ModelEntry:
         licence="unknown",
         gguf=gguf,
         mmproj=mmproj,
+        sampling=sampling or None,
     )
 
 

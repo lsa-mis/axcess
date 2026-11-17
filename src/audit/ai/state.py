@@ -225,6 +225,9 @@ def effective_settings(settings: Settings) -> Settings:
             "suggestion_text_model": config.text_model,
             "suggestion_vision_model": config.vision_model,
             "suggestions_enabled": enabled,
+            "suggestion_temperature": None
+            if config.custom_model is not None and config.custom_model.sampling
+            else settings.suggestion_temperature,
         }
     )
 

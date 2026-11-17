@@ -224,6 +224,8 @@ def preset_text(models: Iterable[tuple[ModelEntry, Path, Path | None]], *, gpu: 
         lines += ["", f"[{entry.served_name}]", f"model = {model}"]
         if mmproj is not None:
             lines.append(f"mmproj = {mmproj}")
+        for key, value in sorted((entry.sampling or {}).items()):
+            lines.append(f"{key} = {value:g}")
     return "\n".join(lines) + "\n"
 
 
@@ -550,6 +552,8 @@ class LlamaRuntime:
                 "--no-webui",
                 "--offline",
             ]
+            for key, value in sorted((entry.sampling or {}).items()):
+                argv += [f"--{key}", f"{value:g}"]
             processes.append(ModelProcess(entry.served_name, sock, argv))
         service = LauncherService(launcher)
         self._windows = service

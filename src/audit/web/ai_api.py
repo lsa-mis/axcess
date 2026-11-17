@@ -14,7 +14,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from audit.ai import custom
-from audit.ai.catalog import TierId
+from audit.ai.catalog import SamplingKey, TierId
 from audit.ai.installer import InstallStatus
 from audit.ai.manager import (
     AIBusyError,
@@ -41,6 +41,9 @@ class UseMyModelRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     model: str = Field(pattern=r"^[a-f0-9]{64}$")
     image_addon: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    # The model maker's recommended sampling; llama-server applies it and
+    # Axcess then sends no temperature of its own.
+    sampling: dict[SamplingKey, float] | None = None
     confirm: Literal[True]
 
 
@@ -162,7 +165,9 @@ def build_ai_router(manager: AIManager) -> APIRouter:
     async def ai_use_my_model(body: UseMyModelRequest) -> AIPlan:
         """Run your own model in the private AI service, then return the plan."""
         try:
-            await asyncio.to_thread(manager.use_my_model, body.model, body.image_addon)
+            await asyncio.to_thread(
+                manager.use_my_model, body.model, body.image_addon, body.sampling
+            )
         except AIBusyError as exc:
             raise HTTPException(409, str(exc)) from exc
         except custom.MyModelError as exc:

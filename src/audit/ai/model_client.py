@@ -127,7 +127,9 @@ class GenerateRequest:
     json_schema: Mapping[str, Any] | None = None
     # Constrain output to any JSON object (Ollama ``format: "json"``).
     json_mode: bool = False
-    temperature: float = 0.0
+    # None: not sent, so llama-server uses the model's own sampling
+    # settings (your own model with its maker's recommended values).
+    temperature: float | None = 0.0
     seed: int | None = None
     context_tokens: int | None = None
     max_tokens: int | None = None
@@ -479,7 +481,9 @@ def ollama_generate_body(request: GenerateRequest) -> dict[str, Any]:
         body["format"] = "json"
     if request.keep_alive is not None:
         body["keep_alive"] = request.keep_alive
-    options: dict[str, Any] = {"temperature": request.temperature}
+    options: dict[str, Any] = (
+        {} if request.temperature is None else {"temperature": request.temperature}
+    )
     if request.seed is not None:
         options["seed"] = request.seed
     if request.context_tokens is not None:
@@ -598,8 +602,9 @@ def llama_cpp_generate_body(request: GenerateRequest) -> dict[str, Any]:
         "model": request.model,
         "messages": [{"role": "user", "content": content}],
         "stream": False,
-        "temperature": request.temperature,
     }
+    if request.temperature is not None:
+        body["temperature"] = request.temperature
     if request.seed is not None:
         body["seed"] = request.seed
     if request.max_tokens is not None:

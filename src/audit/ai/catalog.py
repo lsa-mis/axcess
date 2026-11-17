@@ -25,6 +25,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 CATALOG_PATH = Path(__file__).with_name("catalog.json")
+SamplingKey = Literal["temp", "top-p", "top-k", "min-p", "presence-penalty", "repeat-penalty"]
 TierId = Literal["small", "standard", "large", "extra_large"]
 Accelerator = Literal["metal", "vulkan", "cpu"]
 
@@ -76,6 +77,11 @@ class ModelEntry(_Frozen):
     licence: str
     gguf: GgufFile
     mmproj: GgufFile | None = None
+    # llama-server sampling options for this model (``temp``, ``top-p``,
+    # ``top-k``, ``min-p``, ``presence-penalty``, ``repeat-penalty``), set
+    # for your own model to its maker's recommended values. Unset: Axcess
+    # sends temperature 0 with each request, as for the catalogue's models.
+    sampling: dict[SamplingKey, float] | None = None
 
     @property
     def served_name(self) -> str:

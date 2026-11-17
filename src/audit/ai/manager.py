@@ -16,7 +16,7 @@ from pydantic import BaseModel
 
 from audit.ai import custom
 from audit.ai import hardware as hw
-from audit.ai.catalog import Catalog, ModelEntry, Tier, TierId, load_catalog
+from audit.ai.catalog import Catalog, ModelEntry, SamplingKey, Tier, TierId, load_catalog
 from audit.ai.installer import Installer, InstallStatus
 from audit.ai.runtime import LlamaRuntime, NotEnoughMemoryError, RuntimeSetupError
 from audit.ai.sandbox import IsolationError
@@ -361,7 +361,12 @@ class AIManager:
             self.runtime.stop()
         return status
 
-    def use_my_model(self, model_sha256: str, addon_sha256: str | None) -> AIConfig:
+    def use_my_model(
+        self,
+        model_sha256: str,
+        addon_sha256: str | None,
+        sampling: dict[SamplingKey, float] | None = None,
+    ) -> AIConfig:
         """Run your own model (files copied in before) instead of a size.
 
         Stops the service, starts it with that model in the same sandbox,
@@ -382,7 +387,7 @@ class AIManager:
             models = self.runtime.models_dir
             model = custom.find(models, model_sha256, "model")
             addon = custom.find(models, addon_sha256, "image_addon") if addon_sha256 else None
-            entry = custom.model_entry(model, addon)
+            entry = custom.model_entry(model, addon, sampling)
             self.runtime.stop()
             self.runtime.start((entry,))
             config = AIConfig(
