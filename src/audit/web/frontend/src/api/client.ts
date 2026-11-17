@@ -400,10 +400,10 @@ export const api = {
   removeAi: () => request<void>("/api/ai", { method: "DELETE" }),
   copyMyModel,
   /** Run your own model (files copied in before) in the private AI service. */
-  useMyModel: (model: string, imageAddon: string | null) =>
+  useMyModel: (model: string, imageAddon: string | null, sampling: Record<string, number> | null) =>
     request<AiPlan>("/api/ai/my-models/use", {
       method: "POST",
-      body: JSON.stringify({ model, image_addon: imageAddon, confirm: true }),
+      body: JSON.stringify({ model, image_addon: imageAddon, sampling, confirm: true }),
     }),
   /** Whether AI fix suggestions are turned on and their local model is ready. */
   getSuggestionStatus: () =>

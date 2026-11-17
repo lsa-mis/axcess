@@ -547,7 +547,47 @@ function AiSetupPage({
  * - Copy progress is a native <progress> with a visible percent; only the
  *   change of step is announced, in the page's status region (SC 4.1.3
  *   Status Messages, Level AA), as the size download does.
+ * - Answer settings (sampling) sit in a closed native <details> above the
+ *   file choice, because most people never need them and the model's own
+ *   page gives the values to copy (developer, 2026-11-17: "allow user to
+ *   tune top k top p and other important parameters"). One set applies to
+ *   whichever model this card starts next, the copy and the "Use ..."
+ *   buttons alike, so there is one place to set them, not one per model
+ *   (W3C COGA Making Content Usable, paraphrased: one way to do one
+ *   thing). Each field is a native number input with a visible label that
+ *   puts the plain phrase first and the technical name in parentheses
+ *   (repo plain-language rule 3; WCAG technique H44), and its allowed range
+ *   in words, not only in min/max (SC 3.3.2 Labels or Instructions,
+ *   Level A). A value out of range is named in the status region and its
+ *   field takes focus (SC 3.3.1 Error Identification, Level A).
  */
+const SAMPLING_FIELDS: {
+  key: "temp" | "top-p" | "top-k" | "min-p" | "presence-penalty" | "repeat-penalty";
+  label: string;
+  min: number;
+  max: number;
+  step: string;
+}[] = [
+  { key: "temp", label: "Randomness (temperature), 0 to 2", min: 0, max: 2, step: "any" },
+  { key: "top-p", label: "Word choice by share (top-p), 0 to 1", min: 0, max: 1, step: "any" },
+  { key: "top-k", label: "Word choice by count (top-k), 0 to 1000", min: 0, max: 1000, step: "1" },
+  { key: "min-p", label: "Least likely word kept (min-p), 0 to 1", min: 0, max: 1, step: "any" },
+  {
+    key: "presence-penalty",
+    label: "Penalty for any repeated word (presence penalty), -2 to 2",
+    min: -2,
+    max: 2,
+    step: "any",
+  },
+  {
+    key: "repeat-penalty",
+    label: "Penalty for repeating often (repetition penalty), 0 to 2",
+    min: 0,
+    max: 2,
+    step: "any",
+  },
+];
+
 function MyModelCard({
   plan,
   disabled,
@@ -562,14 +602,40 @@ function MyModelCard({
   const modelInput = useRef<HTMLInputElement>(null);
   const addonInput = useRef<HTMLInputElement>(null);
   const [progress, setProgress] = useState<{ label: string; fraction: number } | null>(null);
+  const [settings, setSettings] = useState<Record<string, string>>({});
   const current = plan.current?.tier === "custom" ? plan.current.custom_model : null;
+
+  /** The filled-in answer settings, or null when one is out of range. */
+  const sampling = (): Record<string, number> | null | "invalid" => {
+    const out: Record<string, number> = {};
+    for (const field of SAMPLING_FIELDS) {
+      const raw = (settings[field.key] ?? "").trim();
+      if (!raw) continue;
+      const value = Number(raw);
+      const whole = field.step === "1" ? Number.isInteger(value) : true;
+      if (!Number.isFinite(value) || value < field.min || value > field.max || !whole) {
+        onMessage(`Check the answer setting "${field.label}". Nothing was started.`);
+        document.getElementById(`${id}-${field.key}`)?.focus();
+        return "invalid";
+      }
+      out[field.key] = value;
+    }
+    return Object.keys(out).length ? out : null;
+  };
   const models = plan.my_models.filter((f) => f.kind === "model");
   const addonFor = (model: MyModelFile) =>
     plan.my_models.find((f) => f.kind === "image_addon" && f.for_model === model.sha256) ?? null;
 
   const use = useMutation({
-    mutationFn: ({ model, addon }: { model: MyModelFile; addon: MyModelFile | null }) =>
-      api.useMyModel(model.sha256, addon?.sha256 ?? null),
+    mutationFn: ({
+      model,
+      addon,
+      tuned,
+    }: {
+      model: MyModelFile;
+      addon: MyModelFile | null;
+      tuned: Record<string, number> | null;
+    }) => api.useMyModel(model.sha256, addon?.sha256 ?? null, tuned),
     onMutate: ({ model }) =>
       onMessage(`Starting ${model.name} in the private AI service. This can take a minute.`),
     onSuccess: (next, { model }) => {
@@ -583,7 +649,7 @@ function MyModelCard({
       onMessage(error instanceof Error ? error.message : "Your model could not start."),
   });
   const copy = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (tuned: Record<string, number> | null) => {
       const modelFile = modelInput.current?.files?.[0];
       if (!modelFile) throw new Error("Choose a model file (GGUF) first.");
       const addonFile = addonInput.current?.files?.[0] ?? null;
@@ -602,7 +668,7 @@ function MyModelCard({
           model.sha256,
         );
       }
-      return { model, addon };
+      return { model, addon, tuned };
     },
     onMutate: () => onMessage("Copying the model file. You can keep using Axcess."),
     onSuccess: (files) => {
@@ -631,11 +697,49 @@ function MyModelCard({
       </p>
       {current && <p className="mt-2 font-semibold">{`In use now: ${current.tag}.`}</p>}
 
+      <details className="mt-3">
+        <summary className="min-h-target cursor-pointer content-center font-semibold">
+          Answer settings (sampling), optional
+        </summary>
+        <p id={`${id}-sampling-hint`} className="text-xs leading-5 text-fg-muted">
+          Copy these from the model&rsquo;s own page, where its makers list recommended
+          settings. Leave them all empty to use Axcess&rsquo;s setting: randomness 0, the most
+          predictable answers. Once you fill in any, an empty one uses llama.cpp&rsquo;s
+          default. They apply to the next model you start here.
+        </p>
+        <div className="mt-2 grid gap-3 sm:grid-cols-2">
+          {SAMPLING_FIELDS.map((field) => (
+            <div key={field.key}>
+              <label htmlFor={`${id}-${field.key}`} className="block">
+                {field.label}
+              </label>
+              <input
+                id={`${id}-${field.key}`}
+                type="number"
+                inputMode="decimal"
+                min={field.min}
+                max={field.max}
+                step={field.step}
+                value={settings[field.key] ?? ""}
+                onChange={(event) =>
+                  setSettings((now) => ({ ...now, [field.key]: event.target.value }))
+                }
+                aria-describedby={`${id}-sampling-hint`}
+                disabled={busy}
+                className="mt-1 block min-h-target w-full rounded-xs border border-border-strong bg-surface px-2 text-sm"
+              />
+            </div>
+          ))}
+        </div>
+      </details>
+
       <form
         className="mt-3 space-y-3"
         onSubmit={(event) => {
           event.preventDefault();
-          if (!busy) copy.mutate();
+          if (busy) return;
+          const tuned = sampling();
+          if (tuned !== "invalid") copy.mutate(tuned);
         }}
       >
         <div>
@@ -708,7 +812,9 @@ function MyModelCard({
                       type="button"
                       aria-disabled={busy || undefined}
                       onClick={() => {
-                        if (!busy) use.mutate({ model, addon });
+                        if (busy) return;
+                        const tuned = sampling();
+                        if (tuned !== "invalid") use.mutate({ model, addon, tuned });
                       }}
                     >
                       {`Use ${model.name}`}

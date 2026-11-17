@@ -106,3 +106,35 @@ this is accuracy.
 5. Colour fixes failed everywhere: the prompt could give the model the
    computed ratio of each candidate colour, or Axcess could compute a passing
    colour itself.
+
+## Second round, 2026-11-17: small models in the real app
+
+Each model ran alone in the desktop app (`Use your own model`), with
+reasoning off and its maker's recommended sampling from its model card, on
+10 real occurrences from the local scan of accessibility.umich.edu (2
+contrast, invalid ARIA attribute, 2 heading order, duplicate landmark,
+target size, clipped screen-reader-only text, 2 images). Intel Iris Xe,
+Vulkan, 16 GB. Every answer was read by Claude; no person has checked the
+verdicts. Results: `artifacts/llama/eval/results/`.
+
+| Model (sampling) | Usable | Partly | Nonsense or wrong | Time per answer |
+| --- | --- | --- | --- | --- |
+| Qwen3.5-2B + mmproj (temp 1.0, top-p 1.0, top-k 20, presence 2.0) | 1 | 3 | 6 | 52–317 s |
+| LFM3-VL-2B + mmproj (temp 0.1, top-p 1.0, top-k 50, repeat 1.1) | 2 | 2 | 6 | 24–69 s |
+| Spark-X2.6-1.7B, text only (temp 1.0, top-p 0.95, top-k off) | 0 | 1 | 9 | 18–77 s |
+| Bonsai-4B Q1_0, text only (temp 0.5, top-p 0.9, top-k 20) | 0 | 0 | 10 | could not run |
+
+- Bonsai-4B: llama.cpp b12284 could not build the JSON-schema grammar for
+  it ("error initializing grammar sampler"), so no answer was written.
+- Every model failed both contrast fixes (no change, or a colour that
+  breaks "Red = Urgent"), "fixed" the screen-reader-only text that is a
+  false alarm, and two copied the rule guidance's example alt text
+  ("Free workshop, Tuesday 3 pm, Room 204") into real images.
+- Harmful answers: red text on a red background (LFM3), an icon link
+  stripped of its name (LFM3, Spark), an unrelated logo link as the fix
+  for a landmark (Qwen3.5).
+
+Decision (developer, 2026-11-17): no 2B size; the sizes start at
+Standard (Qwen3-4B-Instruct-2507). Next lead: generate fixes mechanically
+where the rule allows (computed colours, attribute tables, heading levels)
+and let a model only reword the text.

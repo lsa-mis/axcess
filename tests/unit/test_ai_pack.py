@@ -52,7 +52,7 @@ def test_catalog_pins_every_platform_and_only_open_licences() -> None:
         for asset in builds:
             assert len(asset.sha256) == 64
             assert catalog.llama_cpp.version in asset.name
-    assert [t.id for t in catalog.tiers] == ["small", "standard", "large", "extra_large"]
+    assert [t.id for t in catalog.tiers] == ["standard", "large", "extra_large"]
     for tier in catalog.tiers:
         assert tier.text.licence == tier.vision.licence == "Apache-2.0"
         # Image models need their add-on; a text-only model has none. One
@@ -96,11 +96,11 @@ def test_preset_names_each_model_by_its_served_name_and_turns_reasoning_off(tmp_
     ("memory", "apple", "gpu", "expected"),
     [
         (4, True, None, None),
-        (8, True, None, "small"),
+        (8, True, None, None),
         (16, True, None, "standard"),
         (24, True, None, "standard"),
         (36, True, None, "extra_large"),
-        (64, False, None, "small"),  # no GPU: bigger models are too slow
+        (64, False, None, "standard"),  # no GPU: bigger models are too slow
         (64, False, "NVIDIA", "extra_large"),
     ],
 )
@@ -275,9 +275,9 @@ def test_remove_legacy_ollama_keeps_llama_files(tmp_path: Path) -> None:
     assert (tmp_path / "ai" / "gguf" / "x").is_dir()
 
 
-@pytest.mark.parametrize("size", ["small", "standard"])
+@pytest.mark.parametrize("size", ["standard"])
 def test_install_saves_private_llama_cpp_setup(tmp_path: Path, size: str) -> None:
-    """Standard downloads a text and an image model; Small one model for both."""
+    """Standard downloads a text and an image model."""
     settings = Settings(data_dir=tmp_path, desktop=True)
     changes: list[AIConfig | None] = []
     pulled: list[str] = []
@@ -360,8 +360,8 @@ def test_plan_marks_a_size_installed_only_when_every_file_is_here(tmp_path: Path
     """The setup page offers no download for a size that is set up (2026-11-17)."""
     manager = AIManager(Settings(data_dir=tmp_path, desktop=True), lambda _c: None)
     manager.probe = lambda: machine(24)  # type: ignore[method-assign]
-    small = load_catalog().tier("small")
-    present = {small.text.tag, small.vision.tag}
+    standard = load_catalog().tier("standard")
+    present = {standard.text.tag, standard.vision.tag}
     manager.runtime.has_model = lambda m: m.tag in present  # type: ignore[method-assign]
 
     manager.runtime.installed = lambda: False  # type: ignore[method-assign]
@@ -369,13 +369,12 @@ def test_plan_marks_a_size_installed_only_when_every_file_is_here(tmp_path: Path
 
     manager.runtime.installed = lambda: True  # type: ignore[method-assign]
     assert {t.id: t.installed for t in manager.plan().tiers} == {
-        "small": True,
-        "standard": False,
+        "standard": True,
         "large": False,
         "extra_large": False,
     }
 
-    present.discard(small.vision.tag)
+    present.discard(standard.vision.tag)
     assert not any(t.installed for t in manager.plan().tiers)
 
 
@@ -392,7 +391,7 @@ def test_a_setup_saved_before_the_rename_keeps_its_models_under_the_new_name(
             source="private",
             base_url="http://localhost",
             backend="llama_cpp",
-            tier="small",
+            tier="standard",
             text_model=standard.text.served_name,
             vision_model=standard.vision.served_name,
         ),

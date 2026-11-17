@@ -35,6 +35,17 @@ class InstallRequest(BaseModel):
     tier: TierId
 
 
+# The ranges the setup page offers (``SAMPLING_FIELDS`` in AiSetup.tsx).
+SAMPLING_RANGES: dict[str, tuple[float, float]] = {
+    "temp": (0, 2),
+    "top-p": (0, 1),
+    "top-k": (0, 1000),
+    "min-p": (0, 1),
+    "presence-penalty": (-2, 2),
+    "repeat-penalty": (0, 2),
+}
+
+
 class UseMyModelRequest(BaseModel):
     """Switch the private service to files copied in before."""
 
@@ -45,6 +56,17 @@ class UseMyModelRequest(BaseModel):
     # Axcess then sends no temperature of its own.
     sampling: dict[SamplingKey, float] | None = None
     confirm: Literal[True]
+
+    @field_validator("sampling")
+    @classmethod
+    def sampling_in_range(
+        cls, value: dict[SamplingKey, float] | None
+    ) -> dict[SamplingKey, float] | None:
+        for key, number in (value or {}).items():
+            low, high = SAMPLING_RANGES[key]
+            if not low <= number <= high or (key == "top-k" and number != int(number)):
+                raise ValueError(f"The answer setting {key} must be from {low:g} to {high:g}.")
+        return value
 
 
 class PreferenceRequest(BaseModel):
@@ -109,6 +131,8 @@ def build_ai_router(manager: AIManager) -> APIRouter:
     @router.post("/ai/install", status_code=202)
     def ai_install(body: InstallRequest) -> InstallStatus:
         """Start or resume the download for one size."""
+        if body.tier not in {t.id for t in manager.catalog.tiers}:
+            raise HTTPException(404, "That AI size is not offered. Choose another size.")
         current = manager.installer.status
         if manager.installer.running and current.tier != body.tier:
             raise HTTPException(409, "Another AI download is running. Pause it first.")

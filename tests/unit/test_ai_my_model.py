@@ -143,3 +143,17 @@ def test_a_model_without_an_image_addon_answers_image_questions_from_text() -> N
     assert (choice.model, choice.uses_vision) == ("my-text", False)
     choice = choose_model(bundle, text_model="t", vision_model="v")  # type: ignore[arg-type]
     assert (choice.model, choice.uses_vision) == ("v", True)
+
+
+def test_answer_settings_out_of_range_are_refused() -> None:
+    from pydantic import ValidationError
+
+    from audit.web.ai_api import UseMyModelRequest
+
+    ok = UseMyModelRequest(
+        model="a" * 64, sampling={"temp": 0.7, "top-p": 0.8, "top-k": 20}, confirm=True
+    )
+    assert ok.sampling == {"temp": 0.7, "top-p": 0.8, "top-k": 20}
+    for bad in ({"temp": 3.0}, {"top-p": 1.5}, {"top-k": 20.5}, {"presence-penalty": -3.0}):
+        with pytest.raises(ValidationError):
+            UseMyModelRequest(model="a" * 64, sampling=bad, confirm=True)
