@@ -400,6 +400,14 @@ Examples of real gaps: `aria-expanded` on a disclosure button,
 own (`role="button"` on a `<button>`), and never use ARIA to hide a
 problem that better markup would fix.
 
+**Stay in scope.** When asked to fix or adjust X, change only X. If you
+see something else worth changing, report it and ask first. A vague
+request means ask what the problem is, not guess. This holds for padding,
+spacing, alignment and wording as much as for logic: a layout or
+spacing value the developer did not name stays as it is (the developer's
+rule, 2026-11-16, after a "fix the Delete button" request led to unasked
+changes to the actions cell's alignment and box edge).
+
 If a requested change, or code you touch, is not the most accessible
 option or is weaker UX than a known alternative, **tell the developer in
 your reply**. Name the problem, the criterion or principle, and the better

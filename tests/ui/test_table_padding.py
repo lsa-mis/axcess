@@ -12,6 +12,11 @@ change cannot go lower without this test saying so:
   (tests/ui/test_accessibility_axe.py::test_issue_table_fits_the_default_desktop_width):
   4px on the three headings that carry a "?" and 6px elsewhere.
 
+Each heading and cell also has the same padding on both sides: a narrow side
+is made as wide as the wide one (the developer's rule, 2026-11-16), so a
+column's words are not nearer one line than the other. The one exception is
+named in ``_indent``.
+
 To fit a table, narrow a column's width (a ``w-*`` or ``min-w-*`` on its
 heading), never its padding.
 """
@@ -65,6 +70,13 @@ def _minimum(table: str) -> int:
     return SHARED_MINIMUM
 
 
+def _indent(item: dict[str, Any]) -> bool:
+    """The Reports table's Site heading: 64px on the left puts it over the
+    site names, which start after the open and close arrow, so it is an
+    indent that lines the heading up, not padding."""
+    return item["table"].startswith("Public reports by site") and item["text"] == "Site"
+
+
 async def test_no_table_squeezes_its_side_padding_on_any_screen(
     live_server: tuple[str, int],
     new_page: Any,
@@ -78,6 +90,11 @@ async def test_no_table_squeezes_its_side_padding_on_any_screen(
         page = await _open(new_page, base, path)
         for item in await page.evaluate(_PADDING):
             checked += 1
+            if item["left"] != item["right"] and not _indent(item):
+                problems.append(
+                    f"{path}: {item['table']} / {item['kind']} {item['text']!r}: "
+                    f"uneven, {item['left']}px left, {item['right']}px right"
+                )
             least = _minimum(item["table"])
             if min(item["left"], item["right"]) < least:
                 problems.append(

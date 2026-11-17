@@ -852,13 +852,12 @@ function IssueTable({
                   // same line as the issue types (the developer's report,
                   // 2026-11-16).
                   column === "Issue" && "sticky left-0 z-[1] bg-surface-muted px-4",
-                  // A number column's right edge gets 12px, not 6: its
-                  // numbers and heading ended 2px from the column line
-                  // (the sort button is pulled out 4px). The body cells
-                  // below get the same, so the numbers end under the
-                  // heading's words. The left stays 6px (the developer's
-                  // direction, 2026-11-16: keep the 6px padding).
-                  SORT_KINDS[column] === "number" && column !== "Priority" && "pr-3",
+                  // A number column gets 12px at each side, not 6 and 12: the
+                  // heading's words sat 6px from the left line and its arrow
+                  // 12px from the right (measured, 2026-11-16), which read
+                  // as uneven. The body cells below get the same, so the
+                  // numbers end under the heading's arrow.
+                  SORT_KINDS[column] === "number" && column !== "Priority" && "px-3",
                   // The two count columns are set narrow (6rem): their words
                   // wrap ("Issue / occurrences") and the numbers are short,
                   // so the width they took was blank space that pushed the
@@ -939,7 +938,7 @@ const IssueTableRow = memo(function IssueTableRow({
 
   return (
     <Row index={index}>
-      <RowHeader sticky className="min-w-[11rem] max-w-[18rem]">
+      <RowHeader sticky className="min-w-[10.5rem] max-w-[18rem]">
         {/* The title is the row's main link and opens the issue's full
             evidence record: what it is, why it matters, the fix, and its
             pages. The page count beside it is the shortcut straight to
@@ -970,10 +969,10 @@ const IssueTableRow = memo(function IssueTableRow({
           <span title={PRIORITY_HELP[priorityTier(row.priority)]}>{priorityTier(row.priority)}</span>
         )}
       </Cell>
-      <Cell numeric className={cn(cell, "pr-3")}>
+      <Cell numeric className={cn(cell, "px-3")}>
         {row.occurrence_count}
       </Cell>
-      <Cell numeric className={cn(cell, "pr-3")}>
+      <Cell numeric className={cn(cell, "px-3")}>
         {row.page_count}
       </Cell>
       <Cell className={cell}>

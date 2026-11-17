@@ -1067,7 +1067,7 @@ function DeleteScanButton({ scan }: { scan: ScanSummary }) {
         variant="ghost"
         disabled
         title="Stop the scan before you delete this report."
-        className="text-fg-subtle"
+        className="px-3.5 text-fg-subtle"
         aria-label={`Delete report ${scan.id} (not available while the scan is running)`}
       >
         <Trash2 className="h-4 w-4" aria-hidden />
@@ -1081,7 +1081,9 @@ function DeleteScanButton({ scan }: { scan: ScanSummary }) {
       <Button
         variant="ghost"
         disabled={mutation.isPending}
-        className="text-sev-critical hover:bg-sev-critical-bg"
+        // px-3.5: 2px less each side than the shared button's 16px (the
+        // developer's request, 2026-11-16).
+        className="px-3.5 text-sev-critical hover:bg-sev-critical-bg"
         aria-label={`Delete report ${scan.id}`}
         onClick={() => {
           // confirm() blocks; it's the right primitive for "are you sure".
