@@ -126,15 +126,22 @@ function AiSetupPage({
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const headingId = useId();
-  const [chosen, setChosen] = useState<AiTierId | null>(
-    status.tier ??
-      (plan.current?.tier === "custom" ? null : plan.current?.tier) ??
+  // A saved setup's size that is no longer offered ("small") is not a choice.
+  const offered = (id: string | undefined): AiTierId | "custom" | null =>
+    id === "custom" || plan.tiers.some((t) => t.id === id) ? (id as AiTierId | "custom") : null;
+  const [chosen, setChosen] = useState<AiTierId | "custom" | null>(
+    offered(status.tier ?? undefined) ??
+      offered(plan.current?.tier) ??
       plan.recommended ??
       plan.tiers[0]?.id ??
       null,
   );
   const [confirmRemove, setConfirmRemove] = useState(false);
+  // Two status lines, each under the buttons it reports on: the on/off card
+  // and the models card. One line at the page top was out of sight when a
+  // button far down the page was pressed (developer, 2026-11-17).
   const [message, setMessage] = useState("");
+  const [modelsMessage, setModelsMessage] = useState("");
   const confirmRef = useRef<HTMLButtonElement>(null);
 
   const refresh = () => {
@@ -174,11 +181,11 @@ function AiSetupPage({
     mutationFn: (tier: AiTierId) => api.installAi(tier),
     onSuccess: (next) => {
       queryClient.setQueryData(["ai-install"], next);
-      setMessage("Download started.");
+      setModelsMessage("Download started.");
       refresh();
     },
     onError: (error) =>
-      setMessage(
+      setModelsMessage(
         error instanceof Error
           ? error.message
           : "The download could not start.",
@@ -187,7 +194,7 @@ function AiSetupPage({
   const pause = useMutation({
     mutationFn: api.pauseAiInstall,
     onSuccess: () => {
-      setMessage("Download paused. What is already downloaded is kept.");
+      setModelsMessage("Download paused. What is already downloaded is kept.");
       refresh();
     },
   });
@@ -195,7 +202,7 @@ function AiSetupPage({
     mutationFn: api.removeAi,
     onSuccess: () => {
       setConfirmRemove(false);
-      setMessage("AI features removed.");
+      setModelsMessage("AI features removed.");
       refresh();
       // The Remove button is gone now, so focus moves to the size choice,
       // the next thing to act on, instead of falling back to the page top
@@ -204,7 +211,7 @@ function AiSetupPage({
         document.querySelector<HTMLInputElement>(`input[name="${headingId}-tier"]:checked`)?.focus(),
       );
     },
-    onError: () => setMessage("AI features could not be removed. Try again."),
+    onError: () => setModelsMessage("AI features could not be removed. Try again."),
   });
 
   useEffect(() => {
@@ -224,7 +231,7 @@ function AiSetupPage({
             : "";
     if (text && text !== announced.current) {
       announced.current = text;
-      setMessage(text);
+      setModelsMessage(text);
     }
   }, [status.state, status.step, status.error]);
 
@@ -248,16 +255,6 @@ function AiSetupPage({
         title="AI features"
         subtitle="Optional. The AI suggests fixes and checks images and wording, on this computer."
       />
-      <p
-        role="status"
-        className={cn(
-          "text-sm font-semibold text-fg",
-          message ? "mb-4" : "sr-only",
-        )}
-      >
-        {message}
-      </p>
-
       <div className="space-y-5">
         {/* Facts first, short: one sentence on limits, three on privacy.
             Rejected: the earlier two headings and four long bullets, which
@@ -291,8 +288,8 @@ function AiSetupPage({
             </p>
             {current && <p className="mt-2">
               {current.tier === "custom"
-                ? `Model: ${AI_MY_MODEL_LABEL}${current.custom_model ? ` (${current.custom_model.tag})` : ""}.`
-                : `Size: ${AI_TIER_LABEL[current.tier]}.`}
+                ? `Models in use: ${AI_MY_MODEL_LABEL.toLowerCase()}, ${ownModelName(plan) ?? "a GGUF file"}${current.vision_model ? "" : " (text only)"}.`
+                : `Models in use: the ${AI_TIER_LABEL[current.tier] ?? current.tier} size.`}
             </p>}
             <AiRuntimeControls setupPage />
             {(enabled || current) && <Button
@@ -312,14 +309,15 @@ function AiSetupPage({
             {enabled && <p className="mt-2 text-fg-muted">
               Turning AI off keeps the models and stops only Axcess’s private AI service. Finish current work first.
             </p>}
+            <p role="status" className={message ? "mt-2 font-semibold" : "sr-only"}>
+              {message}
+            </p>
           </Card>
 
         <Card className="px-4 py-4">
           <fieldset aria-describedby={`${headingId}-hw`} disabled={running}>
             <legend className="text-sm font-semibold text-fg">
-              {current
-                ? "Change the size of the AI models"
-                : "Choose the size of the AI models"}
+              {current ? "Change the AI models" : "Choose the AI models"}
             </legend>
             <p
               id={`${headingId}-hw`}
@@ -341,15 +339,29 @@ function AiSetupPage({
                   onChoose={() => setChosen(tier.id)}
                 />
               ))}
+              <ModelOption
+                name={`${headingId}-tier`}
+                value="custom"
+                title={AI_MY_MODEL_LABEL}
+                note={current?.tier === "custom" ? " (in use now)" : ""}
+                description="A model file (GGUF) on this computer, to try a model that is not one of the sizes. Nothing is downloaded."
+                checked={chosen === "custom"}
+                onChoose={() => setChosen("custom")}
+              />
             </div>
             {plan.recommended === null && (
               <p className="mt-3 text-xs leading-5 text-fg">
                 This computer has less memory or free disk space than even the
-                small size needs. You can still try it, but it may be very slow
-                or fail.
+                smallest size needs. You can still try it, but it may be very
+                slow or fail.
               </p>
             )}
           </fieldset>
+
+          {chosen === "custom" ? (
+            <MyModelPanel plan={plan} disabled={running} onMessage={setModelsMessage} />
+          ) : (
+          <>
 
           {/* Model names and licences are for people who need them (an IT
               check, say), so they sit one press away instead of in every
@@ -461,13 +473,18 @@ function AiSetupPage({
                 </Button>
               )
             )}
-            {(current || hasDownload) && !running && !confirmRemove && (
+          </div>
+          </>
+          )}
+
+          {(current || hasDownload) && !running && !confirmRemove && (
+            <div className="mt-4">
               <Button type="button" onClick={() => setConfirmRemove(true)}>
                 <Trash2 className="h-4 w-4" aria-hidden />
                 Remove AI features
               </Button>
-            )}
-          </div>
+            </div>
+          )}
           {!enabled && !current && <div className="mt-3">
             <p className="mb-2 text-sm text-fg">
               Download and set up turns AI on when setup finishes.
@@ -510,9 +527,10 @@ function AiSetupPage({
               </div>
             </div>
           )}
+          <p role="status" className={modelsMessage ? "mt-4 text-sm font-semibold text-fg" : "sr-only"}>
+            {modelsMessage}
+          </p>
         </Card>
-
-        <MyModelCard plan={plan} disabled={running} onMessage={setMessage} />
 
         <p className="text-sm text-fg-muted">
           <LinkButton to="/settings" variant="ghost">
@@ -525,41 +543,41 @@ function AiSetupPage({
 }
 
 /**
- * "Use your own model": run a GGUF file the person chose instead of a size,
- * for trying models the catalogue does not offer (developer, 2026-11-17).
+ * "Your own model": the fourth choice in "Choose the AI models", for trying
+ * a GGUF file the catalogue does not offer (developer, 2026-11-17).
  *
+ * - One of the model options, not a card of its own. Two places that each
+ *   chose the model left the sizes showing "Standard (in use now)" while
+ *   your own model ran (developer, 2026-11-17: "the size of AI models should
+ *   switch to custom"). One radio group, one model in use, marked "(in use
+ *   now)" whichever it is (repo rule "One control, one job"; W3C COGA
+ *   Making Content Usable, https://www.w3.org/TR/coga-usable/, paraphrased:
+ *   one way to do one thing).
  * - Native file inputs with visible labels, not a drop zone: they work by
- *   keyboard and screen reader everywhere, including the desktop app,
- *   which has no file dialog of its own. W3C "Using ARIA", rule 1
+ *   keyboard and screen reader everywhere, including the desktop app, which
+ *   has no file dialog of its own. W3C "Using ARIA", rule 1
  *   (https://www.w3.org/TR/using-aria/#rule1, paraphrased: use the native
- *   element); WCAG technique H44 (label elements).
- * - Its own card below the sizes, not a fifth size: it has no download,
- *   no memory check and no pinned checksum, so it cannot promise what a
- *   size promises. The card says so in plain words before the choice
- *   (repo plain-language rule: never drop a limitation or safety fact).
- * - One button copies and starts the model. Copying alone would leave a
- *   second step with nothing to decide (W3C COGA Making Content Usable,
- *   https://www.w3.org/TR/coga-usable/, paraphrased: fewer steps). Models
- *   copied before are listed with a "Use ..." button each, named with the
- *   model, so switching between them for a comparison needs no new copy
- *   (WCAG 2.2 SC 2.4.6 Headings and Labels, Level AA: the button says
- *   which model).
- * - Copy progress is a native <progress> with a visible percent; only the
- *   change of step is announced, in the page's status region (SC 4.1.3
- *   Status Messages, Level AA), as the size download does.
- * - Answer settings (sampling) sit in a closed native <details> above the
- *   file choice, because most people never need them and the model's own
- *   page gives the values to copy (developer, 2026-11-17: "allow user to
- *   tune top k top p and other important parameters"). One set applies to
- *   whichever model this card starts next, the copy and the "Use ..."
- *   buttons alike, so there is one place to set them, not one per model
- *   (W3C COGA Making Content Usable, paraphrased: one way to do one
- *   thing). Each field is a native number input with a visible label that
- *   puts the plain phrase first and the technical name in parentheses
- *   (repo plain-language rule 3; WCAG technique H44), and its allowed range
- *   in words, not only in min/max (SC 3.3.2 Labels or Instructions,
- *   Level A). A value out of range is named in the status region and its
- *   field takes focus (SC 3.3.1 Error Identification, Level A).
+ *   element); WCAG technique H44.
+ * - One button copies and starts the model; models copied before are listed
+ *   with a "Use <name>" button each, so switching for a comparison needs no
+ *   new copy (WCAG 2.2 SC 2.4.6 Headings and Labels, Level AA).
+ * - Errors are said in text under the field they belong to, the field is
+ *   marked invalid (aria-invalid) and points at that text
+ *   (aria-describedby), focus moves to the first one, and each says what to
+ *   enter instead, with an example. The form checks itself (noValidate)
+ *   rather than the browser's passing tooltip, which disappears and is not
+ *   part of the page. WCAG 2.2 SC 3.3.1 Error Identification (Level A) and
+ *   SC 3.3.3 Error Suggestion (Level AA); techniques ARIA21 and G85. A file
+ *   Axcess refuses (not GGUF, the wrong kind) is reported under the file
+ *   field that held it.
+ * - Answer settings (sampling) sit in a closed native <details>, opened
+ *   when one of them has an error so the error can be seen. The model's own
+ *   page gives the values to copy. Labels put the plain phrase first, the
+ *   technical name in parentheses, then the allowed range (repo
+ *   plain-language rule 3; SC 3.3.2 Labels or Instructions, Level A).
+ * - Copy progress is a native <progress> with a visible percent; changes of
+ *   step and the result go to the models card's status line under its
+ *   buttons (SC 4.1.3 Status Messages, Level AA).
  */
 const SAMPLING_FIELDS: {
   key: "temp" | "top-p" | "top-k" | "min-p" | "presence-penalty" | "repeat-penalty";
@@ -567,17 +585,19 @@ const SAMPLING_FIELDS: {
   min: number;
   max: number;
   step: string;
+  example: string;
 }[] = [
-  { key: "temp", label: "Randomness (temperature), 0 to 2", min: 0, max: 2, step: "any" },
-  { key: "top-p", label: "Word choice by share (top-p), 0 to 1", min: 0, max: 1, step: "any" },
-  { key: "top-k", label: "Word choice by count (top-k), 0 to 1000", min: 0, max: 1000, step: "1" },
-  { key: "min-p", label: "Least likely word kept (min-p), 0 to 1", min: 0, max: 1, step: "any" },
+  { key: "temp", label: "Randomness (temperature), 0 to 2", min: 0, max: 2, step: "any", example: "0.6" },
+  { key: "top-p", label: "Word choice by share (top-p), 0 to 1", min: 0, max: 1, step: "any", example: "0.95" },
+  { key: "top-k", label: "Word choice by count (top-k), 0 to 1000", min: 0, max: 1000, step: "1", example: "20" },
+  { key: "min-p", label: "Least likely word kept (min-p), 0 to 1", min: 0, max: 1, step: "any", example: "0" },
   {
     key: "presence-penalty",
     label: "Penalty for any repeated word (presence penalty), -2 to 2",
     min: -2,
     max: 2,
     step: "any",
+    example: "1.5",
   },
   {
     key: "repeat-penalty",
@@ -585,10 +605,19 @@ const SAMPLING_FIELDS: {
     min: 0,
     max: 2,
     step: "any",
+    example: "1.1",
   },
 ];
 
-function MyModelCard({
+/** The model in use when it is your own, by the name in its file. */
+function ownModelName(plan: AiPlan): string | null {
+  const sha = plan.current?.custom_model?.gguf.sha256;
+  return plan.my_models.find((f) => f.sha256 === sha)?.name ?? null;
+}
+
+type FieldKey = "model" | "addon" | (typeof SAMPLING_FIELDS)[number]["key"];
+
+function MyModelPanel({
   plan,
   disabled,
   onMessage,
@@ -601,11 +630,25 @@ function MyModelCard({
   const id = useId();
   const modelInput = useRef<HTMLInputElement>(null);
   const addonInput = useRef<HTMLInputElement>(null);
+  const settingsBox = useRef<HTMLDetailsElement>(null);
   const [progress, setProgress] = useState<{ label: string; fraction: number } | null>(null);
   const [settings, setSettings] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Partial<Record<FieldKey, string>>>({});
   const current = plan.current?.tier === "custom" ? plan.current.custom_model : null;
+  const fieldId = (key: FieldKey) => `${id}-${key}`;
+  const errorId = (key: FieldKey) => `${id}-${key}-error`;
 
-  /** The filled-in answer settings, or null when one is out of range. */
+  /** Show one error under its field, mark the field, and move focus there. */
+  const showError = (key: FieldKey, text: string) => {
+    setErrors({ [key]: text });
+    if (key !== "model" && key !== "addon" && settingsBox.current) {
+      settingsBox.current.open = true;
+    }
+    onMessage("Nothing was started. Fix the field marked below.");
+    requestAnimationFrame(() => document.getElementById(fieldId(key))?.focus());
+  };
+
+  /** The filled-in answer settings, or "invalid" after showing the error. */
   const sampling = (): Record<string, number> | null | "invalid" => {
     const out: Record<string, number> = {};
     for (const field of SAMPLING_FIELDS) {
@@ -614,8 +657,10 @@ function MyModelCard({
       const value = Number(raw);
       const whole = field.step === "1" ? Number.isInteger(value) : true;
       if (!Number.isFinite(value) || value < field.min || value > field.max || !whole) {
-        onMessage(`Check the answer setting "${field.label}". Nothing was started.`);
-        document.getElementById(`${id}-${field.key}`)?.focus();
+        showError(
+          field.key,
+          `Enter a ${field.step === "1" ? "whole number" : "number"} from ${field.min} to ${field.max}, for example ${field.example}. Or leave it empty.`,
+        );
         return "invalid";
       }
       out[field.key] = value;
@@ -638,27 +683,42 @@ function MyModelCard({
     }) => api.useMyModel(model.sha256, addon?.sha256 ?? null, tuned),
     onMutate: ({ model }) =>
       onMessage(`Starting ${model.name} in the private AI service. This can take a minute.`),
-    onSuccess: (next, { model }) => {
+    onSuccess: (next, { model, addon }) => {
       queryClient.setQueryData(["ai-plan"], next);
-      onMessage(`${model.name} is in use. AI features are on.`);
+      onMessage(
+        `${model.name} is in use${addon ? "" : ", for text only"}. AI features are on.`,
+      );
       for (const key of [["ai-runtime"], ["suggestion-status"], ["ai-preferences"]]) {
         void queryClient.invalidateQueries({ queryKey: key });
       }
     },
     onError: (error) =>
-      onMessage(error instanceof Error ? error.message : "Your model could not start."),
+      onMessage(
+        error instanceof Error
+          ? `${error.message} The model in use before is still set up; turn AI on to start it again.`
+          : "Your model could not start. Try again, or choose one of the sizes.",
+      ),
   });
+  // Which file was being sent, so a refusal lands under that field.
+  const sending = useRef<"model" | "addon">("model");
   const copy = useMutation({
-    mutationFn: async (tuned: Record<string, number> | null) => {
-      const modelFile = modelInput.current?.files?.[0];
-      if (!modelFile) throw new Error("Choose a model file (GGUF) first.");
-      const addonFile = addonInput.current?.files?.[0] ?? null;
+    mutationFn: async ({
+      modelFile,
+      addonFile,
+      tuned,
+    }: {
+      modelFile: File;
+      addonFile: File | null;
+      tuned: Record<string, number> | null;
+    }) => {
+      sending.current = "model";
       setProgress({ label: "Copying the model file", fraction: 0 });
       const model = await api.copyMyModel(modelFile, "model", (fraction) =>
         setProgress({ label: "Copying the model file", fraction }),
       );
       let addon: MyModelFile | null = null;
       if (addonFile) {
+        sending.current = "addon";
         onMessage("Copying the image add-on file.");
         setProgress({ label: "Copying the image add-on file", fraction: 0 });
         addon = await api.copyMyModel(
@@ -677,87 +737,74 @@ function MyModelCard({
     },
     onError: (error) => {
       setProgress(null);
-      onMessage(error instanceof Error ? error.message : "The file could not be copied.");
+      const text =
+        error instanceof Error
+          ? error.message
+          : "The file could not be copied. Check that it is on this computer and try again.";
+      showError(sending.current, text);
     },
   });
   const busy = disabled || copy.isPending || use.isPending;
   const percent = progress ? Math.floor(progress.fraction * 100) : 0;
+  const describedBy = (...ids: (string | false)[]) => ids.filter(Boolean).join(" ") || undefined;
+  const errorText = (key: FieldKey) =>
+    errors[key] ? (
+      <p id={errorId(key)} className="mt-1 text-sm font-semibold text-sev-critical">
+        {`Error: ${errors[key]}`}
+      </p>
+    ) : null;
 
   return (
-    <Card className="px-4 py-4 text-sm leading-6 text-fg">
-      <h2 className="font-semibold">Use your own model</h2>
-      <p className="mt-2">
-        To try a model that is not one of the sizes. Choose a model file (GGUF) on this
-        computer. Axcess copies it into its AI folder and runs it in the same private AI
-        service, which cannot reach the internet. Thinking (reasoning) stays off.
+    <div className="mt-4 text-sm leading-6 text-fg">
+      <p>
+        Choose a model file (GGUF) on this computer. Axcess copies it into its AI folder
+        and runs it in the same private AI service, which cannot reach the internet.
+        Thinking (reasoning) stays off.
       </p>
       <p className="mt-2">
-        Axcess cannot check where the file came from, what licence it has, or how good its
-        answers are. Check every answer.
+        Axcess cannot check where the file came from, what licence it has, how good its
+        answers are, or whether it fits in this computer&rsquo;s memory. Check every answer.
       </p>
-      {current && <p className="mt-2 font-semibold">{`In use now: ${current.tag}.`}</p>}
-
-      <details className="mt-3">
-        <summary className="min-h-target cursor-pointer content-center font-semibold">
-          Answer settings (sampling), optional
-        </summary>
-        <p id={`${id}-sampling-hint`} className="text-xs leading-5 text-fg-muted">
-          Copy these from the model&rsquo;s own page, where its makers list recommended
-          settings. Leave them all empty to use Axcess&rsquo;s setting: randomness 0, the most
-          predictable answers. Once you fill in any, an empty one uses llama.cpp&rsquo;s
-          default. They apply to the next model you start here.
-        </p>
-        <div className="mt-2 grid gap-3 sm:grid-cols-2">
-          {SAMPLING_FIELDS.map((field) => (
-            <div key={field.key}>
-              <label htmlFor={`${id}-${field.key}`} className="block">
-                {field.label}
-              </label>
-              <input
-                id={`${id}-${field.key}`}
-                type="number"
-                inputMode="decimal"
-                min={field.min}
-                max={field.max}
-                step={field.step}
-                value={settings[field.key] ?? ""}
-                onChange={(event) =>
-                  setSettings((now) => ({ ...now, [field.key]: event.target.value }))
-                }
-                aria-describedby={`${id}-sampling-hint`}
-                disabled={busy}
-                className="mt-1 block min-h-target w-full rounded-xs border border-border-strong bg-surface px-2 text-sm"
-              />
-            </div>
-          ))}
-        </div>
-      </details>
 
       <form
+        noValidate
         className="mt-3 space-y-3"
         onSubmit={(event) => {
           event.preventDefault();
           if (busy) return;
+          const modelFile = modelInput.current?.files?.[0];
+          if (!modelFile) {
+            showError(
+              "model",
+              "Choose a model file. Its name ends in .gguf, for example Qwen3-4B-Q4_K_M.gguf.",
+            );
+            return;
+          }
           const tuned = sampling();
-          if (tuned !== "invalid") copy.mutate(tuned);
+          if (tuned === "invalid") return;
+          setErrors({});
+          copy.mutate({ modelFile, addonFile: addonInput.current?.files?.[0] ?? null, tuned });
         }}
       >
         <div>
-          <label htmlFor={`${id}-model`} className="block font-semibold">
+          <label htmlFor={fieldId("model")} className="block font-semibold">
             Model file (GGUF)
           </label>
           <input
             ref={modelInput}
-            id={`${id}-model`}
+            id={fieldId("model")}
             type="file"
             accept=".gguf"
-            required
+            aria-invalid={errors.model ? true : undefined}
+            aria-describedby={describedBy(!!errors.model && errorId("model"))}
+            onChange={() => setErrors((now) => ({ ...now, model: undefined }))}
             disabled={busy}
             className="mt-1 block min-h-target w-full max-w-full text-sm"
           />
+          {errorText("model")}
         </div>
         <div>
-          <label htmlFor={`${id}-addon`} className="block font-semibold">
+          <label htmlFor={fieldId("addon")} className="block font-semibold">
             Image add-on file (mmproj GGUF), optional
           </label>
           <p id={`${id}-addon-hint`} className="text-xs leading-5 text-fg-muted">
@@ -765,14 +812,61 @@ function MyModelCard({
           </p>
           <input
             ref={addonInput}
-            id={`${id}-addon`}
+            id={fieldId("addon")}
             type="file"
             accept=".gguf"
-            aria-describedby={`${id}-addon-hint`}
+            aria-invalid={errors.addon ? true : undefined}
+            aria-describedby={describedBy(`${id}-addon-hint`, !!errors.addon && errorId("addon"))}
+            onChange={() => setErrors((now) => ({ ...now, addon: undefined }))}
             disabled={busy}
             className="mt-1 block min-h-target w-full max-w-full text-sm"
           />
+          {errorText("addon")}
         </div>
+
+        <details ref={settingsBox}>
+          <summary className="min-h-target cursor-pointer content-center font-semibold">
+            Answer settings (sampling), optional
+          </summary>
+          <p id={`${id}-sampling-hint`} className="text-xs leading-5 text-fg-muted">
+            Copy these from the model&rsquo;s own page, where its makers list recommended
+            settings. Leave them all empty to use Axcess&rsquo;s setting: randomness 0, the
+            most predictable answers. Once you fill in any, an empty one uses llama.cpp&rsquo;s
+            default. They apply to the next model you start here.
+          </p>
+          <div className="mt-2 grid gap-3 sm:grid-cols-2">
+            {SAMPLING_FIELDS.map((field) => (
+              <div key={field.key}>
+                <label htmlFor={fieldId(field.key)} className="block">
+                  {field.label}
+                </label>
+                <input
+                  id={fieldId(field.key)}
+                  type="number"
+                  inputMode="decimal"
+                  min={field.min}
+                  max={field.max}
+                  step={field.step}
+                  value={settings[field.key] ?? ""}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setSettings((now) => ({ ...now, [field.key]: value }));
+                    setErrors((now) => ({ ...now, [field.key]: undefined }));
+                  }}
+                  aria-invalid={errors[field.key] ? true : undefined}
+                  aria-describedby={describedBy(
+                    `${id}-sampling-hint`,
+                    !!errors[field.key] && errorId(field.key),
+                  )}
+                  disabled={busy}
+                  className="mt-1 block min-h-target w-full rounded-xs border border-border-strong bg-surface px-2 text-sm"
+                />
+                {errorText(field.key)}
+              </div>
+            ))}
+          </div>
+        </details>
+
         {progress && (
           <div>
             <p id={`${id}-progress`} className="font-semibold">
@@ -787,7 +881,7 @@ function MyModelCard({
             <p className="text-xs text-fg-muted">{percent}%</p>
           </div>
         )}
-        <Button type="submit" aria-disabled={busy || undefined}>
+        <Button type="submit" variant="primary" aria-disabled={busy || undefined}>
           Copy and use this model
         </Button>
       </form>
@@ -814,7 +908,9 @@ function MyModelCard({
                       onClick={() => {
                         if (busy) return;
                         const tuned = sampling();
-                        if (tuned !== "invalid") use.mutate({ model, addon, tuned });
+                        if (tuned === "invalid") return;
+                        setErrors({});
+                        use.mutate({ model, addon, tuned });
                       }}
                     >
                       {`Use ${model.name}`}
@@ -826,7 +922,7 @@ function MyModelCard({
           </ul>
         </div>
       )}
-    </Card>
+    </div>
   );
 }
 
@@ -847,22 +943,58 @@ function TierOption({
   memoryBytes: number;
   onChoose: () => void;
 }) {
-  const id = useId();
   const tooSmall = memoryBytes < tier.min_memory_gb * 1e9 * 0.95;
-  const note = current
-    ? " (in use now)"
-    : recommended
-      ? " (suggested for this computer)"
-      : "";
+  return (
+    <ModelOption
+      name={name}
+      value={tier.id}
+      title={AI_TIER_LABEL[tier.id] ?? tier.label}
+      note={current ? " (in use now)" : recommended ? " (suggested for this computer)" : ""}
+      description={
+        `${tier.min_memory_gb} GB memory · ${formatBytes(tier.download_bytes)} download.` +
+        (tooSmall
+          ? " This computer has less memory than this size needs, so it may be slow or fail."
+          : !tier.fits
+            ? " There may not be enough free disk space for this size."
+            : "")
+      }
+      checked={checked}
+      onChoose={onChoose}
+    />
+  );
+}
+
+/**
+ * One option in "Choose the AI models": a size, or your own model. Shared so
+ * every option looks and works the same (WCAG 2.2 SC 3.2.4 Consistent
+ * Identification, Level AA): a native radio inside its label, the
+ * description tied to it (aria-describedby), and the chosen one marked by a
+ * thicker border and a tint, not by colour alone (SC 1.4.1 Use of Color).
+ */
+function ModelOption({
+  name,
+  value,
+  title,
+  note,
+  description,
+  checked,
+  onChoose,
+}: {
+  name: string;
+  value: string;
+  title: string;
+  note: string;
+  description: string;
+  checked: boolean;
+  onChoose: () => void;
+}) {
+  const id = useId();
   return (
     <label
       htmlFor={id}
       className={cn(
         "grid min-h-target cursor-pointer grid-cols-[auto_minmax(0,1fr)] gap-x-3 rounded-xs border px-3 py-2.5",
-        // Chosen gets a thicker border and a tinted card, not only a colour.
-        checked
-          ? "border-2 border-umich-blue bg-surface-muted"
-          : "border-border",
+        checked ? "border-2 border-umich-blue bg-surface-muted" : "border-border",
         "has-[:focus-visible]:outline has-[:focus-visible]:outline-[3px] has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-umich-blue",
       )}
     >
@@ -870,23 +1002,18 @@ function TierOption({
         id={id}
         type="radio"
         name={name}
-        value={tier.id}
+        value={value}
         checked={checked}
         onChange={onChoose}
         aria-describedby={`${id}-desc`}
         className="row-span-2 mt-1 h-4 w-4 shrink-0 accent-umich-blue"
       />
       <span className="text-sm font-semibold text-fg">
-        {AI_TIER_LABEL[tier.id]}
+        {title}
         {note}
       </span>
       <span id={`${id}-desc`} className="text-xs leading-5 text-fg-muted">
-        {tier.min_memory_gb} GB memory · {formatBytes(tier.download_bytes)} download.
-        {tooSmall &&
-          " This computer has less memory than this size needs, so it may be slow or fail."}
-        {!tooSmall &&
-          !tier.fits &&
-          " There may not be enough free disk space for this size."}
+        {description}
       </span>
     </label>
   );

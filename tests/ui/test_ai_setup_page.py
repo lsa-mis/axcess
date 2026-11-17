@@ -74,7 +74,7 @@ async def test_ai_setup_page_has_no_axe_violations(
     page = await new_page(color_scheme=scheme, viewport={"width": width, "height": 900})
     try:
         await page.goto(f"{server}/app/settings/ai")
-        await page.get_by_role("group", name="Choose the size of the AI models").wait_for()
+        await page.get_by_role("group", name="Choose the AI models").wait_for()
         violations = await _run_axe(page)
         assert not violations, _render_violations(violations)
         # Nothing sideways at 320 px (SC 1.4.10 Reflow).
@@ -133,7 +133,7 @@ async def test_first_launch_setup_never_downloads_without_confirmation(
         await page.get_by_text("AI models from Hugging Face").first.wait_for()
         await _tab_to(page, "Set up AI features")
         await page.keyboard.press("Enter")
-        await page.get_by_role("group", name="Choose the size of the AI models").wait_for()
+        await page.get_by_role("group", name="Choose the AI models").wait_for()
         assert (await (await page.request.get(f"{server}/api/ai/install")).json())[
             "state"
         ] == "idle"
@@ -258,15 +258,16 @@ async def test_choose_a_size_by_keyboard_without_downloading(new_page: Any, serv
     page = await new_page()
     try:
         await page.goto(f"{server}/app/settings/ai")
-        group = page.get_by_role("group", name="Choose the size of the AI models")
+        group = page.get_by_role("group", name="Choose the AI models")
         await group.wait_for()
         radios = group.get_by_role("radio")
-        assert await radios.count() == 3
+        # Standard, Large, Extra large, and your own model: one choice.
+        assert await radios.count() == 4
         await radios.first.focus()
         await page.keyboard.press("Home")
         await page.keyboard.press("ArrowDown")
         checked = await group.locator("input:checked").get_attribute("value")
-        assert checked in {"standard", "small"}
+        assert checked == "large"
         button = page.get_by_role("button", name="Download and set up")
         assert await button.count() == 1
         # The button says how big the download is before anything starts.
@@ -386,7 +387,7 @@ async def test_a_size_that_is_set_up_offers_no_download(new_page: Any, server_se
             "Standard is set up on this computer. Nothing to download.", exact=True
         ).wait_for()
         assert await page.get_by_role("button", name="Download and set up").count() == 0
-        group = page.get_by_role("group", name="Change the size of the AI models")
+        group = page.get_by_role("group", name="Change the AI models")
         await group.locator("input[value='large']").check()
         assert await page.get_by_role("button", name="Download and set up").count() == 1
         violations = await _run_axe(page)
@@ -481,5 +482,109 @@ async def test_download_progress_names_the_private_ai_service(
         await page.get_by_text(label, exact=True).first.wait_for()
         await page.get_by_role("status").filter(has_text=f"{label}.").wait_for()
         assert "Ollama" not in await page.locator("main").inner_text()
+    finally:
+        await page.context.close()
+
+
+async def test_your_own_model_is_one_of_the_choices_and_errors_say_what_to_do(
+    new_page: Any, server: str
+) -> None:
+    """WCAG 2.2 SC 3.3.1 and 3.3.3: the error is text under its field, the
+    field is marked and focused, and the text says what to enter."""
+    page = await new_page(viewport={"width": 320, "height": 900})
+    try:
+        await page.goto(f"{server}/app/settings/ai")
+        group = page.get_by_role("group", name="Choose the AI models")
+        await group.get_by_role("radio", name="Your own model").check()
+        await page.get_by_role("button", name="Copy and use this model").click()
+        model = page.get_by_label("Model file (GGUF)", exact=True)
+        await page.get_by_text("Error: Choose a model file.", exact=False).wait_for()
+        assert await model.get_attribute("aria-invalid") == "true"
+        assert await model.evaluate("e => e === document.activeElement")
+        described = await model.get_attribute("aria-describedby")
+        error = page.locator(f"#{described.split()[-1]}")
+        assert "ends in .gguf" in await error.inner_text()
+        violations = await _run_axe(page)
+        assert not violations, _render_violations(violations)
+        assert (
+            await page.evaluate(
+                "document.documentElement.scrollWidth - document.documentElement.clientWidth"
+            )
+            <= 0
+        )
+    finally:
+        await page.context.close()
+
+
+async def test_an_answer_setting_out_of_range_is_named_under_its_field(
+    new_page: Any, server: str, tmp_path: Path
+) -> None:
+    page = await new_page()
+    try:
+        await page.goto(f"{server}/app/settings/ai")
+        await page.get_by_role("radio", name="Your own model").check()
+        gguf = tmp_path / "tiny.gguf"
+        gguf.write_bytes(b"GGUF" + bytes(40))
+        await page.get_by_label("Model file (GGUF)", exact=True).set_input_files(str(gguf))
+        await page.get_by_text("Answer settings (sampling), optional").click()
+        temp = page.get_by_label("Randomness (temperature), 0 to 2")
+        await temp.fill("5")
+        await page.get_by_role("button", name="Copy and use this model").click()
+        await page.get_by_text("Error: Enter a number from 0 to 2", exact=False).wait_for()
+        assert await temp.get_attribute("aria-invalid") == "true"
+        assert await temp.evaluate("e => e === document.activeElement")
+        # Fixing the value clears the error.
+        await temp.fill("0.6")
+        assert await temp.get_attribute("aria-invalid") is None
+    finally:
+        await page.context.close()
+
+
+async def test_your_own_model_in_use_is_the_chosen_option(
+    new_page: Any, server_set_up: str
+) -> None:
+    """After using your own model, the choice shows it, not a size
+    (developer, 2026-11-17: "the size of AI models should switch to custom")."""
+    page = await new_page()
+    try:
+        sha = "a" * 64
+
+        async def plan(route):
+            response = await route.fetch()
+            body = await response.json()
+            body["current"].update(
+                source="private",
+                backend="llama_cpp",
+                tier="custom",
+                vision_model="",
+                custom_model={
+                    "tag": "my-qwen3.8-4b-aaaaaaaa",
+                    "size": 10,
+                    "gguf": {"sha256": sha},
+                    "mmproj": None,
+                },
+            )
+            body["my_models"] = [
+                {
+                    "sha256": sha,
+                    "file": "Qwen3.8-4B-Q4_K_M.gguf",
+                    "size": 10,
+                    "kind": "model",
+                    "name": "Qwen3.8 4B",
+                    "for_model": None,
+                }
+            ]
+            await route.fulfill(response=response, json=body)
+
+        await page.route("**/api/ai/plan", plan)
+        await page.goto(f"{server_set_up}/app/settings/ai", wait_until="networkidle")
+        own = page.get_by_role("radio", name="Your own model (in use now)")
+        assert await own.is_checked()
+        await page.get_by_text(
+            "Models in use: your own model, Qwen3.8 4B (text only).", exact=True
+        ).wait_for()
+        assert await page.get_by_text("In use now", exact=True).count() == 1
+        violations = await _run_axe(page)
+        assert not violations, _render_violations(violations)
     finally:
         await page.context.close()
