@@ -903,7 +903,10 @@ function ScanRow({
         {/* Default `md` size (44px tall): destructive controls in
             particular must be a real target (SC 2.5.5). In reading order:
             compare this report, then delete it. */}
-        <div className="flex items-center justify-center gap-2">
+        {/* No gap between "Compare with" and Delete: each button's own
+            padding already separates them (the developer's request,
+            2026-11-16). */}
+        <div className="flex items-center justify-center">
           {others.length > 0 && (
             <LinkMenu
               label="Compare with"
