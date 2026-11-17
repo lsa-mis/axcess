@@ -346,3 +346,25 @@ def test_install_refuses_to_start_without_disk_space(tmp_path: Path) -> None:
         manager.install("large")
     assert manager.installer.status.state == "idle"
     assert not manager.installer.running
+
+
+def test_plan_marks_a_size_installed_only_when_every_file_is_here(tmp_path: Path) -> None:
+    """The setup page offers no download for a size that is set up (2026-11-17)."""
+    manager = AIManager(Settings(data_dir=tmp_path, desktop=True), lambda _c: None)
+    manager.probe = lambda: machine(24)  # type: ignore[method-assign]
+    small = load_catalog().tier("small")
+    present = {small.text.tag, small.vision.tag}
+    manager.runtime.has_model = lambda m: m.tag in present  # type: ignore[method-assign]
+
+    manager.runtime.installed = lambda: False  # type: ignore[method-assign]
+    assert not any(t.installed for t in manager.plan().tiers)
+
+    manager.runtime.installed = lambda: True  # type: ignore[method-assign]
+    assert {t.id: t.installed for t in manager.plan().tiers} == {
+        "small": True,
+        "standard": False,
+        "large": False,
+    }
+
+    present.discard(small.vision.tag)
+    assert not any(t.installed for t in manager.plan().tiers)

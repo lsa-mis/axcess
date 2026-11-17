@@ -50,6 +50,9 @@ class TierPlan(BaseModel):
     models_bytes: int
     download_bytes: int
     fits: bool
+    # Every file this size needs is on this computer and checked: the AI
+    # program and both models. The setup page then has nothing to download.
+    installed: bool = False
 
 
 class HardwareInfo(BaseModel):
@@ -249,6 +252,7 @@ class AIManager:
         )
         recommended = hw.recommend(machine, self.catalog, program_bytes)
         release = self.catalog.llama_cpp
+        program_ready = self.runtime.installed()
         return AIPlan(
             preferences=self.preferences(),
             hardware=HardwareInfo(
@@ -276,6 +280,9 @@ class AIManager:
                     models_bytes=t.size,
                     download_bytes=t.size + program_bytes,
                     fits=hw.fits(machine, t, program_bytes),
+                    installed=program_ready
+                    and self.runtime.has_model(t.text)
+                    and self.runtime.has_model(t.vision),
                 )
                 for t in self.catalog.tiers
             ],

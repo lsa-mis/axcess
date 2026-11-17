@@ -21,6 +21,9 @@ from audit.config import Settings
 
 from .test_accessibility_axe import _render_violations, _run_axe
 
+# The line that replaces the Start button while the service runs (lib/terms.ts).
+RUNNING = "AI service is running. It is isolated and stays on this computer."
+
 pytestmark = [pytest.mark.ui, pytest.mark.asyncio(loop_scope="module")]
 
 
@@ -329,12 +332,62 @@ async def test_private_runtime_start_by_keyboard_preserves_focus_and_announces(
         await page.goto(f"{server_set_up}/app/settings/ai", wait_until="networkidle")
         await _tab_to(page, "Start AI service")
         await page.keyboard.press("Enter")
-        await page.get_by_role("status").filter(has_text="AI service started").wait_for()
+        running = page.get_by_text(RUNNING, exact=True)
+        await running.wait_for()
         assert requests == [{"confirm": True}]
-        assert await page.get_by_role("button", name="Start AI service", exact=True).evaluate(
-            "e => e === document.activeElement"
-        )
-        await page.get_by_text("AI service: isolated, local only", exact=True).wait_for()
+        # The button is gone while the service runs (2026-11-17), and focus
+        # moved to the line that says so, not back to the top of the page.
+        assert await page.get_by_role("button", name="Start AI service").count() == 0
+        assert await running.evaluate("e => e === document.activeElement")
+        # A later status check keeps it that way.
+        await page.wait_for_timeout(5500)
+        assert await page.get_by_role("button", name="Start AI service").count() == 0
+        violations = await _run_axe(page)
+        assert not violations, _render_violations(violations)
+    finally:
+        await page.context.close()
+
+
+async def test_a_running_service_shows_no_start_button(new_page: Any, server_set_up: str) -> None:
+    page = await new_page()
+    try:
+
+        async def runtime(route):
+            await route.fulfill(json={"running": True, "isolated": True, "reason": None})
+
+        await page.route("**/api/ai/runtime**", runtime)
+        await page.goto(f"{server_set_up}/app/settings/ai", wait_until="networkidle")
+        await page.get_by_text(RUNNING, exact=True).wait_for()
+        assert await page.get_by_role("button", name="Start AI service").count() == 0
+    finally:
+        await page.context.close()
+
+
+async def test_a_size_that_is_set_up_offers_no_download(new_page: Any, server_set_up: str) -> None:
+    """After the download, the chosen size says it is set up (2026-11-17).
+
+    Choosing another size brings the download button back.
+    """
+    page = await new_page(viewport={"width": 320, "height": 900})
+    try:
+
+        async def plan(route):
+            response = await route.fetch()
+            body = await response.json()
+            body["current"].update(source="private", backend="llama_cpp", tier="small")
+            for tier in body["tiers"]:
+                tier["installed"] = tier["id"] == "small"
+            await route.fulfill(response=response, json=body)
+
+        await page.route("**/api/ai/plan", plan)
+        await page.goto(f"{server_set_up}/app/settings/ai", wait_until="networkidle")
+        await page.get_by_text(
+            "Small is set up on this computer. Nothing to download.", exact=True
+        ).wait_for()
+        assert await page.get_by_role("button", name="Download and set up").count() == 0
+        group = page.get_by_role("group", name="Change the size of the AI models")
+        await group.locator("input[value='standard']").check()
+        assert await page.get_by_role("button", name="Download and set up").count() == 1
         violations = await _run_axe(page)
         assert not violations, _render_violations(violations)
     finally:

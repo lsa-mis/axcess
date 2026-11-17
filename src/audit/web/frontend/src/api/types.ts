@@ -2069,6 +2069,8 @@ export interface AiTierPlan {
   models_bytes: number;
   download_bytes: number;
   fits: boolean;
+  /** The AI program and both models are on this computer and checked. */
+  installed: boolean;
 }
 
 export interface AiInstallStatus {

@@ -1,7 +1,12 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getAiRuntime, startAiRuntime } from "../api/client";
-import { AI_ISOLATION_REASON_LABEL, AI_RUNTIME_START_LABEL } from "../lib/terms";
+import type { AiRuntimeStatus } from "../api/types";
+import {
+  AI_ISOLATION_REASON_LABEL,
+  AI_RUNTIME_RUNNING,
+  AI_RUNTIME_START_LABEL,
+} from "../lib/terms";
 import { Button, LinkButton } from "./ui";
 
 /**
@@ -14,10 +19,25 @@ import { Button, LinkButton } from "./ui";
  * download here: the existing size choices already show cost and consent,
  * avoiding duplicate controls (W3C COGA Making Content Usable,
  * https://www.w3.org/TR/coga-usable/, paraphrased: help people avoid mistakes).
+ *
+ * While the service runs, the Start button is gone and one line says so
+ * (2026-11-17, the developer's request: the button kept saying "Start AI
+ * service" with the service already running). Rejected: a greyed-out
+ * (disabled) button, which keyboard users cannot reach and whose reason a
+ * screen reader does not hear; and keeping it active, a control with nothing
+ * to do (W3C COGA Making Content Usable, https://www.w3.org/TR/coga-usable/,
+ * paraphrased: do not offer controls that cannot work). The button comes back
+ * if the service stops. After a start the person pressed, focus moves from
+ * the vanished button to that line, which can take focus (tabIndex -1) and is
+ * read out there, so focus never falls back to the top of the page (SC 2.4.3
+ * Focus Order, Level A). The status region stays quiet then, so the news is
+ * not said twice.
  */
 export function AiRuntimeControls({ setupPage = false }: { setupPage?: boolean }) {
   const queryClient = useQueryClient();
   const [message, setMessage] = useState("");
+  const runningRef = useRef<HTMLParagraphElement>(null);
+  const [focusRunning, setFocusRunning] = useState(false);
   const runtime = useQuery({
     queryKey: ["ai-runtime"], queryFn: getAiRuntime, retry: false,
     refetchInterval: 5000,
@@ -26,16 +46,35 @@ export function AiRuntimeControls({ setupPage = false }: { setupPage?: boolean }
     mutationFn: startAiRuntime,
     onMutate: () => setMessage("Starting the AI service. You can keep browsing."),
     onSuccess: (result) => {
-      const reason = result.reason ? AI_ISOLATION_REASON_LABEL[result.reason] : null;
-      const size = result.download_bytes !== null
-        ? ` Download size: about ${(result.download_bytes / 1e9).toFixed(1)} GB.` : "";
-      setMessage(`${reason ?? AI_RUNTIME_START_LABEL[result.state]}${size}`);
+      if (result.state === "started" || result.state === "already_running") {
+        // Show the running line now, not at the next status check, so focus
+        // has somewhere to go when the button disappears.
+        queryClient.setQueryData<AiRuntimeStatus>(
+          ["ai-runtime"], { running: true, isolated: true, reason: null },
+        );
+        setMessage("");
+        setFocusRunning(true);
+      } else {
+        const reason = result.reason ? AI_ISOLATION_REASON_LABEL[result.reason] : null;
+        const size = result.download_bytes !== null
+          ? ` Download size: about ${(result.download_bytes / 1e9).toFixed(1)} GB.` : "";
+        setMessage(`${reason ?? AI_RUNTIME_START_LABEL[result.state]}${size}`);
+      }
       void queryClient.invalidateQueries({ queryKey: ["ai-runtime"] });
       void queryClient.invalidateQueries({ queryKey: ["suggestion-status"] });
     },
     onError: () => setMessage("The AI service could not start. Try again or check AI settings."),
   });
   const reason = runtime.data?.reason;
+  const running = Boolean(runtime.data?.running && runtime.data.isolated);
+
+  useEffect(() => {
+    if (focusRunning && running) {
+      runningRef.current?.focus();
+      setFocusRunning(false);
+    }
+  }, [focusRunning, running]);
+
   // Your own Ollama: one plain sentence and no Start button, because the
   // button could only reply that Axcess does not manage it. Rejected: the
   // old three sentences plus a button that did nothing, which said the same
@@ -48,15 +87,17 @@ export function AiRuntimeControls({ setupPage = false }: { setupPage?: boolean }
     </p>;
   }
   return <div className="mt-3 space-y-2 text-sm leading-6 text-fg">
-    <p>{runtime.data?.running && runtime.data.isolated
-      ? "AI service: isolated, local only"
-      : reason ? AI_ISOLATION_REASON_LABEL[reason] ?? "AI service is not running."
-        : runtime.isError ? "AI service status could not be loaded."
-          : "AI service is not running."}</p>
-    <Button type="button" aria-disabled={start.isPending || undefined}
-      onClick={() => { if (!start.isPending) start.mutate(); }}>
-      Start AI service
-    </Button>
+    {running
+      ? <p ref={runningRef} tabIndex={-1} className="font-semibold">{AI_RUNTIME_RUNNING}</p>
+      : <>
+        <p>{reason ? AI_ISOLATION_REASON_LABEL[reason] ?? "AI service is not running."
+          : runtime.isError ? "AI service status could not be loaded."
+            : "AI service is not running."}</p>
+        <Button type="button" aria-disabled={start.isPending || undefined}
+          onClick={() => { if (!start.isPending) start.mutate(); }}>
+          Start AI service
+        </Button>
+      </>}
     <p role="status" className={message ? "" : "sr-only"}>{message}</p>
     {!setupPage && <LinkButton to="/settings/ai">Choose an AI download</LinkButton>}
   </div>;

@@ -56,7 +56,7 @@ React workbench in a sandboxed Electron window.
   On macOS the sandbox allows only the Mac graphics driver and shader
   compiler, so models still run on the graphics chip (Metal).
 - **Start AI service** starts the private AI service without downloading
-  anything. When the app opens with AI on, the service starts in the
+  anything. It shows only while the service is not running. When the app opens with AI on, the service starts in the
   background; until it is ready, AI requests say it is not running.
   Model-assisted scan checks stay off for each new scan and report when the
   AI service is unavailable.

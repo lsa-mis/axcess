@@ -186,7 +186,10 @@ AI on, and in the background when the app opens. Until the service is ready,
 AI requests say that it is not running. To start it yourself, select
 **Start AI service** in Settings or AI features. This starts only Axcess's
 own service and never downloads anything. It does not start, stop or
-download into your own Ollama.
+download into your own Ollama. While the service runs, the button is gone
+and the page says "AI service is running." Once a size is downloaded and in
+use, AI features says it is set up and offers no download for it; choose
+another size to download that one.
 
 ### How the private AI service is kept away from the internet
 

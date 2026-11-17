@@ -231,6 +231,14 @@ function AiSetupPage({
   const chosenTier = plan.tiers.find((t) => t.id === chosen);
   const hasDownload =
     status.state === "paused" || status.state === "failed" || running;
+  // The chosen size is the private setup in use and every file is here, so
+  // there is nothing to download (see the rationale at the button).
+  const chosenIsSetUp =
+    chosenTier !== undefined &&
+    chosenTier.installed &&
+    current?.source === "private" &&
+    current.backend === "llama_cpp" &&
+    current.tier === chosenTier.id;
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -393,14 +401,29 @@ function AiSetupPage({
                 <Pause className="h-4 w-4" aria-hidden />
                 Pause download
               </Button>
+            ) : chosenIsSetUp ? (
+              // The chosen size is set up and every file is checked: a line
+              // says so where the button was (2026-11-17, the developer's
+              // request: after the download the page still offered "Download
+              // and set up"). Rejected: a greyed-out (disabled) button, which
+              // keyboard users cannot reach and whose reason a screen reader
+              // does not hear; one line of text says the same to everyone
+              // (W3C COGA Making Content Usable,
+              // https://www.w3.org/TR/coga-usable/, paraphrased: do not offer
+              // controls that cannot work). Choosing another size brings the
+              // button back.
+              <p className="min-h-target content-center text-sm font-semibold text-fg">
+                {`${AI_TIER_LABEL[chosenTier.id]} is set up on this computer. Nothing to download.`}
+              </p>
             ) : (
-              // Keep the same-size download available to replace missing files,
-              // to move from a system Ollama to the private service, or to
-              // replace a private Ollama setup saved before llama.cpp (its
-              // models no longer run). Hiding it based
-              // on the saved size would leave no repair action. The size-labelled
-              // button keeps download consent separate from start (W3C COGA,
-              // https://www.w3.org/TR/coga-usable/, paraphrased: prevent mistakes).
+              // Otherwise keep the download available, the same size included:
+              // to replace missing files, to move from a system Ollama to the
+              // private service, or to replace a private Ollama setup saved
+              // before llama.cpp (its models no longer run). Hiding it based
+              // on the saved size alone would leave no repair action. The
+              // size-labelled button keeps download consent separate from
+              // start (W3C COGA, https://www.w3.org/TR/coga-usable/,
+              // paraphrased: prevent mistakes).
               chosenTier && (
                 <Button
                   type="button"

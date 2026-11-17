@@ -652,9 +652,12 @@ export const SUGGESTION_ERROR_LABEL: Record<SuggestionErrorCode, string> = {
   internal: "Something went wrong in Axcess. Try again.",
 };
 
+// The AI service's state while it runs, where the Start button was.
+export const AI_RUNTIME_RUNNING = "AI service is running. It is isolated and stays on this computer.";
+
 export const AI_RUNTIME_START_LABEL: Record<import("../api/types").AiRuntimeStartState, string> = {
   started: "AI service started. It is isolated and stays on this computer.",
-  already_running: "AI service: isolated, local only.",
+  already_running: "AI service is running. It is isolated and stays on this computer.",
   model_missing: "The private AI program or models are missing. Choose a size and confirm its download below.",
   not_isolated: "AI was not started because Axcess could not keep it isolated.",
   system_ollama_not_managed: "This is your own Ollama. Axcess does not start, stop or isolate it. Choose a private download for isolated AI.",
