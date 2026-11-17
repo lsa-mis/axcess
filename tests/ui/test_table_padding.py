@@ -45,6 +45,9 @@ _PADDING = r"""() => {
     table.querySelectorAll('th, td').forEach((cell) => {
       if (cell.colSpan > 1) return; // an empty-state message, not a column
       const style = getComputedStyle(cell);
+      // A hidden sizing row (Reports' SizerRows) is never seen, so it has no
+      // padding a reader sees.
+      if (style.visibility !== 'visible') return;
       out.push({
         table: caption,
         kind: cell.tagName === 'TH' ? 'heading' : 'cell',

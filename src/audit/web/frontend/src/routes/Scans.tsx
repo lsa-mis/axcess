@@ -1,7 +1,7 @@
 import { Link, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, PlusCircle, Trash2 } from "lucide-react";
-import { memo, useCallback, useMemo, useState } from "react";
+import { ChevronDown, ChevronRight, PlusCircle, Trash2 } from "lucide-react";
+import { memo, useCallback, useMemo, useState, type ReactNode } from "react";
 import { api } from "../api/client";
 import {
   protectedQueryKey,
@@ -15,6 +15,7 @@ import {
   PageHeader,
   ScanStatusBadge,
   ScanTag,
+  buttonClasses,
   relativeTime,
 } from "../components/ui";
 import { withoutUserinfo } from "../components/ReportCrumb";
@@ -29,7 +30,7 @@ import { confirmDestructive } from "../hooks/usePreferences";
 import BreakableUrl from "../components/BreakableUrl";
 import RunningScanNotice from "../components/RunningScanNotice";
 import ScanAgainLink from "../components/ScanAgainLink";
-import LinkMenu from "../components/LinkMenu";
+import LinkMenu, { LINK_MENU_TRIGGER_CLASS } from "../components/LinkMenu";
 import {
   Cell,
   ColumnHeader,
@@ -608,6 +609,7 @@ export default function ScansRoute() {
                     );
                   })}
                 </tbody>
+                <SizerRows sites={sitePages.pageRows} />
               </Table>
             </TableRegion>
           </PagedTable>
@@ -833,6 +835,13 @@ const OPEN_SITE_SHADE = "bg-surface-subtle";
  * `z-index`) so the layer's `-z-10` puts it over the cell's background and
  * under its content.
  */
+/** A scan row's "Report #N" cell (ScanRow), shared with its sizing row. */
+const SCAN_ROW_HEADER = "whitespace-nowrap py-1 pl-[4.75rem] text-xs font-normal tabular-nums text-fg-muted";
+/** A scan row's actions ("Compare with", Delete), shared with its sizing row. */
+const SCAN_ACTIONS = "flex items-center justify-center";
+/** Delete's padding, 2px less each side than the shared button's 16px (2026-11-16). */
+const DELETE_PADDING = "px-3.5";
+
 function scanCardCell({ first, last, edge }: { first: boolean; last: boolean; edge?: "start" | "end" }): string {
   return cn(
     "before:absolute before:-z-10 before:border-border before:bg-surface before:content-['']",
@@ -899,7 +908,7 @@ function ScanRow({
           row's header. */}
       <RowHeader
         sticky
-        className={cn("whitespace-nowrap py-1 pl-[4.75rem] text-xs font-normal tabular-nums text-fg-muted", piece("start"))}
+        className={cn(SCAN_ROW_HEADER, piece("start"))}
       >
         <Link
           to={isReport(scan) ? `/scans/${scan.id}/issues` : `/scans/${scan.id}`}
@@ -938,7 +947,7 @@ function ScanRow({
         {/* No gap between "Compare with" and Delete: each button's own
             padding already separates them (the developer's request,
             2026-11-16). */}
-        <div className="flex items-center justify-center">
+        <div className={SCAN_ACTIONS}>
           {others.length > 0 && (
             <LinkMenu
               label="Compare with"
@@ -976,6 +985,88 @@ function RuleChecksCell({ scan, className }: { scan: ScanSummary; className?: st
     <Cell className={cn("whitespace-nowrap", checks?.length ? "text-fg" : "text-fg-muted", className)}>
       {checks ? ruleChecksText(checks) : "Not recorded"}
     </Cell>
+  );
+}
+
+/**
+ * Hidden rows that size the columns as if every site on this page were open,
+ * so opening one does not move the column lines (the developer's request,
+ * 2026-11-16: the grid an open site needs is the grid from the start).
+ *
+ * A table's columns take their width from their widest cell, and a closed
+ * site's scan rows are not drawn, so the columns grew the moment a site
+ * opened: Site for "Report #N" and its status badge, which do not wrap,
+ * Issue types and Issue occurrences for "Not counted", Actions for "Compare
+ * with" and Delete. One row here per scan, with the same words and the same
+ * classes as its ScanRow (SCAN_ROW_HEADER, SCAN_ACTIONS, DELETE_PADDING,
+ * LINK_MENU_TRIGGER_CLASS), sets those widths before the rows are shown,
+ * whatever the font. The counts are left out: they are fetched only when a
+ * site opens, and a number is narrower than its column's heading.
+ *
+ * In a ``tfoot``, not the body, so a row count of the body is the rows a
+ * reader sees. Zero height (``py-0`` and an empty-height box around each
+ * cell's words), hidden (``invisible``, which also keeps it out of the tab
+ * order) and ``aria-hidden``, so it is never seen, heard or reached. Its
+ * stand-ins for links and buttons are plain text with their classes, not
+ * controls. The minimum widths on Site and Issue types (COLUMN_WIDTHS) came
+ * first and stay; alone they held only for the fonts and report numbers they
+ * were measured with.
+ */
+function SizerRows({ sites }: { sites: readonly SiteGroup[] }) {
+  const sized = (children: ReactNode) => <div className="h-0 overflow-hidden">{children}</div>;
+  return (
+    <tfoot aria-hidden="true" className="invisible">
+      {sites.flatMap((site) => {
+        const reports = site.scans.filter(isReport);
+        return site.scans.map((scan) => {
+          const compare = isReport(scan) && reports.length > 1;
+          const counted = isReport(scan) ? null : "Not counted";
+          return (
+            <tr key={`${site.site_url}-${scan.id}`}>
+              <td className={cn("px-4", SCAN_ROW_HEADER, "py-0")}>
+                {sized(
+                  <>
+                    <span className="inline-flex items-center px-1 font-semibold">Report #{scan.id}</span>
+                    {scan.status !== "completed" && (
+                      <span className="ml-2 font-sans">
+                        <ScanStatusBadge value={scan.status} />
+                      </span>
+                    )}
+                  </>,
+                )}
+              </td>
+              <Cell className="whitespace-nowrap py-0 text-xs">
+                {sized(relativeTime(scan.finished_at ?? scan.started_at))}
+              </Cell>
+              <Cell className="whitespace-nowrap py-0 text-right">{sized(counted)}</Cell>
+              <Cell className="whitespace-nowrap py-0 text-right">{sized(counted)}</Cell>
+              <Cell numeric className="py-0">
+                {sized(scan.page_count.toLocaleString())}
+              </Cell>
+              <Cell className="whitespace-nowrap py-0">
+                {sized(scan.rule_checks ? ruleChecksText(scan.rule_checks) : "Not recorded")}
+              </Cell>
+              <Cell className="whitespace-nowrap py-0">
+                {sized(
+                  <div className={SCAN_ACTIONS}>
+                    {compare && (
+                      <span className={cn(buttonClasses("ghost"), LINK_MENU_TRIGGER_CLASS)}>
+                        Compare with
+                        <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
+                      </span>
+                    )}
+                    <span className={cn(buttonClasses("ghost"), DELETE_PADDING)}>
+                      <Trash2 className="h-4 w-4" aria-hidden />
+                      Delete
+                    </span>
+                  </div>,
+                )}
+              </Cell>
+            </tr>
+          );
+        });
+      })}
+    </tfoot>
   );
 }
 
@@ -1102,7 +1193,7 @@ function DeleteScanButton({ scan }: { scan: ScanSummary }) {
         variant="ghost"
         disabled
         title="Stop the scan before you delete this report."
-        className="px-3.5 text-fg-subtle"
+        className={cn(DELETE_PADDING, "text-fg-subtle")}
         aria-label={`Delete report ${scan.id} (not available while the scan is running)`}
       >
         <Trash2 className="h-4 w-4" aria-hidden />
@@ -1118,7 +1209,7 @@ function DeleteScanButton({ scan }: { scan: ScanSummary }) {
         disabled={mutation.isPending}
         // px-3.5: 2px less each side than the shared button's 16px (the
         // developer's request, 2026-11-16).
-        className="px-3.5 text-sev-critical hover:bg-sev-critical-bg"
+        className={cn(DELETE_PADDING, "text-sev-critical hover:bg-sev-critical-bg")}
         aria-label={`Delete report ${scan.id}`}
         onClick={() => {
           // confirm() blocks; it's the right primitive for "are you sure".

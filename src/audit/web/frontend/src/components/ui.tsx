@@ -515,17 +515,21 @@ type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 // forwardRef so callers that must move focus back to the trigger, a
 // disclosure closing on Escape, for one, can hold the element itself
 // instead of re-querying the DOM for it.
+/**
+ * A button's own classes, for a stand-in that must take exactly a button's
+ * width without being one: the Reports table's hidden sizing rows
+ * (routes/Scans.tsx, ``SizerRows``). Every real control uses ``Button``.
+ */
+export function buttonClasses(variant: Variant = "secondary", size: Size = "md"): string {
+  return cn(BUTTON_BASE, SIZE_CLASSES[size], VARIANT_CLASSES[variant]);
+}
+
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   function Button({ variant = "secondary", size = "md", className, ...rest }, ref) {
     return (
       <button
         ref={ref}
-        className={cn(
-          BUTTON_BASE,
-          SIZE_CLASSES[size],
-          VARIANT_CLASSES[variant],
-          className,
-        )}
+        className={cn(buttonClasses(variant, size), className)}
         {...rest}
       />
     );

@@ -77,6 +77,18 @@ export type LinkMenuItem = {
  * the page, where a heading inside a table cell would break the outline.
  * This component keeps their keys and their closing rules.
  */
+/**
+ * The trigger's classes, on top of a ghost ``Button``. Exported so the Reports
+ * table's hidden sizing rows can take the trigger's exact width.
+ *
+ * Padding: 14px left, 10px right, 2px less than the shared button's 16px
+ * each side (the developer's request, 2026-11-16). The chevron's drawing has
+ * about 4px of blank inside its 16px box, so 10px of padding leaves the same
+ * 14px between the arrow's ink and the button's edge as the left side has
+ * before the words.
+ */
+export const LINK_MENU_TRIGGER_CLASS = "report-link whitespace-nowrap pl-3.5 pr-2.5";
+
 export default function LinkMenu({
   label,
   labelContext,
@@ -216,12 +228,7 @@ export default function LinkMenu({
         aria-controls={panelId}
         onClick={() => setOpen((current) => !current)}
         onKeyDown={onButtonKey}
-        // Padding: 14px left, 10px right, 2px less than the shared
-        // button's 16px each side (the developer's request, 2026-11-16).
-        // The chevron's drawing has about 4px of blank inside its 16px box,
-        // so 10px of padding leaves the same 14px between the arrow's ink
-        // and the button's edge as the left side has before the words.
-        className="report-link whitespace-nowrap pl-3.5 pr-2.5"
+        className={LINK_MENU_TRIGGER_CLASS}
       >
         {label}
         {labelContext && <span className="sr-only">{labelContext}</span>}
