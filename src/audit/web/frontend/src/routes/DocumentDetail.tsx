@@ -150,7 +150,7 @@ export default function DocumentDetailRoute() {
     <>
       <ReportHeader
         scanId={scan.id}
-        previousScanId={scan.previous_scan_id}
+        canCompare={scan.has_other_reports}
         title={
           <span className="[overflow-wrap:anywhere]" data-scanned-content>
             {row.name}

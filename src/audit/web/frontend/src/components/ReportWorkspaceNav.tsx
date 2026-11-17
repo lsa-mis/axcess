@@ -30,12 +30,13 @@ import { FRAMED } from "../lib/framed";
 export interface ReportView {
   key: string;
   label: string;
-  /** Where the tab goes. ``previousScanId`` is the comparison target, if any. */
-  path: (scanId: number, previousScanId: number | null) => string;
+  /** Where the tab goes. */
+  path: (scanId: number) => string;
   /** The path segment under ``/scans/:id/`` that makes this tab current. */
   segment: string;
-  /** Whether the report has this view. Omitted, it always does. */
-  available?: (previousScanId: number | null) => boolean;
+  /** Whether the report has this view, given whether another report of its
+   *  site exists. Omitted, it always does. */
+  available?: (canCompare: boolean) => boolean;
 }
 
 /**
@@ -70,9 +71,9 @@ export const REPORT_VIEWS: readonly ReportView[] = [
   // before Compare reports (the developer's decision, 2026-11-16): like
   // Images it looks into this report, and Compare reports looks across two,
   // so the views of this report come first. It also keeps the tab in the
-  // same place on every report: Compare reports appears only when there is
-  // an earlier report, and Documents after it was the 3rd tab on a site's
-  // first report and the 4th on later ones (SC 3.2.3 Consistent
+  // same place on every report: Compare reports appears only when the site
+  // has another report, and Documents after it was the 3rd tab on a site's
+  // only report and the 4th otherwise (SC 3.2.3 Consistent
   // Navigation, Level AA). A reader still looks at the page issues first. Always shown, even for a report
   // that did not look for documents: the tab then says why there is no
   // list, which a missing tab could not.
@@ -86,8 +87,15 @@ export const REPORT_VIEWS: readonly ReportView[] = [
     key: "compare",
     label: "Compare reports",
     segment: "compare",
-    // A site's first report has nothing earlier to compare with.
-    available: (previousScanId) => previousScanId != null,
+    // Shown on every report of a site that has two or more, earlier or
+    // later: the page pairs this report with any other one of its site, so
+    // the oldest report can be compared too. Hidden only on a site's one
+    // report, where the page would offer nothing to choose. Until
+    // 2026-11-17 it needed an *earlier* report, so a site's first report
+    // had no tab while its later ones did: the same pair could be opened
+    // from one side only, and the tab came and went between two reports of
+    // one site (SC 3.2.3 Consistent Navigation, Level AA).
+    available: (canCompare) => canCompare,
     path: (scanId) => `/scans/${scanId}/compare`,
   },
 ];
@@ -100,10 +108,11 @@ export function activeReportView(pathname: string): ReportView {
 
 export default function ReportWorkspaceNav({
   scanId,
-  previousScanId,
+  canCompare,
 }: {
   scanId: number;
-  previousScanId: number | null;
+  /** Another report of the same site exists, earlier or later. */
+  canCompare: boolean;
 }) {
   const { pathname } = useLocation();
   const active = activeReportView(pathname);
@@ -119,7 +128,7 @@ export default function ReportWorkspaceNav({
   const views = REPORT_VIEWS.filter(
     (view) =>
       view === active ||
-      (!(FRAMED && PANEL_LEAVES_OUT.has(view.key)) && (view.available?.(previousScanId) ?? true)),
+      (!(FRAMED && PANEL_LEAVES_OUT.has(view.key)) && (view.available?.(canCompare) ?? true)),
   );
   // One view is not a choice; the heading already names it.
   if (views.length < 2) return null;
@@ -133,7 +142,7 @@ export default function ReportWorkspaceNav({
       items={views.map((view) => ({
         key: view.key,
         label: view.label,
-        to: view.path(scanId, previousScanId),
+        to: view.path(scanId),
       }))}
     />
   );

@@ -202,7 +202,7 @@ export default function ImagesRoute() {
       <ReportHeader
         tabs
         scanId={id}
-        previousScanId={scan?.previous_scan_id ?? null}
+        canCompare={scan?.has_other_reports ?? false}
         title="Images"
         // The ZIP: the pictures in folders by group, then by verdict, and a
         // sheet listing them all (src/audit/exports/images_zip.py). In the

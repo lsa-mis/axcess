@@ -119,7 +119,7 @@ function CompareReports() {
   // no `compare_to`.
   const askedId = positiveId(params.get("compare_to"));
   const second = askedId === first ? null : askedId;
-  const previous = scanQuery.data?.previous_scan_id ?? null;
+  const canCompare = scanQuery.data?.has_other_reports ?? false;
   const points = historyQuery.data?.scans;
   const history = { points, failed: Boolean(historyQuery.error) };
   // Which heading takes focus once the address has changed: see "Focus
@@ -171,7 +171,7 @@ function CompareReports() {
       <ReportHeader
         tabs
         scanId={first}
-        previousScanId={previous}
+        canCompare={canCompare}
         title="Compare reports"
         meta="Two reports of the same site, side by side. Each panel works on its own: open an issue, filter the table or go back, and the other panel stays as it is."
         actions={

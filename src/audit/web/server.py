@@ -144,6 +144,7 @@ from audit.web.comparison import (
     Pipeline,
     SiteHistory,
     compare_reports,
+    has_other_report,
     previous_scan_id,
     site_history,
 )
@@ -1389,6 +1390,7 @@ def create_app(
             protection = _get_protected_scan_compat(conn, scan_id=scan_id)
             breakdown = _severity_breakdown(conn, scan_id)
             prev = previous_scan_id(conn, scan)
+            other_reports = prev is not None or has_other_report(conn, scan)
             blocked = _detect_blocked_scan(conn, scan_id, scan)
             progress = _scan_progress(conn, scan_id) if scan["status"] == "running" else None
             method_coverage = _scan_method_coverage(conn, scan_id)
@@ -1398,6 +1400,10 @@ def create_app(
             "error_count": int(scan.get("error_count") or 0),
             "by_severity": {level: int(breakdown.get(level, 0)) for level in _SEVERITY_OPTIONS},
             "previous_scan_id": prev,
+            # Another report of the same site, earlier or later: the report
+            # then offers Compare reports. ``previous_scan_id`` is only the
+            # earlier one, which a site's first report never has.
+            "has_other_reports": other_reports,
             # How much of the site this scan covered, as facts: pages found,
             # pages visited, the limits chosen and how it ended. This replaces
             # the old "partial report" label for a stopped scan.

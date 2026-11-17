@@ -39,6 +39,9 @@ def test_comparison_api_and_chronological_predecessor(
     assert data["coverage"]
     assert client.get(f"/api/scans/{old}").json()["previous_scan_id"] is None
     assert client.get(f"/api/scans/{current}").json()["previous_scan_id"] == old
+    # Both reports of the site offer Compare reports, the older one too.
+    assert client.get(f"/api/scans/{old}").json()["has_other_reports"] is True
+    assert client.get(f"/api/scans/{current}").json()["has_other_reports"] is True
     assert client.get(f"/api/scans/{old}/comparison").json()["baseline"] is None
     assert client.get(f"/api/scans/{current}/diff?compare_to={old}").status_code == 200
     # The Compare reports page asks for every row at once.
