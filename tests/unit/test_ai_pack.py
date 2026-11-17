@@ -338,7 +338,7 @@ def test_install_failure_is_reported_in_plain_words(tmp_path: Path) -> None:
     installer = Installer(
         load_catalog(), runtime, lambda c: save_config(settings, c), pull=failing_pull
     )
-    installer.start(load_catalog().tier("small"))
+    installer.start(load_catalog().tier("standard"))
     installer._thread.join(5)  # type: ignore[union-attr]
     assert installer.status.state == "failed"
     assert installer.status.error == "The AI model download stopped. Try again."

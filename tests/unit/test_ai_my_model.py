@@ -13,6 +13,12 @@ from audit.ai.downloader import file_path, model_present
 from audit.ai.state import AIConfig
 
 
+@pytest.fixture(autouse=True)
+def _no_disk_reserve(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The copy keeps 3 GB of disk free; test files are tiny and /tmp may be small."""
+    monkeypatch.setattr(custom, "DISK_MARGIN", 0)
+
+
 def _string(value: str) -> bytes:
     data = value.encode()
     return struct.pack("<Q", len(data)) + data

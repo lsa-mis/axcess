@@ -521,6 +521,11 @@ def test_runtime_uses_same_sandbox_for_probe_and_serve_with_clean_environment(
     monkeypatch.setattr("audit.ai.runtime.test_network_boundary", probe)
     process = Mock()
     process.poll.return_value = None
+    process.pid = 4321
+    ended: list[int] = []
+    monkeypatch.setattr(
+        "audit.ai.runtime._end_group", lambda pgid, process=None: ended.append(pgid)
+    )
     sock = (tmp_path / "ai" / "scratch" / "llama.sock").resolve()
 
     def spawn(*_args, **_kwargs):
@@ -567,7 +572,8 @@ def test_runtime_uses_same_sandbox_for_probe_and_serve_with_clean_environment(
     assert env["HOME"] == str((tmp_path / "ai" / "scratch").resolve())
     assert runtime.isolated and runtime.running()
     runtime.stop()
-    process.terminate.assert_called_once()
+    # The stop ends the service's whole process group (its model servers too).
+    assert ended == [4321]
     assert not runtime.isolated and not runtime.running()
     assert runtime.socket_path is None
     assert not sock.exists()
@@ -591,12 +597,17 @@ def test_runtime_falls_back_to_the_cpu_build_when_the_gpu_build_cannot_load(
     sock = (tmp_path / "ai" / "scratch" / "llama.sock").resolve()
     spawned: list[str] = []
     processes: list[Mock] = []
+    ended: list[int] = []
+    monkeypatch.setattr(
+        "audit.ai.runtime._end_group", lambda pgid, process=None: ended.append(pgid)
+    )
 
     def spawn(argv, **_kwargs):
         spawned.append(argv[1])
         sock.touch()
         process = Mock()
         process.poll.return_value = None
+        process.pid = 5000 + len(processes)
         processes.append(process)
         return process
 
@@ -611,7 +622,7 @@ def test_runtime_falls_back_to_the_cpu_build_when_the_gpu_build_cannot_load(
     assert spawned == [str(s.resolve()) for _, s in servers]
     # Only the GPU build is given the graphics devices.
     assert built[-2:] == [True, False]
-    processes[0].terminate.assert_called_once()
+    assert ended == [5000]  # the GPU build's whole group, before the CPU build
     assert runtime.accelerator == "cpu" and runtime.isolated
 
 
@@ -622,6 +633,12 @@ def _fake_service(tmp_path, monkeypatch, states):
     sock = (tmp_path / "ai" / "scratch" / "llama.sock").resolve()
     process = Mock()
     process.poll.return_value = None
+    process.pid = 6000
+    # The groups a stop ends, kept on the stand-in for the test to read.
+    process.ended = []
+    monkeypatch.setattr(
+        "audit.ai.runtime._end_group", lambda pgid, _p=None: process.ended.append(pgid)
+    )
 
     def spawn(*_args, **_kwargs):
         sock.touch()
@@ -658,7 +675,7 @@ def test_stop_makes_a_start_still_loading_models_give_up(tmp_path, monkeypatch) 
     assert not thread.is_alive()
     assert len(errors) == 1 and isinstance(errors[0], RuntimeSetupError)
     assert "stopped while it was starting" in str(errors[0])
-    process.terminate.assert_called()
+    assert process.ended == [6000]
     assert not runtime.running() and runtime.socket_path is None
     assert not sock.exists()
     # The stop request does not linger: the next start works.
