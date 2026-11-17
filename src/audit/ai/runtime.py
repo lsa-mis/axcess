@@ -84,6 +84,8 @@ class NotEnoughMemoryError(RuntimeSetupError):
 # models by their published shapes; 1.5 GB per model plus a 1 GB margin.
 WORKING_BYTES_PER_MODEL = 1_500_000_000
 MEMORY_MARGIN_BYTES = 1_000_000_000
+# How long a start waits for memory to come back before refusing.
+MEMORY_SETTLE_S = 10.0
 # The service's process group, kept so a later start can end what an
 # earlier run left behind (a crash, a killed app).
 GROUP_FILE = "service.group"
@@ -750,12 +752,18 @@ class LlamaRuntime:
         Starting them anyway makes the computer swap or stop responding;
         a plain refusal leaves everything else working.
         """
-        free = hardware.available_memory_bytes()
-        if free is None:
-            return
         need = memory_needed(models, dedicated_gpu=hardware.dedicated_gpu())
-        if free >= need:
-            return
+        # Memory a model just stopped holds comes back over a few seconds
+        # (integrated graphics frees its part late), so a switch measured at
+        # once was refused with room to spare (end-to-end test, 2026-11-17).
+        deadline = time.monotonic() + MEMORY_SETTLE_S
+        while True:
+            free = hardware.available_memory_bytes()
+            if free is None or free >= need:
+                return
+            if time.monotonic() >= deadline:
+                break
+            time.sleep(0.5)
         self.isolation_reason = "not_enough_memory"
         note(
             self.ai_dir / "llama-server.log",

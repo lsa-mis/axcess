@@ -388,8 +388,15 @@ class AIManager:
             model = custom.find(models, model_sha256, "model")
             addon = custom.find(models, addon_sha256, "image_addon") if addon_sha256 else None
             entry = custom.model_entry(model, addon, sampling)
+            previous = self.config()
+            before = self._models(previous) if previous and self.runtime.running() else None
             self.runtime.stop()
-            self.runtime.start((entry,))
+            try:
+                self.runtime.start((entry,))
+            except RuntimeSetupError as exc:
+                # Do not leave AI off because the new model could not start:
+                # start the one that ran before, and say which happened.
+                raise type(exc)(f"{exc} {self._restart_previous(before)}") from exc
             config = AIConfig(
                 source="private",
                 base_url=SOCKET_BASE_URL,
@@ -405,6 +412,16 @@ class AIManager:
             return config
         finally:
             self._start_lock.release()
+
+    def _restart_previous(self, models: tuple[ModelEntry, ...] | None) -> str:
+        """Start the models that ran before a failed switch; say the outcome."""
+        if not models:
+            return "Choose a model and try again."
+        try:
+            self.runtime.start(models)
+        except (RuntimeSetupError, IsolationError):
+            return "The model used before is not running either; select Start AI service."
+        return "The model used before is running again."
 
     def remove(self) -> None:
         """Forget the setup; delete the private program and models if Axcess owns them.

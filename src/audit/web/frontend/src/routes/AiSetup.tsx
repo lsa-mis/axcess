@@ -707,12 +707,18 @@ function MyModelPanel({
         void queryClient.invalidateQueries({ queryKey: key });
       }
     },
-    onError: (error) =>
+    onError: (error) => {
+      // The server says what happened to the model used before (running
+      // again, or not). Refresh so the list and "(in use now)" match it.
       onMessage(
         error instanceof Error
-          ? `${error.message} The model in use before is still set up; turn AI on to start it again.`
+          ? error.message
           : "Your model could not start. Try again, or choose one of the sizes.",
-      ),
+      );
+      for (const key of [["ai-plan"], ["ai-runtime"], ["suggestion-status"]]) {
+        void queryClient.invalidateQueries({ queryKey: key });
+      }
+    },
   });
   // Which file was being sent, so a refusal lands under that field.
   const sending = useRef<"model" | "addon">("model");

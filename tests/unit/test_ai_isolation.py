@@ -780,6 +780,9 @@ def test_a_start_that_would_not_fit_in_free_memory_is_refused(
     from audit.ai.runtime import NotEnoughMemoryError
 
     runtime = LlamaRuntime(tmp_path / "ai", load_catalog())
+    from audit.ai import runtime as runtime_module
+
+    monkeypatch.setattr(runtime_module, "MEMORY_SETTLE_S", 0.0)
     monkeypatch.setattr(hardware, "available_memory_bytes", lambda: 2_000_000_000)
     monkeypatch.setattr(hardware, "dedicated_gpu", lambda: False)
     with pytest.raises(NotEnoughMemoryError, match="free memory"):
@@ -809,3 +812,18 @@ def test_a_service_left_running_is_ended_before_a_new_one(
     (runtime.scratch / runtime_module.GROUP_FILE).write_text("777", encoding="ascii")
     runtime._end_leftovers()
     assert ended == [4242]
+
+
+def test_a_start_waits_briefly_for_memory_a_stop_gives_back(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Memory comes back a moment after a model stops; the check waits for it."""
+    from audit.ai import hardware
+    from audit.ai import runtime as runtime_module
+
+    readings = iter([1_000_000_000, 2_000_000_000, 99_000_000_000])
+    monkeypatch.setattr(hardware, "available_memory_bytes", lambda: next(readings))
+    monkeypatch.setattr(hardware, "dedicated_gpu", lambda: False)
+    monkeypatch.setattr(runtime_module.time, "sleep", lambda _s: None)
+    runtime = LlamaRuntime(tmp_path / "ai", load_catalog())
+    runtime._require_memory(list(load_catalog().tier("standard").models))

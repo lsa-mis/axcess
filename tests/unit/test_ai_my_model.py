@@ -198,3 +198,43 @@ def test_start_ai_service_works_with_your_own_model(tmp_path: Path) -> None:
     manager = AIManager(settings, lambda _c: None, runtime=runtime)
     assert manager.start_runtime().state == "started"
     runtime.start.assert_called_once_with((entry,))
+
+
+def test_a_switch_that_cannot_start_brings_back_the_model_used_before(tmp_path: Path) -> None:
+    """End-to-end test, 2026-11-17: a refused switch left AI off and told the
+    person to "turn AI on", though it was on."""
+    from unittest.mock import Mock
+
+    from audit.ai.manager import AIManager
+    from audit.ai.runtime import NotEnoughMemoryError
+    from audit.ai.state import save_config
+    from audit.config import Settings
+
+    settings = Settings(data_dir=tmp_path, desktop=True)
+    before = custom.model_entry(
+        custom.MyModelFile(sha256="c" * 64, file="a.gguf", size=10, kind="model", name="A"), None
+    )
+    save_config(
+        settings,
+        AIConfig(
+            source="private",
+            base_url="http://localhost",
+            backend="llama_cpp",
+            tier="custom",
+            text_model=before.served_name,
+            vision_model="",
+            custom_model=before,
+        ),
+    )
+    runtime = Mock()
+    runtime.running.return_value = True
+    runtime.installed.return_value = True
+    runtime.start.side_effect = [NotEnoughMemoryError("Not enough memory."), "ok"]
+    manager = AIManager(settings, lambda _c: None, runtime=runtime)
+    new = custom.MyModelFile(sha256="d" * 64, file="b.gguf", size=10, kind="model", name="B")
+    manager.runtime.models_dir = tmp_path
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(custom, "find", lambda _models, sha, _kind: new)
+        with pytest.raises(NotEnoughMemoryError, match="The model used before is running again"):
+            manager.use_my_model(new.sha256, None)
+    assert runtime.start.call_args_list[-1].args == ((before,),)
