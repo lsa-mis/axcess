@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -11,7 +12,7 @@ import {
   type TdHTMLAttributes,
   type ThHTMLAttributes,
 } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, Search } from "lucide-react";
+import { ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, Search } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { ariaSort, nextSort, sortChip, type Sort, type SortKind } from "./sort";
 
@@ -544,7 +545,7 @@ export function SortHeader<K extends string>({
         )}
       >
         <Arrow className="h-3 w-3 shrink-0" aria-hidden />
-        {chip ? chip(sort) : sortChip(kind, sort.direction)}
+        {withDrawnArrows(chip ? chip(sort) : sortChip(kind, sort.direction))}
       </span>
     ) : (
       <Arrow
@@ -699,6 +700,32 @@ function useFitToLines(button: RefObject<HTMLButtonElement | null>, enabled: boo
       el.style.maxWidth = "";
     };
   }, [button, enabled, key]);
+}
+
+/**
+ * A sort chip's words with each "→" drawn as an icon ("high → low").
+ *
+ * The app's font has no arrows, so a typed "→" came from whatever font the
+ * computer had, and took a different width on each one: the Issues table
+ * fitted 1280px here and was 13px too wide in CI with a column sorted
+ * (test_issue_table_fits_the_default_desktop_width, 2026-11-16). The icon is
+ * one width everywhere, like the chip's own direction arrow. The "→" stays
+ * in the text, visually hidden, so the button's name and text are unchanged.
+ */
+function withDrawnArrows(words: string): ReactNode {
+  const parts = words.split("→");
+  if (parts.length === 1) return words;
+  return parts.map((part, index) => (
+    <Fragment key={index}>
+      {index > 0 && (
+        <>
+          <ArrowRight className="h-2.5 w-2.5 shrink-0" aria-hidden />
+          <span className="sr-only">→</span>
+        </>
+      )}
+      {part}
+    </Fragment>
+  ));
 }
 
 /**

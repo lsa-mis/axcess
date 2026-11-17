@@ -938,7 +938,11 @@ const IssueTableRow = memo(function IssueTableRow({
 
   return (
     <Row index={index}>
-      <RowHeader sticky className="min-w-[10.5rem] max-w-[18rem]">
+      {/* At least 9.5rem: the narrowest the issue titles go before the table
+          is too wide at 1280px. It was 11rem, then 10.5rem; 9.5rem leaves
+          about 20px to spare with a column sorted, so a computer that draws
+          text a little wider (CI, 2026-11-16) still fits. */}
+      <RowHeader sticky className="min-w-[9.5rem] max-w-[18rem]">
         {/* The title is the row's main link and opens the issue's full
             evidence record: what it is, why it matters, the fix, and its
             pages. The page count beside it is the shortcut straight to
