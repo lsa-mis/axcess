@@ -264,6 +264,31 @@ const SORT_KINDS: Record<SortKey, SortKind> = {
   completed: "date",
 };
 
+/**
+ * Each column's width, the wider of its width with every site closed and with
+ * one open (measured on the developer's data, 2026-11-16). Without it every
+ * column took its share of the table's spare width by what its cells held
+ * (the table's columns size automatically), so opening a site moved every
+ * column line by up to 15px. With a width on each column but Site, the spare
+ * width goes to Site and the others stay put. A width is a preference, not a
+ * minimum: on a narrow window the columns still shrink toward their longest
+ * word, as they did, so nothing scrolls sideways sooner than before (SC 1.4.10
+ * Reflow, Level AA). Two columns also have a minimum, the width each had
+ * with a site open: Site 241px (15.0625rem; a closed row's long address
+ * wraps, an open site's "Report #N" and badge do not) and Issue types 109px
+ * (6.8125rem; "Not counted" does not wrap), so they do not jump when a site
+ * opens in a window too narrow for the widths above (the developer's
+ * request, 2026-11-16). Rejected: a fixed table layout, which cuts words off
+ * where a narrow window gives a column less than its longest word.
+ */
+const COLUMN_WIDTHS: Partial<Record<SortKey, string>> = {
+  completed: "w-[10.5rem]",
+  kinds: "w-[9.25rem] min-w-[6.8125rem]",
+  issues: "w-[12rem]",
+  pages: "w-[7.5rem]",
+  checks: "w-[8.5rem]",
+};
+
 const SORT_LABELS: Record<SortKey, string> = {
   site: "Site",
   pages: "Pages",
@@ -530,7 +555,7 @@ export default function ScansRoute() {
                       column="site"
                       kind="text"
                       wrap="words"
-                      className="sticky left-0 z-[2] bg-surface-muted pl-[calc(1rem+var(--target,44px)+0.25rem)]"
+                      className="sticky left-0 z-[2] min-w-[15.0625rem] bg-surface-muted pl-[calc(1rem+var(--target,44px)+0.25rem)]"
                       {...sortProps}
                     >
                       {SORT_LABELS.site}
@@ -543,13 +568,18 @@ export default function ScansRoute() {
                         column={column}
                         kind={SORT_KINDS[column]}
                         wrap="words"
+                        className={COLUMN_WIDTHS[column]}
                         hint={column === "checks" ? RULE_CHECK_HELP : undefined}
                         {...sortProps}
                       >
                         {SORT_LABELS[column]}
                       </SortHeader>
                     ))}
-                    <ColumnHeader className="whitespace-nowrap px-3 py-1.5">
+                    {/* min-w-[17rem]: the Actions column is at least 272px wide, about 8px
+                        more than the buttons need in the test data, so Delete's hover
+                        fill clears the box's right edge (the developer's request,
+                        2026-11-16: make the column wider). */}
+                    <ColumnHeader className="w-[22rem] min-w-[17rem] whitespace-nowrap px-3 py-1.5">
                       {/* The height of a sort button, words in its middle like theirs,
                           so its label lines up with them. */}
                       <span className="inline-flex min-h-target items-center px-1">Actions</span>
