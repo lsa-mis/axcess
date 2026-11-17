@@ -16,7 +16,7 @@ new one instead.
 
 from yoyo import step
 
-__depends__ = {"0042_linked_file_pdfua"}
+__depends__ = {"0041_linked_file_thumbnails"}
 
 
 def apply_step(conn):  # type: ignore[no-untyped-def]
