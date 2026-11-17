@@ -84,15 +84,20 @@
       "label": "Standard",
       "min_memory_gb": 16,
       "text": {
-        "tag": "qwen3:4b-instruct-2507-q4_K_M",
-        "size": 2497281120,
+        "tag": "qwen3.8:4b-distill-q4_K_M",
+        "size": 2783446304,
         "licence": "Apache-2.0",
         "gguf": {
-          "repo": "unsloth/Qwen3-4B-Instruct-2507-GGUF",
-          "revision": "a06e946bb6b655725eafa393f4a9745d460374c9",
-          "file": "Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
-          "size": 2497281120,
-          "sha256": "3605803b982cb64aead44f6c1b2ae36e3acdb41d8e46c8a94c6533bc4c67e597"
+          "repo": "empero-ai/Qwen3.8-4B-Distill-GGUF",
+          "revision": "391fc7d103e3942a408def3e4f51c2f85d464417",
+          "file": "Qwen3.8-4B-Q4_K_M.gguf",
+          "size": 2783446304,
+          "sha256": "dec96e8cf2e11b613bb46513dec485377f9ca5a351e71712ee0e244f287c6790"
+        },
+        "sampling": {
+          "temp": 0.6,
+          "top-p": 0.95,
+          "top-k": 20
         }
       },
       "vision": {
@@ -112,6 +117,9 @@
           "file": "mmproj-Qwen3VL-2B-Instruct-F16.gguf",
           "size": 819394848,
           "sha256": "c3d5afbef5287953acd57b4043d2269456e5761a4eaccb3b71b062996970aea5"
+        },
+        "sampling": {
+          "temp": 0
         }
       }
     },

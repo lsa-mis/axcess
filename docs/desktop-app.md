@@ -35,8 +35,9 @@ React workbench in a sandboxed Electron window.
   (GGUF files) from Hugging Face. Each file is pinned to an exact version
   and checked against its SHA-256 before use.
 - The AI models, all under the Apache 2.0 licence, are a text model and an
-  image model for each size. Standard: Qwen3-4B-Instruct-2507 and
-  Qwen3-VL-2B. Large: Qwen2.5-Coder-7B and Qwen3-VL-4B. Extra large:
+  image model for each size. Standard: Qwen3.8-4B distill (empero-ai, a
+  community distillation, not an official Qwen release; temperature 0.6,
+  top-p 0.95, top-k 20 as its page recommends) and Qwen3-VL-2B. Large: Qwen2.5-Coder-7B and Qwen3-VL-4B. Extra large:
   Qwen2.5-Coder-14B and Qwen3-VL-8B. The sizes were renamed on 2026-11-17
   (each moved up one name: Small is now Standard); a setup saved before
   keeps its models under the new name. There is no 2B size: none of the

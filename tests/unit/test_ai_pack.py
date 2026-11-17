@@ -18,9 +18,11 @@ from audit.ai.manager import AIManager, NotEnoughSpaceError
 from audit.ai.runtime import LlamaRuntime, RuntimeSetupError, preset_text
 from audit.ai.state import (
     AIConfig,
+    AIPreferences,
     effective_settings,
     load_config,
     save_config,
+    save_preferences,
     semantic_model,
     trust_private_runtime,
 )
@@ -401,3 +403,54 @@ def test_a_setup_saved_before_the_rename_keeps_its_models_under_the_new_name(
     assert config is not None and config.tier == "standard"
     assert load_config(settings).tier == "standard"  # type: ignore[union-attr]
     assert manager._models(config) == standard.models
+
+
+def test_standards_text_model_runs_with_its_recommended_settings(tmp_path: Path) -> None:
+    """Qwen3.8-4B distill is Standard's text model (developer, 2026-11-17), with
+    the sampling its page recommends; Axcess then sends no temperature."""
+
+    standard = load_catalog().tier("standard")
+    assert standard.text.gguf.repo == "empero-ai/Qwen3.8-4B-Distill-GGUF"
+    assert standard.text.sampling == {"temp": 0.6, "top-p": 0.95, "top-k": 20}
+    assert standard.vision.sampling == {"temp": 0}
+    text = preset_text(
+        [(m, tmp_path / f"{i}.gguf", None) for i, m in enumerate(standard.models)], gpu=False
+    )
+    assert "temp = 0.6\ntop-k = 20\ntop-p = 0.95" in text
+    settings = Settings(data_dir=tmp_path, desktop=True)
+    save_preferences(settings, AIPreferences(enabled=True, choice_recorded=True))
+    save_config(
+        settings,
+        AIConfig(
+            source="private",
+            base_url="http://localhost",
+            backend="llama_cpp",
+            socket_path=str(tmp_path / "s.sock"),
+            tier="standard",
+            text_model=standard.text.served_name,
+            vision_model=standard.vision.served_name,
+        ),
+    )
+    assert effective_settings(settings).suggestion_temperature is None
+
+
+def test_macos_free_memory_counts_the_file_cache() -> None:
+    """A 16 GB Mac with 9 GB of file cache has room for Standard."""
+    vm_stat = """Mach Virtual Memory Statistics: (page size of 16384 bytes)
+Pages free:                               30000.
+Pages active:                            300000.
+Pages inactive:                          120000.
+Pages speculative:                         5000.
+Pages wired down:                        150000.
+Pages purgeable:                           2000.
+File-backed pages:                       560000.
+Anonymous pages:                         200000.
+Pages occupied by compressor:             50000.
+"""
+    total = 16 * 1024**3
+    free = hw._macos_available(vm_stat, total)
+    narrow = (30000 + 120000 + 5000 + 2000) * 16384
+    assert free > narrow
+    assert free == total - (150000 + 50000 + 200000) * 16384
+    # Never stricter than the narrow reading.
+    assert hw._macos_available(vm_stat, 0) == narrow

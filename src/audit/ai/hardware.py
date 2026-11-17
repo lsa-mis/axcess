@@ -82,6 +82,35 @@ def _memory_bytes() -> int:
     return 0
 
 
+def _macos_available(vm_stat: str, total: int) -> int:
+    """Memory a new program can have on macOS without swapping.
+
+    The larger of two readings. Free, inactive, speculative and purgeable
+    pages alone undercount: macOS keeps most spare memory as file cache
+    (file-backed pages), which it gives back at once. So also everything
+    that is not wired, compressed or held by programs (anonymous pages),
+    as Activity Monitor's "Memory Used" leaves out (2026-11-17: the narrow
+    reading refused Standard on a 16 GB Mac with room to spare).
+    """
+    page = int(vm_stat.split("page size of", 1)[1].split()[0])
+    counts: dict[str, int] = {}
+    for line in vm_stat.splitlines():
+        key, _, value = line.partition(":")
+        value = value.strip().rstrip(".")
+        if value.isdigit():
+            counts[key.strip()] = int(value)
+    quick = sum(
+        counts.get(k, 0)
+        for k in ("Pages free", "Pages inactive", "Pages speculative", "Pages purgeable")
+    )
+    held = sum(
+        counts.get(k, 0)
+        for k in ("Pages wired down", "Pages occupied by compressor", "Anonymous pages")
+    )
+    reclaimable = total - held * page if total else 0
+    return max(quick * page, reclaimable)
+
+
 def dedicated_gpu() -> bool:
     """A separate graphics card with its own memory (NVIDIA, AMD)."""
     return _gpu() in ("NVIDIA", "AMD")
@@ -107,18 +136,7 @@ def available_memory_bytes() -> int | None:
                 text=True,
                 timeout=5,
             ).stdout
-            page = int(out.split("page size of", 1)[1].split()[0])
-            pages = 0
-            for line in out.splitlines():
-                key, _, value = line.partition(":")
-                if key.strip() in (
-                    "Pages free",
-                    "Pages inactive",
-                    "Pages speculative",
-                    "Pages purgeable",
-                ):
-                    pages += int(value.strip().rstrip("."))
-            return pages * page
+            return _macos_available(out, _memory_bytes())
         elif platform.startswith("win"):
 
             class _Status(ctypes.Structure):

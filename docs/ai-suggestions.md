@@ -105,7 +105,7 @@ Choosing to continue keeps AI off. You can change your choice in Settings.
 
    | Size | Needs at least | Text model | Image model | Download |
    | --- | --- | --- | --- | --- |
-   | Standard | 16 GB memory | `qwen3:4b-instruct-2507-q4_K_M` | `qwen3-vl:2b-instruct` | about 4.4 GB |
+   | Standard | 16 GB memory | `qwen3.8:4b-distill-q4_K_M` | `qwen3-vl:2b-instruct` | about 4.7 GB |
    | Large | 32 GB memory | `qwen2.5-coder:7b-instruct` | `qwen3-vl:4b-instruct` | about 8 GB |
    | Extra large | 32 GB memory | `qwen2.5-coder:14b-instruct` | `qwen3-vl:8b-instruct` | about 15 GB |
 

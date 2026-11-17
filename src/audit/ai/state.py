@@ -183,6 +183,31 @@ def clear_config(settings: Settings) -> None:
     config_path(settings).unlink(missing_ok=True)
 
 
+def _models_bring_sampling(config: AIConfig) -> bool:
+    """True when every model the setup runs has its own sampling settings.
+
+    llama-server then applies them (your own model, or a catalogue model
+    with its maker's recommended values such as Standard's text model), and
+    fix-suggestion requests send no temperature of their own.
+    """
+    if config.custom_model is not None:
+        return bool(config.custom_model.sampling)
+    if config.backend != "llama_cpp" or config.source != "private":
+        return False
+    from audit.ai.catalog import load_catalog
+
+    try:
+        tier = load_catalog().tier(config.tier)
+    except KeyError:
+        return False
+    if (tier.text.served_name, tier.vision.served_name) != (
+        config.text_model,
+        config.vision_model,
+    ):
+        return False
+    return all(m.sampling for m in tier.models)
+
+
 def effective_settings(settings: Settings) -> Settings:
     """Settings with the desktop AI setup applied, or unchanged if none."""
     if not settings.desktop:
@@ -226,7 +251,7 @@ def effective_settings(settings: Settings) -> Settings:
             "suggestion_vision_model": config.vision_model,
             "suggestions_enabled": enabled,
             "suggestion_temperature": None
-            if config.custom_model is not None and config.custom_model.sampling
+            if _models_bring_sampling(config)
             else settings.suggestion_temperature,
         }
     )
