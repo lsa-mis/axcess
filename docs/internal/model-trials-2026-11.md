@@ -155,3 +155,13 @@ Two more, same setup (developer's own files, nothing downloaded):
   from a hidden heading, a "darker" blue that still fails.
 - Qwen3.8-4B is a community distill, not an official Qwen release; its file
   matches empero-ai/Qwen3.8-4B-Distill-GGUF by SHA-256.
+| Qwen3-4B-Instruct-2507 (today's Standard text model), text only (temp 0.7, top-p 0.8, top-k 20, min-p 0, from its card) | 3 | 3 | 4 | 32–127 s |
+
+- Qwen3-4B against Qwen3.8-4B, same tasks and conditions: both right on
+  aria-role and both headings; both wrong on the blue button (white text)
+  and the screen-reader-only false alarm. Qwen3-4B turned "Red = Urgent"
+  black (passes, but the legend loses its meaning) where Qwen3.8 kept it
+  red; Qwen3-4B rewrote the whole search region for the landmark label;
+  Qwen3-4B's infographic answer added the chart titles from the image
+  (partly) where Qwen3.8's was unusable. One run each with random
+  sampling: a two-task difference can flip on a rerun.
