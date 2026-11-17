@@ -195,6 +195,25 @@ and the page says "AI service is running." Once a size is downloaded and in
 use, AI features says it is set up and offers no download for it; choose
 another size to download that one.
 
+### Use your own model
+
+To try a model that is not one of the sizes, use **Use your own model** on
+**Settings > AI features**:
+
+1. Choose a model file (GGUF) on this computer. To let it look at images,
+   also choose its image add-on file (mmproj GGUF); without one, the model
+   answers from text only, and image questions are answered from the
+   image's stored facts.
+2. Select **Copy and use this model**. Axcess copies the files into its AI
+   folder, checks that they are GGUF files, records their SHA-256, and runs
+   the model in the same private AI service, with no internet and with
+   thinking (reasoning) off.
+
+Axcess cannot check where such a file came from, what licence it has, or
+how good its answers are, and it does not check that it fits in memory.
+Models copied before are listed with a **Use** button each, to switch back
+and forth. **Remove AI features** deletes them with everything else.
+
 ### How the private AI service is kept away from the internet
 
 The private AI service runs inside an operating-system sandbox that has no

@@ -2090,9 +2090,17 @@ export interface AiSetup {
   /** "llama_cpp" for the private service; "ollama" for a setup saved before it. */
   backend: "ollama" | "llama_cpp";
   socket_path: string | null;
-  tier: AiTierId;
+  /** "custom": your own model, not one of the sizes. */
+  tier: AiTierId | "custom";
   text_model: string;
+  /** Empty for your own model without an image add-on (text only). */
   vision_model: string;
+  custom_model: {
+    tag: string;
+    size: number;
+    gguf: { sha256: string };
+    mmproj: { sha256: string } | null;
+  } | null;
   ollama_version: string | null;
   llama_cpp_version: string | null;
 }
@@ -2117,6 +2125,20 @@ export interface AiPlan {
   recommended: AiTierId | null;
   current: AiSetup | null;
   install: AiInstallStatus;
+  /** Files copied in for "Use your own model", newest first. */
+  my_models: MyModelFile[];
+}
+
+/** One GGUF file copied into the AI folder (``audit.ai.custom.MyModelFile``). */
+export interface MyModelFile {
+  sha256: string;
+  file: string;
+  size: number;
+  kind: "model" | "image_addon";
+  /** The model's own name from the file, or the file name. */
+  name: string;
+  /** An image add-on: the model it was copied with. */
+  for_model: string | null;
 }
 
 export interface AiPreferences {

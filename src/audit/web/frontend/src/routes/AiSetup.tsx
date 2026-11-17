@@ -8,6 +8,7 @@ import type {
   AiPlan,
   AiTierId,
   AiTierPlan,
+  MyModelFile,
 } from "../api/types";
 import { Button, Card, LinkButton, PageHeader } from "../components/ui";
 import { AiRuntimeControls } from "../components/AiRuntimeControls";
@@ -17,6 +18,7 @@ import {
   AI_INSTALL_STEP_LABEL,
   AI_TIER_LABEL,
   AI_FEATURE_STATE_LABEL,
+  AI_MY_MODEL_LABEL,
 } from "../lib/terms";
 
 /**
@@ -126,7 +128,7 @@ function AiSetupPage({
   const headingId = useId();
   const [chosen, setChosen] = useState<AiTierId | null>(
     status.tier ??
-      plan.current?.tier ??
+      (plan.current?.tier === "custom" ? null : plan.current?.tier) ??
       plan.recommended ??
       plan.tiers[0]?.id ??
       null,
@@ -288,7 +290,9 @@ function AiSetupPage({
                 : "No new AI suggestions or model checks run. Regular checks, reading text inside images (OCR), and saved results still work. Downloaded models are kept."}
             </p>
             {current && <p className="mt-2">
-              {`Size: ${AI_TIER_LABEL[current.tier]}.`}
+              {current.tier === "custom"
+                ? `Model: ${AI_MY_MODEL_LABEL}${current.custom_model ? ` (${current.custom_model.tag})` : ""}.`
+                : `Size: ${AI_TIER_LABEL[current.tier]}.`}
             </p>}
             <AiRuntimeControls setupPage />
             {(enabled || current) && <Button
@@ -508,6 +512,8 @@ function AiSetupPage({
           )}
         </Card>
 
+        <MyModelCard plan={plan} disabled={running} onMessage={setMessage} />
+
         <p className="text-sm text-fg-muted">
           <LinkButton to="/settings" variant="ghost">
             Back to Settings
@@ -515,6 +521,206 @@ function AiSetupPage({
         </p>
       </div>
     </div>
+  );
+}
+
+/**
+ * "Use your own model": run a GGUF file the person chose instead of a size,
+ * for trying models the catalogue does not offer (developer, 2026-11-17).
+ *
+ * - Native file inputs with visible labels, not a drop zone: they work by
+ *   keyboard and screen reader everywhere, including the desktop app,
+ *   which has no file dialog of its own. W3C "Using ARIA", rule 1
+ *   (https://www.w3.org/TR/using-aria/#rule1, paraphrased: use the native
+ *   element); WCAG technique H44 (label elements).
+ * - Its own card below the sizes, not a fifth size: it has no download,
+ *   no memory check and no pinned checksum, so it cannot promise what a
+ *   size promises. The card says so in plain words before the choice
+ *   (repo plain-language rule: never drop a limitation or safety fact).
+ * - One button copies and starts the model. Copying alone would leave a
+ *   second step with nothing to decide (W3C COGA Making Content Usable,
+ *   https://www.w3.org/TR/coga-usable/, paraphrased: fewer steps). Models
+ *   copied before are listed with a "Use ..." button each, named with the
+ *   model, so switching between them for a comparison needs no new copy
+ *   (WCAG 2.2 SC 2.4.6 Headings and Labels, Level AA: the button says
+ *   which model).
+ * - Copy progress is a native <progress> with a visible percent; only the
+ *   change of step is announced, in the page's status region (SC 4.1.3
+ *   Status Messages, Level AA), as the size download does.
+ */
+function MyModelCard({
+  plan,
+  disabled,
+  onMessage,
+}: {
+  plan: AiPlan;
+  disabled: boolean;
+  onMessage: (text: string) => void;
+}) {
+  const queryClient = useQueryClient();
+  const id = useId();
+  const modelInput = useRef<HTMLInputElement>(null);
+  const addonInput = useRef<HTMLInputElement>(null);
+  const [progress, setProgress] = useState<{ label: string; fraction: number } | null>(null);
+  const current = plan.current?.tier === "custom" ? plan.current.custom_model : null;
+  const models = plan.my_models.filter((f) => f.kind === "model");
+  const addonFor = (model: MyModelFile) =>
+    plan.my_models.find((f) => f.kind === "image_addon" && f.for_model === model.sha256) ?? null;
+
+  const use = useMutation({
+    mutationFn: ({ model, addon }: { model: MyModelFile; addon: MyModelFile | null }) =>
+      api.useMyModel(model.sha256, addon?.sha256 ?? null),
+    onMutate: ({ model }) =>
+      onMessage(`Starting ${model.name} in the private AI service. This can take a minute.`),
+    onSuccess: (next, { model }) => {
+      queryClient.setQueryData(["ai-plan"], next);
+      onMessage(`${model.name} is in use. AI features are on.`);
+      for (const key of [["ai-runtime"], ["suggestion-status"], ["ai-preferences"]]) {
+        void queryClient.invalidateQueries({ queryKey: key });
+      }
+    },
+    onError: (error) =>
+      onMessage(error instanceof Error ? error.message : "Your model could not start."),
+  });
+  const copy = useMutation({
+    mutationFn: async () => {
+      const modelFile = modelInput.current?.files?.[0];
+      if (!modelFile) throw new Error("Choose a model file (GGUF) first.");
+      const addonFile = addonInput.current?.files?.[0] ?? null;
+      setProgress({ label: "Copying the model file", fraction: 0 });
+      const model = await api.copyMyModel(modelFile, "model", (fraction) =>
+        setProgress({ label: "Copying the model file", fraction }),
+      );
+      let addon: MyModelFile | null = null;
+      if (addonFile) {
+        onMessage("Copying the image add-on file.");
+        setProgress({ label: "Copying the image add-on file", fraction: 0 });
+        addon = await api.copyMyModel(
+          addonFile,
+          "image_addon",
+          (fraction) => setProgress({ label: "Copying the image add-on file", fraction }),
+          model.sha256,
+        );
+      }
+      return { model, addon };
+    },
+    onMutate: () => onMessage("Copying the model file. You can keep using Axcess."),
+    onSuccess: (files) => {
+      setProgress(null);
+      use.mutate(files);
+    },
+    onError: (error) => {
+      setProgress(null);
+      onMessage(error instanceof Error ? error.message : "The file could not be copied.");
+    },
+  });
+  const busy = disabled || copy.isPending || use.isPending;
+  const percent = progress ? Math.floor(progress.fraction * 100) : 0;
+
+  return (
+    <Card className="px-4 py-4 text-sm leading-6 text-fg">
+      <h2 className="font-semibold">Use your own model</h2>
+      <p className="mt-2">
+        To try a model that is not one of the sizes. Choose a model file (GGUF) on this
+        computer. Axcess copies it into its AI folder and runs it in the same private AI
+        service, which cannot reach the internet. Thinking (reasoning) stays off.
+      </p>
+      <p className="mt-2">
+        Axcess cannot check where the file came from, what licence it has, or how good its
+        answers are. Check every answer.
+      </p>
+      {current && <p className="mt-2 font-semibold">{`In use now: ${current.tag}.`}</p>}
+
+      <form
+        className="mt-3 space-y-3"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!busy) copy.mutate();
+        }}
+      >
+        <div>
+          <label htmlFor={`${id}-model`} className="block font-semibold">
+            Model file (GGUF)
+          </label>
+          <input
+            ref={modelInput}
+            id={`${id}-model`}
+            type="file"
+            accept=".gguf"
+            required
+            disabled={busy}
+            className="mt-1 block min-h-target w-full max-w-full text-sm"
+          />
+        </div>
+        <div>
+          <label htmlFor={`${id}-addon`} className="block font-semibold">
+            Image add-on file (mmproj GGUF), optional
+          </label>
+          <p id={`${id}-addon-hint`} className="text-xs leading-5 text-fg-muted">
+            Lets the model look at images. Without it, the model answers from text only.
+          </p>
+          <input
+            ref={addonInput}
+            id={`${id}-addon`}
+            type="file"
+            accept=".gguf"
+            aria-describedby={`${id}-addon-hint`}
+            disabled={busy}
+            className="mt-1 block min-h-target w-full max-w-full text-sm"
+          />
+        </div>
+        {progress && (
+          <div>
+            <p id={`${id}-progress`} className="font-semibold">
+              {progress.label}
+            </p>
+            <progress
+              aria-labelledby={`${id}-progress`}
+              max={100}
+              value={percent}
+              className="mt-1 h-3 w-full accent-umich-blue"
+            />
+            <p className="text-xs text-fg-muted">{percent}%</p>
+          </div>
+        )}
+        <Button type="submit" aria-disabled={busy || undefined}>
+          Copy and use this model
+        </Button>
+      </form>
+
+      {models.length > 0 && (
+        <div className="mt-4">
+          <h3 className="font-semibold">Models copied before</h3>
+          <ul className="mt-1 space-y-2">
+            {models.map((model) => {
+              const addon = addonFor(model);
+              const inUse = current?.gguf.sha256 === model.sha256;
+              return (
+                <li key={model.sha256} className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span className="break-all">
+                    {`${model.name} · ${formatBytes(model.size + (addon?.size ?? 0))} · `}
+                    {addon ? "reads images" : "text only"}
+                  </span>
+                  {inUse ? (
+                    <span className="font-semibold">In use now</span>
+                  ) : (
+                    <Button
+                      type="button"
+                      aria-disabled={busy || undefined}
+                      onClick={() => {
+                        if (!busy) use.mutate({ model, addon });
+                      }}
+                    >
+                      {`Use ${model.name}`}
+                    </Button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+    </Card>
   );
 }
 

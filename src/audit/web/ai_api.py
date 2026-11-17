@@ -10,9 +10,10 @@ from __future__ import annotations
 import asyncio
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, ConfigDict, field_validator
+from fastapi import APIRouter, HTTPException, Query, Request
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from audit.ai import custom
 from audit.ai.catalog import TierId
 from audit.ai.installer import InstallStatus
 from audit.ai.manager import (
@@ -32,6 +33,15 @@ class InstallRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     tier: TierId
+
+
+class UseMyModelRequest(BaseModel):
+    """Switch the private service to files copied in before."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+    model: str = Field(pattern=r"^[a-f0-9]{64}$")
+    image_addon: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    confirm: Literal[True]
 
 
 class PreferenceRequest(BaseModel):
@@ -120,5 +130,45 @@ def build_ai_router(manager: AIManager) -> APIRouter:
             await asyncio.to_thread(manager.remove)
         except AIBusyError as exc:
             raise HTTPException(409, str(exc)) from exc
+
+    @router.put("/ai/my-models")
+    async def ai_copy_my_model(
+        request: Request,
+        kind: custom.FileKind,
+        name: str = Query(min_length=1, max_length=255),
+        for_model: str | None = Query(default=None, pattern=r"^[a-f0-9]{64}$"),
+    ) -> custom.MyModelFile:
+        """Copy one GGUF file the person chose into the AI folder.
+
+        The body is the file itself, streamed to disk and checked as it
+        arrives; nothing runs it until ``POST /api/ai/my-models/use``. Not
+        held by the AI-settings lock (a copy can take minutes): it only adds
+        a checked file beside the others.
+        """
+        length = request.headers.get("content-length")
+        try:
+            return await custom.receive(
+                manager.runtime.models_dir,
+                request.stream(),
+                file_name=name,
+                kind=kind,
+                declared_size=int(length) if length and length.isdigit() else None,
+                for_model=for_model,
+            )
+        except custom.MyModelError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+    @router.post("/ai/my-models/use")
+    async def ai_use_my_model(body: UseMyModelRequest) -> AIPlan:
+        """Run your own model in the private AI service, then return the plan."""
+        try:
+            await asyncio.to_thread(manager.use_my_model, body.model, body.image_addon)
+        except AIBusyError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        except custom.MyModelError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        except (RuntimeSetupError, IsolationError, AIStateError) as exc:
+            raise HTTPException(503, str(exc)) from exc
+        return await asyncio.to_thread(manager.plan)
 
     return router

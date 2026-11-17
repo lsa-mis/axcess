@@ -14,12 +14,14 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from audit.ai import custom
 from audit.ai import hardware as hw
 from audit.ai.catalog import Catalog, ModelEntry, Tier, TierId, load_catalog
 from audit.ai.installer import Installer, InstallStatus
 from audit.ai.runtime import LlamaRuntime, RuntimeSetupError
 from audit.ai.sandbox import IsolationError
 from audit.ai.state import (
+    SOCKET_BASE_URL,
     AIConfig,
     AIPreferences,
     AIStateError,
@@ -83,6 +85,8 @@ class AIPlan(BaseModel):
     recommended: TierId | None
     current: AIConfig | None
     install: InstallStatus
+    # Files copied in for "Use your own model", newest first.
+    my_models: list[custom.MyModelFile] = []
 
 
 class AiRuntimeStatus(BaseModel):
@@ -234,6 +238,8 @@ class AIManager:
         Private setups name llama.cpp's served names; a setup with your own
         Ollama names the Ollama tags.
         """
+        if config.tier == "custom":
+            return None
         pair = (config.text_model, config.vision_model)
         for tier in self.catalog.tiers:
             if pair in {
@@ -257,6 +263,11 @@ class AIManager:
         """
         if config.backend != "llama_cpp":
             return None
+        if config.tier == "custom":
+            own = config.custom_model
+            if own is None or own.served_name != config.text_model:
+                return None
+            return (own,)
         try:
             tier = self.catalog.tier(config.tier)
         except KeyError:
@@ -317,6 +328,7 @@ class AIManager:
             recommended=recommended.id if recommended else None,
             current=self.config(),
             install=self.installer.status,
+            my_models=custom.list_files(self.runtime.models_dir),
         )
 
     def install(self, tier_id: str) -> InstallStatus:
@@ -348,6 +360,46 @@ class AIManager:
         if not self.preferences().enabled:
             self.runtime.stop()
         return status
+
+    def use_my_model(self, model_sha256: str, addon_sha256: str | None) -> AIConfig:
+        """Run your own model (files copied in before) instead of a size.
+
+        Stops the service, starts it with that model in the same sandbox,
+        and saves the setup only once the model answered. Raises
+        :class:`AIBusyError`, :class:`IsolationError`,
+        :class:`custom.MyModelError` or :class:`RuntimeSetupError`.
+        """
+        if not self._start_lock.acquire(blocking=False):
+            raise AIBusyError("The AI service is starting. Try again in a moment.")
+        try:
+            self._require_idle()
+            self.runtime.require_isolation()
+            if not self.runtime.installed():
+                raise RuntimeSetupError(
+                    "The AI program is not installed yet. Download a size first; your "
+                    "own model then runs with the same program."
+                )
+            models = self.runtime.models_dir
+            model = custom.find(models, model_sha256, "model")
+            addon = custom.find(models, addon_sha256, "image_addon") if addon_sha256 else None
+            entry = custom.model_entry(model, addon)
+            self.runtime.stop()
+            self.runtime.start((entry,))
+            config = AIConfig(
+                source="private",
+                base_url=SOCKET_BASE_URL,
+                backend="llama_cpp",
+                **self.runtime.service_fields(),
+                tier="custom",
+                text_model=entry.served_name,
+                vision_model=entry.served_name if addon else "",
+                custom_model=entry,
+                llama_cpp_version=self.catalog.llama_cpp.version,
+            )
+            self._installed(config)
+            return config
+        finally:
+            self._start_lock.release()
 
     def remove(self) -> None:
         """Forget the setup; delete the private program and models if Axcess owns them.

@@ -637,6 +637,8 @@ export const AI_TIER_LABEL: Record<AiTierId, string> = {
   large: "Large",
   extra_large: "Extra large",
 };
+/** Desktop AI setup: a GGUF file the person chose instead of a size. */
+export const AI_MY_MODEL_LABEL = "Your own model";
 
 /** Why a suggestion failed, in words that say what to do next. */
 export const SUGGESTION_ERROR_LABEL: Record<SuggestionErrorCode, string> = {

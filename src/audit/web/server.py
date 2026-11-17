@@ -1178,6 +1178,11 @@ def create_app(
         releases_work = request.url.path.startswith("/api/agents/") and request.url.path.endswith(
             "/work"
         )
+        # Copying your own model file can take minutes and only adds a
+        # checked file to the AI folder; switching to it (".../use") is
+        # serialized like every other AI change.
+        if request.method == "PUT" and request.url.path == "/api/ai/my-models":
+            related = False
         if (
             base_settings.desktop
             and related
