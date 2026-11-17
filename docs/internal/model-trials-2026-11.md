@@ -172,3 +172,34 @@ Two more, same setup (developer's own files, nothing downloaded):
   link's icon into visible text, and pasted the guidance example ("Free
   workshop, Tuesday 3 pm, Room 204") into both images' alt text. Same
   pattern as every 2B model tried: none is usable for fix suggestions.
+
+## Third round, 2026-11-17: small models under 2.6 GB
+
+Same setup and tasks; each model alone, reasoning off, its card's
+recommended sampling (Granite gives none: Axcess's temperature 0). All on
+stock llama.cpp b12284, text only (no image add-ons). All Apache-2.0.
+
+| Model | File | Usable | Partly | Nonsense or wrong | Time per answer |
+| --- | --- | --- | --- | --- | --- |
+| Ternary-Bonsai-2-9B Q2_0 (PrismML; temp 0.7, top-p 0.8, top-k 20, presence 1.5) | 2.56 GB | 5 | 2 | 3 | 40–97 s |
+| Ternary-Bonsai-2-4B Q2_0 (same sampling) | 1.21 GB | 4 | 2 | 4 | 22–86 s |
+| Qwen3.5-4B Q3_K_M (temp 0.7, top-p 0.8, top-k 20, presence 1.5) | 2.29 GB | 3 | 5 | 2 | 47–148 s |
+| Granite 4.1 3B Q4_K_M (temp 0) | 2.10 GB | 3 | 1 | 6 | 26–111 s |
+| Ministral 3 3B Q4_K_M (temp 0.1) | 2.15 GB | 3 | 2 | 5 | 34–163 s |
+| SmolLM3-3B Q4_K_M | 1.92 GB | – | – | 10 (could not run) | – |
+
+- SmolLM3-3B, like Bonsai-4B Q1_0 earlier: llama.cpp b12284 could not
+  build the JSON-schema grammar ("error initializing grammar sampler");
+  likely the known bug where a template's assistant prefill (its thinking
+  switch) breaks schema grammars.
+- Ternary-Bonsai-2-9B: both colour fixes pass (pale button background
+  about 12:1; dark red about 10:1), and the only model to give the two
+  search landmarks different labels. Wrong: an invented heading, the
+  screen-reader-only false alarm, repeated alt-text words.
+- Ternary-Bonsai-2-4B: nearly as good at less than half the size; Bonsai 2
+  publishes image add-ons (mmproj), not yet tested.
+- Granite 4.1 3B: the only correct blue-button fix of the day (black text,
+  about 7.3:1), but a duplicate heading, an h5, and an altered image
+  address.
+- The fork (PrismML-Eng/llama.cpp, MIT, latest prism-b12128) is not
+  needed for Q2_0, which stock b12284 runs.
