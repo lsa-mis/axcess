@@ -130,3 +130,16 @@ def test_a_setup_with_your_own_model_is_saved_with_it() -> None:
         custom_model=entry,
     )
     assert AIConfig.model_validate_json(config.model_dump_json()) == config
+
+
+def test_a_model_without_an_image_addon_answers_image_questions_from_text() -> None:
+    """Before, the image went to an empty model name and failed (HTTP 400)."""
+    from types import SimpleNamespace
+
+    from audit.suggest.provider import choose_model
+
+    bundle = SimpleNamespace(image_bytes=b"png")
+    choice = choose_model(bundle, text_model="my-text", vision_model="")  # type: ignore[arg-type]
+    assert (choice.model, choice.uses_vision) == ("my-text", False)
+    choice = choose_model(bundle, text_model="t", vision_model="v")  # type: ignore[arg-type]
+    assert (choice.model, choice.uses_vision) == ("v", True)

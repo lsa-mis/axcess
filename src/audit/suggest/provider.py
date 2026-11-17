@@ -170,7 +170,9 @@ class ModelChoice:
 
 
 def choose_model(bundle: EvidenceBundle, *, text_model: str, vision_model: str) -> ModelChoice:
-    if bundle.image_bytes is not None:
+    # No image model (your own model without an image add-on): the text
+    # model answers from the text and the image's stored facts.
+    if bundle.image_bytes is not None and vision_model:
         return ModelChoice(vision_model, True)
     return ModelChoice(text_model, False)
 
