@@ -1122,7 +1122,7 @@
    "words": 182,
    "expected": {
     "alt_text": "n/a",
-    "table_header": "pass",
+    "table_header": "fail",
     "slide_title": "n/a",
     "language": "pass",
     "headings": "pass",
@@ -1130,12 +1130,12 @@
     "link_text": "pass",
     "title": "fail"
    },
-   "barrier": false,
+   "barrier": true,
    "alt_meaningful": null,
    "link_text_kind": null,
    "notes": {
     "alt_text": "No body images. header1 (image1.jpg) and footer1 (image2.png) pictures have no alt, but headers/footers are excluded.",
-    "table_header": "CLOSE CALL. 1 table, 2x3, 'Other groups that can help': 'Ross Operations | ross.facilities@umich.edu | Building concerns...' and 'Wolverine Access - Human Resources | Wolverine Access | Human resources portal...'. Treated as data (contact directory) though it has no column-name row. tblLook val 0600 (no firstRow bit) but w:tblHeader is set on rows 0 and 1, so it has a marker; the marked 'header' row is actually a data row (Google export pins rows).",
+    "table_header": "FAIL: data table(s) T1 have no header marker (tblHeader off/absent, tblLook firstRow off). 1 tables: T1 2x3 DATA \"Ross Operations | ross.facilities@umich.edu | Building concerns (heati\"; tblHeader off(val=0); tblLook val=0600 (0x20 clear); marker: NONE CLOSE CALL kept as DATA (contact directory: name | email | description per row, no column-name row); would be n/a if judged layout.",
     "slide_title": "Word file.",
     "language": "w:lang 'en'.",
     "headings": "182 words; 10 'heading 2' paragraphs incl. 'Welcome to Ross!', 'Questions? How to contact us:', 'How do I connect to the network?', 'How do I print?' (2 of them empty).",
@@ -1145,7 +1145,17 @@
     "other": "2 empty heading-2 paragraphs."
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: no); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "relabelled": [
+    {
+     "criterion": "table_header",
+     "from": "pass",
+     "to": "fail",
+     "date": "2026-11-17",
+     "why": "review by a second labelling agent of every table: the first labeller read <w:tblHeader w:val=\"0\"/> (off) as a header marker; data/layout judgements kept",
+     "barrier": "False -> True"
+    }
+   ]
   },
   {
    "id": "6b97e6196dc6",
@@ -1159,7 +1169,7 @@
    "words": 568,
    "expected": {
     "alt_text": "fail",
-    "table_header": "pass",
+    "table_header": "fail",
     "slide_title": "n/a",
     "language": "pass",
     "headings": "pass",
@@ -1172,7 +1182,7 @@
    "link_text_kind": null,
    "notes": {
     "alt_text": "36 inline pictures, all docPr name=\"image1.png\" with no descr and not decorative, placed in table cells across the 8 comparison tables. Viewed: a red circle with a white bar (\"not supported/no entry\" icon). It is the only content of those cells (e.g. row \"Printing Quizzes\" has empty text in both Classic/New columns), so it carries the \"not supported\" value. Header/footer images excluded.",
-    "table_header": "8 data tables (T0-T7, 6-39 rows x 3 cols), each with column names \"<category> | Classic Quizzes | New Quizzes\". tblLook val=0600 (no firstRow bit) but w:tblHeader is set on row 1 - in fact on every row of every table (27/27, 39/39, 17/17, 17/17, 20/20, 7/7, 8/8, 6/6). Passes by the rule; marking all rows as header rows is a Google-export quirk.",
+    "table_header": "FAIL: data table(s) T1, T2, T3, T4, T5, T6, T7, T8 have no header marker (tblHeader off/absent, tblLook firstRow off). 8 tables: T1 27x3 DATA \"Supported Canvas Workflows | Classic Quizzes | New  Quizzes\"; tblHeader off(val=0); tblLook val=0600 (0x20 clear); marker: NONE || T2 39x3 DATA \"Features | Classic Quizzes | New  Quizzes\"; tblHeader off(val=0); tblLook val=0600 (0x20 clear); marker: NONE || T3 17x3 DATA \"Item/Question Types | Classic Quizzes | New  Quizzes\"; tblHeader off(val=0); tblLook val=0600 (0x20 clear); marker: NONE || T4 17x3 DATA \"Settings | Classic Quizzes | New  Quizzes\"; tblHeader off(val=0); tblLook val=0600 (0x20 clear); marker: NONE || T5 20x3 DATA \"Grading & Moderation | Classic Quizzes | New  Quizzes\"; tblHeader off(val=0); tblLook val=0600 (0x20 clear); marker: NONE || T6 7x3 DATA \"Reporting and Analytics | Classic Quizzes | New  Quizzes\"; tblHeader off(val=0); tblLook val=0600 (0x20 clear); marker: NONE || T7 8x3 DATA \"Interoperability | Classic Quizzes | New  Quizzes\"; tblHeader off(val=0); tblLook val=0600 (0x20 clear); marker: NONE || T8 6x3 DATA \"Outcomes | Classic Quizzes | New  Quizzes\"; tblHeader off(val=0); tblLook val=0600 (0x20 clear); marker: NONE",
     "slide_title": "Word file",
     "language": "styles.xml docDefaults w:lang val=\"en\" (Google export)",
     "headings": "~568 words. Title style \"Canvas | Quizzes Feature Comparison\", then Heading 1 for each section: \"Supported Canvas Workflows\", \"Features\", \"Item/Question Types\", \"Settings\", \"Grading & Moderation\", \"Reporting and Analytics\", \"Interoperability\", \"Outcomes\" (+2 empty Heading 1 paragraphs).",
@@ -1182,7 +1192,16 @@
     "other": "Google Doc export. Checkmarks are text characters; \"not supported\" is conveyed only by the icon image."
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: yes); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "relabelled": [
+    {
+     "criterion": "table_header",
+     "from": "pass",
+     "to": "fail",
+     "date": "2026-11-17",
+     "why": "review by a second labelling agent of every table: the first labeller read <w:tblHeader w:val=\"0\"/> (off) as a header marker; data/layout judgements kept"
+    }
+   ]
   },
   {
    "id": "73009f0abf8a",
@@ -1307,7 +1326,7 @@
    "words": 6184,
    "expected": {
     "alt_text": "fail",
-    "table_header": "pass",
+    "table_header": "fail",
     "slide_title": "n/a",
     "language": "pass",
     "headings": "pass",
@@ -1320,7 +1339,7 @@
    "link_text_kind": "url",
    "notes": {
     "alt_text": "2 body pictures, both named only by file name with no descr: image2.jpg = full-page cover (photo of Burton Tower with the text 'YOUR BENEFITS IN RETIREMENT / IT'S YOUR FUTURE | Making the most of Your U-M Retirement' and U-M logo) - the document's title exists only in this image; image1.jpg = full-page picture of the 'Agreement for Preauthorized Benefit Premium Payments' form marked SAMPLE (all text in image). Both meaningful.",
-    "table_header": "4 tables. Data: T0 19x2 'Amounts of Insurance' / 'Your Age On and After Retirement | Amount of Insurance' (tblHeader on every row; tblLook 0600 no firstRow bit; row 0 is a merged caption); T1 4x3 'Enrollment Period | Timeline for Enrollment | When to Enroll' (tblHeader every row); T2 nested 8x2 'If you apply in this month... | Your Medicare Part B start day' (tblHeader every row). T3 1x2 TIAA/Fidelity addresses = layout.",
+    "table_header": "FAIL: data table(s) T1, T2, T3 have no header marker (tblHeader off/absent, tblLook firstRow off). 4 tables: T1 19x2 DATA \"Amounts of Insurance\"; tblHeader off(val=0); tblLook val=0600 (0x20 clear); marker: NONE || T2 4x3 DATA \"Enrollment Period | Timeline for Enrollment (for you and/or  | When to\"; tblHeader off(val=0); tblLook val=0400 (0x20 clear); marker: NONE || T3 8x2 DATA \"If you apply in this month of your (IEP) | Your Medicare Part B start \"; tblHeader off(val=0); tblLook val=0400 (0x20 clear); marker: NONE || T4 1x2 LAYOUT \"TIAA  730 Third AvenueNew York, NY 10017 | Fidelity Investments  P.O. \"; tblHeader off(val=0); tblLook val=0400 (0x20 clear) T3 is nested inside T2.",
     "slide_title": "Word file.",
     "language": "w:lang 'en'.",
     "headings": "6184 words; ~75 heading paragraphs H1-H4, e.g. H1 'Retirement from the University of Michigan', 'Retiring Before Age 62', 'Your U-M Health Plan and Medicare', 'Contact Information'; ~20 of them are empty.",
@@ -1330,7 +1349,16 @@
     "other": "Text in images: cover title and a whole sample form are pictures. Google export marks every table row as a header row (tblHeader). Contains a table of contents (1 sdt). ~20 empty heading paragraphs."
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: yes); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "relabelled": [
+    {
+     "criterion": "table_header",
+     "from": "pass",
+     "to": "fail",
+     "date": "2026-11-17",
+     "why": "review by a second labelling agent of every table: the first labeller read <w:tblHeader w:val=\"0\"/> (off) as a header marker; data/layout judgements kept"
+    }
+   ]
   },
   {
    "id": "a24f946e2c7e",
@@ -1381,7 +1409,7 @@
    "words": 426,
    "expected": {
     "alt_text": "n/a",
-    "table_header": "pass",
+    "table_header": "fail",
     "slide_title": "n/a",
     "language": "pass",
     "headings": "pass",
@@ -1389,12 +1417,12 @@
     "link_text": "n/a",
     "title": "fail"
    },
-   "barrier": false,
+   "barrier": true,
    "alt_meaningful": null,
    "link_text_kind": null,
    "notes": {
     "alt_text": "No body images and no media.",
-    "table_header": "4 data tables, each with w:tblHeader on every row (tblLook 0600, no firstRow bit): T0 8x4 IRMAA brackets (merged caption row 'If your yearly income in 2024...', then 'File Individual Tax Return | File Joint Tax Return | Married Filing Separately | Part D IRMAA Premiums'); T1-T3 4x4 worksheets 'U-M (Medicare) Advantage Plans | U-M Premier Care Advantage | Priority Health Medicare Advantage | Medicare Advantage PPO'.",
+    "table_header": "FAIL: data table(s) T1, T2, T3, T4 have no header marker (tblHeader off/absent, tblLook firstRow off). 4 tables: T1 8x4 DATA \"If your yearly income in 2024 was:\"; tblHeader off(val=0); tblLook val=0600 (0x20 clear); marker: NONE || T2 4x4 DATA \"U-M Advantage Plans | U-M Premier Care Advantage | Priority Health Med\"; tblHeader off(val=0); tblLook val=0600 (0x20 clear); marker: NONE || T3 4x4 DATA \"U-M Medicare Advantage Plans | U-M Premier Care Advantage | Priority H\"; tblHeader off(val=0); tblLook val=0600 (0x20 clear); marker: NONE || T4 4x4 DATA \"U-M Medicare Advantage Plans | U-M Premier Care Advantage | Priority H\"; tblHeader off(val=0); tblLook val=0600 (0x20 clear); marker: NONE",
     "slide_title": "Word file.",
     "language": "w:lang 'en'.",
     "headings": "426 words; Title 'Part D IRMAA Brackets and Premiums Worksheet' and heading 1 '2026 Part D IRMAA Brackets and Premiums'. Short worksheet.",
@@ -1404,7 +1432,17 @@
     "other": "Google export marks every row as header row. T0 first row is a merged caption."
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: no); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "relabelled": [
+    {
+     "criterion": "table_header",
+     "from": "pass",
+     "to": "fail",
+     "date": "2026-11-17",
+     "why": "review by a second labelling agent of every table: the first labeller read <w:tblHeader w:val=\"0\"/> (off) as a header marker; data/layout judgements kept",
+     "barrier": "False -> True"
+    }
+   ]
   },
   {
    "id": "b2a58133948c",
@@ -1418,7 +1456,7 @@
    "words": 183,
    "expected": {
     "alt_text": "n/a",
-    "table_header": "pass",
+    "table_header": "fail",
     "slide_title": "n/a",
     "language": "pass",
     "headings": "pass",
@@ -1426,12 +1464,12 @@
     "link_text": "pass",
     "title": "fail"
    },
-   "barrier": false,
+   "barrier": true,
    "alt_meaningful": null,
    "link_text_kind": null,
    "notes": {
     "alt_text": "No body drawings; image2.jpg (header) and image1.png (footer) excluded.",
-    "table_header": "1 table T0 3x3 contacts: \"Faculty Support | FSQuestions@umich.edu | Administrative, classroom, & research support...\", \"Ross Operations | ...\", \"Canvas | ...\". No row of column names. Close call data vs layout: treated as a small DATA table (name/email/description per row). tblLook 0600 (no firstRow) but w:tblHeader on all 3 rows, so row 1 is marked (though row 1 is data, not names). Pass by the rule; would be n/a if judged layout.",
+    "table_header": "FAIL: data table(s) T1 have no header marker (tblHeader off/absent, tblLook firstRow off). 1 tables: T1 3x3 DATA \"Faculty Support | FSQuestions@umich.edu | Administrative, classroom, &\"; tblHeader off(val=0); tblLook val=0600 (0x20 clear); marker: NONE CLOSE CALL kept as DATA (contact directory: name | email | description per row, no column-name row); would be n/a if judged layout.",
     "slide_title": "Word file",
     "language": "styles.xml docDefaults w:lang val=\"en\" (Google export)",
     "headings": "~183 words. Heading 2 used for each section: \"Welcome to Ross!\", \"Questions? How to contact us:\", \"How do I connect to the network?\", \"How do I print?\", \"How do I get equipment?\", \"What do I need to do to log in...\", \"Ross IT resources for Faculty:\", \"Other groups that can help:\" (+1 empty Heading 2).",
@@ -1441,7 +1479,17 @@
     "other": "Google Doc export."
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: no); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "relabelled": [
+    {
+     "criterion": "table_header",
+     "from": "pass",
+     "to": "fail",
+     "date": "2026-11-17",
+     "why": "review by a second labelling agent of every table: the first labeller read <w:tblHeader w:val=\"0\"/> (off) as a header marker; data/layout judgements kept",
+     "barrier": "False -> True"
+    }
+   ]
   },
   {
    "id": "b917977f6ec3",
@@ -1529,7 +1577,7 @@
    "words": 1895,
    "expected": {
     "alt_text": "pass",
-    "table_header": "pass",
+    "table_header": "fail",
     "slide_title": "n/a",
     "language": "pass",
     "headings": "pass",
@@ -1537,12 +1585,12 @@
     "link_text": "n/a",
     "title": "fail"
    },
-   "barrier": false,
+   "barrier": true,
    "alt_meaningful": null,
    "link_text_kind": null,
    "notes": {
     "alt_text": "1 picture with descr 'Maize block \"M\" logo with Human Resources Benefits Office, University of Michigan text to the right of it.'",
-    "table_header": "4 data tables, all with w:tblHeader on every row: T0 4x4 'Retirement Plan | General Limit | Age 50 Catch-up | Age 60-63 Catch-up'; T1 4x5 'Status | You Contribute Only to 403(b) | ...' (row headers in col 1); T2/T3 5x4 numbered worksheet ('1. | Your target contribution | | $28,000').",
+    "table_header": "FAIL: data table(s) T1, T3, T4 have no header marker (tblHeader off/absent, tblLook firstRow off). 4 tables: T1 4x4 DATA \"Retirement Plan | GeneralLimit | Age 50Catch-up | Age 60-63Catch-up\"; tblHeader off(val=0); tblLook val=0600 (0x20 clear); marker: NONE || T2 4x5 DATA \"Status | You Contribute Only to 403(b) SRA | You Contribute Only to 45\"; tblHeader on(val=1); tblLook val=0400 (0x20 clear); marker: tblHeader || T3 5x4 DATA \"1. | Your target contribution for 2026 |  | $28,000\"; tblHeader off(val=0); tblLook val=0600 (0x20 clear); marker: NONE || T4 5x4 DATA \"1. | Your target contribution for 2026 |  | $\"; tblHeader off(val=0); tblLook val=0600 (0x20 clear); marker: NONE",
     "slide_title": "Word file.",
     "language": "w:lang 'en'.",
     "headings": "1895 words; heading 1 'SECURE 2.0 Act Roth Mandate and the U-M Retirement Plans', 15 heading 2 ('Age 50 Catch-up', 'You May Need to Act', 'Disclaimer and Limitations', 'Hypothetical Calculation'...), 1 heading 3 'Which Scenario Fits Your Situation?'; one empty H1.",
@@ -1552,7 +1600,17 @@
     "other": "Google export marks every table row as header row."
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: no); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "relabelled": [
+    {
+     "criterion": "table_header",
+     "from": "pass",
+     "to": "fail",
+     "date": "2026-11-17",
+     "why": "review by a second labelling agent of every table: the first labeller read <w:tblHeader w:val=\"0\"/> (off) as a header marker; data/layout judgements kept",
+     "barrier": "False -> True"
+    }
+   ]
   },
   {
    "id": "d986846522f9",
@@ -1677,7 +1735,7 @@
    "words": 158,
    "expected": {
     "alt_text": "n/a",
-    "table_header": "pass",
+    "table_header": "fail",
     "slide_title": "n/a",
     "language": "pass",
     "headings": "pass",
@@ -1685,12 +1743,12 @@
     "link_text": "pass",
     "title": "fail"
    },
-   "barrier": false,
+   "barrier": true,
    "alt_meaningful": null,
    "link_text_kind": null,
    "notes": {
     "alt_text": "No body drawings; image2.jpg (header) and image1.png (footer) excluded.",
-    "table_header": "1 table T0 3x3 contacts: \"Ross Undergraduate Advising | rossugacadadvising@umich.edu | Advising resources for undergraduate students\", \"Ross Graduate Advising | ...\", \"Canvas | ...\". No column-name row. Close call data vs layout: treated as DATA; tblLook 0600 (no firstRow) but w:tblHeader on all 3 rows, so row 1 is marked (row 1 is data). Pass by the rule; n/a if judged layout.",
+    "table_header": "FAIL: data table(s) T1 have no header marker (tblHeader off/absent, tblLook firstRow off). 1 tables: T1 3x3 DATA \"Ross Undergraduate Advising | rossugacadadvising@umich.edu | Advising \"; tblHeader off(val=0); tblLook val=0600 (0x20 clear); marker: NONE CLOSE CALL kept as DATA (contact directory: name | email | description per row, no column-name row); would be n/a if judged layout.",
     "slide_title": "Word file",
     "language": "styles.xml docDefaults w:lang val=\"en\" (Google export)",
     "headings": "~158 words. Heading 2 for each section: \"Welcome to Ross!\", \"Questions? How to contact us:\", \"How do I connect to the network?\", \"How do I print?\", \"What do I need to do to log in...\", \"Ross IT resources for Students:\", \"Other groups that can help:\" (+3 consecutive empty Heading 2 paragraphs).",
@@ -1700,7 +1758,17 @@
     "other": "Google Doc export; student version of b2a58133948c."
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: no); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "relabelled": [
+    {
+     "criterion": "table_header",
+     "from": "pass",
+     "to": "fail",
+     "date": "2026-11-17",
+     "why": "review by a second labelling agent of every table: the first labeller read <w:tblHeader w:val=\"0\"/> (off) as a header marker; data/layout judgements kept",
+     "barrier": "False -> True"
+    }
+   ]
   }
  ]
 }
