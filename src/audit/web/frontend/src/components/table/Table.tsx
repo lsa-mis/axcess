@@ -255,7 +255,10 @@ export function TableRegion({
   // Whether the table is wider than the region, so the region scrolls
   // sideways. Measured whenever either changes size.
   const [scrolls, setScrolls] = useState(false);
+  // The table's full width, for the top bar's track (see below).
+  const [scrollWidth, setScrollWidth] = useState(0);
   const [node, setNode] = useState<HTMLDivElement | null>(null);
+  const [top, setTop] = useState<HTMLDivElement | null>(null);
   const setRef = useCallback(
     (element: HTMLDivElement | null) => {
       setNode(element);
@@ -266,7 +269,10 @@ export function TableRegion({
   );
   useEffect(() => {
     if (!node) return;
-    const measure = () => setScrolls(node.scrollWidth > node.clientWidth + 1);
+    const measure = () => {
+      setScrolls(node.scrollWidth > node.clientWidth + 1);
+      setScrollWidth(node.scrollWidth);
+    };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(node);
@@ -283,7 +289,68 @@ export function TableRegion({
       node.removeEventListener("focus", onFocus);
     };
   }, [node]);
+  // The top bar and the region scroll together: moving either moves the
+  // other to the same place. Equal positions end the back-and-forth.
+  useEffect(() => {
+    if (!node || !top) return;
+    top.scrollLeft = node.scrollLeft;
+    const follow = (from: HTMLElement, to: HTMLElement) => () => {
+      if (Math.abs(to.scrollLeft - from.scrollLeft) >= 1) to.scrollLeft = from.scrollLeft;
+    };
+    const fromRegion = follow(node, top);
+    const fromTop = follow(top, node);
+    // A click on the bar would focus it (a scrolling box takes focus), and
+    // focus must never rest on something hidden from screen readers (axe
+    // aria-hidden-focus). It goes to the region instead, the one keyboard
+    // control for this scrolling, so the arrow keys carry on from the click.
+    const toRegion = () => node.focus({ preventScroll: true });
+    node.addEventListener("scroll", fromRegion, { passive: true });
+    top.addEventListener("scroll", fromTop, { passive: true });
+    top.addEventListener("focus", toRegion);
+    return () => {
+      node.removeEventListener("scroll", fromRegion);
+      top.removeEventListener("scroll", fromTop);
+      top.removeEventListener("focus", toRegion);
+    };
+  }, [node, top]);
   return (
+    <>
+      {/* A scroll bar over a table that is wider than its region, at the
+          top, so it shows as soon as the table does that the table scrolls
+          sideways, and it can be dragged without first scrolling down to
+          the region's own bar under the last row (the developer's request,
+          2026-11-16). Shown only while the table scrolls. It is the
+          browser's own scroll bar, on a strip as wide as the region with a
+          track as wide as the table, kept in step with the region (the
+          effect above), and styled thin and always visible
+          (.table-scrollbar in styles.css), so it does not fade away as
+          overlay scroll bars do on a Mac. Its target size, contrast and
+          forced-colours behaviour are set out there.
+          It is for the pointer only, as a browser's own scroll bar is: a
+          scroll bar is never a Tab stop. The keyboard way to scroll is to
+          focus the scrolling box and use the arrow keys, and the region
+          below is that box (SC 2.1.1 Keyboard, Level A; axe
+          scrollable-region-focusable). So the bar is out of the Tab order
+          (tabIndex -1; without it, recent Chromium makes any scrolling box
+          a Tab stop), hidden from screen readers (aria-hidden: a second
+          thing to scroll, read out, would be two controls for one job, W3C
+          COGA, "Making Content Usable"), and a click on it sends focus to
+          the region (the effect above), so focus never rests on hidden
+          content. It has no scrollbar role, as before: a role="scrollbar"
+          widget (WAI-ARIA APG) would need its own focus, value and arrow
+          keys, all of which the region already gives. Rejected: a drawn bar with a draggable thumb, which
+          would be a custom widget, and a "Scroll for more columns" note,
+          which tells but does not let the reader scroll. */}
+      {scrolls && (
+        <div
+          ref={setTop}
+          aria-hidden="true"
+          tabIndex={-1}
+          className={cn("table-scrollbar overflow-x-auto overflow-y-hidden border-b border-border", CARD_EDGE)}
+        >
+          <div style={{ width: scrollWidth, height: 1 }} />
+        </div>
+      )}
     <div
       ref={setRef}
       role="region"
@@ -320,6 +387,7 @@ export function TableRegion({
     >
       {children}
     </div>
+    </>
   );
 }
 
