@@ -138,3 +138,20 @@ Decision (developer, 2026-11-17): no 2B size; the sizes start at
 Standard (Qwen3-4B-Instruct-2507). Next lead: generate fixes mechanically
 where the rule allows (computed colours, attribute tables, heading levels)
 and let a model only reword the text.
+
+Two more, same setup (developer's own files, nothing downloaded):
+
+| Model (sampling) | Usable | Partly | Nonsense or wrong | Time per answer |
+| --- | --- | --- | --- | --- |
+| Qwen3.8-4B distill (empero-ai, Apache-2.0), Q4_K_M, text only (temp 0.6, top-p 0.95, top-k 20) | 5 | 1 | 4 | 40–60 s (one 185 s) |
+| LFM3-1.7B Q8_0, text only (temp 0.1, top-k 50, repeat 1.1, from the file) | 1 | 3 | 6 | 26–101 s |
+
+- Qwen3.8-4B: the only model to fix "Red = Urgent" correctly (#cc0000,
+  about 5.9:1, still red); right on aria-role, both heading levels and the
+  landmark label. Wrong: white text on the blue button (about 2.9:1, worse),
+  the screen-reader-only false alarm, and OCR junk ("@Normal @") pasted into
+  alt text. The infographic answer was unusable (bad_answer).
+- LFM3-1.7B: broken markup (`<h2>...</h3>`), removed `visually-hidden`
+  from a hidden heading, a "darker" blue that still fails.
+- Qwen3.8-4B is a community distill, not an official Qwen release; its file
+  matches empero-ai/Qwen3.8-4B-Distill-GGUF by SHA-256.
