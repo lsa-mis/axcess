@@ -8,6 +8,7 @@ safe data boundary is testable now and remains local by default.
 from __future__ import annotations
 
 import sqlite3
+from dataclasses import asdict
 from typing import Any, cast
 
 from audit import coverage_matrix, evaluation
@@ -43,8 +44,6 @@ def _completed_scan(conn: sqlite3.Connection, scan_id: int) -> sqlite3.Row:
     ).fetchone()
     if protected is not None:
         raise ValueError("Protected reports are unavailable through MCP")
-    if scan["status"] != "completed":
-        raise ValueError("Report is not complete")
     return cast(sqlite3.Row, scan)
 
 
@@ -102,6 +101,9 @@ def get_report_issue_detail(
         "fix_steps": detail.fix_steps,
         "verify_manual": detail.verify_manual,
         "verify_automated": detail.verify_automated,
+        "screen_reader_check": (
+            asdict(detail.screen_reader_check) if detail.screen_reader_check else None
+        ),
         "acceptance": detail.acceptance,
         "pages": [
             {

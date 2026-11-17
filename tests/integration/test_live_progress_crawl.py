@@ -24,7 +24,7 @@ from .test_crawl_end_to_end import _serve
 
 pytestmark = pytest.mark.integration
 
-CHECKS = ("axe", "keyboard", "responsive", "interaction")
+CHECKS = ("axe", "markup", "keyboard", "responsive", "interaction")
 
 
 def test_a_browser_crawl_records_each_check_on_each_page(
@@ -83,6 +83,12 @@ def test_a_browser_crawl_records_each_check_on_each_page(
             focus_checks_enabled=False,
             visual_checks_enabled=False,
             interaction_checks_enabled=True,
+            # On by default since this test was written, and off here: this
+            # test follows the page's own checks, and the document check
+            # finishes after the page (its marks are tested in
+            # test_linked_files_crawl.py). The page code check stays on: the
+            # expected order includes it.
+            linked_files_enabled=False,
             capture_screenshots=False,
         )
         summary = asyncio.run(run_crawl(tmp_db, config))
@@ -95,6 +101,8 @@ def test_a_browser_crawl_records_each_check_on_each_page(
     for checks in during_keyboard:
         assert checks == {
             "axe": "done",
+            # The page code check runs right after the rule check.
+            "markup": "done",
             "keyboard": "running",
             "responsive": "waiting",
             "interaction": "waiting",

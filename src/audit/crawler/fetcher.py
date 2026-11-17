@@ -7,17 +7,22 @@ failures (DNS, timeout, connection reset) raise :class:`FetchError`.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from email.utils import parsedate_to_datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
+from urllib.parse import urljoin
 
 import httpx
 
 if TYPE_CHECKING:
+    from playwright.async_api import APIRequestContext
+
     from audit.analyzer.axe import AxeViolation
     from audit.analyzer.focus import FocusFinding
     from audit.analyzer.forms import FormFinding
     from audit.analyzer.interaction import RevealedViolation, StateCapture
+    from audit.analyzer.interaction.base import RevealedLink
     from audit.analyzer.keyboard import KeyboardTrap
     from audit.analyzer.markup import MarkupFinding
     from audit.analyzer.responsive import ResponsiveFinding
@@ -104,6 +109,10 @@ class FetchResult:
     interaction_dialogs_stuck: int = 0
     interaction_detail: str = ""
     discovered_urls: tuple[str, ...] = ()
+    # Links that appeared after a click, with the control that revealed each,
+    # for the Documents tab (``audit.linked_files``). JsFetcher only, when
+    # the interaction probe ran.
+    revealed_links: tuple[RevealedLink, ...] = ()
     search_result: SearchResult | None = None
     # The page's CSS and style fingerprint, read right after ``body`` was
     # serialized (see ``audit.crawler.style_snapshot``). Every JsFetcher
@@ -163,6 +172,83 @@ class StaticFetcher:
             body=body,
             retry_after=_parse_retry_after(resp.headers.get("retry-after")),
         )
+
+
+class PageFetcher(Protocol):
+    """What the crawl needs from a static fetcher: one page's response."""
+
+    async def fetch(self, url: str) -> FetchResult: ...
+
+
+class AuthenticatedStaticFetcher:
+    """A static fetch through a signed-in browser's own request client.
+
+    A sign-in scan's "Load pages without running scripts" (2026-11-16): the
+    page's code comes from ``APIRequestContext.get``, which carries the
+    signed-in context's cookies, so the response is the signed-in page, not
+    an anonymous one. A sign-in kept only in sessionStorage is not sent this
+    way, which the New scan form's hint says. Every address, and every
+    redirect, is checked by ``validate_url`` (the sign-in scan's egress
+    policy) before it is requested, the same rule as
+    ``AuthenticatedImageDownloader``.
+    """
+
+    def __init__(
+        self,
+        request_context: APIRequestContext,
+        *,
+        validate_url: Callable[[str], str],
+        max_body_bytes: int = 10 * 1024 * 1024,
+        max_redirects: int = 5,
+        timeout_ms: float = 30_000,
+    ) -> None:
+        self._request = request_context
+        self._validate_url = validate_url
+        self._max_body_bytes = max_body_bytes
+        self._max_redirects = max_redirects
+        self._timeout_ms = timeout_ms
+
+    async def fetch(self, url: str) -> FetchResult:
+        """Fetch ``url``. Raises :class:`FetchError` on failure or scope escape."""
+        try:
+            current = self._validate_url(url)
+        except Exception as exc:
+            raise FetchError("address is outside the scan's scope") from exc
+        for _ in range(self._max_redirects + 1):
+            response = None
+            try:
+                response = await self._request.get(
+                    current,
+                    fail_on_status_code=False,
+                    max_redirects=0,
+                    timeout=self._timeout_ms,
+                )
+                status = response.status
+                headers = response.headers
+                if status in {301, 302, 303, 307, 308} and headers.get("location"):
+                    try:
+                        current = self._validate_url(urljoin(current, headers["location"]))
+                    except Exception as exc:
+                        raise FetchError("redirect left the scan's scope") from exc
+                    continue
+                body = (await response.body())[: self._max_body_bytes]
+                return FetchResult(
+                    url=current,
+                    status_code=status,
+                    content_type=headers.get("content-type", ""),
+                    body=body,
+                    retry_after=_parse_retry_after(headers.get("retry-after")),
+                )
+            except FetchError:
+                raise
+            except Exception as exc:
+                # The class only: a protected page's error text can carry
+                # session detail.
+                raise FetchError(type(exc).__name__) from exc
+            finally:
+                if response is not None:
+                    await response.dispose()
+        raise FetchError("too many redirects")
 
 
 def _parse_retry_after(raw: str | None) -> float | None:

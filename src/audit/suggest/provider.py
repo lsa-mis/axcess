@@ -29,7 +29,7 @@ from audit.ai.model_client import (
     ModelTimeoutError,
     make_model_client,
 )
-from audit.analyzer.ollama_base import prompt_content_version
+from audit.analyzer.ollama_base import prompt_content_version, why_not_local_service
 from audit.suggest.context import EvidenceBundle
 from audit.suggest.models import ErrorCode, ModelAnswer, ModelAnswerV2
 
@@ -208,6 +208,11 @@ class OllamaSuggestionProvider:
         return {m.name for m in models}
 
     async def generate(self, prompt: str, *, model: str, image: bytes | None) -> str:
+        # A cloud model runs on Ollama's servers, so the evidence would leave
+        # this computer (audit.analyzer.ollama_base.is_cloud_model).
+        reason = await why_not_local_service(self._model_client, self._client, model)
+        if reason is not None:
+            raise SuggestionError("model_not_local", reason)
         request = GenerateRequest(
             model=model,
             prompt=prompt,

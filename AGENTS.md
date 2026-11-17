@@ -34,8 +34,14 @@ The tool combines evidence with different confidence levels:
 | Image-of-text OCR/VLM | `findings`, `analyses`, `page_images` | OCR plus local Ollama judgment; treat classification/rationale as evidence, not a legal conclusion. |
 | Semantic analyzer | `page_a11y_findings` with pipeline discrimination | Local LLM judgment of contextual WCAG criteria; explicitly present it as a lead requiring human confirmation. |
 
-An **accessibility report** in product language is one completed `scans` row
-and its child evidence. An **issue** is a grouped view within that report:
+An **accessibility report** in product language is one completed `scans`
+row, or a stopped or failed one that saved at least one page, and its child
+evidence. How a scan ended does not make it more or less
+of a report: a scan stopped after 100 pages covers more than one that
+completed at a 10-page limit. Say coverage with facts (pages found, pages
+visited, the limits chosen, how it ended), never by calling a report
+"partial" or "full", and never hide a report's views or refuse an action
+because the scan was stopped. An **issue** is a grouped view within that report:
 one axe/probe/semantic rule or one `(classification, alt_adequacy)` image
 finding group. Never mix data from different `scan_id` values in an answer
 unless the user explicitly requests a comparison.
@@ -94,6 +100,15 @@ on 130 of them, then got every verdict wrong on its first real pages
    scored 100% precision and 96.2% recall on 142 of them, while its real
    set, the number that counts, had only 9 failing forms, most of them
    used to tune it. Say how small and how independent the real set is.
+## Project management (Asana)
+
+All project management for this repo lives in one Asana project:
+**"Axcess – Feature & Development Tracker"** (project GID `1218150267797869`,
+https://app.asana.com/1/939514425027676/project/1218150267797869).
+
+When reading or writing Asana tasks for this project, scope every query and
+update to that project only. Do not pull tasks from, or create tasks in, any
+other Asana project on behalf of this repo.
 
 ## Code map
 
@@ -101,6 +116,15 @@ on 130 of them, then got every verdict wrong on its first real pages
 - `src/audit/extractor/` discovers images/SVG text and stores blobs.
 - `src/audit/analyzer/` contains axe, OCR, VLM, semantic, and behavioral
   probes.
+- `src/audit/linked_files/` records the PDF, Office and Google files pages
+  link to (the report's Documents tab) and checks PDFs with pypdf. Called
+  "linked files" in code because a crawler "document" is an HTML page.
+  Storage: `src/audit/db/linked_files.py` (migration 0039); list:
+  `src/audit/web/linked_files_queries.py`. A file's identity is its
+  normalized address; the SHA-256 only marks copies. PDF downloads run
+  beside the crawl: a page queues its PDFs (`queue_page`) and its worker
+  moves on. Never make a page worker await a document download. See
+  `docs/internal/document-check.md`.
 - `src/audit/synthesizer/` turns raw evidence into image findings, severity,
   priority, remediation, and scan diffs.
 - `src/audit/db/` owns SQLite migrations, transactions, repositories, and the
@@ -127,16 +151,15 @@ Existing product constraints are load-bearing:
 ## Per-report MCP conversation: target design
 
 The desired feature is a brief, evidence-grounded conversation attached to a
-single completed accessibility report. It is **not implemented yet**. Build it
+single accessibility report. It is **not implemented yet**. Build it
 as an optional MCP integration with a separate model provider adapter; do not
 couple it to the existing Ollama analyzers or silently send report contents to
 an external model.
 
 ### Scope and interaction contract
 
-1. The chat entry point lives on a completed scan's detail/Issues page and is
-   initialized with an immutable `scan_id`. Reject chats for running,
-   failed, or deleted scans.
+1. The chat entry point lives on a report's Issues page and is
+   initialized with an immutable `scan_id`. Reject chats for deleted scans.
 2. The assistant can answer concise questions such as "What should we fix
    first?", "Why is this an issue?", and "Which pages are affected?" using
    that scan's stored evidence.
@@ -160,12 +183,12 @@ server-side session scope:
 
 | Tool | Purpose | Required guard |
 | --- | --- | --- |
-| `get_report_summary` | Scan metadata, coverage/methods used, counts and limitations. | Completed scan; exact `scan_id`. |
+| `get_report_summary` | Scan metadata, coverage/methods used, counts and limitations. | Exact `scan_id`. |
 | `list_issues` | Filtered, paginated unified issue rows. | Bounded `limit` (max 50); no cross-scan query. |
 | `get_issue_detail` | Remediation, affected pages, status summary, and rule metadata. | Validate canonical issue key belongs to scan. |
 | `get_finding_evidence` | Specific DOM/OCR/VLM/probe evidence and screenshot/blob reference. | Finding must belong to scan; omit oversized/raw HTML by default. |
 | `get_coverage_and_limitations` | Enabled/skipped methods and manual-review caveats. | Always include when discussing report completeness. |
-| `compare_reports` | Explicit opt-in diff between two completed scans of the same normalized scope. | Exact two IDs, no implicit comparison. |
+| `compare_reports` | Explicit opt-in diff between two reports of the same normalized scope. | Exact two IDs, no implicit comparison. |
 
 Do not expose raw SQL, arbitrary filesystem paths, arbitrary URLs, the
 access-token value, or a general HTTP-fetch tool through MCP. Do not make
@@ -377,6 +400,40 @@ Examples of real gaps: `aria-expanded` on a disclosure button,
 own (`role="button"` on a `<button>`), and never use ARIA to hide a
 problem that better markup would fix.
 
+**One control, one job.** Each control does one thing, and no two
+controls on a screen do the same thing or overlap in what they do. Two
+controls overlap when both narrow, sort, move through or change the same
+thing, so a reader has two ways to reach one result and two settings to
+understand and reset. Example: the Images tab has group buttons ("Images
+without alt text") over the table and a "Filter images" menu ("Needs alt
+text") that narrow the same list, two filters for one job (raised
+2026-11-17; the developer is still deciding whether to remove the group
+buttons). Before you design or build a control:
+
+1. Name its one job in a sentence.
+2. Search the screen, and the shared components it uses, for a control
+   that already does that job or part of it. Extend that one (a new
+   choice in an existing menu, a prop) instead of adding a second.
+3. If the developer asks for a control, a design or a copy of a pattern
+   whose job overlaps one that exists, you **must** warn them before you
+   build it: name both controls, say what they both do, and propose the
+   single-control design. Build the overlapping one only after they
+   confirm, and record their decision and the overlap in the rationale
+   comment. Never build an overlap silently.
+
+The standard: W3C COGA, "Making Content Usable"
+(https://www.w3.org/TR/coga-usable/), on one way to do one thing and no
+duplicate controls for one function, and WCAG 2.2 SC 3.2.4 Consistent
+Identification (Level AA).
+
+**Stay in scope.** When asked to fix or adjust X, change only X. If you
+see something else worth changing, report it and ask first. A vague
+request means ask what the problem is, not guess. This holds for padding,
+spacing, alignment and wording as much as for logic: a layout or
+spacing value the developer did not name stays as it is (the developer's
+rule, 2026-11-16, after a "fix the Delete button" request led to unasked
+changes to the actions cell's alignment and box edge).
+
 If a requested change, or code you touch, is not the most accessible
 option or is weaker UX than a known alternative, **tell the developer in
 your reply**. Name the problem, the criterion or principle, and the better
@@ -387,8 +444,17 @@ the task. Report them.
 
 ## Verification
 
-Run the narrowest relevant tests during development, then the appropriate
-project gates before handoff:
+**Run tests only before a merge the developer asks for.** Do not run
+`pytest`, the UI suites, or `make test` while iterating on a change, even
+for one file: a UI run takes minutes and the developer reviews the change
+in the running app instead. Fast build steps that the running app needs
+(`make frontend-build`) and `make lint` / `make typecheck` are fine at any
+time. Update or add the tests a change needs as you go, without running
+them, and when you report a change, say plainly that its tests have not
+been run yet. When the developer asks to merge, run the gates below first,
+fix what fails, and only then merge.
+
+The gates, run before a requested merge:
 
 ```bash
 uv run pytest tests/unit
@@ -421,7 +487,8 @@ If you cannot verify an action is reversible, treat it as irreversible.
 **If any premise in your task turns out to be wrong or impossible, stop and
 report that instead of working around it.** State what you **verified** (ran it,
 saw the output) separately from what you **assumed**. Do not report a task
-complete on the basis of code you did not run.
+complete on the basis of code you did not run. Until the tests run before a
+merge (see Verification), report a change as built but not yet tested.
 
 ## Session hygiene
 

@@ -172,10 +172,11 @@ class SuggestionWorker:
         try:
             raw = await self._generate(bundle, choice.model, with_image=uses_vision)
         except SuggestionError as exc:
-            if not (uses_vision and exc.code == "model_missing"):
+            if not (uses_vision and exc.code in ("model_missing", "model_not_local")):
                 raise
-            # The picture model is not installed: answer from the text and
-            # the image's stored facts rather than not at all.
+            # The picture model is not installed, or may run off this
+            # computer: answer from the text and the image's stored facts
+            # rather than not at all. The text model is checked the same way.
             uses_vision = False
             raw = await self._generate(bundle, self._text_model, with_image=False)
         model = choice.model if uses_vision else self._text_model

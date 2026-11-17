@@ -24,19 +24,13 @@ This module is deliberately narrow and defensive:
   here), and any target URL that falls outside the scan's recorded scope
   (host + registrable domain, honoring the scan's ``allow_subdomains``
   setting).
-* The *on-demand render* additionally needs a ``completed`` report, because it
-  leaves this machine to fetch a page a partial report cannot vouch for.
-  Serving a capture the scan already stored carries no such risk and is
-  allowed whatever the status: a stopped scan's evidence is still its
-  evidence, and refusing to show it was a rule about re-rendering applied to
-  reading.
 * It bounds the work: a navigation/idle timeout and a cap on the serialized
   DOM length (truncated with an honest flag).
 
 The fallback render itself is a throwaway Playwright browser, one page, no
 probes, no axe pass, no crawl state. Rendering is explicitly an external
 fetch, so this must only ever be reached behind the existing access-token
-gate and a non-protected, completed report.
+gate and a non-protected report.
 """
 
 from __future__ import annotations
@@ -55,6 +49,7 @@ from pydantic import BaseModel, ConfigDict
 
 from audit.crawler import url_policy
 from audit.crawler.style_snapshot import StoredStyles, concatenate
+from audit.crawler.user_agent import chosen_user_agent
 from audit.db import repo
 from audit.labels import CLICK_THROUGH_STATE
 
@@ -385,29 +380,14 @@ def _validate(conn: sqlite3.Connection, scan_id: int, page_id: int) -> dict[str,
     target_url = page["url_normalized"]
     _assert_in_scope(target_url, seed_url, allow_subdomains)
 
-    # Only the *on-demand render* needs a finished report: it leaves this
-    # machine to fetch a page the scan may never have reached, and a partial
-    # report cannot vouch for it. Reading back a capture the scan already took
-    # asks nothing of the site and claims nothing about coverage, so it is
-    # allowed whatever the scan's status -- a stopped scan's evidence is still
-    # its evidence. The refusal used to sit before the page row was even
-    # loaded, so it could not tell the two apart, and a stopped scan's stored
-    # pages were unreadable for a reason that only applied to re-rendering.
-    completed = scan["status"] == "completed"
-    stored_available = page["rendered_html"] is not None
-    if not completed and not stored_available:
-        raise InspectionUnavailableError(
-            "This page has no stored capture, and only a completed report can "
-            f"be re-rendered on demand. This scan ended as {scan['status']}.",
-            status_code=409,
-        )
-
     return {
         "scan": scan,
         "page": page,
         "target_url": target_url,
+        # The browser name the scan sent, when New scan chose one. A live
+        # render under a different name can be served a different page.
+        "user_agent": chosen_user_agent(config),
         "store_rendered_html": store_rendered_html,
-        "allow_live_render": completed,
     }
 
 
@@ -612,27 +592,9 @@ async def inspect_page(
     # bundled 3.11 typeshed here does not expose the alias yet.
     captured_at = datetime.now(timezone.utc).isoformat()  # noqa: UP017
 
-    if not validated["allow_live_render"]:
-        # Reached when a capture exists but will not decode. _validate already
-        # refused the no-capture case; falling through to the live render here
-        # would fetch a page an unfinished report never promised to have seen.
-        return {
-            "page": _page_payload(page, captured_at=_iso_timestamp(page["fetched_at"])),
-            "store_rendered_html": validated["store_rendered_html"],
-            "states": states,
-            "saved_styles": None,
-            "render": {
-                "ok": False,
-                "source": "stored",
-                "error": (
-                    "This page's stored capture could not be read, and only a "
-                    "completed report can be re-rendered on demand."
-                ),
-            },
-        }
     outcome, error = await _render_page(
         validated["target_url"],
-        user_agent=user_agent,
+        user_agent=validated["user_agent"] or user_agent,
         viewport=viewport or _DEFAULT_VIEWPORT,
         nav_timeout_ms=nav_timeout_ms,
         idle_timeout_ms=idle_timeout_ms,

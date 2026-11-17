@@ -32,6 +32,22 @@ import { CLICK_THROUGH } from "../lib/labels";
 import { checkedPercent, formatScanEta } from "../lib/scanProgress";
 import { CHECK_LABEL } from "../lib/terms";
 
+/**
+ * The document check's column, by the check's own name (the glossary's
+ * "Document check", the New scan summary's too). On each page it finds the
+ * links to PDF, Word and other files and checks the PDFs among them that
+ * no earlier page had checked (audit/linked_files/tracker.py, queue_page).
+ * So "Done" means the page's documents are found and each of its PDFs is
+ * checked. A PDF is never a row of its own: the scan does not open a
+ * document link as a page. The page does not wait for its PDFs: its row
+ * can read "Checked" while this column still reads "Checking", and the
+ * line over the table says so, so the two are not read as a
+ * contradiction. It was "Document links" while PDFs on other sites were
+ * checked only after the last page (until 2026-11-14), when "Done" under a
+ * check's name would have claimed more than was done.
+ */
+const DOCUMENT_CHECK_COLUMN = "Document check";
+
 /** Each check a page goes through, by its interface name, keyed as the API keys methods. */
 const CHECK_NAME: Record<string, string> = {
   axe: CHECK_LABEL.axe,
@@ -42,7 +58,9 @@ const CHECK_NAME: Record<string, string> = {
   interaction: CLICK_THROUGH,
   image: CHECK_LABEL.image,
   semantic: CHECK_LABEL.semantic,
+  documents: DOCUMENT_CHECK_COLUMN,
 };
+
 
 type StepStatus = "done" | "active" | "waiting";
 
@@ -66,6 +84,13 @@ export default function ScanProgressView({
   const completed = progress?.completed ?? 0;
   const percent = checkedPercent(progress);
   const checks = scan.methods_used.filter((method) => method.enabled && method.key in CHECK_NAME);
+  // The pages table's columns: those checks, then the document check. It is
+  // not one of the report's methods (it fills the Documents tab, not
+  // Issues), so its column comes from the pages' own records: a scan that
+  // looks for documents marks "documents" on each page it reads.
+  const rows = pageRows(progress);
+  const documents = rows.some((row) => "documents" in row.checks);
+  const columns = [...checks.map((method) => method.key), ...(documents ? ["documents"] : [])];
   const site = siteLabel(scan.seed_url);
 
   return (
@@ -115,8 +140,9 @@ export default function ScanProgressView({
       />
 
       <PagesTable
-        rows={pageRows(progress)}
-        checks={checks}
+        rows={rows}
+        columns={columns}
+        documents={documents}
         preparing={preparing}
         seedUrl={scan.seed_url}
       />
@@ -425,12 +451,16 @@ function pagePath(url: string, seedUrl: string): string {
 
 function PagesTable({
   rows,
-  checks: chosen,
+  columns: chosen,
+  documents,
   preparing,
   seedUrl,
 }: {
   rows: ScanPageChecks[];
-  checks: ScanMethodCoverage[];
+  /** Each check's key, one column each, in order (CHECK_NAME names them). */
+  columns: string[];
+  /** Whether the scan looks for documents, which the line over the table explains. */
+  documents: boolean;
   preparing: boolean;
   seedUrl: string;
 }) {
@@ -449,6 +479,12 @@ function PagesTable({
         </h2>
         <p className="mt-1 text-sm text-fg-muted">
           The pages being checked now, the latest finished, and the next few waiting.
+          {/* What the Document check column does on a page, and why a page
+              that links only to PDFs checked before is quick (see
+              DOCUMENT_CHECK_COLUMN). */}
+          {tracked && documents && (
+            <> {DOCUMENT_CHECK_COLUMN} finds the documents each page links to and checks its PDFs, each PDF once. The next page starts while a page&rsquo;s PDFs download, so a page marked Checked can still show Checking under {DOCUMENT_CHECK_COLUMN}.</>
+          )}
           {!tracked && rows.length > 0 && (
             <> Each check&rsquo;s progress on a page is not available for this scan, so each page shows its status only.</>
           )}
@@ -468,8 +504,8 @@ function PagesTable({
               <tr>
                 <ColumnHeader>Page</ColumnHeader>
                 <ColumnHeader>Status</ColumnHeader>
-                {checks.map((method) => (
-                  <ColumnHeader key={method.key}>{CHECK_NAME[method.key]}</ColumnHeader>
+                {checks.map((key) => (
+                  <ColumnHeader key={key}>{CHECK_NAME[key]}</ColumnHeader>
                 ))}
               </tr>
             </TableHead>
@@ -481,14 +517,14 @@ function PagesTable({
                       {pagePath(row.url, seedUrl)}
                     </span>
                   </RowHeader>
-                  <Cell className="whitespace-nowrap text-center text-sm font-semibold text-fg">{PAGE_WORD[row.state]}</Cell>
-                  {checks.map((method) => {
+                  <Cell className="whitespace-nowrap text-sm font-semibold text-fg">{PAGE_WORD[row.state]}</Cell>
+                  {checks.map((key) => {
                       // A waiting page has started no check; any other page
                       // without a state for a check was not tracked for it
                       // (checked before a restart, say), which says so.
-                      const state = row.checks[method.key] ?? (row.state === "waiting" ? "waiting" : undefined);
+                      const state = row.checks[key] ?? (row.state === "waiting" ? "waiting" : undefined);
                       return (
-                        <Cell key={method.key} className="text-center">
+                        <Cell key={key}>
                           {state ? (
                             <Chip tone={state}>{CELL_WORD[state]}</Chip>
                           ) : (

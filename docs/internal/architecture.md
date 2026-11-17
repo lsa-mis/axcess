@@ -95,8 +95,10 @@ it accepts requests.
 2. **Fetch.** A plain HTTP fetch, then a render in Chromium. By default
    (`js_eager=True`) every HTML page is rendered. With `--static-only`, only
    pages that look like a script-only shell or a bot challenge are rendered.
-   `skip_static_when_rendering` (off by default) skips the plain fetch, and
-   login scans are always browser-only.
+   `skip_static_when_rendering` (off by default) skips the plain fetch. A
+   login scan is browser-only, except when it loads pages without running
+   scripts: then the plain fetch goes through the signed-in browser's own
+   request client (`AuthenticatedStaticFetcher`), never an anonymous one.
 3. **Record the page** with `_record_page`. The rendered HTML is stored
    gzipped, up to 2,000,000 uncompressed bytes, unless rendered storage is off.
 4. **Images.** `process_page` extracts images, stores them, and runs OCR and
@@ -484,6 +486,19 @@ How it works:
    closed, the kept copy is used. With "Show the scanning browser window",
    the scan reuses the signed-in tabs instead, or a visible window reopened
    from the kept copy.
+   The scan gets one signed-in tab per worker ("Pages at once (workers)",
+   the same field and name as on the public form: 4 by default, at most 8
+   here; the interface never says "tabs"). Cookies, local storage and IndexedDB are shared by
+   every tab; sessionStorage belongs to one tab, so each tab after the first
+   is seeded with an in-memory copy of the first tab's. A copy can go stale
+   when the site issues a new token, and its pages then load as the sign-in
+   page. So a sign-in page in a copied tab is loaded again in the first tab
+   before any check runs (`audit.crawler.tab_pool`): if the first tab shows
+   the real page, the scan closes the other tabs, finishes in the first tab
+   alone, and writes a note on the report ("How this scan ran",
+   `scans.scan_note`); if it shows a sign-in page too, the page is recorded
+   as one, as before. If the site ends the whole sign-in, every tab is
+   signed out and the scan reports its sign-in pages as it always did.
 6. The crawl starts where sign-in landed, and the scope still comes from the
    URL you typed.
 7. When the scan ends, `session.close()` shuts the browsers and deletes the

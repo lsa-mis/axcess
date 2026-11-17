@@ -52,6 +52,7 @@ _RAIL_NAME = {
     "Check the page code for problems the rule check misses": "Page code check",
     "Check that forms describe their errors": "Form error check",
     "Check narrow screens and zoom": "Zoom and layout check",
+    "Check the documents the pages link to": "Document check",
     "Read text inside images (OCR)": "Image text check",
     "Compare image text with alt text (vision model)": "Vision model review",
     "AI review of wording": "AI review",
@@ -246,7 +247,7 @@ async def test_summary_rail_follows_the_switches_and_resets(
     await playwright_async.expect(
         summary.get_by_role("heading", name="What this scan will do")
     ).to_be_focused()
-    await playwright_async.expect(pages).to_have_value("2500")
+    await playwright_async.expect(pages).to_have_value("10000")
     await playwright_async.expect(keyboard).to_be_checked()
 
 
@@ -447,12 +448,12 @@ async def test_settings_are_closed_accordions_and_start_is_top_right(
 @pytest.mark.parametrize(
     ("field", "value", "message"),
     [
-        ("Maximum pages", "", "Maximum pages is empty. Enter a whole number from 1 to 10,000."),
+        ("Maximum pages", "", "Maximum pages is empty. Enter a whole number from 1 to 20,000."),
         ("Maximum pages", "0", "Maximum pages must be at least 1."),
         (
             "Maximum pages",
-            "10001",
-            "Maximum pages can be at most 10,000 for a public website scan.",
+            "20001",
+            "Maximum pages can be at most 20,000 for a public website scan.",
         ),
         ("Maximum pages", "2.5", "Maximum pages must be a whole number."),
         (
@@ -520,7 +521,8 @@ async def test_limits_are_validated_by_name_with_their_range(
 async def test_scan_every_page_it_finds(live_server: tuple[str, int], new_page: Any) -> None:
     """No page limit: Maximum pages goes off, the rail says so, and it is what posts.
 
-    A sign-in scan keeps its cap, so its form does not offer the switch.
+    A sign-in scan offers the switch too since 2026-11-16 (the two forms
+    offer the same settings), and posts it to the sign-in API.
     """
     base, _ = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
@@ -563,7 +565,7 @@ async def test_scan_every_page_it_finds(live_server: tuple[str, int], new_page: 
     ).to_be_visible()
     await playwright_async.expect(
         page.get_by_role("switch", name=re.compile(r"^Scan every page it finds"))
-    ).to_have_count(0)
+    ).not_to_be_checked()
 
 
 async def test_depth_dots_are_gone(live_server: tuple[str, int], new_page: Any) -> None:
@@ -594,6 +596,7 @@ async def test_depth_dots_are_gone(live_server: tuple[str, int], new_page: Any) 
                 # On by default for public websites (2026-11-02).
                 "Form error check",
                 "Zoom and layout check",
+                "Document check",
                 "Image text check",
             ],
             [
@@ -607,16 +610,26 @@ async def test_depth_dots_are_gone(live_server: tuple[str, int], new_page: Any) 
         ),
         (
             "login",
+            # Every check the public form has (2026-11-16); the form error
+            # check starts off in a sign-in scan.
             [
                 "Opens menus and pop-up windows (Click-Through)",
                 "Keyboard check",
+                "Focus check",
+                "Page code check",
                 "Zoom and layout check",
+                # On by default in a sign-in scan too, through the sign-in.
+                "Document check",
             ],
             [
                 "Pages on any other website",
                 "Whole signed-in website",
+                "Subdomains",
+                "Form error check",
                 "Image text check",
                 "Vision model review",
+                "AI review",
+                "Motion and reading-order check",
             ],
         ),
     ],
@@ -797,7 +810,7 @@ async def test_a_login_scan_restarts_on_its_tab_with_confirmations_unticked(
         page.get_by_role("spinbutton", name="Maximum pages")
     ).to_have_value("40")
     await playwright_async.expect(
-        page.get_by_role("spinbutton", name="Signed-in tabs")
+        page.get_by_role("spinbutton", name="Pages at once (workers)")
     ).to_have_value("3")
     assert "sso-ticket-value" not in await page.content()
 
@@ -848,7 +861,7 @@ async def test_failed_scan_explains_both_retries(
     assert posted[-1]["skip_interaction"] is True
     assert posted[-1]["skip_forms"] is True
     assert posted[-1]["send_empty_forms"] is False
-    assert posted[-1]["max_pages"] == 2500
+    assert posted[-1]["max_pages"] == 10000
 
 
 async def test_the_form_error_check_is_on_for_public_websites_and_absent_when_signed_in(
@@ -856,8 +869,9 @@ async def test_the_form_error_check_is_on_for_public_websites_and_absent_when_si
     new_page: Any,
 ) -> None:
     """On by default for a public website (2026-11-02), without sending
-    anything; sending empty forms is a choice of its own (2026-11-04); no
-    question at all for a sign-in scan."""
+    anything; sending empty forms is a choice of its own (2026-11-04). A
+    sign-in scan asks the same question since 2026-11-16, off by default,
+    and says a form is pressed as the person signed in."""
     base, _ = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
     posted: list[dict[str, Any]] = []
@@ -902,6 +916,286 @@ async def test_the_form_error_check_is_on_for_public_websites_and_absent_when_si
 
     await page.goto(f"{base}/app/scans/new?mode=login", wait_until="networkidle")
     await _open_groups(page)
+    forms = page.get_by_role("group", name="Check that forms describe their errors")
     await playwright_async.expect(
-        page.get_by_role("group", name="Check that forms describe their errors")
-    ).to_have_count(0)
+        forms.get_by_role("radio", name="Don\u2019t check forms")
+    ).to_be_checked()
+    await playwright_async.expect(forms).to_contain_text(
+        "In a sign-in scan, Axcess presses each form as you, the person signed in."
+    )
+    await playwright_async.expect(
+        forms.get_by_role("radio", name="Check forms, and send empty ones to this site")
+    ).to_have_accessible_description(re.compile("from your account"))
+
+
+async def test_the_document_check_is_on_by_default_and_says_what_it_keeps(
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """On for a public website (2026-11-14), named in the summary and sent
+    as skip_documents. Offered for a sign-in scan too (2026-11-16), with its
+    own hint: there it downloads with the person's sign-in and does not
+    download files on other sites."""
+    base, _ = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    posted: list[dict[str, Any]] = []
+
+    async def capture(route: Any) -> None:
+        posted.append(route.request.post_data_json)
+        await route.fulfill(status=409, json={"error": "A crawl is already running."})
+
+    await page.route("**/api/scans", capture)
+    await page.goto(f"{base}/app/scans/new", wait_until="networkidle")
+    await _open_groups(page)
+    switch = page.get_by_role("switch", name="Check the documents the pages link to")
+    if not await switch.count():
+        switch = page.get_by_role("checkbox", name="Check the documents the pages link to")
+    await playwright_async.expect(switch).to_be_checked()
+    await playwright_async.expect(switch).to_be_enabled()
+    # The privacy facts are read with it, as its description.
+    await playwright_async.expect(switch).to_have_accessible_description(
+        re.compile(
+            "downloads each PDF once to this computer.*also from other sites.*"
+            "keeps the result and a picture of the first page, not the file"
+        )
+    )
+    summary = page.get_by_role("complementary", name="What this scan will do")
+    assert "Document check" in await _rail_items(summary, "Checks that run")
+    await page.get_by_role("textbox", name="Website address", exact=True).fill(
+        "https://example.com/"
+    )
+    await page.get_by_role("button", name="Start scan").click()
+    await playwright_async.expect(page.get_by_role("alert").first).to_be_visible()
+    assert posted and posted[-1]["skip_documents"] is False
+
+    await switch.click()
+    assert "Document check" in await _rail_items(summary, "Not included")
+    await page.get_by_role("button", name="Start scan").click()
+    for _ in range(50):
+        if len(posted) >= 2:
+            break
+        await page.wait_for_timeout(100)
+    assert posted[-1]["skip_documents"] is True
+
+    await page.goto(f"{base}/app/scans/new?mode=login", wait_until="networkidle")
+    await _open_groups(page)
+    signed_in = page.get_by_role("switch", name="Check the documents the pages link to")
+    await playwright_async.expect(signed_in).to_be_checked()
+    await playwright_async.expect(signed_in).to_have_accessible_description(
+        re.compile(
+            "downloads each PDF on this website with your sign-in, as you.*"
+            "lists files on other sites but does not download them"
+        )
+    )
+
+
+_CHROME_WINDOWS = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36"
+)
+_BROWSER_NAME = "Browser the site sees (user agent)"
+_TYPED_NAME = "Browser name to send (user agent)"
+
+
+async def test_a_browser_name_is_chosen_typed_checked_and_posted(
+    live_server: tuple[str, int],
+    new_page: Any,
+    choose_option: Any,
+) -> None:
+    """The site sees the chosen browser's exact string; a typed one is checked first."""
+    base, _ = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    posted: list[dict[str, Any]] = []
+
+    async def capture(route: Any) -> None:
+        posted.append(route.request.post_data_json)
+        await route.fulfill(status=409, json={"error": "A crawl is already running."})
+
+    await page.route("**/api/scans", capture)
+    await page.goto(f"{base}/app/scans/new", wait_until="networkidle")
+    await page.get_by_role("textbox", name="Website address", exact=True).fill(
+        "https://example.com/"
+    )
+    summary = page.get_by_role("complementary", name="What this scan will do")
+    await _open_groups(page)
+    speed = page.locator("#speed")
+    # Chrome on this computer by default (2026-11-16), and the form says
+    # what that means; Axcess's own name is the next choice.
+    browser = page.get_by_role("combobox", name=_BROWSER_NAME, exact=True)
+    await playwright_async.expect(browser).to_contain_text("Chrome on this computer (default)")
+    await playwright_async.expect(speed).to_contain_text("the Chrome version Axcess runs")
+    await choose_option(page, _BROWSER_NAME, "axcess")
+    await playwright_async.expect(speed).to_contain_text("so the site can see that a scanner")
+    await playwright_async.expect(summary).to_contain_text("Tells the site it is Axcess, a scanner")
+    await choose_option(page, _BROWSER_NAME, "chrome")
+    # Both limits are stated beside the choice.
+    await playwright_async.expect(speed).to_contain_text("Every page still opens in Chromium")
+    await playwright_async.expect(speed).to_contain_text("robots.txt rules for Axcess still apply")
+
+    await choose_option(page, _BROWSER_NAME, "chrome_windows")
+    await playwright_async.expect(speed).to_contain_text(f"Sends: {_CHROME_WINDOWS}")
+    await playwright_async.expect(summary).to_contain_text("Tells the site it is Chrome on Windows")
+    await playwright_async.expect(summary.get_by_text("Customized", exact=True)).to_be_visible()
+    await page.get_by_role("button", name="Start scan").click()
+    await playwright_async.expect(page.get_by_role("alert").first).to_be_visible()
+    assert posted[-1]["user_agent_choice"] == "chrome_windows"
+    assert posted[-1]["user_agent"] == _CHROME_WINDOWS
+
+    # A phone browser says the window does not change size.
+    await choose_option(page, _BROWSER_NAME, "safari_iphone")
+    await playwright_async.expect(speed).to_contain_text("iPhone OS 18_7")
+    await playwright_async.expect(speed).to_contain_text("The scanning window stays computer-sized")
+
+    # Typed: an empty box is named in the alert and on the field.
+    await choose_option(page, _BROWSER_NAME, "custom")
+    typed = page.get_by_role("textbox", name=_TYPED_NAME, exact=True)
+    await playwright_async.expect(typed).to_be_visible()
+    count = len(posted)
+    speed_button = page.get_by_role("button", name="Speed and browser window", exact=True)
+    await speed_button.click()
+    await page.get_by_role("button", name="Start scan").click()
+    await playwright_async.expect(speed_button).to_have_attribute("aria-expanded", "true")
+    alert = page.get_by_role("alert").first
+    await playwright_async.expect(alert).to_be_focused()
+    await playwright_async.expect(alert).to_contain_text("Type the browser name (user agent)")
+    assert await typed.get_attribute("aria-invalid") == "true"
+    assert len(posted) == count  # nothing was sent
+    violations = await _run_axe_aaa(page)
+    assert not violations, _render_violations(violations)
+
+    await typed.fill("Navigateur/1 é")
+    await page.get_by_role("button", name="Start scan").click()
+    await playwright_async.expect(page.locator("#scan-user-agent-error")).to_contain_text(
+        "only English letters"
+    )
+    await typed.fill("  PartnerScanner/2  ")
+    await playwright_async.expect(page.locator("#scan-user-agent-error")).to_have_count(0)
+    async with page.expect_request("**/api/scans"):
+        await page.get_by_role("button", name="Start scan").click()
+    await playwright_async.expect(alert).to_contain_text("A crawl is already running")
+    assert len(posted) == count + 1
+    assert posted[-1]["user_agent_choice"] == "custom"
+    assert posted[-1]["user_agent"] == "PartnerScanner/2"
+    await playwright_async.expect(summary).to_contain_text(
+        "Tells the site it is the browser you typed"
+    )
+
+    await page.locator("form").get_by_role("button", name="Reset to default settings").click()
+    await playwright_async.expect(
+        page.get_by_role("combobox", name=_BROWSER_NAME, exact=True)
+    ).to_contain_text("Chrome on this computer (default)")
+
+
+async def test_a_sign_in_scan_offers_the_browser_name(
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """Offered since 2026-11-16; the sign-in window sends the same name."""
+    base, _ = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(f"{base}/app/scans/new?mode=login", wait_until="networkidle")
+    await _open_groups(page)
+    name = page.get_by_role("combobox", name=_BROWSER_NAME, exact=True)
+    await playwright_async.expect(name).to_contain_text("Chrome on this computer (default)")
+    await playwright_async.expect(name).to_have_accessible_description(
+        re.compile("the sign-in window sends this name too")
+    )
+
+
+# Names a setting has only in the sign-in form, for the same setting.
+_SIGN_IN_NAME = {
+    "Website address": "Website address to scan after you sign in",
+    "Scan the whole website": "Scan the whole signed-in website",
+}
+# Each field's own name: its label's title line, without the hint under it
+# (a hint may differ between the two forms, and should), and each question
+# by its legend.
+_SETTING_NAMES = r"""
+() => {
+  const form = document.querySelector('form#scan-form');
+  const firstLine = (text) => (text || '').split('\n')[0].trim();
+  const out = [];
+  for (const el of form.querySelectorAll('input, select, textarea, [role=combobox]')) {
+    if (el.type === 'hidden') continue;
+    const label = el.labels && el.labels[0];
+    const title = label && label.querySelector('.font-semibold');
+    const name = title ? title.textContent.trim() : firstLine(label ? label.innerText : '')
+      || el.getAttribute('aria-label') || '';
+    if (name) out.push(name);
+  }
+  for (const legend of form.querySelectorAll('legend')) out.push(firstLine(legend.innerText));
+  return out;
+}
+"""
+
+
+async def _settings(page: Any) -> set[str]:
+    """Every setting's name and every question in the scan form."""
+    await _open_groups(page)
+    return set(await page.evaluate(_SETTING_NAMES))
+
+
+async def test_the_sign_in_form_offers_every_setting_the_public_form_does(
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """The two forms offer the same settings, 1:1 (2026-11-16, the developer's
+    rule). A sign-in scan may add its own (the permission and image boxes),
+    may start from other defaults, and may say more in a hint, but no public
+    setting may be missing from it. A setting renamed for a sign-in scan is
+    listed in ``_SIGN_IN_NAME``."""
+    base, _ = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(f"{base}/app/scans/new", wait_until="networkidle")
+    public = await _settings(page)
+    await page.goto(f"{base}/app/scans/new?mode=login", wait_until="networkidle")
+    sign_in = await _settings(page)
+    # The check reads enough of the form to mean something.
+    assert len(public) >= 25, sorted(public)
+    missing = sorted(
+        setting for setting in public if _SIGN_IN_NAME.get(setting, setting) not in sign_in
+    )
+    assert not missing, f"The sign-in form is missing: {missing}"
+
+
+@pytest.mark.parametrize("choice", ["chrome_windows", "custom"])
+async def test_a_restarted_scan_keeps_its_browser_choice_but_not_typed_text(
+    live_server: tuple[str, int],
+    seeded_db: tuple[Any, Any, int],
+    new_page: Any,
+    choice: str,
+) -> None:
+    from audit.crawler.orchestrator import CrawlConfig
+
+    base, _ = live_server
+    sent = _CHROME_WINDOWS.replace("157", "150") if choice != "custom" else "Partner/1 secret-77"
+    scan_id = _insert_scan(
+        seeded_db[0],
+        seed_url="https://agent.example.test/",
+        config=CrawlConfig(
+            seed_url="https://agent.example.test/",
+            user_agent=sent,
+            user_agent_choice=choice,
+        ),
+        status="interrupted",
+    )
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(f"{base}/app/scans/new?from={scan_id}", wait_until="networkidle")
+    notice = page.get_by_role("status").filter(has_text="Axcess copied the settings")
+    await playwright_async.expect(notice).to_be_visible()
+    await _open_groups(page)
+    box = page.get_by_role("combobox", name=_BROWSER_NAME, exact=True)
+    if choice == "custom":
+        await playwright_async.expect(box).to_contain_text("Type your own")
+        await playwright_async.expect(
+            page.get_by_role("textbox", name=_TYPED_NAME, exact=True)
+        ).to_have_value("")
+        await playwright_async.expect(notice).to_contain_text(
+            "Axcess does not keep a browser name you typed"
+        )
+    else:
+        # The listed browser as it is now, not the version the old scan sent.
+        await playwright_async.expect(box).to_contain_text("Chrome on Windows")
+        await playwright_async.expect(page.locator("#speed")).to_contain_text(_CHROME_WINDOWS)
+    assert "secret-77" not in await page.content()
+    assert "Chrome/150" not in await page.content()

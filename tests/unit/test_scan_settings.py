@@ -4,7 +4,7 @@ The snapshot is how a failed or stopped scan is started again without
 re-entering every setting. These tests pin the two things that matter: every
 form setting survives the trip through ``config_json``, and nothing that is
 not a form setting (credentials, session state, the post-sign-in landing URL,
-the user agent) can come back out.
+the user agent string) can come back out.
 """
 
 from __future__ import annotations
@@ -51,16 +51,28 @@ _CUSTOM_FORM: dict[str, Any] = {
     "skip_semantic": False,
     "skip_focus": True,
     "skip_markup": True,
+    "skip_documents": True,
     "skip_visual": False,
     "skip_forms": False,
     "send_empty_forms": True,
     "skip_rendered_storage": True,
     "axe_level": "AAA",
     "wcag_version": "2.2",
+    "user_agent_choice": "safari_mac",
+    # Never sent back: the form fills in a listed browser's string itself.
+    "user_agent": "",
 }
+
+_SAFARI = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 "
+    "(KHTML, like Gecko) Version/27.2 Safari/605.1.15"
+)
 
 
 def _round_trip(form: dict[str, Any]) -> dict[str, Any]:
+    # What the form posts: the chosen browser's string rides along.
+    if form.get("user_agent_choice", "axcess") != "axcess":
+        form = {**form, "user_agent": _SAFARI}
     config = server._build_crawl_config(form, Settings())
     snapshot = snapshot_from_config(
         scan_id=7, seed_url=form["url"], config_json=config_json_for_scan(config)
@@ -72,6 +84,16 @@ def _round_trip(form: dict[str, Any]) -> dict[str, Any]:
 
 def test_every_public_form_setting_round_trips() -> None:
     assert _round_trip(_CUSTOM_FORM) == _CUSTOM_FORM
+
+
+def test_the_browser_name_is_stored_but_only_its_choice_comes_back() -> None:
+    config = server._build_crawl_config({**_CUSTOM_FORM, "user_agent": _SAFARI}, Settings())
+    stored = json.loads(config_json_for_scan(config))
+    assert (stored["user_agent"], stored["user_agent_choice"]) == (_SAFARI, "safari_mac")
+    snapshot = snapshot_from_config(
+        scan_id=7, seed_url=_CUSTOM_FORM["url"], config_json=config_json_for_scan(config)
+    )
+    assert "Safari/605" not in snapshot.model_dump_json()
 
 
 def test_the_form_defaults_round_trip() -> None:
@@ -95,12 +117,14 @@ def test_the_form_defaults_round_trip() -> None:
         "skip_semantic": True,
         "skip_focus": False,
         "skip_markup": False,
+        "skip_documents": False,
         "skip_visual": True,
         "skip_forms": True,
         "send_empty_forms": False,
         "skip_rendered_storage": False,
         "axe_level": "AA",
         "wcag_version": "2.1",
+        "user_agent_choice": "axcess",
     }
     assert _round_trip(defaults) == defaults
 
@@ -279,3 +303,19 @@ def test_an_old_or_unreadable_config_falls_back_to_form_defaults(
 def test_limit_refusal(body: dict[str, Any], field: str | None) -> None:
     refusal = limit_refusal(body)
     assert (refusal[0] if refusal else None) == field
+
+
+def test_the_document_check_is_on_unless_turned_off() -> None:
+    """A client that sends nothing gets the Documents tab, and a scan made
+    before the switch existed runs it again when scanned again."""
+    sent = {key: value for key, value in _CUSTOM_FORM.items() if key != "skip_documents"}
+    config = server._build_crawl_config(sent, Settings())
+    assert config.linked_files_enabled is True
+    off = server._build_crawl_config({**sent, "skip_documents": True}, Settings())
+    assert off.linked_files_enabled is False
+    stored = json.loads(config_json_for_scan(config))
+    stored.pop("linked_files_enabled", None)
+    snapshot = snapshot_from_config(
+        scan_id=7, seed_url="https://example.test/", config_json=json.dumps(stored)
+    )
+    assert snapshot.settings.skip_documents is False

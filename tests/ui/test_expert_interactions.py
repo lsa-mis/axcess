@@ -9,6 +9,8 @@ import pytest
 
 from audit.exports.audit_report import load_report_rules
 
+from .conftest import ALL_HOW_SURE
+
 # One browser per module (tests/ui/conftest.py), so the tests run on the
 # module's event loop. Each ``new_page`` call still opens its own context.
 pytestmark = [pytest.mark.ui, pytest.mark.asyncio(loop_scope="module")]
@@ -91,11 +93,13 @@ async def test_issue_table_filters_are_keyboard_operable(
     """The simplified table needs only ordinary form and link interactions."""
     base, scan_id = live_server
     page = await new_page()
-    await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+    # Every "How sure" value shown: the logo row is For information, which
+    # the table holds back when it opens.
+    await page.goto(f"{base}/app/scans/{scan_id}/issues?{ALL_HOW_SURE}", wait_until="networkidle")
     search = page.get_by_label("Search issues")
     await search.focus()
     await search.fill("logo")
-    await page.wait_for_url("**?q=logo")
+    await page.wait_for_url("**q=logo*")
     # The row header holds the issue's own link; the count link beside
     # it names the issue too, so its purpose stands alone (SC 2.4.9).
     await playwright_async.expect(
@@ -106,8 +110,9 @@ async def test_issue_table_filters_are_keyboard_operable(
     await search.press("Tab")
     # The next stop is the one Filter menu (Level, Type, Finding type). Its
     # visible text is its accessible name; there is no second, different
-    # one via aria-label.
-    filters = page.get_by_role("button", name="Filter issues", exact=True)
+    # one via aria-label. "1 active" is the badge for the How sure group
+    # this page was opened with.
+    filters = page.get_by_role("button", name="Filter issues 1 active", exact=True)
     await playwright_async.expect(filters).to_be_focused()
     await playwright_async.expect(filters).to_have_attribute("aria-expanded", "false")
 

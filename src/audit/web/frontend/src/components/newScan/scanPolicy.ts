@@ -1,6 +1,13 @@
 import type { LocalLoginScanPayload, NewScanPayload, ScanSettingsSnapshot } from "../../api/types";
 import { withScheme } from "../../lib/webAddress";
-import { ERRORS, FIXED_NOTE_LOGIN, NUMBERS, SUBMIT, URL_COPY } from "./copy";
+import { ERRORS, NUMBERS, SUBMIT, URL_COPY } from "./copy";
+import {
+  CUSTOM_USER_AGENT_CHOICE,
+  DEFAULT_USER_AGENT_CHOICE,
+  knownChoice,
+  MAX_USER_AGENT_LENGTH,
+  userAgentToSend,
+} from "./userAgents";
 
 /**
  * One settings model for both scan forms.
@@ -22,6 +29,7 @@ export type FieldKey =
   | "max_pages"
   | "max_depth"
   | "static_only"
+  | "user_agent"
   | "authorized"
   | "image_ack"
   | "form";
@@ -66,17 +74,25 @@ const SETTING_KEYS = [
   "skip_semantic",
   "skip_focus",
   "skip_markup",
+  "skip_documents",
   "skip_visual",
   "skip_forms",
   "send_empty_forms",
   "skip_rendered_storage",
   "axe_level",
   "wcag_version",
+  // The choice, not the typed text: text left in the box after choosing
+  // another entry is not sent, so it does not make the settings Customized.
+  "user_agent_choice",
 ] as const satisfies ReadonlyArray<keyof ScanSettings>;
 
 export const PUBLIC_DEFAULTS: ScanSettings = {
   url: "",
-  max_pages: 2500,
+  // 10,000 pages unless the person chooses otherwise (2026-11-16, the
+  // developer's decision). It was 5,000 from 2026-11-14, and 2,500 before
+  // that. A scan that reaches the limit says so in its report, with the
+  // pages it found, so the limit is never hidden.
+  max_pages: 10000,
   all_pages: false,
   max_depth: 10,
   rps: 2.0,
@@ -99,14 +115,18 @@ export const PUBLIC_DEFAULTS: ScanSettings = {
   skip_focus: false,
   // On by default: it only reads the page code, after the rule check.
   skip_markup: false,
+  // On by default (the developer's request, 2026-11-14): it lists the files
+  // the pages link to and checks each PDF, downloading it once to this
+  // computer and keeping the result, not the file.
+  skip_documents: false,
   skip_visual: true,
   // On for public websites (2026-11-02, the developer's decision, after the
   // safety review): it presses submit buttons, with nothing typed, and
   // nothing leaves the page meanwhile (the guard's strict mode and the socket
   // hold, docs/internal/form-error-check.md). A clear failure is Mostly
   // sure and an unclear one Not sure (2026-11-05, the developer's decision);
-  // it is not yet validated on real forms. Never in a sign-in scan
-  // (LOGIN_POLICY below).
+  // it is not yet validated on real forms. Off by default in a sign-in scan
+  // (LOGIN_DEFAULTS below).
   skip_forms: false,
   // Sending an empty form to the site is never a default: the site may act
   // on it (a blank message emailed to someone). Chosen per scan, on a site
@@ -117,13 +137,23 @@ export const PUBLIC_DEFAULTS: ScanSettings = {
   // The current U-M standard. 2.2 is a deliberate choice, and marks the
   // settings Customized.
   wcag_version: "2.1",
+  // Chrome's name, as the Chromium Axcess runs, unless the person chooses
+  // otherwise (2026-11-16; userAgents.ts). Axcess's own name is a choice.
+  user_agent_choice: DEFAULT_USER_AGENT_CHOICE,
+  user_agent: "",
 };
 
 /** The login form's own defaults, on the shared shape. */
 export const LOGIN_DEFAULTS: ScanSettings = {
   ...PUBLIC_DEFAULTS,
+  // 10,000 pages, the same default as a public scan (2026-11-16, the
+  // developer's decision; it was 2,500). It is also the sign-in scan's
+  // maximum (LOGIN_POLICY.caps below), which stays under the public one.
+  max_pages: 10000,
   rps: 1,
-  workers: 2,
+  // One signed-in tab per worker; a tab the site signs out sends the scan
+  // back to one tab (audit.crawler.tab_pool), so 4 costs speed at worst.
+  workers: 4,
   // A signed-in session is the only way to reach these pages; robots.txt is
   // written for anonymous crawlers, and the authorization checkbox is the
   // consent that replaces it.
@@ -131,6 +161,10 @@ export const LOGIN_DEFAULTS: ScanSettings = {
   // Protected images are only read after the reviewer acknowledges where
   // the evidence is stored, so image text reading starts off.
   skip_ocr: true,
+  // Offered since 2026-11-16 (every setting the public form has), but off by
+  // default here: pressing a form's submit button while signed in acts as
+  // the person signed in. The public default checks forms.
+  skip_forms: true,
 };
 
 // The address as it will be scanned: a scheme typed or not, it is completed
@@ -146,7 +180,9 @@ function parseUrl(raw: string): URL | null {
 
 export const PUBLIC_POLICY: ScanPolicy = {
   mode: "public",
-  caps: { max_pages: 10000, max_depth: 20, rps: 50, workers: 32 },
+  // 20,000 pages at most (2026-11-16, the developer's decision; it was
+  // 10,000). Mirrors PUBLIC_MAX_PAGES in src/audit/web/scan_settings.py.
+  caps: { max_pages: 20000, max_depth: 20, rps: 50, workers: 32 },
   defaults: PUBLIC_DEFAULTS,
   fixed: {},
   fixedNote: null,
@@ -168,29 +204,27 @@ export const PUBLIC_POLICY: ScanPolicy = {
 
 export const LOGIN_POLICY: ScanPolicy = {
   mode: "login",
-  caps: { max_pages: 2500, max_depth: 20, rps: 5, workers: 4 },
+  // 10,000 pages at most (2026-11-16; it was 2,500): the developer raised
+  // the sign-in default to 10,000, so the cap rose with it. Kept at 10,000,
+  // under the public 20,000: it mirrors LocalLoginScanRequest in
+  // src/audit/web/server.py and the sign-in index's own 10,000-page limit
+  // (src/audit/protected/companion.py, repository.py).
+  caps: { max_pages: 10000, max_depth: 20, rps: 5, workers: 8 },
   defaults: LOGIN_DEFAULTS,
-  fixed: {
-    // A signed-in session keeps its page cap: an unbounded crawl behind a
-    // sign-in is a load the session and the site owner did not agree to.
-    all_pages: false,
-    include_subdomain: false,
-    static_only: false,
-    ignore_robots: true,
-    // Not offered for signed-in scans; the login payload has no field for
-    // them, so they stay at their defaults and are dropped at submit.
-    skip_semantic: true,
-    skip_focus: false,
-    // Always on in a signed-in scan (the server runs it); it only reads the
-    // page, so it is as safe there as the rule check.
-    skip_markup: false,
-    skip_visual: true,
-    // Never in a signed-in session: pressing submit there could act as the
-    // person signed in, even with requests blocked.
-    skip_forms: true,
-    send_empty_forms: false,
-  },
-  fixedNote: FIXED_NOTE_LOGIN,
+  // Nothing is fixed (2026-11-16, the developer's decision): the sign-in
+  // form offers every setting the public form does, 1:1, and
+  // tests/ui/test_new_scan_form.py checks that no setting is missing. Until
+  // then it held back the page limit's "no limit", subdomains, robots.txt,
+  // the fast scan, the focus, page code, AI review, visual and form error
+  // checks, and the browser name. Where a setting means something more
+  // behind a sign-in, its hint says so (SIGN_IN_NOTES in copy.ts). Defaults
+  // may still differ (LOGIN_DEFAULTS).
+  // The document check too, since 2026-11-16 (the developer's decision):
+  // in a sign-in scan its PDFs download through the signed-in browser, and
+  // files on other sites are listed but not downloaded (copy.ts, the
+  // switch's signed-in hint).
+  fixed: {},
+  fixedNote: null,
   urlLabel: URL_COPY.login.label,
   urlHelp: URL_COPY.login.help,
   urlPlaceholder: URL_COPY.login.placeholder,
@@ -274,6 +308,10 @@ export function validateScan(
   if (settings.static_only && settings.scan_engine !== "alfa") {
     errors.push({ field: "static_only", message: ERRORS.staticWithAxe });
   }
+  if (settings.user_agent_choice === CUSTOM_USER_AGENT_CHOICE) {
+    const message = userAgentError(settings.user_agent);
+    if (message) errors.push({ field: "user_agent", message });
+  }
   if (policy.mode === "login") {
     if (!extras.authorized) {
       errors.push({ field: "authorized", message: ERRORS.notAuthorized });
@@ -283,6 +321,31 @@ export function validateScan(
     }
   }
   return errors;
+}
+
+/**
+ * A message for a typed browser name (user agent), or null when it can be
+ * sent. The same rules the server applies (`audit.crawler.user_agent`).
+ */
+export function userAgentError(typed: string): string | null {
+  const text = typed.trim();
+  if (!text) return ERRORS.userAgentEmpty;
+  if (text.length > MAX_USER_AGENT_LENGTH) return ERRORS.userAgentLong(MAX_USER_AGENT_LENGTH);
+  if (!/^[\x20-\x7e]+$/.test(text)) return ERRORS.userAgentCharacters;
+  return null;
+}
+
+/**
+ * What the public create endpoint is sent: the address completed, and the
+ * chosen browser's exact string in `user_agent` (empty for Axcess's own
+ * name, which the server fills in).
+ */
+export function publicPayload(settings: ScanSettings): ScanSettings {
+  return {
+    ...settings,
+    url: withScheme(settings.url),
+    user_agent: userAgentToSend(settings.user_agent_choice, settings.user_agent) ?? "",
+  };
 }
 
 /** The subset the local-login API accepts, with the URL normalized. */
@@ -297,10 +360,14 @@ export function toLocalLoginPayload(
     approved_auth_origins: [],
     authorization_acknowledged: true,
     max_pages: settings.max_pages,
+    all_pages: settings.all_pages,
     max_depth: settings.max_depth,
     rps: settings.rps,
     workers: settings.workers,
     whole_host: settings.whole_host,
+    include_subdomain: settings.include_subdomain,
+    ignore_robots: settings.ignore_robots,
+    static_only: settings.static_only,
     show_browser: settings.show_browser,
     scan_engine: settings.scan_engine,
     axe_level: settings.axe_level,
@@ -308,6 +375,15 @@ export function toLocalLoginPayload(
     skip_interaction: settings.skip_interaction,
     skip_keyboard: settings.skip_keyboard,
     skip_responsive: settings.skip_responsive,
+    skip_focus: settings.skip_focus,
+    skip_markup: settings.skip_markup,
+    skip_documents: settings.skip_documents,
+    skip_semantic: settings.skip_semantic,
+    skip_visual: settings.skip_visual,
+    skip_forms: settings.skip_forms,
+    send_empty_forms: !settings.skip_forms && settings.send_empty_forms,
+    user_agent_choice: settings.user_agent_choice,
+    user_agent: userAgentToSend(settings.user_agent_choice, settings.user_agent) ?? "",
     skip_ocr: settings.skip_ocr,
     skip_vlm: settings.skip_vlm,
     skip_rendered_storage: settings.skip_rendered_storage,
@@ -329,6 +405,7 @@ export type SwitchKey =
   | "keyboard"
   | "focus"
   | "markup"
+  | "documents"
   | "forms"
   | "responsive"
   | "skip_rendered_storage"
@@ -347,6 +424,7 @@ const SWITCH_FIELDS: Record<SwitchKey, { field: keyof ScanSettings; inverted: bo
   keyboard: { field: "skip_keyboard", inverted: true },
   focus: { field: "skip_focus", inverted: true },
   markup: { field: "skip_markup", inverted: true },
+  documents: { field: "skip_documents", inverted: true },
   forms: { field: "skip_forms", inverted: true },
   responsive: { field: "skip_responsive", inverted: true },
   skip_rendered_storage: { field: "skip_rendered_storage", inverted: false },
@@ -404,6 +482,9 @@ const CHECKS: ReadonlyArray<{ key: SwitchKey; group: CheckGroup; label: string; 
   { key: "markup", group: "checks", label: "Page code", needsBrowser: true },
   { key: "forms", group: "checks", label: "Form errors", needsBrowser: true },
   { key: "responsive", group: "checks", label: "Responsive & zoom", needsBrowser: true },
+  // Last of the checks, as its switch is; it needs no browser (finding a
+  // page's links works in Fast scan too).
+  { key: "documents", group: "checks", label: "Documents" },
   { key: "ocr", group: "localAi", label: "Image text (OCR)" },
   { key: "vision", group: "localAi", label: "Vision model" },
   { key: "semantic", group: "localAi", label: "Wording review" },
@@ -461,5 +542,12 @@ export function quickRetrySettings(url: string, wcagVersion: ScanSettings["wcag_
  * were so validation can name them instead of silently changing them.
  */
 export function settingsFromSnapshot(snapshot: ScanSettingsSnapshot, policy: ScanPolicy): ScanSettings {
-  return applyPolicy({ ...policy.defaults, ...snapshot.settings }, policy);
+  const settings = { ...policy.defaults, ...snapshot.settings };
+  // A browser this form no longer lists falls back to the default (Chrome
+  // on this computer) rather than to a choice the Select cannot show.
+  if (!knownChoice(settings.user_agent_choice)) {
+    settings.user_agent_choice = DEFAULT_USER_AGENT_CHOICE;
+    settings.user_agent = "";
+  }
+  return applyPolicy(settings, policy);
 }

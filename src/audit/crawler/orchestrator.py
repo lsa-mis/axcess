@@ -56,7 +56,7 @@ from audit.analyzer.vlm.vision import OllamaVisionProvider
 from audit.blob_store import BlobStore
 from audit.config import get_settings
 from audit.crawler import live_progress, url_policy
-from audit.crawler.fetcher import FetchError, FetchResult, StaticFetcher
+from audit.crawler.fetcher import FetchError, FetchResult, PageFetcher, StaticFetcher
 from audit.crawler.js_fetcher import JsFetcher
 from audit.crawler.rate_limit import HostLimiter
 from audit.crawler.render_detect import (
@@ -69,9 +69,13 @@ from audit.crawler.search import SearchConfig, SearchExplorer, search_url_allowe
 from audit.crawler.style_snapshot import SheetRef, StoredStyles, StyleSnapshot
 from audit.crawler.url_policy import HostScope
 from audit.db import queue, repo
+from audit.db.reports import record_pages_found
 from audit.db.schema import write_batch
 from audit.extractor.downloader import ImageDownloader, ImageDownloaderProtocol
 from audit.extractor.pipeline import OcrConfig, VlmConfig, process_page
+from audit.linked_files import formats as linked_file_formats
+from audit.linked_files.fetch import FileFetcher
+from audit.linked_files.tracker import LinkedFileTracker
 from audit.logging import get_logger
 from audit.synthesizer.findings import synthesize_findings
 from audit.wcag_version import (
@@ -131,6 +135,14 @@ class CrawlConfig:
     concurrency_per_host: int = 2
     workers: int = 4
     user_agent: str = "axcess/0.1 (+local accessibility audit)"
+    # The name robots.txt rules are matched against. None means
+    # ``user_agent``. Set to Axcess's own name when the scan sends a
+    # browser's name instead (``audit.crawler.user_agent``), so choosing
+    # "Chrome" never changes which robots.txt rules apply.
+    robots_user_agent: str | None = None
+    # Which entry of New scan's browser-name list was chosen; None when the
+    # scan kept Axcess's own name or was not started from that form.
+    user_agent_choice: str | None = None
     request_timeout_s: float = 30.0
     # OCR, disable with ``ocr_enabled=False`` or by passing ``--skip-ocr`` on the CLI.
     ocr_enabled: bool = True
@@ -340,6 +352,17 @@ class CrawlConfig:
     # inspector then always re-renders on demand. Finding evidence,
     # screenshots, and image blobs are unaffected.
     store_rendered_html: bool = True
+    # Linked files, the report's Documents tab (``audit.linked_files``):
+    # record every PDF, Office or Google file the scanned pages link to,
+    # where from, and check each PDF during the crawl, including a PDF on
+    # another host (one file, never a crawl of that host).
+    linked_files_enabled: bool = True
+    # A sign-in scan's document check (2026-11-16): its PDFs are downloaded
+    # only through the signed-in browser (``run_crawl``'s ``file_fetcher``),
+    # whose egress policy keeps them to the signed-in site. Without that
+    # fetcher the check does not run at all, never with anonymous requests.
+    # Other browser-only scans (the protected agent pipeline) never run it.
+    documents_signed_in: bool = False
     # The row this crawl must write into, when the caller already created it.
     # ``_prepare_scan_row`` and ``_ensure_scan`` each work out "which row is
     # this crawl" from the seed URL, and they do not work it out the same way.
@@ -433,8 +456,20 @@ async def run_crawl(
     vlm_provider: VlmProvider | None = None,
     image_downloader: ImageDownloaderProtocol | None = None,
     alfa_analyzer: AlfaPageAnalyzer | None = None,
+    static_fetcher: PageFetcher | None = None,
+    file_fetcher: FileFetcher | None = None,
 ) -> CrawlSummary:
-    """Execute (or resume) a crawl for ``config.seed_url``."""
+    """Execute (or resume) a crawl for ``config.seed_url``.
+
+    ``static_fetcher`` replaces the anonymous static fetch: a sign-in scan
+    that loads pages without running scripts passes one that goes through
+    the signed-in browser (``AuthenticatedStaticFetcher``). ``file_fetcher``
+    does the same for the document check's downloads
+    (``SignedInFileFetcher``); a scan with ``documents_signed_in`` must pass
+    it.
+    """
+    if config.documents_signed_in and _linked_files_on(config) and file_fetcher is None:
+        raise ValueError("A sign-in scan's document check needs the signed-in file fetcher")
     # Path-auto-slash first (``/bicentennial`` → ``/bicentennial/``), then
     # the canonical normalize pass. Scope then reads the normalized path.
     seed_with_slash = url_policy.normalize_seed_url(config.seed_url)
@@ -505,8 +540,8 @@ async def run_crawl(
 
     owned_client = http_client is None
     client = http_client or _default_client(config)
-    robots = RobotsChecker(client, user_agent=config.user_agent)
-    fetcher = StaticFetcher(client)
+    robots = RobotsChecker(client, user_agent=config.robots_user_agent or config.user_agent)
+    fetcher: PageFetcher = static_fetcher or StaticFetcher(client)
     blob_store = BlobStore(get_settings().blob_dir)
     downloader = image_downloader or ImageDownloader(client, blob_store)
     ocr_pool: OcrPool | None = None
@@ -521,7 +556,7 @@ async def run_crawl(
         )
     # The AI checks share the crawl's client, as before, unless the model
     # service is behind a UNIX socket, which needs its own transport.
-    model_client = _model_http_client(config, client)
+    model_client = model_http_client(config, client)
     vlm_config = await _build_vlm(config, model_client, vlm_provider)
     # Build the axe analyzer once for the whole crawl. Reads the bundled
     # axe.min.js off disk; reuses the same JS source across every page so
@@ -594,7 +629,7 @@ async def run_crawl(
     if config.visual_checks_enabled:
         vision_provider = None
         if config.vlm_enabled:
-            vision_provider = await _build_vision_provider(config, model_client)
+            vision_provider = await build_vision_provider(config, model_client)
         visual_probe = VisualProbe(provider=vision_provider)
     # Interaction probe, opt-in. Shares the crawl's single AxeAnalyzer so
     # axe is injected once per page whether or not this probe runs.
@@ -667,34 +702,71 @@ async def run_crawl(
         in_flight=0,
         summary=summary,
         semantic_analyzers=semantic_analyzers,
+        linked_files=(
+            LinkedFileTracker(
+                conn, scan_id=scan_id, scope=scope, allow_subdomains=config.allow_subdomains
+            )
+            if _linked_files_on(config)
+            else None
+        ),
     )
 
     interrupted = False
+    if ctx.linked_files is not None:
+        # Each page checks the PDFs it links to (check_page), with the
+        # crawl's own client, rate limit and robots rules.
+        ctx.linked_files.attach_downloads(
+            client=client,
+            limiter=limiter,
+            robots=robots,
+            ignore_robots=config.ignore_robots,
+            blocked_url_patterns=config.blocked_url_patterns,
+            excluded_scopes=config.excluded_scopes,
+            # A picture of each readable PDF's first page, unless the scan
+            # chose not to store rendered pages.
+            thumbnails=blob_store if config.store_rendered_html else None,
+            fetch=file_fetcher,
+        )
     try:
         try:
             async with asyncio.TaskGroup() as tg:
                 for _ in range(config.workers):
                     tg.create_task(_worker(ctx))
+            # After the last page and before synthesis: the PDF checks the
+            # pages queued and still running, then anything still waiting.
+            # Inside this block so a stop during it is an interrupted scan
+            # like any other.
+            if ctx.linked_files is not None:
+                await ctx.linked_files.check_pending(
+                    client=client,
+                    limiter=limiter,
+                    robots=robots,
+                    ignore_robots=config.ignore_robots,
+                    blocked_url_patterns=config.blocked_url_patterns,
+                    excluded_scopes=config.excluded_scopes,
+                )
         except* asyncio.CancelledError:
             interrupted = True
     except asyncio.CancelledError:
         interrupted = True
         raise
     finally:
+        # A stop or a failure ends the PDF checks the pages queued; the ones
+        # not finished stay "not checked" in the report.
+        if ctx.linked_files is not None:
+            await ctx.linked_files.cancel_background()
         if interrupted:
             summary.status = "interrupted"
             summary.notes.append("crawl interrupted")
         elif summary.status == "running":
             summary.status = "completed"
-        if (
-            summary.status == "completed"
-            and config.synthesize_enabled
-            and summary.pages_fetched > 0
-        ):
+        # Every scan that saved pages gets its report finished, however it
+        # ended. Synthesis is idempotent, so a crawl resumed later redoes it.
+        if config.synthesize_enabled and summary.pages_fetched > 0:
             try:
                 prior = config.compare_to
                 if prior is None:
-                    prior = _previous_completed_scan(conn, normalized_seed, scan_id)
+                    prior = _previous_report_scan(conn, normalized_seed, scan_id)
                 synth = synthesize_findings(conn, scan_id=scan_id, compare_to=prior)
                 summary.findings_written = synth.findings_written
                 summary.findings_by_severity = synth.by_severity
@@ -743,7 +815,7 @@ def _signed_in_entry_url(start_url: str) -> str:
     return urlunsplit(urlsplit(canonical)._replace(fragment=fragment))
 
 
-def _model_http_client(config: CrawlConfig, client: httpx.AsyncClient) -> httpx.AsyncClient:
+def model_http_client(config: CrawlConfig, client: httpx.AsyncClient) -> httpx.AsyncClient:
     """The HTTP client the AI checks use: the crawl's, or one for a socket."""
     if not config.model_socket and not config.model_routes:
         return client
@@ -898,6 +970,14 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             "ignore_robots": config.ignore_robots,
             "concurrency_per_host": config.concurrency_per_host,
             "user_agent": config.user_agent,
+            # Only when New scan's list chose it, so "Edit settings and retry"
+            # can choose it again. Older rows, and scans that kept Axcess's
+            # own name, omit it.
+            **(
+                {"user_agent_choice": config.user_agent_choice}
+                if config.user_agent_choice is not None
+                else {}
+            ),
             # Pipeline switches, drives the "methods used" UI row.
             "js_eager": config.js_eager,
             "browser_headless": config.browser_headless,
@@ -940,6 +1020,10 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             # was allowed to collect cannot explain the evidence it lacks.
             "capture_screenshots": config.capture_screenshots,
             "store_rendered_html": config.store_rendered_html,
+            # Whether this scan looked for linked files (migration 0039). Older
+            # reports omit it: their Documents tab says the scan predates it
+            # rather than showing an empty list as "none found".
+            "linked_files_enabled": _linked_files_on(config),
             # Read back by the row-discovery predicate, not just by the UI.
             "resumable": config.resumable,
             "search": config.search.model_dump(mode="json") if config.search else None,
@@ -955,6 +1039,21 @@ def config_json_for_scan(config: CrawlConfig) -> str:
 
 # Backwards-compatible private alias (existing call sites/tests).
 _config_json = config_json_for_scan
+
+
+def _linked_files_on(config: CrawlConfig) -> bool:
+    """Linked files are recorded unless turned off.
+
+    A public scan downloads with its own client. A sign-in scan
+    (``documents_signed_in``) downloads only through the signed-in browser,
+    and ``run_crawl`` refuses to start its check without that fetcher. Any
+    other browser-only scan never records them: their links and files can
+    be private to the signed-in user, and nothing would download them as
+    that user.
+    """
+    if not config.linked_files_enabled:
+        return False
+    return config.documents_signed_in or not config.browser_only
 
 
 def _purge_out_of_scope_jobs(
@@ -1125,7 +1224,7 @@ class _WorkerContext:
     scan_id: int
     limiter: HostLimiter
     robots: RobotsChecker
-    static: StaticFetcher
+    static: PageFetcher
     js: _LazyJs | None
     downloader: ImageDownloaderProtocol
     # Shared content-addressed store. Used to persist per-finding element
@@ -1140,6 +1239,8 @@ class _WorkerContext:
     # page. Empty when ``config.semantic_enabled`` is False, the
     # provider can't reach Ollama, or no SC is registered.
     semantic_analyzers: list[Any] = field(default_factory=list)
+    # The report's Documents tab; None when the scan does not record them.
+    linked_files: LinkedFileTracker | None = None
 
 
 async def _build_vlm(
@@ -1171,7 +1272,7 @@ async def _build_vlm(
     return VlmConfig(provider=ollama)
 
 
-async def _build_vision_provider(
+async def build_vision_provider(
     config: CrawlConfig,
     client: httpx.AsyncClient,
 ) -> OllamaVisionProvider | None:
@@ -1316,6 +1417,10 @@ def _tracked_checks(ctx: _WorkerContext) -> list[str]:
         checks.append("image")
     if ctx.semantic_analyzers:
         checks.append("semantic")
+    # The document check: each page's document links, and the PDFs among
+    # them not checked yet, checked with the page.
+    if ctx.linked_files is not None:
+        checks.append("documents")
     return checks
 
 
@@ -1443,6 +1548,21 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
             states=0,
             screenshots={},
             count_page=False,
+        )
+    # A linked file the crawler fetched itself: an in-scope PDF or Office
+    # file, or an address with no extension that answered with a file's
+    # Content-Type. HTML answers too: a ".pdf" address that answers with an
+    # error page or a sign-in page is a file that could not be checked. The
+    # crawl's own handling of the response does not change.
+    if ctx.linked_files is not None:
+        await ctx.linked_files.record_response(
+            url=url,
+            status_code=result.status_code,
+            content_type=result.content_type,
+            body=result.body,
+            # Only a plain HTTP response carries the file's own bytes; a
+            # browser's is the page it rendered around them.
+            complete=render_mode == "static",
         )
     redirected = bool(result.url and result.url != url)
     if redirected:
@@ -1665,6 +1785,22 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
 
     if not result.is_html or not result.is_ok:
         return
+    # Before the depth and page limits: a page at the last depth still links
+    # to files, and its files are checked even though its pages are not.
+    if ctx.linked_files is not None and page_id is not None:
+        # "documents" on the progress page (Document check): this page's
+        # document links found now, and the PDFs among them that no earlier
+        # page had checked, downloaded and checked in the background. The
+        # worker does not wait for them; the check is marked done when they
+        # are (live_progress.later).
+        documents_done = live_progress.later("documents")
+        ctx.linked_files.record_page(
+            page_id=page_id,
+            base_url=result.url,
+            body=result.body,
+            revealed=result.revealed_links,
+        )
+        ctx.linked_files.queue_page(page_id, documents_done)
     if depth >= ctx.config.max_depth:
         return
     if _page_limit_reached(ctx):
@@ -1818,6 +1954,17 @@ def _enqueue_children(
         if normalized in seen:
             continue
         seen.add(normalized)
+        # A link whose address names a document (a .pdf, .docx, a Google
+        # file) is not a page: the crawl does not fetch it. The document
+        # check (when on) downloads and checks it in the background, and it
+        # never takes a slot of the page cap or a line in Pages visited
+        # (2026-11-14, the developer's decision: a 50-page cap means 50 web
+        # pages). With the document check off, it is not downloaded at all.
+        # An address with no extension that answers with a file's
+        # Content-Type is still fetched, and recognised then.
+        if linked_file_formats.classify_url(normalized) is not None:
+            log.debug("crawl.link_refused", url=normalized, source=base_url, reason="document")
+            continue
         if not url_policy.is_in_scope(
             normalized, ctx.scope, allow_subdomains=ctx.config.allow_subdomains
         ):
@@ -2533,10 +2680,14 @@ def _persist_semantic(
         ctx.summary.semantic_findings_total += written
 
 
-def _previous_completed_scan(
+def _previous_report_scan(
     conn: sqlite3.Connection, seed_url: str, current_scan_id: int
 ) -> int | None:
-    """Most-recent completed scan of the same logical site, excluding ``current``.
+    """Most-recent report of the same logical site, excluding ``current``.
+
+    A completed scan, or any scan that ended with saved pages, however it
+    ended. ``page_count`` stays 0 until a scan ends, so a running scan is
+    never picked.
 
     Matching uses :func:`audit.crawler.url_policy.compare_key`, which drops
     ports on loopback hosts so a dev-server port change doesn't hide the
@@ -2546,7 +2697,7 @@ def _previous_completed_scan(
     rows = conn.execute(
         """
         SELECT id, seed_url FROM scans
-         WHERE status = 'completed' AND id <> ?
+         WHERE (status = 'completed' OR page_count > 0) AND id <> ?
          ORDER BY id DESC
         """,
         (current_scan_id,),
@@ -2574,3 +2725,4 @@ def _finalize_scan(conn: sqlite3.Connection, scan_id: int, summary: CrawlSummary
         """,
         (summary.status, int(page_count), summary.errors, scan_id),
     )
+    record_pages_found(conn, scan_id)

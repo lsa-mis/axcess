@@ -49,12 +49,29 @@ def _sorted(content: bytes) -> str:
     return json.dumps(json.loads(content), sort_keys=True)
 
 
+# Every model these tests name, listed as local. Before each send, Axcess
+# reads Ollama's model list and refuses a cloud model or one it cannot find
+# (``ollama_base.why_not_local``, from main 2026-11-16). That read is a GET
+# of /api/tags; the generate request itself is what must not change.
+LOCAL_MODELS = [
+    "qwen3-vl:2b-instruct",
+    "qwen2-vl:7b",
+    "local-test",
+    "qwen2.5:7b-instruct",
+    "qwen2.5:14b-instruct",
+    "coder:7b",
+    "vision:7b",
+]
+
+
 class _Capture:
     def __init__(self, reply: dict[str, Any]) -> None:
         self.requests: list[httpx.Request] = []
         self._reply = reply
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
+        if request.method == "GET" and request.url.path == "/api/tags":
+            return httpx.Response(200, json={"models": [{"name": m} for m in LOCAL_MODELS]})
         self.requests.append(request)
         return httpx.Response(200, json=self._reply)
 

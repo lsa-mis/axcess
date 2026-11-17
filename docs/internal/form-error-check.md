@@ -3,7 +3,8 @@
 Status: built, measured on synthetic pages, and wired into scans behind the
 New scan switch "Check that forms describe their errors", **on by default for
 public websites** since 2026-11-02 (the developer's decision, after the safety
-review below), never in sign-in scans, and off in "Scan again with faster
+review below), off by default in sign-in scans (offered there since
+2026-11-16; see the policy below), and off in "Scan again with faster
 settings". It is not yet validated on real forms by experts. Code:
 `src/audit/analyzer/forms/`. Metric: the real-page set, `tests/real_pages/`.
 Regression tests: `tests/integration/test_form_error_identification.py`.
@@ -197,8 +198,9 @@ checked": it is checked only on its server, so its red questions appear
 only in the page the server sends back. New scan's form question has a third
 answer, **Check forms, and send empty ones to this site**
 (`send_empty_forms`, stored as `form_send_empty_forms`). It is never a
-default, never offered in sign-in scans (the browser never runs the check
-in a signed-in session), and off in "Scan again with faster settings".
+default, and off in "Scan again with faster settings". Since 2026-11-16 a
+sign-in scan offers it too, where the site receives each empty form from
+the signed-in account; New scan says so beside the choice.
 
 A form is sent only when all of these hold (`ErrorIdentificationProbe._may_send`):
 the skip rules already passed (sign-in, payment, CAPTCHA, search, delete);
@@ -283,11 +285,16 @@ Ordered by what blocks using the check, then by expected value.
       text", since 2026-11-05): a "Required" hint that only turns red; a
       message only screen readers get; a placeholder that changes to
       "Required"; a message drawn as an image with alt text.
-- [x] Decide the policy for sign-in scans (2026-11-02): never. New scan has
-      no switch for it there, and the fetcher refuses it in a signed-in
+- [x] Decide the policy for sign-in scans (2026-11-02): never. New scan had
+      no switch for it there, and the fetcher refused it in a signed-in
       browser. Pressing submit while signed in could act as the person, even
-      with every request blocked. Revisit only as an explicit opt-in for test
-      accounts, after validation.
+      with every request blocked.
+- [x] Changed (2026-11-16, the developer's decision): the sign-in form offers
+      every setting the public form does, the form error check included, as
+      an explicit opt-in, off by default. Its hints say that each form is
+      pressed, or sent, as the person signed in. Its log lines in a sign-in
+      scan leave out the page address, the form's text and the reply's title
+      (`ErrorIdentificationProbe.private`).
 - [x] Safety review of what the guard cannot block (2026-11-02). Found: it
       let same-origin GET, HEAD and OPTIONS requests through, and it cannot
       see sockets, so a socket open before the press could send, and a new

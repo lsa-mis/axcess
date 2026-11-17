@@ -32,6 +32,9 @@ const IssueDetailRoute = lazy(() => import("./routes/IssueDetail"));
 const IssuePagesRoute = lazy(() => import("./routes/IssuePages"));
 const IssuePageScreenshotsRoute = lazy(() => import("./routes/IssuePageScreenshots"));
 const IssuesRoute = lazy(() => import("./routes/Issues"));
+const ImagesRoute = lazy(() => import("./routes/Images"));
+// One image of the Images tab: its facts and every page it appears on.
+const ImageDetailRoute = lazy(() => import("./routes/ImageDetail"));
 const ScansRoute = lazy(() => import("./routes/Scans"));
 const ScanDetailRoute = lazy(() => import("./routes/ScanDetail"));
 const NewScanRoute = lazy(() => import("./routes/NewScan"));
@@ -46,9 +49,13 @@ const FindingDetailRoute = lazy(() => import("./routes/FindingDetail"));
 const CompareReportsRoute = lazy(() => import("./routes/CompareReports"));
 const WhatChangedRoute = lazy(() => import("./routes/Compare"));
 const TrackingRoute = lazy(() => import("./routes/Tracking"));
+const CoverageRoute = lazy(() => import("./routes/Coverage"));
 const PageEvidenceRoute = lazy(() => import("./routes/PageEvidence"));
 // Every page a report visited; the summary's "Pages visited" links here.
 const PagesVisitedRoute = lazy(() => import("./routes/PagesVisited"));
+// The files a report's pages link to, the report's third tab.
+const DocumentsRoute = lazy(() => import("./routes/Documents"));
+const DocumentDetailRoute = lazy(() => import("./routes/DocumentDetail"));
 const InspectorRoute = lazy(() => import("./routes/Inspector"));
 const AboutRoute = lazy(() => import("./routes/About"));
 const SettingsRoute = lazy(() => import("./routes/Settings"));
@@ -101,14 +108,26 @@ export default function App() {
           path="/scans/:scanId/a11y/by-rule"
           element={<ProtectedReportGate><A11yByRuleRoute /></ProtectedReportGate>}
         />
+        <Route path="/scans/:scanId/images" element={<ProtectedReportGate><ImagesRoute /></ProtectedReportGate>} />
+        <Route
+          path="/scans/:scanId/images/:imageId"
+          element={<ProtectedReportGate><ImageDetailRoute /></ProtectedReportGate>}
+        />
         <Route path="/scans/:scanId/compare" element={<ProtectedReportGate><CompareReportsRoute /></ProtectedReportGate>} />
         <Route
           path="/scans/:scanId/compare/changes"
           element={<ProtectedReportGate><WhatChangedRoute /></ProtectedReportGate>}
         />
+        <Route path="/scans/:scanId/documents" element={<ProtectedReportGate><DocumentsRoute /></ProtectedReportGate>} />
+        <Route
+          path="/scans/:scanId/documents/:fileId"
+          element={<ProtectedReportGate><DocumentDetailRoute /></ProtectedReportGate>}
+        />
         <Route path="/scans/:scanId/diff" element={<LegacyDiffRedirect />} />
         <Route path="/findings/:findingId" element={<FindingDetailRoute />} />
         <Route path="/tracking" element={<TrackingRoute />} />
+        <Route path="/coverage" element={<CoverageRoute view="checks" />} />
+        <Route path="/coverage/found" element={<CoverageRoute view="found" />} />
         <Route path="/about" element={<AboutRoute />} />
         <Route path="/settings" element={<SettingsRoute />} />
         <Route path="/settings/ai" element={<AiSetupRoute />} />

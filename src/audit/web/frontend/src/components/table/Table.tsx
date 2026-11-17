@@ -1,15 +1,18 @@
 import {
+  Fragment,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type HTMLAttributes,
   type ReactNode,
   type Ref,
+  type RefObject,
   type TdHTMLAttributes,
   type ThHTMLAttributes,
 } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, Search } from "lucide-react";
+import { ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, Search } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { ariaSort, nextSort, sortChip, type Sort, type SortKind } from "./sort";
 
@@ -23,6 +26,13 @@ import { ariaSort, nextSort, sortChip, type Sort, type SortKind } from "./sort";
  *   TableRegion    the keyboard-scrollable region
  *     Table, TableHead, SortHeader / ColumnHeader
  *     Row, RowHeader, Cell    striped rows, one target tall
+ *   TableFoot      the pager again, under the last row (../TablePagination,
+ *                  `place="end"`), so a reader who has read to the end
+ *                  turns the page there
+ *
+ * A paged table wraps everything from TableBar down in `PagedTable`
+ * (../TablePagination), which draws the pager in TableBar and in TableFoot
+ * as one pair, so no table can have one without the other.
  *
  * Tables compose these rather than restyling a <table>, so a change to the
  * design lands everywhere at once.
@@ -42,6 +52,18 @@ const CARD_EDGE = "[[data-card]>&:first-child]:rounded-t-[7px] [[data-card]>&:la
  * rows (search, the Filter menu) on the left, the pager on the right, and
  * `footer` (the active filters) under both. It wraps on a narrow screen
  * rather than clipping: the pager drops under the search.
+ *
+ * The left group asks for 20rem only when it holds a search box, the room
+ * the box needs to be usable before the pager wraps under it. Without one
+ * (the Documents tab: only "Filter documents") it asks for its controls'
+ * own width. A fixed 20rem there pushed a wide pager (909 documents, 91
+ * pages) onto a second line under a lone button at 1440px, leaving the
+ * bar's right half empty on the first line (the developer's report,
+ * 2026-11-16). Rejected: a prop on TableBar for "no search", which every
+ * caller would have to remember; the bar can see whether it has a search
+ * box itself (CSS ``:has()``). The pager still wraps under the controls
+ * when the row is too narrow for both, so nothing scrolls sideways at
+ * 320px (SC 1.4.10 Reflow, Level AA).
  */
 export function TableBar({
   children,
@@ -55,10 +77,36 @@ export function TableBar({
   return (
     <div className={cn("border-b border-border bg-surface-subtle", CARD_EDGE)}>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 px-4 py-3">
-        {children && <div className="flex min-w-0 flex-[1_1_20rem] flex-wrap items-center gap-2">{children}</div>}
+        {children && (
+          <div className="flex min-w-0 flex-[1_1_auto] flex-wrap items-center gap-2 has-[[type=search]]:basis-80">
+            {children}
+          </div>
+        )}
         {pager}
       </div>
       {footer}
+    </div>
+  );
+}
+
+/**
+ * The bar under a table's last row, styled like `TableBar` above it, with
+ * the pager on the right where it sits in the top bar. It holds only the
+ * end-of-table pager (`TablePagination` with `place="end"` draws it, and
+ * `PagedTable` draws that with the top pager), so it is there exactly when
+ * the top pager is: on a table with more than one page. Search and
+ * filters stay in the top bar only; they change what the table holds,
+ * which a reader decides before reading it, not after.
+ */
+export function TableFoot({ children }: { children: ReactNode }) {
+  return (
+    <div
+      className={cn(
+        "flex flex-wrap items-center justify-end border-t border-border bg-surface-subtle px-4 py-3",
+        CARD_EDGE,
+      )}
+    >
+      {children}
     </div>
   );
 }
@@ -208,7 +256,10 @@ export function TableRegion({
   // Whether the table is wider than the region, so the region scrolls
   // sideways. Measured whenever either changes size.
   const [scrolls, setScrolls] = useState(false);
+  // The table's full width, for the top bar's track (see below).
+  const [scrollWidth, setScrollWidth] = useState(0);
   const [node, setNode] = useState<HTMLDivElement | null>(null);
+  const [top, setTop] = useState<HTMLDivElement | null>(null);
   const setRef = useCallback(
     (element: HTMLDivElement | null) => {
       setNode(element);
@@ -219,7 +270,10 @@ export function TableRegion({
   );
   useEffect(() => {
     if (!node) return;
-    const measure = () => setScrolls(node.scrollWidth > node.clientWidth + 1);
+    const measure = () => {
+      setScrolls(node.scrollWidth > node.clientWidth + 1);
+      setScrollWidth(node.scrollWidth);
+    };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(node);
@@ -236,7 +290,68 @@ export function TableRegion({
       node.removeEventListener("focus", onFocus);
     };
   }, [node]);
+  // The top bar and the region scroll together: moving either moves the
+  // other to the same place. Equal positions end the back-and-forth.
+  useEffect(() => {
+    if (!node || !top) return;
+    top.scrollLeft = node.scrollLeft;
+    const follow = (from: HTMLElement, to: HTMLElement) => () => {
+      if (Math.abs(to.scrollLeft - from.scrollLeft) >= 1) to.scrollLeft = from.scrollLeft;
+    };
+    const fromRegion = follow(node, top);
+    const fromTop = follow(top, node);
+    // A click on the bar would focus it (a scrolling box takes focus), and
+    // focus must never rest on something hidden from screen readers (axe
+    // aria-hidden-focus). It goes to the region instead, the one keyboard
+    // control for this scrolling, so the arrow keys carry on from the click.
+    const toRegion = () => node.focus({ preventScroll: true });
+    node.addEventListener("scroll", fromRegion, { passive: true });
+    top.addEventListener("scroll", fromTop, { passive: true });
+    top.addEventListener("focus", toRegion);
+    return () => {
+      node.removeEventListener("scroll", fromRegion);
+      top.removeEventListener("scroll", fromTop);
+      top.removeEventListener("focus", toRegion);
+    };
+  }, [node, top]);
   return (
+    <>
+      {/* A scroll bar over a table that is wider than its region, at the
+          top, so it shows as soon as the table does that the table scrolls
+          sideways, and it can be dragged without first scrolling down to
+          the region's own bar under the last row (the developer's request,
+          2026-11-16). Shown only while the table scrolls. It is the
+          browser's own scroll bar, on a strip as wide as the region with a
+          track as wide as the table, kept in step with the region (the
+          effect above), and styled thin and always visible
+          (.ax-scrollbar in styles.css), so it does not fade away as
+          overlay scroll bars do on a Mac. Its target size, contrast and
+          forced-colours behaviour are set out there.
+          It is for the pointer only, as a browser's own scroll bar is: a
+          scroll bar is never a Tab stop. The keyboard way to scroll is to
+          focus the scrolling box and use the arrow keys, and the region
+          below is that box (SC 2.1.1 Keyboard, Level A; axe
+          scrollable-region-focusable). So the bar is out of the Tab order
+          (tabIndex -1; without it, recent Chromium makes any scrolling box
+          a Tab stop), hidden from screen readers (aria-hidden: a second
+          thing to scroll, read out, would be two controls for one job, W3C
+          COGA, "Making Content Usable"), and a click on it sends focus to
+          the region (the effect above), so focus never rests on hidden
+          content. It has no scrollbar role, as before: a role="scrollbar"
+          widget (WAI-ARIA APG) would need its own focus, value and arrow
+          keys, all of which the region already gives. Rejected: a drawn bar with a draggable thumb, which
+          would be a custom widget, and a "Scroll for more columns" note,
+          which tells but does not let the reader scroll. */}
+      {scrolls && (
+        <div
+          ref={setTop}
+          aria-hidden="true"
+          tabIndex={-1}
+          className={cn("ax-scrollbar overflow-x-auto overflow-y-hidden border-b border-border", CARD_EDGE)}
+        >
+          <div style={{ width: scrollWidth, height: 1 }} />
+        </div>
+      )}
     <div
       ref={setRef}
       role="region"
@@ -273,6 +388,7 @@ export function TableRegion({
     >
       {children}
     </div>
+    </>
   );
 }
 
@@ -360,9 +476,11 @@ export function SortHeader<K extends string>({
   sort,
   onSort,
   kind = "text",
+  align,
   chip,
   wrap = "chip",
   hint,
+  help,
   className,
   children,
   ...th
@@ -371,6 +489,13 @@ export function SortHeader<K extends string>({
   sort: Sort<K> | null;
   onSort: (next: Sort<K>) => void;
   kind?: SortKind;
+  /**
+   * Which side the heading sits on: its column's content's side (see
+   * ``ColumnHeader``). Defaults from ``kind``: right for a number column,
+   * left otherwise. Set it for a column that sorts by a number but shows
+   * words (Issues' Priority sorts by score and shows High, Medium, Low).
+   */
+  align?: "left" | "right";
   /** Words for the chip when the column's order is not plain text, number or date. */
   chip?: (sort: Sort<K>) => string;
   wrap?: "chip" | "words";
@@ -380,11 +505,33 @@ export function SortHeader<K extends string>({
    * reader and shows on focus in the "Always" hints setting.
    */
   hint?: string;
+  /**
+   * A ``HelpTip`` ("?") after the sort button, for a column whose values
+   * need explaining (Issues' "How sure"). Beside the button, not inside it:
+   * one control sorts and the other explains, so neither does two things.
+   * In the middle of the label's line, on the column's side, like the label.
+   *
+   * With a "?", a label that wraps keeps the "?" beside its words: the sort
+   * button is shrunk to its longest line (``useFitToLines``). A wrapped
+   * button is otherwise as wide as the space it was given, not as its text,
+   * so the "?" after it floated apart from the words it explains
+   * ("Accessibility / problems? ⇅ … ?", the developer's screenshot,
+   * 2026-11-16). Proximity says what belongs together (W3C COGA, "Making
+   * Content Usable"). Here, not on one header, so every header with a "?"
+   * gets it; a label on one line looks the same either way. Rejected:
+   * aligning the lines to the "?" (it moved the heading off its column's
+   * side, the rule above) and keeping such a label on one line (it widened
+   * the column until the table scrolled sideways at 1280px).
+   */
+  help?: ReactNode;
   className?: string;
   /** The header's label. Defaults to the column key. */
   children?: ReactNode;
 }) {
   const active = sort?.column === column;
+  const right = (align ?? (kind === "number" ? "right" : "left")) === "right";
+  const button = useRef<HTMLButtonElement>(null);
+  useFitToLines(button, help != null, `${active}-${sort?.direction}-${typeof children === "string" ? children : column}`);
   const Arrow = !sort || !active ? ArrowUpDown : sort.direction === "asc" ? ArrowUp : ArrowDown;
   const words = wrap === "words";
   const label = children ?? column;
@@ -392,18 +539,19 @@ export function SortHeader<K extends string>({
     sort && active ? (
       <span
         key={`${sort.column}-${sort.direction}`}
+        data-sort-mark
         className={cn(
           "inline-flex items-center gap-0.5 whitespace-nowrap rounded-full bg-umich-blue px-1.5 py-px text-2xs font-semibold normal-case tracking-normal text-fg-inverse motion-safe:animate-sort-pop",
         )}
       >
         <Arrow className="h-3 w-3 shrink-0" aria-hidden />
-        {chip ? chip(sort) : sortChip(kind, sort.direction)}
+        {withDrawnArrows(chip ? chip(sort) : sortChip(kind, sort.direction))}
       </span>
     ) : (
       <Arrow
         className={cn(
           "h-3.5 w-3.5 shrink-0 opacity-40 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100",
-          words && "ml-1 inline-block align-[-2px]",
+          words && (right ? "inline-block" : "ml-1 inline-block align-[-2px]"),
         )}
         aria-hidden
       />
@@ -413,25 +561,53 @@ export function SortHeader<K extends string>({
       scope="col"
       aria-sort={sort ? ariaSort(active, sort.direction) : "none"}
       className={cn(
-        "px-3 py-1.5 text-center font-semibold",
+        // 16px at the sides, as the body cells (Cell, RowHeader), with the
+        // sort button pulled out by its own 4px padding (-mx-1 below), so
+        // the heading's words start on the same line as the words under it.
+        // A table that pads its cells otherwise (Issues: px-1.5) gives its
+        // headers the same class, and the two still line up. They were 12px
+        // plus the button's 4px, which matched only the default: with any
+        // other padding the heading sat 4px in from its column's words, and
+        // further where a row header kept the default (the developer's
+        // report, 2026-11-16: "Issue type" was not left-aligned with the
+        // issue types under it).
+        "px-4 py-1.5 font-semibold",
+        right ? "text-right" : "text-left",
         active && "shadow-[inset_0_-3px_0_theme(colors.umich.blue)]",
         className,
       )}
       {...th}
     >
+      {help ? (
+        <span className={cn("inline-flex items-center", right ? "justify-end" : "justify-start")}>
+          {sortButton()}
+          {help}
+        </span>
+      ) : (
+        sortButton()
+      )}
+    </th>
+  );
+
+  function sortButton() {
+    return (
       <button
+        ref={button}
         type="button"
         title={hint}
         onClick={() => onSort(nextSort(sort, column, kind))}
         className={cn(
-          "group inline-flex min-h-target min-w-target justify-center rounded-xs px-1 text-sm font-semibold normal-case tracking-normal hover:bg-border/50 focus-visible:outline-none focus-visible:shadow-focus",
-          // Words at the foot of the target, not its middle: with the cell
-          // bottom-aligned, the last line of every label then sits on one
-          // line, right over the column's data, however many lines each
-          // label takes. The target keeps its full height (SC 2.5.5).
-          words ? "items-end pb-1.5" : "items-center",
-          !words && "flex-wrap justify-center gap-x-1.5 gap-y-0.5",
-          "text-center",
+          // -mx-1: its padding (the hover fill and focus ring's room) sits
+          // outside the words, not in front of them (see the cell above).
+          "group -mx-1 inline-flex min-h-target min-w-target rounded-xs px-1 text-sm font-semibold normal-case tracking-normal hover:bg-border/50 focus-visible:outline-none focus-visible:shadow-focus",
+          right ? "justify-end text-right" : "justify-start text-left",
+          // Words in the middle of the target, so every label sits in the
+          // middle of the header row (the developer's request, 2026-11-16).
+          // They were at its foot, to keep the last line of a two-line label
+          // level with its one-line neighbours, but a one-line label then
+          // sat visibly low. The target keeps its full height (SC 2.5.5).
+          "items-center",
+          !words && "flex-wrap gap-x-1.5 gap-y-0.5",
           active ? "text-umich-blue" : "text-fg-muted",
         )}
       >
@@ -443,7 +619,23 @@ export function SortHeader<K extends string>({
           active ? (
             <span>
               {label}
-              <span className="mt-0.5 flex justify-center">{indicator}</span>
+              <span className={cn("mt-0.5 flex", right ? "justify-end" : "justify-start")}>{indicator}</span>
+            </span>
+          ) : right ? (
+            // A right-aligned label that wraps ("Issue / occurrences"): the
+            // lines are right-aligned to each other and the arrow stands in
+            // its own column after them, centred on the label. With the
+            // arrow after the last word, the last line was pushed left of the
+            // others and "Issue" no longer ended where "occurrences" did
+            // (the developer's screenshots, 2026-11-16). Rejected: the arrow
+            // inline after the last word, the left-aligned columns' way,
+            // which is right where the lines start on the left. Proximity
+            // and alignment: W3C COGA, "Making Content Usable"
+            // (https://www.w3.org/TR/coga-usable/); the sort mark is still
+            // inside the one button (SC 2.5.3 Label in Name, Level A).
+            <span className="inline-flex items-center gap-1">
+              <span className="text-right">{label}</span>
+              {indicator}
             </span>
           ) : (
             <span>{withLastWord(label, indicator)}</span>
@@ -455,8 +647,85 @@ export function SortHeader<K extends string>({
           </>
         )}
       </button>
-    </th>
-  );
+    );
+  }
+}
+
+/**
+ * Shrinks a sort button whose label wrapped to the width of its longest
+ * line, so a "?" after it sits beside the words (see SortHeader's ``help``).
+ * CSS has no width that fits wrapped lines: a box that wraps is as wide as
+ * the space it was given. So this measures the label's text and its sort
+ * mark (arrow or chip) after layout and caps the button at that width, and
+ * measures again whenever the header cell changes size (a window resized,
+ * a column re-laid out). Lines never change: they already fit inside it.
+ * A cap (``max-width``), not a ``width``: a set width would also be the
+ * narrowest the column could get, where a cap leaves that at the label's
+ * longest word, as without this step.
+ * Off without a "?". ``key`` changes when the button's content does.
+ */
+function useFitToLines(button: RefObject<HTMLButtonElement | null>, enabled: boolean, key: string) {
+  useLayoutEffect(() => {
+    const el = button.current;
+    if (!enabled || !el) return;
+    const fit = () => {
+      el.style.maxWidth = "";
+      const rects: DOMRect[] = [];
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      const range = document.createRange();
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (!node.textContent?.trim()) continue;
+        range.selectNodeContents(node);
+        rects.push(...Array.from(range.getClientRects()));
+      }
+      el.querySelectorAll("svg, [data-sort-mark]").forEach((mark) => rects.push(mark.getBoundingClientRect()));
+      const shown = rects.filter((rect) => rect.width > 0);
+      if (shown.length === 0) return;
+      const style = getComputedStyle(el);
+      const needed = Math.ceil(
+        Math.max(...shown.map((rect) => rect.right)) -
+          Math.min(...shown.map((rect) => rect.left)) +
+          parseFloat(style.paddingLeft) +
+          parseFloat(style.paddingRight),
+      );
+      if (needed < el.getBoundingClientRect().width - 1) el.style.maxWidth = `${needed}px`;
+    };
+    fit();
+    const cell = el.closest("th");
+    if (!cell || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(fit);
+    observer.observe(cell);
+    return () => {
+      observer.disconnect();
+      el.style.maxWidth = "";
+    };
+  }, [button, enabled, key]);
+}
+
+/**
+ * A sort chip's words with each "→" drawn as an icon ("high → low").
+ *
+ * The app's font has no arrows, so a typed "→" came from whatever font the
+ * computer had, and took a different width on each one: the Issues table
+ * fitted 1280px here and was 13px too wide in CI with a column sorted
+ * (test_issue_table_fits_the_default_desktop_width, 2026-11-16). The icon is
+ * one width everywhere, like the chip's own direction arrow. The "→" stays
+ * in the text, visually hidden, so the button's name and text are unchanged.
+ */
+function withDrawnArrows(words: string): ReactNode {
+  const parts = words.split("→");
+  if (parts.length === 1) return words;
+  return parts.map((part, index) => (
+    <Fragment key={index}>
+      {index > 0 && (
+        <>
+          <ArrowRight className="h-2.5 w-2.5 shrink-0" aria-hidden />
+          <span className="sr-only">→</span>
+        </>
+      )}
+      {part}
+    </Fragment>
+  ));
 }
 
 /**
@@ -485,24 +754,39 @@ function withLastWord(label: ReactNode, after: ReactNode): ReactNode {
 }
 
 /**
- * A column header that does not sort. Every heading, sorting or not, is
- * centred over its column, so a row of headings reads as one even line
- * whatever the widths of the columns under them.
+ * A column header that does not sort.
+ *
+ * Every heading, sorting or not, sits on the side its column's content
+ * does: left over words, links and tags, right over numbers (``numeric``
+ * here, ``Cell numeric`` under it). The developer's rule, 2026-11-16,
+ * replacing centred headings (e905267, 2026-09-26), which floated away
+ * from the left edge of the text under them, more so in wide columns, so a
+ * reader using screen magnification, or anyone tracking a dense table,
+ * could lose which heading went with which column (W3C COGA, "Making
+ * Content Usable", https://www.w3.org/TR/coga-usable/: keep related things
+ * visibly together). Numbers sit right so they line up by place value.
+ * The GOV.UK Design System, the U.S. Web Design System and Material align
+ * headings with their data the same way (paraphrased). WCAG has no
+ * criterion on it; a screen reader is unaffected, since it reads
+ * ``th``/``scope``. tests/ui/test_table_alignment.py checks every screen.
  */
 export function ColumnHeader({
   className,
   children,
   scope = "col",
+  numeric = false,
   ...th
 }: HeaderProps & {
   scope?: "col" | "colgroup";
   className?: string;
+  /** The column holds numbers: the heading sits right, over them. */
+  numeric?: boolean;
   children: ReactNode;
 }) {
   return (
     <th
       scope={scope}
-      className={cn("px-4 py-3 text-center font-semibold", className)}
+      className={cn("px-4 py-3 font-semibold", numeric ? "text-right" : "text-left", className)}
       {...th}
     >
       {children}
@@ -555,9 +839,10 @@ export function RowHeader({
 }
 
 /**
- * A body cell. `numeric` sets it in tabular figures, on one line, centred
- * under its centred heading. Other cells stay left-aligned: running text
- * such as a title or an address reads best from a straight left edge.
+ * A body cell. `numeric` sets it in tabular figures, on one line, on the
+ * right, so numbers line up by place value under their right-aligned
+ * heading. Other cells are left-aligned: running text such as a title or an
+ * address reads best from a straight left edge (see ``ColumnHeader``).
  */
 export function Cell({
   numeric = false,
@@ -569,7 +854,7 @@ export function Cell({
     <td
       className={cn(
         "px-4 py-3.5 align-middle leading-6",
-        numeric && "whitespace-nowrap text-center tabular-nums",
+        numeric && "whitespace-nowrap text-right tabular-nums",
         className,
       )}
       {...td}
@@ -579,7 +864,19 @@ export function Cell({
   );
 }
 
-/** What a table shows in place of rows when none match or none exist. */
+/**
+ * What a table shows in place of rows when none match or none exist.
+ *
+ * Centred in a column about 72 characters wide (52ch, the measure the
+ * report's short paragraphs use), not the card's full width. An empty table
+ * often says why it is empty and where to look next, in two or three
+ * sentences (Issues: "That does not mean the site meets WCAG… See “What was
+ * checked”, below this table."); across a 1280px card those ran to about 150
+ * characters a line. SC 1.4.8 Visual Presentation (Level AAA) asks for no
+ * more than 80. Rejected: keeping each message to one short sentence, which
+ * is how Documents worked around it and which pushed the caveat out of the
+ * empty table. A one-line message looks the same as before.
+ */
 export function TableEmpty({ children }: { children: ReactNode }) {
-  return <p className="px-4 py-8 text-center text-sm text-fg-muted">{children}</p>;
+  return <p className="mx-auto max-w-[52ch] px-4 py-8 text-center text-sm text-fg-muted">{children}</p>;
 }

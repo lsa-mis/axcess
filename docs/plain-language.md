@@ -71,7 +71,9 @@ Use the word in the first column, and never the words in the last.
 | occurrence | One place a problem appears: one element on one page, or in one page state. "476 occurrences". As a label or column header: "Issue occurrences". Explain it where a screen first counts it: "An occurrence is one place a problem appears." | issue (for one place), instance, violation, result, finding, hit, error (for an occurrence); "Occurrences" alone as a label |
 | issue | A general word for a problem, and part of names: the Issues page, the Issues table, "All issues", "Issue type". | "N issues" as a count (count issue types or occurrences) |
 | image | One image the image text check looked at: "Image #12". | finding (for an image) |
-| Mostly sure / Not sure / For information | The three "How sure" values, in the Issues table's "How sure" column: how sure Axcess is that an issue type is a real problem. An Alfa "cannot tell" result is Not sure; a clear form error is Mostly sure, an unclear one Not sure. | Barrier, Needs review, Informational, likely barrier, likely problem, possible problem, needs confirmation, review lead, lead, expert decision, cantTell, "Type" (for this column) |
+| Needs alt text / Needs better alt text / Good alt text / Needs a person to check | The alt text verdicts on the Images tab. "Needs alt text" when there is none (or `alt=""` on an image with text); "Needs better alt text" when there is some and it falls short; "Needs a person to check" when Axcess could not judge it. Not "Adequate" for an image the scan could not judge, and not "Not checked yet", which is the "Checked by a person" value. | bad alt text, adequate, inadequate, partial, missing (as a verdict) |
+| Images with text / Images without alt text / Images with alt text | The Images tab's three groups. An image is in "Images with text" and one of the other two. | image of text (as a group name), alt missing |
+| Mostly sure / Measured / Not sure / For information | The four "How sure" values, in the Issues table's "How sure" column: how sure Axcess is that an issue type is a real problem. Measured is a browser check that used no AI and is trusted to be shown by default (docs/glossary.md, "Measured", lists which). An Alfa "cannot tell" result is Not sure; a clear form error is Mostly sure, an unclear one Not sure. The Issues table opens showing every issue type, with a note over it that says what Not sure and For information mean. | Barrier, Needs review, Informational, likely barrier, likely problem, possible problem, needs confirmation, review lead, lead, expert decision, cantTell, "Type" (for this column) |
 | At page load / After clicking / In an image | The values of the Issues table's "Where it shows" column: where an issue type shows up. "At page load" and "After clicking" match the page state names. | Found by, Found (as the header), WCAG (as a value), Click-Through (as a value; it stays the feature's name), Alt Text (as a value), finding type |
 | Critical / Serious / Moderate / Minor | An issue type's impact rating: how badly the problem affects people (glossary "Impact"). | critical, serious (lower case, as raw values), severity (for this rating) |
 | status | Where an occurrence stands in review. Values: New, Reviewing, In progress, Fixed, Accepted risk, Not a problem (false positive). | triage status, review status, remediated, raw values like `in_progress` |
@@ -100,6 +102,8 @@ Use the word in the first column, and never the words in the last.
 | panel | One of the two reports on Compare reports, each in its own frame: "Go back in the report #24 panel". Never "left" or "right": on a narrow screen the panels are one above the other. | pane, side, left, right |
 | What changed | The page that lists what is new, still found and no longer found between two reports. | Compare reports (for this page), diff, verify changes |
 | Does not apply | A table cell with no value for this row. | n/a |
+| document | A PDF, Word, Excel, PowerPoint, OpenDocument, RTF or Google file that a scanned page links to or shows: the **Documents** tab. In code, a "linked file". | attachment, asset, download (as a noun), linked file (in the interface) |
+| Could not check | The Documents tab's third "Accessibility problems?" value: Axcess has no result for the file, and the row says why. Keep "does not check this file type yet" (a later version may) apart from "cannot check" (no machine check can). | Unknown, Error, Skipped, Not applicable, Accessible, Passed |
 | remove private details (redact) | Replace likely private details in a download with "[redacted]". The choice is "Remove private details (redact)"; the file is a "redacted copy". | sanitize, scrub, anonymize, mask, PII |
 
 ### Why "occurrence" and "issue type"
@@ -181,13 +185,24 @@ issue type is a real problem? Each word was chosen against these alternatives.
 | Choice | Rejected | Why |
 | --- | --- | --- |
 | "How sure" (column) | "Type" | "Type" names no question, so the badges under it had nothing to answer. |
+| "Accessibility problems?" (the Documents column) | "How sure" | On Documents, "How sure" did not say of what, so "0 Mostly sure" told readers nothing about the files. The values stay the same words; only the column names the question they answer. |
+| "Hosted on" (the Documents column) | "Site", "What hosts it" | "Site" could be read as the page of our site the file is on, which is "Pages it appears on". "What hosts it" is a question where the other headers are names. |
 | "Mostly sure" | "Barrier" | Jargon, and it sounds certain. |
 | "Mostly sure" | "Very sure", "Sure" | A fixed rule gives the same result every time, but it can still misjudge a page, such as contrast on text over a picture. We tell people to check each one on the page first ("Zero false positive goal" in the glossary). "Very sure" invites them to skip that check, and AGENTS.md says never to claim more than the evidence shows. |
 | "Mostly sure" | "Fairly certain", "Pretty certain", "High chance" | Longer words. "Fairly" and "pretty" have other meanings that confuse translation, and "High chance" does not say of what. |
 | "Not sure" | "Needs review" | It did not say who reviews, or that the problem may not be real. |
 | "Mostly sure" / "Not sure" | "Likely problem" / "Possible problem" | Both mean "maybe", so readers could not tell them apart. Badges in one column are read against each other, so they need to be clear opposites. |
+| "Measured" | "Likely", "Probably" | Added 2026-11-10 for browser checks that measure the page with no AI model. "Likely" cannot be ranked against "Mostly sure" (the "Likely problem" row above). "Measured" says what happened, so it does not compete with the two "sure" words, and it does not claim the problem is real. |
+| "Measured" | "Sure" for rule checks, with "Mostly sure" here | "Sure" claims more than a rule check can show (the "Very sure" row above). The developer kept "Mostly sure" on top. |
+| "hidden" (issue types the table holds back when it opens) | "filtered out", "suppressed", "low confidence" | "Hidden" is the short, common word, and the note beside it says how to show them. Nothing is deleted, and the exports include them. |
 | "For information" | "Informational" | A longer word for the same idea. |
 | "For information" | "Not a problem" | Already the status for a false positive. One phrase names one thing. |
+
+The Documents tab uses "Mostly sure" and "Not sure" with the same meaning:
+proved by a machine check, or needing a person. Its third value is "Could not
+check", not "For information": Axcess has no result for the file at all. It
+has no "Accessible" or "Passed" value, because a machine check cannot prove a
+file is accessible.
 
 ### Check names
 
@@ -203,6 +218,7 @@ issue type is a real problem? Each word was chosen against these alternatives.
 | Visual order, motion, and autoplay | Motion and reading-order check |
 | Semantic (local language model) | AI review |
 | Image text (OCR and vision model) | Image text check |
+| Linked files (PDF checks) | Document check |
 
 Name the tool only when it matters to the reader, and in parentheses.
 

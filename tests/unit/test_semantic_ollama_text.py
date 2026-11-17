@@ -16,6 +16,21 @@ import respx
 from audit.analyzer.ollama_base import OllamaError
 from audit.analyzer.semantic.ollama_text import OllamaTextProvider
 
+
+@pytest.fixture(autouse=True)
+def _no_remote_models(monkeypatch: pytest.MonkeyPatch) -> None:
+    """These tests mock only /api/generate; the model runs on this computer.
+
+    The /api/tags read that refuses a cloud model is tested in
+    tests/unit/test_ollama_cloud_models.py.
+    """
+
+    async def local(*_args: object) -> None:
+        return None
+
+    monkeypatch.setattr("audit.analyzer.ollama_base.why_not_local", local)
+
+
 BASE = "http://ollama-test.local"
 MODEL = "qwen2.5:7b-instruct"
 

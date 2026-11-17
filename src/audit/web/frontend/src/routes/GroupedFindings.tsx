@@ -21,7 +21,7 @@ import type {
   FindingsGroup,
   GroupedFinding,
 } from "../api/types";
-import { TablePagination, usePagedRows } from "../components/TablePagination";
+import { PagedTable, usePagedRows } from "../components/TablePagination";
 import {
   Cell,
   ColumnHeader,
@@ -400,32 +400,31 @@ function FindingsInGroup({
   const paged = usePagedRows(findings, { local: true, resetKey });
   return (
     <>
-      {paged.pages > 1 && (
-        <TableBar pager={<TablePagination label="Images in this group" noun="images" {...paged} />} />
-      )}
-      <TableRegion label={`${label} images table`}>
-        <Table caption={`Images in ${label}`}>
-          <TableHead>
-            <tr>
-              <ColumnHeader>Image</ColumnHeader>
-              <ColumnHeader>Text read from image (OCR)</ColumnHeader>
-              <ColumnHeader>Severity</ColumnHeader>
-              <ColumnHeader>Status</ColumnHeader>
-              <ColumnHeader>Pages</ColumnHeader>
-            </tr>
-          </TableHead>
-          <tbody>
-            {paged.pageRows.map((f, index) => (
-              <FindingRow
-                key={f.id}
-                finding={f}
-                scanId={scanId}
-                index={(paged.page - 1) * paged.pageSize + index}
-              />
-            ))}
-          </tbody>
-        </Table>
-      </TableRegion>
+      <PagedTable pagination={{ label: "Images in this group", noun: "images", ...paged }}>
+        <TableRegion label={`${label} images table`}>
+          <Table caption={`Images in ${label}`}>
+            <TableHead>
+              <tr>
+                <ColumnHeader>Image</ColumnHeader>
+                <ColumnHeader>Text read from image (OCR)</ColumnHeader>
+                <ColumnHeader>Severity</ColumnHeader>
+                <ColumnHeader>Status</ColumnHeader>
+                <ColumnHeader>Pages</ColumnHeader>
+              </tr>
+            </TableHead>
+            <tbody>
+              {paged.pageRows.map((f, index) => (
+                <FindingRow
+                  key={f.id}
+                  finding={f}
+                  scanId={scanId}
+                  index={(paged.page - 1) * paged.pageSize + index}
+                />
+              ))}
+            </tbody>
+          </Table>
+        </TableRegion>
+      </PagedTable>
     </>
   );
 }

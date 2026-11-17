@@ -1,4 +1,6 @@
 import type {
+  DocumentOnPage,
+  ScanDocumentResponse,
   ScanSettingsSnapshot,
   A11yByRuleResponse,
   A11yDrillFinding,
@@ -17,6 +19,7 @@ import type {
   PageEvidence,
   ScanPagesResponse,
   ScanPagesSort,
+  ScanDocumentsResponse,
   PageInspection,
   DiffReport,
   ExportFormat,
@@ -24,6 +27,10 @@ import type {
   OccurrenceReviewRequest,
   ExportOptions,
   FindingDetail,
+  ReportImage,
+  ReportImagesFilter,
+  ReportImageDetail,
+  ReportImagesResponse,
   FindingsFilter,
   FindingsPage,
   FindingStatus,
@@ -60,6 +67,9 @@ import type {
   SuggestionOccurrenceKind,
   SuggestionRecord,
   TrackingData,
+  CoverageChecks,
+  CoverageFound,
+  WcagVersion,
 } from "./types";
 
 /**
@@ -322,6 +332,15 @@ export const api = {
     });
     return request<ScanPagesResponse>(`/api/scans/${scanId}/pages?${params}`);
   },
+  /** One page of the files a report's pages link to; `limit` is at most 200. */
+  listScanDocuments: (scanId: number, { limit, offset }: { limit: number; offset: number }) => {
+    const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+    return request<ScanDocumentsResponse>(`/api/scans/${scanId}/documents?${params}`);
+  },
+  getScanDocument: (scanId: number, fileId: number) =>
+    request<ScanDocumentResponse>(`/api/scans/${scanId}/documents/${fileId}`),
+  getDocumentOnPage: (scanId: number, fileId: number, pageId: number) =>
+    request<DocumentOnPage>(`/api/scans/${scanId}/documents/${fileId}/pages/${pageId}`),
   getPageEvidence: (scanId: number, pageId: number) =>
     request<PageEvidence>(`/api/scans/${scanId}/pages/${pageId}`),
   /** Desktop only: this computer, the AI sizes it can run, and the current setup. 404 elsewhere. */
@@ -514,6 +533,28 @@ export const api = {
     if (filter.q) params.set("q", filter.q);
     return request<FindingsPage>(`/api/scans/${scanId}/findings?${params}`);
   },
+  /** One page of one group of the report's images (the Images tab). */
+  /** One image of the report, and every page it appears on (up to 2,000). */
+  getReportImage: (scanId: number, imageId: number) =>
+    request<ReportImageDetail>(`/api/scans/${scanId}/images/${imageId}`),
+  listReportImages: (scanId: number, filter: ReportImagesFilter) => {
+    const params = new URLSearchParams();
+    params.set("group", filter.group);
+    if (filter.verdict) params.set("verdict", filter.verdict);
+    if (filter.q) params.set("q", filter.q);
+    params.set("limit", String(filter.limit));
+    params.set("offset", String(filter.offset));
+    return request<ReportImagesResponse>(`/api/scans/${scanId}/images?${params}`);
+  },
+  /**
+   * Ask the local model about one image's alt text. A person's explicit
+   * request; the server saves the answer and returns the image's new row.
+   */
+  checkImageAlt: (scanId: number, imageId: number) =>
+    request<ReportImage>(`/api/scans/${scanId}/images/${imageId}/alt-check`, {
+      method: "POST",
+    }),
+  downloadImagesZip,
   getFinding: (id: number) => request<FindingDetail>(`/api/findings/${id}`),
   setStatus: (id: number, status: FindingStatus, rationale?: string) =>
     request<{ status: FindingStatus }>(`/api/findings/${id}/status`, {
@@ -656,7 +697,7 @@ export const api = {
       responsibility?: string;
       abilities?: AbilityLabel | "";
       status?: FindingStatus | "";
-      review_lane?: "likely_barrier" | "expert_review" | "informational" | "" | (string & {});
+      review_lane?: "likely_barrier" | "measured" | "expert_review" | "informational" | "" | (string & {});
       finding_type?: FindingType | "" | (string & {});
       q?: string;
       sort?: string;
@@ -677,11 +718,52 @@ export const api = {
    * drift from the code.
    */
   getTracking: () => request<TrackingData>("/api/tracking"),
+  /** What Axcess checks for each WCAG criterion, built from its own code. */
+  getCoverageChecks: (version: WcagVersion) =>
+    request<CoverageChecks>(`/api/coverage/checks?version=${encodeURIComponent(version)}`),
+  /**
+   * What Axcess found, counted on request from this computer's completed
+   * reports: across the most recent ones, or one report.
+   */
+  getCoverageFound: (scanId?: number) =>
+    request<CoverageFound>(scanId ? `/api/coverage/found?scan_id=${scanId}` : "/api/coverage/found"),
 };
+
+/**
+ * A document's first-page picture, for <img src=…> (has_thumbnail rows only):
+ * ``small`` for the Documents table's 72 by 48 box, ``large`` for its own page.
+ */
+export const documentThumbnailUrl = (
+  scanId: number,
+  fileId: number,
+  size: "small" | "large" = "large",
+): string => `/api/scans/${scanId}/documents/${fileId}/thumbnail${size === "small" ? "?size=small" : ""}`;
 
 /** Direct URL (bypass fetch) for image blobs, used in <img src=…>. */
 export const blobUrl = (contentHash: string): string =>
   `/blobs/${contentHash}`;
+
+/**
+ * Fetch the Images tab's ZIP and hand it to the browser to save, the way
+ * Export report does (downloadExport): a plain download link was ignored in
+ * some windows (the developer's report, 2026-11-13), and fetching lets the
+ * page say it is working and show an error in words.
+ */
+async function downloadImagesZip(scanId: number): Promise<{ filename: string; sizeBytes: number }> {
+  const res = await fetch(imagesZipUrl(scanId), { credentials: "same-origin", cache: "no-store" });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new ApiError(res.status, apiErrorMessage(res.status, body));
+  }
+  const blob = await res.blob();
+  const filename =
+    dispositionFilename(res.headers.get("Content-Disposition")) ?? `report-${scanId}-images.zip`;
+  saveBlob(blob, filename);
+  return { filename, sizeBytes: blob.size };
+}
+
+/** Download URL for the Images tab's ZIP: pictures in folders by group and verdict, and a sheet. */
+export const imagesZipUrl = (scanId: number): string => `/api/scans/${scanId}/images/export.zip`;
 
 /**
  * Download URL for a scan export; incomplete reports require explicit draft

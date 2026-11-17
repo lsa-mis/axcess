@@ -25,6 +25,7 @@ import pytest
 import respx
 import yaml
 
+from audit.analyzer import model_registry
 from audit.analyzer.semantic.base import AnalysisContext
 from audit.analyzer.semantic.ollama_text import OllamaTextProvider
 from audit.analyzer.semantic.registry import build_analyzers
@@ -44,6 +45,22 @@ def _ollama_envelope(payload: dict[str, object]) -> dict[str, str]:
 # --------------------------------------------------------------------
 # Mocked end-to-end (default — runs in CI)
 # --------------------------------------------------------------------
+
+
+def _local_daemon() -> None:
+    """The daemon lists MODEL as a model on this computer (/api/tags).
+
+    Every model call first checks that the model runs locally, so a mocked
+    daemon answers that read the way a real one does.
+    """
+    # The 2.4.4 analyzer picks its own model (analyzer_models.yaml).
+    pick = model_registry.get_pick("2.4.4")
+    names = {MODEL, pick.primary, *([pick.fast] if pick.fast else [])}
+    respx.get(f"{BASE}/api/tags").mock(
+        return_value=httpx.Response(
+            200, json={"models": [{"name": name, "model": name} for name in sorted(names)]}
+        )
+    )
 
 
 def _seed_scan_page(conn: sqlite3.Connection) -> tuple[int, int]:
@@ -69,6 +86,7 @@ async def test_end_to_end_one_criterion_one_finding(
     tmp_db: sqlite3.Connection,
 ) -> None:
     """Full happy path: registry → analyzer → runner → persistence."""
+    _local_daemon()
     respx.post(f"{BASE}/api/generate").mock(
         return_value=httpx.Response(
             200,
@@ -126,6 +144,7 @@ async def test_end_to_end_re_run_is_idempotent(
     tmp_db: sqlite3.Connection,
 ) -> None:
     """Running the same pipeline twice on the same page produces ONE row."""
+    _local_daemon()
     respx.post(f"{BASE}/api/generate").mock(
         return_value=httpx.Response(
             200,
@@ -166,6 +185,7 @@ async def test_end_to_end_human_status_survives_rerun(
 ) -> None:
     """A finding triaged ``accepted_risk`` doesn't revert to ``new``
     on the next scan, even though the analyzer rediscovered it."""
+    _local_daemon()
     respx.post(f"{BASE}/api/generate").mock(
         return_value=httpx.Response(
             200,

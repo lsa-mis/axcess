@@ -5,7 +5,7 @@ import { useLocation, useParams, useSearchParams } from "react-router";
 import { ApiError, api } from "../api/client";
 import type { ScanPageRow, ScanPagesSort } from "../api/types";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
-import { TablePagination } from "../components/TablePagination";
+import { PagedTable } from "../components/TablePagination";
 import {
   Cell,
   ColumnHeader,
@@ -13,7 +13,6 @@ import {
   RowHeader,
   SortHeader,
   Table,
-  TableBar,
   TableEmpty,
   TableHead,
   TableRegion,
@@ -307,66 +306,65 @@ export default function PagesVisitedRoute() {
       </div>
 
       <Card>
-        {pages > 1 && (
-          <TableBar
-            pager={
-              <TablePagination
-                label={PAGES_VISITED_VIEW}
-                noun="pages"
-                page={shownPage}
-                pages={pages}
-                total={total}
-                setPage={setPage}
-                pageSize={pageSize}
-                pagerId="pager-pages-visited"
-                disabled={pagesQuery.isPlaceholderData}
-              />
-            }
-          />
-        )}
-        <TableStatus>Sorted by {describeSort(sort)}.</TableStatus>
-        {data.total === 0 ? (
-          <TableEmpty>This report has no saved pages.</TableEmpty>
-        ) : (
-          <TableRegion label="Pages visited table" busy={pagesQuery.isPlaceholderData}>
-            <Table caption={`Pages visited by report #${scan.id}, sorted by ${describeSort(sort)}`}>
-              <TableHead>
-                <tr>
-                  <ColumnHeader>Page</ColumnHeader>
-                  <SortHeader
-                    column="load"
-                    kind="number"
-                    chip={(current) => loadWords(current.direction)}
-                    {...sortProps}
-                  >
-                    {COLUMN_LABEL.load}
-                  </SortHeader>
-                  <SortHeader column="occurrences" kind="number" wrap="words" {...sortProps}>
-                    {COLUMN_LABEL.occurrences}
-                  </SortHeader>
-                  <SortHeader column="images" kind="number" wrap="words" {...sortProps}>
-                    {COLUMN_LABEL.images}
-                  </SortHeader>
-                  <SortHeader column="states" kind="number" wrap="words" {...sortProps}>
-                    {COLUMN_LABEL.states}
-                  </SortHeader>
-                  <ColumnHeader className="whitespace-nowrap">Actions</ColumnHeader>
-                </tr>
-              </TableHead>
-              <tbody>
-                {data.pages.map((row, index) => (
-                  <PageRow
-                    key={row.page_id}
-                    row={row}
-                    index={(shownPage - 1) * pageSize + index}
-                    scanId={scan.id}
-                    backTo={here}
-                  />
-                ))}
-              </tbody>
-            </Table>
-          </TableRegion>
-        )}
+        <PagedTable
+          pagination={{
+            label: PAGES_VISITED_VIEW,
+            noun: "pages",
+            page: shownPage,
+            pages,
+            total,
+            setPage,
+            pageSize,
+            pagerId: "pager-pages-visited",
+            disabled: pagesQuery.isPlaceholderData,
+          }}
+        >
+          <TableStatus>Sorted by {describeSort(sort)}.</TableStatus>
+          {data.total === 0 ? (
+            <TableEmpty>This report has no saved pages.</TableEmpty>
+          ) : (
+            <TableRegion label="Pages visited table" busy={pagesQuery.isPlaceholderData}>
+              <Table caption={`Pages visited by report #${scan.id}, sorted by ${describeSort(sort)}`}>
+                <TableHead>
+                  <tr>
+                    <ColumnHeader>Page</ColumnHeader>
+                    <SortHeader
+                      column="load"
+                      kind="number"
+                      // Sorted by how it loaded, shown as words: left.
+                      align="left"
+                      chip={(current) => loadWords(current.direction)}
+                      {...sortProps}
+                    >
+                      {COLUMN_LABEL.load}
+                    </SortHeader>
+                    <SortHeader column="occurrences" kind="number" wrap="words" {...sortProps}>
+                      {COLUMN_LABEL.occurrences}
+                    </SortHeader>
+                    <SortHeader column="images" kind="number" wrap="words" {...sortProps}>
+                      {COLUMN_LABEL.images}
+                    </SortHeader>
+                    <SortHeader column="states" kind="number" wrap="words" {...sortProps}>
+                      {COLUMN_LABEL.states}
+                    </SortHeader>
+                    <ColumnHeader className="whitespace-nowrap">Actions</ColumnHeader>
+                  </tr>
+                </TableHead>
+                <tbody>
+                  {data.pages.map((row, index) => (
+                    <PageRow
+                      key={row.page_id}
+                      row={row}
+                      index={(shownPage - 1) * pageSize + index}
+                      scanId={scan.id}
+                      backTo={here}
+                    />
+                  ))}
+                </tbody>
+              </Table>
+            </TableRegion>
+          )}
+        </PagedTable>
       </Card>
     </>
   );

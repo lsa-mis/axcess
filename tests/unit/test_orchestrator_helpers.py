@@ -1,6 +1,6 @@
 """Unit tests for orchestrator-internal helpers.
 
-The rescan auto-diff hangs off ``_previous_completed_scan``, which uses
+The rescan auto-diff hangs off ``_previous_report_scan``, which uses
 ``compare_key`` so a dev-server port change between crawls doesn't hide the
 previous scan from the auto-diff.
 """
@@ -16,7 +16,7 @@ from audit.crawler.orchestrator import (
     _MAX_STORED_HTML_BYTES,
     CrawlConfig,
     _compress_html,
-    _previous_completed_scan,
+    _previous_report_scan,
     _purge_out_of_scope_jobs,
     _signed_in_entry_url,
     config_json_for_scan,
@@ -24,26 +24,43 @@ from audit.crawler.orchestrator import (
 from audit.crawler.url_policy import build_scope
 
 
-def _insert_scan(conn: sqlite3.Connection, seed: str, status: str = "completed") -> int:
+def _insert_scan(
+    conn: sqlite3.Connection, seed: str, status: str = "completed", page_count: int = 1
+) -> int:
     cur = conn.execute(
-        "INSERT INTO scans (seed_url, status, config_json) VALUES (?, ?, '{}')",
-        (seed, status),
+        "INSERT INTO scans (seed_url, status, config_json, page_count) VALUES (?, ?, '{}', ?)",
+        (seed, status, page_count),
     )
     return int(cur.lastrowid or 0)
 
 
-def test_previous_completed_scan_ignores_self(tmp_db: sqlite3.Connection) -> None:
+def test_previous_report_scan_takes_a_stopped_scan_with_pages(tmp_db: sqlite3.Connection) -> None:
+    """A stopped scan that saved pages is a report, the baseline like any other."""
+    a = _insert_scan(tmp_db, "https://x.test/", status="interrupted", page_count=100)
+    b = _insert_scan(tmp_db, "https://x.test/")
+    assert _previous_report_scan(tmp_db, "https://x.test/", current_scan_id=b) == a
+
+
+def test_previous_report_scan_skips_running_and_empty_scans(tmp_db: sqlite3.Connection) -> None:
+    # A running scan's stored page_count stays 0 until the scan ends.
+    _insert_scan(tmp_db, "https://x.test/", status="running", page_count=0)
+    _insert_scan(tmp_db, "https://x.test/", status="interrupted", page_count=0)
+    b = _insert_scan(tmp_db, "https://x.test/")
+    assert _previous_report_scan(tmp_db, "https://x.test/", current_scan_id=b) is None
+
+
+def test_previous_report_scan_ignores_self(tmp_db: sqlite3.Connection) -> None:
     a = _insert_scan(tmp_db, "http://127.0.0.1:8000/")
-    assert _previous_completed_scan(tmp_db, "http://127.0.0.1:8000/", current_scan_id=a) is None
+    assert _previous_report_scan(tmp_db, "http://127.0.0.1:8000/", current_scan_id=a) is None
 
 
-def test_previous_completed_scan_exact_match(tmp_db: sqlite3.Connection) -> None:
+def test_previous_report_scan_exact_match(tmp_db: sqlite3.Connection) -> None:
     a = _insert_scan(tmp_db, "http://127.0.0.1:8000/")
     b = _insert_scan(tmp_db, "http://127.0.0.1:8000/")
-    assert _previous_completed_scan(tmp_db, "http://127.0.0.1:8000/", current_scan_id=b) == a
+    assert _previous_report_scan(tmp_db, "http://127.0.0.1:8000/", current_scan_id=b) == a
 
 
-def test_previous_completed_scan_matches_across_loopback_ports(
+def test_previous_report_scan_matches_across_loopback_ports(
     tmp_db: sqlite3.Connection,
 ) -> None:
     a = _insert_scan(tmp_db, "http://127.0.0.1:18800/gallery.html")
@@ -51,45 +68,40 @@ def test_previous_completed_scan_matches_across_loopback_ports(
     # From scan B's perspective, scan A is the logical predecessor even though
     # the port (and host alias) differ.
     assert (
-        _previous_completed_scan(tmp_db, "http://localhost:18801/gallery.html", current_scan_id=b)
-        == a
+        _previous_report_scan(tmp_db, "http://localhost:18801/gallery.html", current_scan_id=b) == a
     )
 
 
-def test_previous_completed_scan_does_not_bridge_different_real_hosts(
+def test_previous_report_scan_does_not_bridge_different_real_hosts(
     tmp_db: sqlite3.Connection,
 ) -> None:
     _insert_scan(tmp_db, "https://staging.example.com/gallery")
     b = _insert_scan(tmp_db, "https://prod.example.com/gallery")
     # Different hosts → no auto-match.
     assert (
-        _previous_completed_scan(tmp_db, "https://prod.example.com/gallery", current_scan_id=b)
-        is None
+        _previous_report_scan(tmp_db, "https://prod.example.com/gallery", current_scan_id=b) is None
     )
 
 
-def test_previous_completed_scan_skips_running_and_failed_scans(
+def test_previous_report_scan_takes_a_failed_scan_with_pages(
     tmp_db: sqlite3.Connection,
 ) -> None:
-    _insert_scan(tmp_db, "http://127.0.0.1:8000/", status="failed")
-    _insert_scan(tmp_db, "http://127.0.0.1:8000/", status="running")
-    completed = _insert_scan(tmp_db, "http://127.0.0.1:8000/", status="completed")
+    """How a scan ended does not decide whether it is a report; saved pages do."""
+    failed = _insert_scan(tmp_db, "http://127.0.0.1:8000/", status="failed", page_count=3)
+    _insert_scan(tmp_db, "http://127.0.0.1:8000/", status="running", page_count=0)
     cursor_id = _insert_scan(tmp_db, "http://127.0.0.1:8000/")
     assert (
-        _previous_completed_scan(tmp_db, "http://127.0.0.1:8000/", current_scan_id=cursor_id)
-        == completed
+        _previous_report_scan(tmp_db, "http://127.0.0.1:8000/", current_scan_id=cursor_id) == failed
     )
 
 
-def test_previous_completed_scan_picks_most_recent_match(
+def test_previous_report_scan_picks_most_recent_match(
     tmp_db: sqlite3.Connection,
 ) -> None:
     _insert_scan(tmp_db, "http://127.0.0.1:8000/")
     newer = _insert_scan(tmp_db, "http://localhost:9000/")
     current = _insert_scan(tmp_db, "http://127.0.0.1:7000/")
-    assert (
-        _previous_completed_scan(tmp_db, "http://127.0.0.1:7000/", current_scan_id=current) == newer
-    )
+    assert _previous_report_scan(tmp_db, "http://127.0.0.1:7000/", current_scan_id=current) == newer
 
 
 # ---------- _purge_out_of_scope_jobs -----------------------------------------

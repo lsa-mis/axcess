@@ -61,23 +61,36 @@ from audit.ai.model_client import (
 )
 from audit.ai.state import AIConfig, ai_enabled, initialize_preferences, model_service
 from audit.ai.state import effective_settings as effective_ai_settings
+from audit.ai.state import load_config as load_ai_config
 from audit.ai.state import semantic_model as ai_semantic_model
 from audit.analyzer.alfa import AlfaAnalyzer, AlfaResult, chromium_executable_path
 from audit.analyzer.alfa import availability as alfa_availability
 from audit.analyzer.axe import AxeAnalyzer
 from audit.analyzer.focus import FocusProbe
+from audit.analyzer.forms import ErrorIdentificationProbe
 from audit.analyzer.interaction import DEFAULT_BLOCKED_LABELS, InteractionProbe
 from audit.analyzer.keyboard import KeyboardProbe
 from audit.analyzer.markup import MarkupProbe
 from audit.analyzer.model_registry import get_pick
 from audit.analyzer.responsive import ResponsiveProbe
 from audit.analyzer.semantic.registry import supported_criteria
+from audit.analyzer.visual import VisualProbe
 from audit.blob_store import BlobStore
 from audit.config import Settings, get_settings
 from audit.crawler import live_progress, url_policy
-from audit.crawler.orchestrator import CrawlConfig, CrawlSummary, build_search_explorer, run_crawl
+from audit.crawler.orchestrator import (
+    CrawlConfig,
+    CrawlSummary,
+    build_search_explorer,
+    build_vision_provider,
+    model_http_client,
+    run_crawl,
+)
 from audit.crawler.search import SearchConfig, search_url_allowed
+from audit.crawler.tab_pool import TabPool
+from audit.crawler.user_agent import CHROME_CHOICE, chosen_user_agent
 from audit.db import repo
+from audit.db.reports import record_pages_found, scan_coverage
 from audit.db.schema import connect
 from audit.exports.audit_report import render_audit_report
 from audit.exports.collector import DEFAULT_UI_BASE, ExportScan, collect_scan
@@ -129,7 +142,7 @@ from audit.wcag_version import (
     is_wcag_version,
     stored_wcag_version,
 )
-from audit.web import local_sign_in, pages_queries
+from audit.web import image_inventory, linked_files_queries, local_sign_in, pages_queries
 from audit.web.ai_api import build_ai_router
 from audit.web.comparison import (
     MAX_PAGE_SIZE,
@@ -142,6 +155,7 @@ from audit.web.comparison import (
     previous_scan_id,
     site_history,
 )
+from audit.web.coverage_checks import CoverageChecksResponse, coverage_checks
 from audit.web.coverage_status import ROADMAP, SHIPPED, roadmap_counts
 from audit.web.export_options import ExportOptions, PanelFormat, build_export_options
 from audit.web.export_readiness import (
@@ -150,6 +164,12 @@ from audit.web.export_readiness import (
     assess_public_export_readiness,
     label_draft_export,
     public_export_filename,
+)
+from audit.web.issue_share import IssueShareError, IssueShareResponse, issue_share
+from audit.web.linked_files_queries import (
+    DocumentOnPage,
+    ScanDocumentResponse,
+    ScanDocumentsResponse,
 )
 from audit.web.local_sign_in import (
     SIGN_IN_KEEP_MINUTES,
@@ -225,12 +245,50 @@ class LocalLoginScanRequest(BaseModel):
     seed_url: str = Field(min_length=12, max_length=2048)
     approved_auth_origins: tuple[str, ...] = Field(default=(), max_length=32)
     authorization_acknowledged: bool
-    max_pages: int = Field(default=2500, ge=1, le=2500)
+    max_pages: int = Field(default=10_000, ge=1, le=10_000)
+    # "Scan every page it finds": no page limit. ``max_pages`` then only
+    # keeps the form's value. Offered in sign-in scans since 2026-11-16
+    # (the developer's decision: the sign-in form offers every setting the
+    # public form does).
+    all_pages: bool = False
     max_depth: int = Field(default=10, ge=1, le=20)
     rps: float = Field(default=1.0, ge=0.1, le=5.0)
-    workers: int = Field(default=2, ge=1, le=4)
+    # "Pages at once (workers)": one signed-in tab per worker. Each tab after
+    # the first holds a copy of the sign-in;
+    # a copy the site signs out sends the scan back to one tab
+    # (audit.crawler.tab_pool), so more tabs cost speed at worst, not pages.
+    workers: int = Field(default=4, ge=1, le=8)
     show_browser: bool = False
     whole_host: bool = False
+    # The settings below joined the sign-in scan on 2026-11-16, so its form
+    # offers every setting the public form does (the developer's decision).
+    # Before that a sign-in scan stayed on the exact host, ignored
+    # robots.txt, always rendered, always ran the focus and page code
+    # checks, never ran the AI review, the visual check or the form error
+    # check, and always sent Axcess's own browser name.
+    include_subdomain: bool = False
+    # A sign-in scan ignores robots.txt unless asked not to: robots.txt is
+    # written for anonymous crawlers, and the authorization box is the
+    # consent that replaces it.
+    ignore_robots: bool = True
+    # Load each page's code without running its scripts, through the
+    # signed-in browser's own request client (its cookies), never an
+    # anonymous request (``AuthenticatedStaticFetcher``).
+    static_only: bool = False
+    skip_focus: bool = False
+    skip_markup: bool = False
+    # The document check, through the signed-in browser (2026-11-16).
+    skip_documents: bool = False
+    skip_semantic: bool = True
+    skip_visual: bool = True
+    # Off by default in a sign-in scan, unlike a public one: pressing a
+    # form's submit button while signed in acts as the person signed in.
+    skip_forms: bool = True
+    send_empty_forms: bool = False
+    # Chrome's name, as the Chromium Axcess runs, unless the request chose
+    # otherwise (the default since 2026-11-16, as in a public scan).
+    user_agent_choice: str | None = CHROME_CHOICE
+    user_agent: str | None = Field(default=None, max_length=1024)
     scan_engine: Literal["axe", "alfa", "both"] = "axe"
     axe_level: Literal["A", "AA", "AAA"] = "AA"
     wcag_version: WcagVersion = DEFAULT_WCAG_VERSION
@@ -271,6 +329,13 @@ class LocalLoginScanRequest(BaseModel):
             raise ValueError("seed URL must be HTTPS with no credentials, query, or fragment")
         if not self.skip_vlm and self.skip_ocr:
             raise ValueError("VLM classification requires OCR image analysis")
+        from audit.web.scan_settings import user_agent_refusal
+
+        refusal_ua = user_agent_refusal(
+            {"user_agent_choice": self.user_agent_choice, "user_agent": self.user_agent}
+        )
+        if refusal_ua is not None:
+            raise ValueError(refusal_ua[1])
         if (not self.skip_ocr or not self.skip_vlm) and not self.image_analysis_acknowledged:
             raise ValueError("local protected-image storage acknowledgement is required")
         if self.search:
@@ -291,6 +356,13 @@ class LocalLoginScanRequest(BaseModel):
     def target_origin(self) -> str:
         parsed = urlsplit(self.seed_url)
         return normalize_exact_https_origin(f"{parsed.scheme}://{parsed.netloc}")
+
+    @property
+    def chosen_user_agent(self) -> str | None:
+        """The browser name to send, or None for Axcess's own."""
+        return chosen_user_agent(
+            {"user_agent_choice": self.user_agent_choice, "user_agent": self.user_agent}
+        )
 
 
 @dataclass
@@ -589,9 +661,6 @@ _EXPORT_EXTENSIONS = {
 #: fix brief is made to be handed to a coding agent, so it never carries the
 #: unredacted evidence.
 _ALWAYS_REDACTED_FORMATS = frozenset({"brief"})
-#: Formats only a completed report can be exported as. A brief of a running,
-#: failed or stopped scan would send an agent to fix a partial list.
-_COMPLETED_ONLY_FORMATS = frozenset({"brief"})
 
 _BASE_DIR = Path(__file__).resolve().parent
 _FRONTEND_DIST = _BASE_DIR / "frontend" / "dist"
@@ -1073,6 +1142,8 @@ def create_app(
         try:
             await _stop_worker()
             settings = next_settings
+            # The Images tab's alt text check follows AI features too.
+            app.state.alt_checker_factory = _alt_checker_factory_for(settings)
             await _start_worker()
         except (Exception, asyncio.CancelledError):
             # Do not leave a half-applied setting after a worker failure or
@@ -1312,7 +1383,7 @@ def create_app(
 
     @app.get("/api/scans/{scan_id:int}/issue-counts")
     def api_scan_issue_counts(scan_id: int) -> JSONResponse:
-        """One completed report's two issue counts, for the Reports list.
+        """One report's two issue counts, for the Reports list.
 
         Fetched when a site's list of scans is opened, not with ``/api/sites``:
         counting means building the issue list, and the site list is fetched
@@ -1321,12 +1392,7 @@ def create_app(
         from audit.web import sites
 
         with get_conn() as conn:
-            scan = _load_scan_or_404(conn, scan_id)
-            if scan["status"] != "completed":
-                raise HTTPException(
-                    status_code=409,
-                    detail="Issues are counted only for a scan that finished.",
-                )
+            _load_scan_or_404(conn, scan_id)
             counts = sites.report_counts(conn, scan_id)
         return JSONResponse(counts.model_dump())
 
@@ -1346,11 +1412,16 @@ def create_app(
             blocked = _detect_blocked_scan(conn, scan_id, scan)
             progress = _scan_progress(conn, scan_id) if scan["status"] == "running" else None
             method_coverage = _scan_method_coverage(conn, scan_id)
+            coverage = scan_coverage(conn, scan, page_count=int(scan.get("page_count") or 0))
         payload: dict[str, Any] = {
             **_scan_row_to_summary(scan),
             "error_count": int(scan.get("error_count") or 0),
             "by_severity": {level: int(breakdown.get(level, 0)) for level in _SEVERITY_OPTIONS},
             "previous_scan_id": prev,
+            # How much of the site this scan covered, as facts: pages found,
+            # pages visited, the limits chosen and how it ended. This replaces
+            # the old "partial report" label for a stopped scan.
+            "coverage": coverage.model_dump(),
             "blocked": blocked,
             "progress": progress,
             # Axe counters denormalized on scans for cheap reads. The SPA
@@ -1364,6 +1435,9 @@ def create_app(
             "failure_reason": (
                 str(scan.get("failure_reason")) if scan.get("failure_reason") else None
             ),
+            # What Axcess wants a reader of this report to know about how it
+            # was made (migration 0039). None when there is nothing to say.
+            "scan_note": str(scan.get("scan_note")) if scan.get("scan_note") else None,
             # Coverage truth: which detection methods were on for this
             # scan (derived from config_json + counters). Lets the UI
             # show when a scan was a partial / static-only run.
@@ -1707,21 +1781,30 @@ def create_app(
                     status_code=400,
                 )
 
+        # The browser name the person chose, sent while signing in and while
+        # scanning, so a site that ties a session to the browser sees one
+        # name throughout. robots.txt rules are still matched against
+        # Axcess's own name, as in a public scan.
+        login_user_agent = body.chosen_user_agent
         config = CrawlConfig(
             seed_url=body.seed_url,
             search=body.search,
-            max_pages=body.max_pages,
+            max_pages=None if body.all_pages else body.max_pages,
             max_depth=body.max_depth,
             rps=body.rps,
             whole_host=body.whole_host,
+            allow_subdomains=body.include_subdomain,
             # Login scans reuse an authenticated BrowserContext and a fixed
-            # tab pool (one tab for sessionStorage-backed sign-in). Keep the cap small
-            # so concurrent pages cannot overwhelm the shared session or the
+            # pool of signed-in tabs, one per worker (each later tab holds a
+            # copy of a sessionStorage sign-in). The cap stays small so
+            # concurrent pages cannot overwhelm the shared session or the
             # target application while still using modern laptop capacity.
             concurrency_per_host=body.workers,
             workers=body.workers,
             browser_headless=not body.show_browser,
-            user_agent=settings.user_agent,
+            user_agent=login_user_agent or settings.user_agent,
+            robots_user_agent=settings.user_agent if login_user_agent else None,
+            user_agent_choice=body.user_agent_choice if login_user_agent else None,
             request_timeout_s=settings.request_timeout_s,
             # Optional protected-image analysis uses the same authenticated
             # browser context and never falls back to anonymous downloads.
@@ -1738,10 +1821,20 @@ def create_app(
             model_routes=dict(local_model.routes) or None if local_model else None,
             vlm_prompt_name=settings.vlm_prompt_name,
             vlm_concurrency=1,
-            semantic_enabled=False,
+            semantic_enabled=not body.skip_semantic and ai_enabled(settings),
             js_enabled=True,
-            js_eager=True,
-            browser_only=True,
+            # "Load pages without running scripts": each page's code comes
+            # from the signed-in browser's request client instead
+            # (_run_local_login_background), never an anonymous request. With
+            # it off, every page is rendered in the signed-in browser.
+            js_eager=not body.static_only,
+            browser_only=not body.static_only,
+            # The document check downloads through the signed-in browser
+            # only (file_fetcher in _run_local_login_background), also when
+            # pages load without scripts; files on other sites are listed,
+            # not downloaded (the sign-in scan's egress policy).
+            linked_files_enabled=not body.skip_documents,
+            documents_signed_in=True,
             image_extraction_enabled=not body.skip_ocr,
             axe_enabled=body.scan_engine in {"axe", "both"},
             axe_level=body.axe_level,
@@ -1752,11 +1845,11 @@ def create_app(
             ),
             keyboard_probe_enabled=not body.skip_keyboard,
             responsive_checks_enabled=not body.skip_responsive,
-            focus_checks_enabled=True,
-            # Reads the page code and changes nothing, so it is as safe
-            # behind a sign-in as the rule check (axe).
-            markup_checks_enabled=True,
-            visual_checks_enabled=False,
+            focus_checks_enabled=not body.skip_focus,
+            markup_checks_enabled=not body.skip_markup,
+            visual_checks_enabled=not body.skip_visual,
+            form_error_checks_enabled=not body.skip_forms,
+            form_send_empty_forms=not body.skip_forms and body.send_empty_forms,
             # A marked element screenshot is what makes a finding reviewable
             # without re-running the sign-in, so an authenticated scan needs
             # them at least as much as an anonymous one. It is also the same
@@ -1768,7 +1861,7 @@ def create_app(
             # docs/protected-scans.md.
             capture_screenshots=not body.skip_rendered_storage,
             store_rendered_html=not body.skip_rendered_storage,
-            ignore_robots=True,
+            ignore_robots=body.ignore_robots,
             # The signed-in context lives in this process's memory and dies
             # with it, so nothing can continue this scan later. Say so on the
             # row: an ordinary crawl of the same seed used to adopt it while
@@ -1780,7 +1873,7 @@ def create_app(
             seed_url=body.seed_url,
             approved_target_origins=(body.target_origin,),
             approved_auth_origins=body.approved_auth_origins,
-            user_agent=settings.user_agent,
+            user_agent=login_user_agent or settings.user_agent,
             # A local human-controlled login may cross dynamically assigned
             # public SSO/MFA origins. Scan mode still tightens to the exact
             # target origin before any page evidence is collected.
@@ -2061,7 +2154,14 @@ def create_app(
                 },
                 status_code=422,
             )
-        from audit.web.scan_settings import limit_refusal
+        from audit.web.scan_settings import limit_refusal, user_agent_refusal
+
+        # The browser name sent to the site. A missing choice, or Axcess's
+        # own, keeps the server's ``settings.user_agent``.
+        ua_refusal = user_agent_refusal(body)
+        if ua_refusal is not None:
+            field, message = ua_refusal
+            return JSONResponse({"error": message, "fields": [field]}, status_code=422)
 
         # "Scan every page it finds": no page limit, so any max_pages sent
         # alongside is the form's hidden value, not a limit to check.
@@ -2074,7 +2174,7 @@ def create_app(
         form = {
             "url": url,
             "search": search,
-            "max_pages": None if all_pages else int(body.get("max_pages") or 2500),
+            "max_pages": None if all_pages else int(body.get("max_pages") or 10_000),
             "max_depth": int(body.get("max_depth") or 10),
             "rps": float(body.get("rps") or 2.0),
             "workers": int(body.get("workers") or 8),
@@ -2096,6 +2196,9 @@ def create_app(
             "skip_focus": bool(body.get("skip_focus")),
             # On unless asked off, like the other checks that only read.
             "skip_markup": bool(body.get("skip_markup")),
+            # On unless asked off: the Documents tab lists the files the
+            # pages link to and checks each PDF.
+            "skip_documents": bool(body.get("skip_documents")),
             "skip_visual": bool(body.get("skip_visual")),
             # Off unless asked for: an older client that sends nothing never
             # starts the form error check, which presses submit buttons.
@@ -2106,6 +2209,11 @@ def create_app(
             "skip_rendered_storage": bool(body.get("skip_rendered_storage")),
             "axe_level": str(body.get("axe_level", "AA")),
             "wcag_version": wcag_version,
+            # Chrome's name unless the request chose otherwise (2026-11-16):
+            # a request with no choice, such as one from an older New scan,
+            # gets the new default.
+            "user_agent_choice": body.get("user_agent_choice") or CHROME_CHOICE,
+            "user_agent": body.get("user_agent"),
         }
         config = _build_crawl_config(form, settings)
         scan_id = _prepare_scan_row(resolved_db, config)
@@ -2146,6 +2254,9 @@ def create_app(
                     "WHERE id = ?",
                     (scan_id, scan_id),
                 )
+                # Before the queue is emptied: the waiting addresses are part
+                # of "pages found", the report's own measure of coverage.
+                record_pages_found(conn, scan_id)
                 # Both states, for every scan. A leased job is one a worker
                 # had checked out when the stop arrived; leaving it behind
                 # meant the lease expired, the work became available again,
@@ -2262,9 +2373,8 @@ def create_app(
     def api_put_evaluation(scan_id: int, body: EvaluationUpdate) -> JSONResponse:
         """Persist the human-authored evaluation context for a completed scan."""
         with get_conn() as conn:
-            scan = _load_scan_or_404(conn, scan_id)
+            _load_scan_or_404(conn, scan_id)
             _deny_legacy_protected_review(conn, scan_id)
-            _require_completed_scan(scan)
             existing = evaluation.get_evaluation(conn, scan_id)
             changes = body.model_dump(exclude_none=True)
             values = {
@@ -2314,9 +2424,8 @@ def create_app(
         scan_id: int, criterion_sc: str, body: ManualCheckUpdate
     ) -> JSONResponse:
         with get_conn() as conn:
-            scan = _load_scan_or_404(conn, scan_id)
+            _load_scan_or_404(conn, scan_id)
             _deny_legacy_protected_review(conn, scan_id)
-            _require_completed_scan(scan)
             try:
                 payload = evaluation.update_manual_check(
                     conn,
@@ -2343,9 +2452,8 @@ def create_app(
         scan_id: int, criterion_sc: str, body: ManualEvidenceCreate
     ) -> JSONResponse:
         with get_conn() as conn:
-            scan = _load_scan_or_404(conn, scan_id)
+            _load_scan_or_404(conn, scan_id)
             _deny_legacy_protected_review(conn, scan_id)
-            _require_completed_scan(scan)
             try:
                 payload = evaluation.add_manual_evidence(
                     conn,
@@ -2372,6 +2480,72 @@ def create_app(
             return pages_queries.list_scan_pages(
                 conn, scan_id, limit=limit, offset=offset, sort=sort
             )
+
+    @app.get("/api/scans/{scan_id:int}/documents", response_model=ScanDocumentsResponse)
+    def api_scan_documents(
+        scan_id: int,
+        limit: int = Query(
+            default=linked_files_queries.DEFAULT_LIMIT, ge=1, le=linked_files_queries.MAX_LIMIT
+        ),
+        offset: int = Query(default=0, ge=0),
+    ) -> ScanDocumentsResponse:
+        """The files this report's pages link to (the Documents tab), in report order."""
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            return linked_files_queries.list_scan_documents(
+                conn, scan_id, limit=limit, offset=offset
+            )
+
+    @app.get(
+        "/api/scans/{scan_id:int}/documents/{file_id:int}", response_model=ScanDocumentResponse
+    )
+    def api_scan_document(scan_id: int, file_id: int) -> ScanDocumentResponse:
+        """One file of this report and every page it appears on (its own page)."""
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            found = linked_files_queries.get_scan_document(conn, scan_id, file_id)
+        if found is None:
+            raise HTTPException(status_code=404, detail="This report has no such document")
+        return found
+
+    @app.get("/api/scans/{scan_id:int}/documents/{file_id:int}/thumbnail")
+    def api_document_thumbnail(
+        scan_id: int, file_id: int, size: Literal["large", "small"] = "large"
+    ) -> FileResponse:
+        """A JPEG of one file's first page (PDFs the check could read).
+
+        ``size=small`` is the Documents table's picture, ``large`` the one on
+        the document's own page.
+        """
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            content_hash = linked_files_queries.thumbnail_hash(
+                conn, scan_id, file_id, small=size == "small"
+            )
+        path = blob_store.path_of(content_hash, "image/jpeg") if content_hash else None
+        if path is None or not path.is_file():
+            raise HTTPException(status_code=404, detail="This document has no picture")
+        # The file never changes (its name is its content hash).
+        return FileResponse(
+            path,
+            media_type="image/jpeg",
+            headers={"Cache-Control": "private, max-age=86400"},
+        )
+
+    @app.get(
+        "/api/scans/{scan_id:int}/documents/{file_id:int}/pages/{page_id:int}",
+        response_model=DocumentOnPage,
+    )
+    def api_document_on_page(scan_id: int, file_id: int, page_id: int) -> DocumentOnPage:
+        """Where one file of this report is linked on one of its pages, for the inspector."""
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            found = linked_files_queries.document_on_page(conn, scan_id, file_id, page_id)
+        if found is None:
+            raise HTTPException(
+                status_code=404, detail="This page of the report does not link to that file"
+            )
+        return found
 
     @app.get("/api/scans/{scan_id:int}/pages/{page_id:int}")
     def api_page_evidence(scan_id: int, page_id: int) -> JSONResponse:
@@ -2677,7 +2851,7 @@ def create_app(
         """JSON form of the unified Issues list, used by the SPA."""
         from dataclasses import asdict
 
-        from audit.labels import FINDING_TYPES
+        from audit.labels import FINDING_TYPES, REVIEW_LANES
         from audit.web import issues as issues_mod
 
         with get_conn() as conn:
@@ -2697,11 +2871,7 @@ def create_app(
                 # Comma-separated like ``conformance``; a single value reads
                 # as before, and an unknown one is ignored rather than
                 # emptying the table.
-                review_lane=[
-                    lane
-                    for lane in _split_csv(review_lane)
-                    if lane in {"likely_barrier", "expert_review", "informational"}
-                ],
+                review_lane=[lane for lane in _split_csv(review_lane) if lane in REVIEW_LANES],
                 finding_type=[kind for kind in _split_csv(finding_type) if kind in FINDING_TYPES],
                 sort=sort,
             )
@@ -2720,6 +2890,10 @@ def create_app(
                     ),
                 },
                 "total_unfiltered": len(unfiltered),
+                # What the Issues page shows when it opens (Mostly sure and
+                # Measured) and what it leaves one click away. The totals
+                # above still describe every row.
+                "default_view_counts": issues_mod.default_view_counts(unfiltered),
             }
         )
 
@@ -2863,6 +3037,200 @@ def create_app(
                 conn, scan_id, status=status if status else None
             )
         return JSONResponse({"coverage": cov, "groups": groups})
+
+    # The report's Images tab: every image the scan saw, in three groups, with
+    # a verdict on its alt text (audit/web/image_inventory.py). Asking the
+    # local model about one image is a separate POST a person makes with a
+    # button; nothing here calls a model on its own.
+    # The check sends the saved image, its OCR text and nearby page text to
+    # the model, and the Images tab says that stays on this computer. So it
+    # runs only against a literal loopback Ollama address, the same rule as
+    # sign-in scans; a remote AUDIT_OLLAMA_BASE_URL leaves the check off.
+    # An Ollama cloud model (tag "cloud" or "...-cloud") runs on Ollama's
+    # servers even through the local daemon, so it leaves the check off too.
+    #
+    # The model: AUDIT_ALT_CHECK_MODEL when the administrator set one, else
+    # in the desktop app the vision model chosen in Settings > AI features
+    # (2026-11-16, the developer's request: turning AI features on is how a
+    # person turns this check on). With AI features off in the desktop app,
+    # the check is off. Worked out again whenever the AI setup changes
+    # (_apply_ai_setup), so turning AI features on needs no restart.
+    app.state.alt_checker_factory = _alt_checker_factory_for(settings)
+
+    @app.get("/api/scans/{scan_id:int}/images")
+    def api_scan_images(
+        scan_id: int,
+        group: str = Query(default="with_text"),
+        verdict: str = Query(default=""),
+        q: str = Query(default="", max_length=200),
+        limit: int = Query(default=25, ge=1, le=image_inventory.MAX_LIMIT),
+        offset: int = Query(default=0, ge=0, le=1_000_000),
+    ) -> JSONResponse:
+        """One page of one group of the report's images, worst verdict first."""
+        if group not in image_inventory.GROUPS:
+            raise HTTPException(status_code=400, detail="Unknown image group")
+        if verdict and verdict not in image_inventory.VERDICTS:
+            raise HTTPException(status_code=400, detail="Unknown alt text verdict")
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            result = image_inventory.list_report_images(
+                conn,
+                scan_id,
+                group=group,
+                verdict=verdict or None,
+                q=q,
+                limit=limit,
+                offset=offset,
+                check_available=app.state.alt_checker_factory is not None,
+            )
+        return JSONResponse(result.model_dump())
+
+    @app.get("/api/scans/{scan_id:int}/images/{image_id:int}")
+    def api_scan_image(scan_id: int, image_id: int) -> JSONResponse:
+        """One image of the report, and every page it appears on."""
+        with get_conn() as conn:
+            _load_scan_or_404(conn, scan_id)
+            detail = image_inventory.get_report_image_detail(
+                conn,
+                scan_id,
+                image_id,
+                check_available=app.state.alt_checker_factory is not None,
+            )
+        if detail is None:
+            raise HTTPException(status_code=404, detail="This image is not part of this report.")
+        return JSONResponse(detail.model_dump())
+
+    @app.post("/api/scans/{scan_id:int}/images/{image_id:int}/alt-check")
+    async def api_check_image_alt(scan_id: int, image_id: int) -> JSONResponse:
+        """Ask the local model about one image's alt text, keep and return its answer.
+
+        A person's explicit request from the Images tab. Refused while the
+        scan is still running, for a protected scan (its images do not leave
+        the protected store), and when no model is set. A timeout or an
+        unusable answer saves nothing and says so; the tab keeps working.
+        """
+        from audit.analyzer.vlm.alt_check import AltCheckInput, OllamaError
+
+        with get_conn() as conn:
+            scan = _load_scan_or_404(conn, scan_id)
+            _require_ended_report(scan)
+            target = image_inventory.check_target(conn, scan_id, image_id)
+        if _protected_scan_owner(resolved_db, scan_id) is not None:
+            raise HTTPException(
+                status_code=403,
+                detail="Images in a protected report are not sent to a model.",
+            )
+        if target is None:
+            raise HTTPException(status_code=404, detail="This image is not in this report")
+        factory = app.state.alt_checker_factory
+        if factory is None:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "No local model is set up to check alt text. "
+                    "Ask the person who runs Axcess to set one."
+                ),
+            )
+        if not target.can_check:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "The model cannot look at this image: it is drawn in the page code (SVG) "
+                    "or was not saved. Check its alt text by hand."
+                ),
+            )
+        full = blob_store.path_for(str(target.blob_path)).resolve()
+        try:
+            full.relative_to(blob_store.root.resolve())
+            image_bytes = full.read_bytes()
+        except (ValueError, OSError) as exc:
+            raise HTTPException(
+                status_code=422, detail="The saved copy of this image is missing."
+            ) from exc
+        given = AltCheckInput(
+            alt_text=target.alt_text,
+            image_text=target.image_text,
+            context_snippet=target.context_snippet,
+        )
+        try:
+            # trust_env=False: proxy settings in the environment
+            # (HTTP_PROXY, ALL_PROXY) must not route the image and page text
+            # through another computer; the service is on this computer.
+            open_client = getattr(factory, "open_client", None)
+            client_cm = open_client() if open_client else httpx.AsyncClient(trust_env=False)
+            async with client_cm as client:
+                checker = factory(client)
+                answer = await asyncio.wait_for(
+                    checker.check(image_bytes, given),
+                    timeout=settings.alt_check_timeout_s,
+                )
+        except TimeoutError as exc:
+            raise HTTPException(
+                status_code=504,
+                detail="The local model took too long to answer. Try again later.",
+            ) from exc
+        except (OllamaError, httpx.HTTPError) as exc:
+            log.warning("alt_check.failed", scan_id=scan_id, image_id=image_id, error=str(exc))
+            raise HTTPException(
+                status_code=502,
+                detail="The local model did not give a usable answer. Nothing was saved.",
+            ) from exc
+        with get_conn() as conn:
+            image_inventory.save_check(
+                conn,
+                scan_id=scan_id,
+                image_id=image_id,
+                verdict=answer.verdict,
+                reason=answer.reason,
+                suggestion=answer.suggestion,
+                model=answer.model,
+                prompt_version=answer.prompt_version,
+            )
+            row = image_inventory.get_report_image(conn, scan_id, image_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="This image is not in this report")
+        return JSONResponse(row.model_dump())
+
+    @app.get("/api/scans/{scan_id:int}/images/export.zip")
+    def api_scan_images_zip(scan_id: int) -> Response:
+        """The report's images in folders by group and verdict, with a sheet.
+
+        A download a person asks for from the Images tab. Only for a completed,
+        non-protected report: a protected report's images stay in its store.
+        Built in a temporary file, not in memory, because a report can hold
+        thousands of images; the file is removed once it has been sent.
+        """
+        import os
+        import tempfile
+
+        from audit.exports.images_zip import images_zip_filename, write_images_zip
+
+        if _protected_scan_owner(resolved_db, scan_id) is not None:
+            raise HTTPException(
+                status_code=403,
+                detail="A protected report's images cannot be downloaded.",
+            )
+        fd, zip_path = tempfile.mkstemp(prefix="axcess-images-", suffix=".zip")
+        try:
+            with os.fdopen(fd, "wb") as out, get_conn() as conn:
+                scan = _load_scan_or_404(conn, scan_id)
+                _require_ended_report(scan)
+                write_images_zip(
+                    conn,
+                    scan_id=scan_id,
+                    seed_url=str(scan.get("seed_url") or ""),
+                    blob_store=blob_store,
+                    out=out,
+                )
+        except BaseException:
+            os.unlink(zip_path)
+            raise
+        return FileResponse(
+            zip_path,
+            media_type="application/zip",
+            filename=images_zip_filename(scan_id),
+            background=BackgroundTask(os.unlink, zip_path),
+        )
 
     @app.post("/api/findings/{finding_id:int}/status")
     async def api_set_finding_status(
@@ -3168,6 +3536,30 @@ def create_app(
             }
         )
 
+    @app.get("/api/coverage/checks", response_model=CoverageChecksResponse)
+    def api_coverage_checks(
+        wcag_version: Annotated[WcagVersion, Query(alias="version")] = DEFAULT_WCAG_VERSION,
+    ) -> CoverageChecksResponse:
+        """What Axcess checks for each WCAG criterion, built from its own code.
+
+        Describes Axcess, not a scan, so it holds no report data
+        (audit/web/coverage_checks.py).
+        """
+        return coverage_checks(wcag_version)
+
+    @app.get("/api/coverage/found", response_model=IssueShareResponse)
+    def api_coverage_found(scan_id: int | None = Query(default=None, ge=1)) -> IssueShareResponse:
+        """What Axcess found, counted on request from this computer's completed reports.
+
+        Across the most recent completed reports, or one of them. Nothing is
+        sent anywhere (audit/web/issue_share.py).
+        """
+        with get_conn() as conn:
+            try:
+                return issue_share(conn, scan_id)
+            except IssueShareError as exc:
+                raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
     @app.get("/", include_in_schema=False)
     def root() -> RedirectResponse:
         # The React SPA is the only UI. /app/ serves a 503 "build the
@@ -3304,11 +3696,6 @@ def create_app(
                 render=render,
                 redacted=redact,
                 always_redacted=_ALWAYS_REDACTED_FORMATS,
-                # A report that is not complete has no brief to measure; the
-                # panel shows the file without a size, and choosing it says why.
-                unavailable=(
-                    _COMPLETED_ONLY_FORMATS if scan.status != "completed" else frozenset()
-                ),
             )
 
     # The SPA's Export panel downloads from this ``/api/*`` route with
@@ -3345,17 +3732,6 @@ def create_app(
             raise HTTPException(status_code=400, detail="Unknown export format")
         with get_conn() as conn:
             scan = collect_public_export_scan(conn, scan_id, request)
-            if fmt_lower in _COMPLETED_ONLY_FORMATS and scan.status != "completed":
-                # Refused before the readiness check, as a deleted scan is
-                # refused before it: there is no complete report to export.
-                raise HTTPException(
-                    status_code=409,
-                    detail=(
-                        f"Report #{scan_id} is not complete (the scan is {scan.status}). "
-                        "A fix brief can only be made from a completed scan. Wait for "
-                        "the scan to finish, or start a new scan."
-                    ),
-                )
             try:
                 readiness = assess_public_export_readiness(
                     conn,
@@ -3496,12 +3872,21 @@ def _sweep_stale_running_scans(db_path: Path) -> int:
                  WHERE run_lease_id IS NOT NULL OR protection_status = 'running'
                 """
             )
-        cur = conn.execute(
-            "UPDATE scans SET status = 'interrupted', "
-            "finished_at = COALESCE(finished_at, CURRENT_TIMESTAMP) "
-            "WHERE status = 'running'"
-        )
-        swept = int(cur.rowcount or 0)
+        stale = [
+            int(row["id"]) for row in conn.execute("SELECT id FROM scans WHERE status = 'running'")
+        ]
+        # The page count and pages found go with the status, as Stop writes
+        # them: an interrupted scan that saved pages is a report.
+        for scan_id in stale:
+            conn.execute(
+                "UPDATE scans SET status = 'interrupted', "
+                "finished_at = COALESCE(finished_at, CURRENT_TIMESTAMP), "
+                "page_count = (SELECT COUNT(*) FROM pages WHERE scan_id = scans.id) "
+                "WHERE id = ?",
+                (scan_id,),
+            )
+            record_pages_found(conn, scan_id)
+        swept = len(stale)
         if swept:
             log.info("web.sweep_stale_scans", count=swept)
         return swept
@@ -3914,6 +4299,10 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
         # Legacy non-browser callers retain the original axe-default behavior.
         scan_engine = "axe"
     model_endpoint = endpoint_from_settings(settings)
+    # A browser name chosen on New scan (already checked by
+    # ``user_agent_refusal``); otherwise the server's own name. robots.txt
+    # is matched against the server's own name either way.
+    chosen = chosen_user_agent(form)
     return CrawlConfig(
         seed_url=str(form["url"]).strip(),
         search=form.get("search"),
@@ -3930,7 +4319,9 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
         allow_subdomains=bool(form["include_subdomain"]),
         whole_host=bool(form.get("whole_host")),
         ignore_robots=bool(form["ignore_robots"]),
-        user_agent=settings.user_agent,
+        user_agent=chosen or settings.user_agent,
+        robots_user_agent=settings.user_agent if chosen else None,
+        user_agent_choice=str(form["user_agent_choice"]) if chosen else None,
         request_timeout_s=settings.request_timeout_s,
         ocr_enabled=not bool(form["skip_ocr"]),
         ocr_language=settings.ocr_language,
@@ -3972,6 +4363,7 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
         responsive_checks_enabled=not bool(form.get("skip_responsive")),
         focus_checks_enabled=not bool(form.get("skip_focus")),
         markup_checks_enabled=not bool(form.get("skip_markup")),
+        linked_files_enabled=not bool(form.get("skip_documents")),
         visual_checks_enabled=not bool(form.get("skip_visual")),
         form_error_checks_enabled=not bool(form.get("skip_forms", True)),
         form_send_empty_forms=not bool(form.get("skip_forms", True))
@@ -4057,15 +4449,22 @@ async def _run_background_crawl(db_path: Path, config: CrawlConfig) -> None:
         # leave the up-front scan row looking "running" forever: that makes a
         # failed startup indistinguishable from a very slow first page.
         log.warning("web.crawl_failed", seed=config.seed_url, error=str(exc))
-        conn.execute(
-            "UPDATE scans SET status = 'failed', finished_at = CURRENT_TIMESTAMP, "
-            "failure_reason = ? "
-            "WHERE id = ("
+        row = conn.execute(
             "SELECT id FROM scans WHERE seed_url = ? AND status = 'running' "
-            "ORDER BY id DESC LIMIT 1"
-            ")",
-            (str(exc)[:1000], _canonical_scan_seed(config.seed_url)),
-        )
+            "ORDER BY id DESC LIMIT 1",
+            (_canonical_scan_seed(config.seed_url),),
+        ).fetchone()
+        if row is not None:
+            # The page count goes with the status: a failed scan that saved
+            # pages is a report (audit.db.reports), and it says how far it got.
+            conn.execute(
+                "UPDATE scans SET status = 'failed', finished_at = CURRENT_TIMESTAMP, "
+                "failure_reason = ?, "
+                "page_count = (SELECT COUNT(*) FROM pages WHERE scan_id = scans.id) "
+                "WHERE id = ?",
+                (str(exc)[:1000], int(row["id"])),
+            )
+            record_pages_found(conn, int(row["id"]))
     finally:
         conn.close()
 
@@ -4074,6 +4473,61 @@ def _canonical_scan_seed(seed_url: str) -> str:
     """Return the same seed identity used by the crawler orchestrator."""
 
     return url_policy.normalize(url_policy.normalize_seed_url(seed_url))
+
+
+def _alt_checker_factory_for(settings: Settings) -> Any:
+    """The Images tab's alt text checker for these settings, or None when off.
+
+    The check sends the saved image, its text and nearby page text to the
+    model, and the Images tab says that stays on this computer. So it runs
+    only on a model service on this computer (``_local_login_model_endpoint``:
+    the desktop app's private service, or a literal loopback address) and
+    never with an Ollama cloud model (tag "cloud" or "...-cloud"), which runs
+    on Ollama's servers even through the local daemon.
+    """
+    from audit.analyzer.ollama_base import is_cloud_model
+
+    model = settings.alt_check_model.strip()
+    if settings.desktop:
+        if not ai_enabled(settings):
+            return None
+        # effective_ai_settings put the AI setup's vision model here when
+        # there is one; a model the administrator named still comes first.
+        model = model or (
+            settings.vlm_model.strip() if load_ai_config(settings) is not None else ""
+        )
+    if not model or is_cloud_model(model):
+        return None
+    endpoint = _local_login_model_endpoint(settings)
+    if endpoint is None:
+        return None
+    return _AltCheckerFactory(endpoint, model, settings.alt_check_timeout_s)
+
+
+@dataclass(frozen=True)
+class _AltCheckerFactory:
+    """Builds the alt text checker for one model service on this computer."""
+
+    endpoint: ModelEndpoint
+    model: str
+    timeout_s: float
+
+    def open_client(self) -> httpx.AsyncClient:
+        """A client that reaches the service: its socket or routes, or the
+        loopback address. Never a proxy (trust_env=False): the image and page
+        text must not go through another computer."""
+        return open_model_http_client(self.endpoint, trust_env=False)
+
+    def __call__(self, client: httpx.AsyncClient) -> Any:
+        from audit.analyzer.vlm.alt_check import OllamaAltChecker
+
+        return OllamaAltChecker(
+            client,
+            model=self.model,
+            base_url=self.endpoint.base_url,
+            timeout_s=self.timeout_s,
+            backend=self.endpoint.backend,
+        )
 
 
 async def _run_local_login_background(
@@ -4095,6 +4549,15 @@ async def _run_local_login_background(
     """
 
     conn: sqlite3.Connection | None = None
+    tab_pool: TabPool | None = None
+    # Used only for the optional loopback model provider (the AI review and
+    # the visual check's vision model); browser_only or the authenticated
+    # static fetcher keeps it from fetching protected documents.
+    local_client = httpx.AsyncClient(trust_env=False)
+    # The visual check's model client: ``local_client`` for an Ollama
+    # address, or one for the private AI service's socket or routes, the
+    # same one a public scan's checks use (``model_http_client``).
+    vision_client: httpx.AsyncClient | None = None
     try:
         run.status = "verifying_authentication"
         if not config.browser_headless and not run.session.window_open:
@@ -4177,9 +4640,33 @@ async def _run_local_login_background(
                 if config.responsive_checks_enabled
                 else None
             ),
-            focus_probe=FocusProbe(suppress_diagnostics=True),
+            focus_probe=(
+                FocusProbe(suppress_diagnostics=True) if config.focus_checks_enabled else None
+            ),
             markup_probe=(
                 MarkupProbe(suppress_diagnostics=True) if config.markup_checks_enabled else None
+            ),
+            # The visual check and the form error check, offered in sign-in
+            # scans since 2026-11-16 and built here the way the orchestrator
+            # builds them for a public scan (this fetcher is built by hand).
+            visual_probe=(
+                VisualProbe(
+                    provider=(
+                        await build_vision_provider(
+                            config,
+                            vision_client := model_http_client(config, local_client),
+                        )
+                        if config.vlm_enabled
+                        else None
+                    )
+                )
+                if config.visual_checks_enabled
+                else None
+            ),
+            form_error_probe=(
+                ErrorIdentificationProbe(send_empty=config.form_send_empty_forms, private=True)
+                if config.form_error_checks_enabled
+                else None
             ),
             interaction_probe=login_interaction,
             # Follow the scan's own setting rather than hardcoding it off.
@@ -4190,6 +4677,7 @@ async def _run_local_login_background(
             shared_pages=scan_pages,
             search_explorer=build_search_explorer(config, login_axe),
         )
+        tab_pool = fetcher.tab_pool
         run.status = "scanning"
         authenticated_alfa: _AuthenticatedAlfaRunner | None = None
         if config.alfa_enabled:
@@ -4208,17 +4696,25 @@ async def _run_local_login_background(
             else None
         )
         conn = connect(db_path)
-        # This client is used only for the optional loopback model provider;
-        # browser_only prevents it from fetching protected documents.
-        async with httpx.AsyncClient(trust_env=False) as local_client:
-            summary = await run_crawl(
-                conn,
-                config,
-                http_client=local_client,
-                js_fetcher=fetcher,
-                image_downloader=image_downloader,
-                alfa_analyzer=authenticated_alfa,
-            )
+        summary = await run_crawl(
+            conn,
+            config,
+            http_client=local_client,
+            js_fetcher=fetcher,
+            image_downloader=image_downloader,
+            alfa_analyzer=authenticated_alfa,
+            # "Load pages without running scripts": the page code comes
+            # through the signed-in browser, never an anonymous request.
+            static_fetcher=(
+                None if config.js_eager else run.session.create_authenticated_static_fetcher()
+            ),
+            # The document check's PDFs, through the signed-in browser too.
+            file_fetcher=(
+                run.session.create_authenticated_file_fetcher()
+                if config.linked_files_enabled
+                else None
+            ),
+        )
         run.status, run.error = _local_login_completion(summary)
         # run_crawl historically records an exhausted queue as completed even
         # when every page job failed.  That is useful for general best-effort
@@ -4242,9 +4738,45 @@ async def _run_local_login_background(
         _finish_local_login_scan(db_path, run.scan_id, "failed")
         log.warning("web.local_login_scan_failed", scan_id=run.scan_id)
     finally:
+        if vision_client is not None and vision_client is not local_client:
+            await vision_client.aclose()
+        await local_client.aclose()
         if conn is not None:
             conn.close()
+        if tab_pool is not None and tab_pool.fell_back:
+            _record_scan_note(db_path, run.scan_id, tab_fallback_note(tab_pool.size))
         await run.session.close()
+
+
+def tab_fallback_note(tabs: int) -> str:
+    """The scan note for a sign-in scan that fell back to one tab.
+
+    Plain words, no page address (the note is shown and exported with the
+    report). Says what happened, what Axcess did about it, and the one
+    limit a reader needs: pages already done in another tab were each
+    checked for a sign-in page when they loaded, not at every moment after.
+    """
+    # Says pages, not tabs: the form calls the setting "Pages at once
+    # (workers)", and the tabs are how that works, not what the person chose.
+    return (
+        f"Axcess started this sign-in scan working on {tabs} pages at once. "
+        "Partway through, the site signed out part of the scan: a page showed a "
+        "sign-in page, but the real page when Axcess loaded it again. Axcess "
+        "kept the real page and scanned the rest of the site one page at a time, "
+        "which is slower. Every page was checked for a sign-in page when it loaded."
+    )
+
+
+def _record_scan_note(db_path: Path, scan_id: int, note: str) -> None:
+    """Write Axcess's own note on a scan row. Never raises."""
+    try:
+        conn = connect(db_path)
+        try:
+            conn.execute("UPDATE scans SET scan_note = ? WHERE id = ?", (note, scan_id))
+        finally:
+            conn.close()
+    except Exception:
+        log.warning("web.scan_note_not_saved", scan_id=scan_id)
 
 
 class _AuthenticatedAlfaRunner:
@@ -4685,8 +5217,6 @@ def _detect_blocked_scan(
     Returns ``{'status_code': int | None, 'title': str | None, 'seed_url': str}``
     when a warning should be shown, or ``None`` to render normally.
     """
-    if scan.get("status") != "completed":
-        return None
     page_count = int(scan.get("page_count") or 0)
     if page_count == 0:
         return None
@@ -5133,6 +5663,21 @@ def _saved_page_count(conn: sqlite3.Connection, scan_id: int) -> int:
     return int(row["n"]) if row is not None else 0
 
 
+def _require_ended_report(scan: dict[str, Any]) -> None:
+    """Guard the Images tab's alt check and ZIP: a report, not a live crawl.
+
+    A report is a completed scan or one that ended with saved pages, however
+    it ended (the rule since 2026-11-14, ``sites.group_scans``). A running
+    scan is still adding images, so it is refused until it ends.
+    """
+    ended = scan["status"] != "running"
+    if not (scan["status"] == "completed" or (ended and int(scan.get("page_count") or 0) > 0)):
+        raise HTTPException(
+            status_code=409,
+            detail="This works once the scan has ended and saved pages.",
+        )
+
+
 def _load_scan_or_404(conn: sqlite3.Connection, scan_id: int) -> dict[str, Any]:
     # ``SELECT *`` keeps public report browsing compatible while a newly added
     # optional coverage column is being migrated. Accessors below use ``get``
@@ -5141,15 +5686,6 @@ def _load_scan_or_404(conn: sqlite3.Connection, scan_id: int) -> dict[str, Any]:
     if row is None:
         raise HTTPException(status_code=404, detail="Scan not found")
     return dict(row)
-
-
-def _require_completed_scan(scan: dict[str, Any]) -> None:
-    """Guard review writes: a live crawl cannot be a stable evaluation."""
-    if scan["status"] != "completed":
-        raise HTTPException(
-            status_code=409,
-            detail="Expert review can begin after this scan completes.",
-        )
 
 
 def _severity_breakdown(conn: sqlite3.Connection, scan_id: int) -> dict[str, int]:

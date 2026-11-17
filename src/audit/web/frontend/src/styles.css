@@ -32,6 +32,34 @@
   --c-umich-blue: 0 39 76;
   --c-umich-blue-600: 0 58 108;
   --c-umich-blue-700: 0 30 60;
+  /* A lighter blue for a quiet icon that must not compete with the words
+     beside it (the "?" of HelpTip; the developer's request, 2026-11-16):
+     the lightest blue in this hue that keeps 7:1 on surface-muted, the
+     darkest surface it sits on (7.05:1; 7.4:1 on surface-subtle, 7.8:1 on
+     white), SC 1.4.6 Contrast (Enhanced), Level AAA, the bar this app holds
+     icons to as well as text. The contrast settings below set it back to
+     umich-blue. */
+  --c-umich-blue-soft: 42 85 126;
+  /* Coverage's five kinds of check, one blue stepped from near black to
+     near white by how much Axcess does (the developer's request, 2026-11-16:
+     five hues read as one, and colour alone told them apart). The order is
+     the data's own, so one hue in lightness steps, not five hues
+     (sequential, not categorical). Each step has its own ink at 7:1 or more
+     (SC 1.4.6 Contrast (Enhanced), Level AAA): white on the two dark steps
+     (17:1, 8.4:1), near black on the three light ones (7.6:1, 12:1, 16:1).
+     No mid blue reaches 7:1 with either ink, so the steps jump between the
+     second and third. The dark theme turns the ramp round (below): the most
+     automated kind stays the one that stands out most from the page. */
+  --c-method-automated: 9 29 52;
+  --c-method-automated-ink: 255 255 255;
+  --c-method-partial: 37 79 126;
+  --c-method-partial-ink: 255 255 255;
+  --c-method-ai: 136 173 215;
+  --c-method-ai-ink: 17 24 39;
+  --c-method-manual: 196 214 235;
+  --c-method-manual-ink: 17 24 39;
+  --c-method-not-needed: 240 244 249;
+  --c-method-not-needed-ink: 17 24 39;
   --c-umich-maize: 255 203 5;
   --c-umich-maize-600: 230 183 4;
   --c-sev-critical: 122 0 0;
@@ -55,6 +83,10 @@
   --c-surface-inverse-fg-subtle: 201 212 224;
   --c-border: 220 227 236;
   --c-border-strong: 184 196 210;
+  /* The app's scroll bars (.ax-scrollbar): just over the 3:1
+     that SC 1.4.11 Non-text Contrast asks, on the card surface (3.07:1 on
+     white). The more and high contrast themes use their border-strong. */
+  --c-scrollbar: 137 148 164;
   --c-border-focus: 0 39 76;
   --c-fg: 17 24 39;
   --c-fg-muted: 55 65 81;
@@ -71,14 +103,17 @@
 }
 
 :root[data-contrast="more"] {
+  --c-umich-blue-soft: 0 39 76;
   --c-fg-muted: 31 41 55; /* 14.7:1 on white */
   --c-fg-subtle: 43 53 68; /* 12.6:1 */
   --c-border: 184 196 210;
   --c-border-strong: 125 138 156; /* 3.5:1, SC 1.4.11 */
+  --c-scrollbar: 125 138 156; /* 3.5:1 */
 }
 
 /* High: near-black on white, no tinted panels. */
 :root[data-contrast="high"] {
+  --c-umich-blue-soft: 0 39 76;
   --c-fg: 0 0 0;
   --c-fg-muted: 11 15 22;
   --c-fg-subtle: 17 24 39;
@@ -86,6 +121,7 @@
   --c-surface-muted: 255 255 255;
   --c-border: 75 85 99;
   --c-border-strong: 31 41 55;
+  --c-scrollbar: 31 41 55;
   --c-sidebar-1: 255 255 255;
   --c-sidebar-2: 255 255 255;
   --c-sidebar-3: 255 255 255;
@@ -134,6 +170,21 @@
   --c-umich-blue: 158 197 238;
   --c-umich-blue-600: 184 213 243;
   --c-umich-blue-700: 134 179 230;
+  /* 7.1:1 on surface-muted (dark), 9.5:1 on surface-subtle. */
+  --c-umich-blue-soft: 157 187 218;
+  /* Coverage's ramp turned round: the most automated kind is the lightest,
+     the one that stands out most on a dark page. The same five colours and
+     inks as the light theme, so each keeps its 7:1. */
+  --c-method-automated: 240 244 249;
+  --c-method-automated-ink: 17 24 39;
+  --c-method-partial: 196 214 235;
+  --c-method-partial-ink: 17 24 39;
+  --c-method-ai: 136 173 215;
+  --c-method-ai-ink: 17 24 39;
+  --c-method-manual: 37 79 126;
+  --c-method-manual-ink: 255 255 255;
+  --c-method-not-needed: 9 29 52;
+  --c-method-not-needed-ink: 255 255 255;
   --c-sev-critical: 255 180 180;
   --c-sev-critical-bg: 63 20 20;
   --c-sev-major: 255 201 153;
@@ -157,6 +208,7 @@
   --c-surface-inverse-fg-subtle: 34 48 63;
   --c-border: 44 58 77;
   --c-border-strong: 104 124 150;
+  --c-scrollbar: 86 104 127; /* 3.07:1 on the dark surface */
   --c-border-focus: 158 197 238;
   --c-fg: 227 233 240;
   --c-fg-muted: 200 209 220;
@@ -168,13 +220,16 @@
   --c-sidebar-3: 22 32 45;
 }
 :root[data-theme="dark"][data-contrast="more"] {
+  --c-umich-blue-soft: 158 197 238;
   --c-fg-muted: 221 227 234;
   --c-fg-subtle: 203 211 221;
   --c-border: 91 110 134;
   --c-border-strong: 128 147 170;
+  --c-scrollbar: 128 147 170;
 }
 :root[data-theme="dark"][data-contrast="high"] {
   --c-umich-blue: 184 213 243;
+  --c-umich-blue-soft: 184 213 243;
   --c-fg: 255 255 255;
   --c-fg-muted: 245 247 250;
   --c-fg-subtle: 232 236 241;
@@ -185,6 +240,7 @@
   --c-surface-raised: 0 0 0;
   --c-border: 160 174 192;
   --c-border-strong: 226 232 240;
+  --c-scrollbar: 226 232 240;
   --c-sidebar-1: 0 0 0;
   --c-sidebar-2: 0 0 0;
   --c-sidebar-3: 0 0 0;
@@ -520,4 +576,53 @@
    scroll, so on this page <main> leaves the document as the container. */
 #main:has(#scan-panel) {
   overflow: visible;
+}
+
+/* The app's scroll bar style (.ax-scrollbar), first made for the bar over a
+   wide table (TableRegion's top scroll bar, Table.tsx) and also on the
+   zoomed image in the image viewer (ImageViewer, ImageParts.tsx), sideways
+   and up and down (the developer's request, 2026-11-17).
+   Always shown, so it does not fade away as overlay scroll bars do on a Mac.
+   - Target: the strip is 24px tall and the thumb fills it, so the part a
+     pointer grabs is 24px tall, or 24px wide when it runs up and down (SC 2.5.8 Target Size (Minimum), Level AA);
+     an 8px clear border inside it leaves an 8px pill showing.
+   - Contrast: the pill is --c-scrollbar, just over the 3:1 that SC 1.4.11
+     Non-text Contrast (Level AA) asks: 3.07:1 on the card surface in the
+     default light and dark themes, the border-strong colour in the more and
+     high contrast themes (the developer's request, 2026-11-16: quiet, but
+     passing). The controls' border colour was tried first: 1.77:1 in the
+     default light theme. It darkens to the muted text colour under the
+     pointer.
+   - No drag needed: a click on the track moves the table a page sideways
+     (SC 2.5.7 Dragging Movements, Level AA), and the region itself
+     scrolls with the arrow keys.
+   - Forced colours (Windows High Contrast): the styling is dropped and the
+     system's own scroll bar shows, since forced colours repaint backgrounds
+     and could leave a custom thumb invisible.
+   Chromium and Safari take the ::-webkit-scrollbar parts; Firefox shows
+   its own bar at its normal size (it has no way to set a 24px one). */
+@media not (forced-colors: active) {
+  .ax-scrollbar::-webkit-scrollbar {
+    height: 24px;
+    width: 24px;
+  }
+  .ax-scrollbar::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  .ax-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .ax-scrollbar::-webkit-scrollbar-thumb {
+    border: 8px solid transparent;
+    border-radius: 999px;
+    background: rgb(var(--c-scrollbar)) padding-box;
+  }
+  .ax-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--c-fg-subtle)) padding-box;
+  }
+  @supports not selector(::-webkit-scrollbar) {
+    .ax-scrollbar {
+      scrollbar-color: rgb(var(--c-scrollbar)) transparent;
+    }
+  }
 }

@@ -1,4 +1,13 @@
-import { CLICK_THROUGH_COPY, ENGINE, FORMS_CHOICE, GROUPS, STANDARD, SWITCHES, WCAG_VERSION } from "./copy";
+import {
+  CLICK_THROUGH_COPY,
+  ENGINE,
+  FORMS_CHOICE,
+  GROUPS,
+  SIGN_IN_NOTES,
+  STANDARD,
+  SWITCHES,
+  WCAG_VERSION,
+} from "./copy";
 import { CHECK_LABEL } from "../../lib/terms";
 import type { GroupProps } from "./groupProps";
 import PillGroup from "./PillGroup";
@@ -19,6 +28,7 @@ import SwitchRow from "./SwitchRow";
  * alone cannot), so the switch it disables is right below it.
  */
 export default function ChecksGroup({ settings, update, policy, capabilities }: GroupProps) {
+  const login = policy.mode === "login";
   const rendered = !settings.static_only;
   const alfaOff = capabilities.alfa?.available === false;
   const alfaReason = alfaOff
@@ -109,8 +119,8 @@ export default function ChecksGroup({ settings, update, policy, capabilities }: 
             or press the page and a reader deciding whether to turn one off
             needs to know which do (W3C COGA "Making Content Usable",
             https://www.w3.org/TR/coga-usable/, paraphrased: say what will
-            happen). Hidden in a sign-in scan, which always runs it (fixed
-            in the login policy), like the focus switch. */}
+            happen). Offered in a sign-in scan too (2026-11-16): the two
+            forms offer the same settings. */}
         {!isFixed(policy, "skip_markup") && (
           <SwitchRow
             checked={switchOn(settings, "markup")}
@@ -133,15 +143,23 @@ export default function ChecksGroup({ settings, update, policy, capabilities }: 
             https://www.w3.org/TR/coga-usable/). Native radios in a
             fieldset whose legend names the question (SC 1.3.1 Info and
             Relationships, Level A, technique H71), each answer's risk in
-            its own hint (SC 3.3.2 Labels or Instructions, Level A). Not
-            offered for signed-in scans (fixed in the login policy), so it
-            is hidden there like the focus switch. */}
+            its own hint (SC 3.3.2 Labels or Instructions, Level A). Offered
+            in a sign-in scan too since 2026-11-16 (the developer's decision:
+            the two forms offer the same settings), off by default there
+            (LOGIN_DEFAULTS), and its hints add that a form is pressed, or
+            sent, as the person signed in (SIGN_IN_NOTES). */}
         {!isFixed(policy, "skip_forms") && (
           <PillGroup
             name="form-check"
             layout="list"
             label={SWITCHES.forms.label}
-            hint={rendered ? SWITCHES.forms.hint : FORMS_CHOICE.needsBrowser}
+            hint={
+              rendered
+                ? login
+                  ? `${SWITCHES.forms.hint} ${SIGN_IN_NOTES.forms}`
+                  : SWITCHES.forms.hint
+                : FORMS_CHOICE.needsBrowser
+            }
             value={settings.skip_forms ? "off" : settings.send_empty_forms ? "send" : "page"}
             onChange={(choice) =>
               update({ skip_forms: choice === "off", send_empty_forms: choice === "send" })
@@ -149,7 +167,12 @@ export default function ChecksGroup({ settings, update, policy, capabilities }: 
             options={[
               { value: "off", label: FORMS_CHOICE.off.label },
               { value: "page", label: FORMS_CHOICE.page.label, hint: FORMS_CHOICE.page.hint, disabled: !rendered },
-              { value: "send", label: FORMS_CHOICE.send.label, hint: FORMS_CHOICE.send.hint, disabled: !rendered },
+              {
+                value: "send",
+                label: FORMS_CHOICE.send.label,
+                hint: login ? `${FORMS_CHOICE.send.hint} ${SIGN_IN_NOTES.sendForms}` : FORMS_CHOICE.send.hint,
+                disabled: !rendered,
+              },
             ]}
           />
         )}
@@ -160,6 +183,25 @@ export default function ChecksGroup({ settings, update, policy, capabilities }: 
           label={SWITCHES.responsive.label}
           hint={rendered ? SWITCHES.responsive.hint : "Needs a browser. Turn off Fast scan to use it."}
         />
+        {/* The document check, last: every switch above checks the pages;
+            this one checks the files they link to (the report's Documents
+            tab), so it follows them rather than sitting among them. On by
+            default (the developer's request, 2026-11-14). Not disabled in
+            Fast scan: finding a page's links needs no browser. Its hint says
+            what is downloaded and kept, and that files on other sites are
+            downloaded too, since this is the one check that reaches beyond
+            the scanned site (AGENTS.md, Interface language rule 4: never
+            drop a privacy fact). In a sign-in scan its own hint replaces
+            that one: there the PDFs download with the person's sign-in,
+            and files on other sites are not downloaded (2026-11-16). */}
+        {!isFixed(policy, "skip_documents") && (
+          <SwitchRow
+            checked={switchOn(settings, "documents")}
+            onChange={(on) => update(switchPatch(settings, "documents", on))}
+            label={SWITCHES.documents.label}
+            hint={login ? SWITCHES.documents.hintSignedIn : SWITCHES.documents.hint}
+          />
+        )}
       </SwitchList>
     </SettingsGroup>
   );

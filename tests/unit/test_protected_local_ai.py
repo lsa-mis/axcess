@@ -21,6 +21,8 @@ async def test_local_image_assessment_keeps_only_a_bounded_signal() -> None:
     captured: dict[str, object] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/tags":  # the model runs on this computer
+            return httpx.Response(200, json={"models": [{"name": "local-test"}]})
         captured["path"] = request.url.path
         payload = json.loads(request.content)
         captured["image_count"] = len(payload["images"])
@@ -43,7 +45,12 @@ async def test_local_image_assessment_keeps_only_a_bounded_signal() -> None:
 
 @pytest.mark.asyncio
 async def test_local_image_assessment_rejects_untrusted_model_shape() -> None:
-    def handler(_: httpx.Request) -> httpx.Response:
+    calls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/tags":  # the model runs on this computer
+            return httpx.Response(200, json={"models": [{"name": "local-test"}]})
+        calls.append(request.url.path)
         return httpx.Response(
             200,
             json={
@@ -63,6 +70,8 @@ async def test_local_image_assessment_rejects_untrusted_model_shape() -> None:
         transport=httpx.MockTransport(handler),
     ) as local:
         assert await local.assess_image(bytearray(b"image")) is None
+    # Refused for the answer's shape, after the model was asked.
+    assert calls == ["/api/generate"]
 
 
 def test_companion_only_accepts_loopback_ollama_and_detects_login_forms() -> None:

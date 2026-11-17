@@ -77,6 +77,7 @@ from audit.exports.collector import ExportScan
 from audit.labels import CLICK_THROUGH, CLICK_THROUGH_STATES_LABEL, REVIEW_LANE_LABELS
 from audit.logging import get_logger
 from audit.web import issues
+from audit.web.screen_reader_checks import as_text_lines
 
 log = get_logger(__name__)
 
@@ -132,6 +133,8 @@ _GUIDANCE_TEMPLATE = (
     "Prioritization Guidance, Start with rows marked "
     f"{REVIEW_LANE_LABELS['likely_barrier']} in the How sure column: a rule "
     "check failed, so check each one on the page, then fix it. Rows marked "
+    f"{REVIEW_LANE_LABELS['measured']} were measured in a browser with no AI: "
+    "check each one on the page before you report it. Rows marked "
     f"{REVIEW_LANE_LABELS['expert_review']} need a person to decide whether "
     "they are real problems before you report them. Rows marked "
     f"{REVIEW_LANE_LABELS['informational']} are not problems to fix. Among "
@@ -381,7 +384,12 @@ class _Ticket:
     def reproduce(self) -> str:
         if self.detail is None:
             return ""
-        return plain_text(self.detail.verify_manual or self.detail.verify_automated or "")
+        text = plain_text(self.detail.verify_manual or self.detail.verify_automated or "")
+        check = self.detail.screen_reader_check
+        if check is None:
+            return text
+        # The same Mac and Windows steps the issue guidance shows.
+        return "\n".join([text, *as_text_lines(check)]).strip()
 
     @property
     def help_url(self) -> str:

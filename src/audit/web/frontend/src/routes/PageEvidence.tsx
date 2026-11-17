@@ -85,19 +85,20 @@ export default function PageEvidenceRoute() {
   // nothing was, a lone "At page load" heading would divide nothing.
   const groups = findings.some((f) => f.revealed_by) ? groupByRevealingControl(findings) : null;
 
-  // Suggestions need a finished, unprotected report: a protected report's
-  // evidence is encrypted and must not reach a model, and a running scan's
-  // evidence is not final. The server refuses both too; hiding the button
-  // here means nobody is offered something that will be refused.
+  // Suggestions need an unprotected report: a protected report's evidence is
+  // encrypted and must not reach a model. The server refuses it too; hiding
+  // the button here means nobody is offered something that will be refused.
+  // How the scan ended does not matter: a stopped scan's evidence is evidence.
   // Saved answers remain readable with AI off. FixSuggestion hides only
   // new-request controls, not the saved answer (COGA: avoid loss of context,
   // https://www.w3.org/TR/coga-usable/, paraphrased).
   const suggestionsApply =
-    scanData.status === "completed" && !scanData.protection && suggestionStatus !== undefined;
+    !scanData.protection && suggestionStatus !== undefined;
   const suggestions: SuggestionAvailability | null =
     suggestionsApply ? suggestionStatus : null;
+  // AI turned off is not "blocked": nothing is said (SuggestionsBlockedNote).
   const suggestionsBlocked =
-    suggestionsApply && !suggestionStatus.enabled
+    suggestionsApply && !suggestionStatus.enabled && suggestionStatus.reason !== "turned_off"
       ? suggestionStatus
       : null;
 

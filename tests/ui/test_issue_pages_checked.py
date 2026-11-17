@@ -103,6 +103,10 @@ async def test_pages_table_shows_and_sorts_what_was_checked(
 
     # The table still fits a laptop screen without sideways scrolling.
     assert await page.evaluate("document.documentElement.scrollWidth") <= 1280
+    # The sort chip fades in over 180ms (animate-sort-pop, from opacity 0).
+    # axe measured it mid-fade and reported low contrast; the finished chip
+    # is white on U-M blue. Wait for every animation to end first.
+    await page.evaluate("Promise.all(document.getAnimations().map((a) => a.finished))")
     await page.add_script_tag(content=_AXE_TEXT)
     violations = await page.evaluate(
         """async (tags) => (await window.axe.run(

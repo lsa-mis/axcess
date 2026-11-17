@@ -690,6 +690,10 @@ class ErrorIdentificationProbe:
     # starting the scan chose it.
     send_empty: bool = False
     max_sends: int = DEFAULT_MAX_SENDS
+    # A sign-in scan's probe: its log lines leave out the page address, the
+    # form's text and the reply's title, which can hold the signed-in
+    # person's details (the rule every sign-in scan log follows).
+    private: bool = False
     _seen: set[str] = field(default_factory=set)
     _sent: int = 0
 
@@ -781,16 +785,26 @@ class ErrorIdentificationProbe:
                 results.append(outcome)
                 # Only counts reach the report for a form that does not fail;
                 # this line is how a scan's answer for each form is found.
-                log.info(
-                    "forms.result",
-                    outcome=outcome.outcome,
-                    reason=outcome.reason,
-                    form=outcome.form[:60],
-                    page=pinned,
-                    sent=outcome.sent,
-                    reply_status=outcome.reply_status,
-                    reply_title=outcome.reply_title[:80],
-                )
+                if self.private:
+                    log.info(
+                        "forms.result",
+                        outcome=outcome.outcome,
+                        reason=outcome.reason,
+                        sent=outcome.sent,
+                        reply_status=outcome.reply_status,
+                        protected_context=True,
+                    )
+                else:
+                    log.info(
+                        "forms.result",
+                        outcome=outcome.outcome,
+                        reason=outcome.reason,
+                        form=outcome.form[:60],
+                        page=pinned,
+                        sent=outcome.sent,
+                        reply_status=outcome.reply_status,
+                        reply_title=outcome.reply_title[:80],
+                    )
 
     async def _wait_for_forms(self, page: Page, keys: Set[str]) -> None:
         """After a reload, wait until the page has built ``keys`` again.

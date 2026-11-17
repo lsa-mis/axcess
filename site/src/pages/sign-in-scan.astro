@@ -142,10 +142,12 @@ const shot = (name: Shot) => ({
     </Card>
     <Card heading="What is different">
       <p>
-        Sign-in scans skip the site's robots.txt file (where a site asks scanners to stay away from pages). Your
-        confirmation that the site owner allows the scan takes its place. They don't run AI review or the Motion
-        and reading-order check, and the Image text check is off unless you turn it on. If Axcess closes during a
-        sign-in scan, start a new one.
+        A sign-in scan offers the same settings as a public one. By default it skips the site's robots.txt file
+        (where a site asks scanners to stay away from pages): your confirmation that the site owner allows the scan
+        takes its place. The form error check and the Image text check are off unless you turn them on. The form
+        error check presses each form as you, the person signed in. The document check downloads PDFs with your
+        sign-in, and only from the site you signed in to; it lists files on other sites without downloading them.
+        If Axcess closes during a sign-in scan, start a new one.
       </p>
     </Card>
   </div>

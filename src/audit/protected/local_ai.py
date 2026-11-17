@@ -35,6 +35,7 @@ from audit.ai.model_client import (
     ModelServiceError,
     make_model_client,
 )
+from audit.analyzer.ollama_base import why_not_local_service
 
 _MAX_IMAGE_BYTES = 8 * 1024 * 1024
 _MAX_RESPONSE_BYTES = 64 * 1024
@@ -115,8 +116,13 @@ class ProtectedLocalOllama:
         """
         if not image or len(image) > _MAX_IMAGE_BYTES:
             return None
-        model_client = self._model_client
-        if model_client is None:
+        model_client, client = self._model_client, self._client
+        if model_client is None or client is None:
+            return None
+        # A cloud model would carry the signed-in page's image off this
+        # computer, past the loopback address the companion enforces.
+        # Fails closed: an unreadable model list sends nothing.
+        if await why_not_local_service(model_client, client, self._model) is not None:
             return None
         prompt = (
             "You are reviewing one image for an authorized accessibility audit. "

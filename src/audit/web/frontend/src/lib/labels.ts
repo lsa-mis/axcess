@@ -72,7 +72,20 @@ export const isFindingType = (value: string): value is FindingType =>
   (FINDING_TYPES as readonly string[]).includes(value);
 
 /** How much confidence an issue type's evidence carries. Table order. */
-export const REVIEW_LANES = ["likely_barrier", "expert_review", "informational"] as const satisfies readonly ReviewLane[];
+export const REVIEW_LANES = ["likely_barrier", "measured", "expert_review", "informational"] as const satisfies readonly ReviewLane[];
+
+/**
+ * The "How sure" values the Issues table shows when it opens: all four, since
+ * 2026-11-13 (the developer's request). Mirrors `DEFAULT_REVIEW_LANES` in
+ * `src/audit/labels.py`, which the server counts by (`default_view_counts`),
+ * so the numbers above the table are the rows under them.
+ */
+export const DEFAULT_REVIEW_LANES = [
+  "likely_barrier",
+  "measured",
+  "expert_review",
+  "informational",
+] as const satisfies readonly ReviewLane[];
 
 /** The "How sure" values' names: `REVIEW_TYPE_LABEL` from terms.ts, under the name this module used. */
 export const REVIEW_LANE_LABELS: Record<ReviewLane, string> = REVIEW_TYPE_LABEL;
@@ -80,8 +93,10 @@ export const REVIEW_LANE_LABELS: Record<ReviewLane, string> = REVIEW_TYPE_LABEL;
 export const REVIEW_LANE_HELP: Record<ReviewLane, string> = {
   likely_barrier:
     "A rule check (axe or Alfa) failed. These checks follow fixed rules, so they give the same result every time. Look at each occurrence on the page, fix it, test the fix, then scan again to see if it is still found.",
+  measured:
+    "The browser measured this on the page. No AI was used. A measurement can still miss how a person uses the page, so check each occurrence before you report it.",
   expert_review:
-    "Axcess found a possible problem, but it cannot be certain. This happens with checks such as the AI review, the browser checks, or a rule check that cannot decide. A person must decide whether it is a real problem before you report it.",
+    "Axcess found a possible problem, but it cannot be certain. This happens with checks such as the AI review, the image text check, or a rule check that cannot decide. A person must decide whether it is a real problem before you report it.",
   informational:
     "Recorded for context. This is not a problem to fix. For example, an image whose text description (alt text) already matches the words in the image.",
 };
@@ -102,7 +117,7 @@ export const REVIEW_LANE_HELP: Record<ReviewLane, string> = {
  * "occurrence" is an advanced word (SC 3.1.3 Unusual Words, Level AAA).
  */
 export const ISSUE_COLUMN_HELP = {
-  "How sure": "How sure Axcess is that this issue type is a real problem: Mostly sure, Not sure, or For information.",
+  "How sure": "How sure Axcess is that this issue type is a real problem: Mostly sure, Measured, Not sure, or For information.",
   "Where it shows": "Where this issue type shows up: at page load, after clicking, or in an image.",
   Priority:
     "High, Medium, or Low, from the impact rating of this issue type. More pages and more occurrences raise it. Not sure lowers it, because a person must confirm it first. Issue types from the rule check (Alfa) have no rating, so they start at the lowest. Issue types marked For information show Does not apply.",
@@ -200,3 +215,24 @@ export const isReviewLane = (value: string): value is ReviewLane =>
 
 /** One page state reached by operating a control (singular). */
 export const CLICK_THROUGH_STATE = "page state opened by clicking";
+
+/**
+ * What the report's two counts mean: the glossary under the Issues table
+ * ("What the labels mean") and the "?" beside each big number over it say
+ * the same words (W3C COGA, "Making Content Usable": the same words for the
+ * same thing).
+ */
+export const OCCURRENCE_HELP =
+  'One place a problem appears: one element on one page, or in one page state. "Issue occurrences" counts them all.';
+export const ISSUE_TYPE_HELP =
+  "All the occurrences one check found for the same reason. Each is one row in the Issues table.";
+
+/**
+ * The question each explained Issues column answers, in the glossary's
+ * headings and in the column's "?" (Issues.tsx, ColumnHelp).
+ */
+export const COLUMN_QUESTION = {
+  "How sure": "how sure Axcess is that an issue type is a real problem",
+  "Where it shows": "where the problem shows up",
+  Priority: "which issue types to look at first",
+} as const;

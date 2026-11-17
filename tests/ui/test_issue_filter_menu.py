@@ -107,6 +107,16 @@ async def _api_keys(page: Any, base: str, scan_id: int, **filters: str) -> set[s
     return {quote(unquote(r["issue_key"]), safe="") for r in body["rows"]}
 
 
+# With nothing checked under "How sure" the table shows every value
+# (audit.labels.DEFAULT_REVIEW_LANES, every level since 2026-11-13).
+_SUREST_LANES = "likely_barrier,measured"
+_ALL_LANES = "likely_barrier,measured,expert_review,informational"
+_DEFAULT_LANES = _ALL_LANES
+# The seed's issue types: 3 Mostly sure or Measured, 1 Not sure, 1 For information.
+_ALL_COUNT = 5
+_SUREST_COUNT = 3
+
+
 async def _assert_matches_api(page: Any, base: str, scan_id: int) -> set[str]:
     p = _params(page)
     expected = await _api_keys(
@@ -114,7 +124,7 @@ async def _assert_matches_api(page: Any, base: str, scan_id: int) -> set[str]:
         base,
         scan_id,
         conformance=p.get("conformance", ""),
-        review_lane=p.get("type", ""),
+        review_lane=p.get("type", "") or _DEFAULT_LANES,
         finding_type=p.get("finding_type", ""),
     )
     # The table follows the URL a fetch later; give it a few tries.
@@ -185,8 +195,16 @@ async def test_several_in_a_group_and_across_groups_match_the_api(
     base, scan_id = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
     await _open(page, base, scan_id)
-    everything = await _assert_matches_api(page, base, scan_id)
-    assert len(everything) == 5, everything
+    # The table opens on every group: the three rule-check groups and the two
+    # image groups (Not sure, For information).
+    opened = await _assert_matches_api(page, base, scan_id)
+    assert opened == {
+        "axe%3Abutton-name",
+        "axe%3Acolor-contrast",
+        "axe%3Aregion",
+        "image%3Aessential_missing",
+        "image%3Alogo_adequate",
+    }, opened
 
     await _open_menu(page)
     # AA first, then A: the URL keeps option order, not click order.
@@ -213,11 +231,15 @@ async def test_several_in_a_group_and_across_groups_match_the_api(
     ct = await _assert_matches_api(page, base, scan_id)
     assert ct == {"axe%3Abutton-name"}, ct
     await _box(page, "Where it shows", "alt_text").check()
-    ct_or_alt = await _assert_matches_api(page, base, scan_id)
-    assert ct < ct_or_alt, ct_or_alt
+    await page.wait_for_url(re.compile(r"finding_type=click_through(%2C|,)alt_text"))
+    # Image groups are never Mostly sure or Measured; with nothing checked
+    # under How sure the table shows them too.
+    both = await _assert_matches_api(page, base, scan_id)
+    assert ct < both and any(key.startswith("image%3A") for key in both), both
     await _box(page, "How sure", "informational").check()
     narrowed = await _assert_matches_api(page, base, scan_id)
-    assert narrowed and narrowed < ct_or_alt, narrowed
+    assert narrowed and narrowed.isdisjoint(ct), narrowed
+    assert all(key.startswith("image%3A") for key in narrowed), narrowed
 
     # The badge counts groups in use; the line under the bar names them.
     await pw.expect(_filter_button(page)).to_contain_text("2")
@@ -267,9 +289,13 @@ async def test_a_reload_and_an_old_single_value_link_keep_the_checks(
     shown = await _assert_matches_api(page, base, scan_id)
     assert shown == {"image%3Aessential_missing"}, shown
 
-    # A junk value is dropped, not treated as "match nothing".
+    # A junk value is dropped, not treated as "match nothing": the table
+    # opens as it does with no value at all.
     await _open(page, base, scan_id, "?type=nonsense")
-    assert len(await _assert_matches_api(page, base, scan_id)) == 5
+    assert await _shown_keys(page) == await _api_keys(
+        page, base, scan_id, review_lane=_DEFAULT_LANES
+    )
+    assert len(await _shown_keys(page)) == _ALL_COUNT
 
 
 async def test_keyboard_only(enriched, live_server, new_page) -> None:
@@ -313,18 +339,173 @@ async def test_clear_all_and_clear_filters_reset_every_group(
     await _open_menu(page)
     await page.get_by_role("button", name="Clear all filters", exact=True).click()
     await page.wait_for_url(lambda url: not re.search(r"conformance|type=", url))
-    assert len(await _assert_matches_api(page, base, scan_id)) == 5
+    assert len(await _assert_matches_api(page, base, scan_id)) == _ALL_COUNT
     for group in ("Level", "How sure", "Where it shows"):
         boxes = page.get_by_role("group", name=group, exact=True).get_by_role("checkbox")
         for i in range(await boxes.count()):
             await pw.expect(boxes.nth(i)).not_to_be_checked()
-    assert len(await _shown_keys(page)) == 5
+    assert len(await _shown_keys(page)) == _ALL_COUNT
 
     await _open(page, base, scan_id, "?conformance=A&finding_type=click_through")
     await page.get_by_role("button", name="Clear filters", exact=True).click()
     await page.wait_for_url(lambda url: not re.search(r"conformance|finding_type", url))
-    assert len(await _assert_matches_api(page, base, scan_id)) == 5
+    assert len(await _assert_matches_api(page, base, scan_id)) == _ALL_COUNT
     await pw.expect(page.get_by_text("Filtered by", exact=False)).to_have_count(0)
+
+
+async def test_table_opens_on_every_group_and_the_filter_shows_the_surest(
+    enriched, live_server, new_page
+) -> None:
+    """The default view shows every issue type (2026-11-13). The Filter menu is
+    the one way to narrow to the surest: the note's "Show only Mostly sure and
+    Measured" button did the same job and was removed (2026-11-16)."""
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await _open(page, base, scan_id)
+    assert len(await _assert_matches_api(page, base, scan_id)) == _ALL_COUNT
+    body = await (await page.request.get(f"{base}/api/scans/{scan_id}/issues")).json()
+    counts = body["default_view_counts"]
+    assert (counts["issue_types"], counts["hidden_issue_types"]) == (_ALL_COUNT, 0), counts
+
+    # The numbers over the table count every row under it; nothing is hidden.
+    summary = page.locator("dl").first
+    # The count follows its term, and the term's "?" (2026-11-16).
+    await pw.expect(summary.get_by_role("definition").first).to_have_text(str(_ALL_COUNT))
+    await pw.expect(summary.get_by_role("term").first).to_contain_text("Issue types")
+    await pw.expect(summary).not_to_contain_text("hidden")
+
+    # No filter was set by the reader, so none is shown as set.
+    await pw.expect(page.get_by_text("Filtered by", exact=False)).to_have_count(0)
+    await _open_menu(page)
+    group = page.get_by_role("group", name="How sure", exact=True)
+    await pw.expect(group).to_contain_text(
+        "With nothing checked, the table shows every issue type."
+    )
+    boxes = group.get_by_role("checkbox")
+    assert await boxes.count() == 4
+    for i in range(await boxes.count()):
+        await pw.expect(boxes.nth(i)).not_to_be_checked()
+    # The surest, from the How sure group: the URL says what is shown.
+    await _box(page, "How sure", "likely_barrier").check()
+    await _box(page, "How sure", "measured").check()
+    await page.wait_for_url(re.compile(r"type=likely_barrier(%2C|,)measured"))
+    assert _params(page)["type"] == _SUREST_LANES
+    assert len(await _assert_matches_api(page, base, scan_id)) == _SUREST_COUNT
+    await page.keyboard.press("Escape")
+    filtered = page.get_by_text("Filtered by", exact=False).locator("xpath=..")
+    await pw.expect(filtered).to_contain_text("How sure: Mostly sure, Measured")
+    # The way back is the same one every filter has.
+    await page.get_by_role("button", name="Clear filters", exact=True).click()
+    await page.wait_for_url(lambda url: "type=" not in url)
+    assert len(await _assert_matches_api(page, base, scan_id)) == _ALL_COUNT
+
+    # No second control for the same job, and no note over the rows.
+    await pw.expect(
+        page.get_by_role("button", name=re.compile(r"^Show only Mostly sure"))
+    ).to_have_count(0)
+    await pw.expect(page.get_by_role("note", name="Issue types shown")).to_have_count(0)
+
+
+_HOW_SURE_HELP = "What does \u201cHow sure\u201d mean?"
+
+
+async def test_how_sure_help_opens_by_keyboard_and_says_what_each_value_means(
+    enriched, live_server, new_page
+) -> None:
+    """The "?" beside the How sure header (2026-11-16): a real button, one
+    target big, that opens and closes by keyboard, keeps focus, says whether
+    it is open, and holds the glossary's words for every value."""
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await _open(page, base, scan_id)
+    header = page.get_by_role("columnheader", name=re.compile(r"^How sure"))
+    tip = header.get_by_role("button", name=_HOW_SURE_HELP, exact=True)
+    # 44px tall and 24px wide (HelpTip ``equivalent``): SC 2.5.5's "Equivalent"
+    # exception, because "What the labels mean" under the table is a 44px
+    # control that shows the same explanation.
+    box = await tip.bounding_box()
+    assert box and box["height"] >= 44 and box["width"] >= 24, box
+    glossary = page.get_by_role("button", name=re.compile(r"^What .*labels mean"))
+    glossary_box = await glossary.bounding_box()
+    assert glossary_box and glossary_box["height"] >= 44 and glossary_box["width"] >= 44
+    await pw.expect(tip).to_have_attribute("aria-expanded", "false")
+    panel = page.locator("[popover]:popover-open")
+    await pw.expect(panel).to_have_count(0)
+
+    await tip.focus()
+    await page.keyboard.press("Enter")
+    await pw.expect(tip).to_have_attribute("aria-expanded", "true")
+    await pw.expect(panel).to_have_count(1)
+    await pw.expect(tip).to_be_focused()
+    await pw.expect(panel).to_contain_text(
+        "How sure Axcess is that an issue type is a real problem."
+    )
+    for label in ("Mostly sure", "Measured", "Not sure", "For information"):
+        await pw.expect(panel).to_contain_text(label)
+    await pw.expect(panel).to_contain_text(
+        "A person must decide whether it is a real problem before you report it."
+    )
+    await pw.expect(panel).to_contain_text("This is not a problem to fix.")
+    assert await _run_axe(page) == []
+
+    # Escape closes it and focus stays on the button.
+    await page.keyboard.press("Escape")
+    await pw.expect(panel).to_have_count(0)
+    await pw.expect(tip).to_have_attribute("aria-expanded", "false")
+    await pw.expect(tip).to_be_focused()
+    # A second press of Space opens it again; a press elsewhere closes it.
+    await page.keyboard.press("Space")
+    await pw.expect(panel).to_have_count(1)
+    await page.mouse.click(5, 5)
+    await pw.expect(panel).to_have_count(0)
+    # Pressing the "?" does not sort the column.
+    assert "sort" not in _params(page)
+
+
+async def test_every_explained_word_has_the_same_help_button(
+    enriched, live_server, new_page
+) -> None:
+    """A "?" after each word that needs explaining (the developer's choice,
+    2026-11-16): the How sure, Priority and Where it shows headers, and the
+    two counts over the table. Each opens the glossary's own words, and the
+    table still fits at 1280px."""
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await _open(page, base, scan_id)
+    panel = page.locator("[popover]:popover-open")
+    expected = {
+        "What does \u201cHow sure\u201d mean?": "A person must decide whether it is a real problem",
+        "What does \u201cPriority\u201d mean?": "Look at these first among issue types",
+        "What does \u201cWhere it shows\u201d mean?": "Found when the page first loads",
+        "What is an issue type?": "All the occurrences one check found for the same reason.",
+        "What is an issue occurrence?": "One place a problem appears",
+    }
+    for name, words in expected.items():
+        tip = page.get_by_role("button", name=name, exact=True)
+        box = await tip.bounding_box()
+        assert box and box["height"] >= 44 and box["width"] >= 24, (name, box)
+        await tip.click()
+        await pw.expect(panel).to_contain_text(words)
+        await page.keyboard.press("Escape")
+        await pw.expect(panel).to_have_count(0)
+    # No other header has one: the rest need no explaining.
+    region = page.get_by_role("region", name="Issues table")
+    await pw.expect(region.locator("thead [popovertarget]")).to_have_count(3)
+    width, room = await region.evaluate("el => [el.scrollWidth, el.clientWidth]")
+    assert width <= room, (width, room)
+
+
+async def test_how_sure_help_fits_at_320(enriched, live_server, new_page) -> None:
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 320, "height": 800})
+    await _open(page, base, scan_id)
+    tip = page.get_by_role("button", name=_HOW_SURE_HELP, exact=True)
+    await tip.scroll_into_view_if_needed()
+    await tip.click()
+    panel = page.locator("[popover]:popover-open")
+    await pw.expect(panel).to_have_count(1)
+    box = await panel.bounding_box()
+    assert box and box["x"] >= 0 and box["x"] + box["width"] <= 320, box
 
 
 async def test_closing_by_clicking_outside_keeps_the_choice(

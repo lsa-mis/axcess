@@ -352,8 +352,13 @@ def test_image_occurrence_defaults_to_editor(
     assert resp.json()["audience_default"] in ("editor", "developer")
 
 
+# Not installed, or refused because it may run off this computer (an Ollama
+# cloud model): either way the text model answers from the image's facts.
+@pytest.mark.parametrize("refusal", ["model_missing", "model_not_local"])
 async def test_vision_falls_back_to_text_model(
-    seeded_db: tuple[Path, Path, int], enabled: None
+    seeded_db: tuple[Path, Path, int],
+    enabled: None,
+    refusal: str,
 ) -> None:
     db_path, _, scan_id = seeded_db
     conn = connect(db_path)
@@ -373,7 +378,7 @@ async def test_vision_falls_back_to_text_model(
         async def generate(self, prompt: str, *, model: str, image: bytes | None) -> str:
             self.models.append(model)
             if model == "qwen2.5vl:7b":
-                raise SuggestionError("model_missing", model)
+                raise SuggestionError(refusal, model)  # type: ignore[arg-type]
             assert image is None
             return self.answer
 
@@ -450,17 +455,11 @@ async def test_cancel_wins_over_late_answer(
     assert done["result"] is None
 
 
-def test_refuses_unfinished_and_protected(seeded_db: tuple[Path, Path, int], enabled: None) -> None:
+def test_refuses_an_unknown_report(seeded_db: tuple[Path, Path, int], enabled: None) -> None:
     db_path, _, scan_id = seeded_db
     finding = _add_finding(db_path, scan_id)
-    conn = connect(db_path)
-    try:
-        conn.execute("UPDATE scans SET status = 'running' WHERE id = ?", (scan_id,))
-    finally:
-        conn.close()
     client = _client(seeded_db)
     body = {"occurrence_kind": "a11y", "occurrence_id": finding}
-    assert client.post(f"/api/scans/{scan_id}/suggestions", json=body).status_code == 409
     assert client.post("/api/scans/99999/suggestions", json=body).status_code == 404
 
 
@@ -619,6 +618,10 @@ def test_migration_rolls_back(tmp_path: Path) -> None:
         conn.close()
 
 
+# Starts Chromium inside AxeFragmentVerifier, which the module scan in
+# tests/conftest.py cannot see, so it is marked here: CI's job without a
+# browser leaves it out, and the browser job runs it.
+@pytest.mark.browser
 async def test_real_offline_axe_check() -> None:
     from audit.suggest.verify import AxeFragmentVerifier
 
@@ -697,6 +700,8 @@ async def test_ollama_request_is_bounded_and_schema_shaped() -> None:
     sent: dict[str, Any] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/tags":  # the model runs on this computer
+            return httpx.Response(200, json={"models": [{"name": "m"}]})
         sent.update(json.loads(request.content))
         return httpx.Response(200, json={"response": json.dumps(GOOD_ANSWER)})
 

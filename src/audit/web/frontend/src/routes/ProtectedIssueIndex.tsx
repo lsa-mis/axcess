@@ -7,13 +7,12 @@ import {
   protectedQueryKey,
   useProtectedIdentityContext,
 } from "../hooks/useProtectedIdentityContext";
-import { TablePagination, usePagedRows } from "../components/TablePagination";
+import { PagedTable, usePagedRows } from "../components/TablePagination";
 import {
   Cell,
   ColumnHeader,
   Row,
   Table,
-  TableBar,
   TableHead,
   TableRegion,
 } from "../components/table/Table";
@@ -135,32 +134,31 @@ export default function ProtectedIssueIndexRoute() {
             </Card>
           ) : (
             <Card>
-              {paged.pages > 1 && (
-                <TableBar pager={<TablePagination label="Sign-in scan issues" noun="issue types" {...paged} />} />
-              )}
-              <TableRegion label="Sign-in scan issues table">
-                <Table caption="Sign-in scan issues, grouped by check and rule">
-                  <TableHead>
-                    <tr>
-                      <ColumnHeader>Check</ColumnHeader>
-                      <ColumnHeader>Rule</ColumnHeader>
-                      <ColumnHeader>WCAG criterion</ColumnHeader>
-                      <ColumnHeader>Result</ColumnHeader>
-                      <ColumnHeader>Issue occurrences</ColumnHeader>
-                      <ColumnHeader>Pages</ColumnHeader>
-                    </tr>
-                  </TableHead>
-                  <tbody>
-                    {paged.pageRows.map((group, position) => (
-                      <IssueRow
-                        key={`${group.source_layer}:${group.rule_id}:${group.engine_outcome ?? "lead"}`}
-                        group={group}
-                        index={(paged.page - 1) * paged.pageSize + position}
-                      />
-                    ))}
-                  </tbody>
-                </Table>
-              </TableRegion>
+              <PagedTable pagination={{ label: "Sign-in scan issues", noun: "issue types", ...paged }}>
+                <TableRegion label="Sign-in scan issues table">
+                  <Table caption="Sign-in scan issues, grouped by check and rule">
+                    <TableHead>
+                      <tr>
+                        <ColumnHeader>Check</ColumnHeader>
+                        <ColumnHeader>Rule</ColumnHeader>
+                        <ColumnHeader>WCAG criterion</ColumnHeader>
+                        <ColumnHeader>Result</ColumnHeader>
+                        <ColumnHeader numeric>Issue occurrences</ColumnHeader>
+                        <ColumnHeader numeric>Pages</ColumnHeader>
+                      </tr>
+                    </TableHead>
+                    <tbody>
+                      {paged.pageRows.map((group, position) => (
+                        <IssueRow
+                          key={`${group.source_layer}:${group.rule_id}:${group.engine_outcome ?? "lead"}`}
+                          group={group}
+                          index={(paged.page - 1) * paged.pageSize + position}
+                        />
+                      ))}
+                    </tbody>
+                  </Table>
+                </TableRegion>
+              </PagedTable>
             </Card>
           )}
           <p className="mt-4 text-sm text-fg-muted">

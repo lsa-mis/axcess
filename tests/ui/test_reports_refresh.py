@@ -36,11 +36,11 @@ def _first_scan_running() -> list[dict[str, Any]]:
         {
             "site_url": NEW_SITE,
             "scan_count": 1,
-            "completed_count": 0,
+            "report_count": 0,
             "most_recent": scan,
-            "most_recent_completed": None,
-            "most_recent_completed_issue_count": None,
-            "most_recent_completed_occurrence_count": None,
+            "most_recent_report": None,
+            "most_recent_report_issue_count": None,
+            "most_recent_report_occurrence_count": None,
             "scans": [scan],
         }
     ]

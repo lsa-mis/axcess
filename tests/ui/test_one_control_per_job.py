@@ -27,6 +27,13 @@ Standards: W3C COGA, "Making Content Usable"
 the repo's rule "no duplicate controls for one function" (AGENTS.md, "Review
 every frontend change for accessibility").
 
+One planned repeat: a paged table's pager is drawn over the table and again
+under its last row (TablePagination.tsx, `place="end"`), so a reader who has
+read to the end turns the page there. The copy carries `data-repeat-of`, the
+id of the pager it repeats. It is checked as a scope of its own, and only
+while it matches that pager control for control: a repeat that drifts from
+its original fails (`_REPEATS`). The rationale is on TablePagination.
+
 What this cannot see: two controls with different words and different
 addresses that still do one job for the reader. That is for review.
 
@@ -73,7 +80,10 @@ _COLLECT = r"""
   for (const el of document.querySelectorAll(selector)) {
     if (hidden(el, el)) continue;
     if (el.closest('[data-scanned-content]')) continue;
-    const scope = el.closest('tr, [role=row], [data-card], dialog, [role=dialog]');
+    // A stated repeat (see the module docstring) is a scope of its own.
+    const scope =
+      el.closest('[data-repeat-of]') ??
+      el.closest('tr, [role=row], [data-card], dialog, [role=dialog]');
     if (!scope) continue;
     if (!scopes.has(scope)) {
       const named = scope.querySelector('th[scope=row], [role=rowheader], h2, h3, th');
@@ -94,6 +104,30 @@ _COLLECT = r"""
       href: el.tagName === 'A' ? el.href : null,
       sameOrigin: el.tagName === 'A' ? el.origin === location.origin : null,
     });
+  }
+  return out;
+}
+"""
+
+# Every stated repeat whose controls differ from its original's, or whose
+# original is missing: [repeat label, what is wrong].
+_REPEATS = r"""
+() => {
+  const controls = (root) =>
+    [...root.querySelectorAll('a[href], button, [role=button]')].map((el) =>
+      [el.tagName, el.textContent.replace(/\s+/g, ' ').trim(),
+       el.getAttribute('aria-label') ?? '', el.getAttribute('href') ?? ''].join('|'));
+  const out = [];
+  for (const repeat of document.querySelectorAll('[data-repeat-of]')) {
+    const label = repeat.getAttribute('aria-label') ?? repeat.dataset.repeatOf;
+    const original = document.getElementById(repeat.dataset.repeatOf);
+    if (!original || repeat.contains(original)) {
+      out.push([label, 'the control it repeats is not on the screen']);
+      continue;
+    }
+    const mine = controls(repeat).join('\n');
+    const theirs = controls(original).join('\n');
+    if (mine !== theirs) out.push([label, `controls differ:\n${mine}\n---\n${theirs}`]);
   }
   return out;
 }
@@ -248,6 +282,8 @@ async def _check(new_page: Any, url: str, completed: set[int]) -> list[str]:
         await page.goto(url, wait_until="networkidle")
         await page.wait_for_selector("main#main *", timeout=5000)
         found = duplicates(await page.evaluate(_COLLECT), completed)
+        repeats = await page.evaluate(_REPEATS)
+        found += [f"[{label}] not a true repeat: {why}" for label, why in repeats]
         # Menus and panels show their own controls only once open.
         for name in (*OPEN, *(f"Compare with another report, for Report #{i}" for i in completed)):
             button = page.get_by_role("button", name=name, exact=True)
@@ -312,5 +348,28 @@ async def test_the_reports_row_count_is_not_a_second_way_in(
         )
         found = duplicates(await page.evaluate(_COLLECT), completed)
         assert any("224 occurrences" in f and "Open latest scan" in f for f in found), found
+    finally:
+        await page.context.close()
+
+
+async def test_a_repeated_pager_must_match_the_one_it_repeats(
+    live_server: tuple[str, int], new_page: Any
+) -> None:
+    """The pager under a table passes only as an exact copy of the one over it."""
+    base, _ = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    try:
+        await page.goto(f"{base}/app/tracking", wait_until="networkidle")
+        repeat = page.locator("[data-repeat-of]").first
+        await repeat.wait_for()
+        assert await page.evaluate(_REPEATS) == []
+        # A copy that has lost a control is no longer the same pager.
+        await repeat.evaluate("el => el.querySelector('li:last-child button').remove()")
+        drifted = await page.evaluate(_REPEATS)
+        assert len(drifted) == 1 and "controls differ" in drifted[0][1], drifted
+        # A copy whose original is gone is a second pager, not a repeat.
+        await repeat.evaluate("el => el.setAttribute('data-repeat-of', 'no-such-pager')")
+        orphaned = await page.evaluate(_REPEATS)
+        assert any("not on the screen" in why for _, why in orphaned), orphaned
     finally:
         await page.context.close()

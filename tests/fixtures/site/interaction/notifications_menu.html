@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Course assignments</title>
+  </head>
+  <body>
+    <!--
+      Cut down from a real signed-in scan of a course web app (scan 62,
+      app.peerceptiv.com). Its header has a notifications menu, and inside it
+      a "Mark all as read" button that changes the account on the server.
+      Click-Through pressed that button on 98 of 100 pages, because no blocked
+      word matched it. Locators follow the scan's log:
+      #notifications-menu > div > button "Mark all as read".
+
+      Each state-changing button records its own press, so the test sees
+      whether it was clicked rather than assuming it.
+    -->
+    <header>
+      <button id="notifications-menu-btn" type="button" aria-expanded="false"
+              aria-controls="notifications-menu">Notifications (60 Unread)</button>
+      <div id="notifications-menu" hidden>
+        <button type="button" class="close">close</button>
+        <div>
+          <button type="button" role="tab">All</button>
+          <button type="button" role="tab">Unread</button>
+          <button type="button" class="mark" data-action="mark-all">Mark all as read</button>
+          <button type="button" class="mark" data-action="mark-one">Mark as unread</button>
+          <button type="button" class="mark" data-action="mark-complete">Mark complete</button>
+          <button type="button" class="mark" data-action="bookmark">Bookmark</button>
+        </div>
+      </div>
+    </header>
+    <main>
+      <h1>Assignments</h1>
+    </main>
+    <script>
+      const opener = document.getElementById("notifications-menu-btn");
+      const menu = document.getElementById("notifications-menu");
+      opener.addEventListener("click", () => {
+        const open = opener.getAttribute("aria-expanded") === "true";
+        opener.setAttribute("aria-expanded", String(!open));
+        menu.hidden = open;
+      });
+      menu.querySelector(".close").addEventListener("click", () => {
+        opener.setAttribute("aria-expanded", "false");
+        menu.hidden = true;
+      });
+      for (const button of document.querySelectorAll("button.mark")) {
+        button.addEventListener("click", () => {
+          const pressed = (document.body.dataset.pressed || "").split(" ").filter(Boolean);
+          pressed.push(button.dataset.action);
+          document.body.dataset.pressed = pressed.join(" ");
+        });
+      }
+    </script>
+  </body>
+</html>

@@ -171,7 +171,8 @@ async def test_saved_suggestion_stays_readable_with_ai_off(
         card = page.locator(f"#finding-{finding_id}")
         await card.get_by_text('<input id="q" aria-label="Search">').wait_for()
         assert await card.get_by_role("button", name="Suggest again").count() == 0
-        await page.get_by_text("AI features are off.", exact=False).first.wait_for()
+        # AI turned off is a choice, not a fault: no note says so.
+        assert await page.get_by_text("AI features are off", exact=False).count() == 0
         violations = await _run_axe(page)
         assert not violations, _render_violations(violations)
     finally:

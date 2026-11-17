@@ -15,6 +15,7 @@ import {
   type ScanSettings,
 } from "./scanPolicy";
 import type { ScopePreviewState } from "./useScopePreview";
+import { AXCESS_USER_AGENT_CHOICE, CUSTOM_USER_AGENT_CHOICE, presetFor } from "./userAgents";
 
 function engineName(engine: ScanSettings["scan_engine"]): string {
   return engine === "both" ? "Rule checks (axe and Alfa)" : engine === "alfa" ? CHECK_LABEL.alfa : CHECK_LABEL.axe;
@@ -149,6 +150,7 @@ export default function ScanSummaryCard({
         ? "Axcess could not work out what to scan from that address."
         : SUMMARY.siteEmpty;
 
+  const userAgentPreset = presetFor(settings.user_agent_choice);
   // No page limit reads as what the scan will do, not as a number.
   const pagesLine =
     settings.all_pages && !isFixed(policy, "all_pages")
@@ -156,10 +158,21 @@ export default function ScanSummaryCard({
       : `Up to ${limitText(settings.max_pages)} pages, ${limitText(settings.max_depth)} clicks deep`;
   const coverage = [
     pagesLine,
-    login ? "Stays on this website" : settings.ignore_robots ? "Ignores robots.txt" : "Follows robots.txt",
-    !login && switchOn(settings, "include_subdomain") ? "Includes subdomains" : null,
+    // The same lines for a sign-in scan, which has offered robots.txt and
+    // subdomains since 2026-11-16; it said "Stays on this website" before.
+    settings.ignore_robots ? "Ignores robots.txt" : "Follows robots.txt",
+    switchOn(settings, "include_subdomain") ? "Includes subdomains" : null,
     settings.static_only ? SUMMARY.htmlOnly : null,
     settings.search ? "Uses a search box to find more pages" : null,
+    // Only when it is not the default (Chrome on this computer), which
+    // needs no line; Axcess's own name says so.
+    settings.user_agent_choice === CUSTOM_USER_AGENT_CHOICE
+      ? SUMMARY.userAgentCustom
+      : settings.user_agent_choice === AXCESS_USER_AGENT_CHOICE
+        ? SUMMARY.userAgentAxcess
+        : userAgentPreset
+          ? SUMMARY.userAgent(userAgentPreset.label)
+          : null,
   ].filter((part): part is string => Boolean(part));
 
   const running = checks.filter((line) => line.on).map((line) => line.label);

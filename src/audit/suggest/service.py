@@ -54,10 +54,6 @@ def _require_report(conn: sqlite3.Connection, scan_id: int, *, is_protected: boo
             "AI suggestions are not available for signed-in (protected) reports. "
             "Their evidence stays encrypted.",
         )
-    if row["status"] != "completed":
-        raise SuggestionRefusedError(
-            409, "AI suggestions are available once the scan has finished."
-        )
 
 
 def create(

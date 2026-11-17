@@ -356,8 +356,8 @@ function HistoryTable({
           <tr>
             <ColumnHeader>Report</ColumnHeader>
             <ColumnHeader>Scanned</ColumnHeader>
-            <ColumnHeader>Issue types</ColumnHeader>
-            <ColumnHeader>Issue occurrences</ColumnHeader>
+            <ColumnHeader numeric>Issue types</ColumnHeader>
+            <ColumnHeader numeric>Issue occurrences</ColumnHeader>
             <ColumnHeader><span className="sr-only">Actions</span></ColumnHeader>
           </tr>
         </TableHead>

@@ -1,6 +1,6 @@
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
 import { parseServerTime } from "../lib/serverTime";
-import { createElement, forwardRef, useEffect, useId, useRef, useState } from "react";
+import { createElement, forwardRef, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { Check, ChevronDown, ChevronRight, ScanEye } from "lucide-react";
 import { Link } from "react-router";
 import { cn } from "../lib/cn";
@@ -99,6 +99,8 @@ export function Card({
 }: {
   children: ReactNode;
   className?: string;
+  /** React 19 passes a ref as a prop; it reaches the card's div. */
+  ref?: React.Ref<HTMLDivElement>;
 } & React.HTMLAttributes<HTMLDivElement>) {
   // `data-card` lets a part that fills the card's edge (a table's bar, its
   // scrolling rows) round its own corners to match (see CARD_EDGE in
@@ -156,6 +158,184 @@ export function StatCard({
     </div>
   );
 }
+
+/**
+ * A small "?" button that opens a short explanation beside the words it
+ * explains, and closes it again (a toggletip).
+ *
+ * Why it exists (the developer's request, 2026-11-16): the explanations of
+ * "How sure" on Issues and of the Images tab were always-visible paragraphs,
+ * and the developer wanted them out of the way, one press from the words
+ * they explain. No existing component fitted: ``Disclosure`` is a full-width
+ * section with a heading, too heavy beside one word, and the ``title`` hover
+ * hints reach only a mouse.
+ *
+ * Opened by a press, not by hover. A hover-only tip never reaches keyboard
+ * or touch users, and a tip that appears on hover must also be dismissable,
+ * hoverable and persistent (SC 1.4.13 Content on Hover or Focus, Level AA).
+ * This one stays open until the reader closes it: Escape, a second press,
+ * or a press anywhere else.
+ *
+ * Built on the native HTML ``popover`` attribute and a ``popovertarget``
+ * button (https://html.spec.whatwg.org/multipage/popover.html), native
+ * HTML before ARIA (https://www.w3.org/TR/using-aria/#rule1): the browser
+ * gives Escape and click-outside closing, and draws the panel in the top
+ * layer, so a scrolling table region cannot cut it off. ``aria-expanded`` is
+ * set as well, as the WAI-ARIA disclosure pattern does
+ * (https://www.w3.org/WAI/ARIA/apg/patterns/disclosure/), so every screen
+ * reader hears "collapsed" or "expanded", not only those that already map
+ * ``popovertarget`` to it. The panel follows the button in the page code,
+ * so a screen reader reads it next. Focus stays on the button: there is
+ * nothing to press inside.
+ *
+ * The button draws the Material Icons "help" symbol (a "?" in a circle;
+ * https://fonts.google.com/icons, Apache License 2.0, inlined as SVG so no
+ * icon package is added): outlined while closed, filled while open, so the
+ * state shows in shape, not only colour (SC 1.4.1 Use of Color, Level A).
+ * The developer asked for it over the first hand-drawn "?" (2026-11-16).
+ * The icon is hidden from screen readers, and the button's name is its
+ * screen-reader-only text, the whole question ("What does How sure
+ * mean?"): words in the button, not an ``aria-label`` (AGENTS.md,
+ * Interface language rule 8; WCAG technique C7). The icon is drawn in
+ * ``currentColor``, so it follows forced colours and keeps the link
+ * colour's contrast (SC 1.4.11 Non-text Contrast, Level AA).
+ *
+ * The target is 44px square (SC 2.5.5 Target Size (Enhanced), Level AAA),
+ * with the icon centred in it. ``equivalent`` narrows it to 28px wide (still
+ * 44px tall) so the icon sits close to the words it explains with even space
+ * on both sides. It takes the id of a 44px control on the same page that
+ * shows the same explanation: that is SC 2.5.5's "Equivalent" exception, and
+ * the id goes on the button as ``data-target-equivalent`` so the target-size
+ * test (tests/ui/test_wcag_aaa.py) checks that control instead. The How sure
+ * header uses it: "What the labels mean" under the table says the same.
+ *
+ * The panel opens under the button, or over it when there is no room
+ * below, and stays 16px inside the window, so at 320px it fits without
+ * sideways scrolling (SC 1.4.10 Reflow, Level AA).
+ */
+export function HelpTip({
+  question,
+  equivalent,
+  small = false,
+  children,
+  className,
+}: {
+  /** The button's name without its "?": "What does “How sure” mean". */
+  question: string;
+  /**
+   * The id of a 44px control on the same page that shows the same
+   * explanation. Given, the button is 28px wide instead of 44px (SC 2.5.5's
+   * "Equivalent" exception; above).
+   */
+  equivalent?: string;
+  /**
+   * An 18px icon in a 24px-wide target (still 44px tall), for a table
+   * header, where the 22px icon outweighed the 14px label beside it (the
+   * developer's suggestion, 2026-11-16). Only with ``equivalent``: 24px is
+   * SC 2.5.8 Target Size (Minimum)'s floor, and the 44px of SC 2.5.5 is
+   * met by the equivalent control.
+   */
+  small?: boolean;
+  children: ReactNode;
+  className?: string;
+}) {
+  const id = useId();
+  const button = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const el = panel.current;
+    if (!el) return;
+    const onToggle = (event: Event) => {
+      const opening = (event as ToggleEvent).newState === "open";
+      if (!opening) el.style.visibility = "hidden";
+      setOpen(opening);
+    };
+    el.addEventListener("toggle", onToggle);
+    return () => el.removeEventListener("toggle", onToggle);
+  }, []);
+
+  // A layout effect, so the panel is placed before the browser paints it.
+  useLayoutEffect(() => {
+    const el = panel.current;
+    const anchor = button.current;
+    if (!open || !el || !anchor) return;
+    const margin = 16;
+    const place = () => {
+      const at = anchor.getBoundingClientRect();
+      const width = el.offsetWidth;
+      const height = el.offsetHeight;
+      const left = Math.min(
+        Math.max(margin, at.left + at.width / 2 - width / 2),
+        window.innerWidth - width - margin,
+      );
+      const below = at.bottom + 4;
+      const above = at.top - height - 4;
+      const top = below + height > window.innerHeight - margin && above >= margin ? above : below;
+      el.style.left = `${Math.max(margin, left)}px`;
+      el.style.top = `${top}px`;
+      el.style.visibility = "";
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open]);
+
+  return (
+    <>
+      <button
+        ref={button}
+        type="button"
+        popoverTarget={id}
+        aria-expanded={open}
+        data-target-equivalent={equivalent}
+        className={cn(
+          "group inline-flex min-h-target shrink-0 items-center justify-center rounded-xs align-middle focus-visible:outline-none focus-visible:shadow-focus",
+          // Quiet at rest (umich-blue-soft, 7:1 on every surface it sits on;
+          // styles.css), full strength on hover and while open, so the icon
+          // never competes with the words it explains but answers a pointer.
+          open ? "text-umich-blue" : "text-umich-blue-soft hover:text-umich-blue",
+          equivalent ? (small ? "w-6" : "w-7") : "min-w-target",
+          className,
+        )}
+      >
+        {/* The whole question, "?" included: a screen reader reads it as
+            the button's name. */}
+        <span className="sr-only">{question}?</span>
+        <svg
+          aria-hidden
+          viewBox="0 0 24 24"
+          className={cn("shrink-0", equivalent && small ? "h-[1.125rem] w-[1.125rem]" : "h-[1.375rem] w-[1.375rem]")}
+          fill="currentColor"
+        >
+          <path d={open ? HELP_FILLED : HELP_OUTLINED} />
+        </svg>
+      </button>
+      <div
+        ref={panel}
+        id={id}
+        popover="auto"
+        // Hidden until placed, so it never shows a frame in the middle of the
+        // window first (the browser's default spot for a popover).
+        style={{ visibility: "hidden" }}
+        className="m-0 w-[min(26rem,calc(100vw-2rem))] max-h-[min(70vh,36rem)] overflow-y-auto rounded-xs border border-border-strong bg-surface-raised p-3 text-left text-sm font-normal normal-case leading-relaxed tracking-normal whitespace-normal text-fg shadow-lg [inset:auto]"
+      >
+        {children}
+      </div>
+    </>
+  );
+}
+
+// Material Icons "help" and "help_outline" (Apache License 2.0).
+const HELP_OUTLINED =
+  "M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z";
+const HELP_FILLED =
+  "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z";
 
 /** Page header, breadcrumb + title + trailing actions. */
 export function PageHeader({
@@ -335,17 +515,21 @@ type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 // forwardRef so callers that must move focus back to the trigger, a
 // disclosure closing on Escape, for one, can hold the element itself
 // instead of re-querying the DOM for it.
+/**
+ * A button's own classes, for a stand-in that must take exactly a button's
+ * width without being one: the Reports table's hidden sizing rows
+ * (routes/Scans.tsx, ``SizerRows``). Every real control uses ``Button``.
+ */
+export function buttonClasses(variant: Variant = "secondary", size: Size = "md"): string {
+  return cn(BUTTON_BASE, SIZE_CLASSES[size], VARIANT_CLASSES[variant]);
+}
+
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   function Button({ variant = "secondary", size = "md", className, ...rest }, ref) {
     return (
       <button
         ref={ref}
-        className={cn(
-          BUTTON_BASE,
-          SIZE_CLASSES[size],
-          VARIANT_CLASSES[variant],
-          className,
-        )}
+        className={cn(buttonClasses(variant, size), className)}
         {...rest}
       />
     );
@@ -513,7 +697,8 @@ export function Disclosure({
 }: {
   id: string;
   title: string;
-  headingLevel?: 2 | 3;
+  /** 4 for a disclosure inside a level 3 section (Coverage's criterion panel). */
+  headingLevel?: 2 | 3 | 4;
   defaultOpen?: boolean;
   /**
    * Controlled mode, for a parent that must open the panel itself (a form
@@ -1197,6 +1382,7 @@ export function PageLink({
   occurrenceId = null,
   snippet = null,
   issue = null,
+  image = null,
   origin,
   context,
   contextTo,
@@ -1218,6 +1404,8 @@ export function PageLink({
   snippet?: string | null;
   /** Issue key to resolve the selector for (used when ``selector`` is absent). */
   issue?: string | null;
+  /** An image's content hash: the inspector outlines every place it appears. */
+  image?: string | null;
   /** Label of the view this link lives in (orientation breadcrumb). */
   origin?: string;
   /** Short context label (rule/issue/finding) shown on the inspector. */
@@ -1258,6 +1446,7 @@ export function PageLink({
     // it at 4000 chars, so mirror that, no point truncating below the source.
     if (snippet) params.set("snippet", snippet.slice(0, 4000));
     if (issue) params.set("issue", issue);
+    if (image) params.set("image", image);
     if (origin) params.set("origin", origin);
     if (context) params.set("context", context);
     if (contextTo) params.set("contextTo", contextTo);

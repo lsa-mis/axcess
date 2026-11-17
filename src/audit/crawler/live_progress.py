@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import threading
 from collections import OrderedDict
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Any, Literal
@@ -45,7 +45,13 @@ def page(scan_id: int, url: str, checks: Iterable[str]) -> Iterator[None]:
     browser could not open gets no browser checks), and one still running
     ended with an error: both are recorded as not run, not as done.
     """
-    entry: dict[str, Any] = {"finished": False, "checks": dict.fromkeys(checks, "waiting")}
+    entry: dict[str, Any] = {
+        "finished": False,
+        "checks": dict.fromkeys(checks, "waiting"),
+        # Checks that go on after the page (``later``): left running at the
+        # page's end, for their own callback to finish.
+        "later": set(),
+    }
     with _lock:
         pages = _scans.setdefault(scan_id, OrderedDict())
         pages.pop(url, None)
@@ -58,6 +64,8 @@ def page(scan_id: int, url: str, checks: Iterable[str]) -> Iterator[None]:
         with _lock:
             states = entry["checks"]
             for key, state in states.items():
+                if key in entry["later"] and state == "running":
+                    continue
                 if state != "done":
                     states[key] = "not_run"
             entry["finished"] = True
@@ -73,6 +81,35 @@ def check(key: str) -> Iterator[None]:
     _set(key, "running")
     yield
     _set(key, "done")
+
+
+def later(key: str) -> Callable[[bool], None]:
+    """Mark ``key`` running on the current page, to be finished after the page.
+
+    For work the page starts but does not wait for (its PDF downloads): the
+    page's row can be checked while ``key`` still runs. The returned callback
+    marks it done (``True``) or not run (``False``) whenever the work ends,
+    as long as the row is still kept. Outside a page it does nothing.
+    """
+    current = _current.get()
+    _set(key, "running")
+    if current is not None:
+        with _lock:
+            pages = _scans.get(current[0])
+            entry = pages.get(current[1]) if pages is not None else None
+            if entry is not None and key in entry["checks"]:
+                entry["later"].add(key)
+
+    def finish(ok: bool) -> None:
+        if current is None:
+            return
+        with _lock:
+            pages = _scans.get(current[0])
+            entry = pages.get(current[1]) if pages is not None else None
+            if entry is not None and key in entry["checks"]:
+                entry["checks"][key] = "done" if ok else "not_run"
+
+    return finish
 
 
 def snapshot(scan_id: int) -> list[dict[str, Any]]:

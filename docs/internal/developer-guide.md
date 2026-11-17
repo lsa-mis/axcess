@@ -206,7 +206,7 @@ Useful `audit crawl` flags:
 | `--skip-screenshots` | Off | Skips the outlined element screenshots |
 | `--axe-level` | AA | Sets the axe-core level: A, AA, or AAA |
 | `--wcag-version` | 2.1 | The WCAG version the level is checked against: 2.1, the current U-M standard, or 2.2. Applies to axe-core and Alfa. |
-| `--compare-to SCAN_ID` | The last completed scan of the same site | The report to compare image findings against |
+| `--compare-to SCAN_ID` | The last report of the same site (a completed scan, or a stopped or failed one that saved pages) | The report to compare image findings against |
 
 Each check also has an off switch: `--skip-axe`, `--skip-keyboard`,
 `--skip-responsive`, `--skip-focus`, `--skip-visual`, `--skip-ocr`,
@@ -221,8 +221,7 @@ The command line differs from the app's New scan form in a few ways:
   reachable, the model-based passes are skipped with a warning and the crawl
   continues.
 - There is no option for Siteimprove Alfa. Choose it in the app instead.
-- It uses 4 workers and a 500 page limit, where the form uses 8 workers and
-  2,500 pages.
+- It uses 4 workers where the form uses 8. Both default to a 10,000 page limit.
 - Ctrl-C interrupts the crawl. Run the same command again to resume it.
 
 ## Common extension tasks
@@ -255,7 +254,7 @@ scan has a completed expert evaluation. The evaluation lives in the
 holds its logic.
 
 - `GET /api/scans/{id}/evaluation` reads the record, and
-  `PUT /api/scans/{id}/evaluation` updates it for a completed scan. The body
+  `PUT /api/scans/{id}/evaluation` updates it for a report. The body
   (`EvaluationUpdate` in `server.py`) holds the target standard and level,
   purpose, included and excluded scope, sample description, reviewer,
   methods note, limitations, and `status` (`draft`, `in_progress`, or

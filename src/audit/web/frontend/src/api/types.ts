@@ -40,18 +40,24 @@ export interface ScanSummary {
 export type RuleCheck = "axe" | "alfa";
 
 /** Every public report of one site (normalized seed scope), newest first.
- *  The headline numbers come from `most_recent_completed` only: an
+ *  The headline numbers come from `most_recent_report` only: an
  *  interrupted or failed crawl holds partial evidence. */
 export interface SiteGroup {
   site_url: string;
   scan_count: number;
-  completed_count: number;
+  report_count: number;
   most_recent: ScanSummary;
-  most_recent_completed: ScanSummary | null;
-  /** Unified issue groups in `most_recent_completed`; null when there is none. */
-  most_recent_completed_issue_count: number | null;
+  most_recent_report: ScanSummary | null;
+  /** Unified issue groups in `most_recent_report`; null when there is none. */
+  most_recent_report_issue_count: number | null;
   /** Occurrences across those issues (the Issues page's total); null when there is none. */
-  most_recent_completed_occurrence_count: number | null;
+  most_recent_report_occurrence_count: number | null;
+  /**
+   * The same two counts for the levels the Issues page shows when it opens.
+   * Optional: absent from a response cached before the fields existed.
+   */
+  most_recent_report_shown_issue_count?: number | null;
+  most_recent_report_shown_occurrence_count?: number | null;
   scans: ScanSummary[];
 }
 
@@ -63,6 +69,12 @@ export interface SiteGroup {
 export interface ScanIssueCounts {
   issue_count: number;
   occurrence_count: number;
+  /**
+   * The same two counts for the levels the Issues page shows when it opens.
+   * Optional: absent from a response cached before the fields existed.
+   */
+  shown_issue_count?: number;
+  shown_occurrence_count?: number;
 }
 
 export interface ScanProgress {
@@ -121,11 +133,32 @@ export interface ScanPageChecks {
   checks: Partial<Record<string, PageCheckState>>;
 }
 
+/** How a scan ended: ``all_found`` visited every page it found,
+ *  ``page_limit`` stopped at the page limit chosen for it. */
+export type ScanEndReason = "running" | "all_found" | "page_limit" | "stopped" | "failed";
+
+export interface ScanCoverage {
+  ended: ScanEndReason;
+  /** Pages the scan found (queued to visit). Null when not recorded. */
+  pages_found: number | null;
+  pages_visited: number;
+  /** The page limit chosen; null means no limit. */
+  page_limit: number | null;
+  depth_limit: number | null;
+}
+
 export interface ScanDetail extends ScanSummary {
   error_count: number;
   failure_reason: string | null;
+  /** Axcess's own plain-words note on how a completed scan ran, such as a
+   *  sign-in scan that went back to one tab. Null when there is nothing to
+   *  say. */
+  scan_note: string | null;
   by_severity: Record<Severity, number>;
   previous_scan_id: number | null;
+  /** How much of the site this scan covered, as facts rather than a
+   *  "partial" or "full" label (src/audit/db/reports.py, ScanCoverage). */
+  coverage: ScanCoverage;
   blocked: null | {
     status_code: number;
     title: string | null;
@@ -361,6 +394,10 @@ export interface NewScanPayload {
   /** Skip the page code check, which reads the rendered page code after axe.
    *  On unless chosen off; the server treats a missing value as on. */
   skip_markup: boolean;
+  /** Skip the document check: listing the files the pages link to (the
+   *  Documents tab) and checking each PDF. On unless chosen off; the server
+   *  treats a missing value as on. Never in a sign-in scan. */
+  skip_documents: boolean;
   /** Skip motion and vision-assisted visual probes. */
   skip_visual: boolean;
   /** Skip the form error check (WCAG 3.3.1). Off unless chosen. */
@@ -377,6 +414,18 @@ export interface NewScanPayload {
   skip_rendered_storage: boolean;
   axe_level: "A" | "AA" | "AAA";
   wcag_version: WcagVersion;
+  /**
+   * Which browser name (user agent) the scan sends: "axcess" for Axcess's
+   * own, an id from `components/newScan/userAgents.ts`, or "custom".
+   * Public scans only; a sign-in scan always sends Axcess's own.
+   */
+  user_agent_choice: string;
+  /**
+   * In the form: the text typed for "custom". In the payload: the exact
+   * string to send for any choice but "axcess" (see `publicPayload`). Always
+   * empty in a settings snapshot: a typed name is never sent back.
+   */
+  user_agent: string;
 }
 
 /**
@@ -434,11 +483,17 @@ export interface LocalLoginScanPayload {
   approved_auth_origins: string[];
   authorization_acknowledged: true;
   max_pages: number;
+  /** No page limit; `max_pages` then only keeps the form's value. */
+  all_pages: boolean;
   max_depth: number;
   rps: number;
-  /** Concurrent authenticated tabs; the local login API caps this at four. */
+  /** Concurrent authenticated tabs; the local login API caps this at eight. */
   workers: number;
   whole_host: boolean;
+  include_subdomain: boolean;
+  ignore_robots: boolean;
+  /** Load page code without scripts, through the signed-in browser. */
+  static_only: boolean;
   /** Keep the signed-in browser visible instead of transferring to headless Chromium. */
   show_browser?: boolean;
   /** DOM rule engines run against the signed-in application scope. */
@@ -449,6 +504,16 @@ export interface LocalLoginScanPayload {
   skip_interaction: boolean;
   skip_keyboard: boolean;
   skip_responsive: boolean;
+  skip_focus: boolean;
+  skip_markup: boolean;
+  skip_documents: boolean;
+  skip_semantic: boolean;
+  skip_visual: boolean;
+  skip_forms: boolean;
+  send_empty_forms: boolean;
+  user_agent_choice: string;
+  /** The exact browser name to send; empty for Axcess's own. */
+  user_agent: string;
   skip_ocr: boolean;
   skip_vlm: boolean;
   /** Do not persist rendered-page snapshots; the Page inspector re-renders. */
@@ -812,7 +877,7 @@ export interface GroupedFindingsResponse {
 
 export type ConformanceLabel = "A" | "AA" | "AAA" | "BP";
 export type AbilityLabel = "vision" | "cognition" | "motor" | "hearing";
-export type ReviewLane = "likely_barrier" | "expert_review" | "informational";
+export type ReviewLane = "likely_barrier" | "measured" | "expert_review" | "informational";
 export type EvidenceConfidence = "high" | "medium" | "low";
 /** Which family of checks produced an issue's evidence (labels: lib/labels.ts). */
 export type FindingType = "wcag" | "click_through" | "alt_text";
@@ -921,6 +986,25 @@ export interface IssueDetail {
   verify_automated: string | null;
   acceptance: string | null;
   help_url: string | null;
+  /** Numbered screen reader steps for each computer, when the issue type has them. */
+  screen_reader_check: ScreenReaderCheck | null;
+}
+
+/** The steps for one computer. A key to press is written `{Command}`. */
+export interface ScreenReaderPlatform {
+  id: string;
+  name: string;
+  intro: string | null;
+  link_text: string | null;
+  link_url: string | null;
+  steps: string[];
+}
+
+/** One shared screen reader check (rules/screen_reader_checks.yaml). */
+export interface ScreenReaderCheck {
+  id: string;
+  title: string;
+  platforms: ScreenReaderPlatform[];
 }
 
 export interface IssuesResponse {
@@ -936,6 +1020,18 @@ export interface IssuesResponse {
     high_confidence: number;
   };
   total_unfiltered: number;
+  /**
+   * What the Issues page shows when it opens, and what it leaves out.
+   * Counted over the whole report. Since 2026-11-13 the page opens on every
+   * issue type, so the `hidden_*` counts are 0 (`default_view_counts` in
+   * `src/audit/web/issues.py`).
+   */
+  default_view_counts?: {
+    issue_types: number;
+    occurrences: number;
+    hidden_issue_types: number;
+    hidden_occurrences: number;
+  };
 }
 
 // ---------------------------------------------------------------
@@ -1090,6 +1186,128 @@ export interface TrackingData {
   coverage: CoverageData;
 }
 
+// --- Coverage (/api/coverage/checks, /api/coverage/found) -------------
+// Mirrors src/audit/web/coverage_checks.py and src/audit/web/issue_share.py.
+
+/** How Axcess checks a criterion; "not_needed" is 4.1.1 Parsing in WCAG 2.1. */
+export type CheckMethod = "automated" | "partial" | "ai-assisted" | "manual" | "not_needed";
+
+/** The other checks a study row credits; "click_through" is axe-core after Click-Through. */
+export type StudyCheck = "click_through" | "image" | "focus" | "keyboard" | "visual" | "semantic" | "responsive";
+
+export interface StudyFigures {
+  sc: string; // WCAG number, or "other"
+  share: number; // of all problems, 0-1 (4.1.1 left out)
+  rule_check: number; // of this criterion's problems, the share axe-core finds
+  other_checks: number; // the share Axcess's other checks add (an estimate)
+  checks: StudyCheck[];
+}
+
+export interface AxeRuleInfo {
+  id: string;
+  help: string;
+  description: string;
+  url: string;
+}
+
+export interface Guidance {
+  title: string;
+  url: string;
+}
+
+export interface CheckCriterion {
+  sc: string;
+  name: string;
+  understanding_url: string;
+  apg: Guidance[];
+  level: string;
+  principle: string;
+  guideline: string;
+  method: CheckMethod;
+  checks: DetectionPipeline[];
+  rules: AxeRuleInfo[];
+  confidence: string;
+  does: string;
+  you: string;
+  technical: string;
+  study: StudyFigures | null;
+}
+
+export interface CommonProblem {
+  label: string;
+  share_of_sites: number;
+  rule: string;
+  sc: string;
+}
+
+export interface CoverageChecks {
+  wcag_version: WcagVersion;
+  scan_default_version: WcagVersion;
+  axe_version: string;
+  criteria: CheckCriterion[];
+  study: StudyFigures[];
+  study_source_url: string;
+  other_checks_hit_rate: number;
+  common_problems: CommonProblem[];
+  common_source_url: string;
+}
+
+export type FoundLayer = "axe_loaded" | "axe_click_through" | "alfa" | "probes" | "image" | "semantic";
+
+export interface CoverageScanOption {
+  id: number;
+  seed_url: string;
+  finished_at: string | null;
+}
+
+export interface CoverageFound {
+  scan_id: number | null;
+  scans: CoverageScanOption[];
+  scans_included: number;
+  scans_completed: number;
+  layers: {
+    total: number;
+    layers: { layer: FoundLayer; count: number; share: number | null }[];
+    excluded_not_a_problem: number;
+    excluded_records: number;
+  };
+  axe_rules: {
+    rule_id: string;
+    help: string;
+    category: string;
+    criteria: string[];
+    loaded: number;
+    click_through: number;
+  }[];
+  found_by_criterion: { sc: string; count: number }[];
+  estimate: {
+    available: boolean;
+    axe_sample: number;
+    min_sample: number;
+    found: number;
+    estimated_total: number | null;
+    share: number | null;
+    criteria: {
+      sc: string;
+      deque_share: number;
+      axe_rate: number;
+      axe_found: number;
+      found: number;
+      estimated_total: number;
+      method: "axe_rate" | "issue_share";
+    }[];
+    source_title: string;
+    source_url: string;
+  };
+  manual_review: {
+    evaluations: number;
+    failed: number;
+    found: number;
+    share: number | null;
+    scans: { scan_id: number; seed_url: string; failed: number; found: number }[];
+  };
+}
+
 // --- Expert evaluation workbench --------------------------------------
 
 export type EvaluationStatus = "draft" | "in_progress" | "completed";
@@ -1184,6 +1402,141 @@ export interface ScanPagesResponse {
   offset: number;
   sort: ScanPagesSort;
   pages: ScanPageRow[];
+}
+
+/** A linked file's type (`linked_files.formats.FileType`). */
+export type LinkedFileType =
+  | "pdf"
+  | "docx"
+  | "doc"
+  | "pptx"
+  | "ppt"
+  | "xlsx"
+  | "xls"
+  | "odt"
+  | "odp"
+  | "ods"
+  | "rtf"
+  | "google_doc"
+  | "google_sheet"
+  | "google_slides"
+  | "google_drive";
+
+/** The three statuses the Documents tab shows (`linked_files_queries.ShownStatus`). */
+export type LinkedFileStatus = "mostly_sure" | "not_sure" | "could_not_check";
+
+/** Why a file could not be checked (`linked_files.formats.Reason`). */
+export type LinkedFileReason =
+  | "type_not_checked_yet"
+  | "old_format"
+  | "google_file"
+  | "broken_link"
+  | "http_error"
+  | "password"
+  | "too_large"
+  | "timed_out"
+  | "not_a_pdf"
+  | "damaged"
+  | "robots"
+  | "blocked"
+  | "limit"
+  | "not_checked";
+
+/** A machine check a PDF failed (`linked_files.formats.FailedCheck`). */
+export type LinkedFileCheck =
+  | "not_tagged"
+  | "no_text"
+  | "blocks_assistive_tech"
+  | "no_title"
+  | "no_language";
+
+/** How a page reaches a file (`linked_files.formats.RefKind`). */
+export type LinkedFileRefKind = "link" | "revealed_link" | "iframe" | "object" | "embed";
+
+/** One place a page of the report reaches a file (`linked_files_queries.LinkedFileRef`). */
+export interface LinkedFileRef {
+  page_id: number;
+  page_url: string;
+  page_title: string | null;
+  how: LinkedFileRefKind;
+  /** The link's accessible name, or the frame's or embed's title. */
+  link_text: string;
+  /** The control a reader presses before the link exists, if any. */
+  revealed_by: string | null;
+}
+
+/** One file in the Documents tab (`linked_files_queries.LinkedFileRow`). */
+export interface LinkedFileRow {
+  file_id: number;
+  url: string;
+  /** Its file name, else the first link's text. */
+  name: string;
+  file_type: LinkedFileType;
+  off_site: boolean;
+  status: LinkedFileStatus;
+  reason: LinkedFileReason | null;
+  failed_checks: LinkedFileCheck[];
+  http_status: number | null;
+  is_form: boolean | null;
+  page_count: number | null;
+  /** Distinct pages of the report that reach the file; the pages are on its own page. */
+  referring_page_count: number;
+  /** The first file at another address with the same bytes, whose result
+   *  this one shares; null when it has no earlier copy. */
+  same_as?: { file_id: number; name: string } | null;
+  /** A picture of the first page is stored (PDFs the check could read). */
+  has_thumbnail?: boolean;
+}
+
+/** One way a page reaches a file (`linked_files_queries.DocumentRefWay`). */
+export interface DocumentRefWay {
+  how: LinkedFileRefKind;
+  link_text: string;
+  revealed_by: string | null;
+}
+
+/** One page a file appears on, and every way it does (`linked_files_queries.DocumentPage`). */
+export interface DocumentPage {
+  page_id: number;
+  page_url: string;
+  page_title: string | null;
+  ways: DocumentRefWay[];
+}
+
+/** `GET /api/scans/{id}/documents/{file}` (`linked_files_queries.ScanDocumentResponse`). */
+export interface ScanDocumentResponse {
+  scan_id: number;
+  file: LinkedFileRow;
+  /** At most 2,000, in address order; `file.referring_page_count` is the total. */
+  pages: DocumentPage[];
+}
+
+/**
+ * `GET /api/scans/{id}/documents/{file}/pages/{page}`
+ * (`linked_files_queries.DocumentOnPage`): where one file is linked on one
+ * page, for the inspector to mark.
+ */
+export interface DocumentOnPage {
+  file_id: number;
+  page_id: number;
+  name: string;
+  refs: LinkedFileRef[];
+  /** False when the scan kept no copy of the page. */
+  saved_copy: boolean;
+  /** Each element of the saved copy that reaches the file, in page order. */
+  places: ElementPlace[];
+}
+
+/** `GET /api/scans/{id}/documents` (`linked_files_queries.ScanDocumentsResponse`). */
+export interface ScanDocumentsResponse {
+  scan_id: number;
+  /** False when the scan did not look for documents at all. */
+  recorded: boolean;
+  total: number;
+  counts: Record<LinkedFileStatus, number>;
+  limit: number;
+  offset: number;
+  files: LinkedFileRow[];
 }
 
 /** What a person decided about an occurrence: a problem to report, or a
@@ -1516,6 +1869,90 @@ export interface ExportOptions {
   formats: ExportFormatOption[];
 }
 
+// ---------------------------------------------------------------------------
+// Report Images tab (GET /api/scans/:id/images, src/audit/web/image_inventory.py)
+// ---------------------------------------------------------------------------
+
+/** A question asked of the report's images. An image is in one or two groups. */
+export type ImageGroup = "with_text" | "missing_alt" | "with_alt";
+
+/** One verdict on an image's alt text, worst first. */
+export type AltVerdict = "needs_alt" | "needs_better" | "not_checked" | "good";
+
+/** What decided the verdict: the page code, the text match, or the local model. */
+export type AltVerdictSource = "page_code" | "text_match" | "local_model";
+
+export interface ImageGroupCounts {
+  total: number;
+  good: number;
+  needs_better: number;
+  needs_alt: number;
+  not_checked: number;
+}
+
+export interface ReportImage {
+  image_id: number;
+  content_hash: string;
+  mime: string | null;
+  image_url: string;
+  has_svg_text: boolean;
+  groups: ImageGroup[];
+  page_count: number;
+  sample_page_id: number | null;
+  sample_page_url: string | null;
+  /** null: no alt attribute. "": alt="" (marked decorative). */
+  alt_text: string | null;
+  alt_text_variants: number;
+  has_text: boolean;
+  image_text: string | null;
+  verdict: AltVerdict;
+  verdict_source: AltVerdictSource | null;
+  verdict_reason: string;
+  suggestion: string | null;
+  suggestion_model: string | null;
+  can_check: boolean;
+  finding_id: number | null;
+}
+
+/** One page an image appears on (`ImagePage` in image_inventory.py). */
+export interface ImagePage {
+  page_id: number;
+  page_url: string;
+  page_title: string | null;
+  /** Each place's alt text on this page, once each: null is no alt attribute, "" is alt="". */
+  alt_texts: Array<string | null>;
+}
+
+/** One image and the pages it appears on, from `GET /api/scans/{id}/images/{imageId}`. */
+export interface ReportImageDetail {
+  image: ReportImage;
+  /** Up to 2,000 pages; `image.page_count` says how many there are. */
+  pages: ImagePage[];
+  check_available: boolean;
+}
+
+export interface ReportImagesResponse {
+  scan_id: number;
+  group: ImageGroup;
+  verdict: AltVerdict | null;
+  q: string;
+  counts: Record<ImageGroup, ImageGroupCounts>;
+  total: number;
+  limit: number;
+  offset: number;
+  rows: ReportImage[];
+  /** Whether a local model is set up to check alt text. */
+  check_available: boolean;
+}
+
+export interface ReportImagesFilter {
+  group: ImageGroup;
+  verdict: AltVerdict | "";
+  q: string;
+  limit: number;
+  offset: number;
+}
+
 /* ---------------------------------------------------------------------------
  * AI fix suggestions (src/audit/suggest/models.py). Mirrors the Pydantic
  * models; keep the two in step.
@@ -1530,6 +1967,7 @@ export type SuggestionFeedback = "helpful" | "not_helpful";
 export type SuggestionErrorCode =
   | "model_unavailable"
   | "model_missing"
+  | "model_not_local"
   | "timeout"
   | "bad_answer"
   | "no_change"

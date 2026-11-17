@@ -13,8 +13,8 @@
 > - Semantic criteria: it lists one. Four are registered: 1.2.1, 2.4.4,
 >   2.4.6, and 3.3.2.
 > - WCAG counts: it uses 50 A and AA criteria (7 full, 11 partial, 32
->   manual). The current matrix has 55: 5 automated, 18 partial, 6
->   AI-assisted, and 26 manual.
+>   manual). The current matrix has 55: 5 automated, 17 partial, 6
+>   AI-assisted, and 27 manual.
 > - Removed: the Jinja templates, the `audit diff` and `audit ollama-serve`
 >   commands, and the `j/k` and `?` shortcuts it mentions.
 >

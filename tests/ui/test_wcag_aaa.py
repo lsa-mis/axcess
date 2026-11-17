@@ -130,12 +130,16 @@ def _screens(scan_id: int, page_id: int) -> list[str]:
         f"/scans/{scan_id}/issues/axe:{RULE}",
         f"/scans/{scan_id}/issues/axe:{RULE}/pages",
         f"/scans/{scan_id}/pages",
+        f"/scans/{scan_id}/documents",
         f"/scans/{scan_id}/pages/{page_id}",
         f"/scans/{scan_id}/pages/{page_id}/inspect?issue=axe:{RULE}",
         f"/scans/{scan_id}/findings",
+        f"/scans/{scan_id}/images",
         f"/scans/{scan_id}/a11y",
         f"/scans/{scan_id}/a11y/by-rule",
         "/tracking",
+        "/coverage",
+        "/coverage/found",
         "/settings",
         "/about",
     ]
@@ -172,6 +176,16 @@ _SMALL_TARGETS = """() => {
     }
     const r = box.getBoundingClientRect();
     if (r.width >= 43.5 && r.height >= 43.5) continue;
+    // SC 2.5.5's "Equivalent" exception: a smaller target whose job a 44px
+    // control on the same page also does names that control
+    // (HelpTip's ``equivalent``). It passes only when that control is there,
+    // shown, and big enough.
+    const twinId = el.dataset.targetEquivalent;
+    const twin = twinId && document.getElementById(twinId);
+    if (twin && shown(twin)) {
+      const t = twin.getBoundingClientRect();
+      if (t.width >= 43.5 && t.height >= 43.5) continue;
+    }
     const block = el.closest('p');
     const inSentence = el.tagName === 'A' && block
       && block.innerText.trim().length > el.innerText.trim().length + 15;
@@ -283,6 +297,26 @@ async def test_running_text_is_short_and_spaced(
         problems += [f"{path}: tight {t}" for t in found["tight"]]
         await page.context.close()
     assert not problems, "\n".join(problems)
+
+
+async def test_an_empty_table_says_why_in_short_lines(
+    live_server: tuple[str, int], new_page: Any, seeded_db: tuple[Path, Path, int]
+) -> None:
+    """SC 1.4.8 on the message an empty table shows in place of rows: it
+    says why and where to look next in a few sentences, and across the
+    card's full width those ran to about 150 characters a line."""
+    base, _ = live_server
+    with sqlite3.connect(seeded_db[0]) as conn:
+        empty = conn.execute(
+            "INSERT INTO scans (seed_url, status, config_json) "
+            "VALUES ('http://empty.example/', 'completed', '{}')"
+        ).lastrowid
+    page = await _open(new_page, base, f"/scans/{empty}/issues")
+    await playwright_async.expect(
+        page.get_by_text(re.compile(r"^Axcess found no issues\. That does not mean"))
+    ).to_be_visible()
+    assert await page.evaluate(_TEXT_LAYOUT) == {"long": [], "tight": []}
+    await page.context.close()
 
 
 async def test_the_checks_catch_what_they_claim(new_page: Any) -> None:
@@ -428,6 +462,7 @@ async def test_every_dropdown_is_named(
         f"/scans/{scan_id}/pages/{page_id}/inspect?issue=axe:{RULE}",
         "/scans/new",
         "/tracking",
+        "/coverage",
     ):
         page = await _open(new_page, base, path)
         boxes = page.get_by_role("combobox")

@@ -37,15 +37,18 @@ from audit.analyzer.alfa import AlfaAnalyzer, AlfaResult
 from audit.analyzer.axe import AxeAnalyzer
 from audit.analyzer.axe import Level as AxeLevel
 from audit.analyzer.focus import FocusProbe
+from audit.analyzer.forms import ErrorIdentificationProbe
 from audit.analyzer.interaction import InteractionProbe
 from audit.analyzer.keyboard import KeyboardProbe
 from audit.analyzer.markup import MarkupProbe
 from audit.analyzer.responsive import ResponsiveProbe
 from audit.analyzer.visual import VisualProbe
 from audit.blob_store import BlobStore
+from audit.crawler.fetcher import AuthenticatedStaticFetcher
 from audit.crawler.js_fetcher import JsFetcher
 from audit.crawler.search import SearchExplorer
 from audit.extractor.downloader import AuthenticatedImageDownloader
+from audit.linked_files.fetch import SignedInFileFetcher
 from audit.logging import get_logger
 from audit.protected.egress import (
     EgressViolation,
@@ -197,6 +200,13 @@ class ManualAuthPolicies:
     scan: ProtectedEgressPolicy
     setup_navigation_origins: frozenset[str] | None
     setup_write_origins: frozenset[str] | None
+
+
+def _with_origin(origins: tuple[str, ...], url: str) -> tuple[str, ...]:
+    """``origins`` plus the origin of ``url``, once."""
+    parts = urlsplit(url)
+    origin = f"{parts.scheme}://{parts.netloc}".lower()
+    return origins if origin in origins else (*origins, origin)
 
 
 def build_manual_auth_policies(
@@ -495,6 +505,9 @@ class ManualAuthenticationSession:
         self._profile_dir: str | None = None
         # The kept sign-in and what keeps it fresh. See the module docstring.
         self._kept: _KeptSignIn | None = None
+        #: Whether the scan's tabs after the first hold a copy of its
+        #: sessionStorage (see ``switch_to_headless``).
+        self.scan_tabs_copied = False
         self._keep_refresh_s = keep_refresh_s
         self._keep_lock = asyncio.Lock()
         self._keep_tasks: set[asyncio.Task[Any]] = set()
@@ -680,9 +693,11 @@ class ManualAuthenticationSession:
         """Restore transferable login state in a new, normal headless Chromium.
 
         State stays in memory. The local login flow opts into this handoff;
-        the managed companion can continue using its original browser. Keep
-        one reusable tab when sessionStorage is present so token updates are
-        shared across successive pages, just as in the original login tab.
+        the managed companion can continue using its original browser. Opens
+        ``count`` tabs. sessionStorage belongs to a tab, so each one is seeded
+        with its own copy of the sign-in tab's; ``scan_tabs_copied`` records
+        that, so the fetcher checks a copy's sign-in pages against the first
+        tab (``audit.crawler.tab_pool``).
         """
         if self._state is not ManualAuthState.AUTHENTICATED or self._playwright is None:
             raise ManualAuthenticationError("Confirm sign-in before starting the headless scan.")
@@ -723,10 +738,11 @@ class ManualAuthenticationSession:
                 await context.add_init_script(_WEBRTC_BLOCK_INIT_SCRIPT)
                 await self._route_guard.install_on_context(context)
                 pages = []
-                for _ in range(1 if tab_storage else count):
+                for _ in range(count):
                     page = await context.new_page()
                     await restore_session_storage(page, tab_storage)
                     pages.append(page)
+                self.scan_tabs_copied = bool(tab_storage) and count > 1
                 # Only retire the login browser after the new context is ready.
                 if login_context is not None:
                     await login_context.close()
@@ -752,8 +768,10 @@ class ManualAuthenticationSession:
         reuse those pages without repeatedly bringing the browser to the
         foreground. The pages and their shared authenticated context remain
         memory-only and are destroyed together at session close.
-        If sign-in uses sessionStorage, the pool retains its single tab;
-        workers serialize access to preserve that tab-scoped session.
+        If sign-in uses sessionStorage, the sign-in tab is kept as the first
+        tab and each other tab is seeded with a copy of its sessionStorage
+        (``scan_tabs_copied``); the fetcher checks a copy's sign-in pages
+        against the first tab (``audit.crawler.tab_pool``).
         """
 
         if self._state is not ManualAuthState.AUTHENTICATED:
@@ -762,17 +780,31 @@ class ManualAuthenticationSession:
             )
         if count <= 0:
             raise ValueError("Background scan page count must be positive.")
-        # sessionStorage belongs to a tab, not its BrowserContext. Opening
-        # fresh worker tabs and closing sign-in silently signs out SPAs that
-        # keep their session there. Retain that tab and serialize the pool
-        # instead of exporting or copying any authentication material.
+        # sessionStorage belongs to a tab, not its BrowserContext. A fresh
+        # tab starts without it, which silently signs out SPAs that keep
+        # their session there. Keep the sign-in tab as the first tab, and
+        # seed every other tab with an in-memory copy of its storage, the
+        # same copy the headless handoff makes. Never written anywhere.
         auth_page = self.page
         # The scan uses this live window; the kept copy has no further use.
         self._kept = None
         if await auth_page.evaluate("() => sessionStorage.length > 0"):
+            tab_storage = await capture_session_storage(auth_page)
             self._auth_pages.remove(auth_page)
             self._page = None
-            return (auth_page,)
+            copies: list[Page] = []
+            try:
+                for _ in range(count - 1):
+                    copy = await self.context.new_page()
+                    copies.append(copy)
+                    await restore_session_storage(copy, tab_storage)
+            except Exception:
+                for copy in copies:
+                    with contextlib.suppress(Exception):
+                        await copy.close(run_before_unload=False)
+                raise
+            self.scan_tabs_copied = bool(copies)
+            return (auth_page, *copies)
         pages: list[Page] = []
         try:
             for _ in range(count):
@@ -889,6 +921,9 @@ class ManualAuthenticationSession:
         # enabled in its config, recorded every page as probed, and reached
         # zero DOM states, because the fetcher had no probe to run.
         interaction_probe: InteractionProbe | None = None,
+        # The form error check (SC 3.3.1), offered in sign-in scans since
+        # 2026-11-16; off unless the scan asked for it.
+        form_error_probe: ErrorIdentificationProbe | None = None,
         capture_screenshots: bool = False,
         max_rendered_html_chars: int | None = None,
         shared_pages: tuple[Page, ...] = (),
@@ -914,7 +949,9 @@ class ManualAuthenticationSession:
             focus_probe=focus_probe,
             markup_probe=markup_probe,
             visual_probe=visual_probe,
+            copied_session=self.scan_tabs_copied,
             interaction_probe=interaction_probe,
+            form_error_probe=form_error_probe,
             capture_screenshots=capture_screenshots,
             shared_context=self.context,
             shared_pages=shared_pages,
@@ -922,6 +959,41 @@ class ManualAuthenticationSession:
             max_rendered_html_chars=max_rendered_html_chars,
             search_explorer=search_explorer,
         )
+
+    def create_authenticated_static_fetcher(self) -> AuthenticatedStaticFetcher:
+        """Fetch page code without scripts, through the signed-in context.
+
+        For a sign-in scan's "Load pages without running scripts": every
+        address and redirect is checked by the scan policy, and the request
+        carries the context's own cookies, never an anonymous request.
+        """
+
+        if self._state is not ManualAuthState.AUTHENTICATED:
+            raise ManualAuthenticationError(
+                "Complete and verify manual sign-in before starting a protected crawl."
+            )
+
+        def validate_page_url(url: str) -> str:
+            return self._policies.scan.validate_url(url).url
+
+        return AuthenticatedStaticFetcher(self.context.request, validate_url=validate_page_url)
+
+    def create_authenticated_file_fetcher(self) -> SignedInFileFetcher:
+        """Download the document check's PDFs through the signed-in context.
+
+        The same egress policy as pages: a file on another site is refused,
+        never downloaded anonymously instead.
+        """
+
+        if self._state is not ManualAuthState.AUTHENTICATED:
+            raise ManualAuthenticationError(
+                "Complete and verify manual sign-in before starting a protected crawl."
+            )
+
+        def validate_file_url(url: str) -> str:
+            return self._policies.scan.validate_url(url).url
+
+        return SignedInFileFetcher(self.context.request, validate_url=validate_file_url)
 
     def create_authenticated_image_downloader(
         self, blob_store: BlobStore
@@ -980,8 +1052,11 @@ class ManualAuthenticationSession:
                 # dropped, handing it an empty set would block every
                 # subresource. Give it the approved targets so it behaves as
                 # it did before; lifting Alfa's own gates is separate work.
-                allowed_origins=self._policies.target.allowed_origins,
-                target_origins=self._policies.target.allowed_origins,
+                # The page's own origin too: a sign-in scan may follow links
+                # to subdomains (2026-11-16), and a page there needs its own
+                # resources. The scan policy has already checked the URL.
+                allowed_origins=_with_origin(self._policies.target.allowed_origins, validated.url),
+                target_origins=_with_origin(self._policies.target.allowed_origins, validated.url),
             )
         except EgressViolation as exc:
             raise ManualAuthenticationError("Alfa URL is outside the approved scan scope.") from exc

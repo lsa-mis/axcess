@@ -26,7 +26,6 @@
     "content_type": "application/json",
     "body": [
       {
-        "completed_count": "integer",
         "most_recent": {
           "dom_state_count": "integer",
           "finding_count": "integer",
@@ -38,24 +37,22 @@
           "started_at": "string",
           "status": "string"
         },
-        "most_recent_completed": {
-          "anyOf": [
-            "null",
-            {
-              "dom_state_count": "integer",
-              "finding_count": "integer",
-              "finished_at": "string",
-              "id": "integer",
-              "page_count": "integer",
-              "rule_checks": [],
-              "seed_url": "string",
-              "started_at": "string",
-              "status": "string"
-            }
-          ]
+        "most_recent_report": {
+          "dom_state_count": "integer",
+          "finding_count": "integer",
+          "finished_at": "null|string",
+          "id": "integer",
+          "page_count": "integer",
+          "rule_checks": [],
+          "seed_url": "string",
+          "started_at": "string",
+          "status": "string"
         },
-        "most_recent_completed_issue_count": "integer|null",
-        "most_recent_completed_occurrence_count": "integer|null",
+        "most_recent_report_issue_count": "integer",
+        "most_recent_report_occurrence_count": "integer",
+        "most_recent_report_shown_issue_count": "integer",
+        "most_recent_report_shown_occurrence_count": "integer",
+        "report_count": "integer",
         "scan_count": "integer",
         "scans": [
           {
@@ -85,6 +82,13 @@
       "axe_violations_total": "integer",
       "blocked": "null",
       "by_severity": {"critical": "integer", "info": "integer", "major": "integer", "minor": "integer"},
+      "coverage": {
+        "depth_limit": "integer",
+        "ended": "string",
+        "page_limit": "integer",
+        "pages_found": "null",
+        "pages_visited": "integer"
+      },
       "dom_state_count": "integer",
       "error_count": "integer",
       "failure_reason": "null",
@@ -111,6 +115,7 @@
       "previous_scan_id": "integer",
       "progress": "null",
       "rule_checks": ["string"],
+      "scan_note": "string",
       "seed_url": "string",
       "started_at": "string",
       "status": "string",
@@ -128,6 +133,13 @@
       "axe_violations_total": "integer",
       "blocked": "null",
       "by_severity": {"critical": "integer", "info": "integer", "major": "integer", "minor": "integer"},
+      "coverage": {
+        "depth_limit": "null",
+        "ended": "string",
+        "page_limit": "null",
+        "pages_found": "integer",
+        "pages_visited": "integer"
+      },
       "dom_state_count": "integer",
       "error_count": "integer",
       "failure_reason": "null",
@@ -186,6 +198,7 @@
         "static_pages": "integer"
       },
       "rule_checks": [],
+      "scan_note": "null",
       "seed_url": "string",
       "started_at": "string",
       "status": "string",
@@ -203,6 +216,13 @@
       "axe_violations_total": "integer",
       "blocked": {"page_count": "integer", "seed_url": "string", "status_code": "integer", "title": "string"},
       "by_severity": {"critical": "integer", "info": "integer", "major": "integer", "minor": "integer"},
+      "coverage": {
+        "depth_limit": "null",
+        "ended": "string",
+        "page_limit": "null",
+        "pages_found": "null",
+        "pages_visited": "integer"
+      },
       "dom_state_count": "integer",
       "error_count": "integer",
       "failure_reason": "null",
@@ -229,6 +249,7 @@
       "previous_scan_id": "null",
       "progress": "null",
       "rule_checks": [],
+      "scan_note": "null",
       "seed_url": "string",
       "started_at": "string",
       "status": "string",
@@ -246,6 +267,13 @@
       "axe_violations_total": "integer",
       "blocked": "null",
       "by_severity": {"critical": "integer", "info": "integer", "major": "integer", "minor": "integer"},
+      "coverage": {
+        "depth_limit": "null",
+        "ended": "string",
+        "page_limit": "null",
+        "pages_found": "null",
+        "pages_visited": "integer"
+      },
       "dom_state_count": "integer",
       "error_count": "integer",
       "failure_reason": "string",
@@ -272,6 +300,7 @@
       "previous_scan_id": "null",
       "progress": "null",
       "rule_checks": [],
+      "scan_note": "null",
       "seed_url": "string",
       "started_at": "string",
       "status": "string",
@@ -282,19 +311,44 @@
   "GET /api/scans/{scan_id}/issue-counts": {
     "status": 200,
     "content_type": "application/json",
-    "body": {"issue_count": "integer", "occurrence_count": "integer"}
+    "body": {
+      "issue_count": "integer",
+      "occurrence_count": "integer",
+      "shown_issue_count": "integer",
+      "shown_occurrence_count": "integer"
+    }
   },
-  "GET /api/scans/{scan_id}/issue-counts (running)": {"status": 409, "content_type": "application/json", "body": {"detail": "string"}},
+  "GET /api/scans/{scan_id}/issue-counts (running)": {
+    "status": 200,
+    "content_type": "application/json",
+    "body": {
+      "issue_count": "integer",
+      "occurrence_count": "integer",
+      "shown_issue_count": "integer",
+      "shown_occurrence_count": "integer"
+    }
+  },
   "GET /api/scans/{scan_id}/issues": {
     "status": 200,
     "content_type": "application/json",
     "body": {
       "abilities_counts": {"cognition": "integer", "motor": "integer", "vision": "integer"},
       "conformance_counts": {"A": "integer", "AA": "integer", "AAA": "integer", "BP": "integer"},
+      "default_view_counts": {
+        "hidden_issue_types": "integer",
+        "hidden_occurrences": "integer",
+        "issue_types": "integer",
+        "occurrences": "integer"
+      },
       "finding_type_counts": {"alt_text": "integer", "click_through": "integer", "wcag": "integer"},
       "occurrence_counts": {"all_evidence": "integer", "high_confidence": "integer"},
       "responsibility_counts": {"designer": "integer", "dev": "integer", "editor": "integer"},
-      "review_lane_counts": {"expert_review": "integer", "informational": "integer", "likely_barrier": "integer"},
+      "review_lane_counts": {
+        "expert_review": "integer",
+        "informational": "integer",
+        "likely_barrier": "integer",
+        "measured": "integer"
+      },
       "rows": [
         {
           "abilities_affected": ["string"],
@@ -345,8 +399,8 @@
             "reviewing": "absent|integer"
           },
           "title": "string",
-          "wcag_name": "string",
-          "wcag_sc": "string",
+          "wcag_name": "null|string",
+          "wcag_sc": "null|string",
           "why_matters": "string"
         }
       ],
@@ -427,6 +481,7 @@
         "wcag_sc": "string",
         "why_matters": "string"
       },
+      "screen_reader_check": "null",
       "verify_automated": "string",
       "verify_manual": "string",
       "why_matters": "string"
@@ -499,6 +554,7 @@
         "wcag_sc": "string",
         "why_matters": "string"
       },
+      "screen_reader_check": "null",
       "verify_automated": "string",
       "verify_manual": "string",
       "why_matters": "string"
@@ -577,6 +633,100 @@
         "wcag_name": "string",
         "wcag_sc": "string",
         "why_matters": "string"
+      },
+      "screen_reader_check": "null",
+      "verify_automated": "string",
+      "verify_manual": "string",
+      "why_matters": "string"
+    }
+  },
+  "GET /api/scans/{scan_id}/issues/{issue_key} (landmark issue)": {
+    "status": 200,
+    "content_type": "application/json",
+    "body": {
+      "acceptance": "string",
+      "description": "string",
+      "fix_steps": ["string"],
+      "help_url": "string",
+      "pages": [
+        {
+          "before_screenshot_hashes": [],
+          "checked_count": "integer",
+          "occurrence_count": "integer",
+          "page_id": "integer",
+          "page_title": "string",
+          "page_url": "string",
+          "reported_count": "integer",
+          "screenshot_hashes": [],
+          "status_summary": {"new": "integer"}
+        }
+      ],
+      "row": {
+        "abilities_affected": ["string"],
+        "acceptance": "string",
+        "also_wcag": [],
+        "click_through_occurrence_count": "integer",
+        "conformance": "string",
+        "description": "string",
+        "detail_url": "string",
+        "difficulty": "string",
+        "evidence_confidence": "string",
+        "evidence_summary": "string",
+        "finding_ids": ["integer"],
+        "finding_types": ["string"],
+        "fix_steps": ["string"],
+        "help_url": "string",
+        "high_confidence_occurrence_count": "integer",
+        "impact": "string",
+        "issue_key": "string",
+        "locations": [
+          {
+            "context": "string",
+            "evidence_url": "string",
+            "html_snippet": "string",
+            "image_url": "null",
+            "page_id": "integer",
+            "page_title": "string",
+            "page_url": "string",
+            "revealed_by": "null",
+            "screenshot_hash": "null",
+            "target": "string"
+          }
+        ],
+        "occurrence_count": "integer",
+        "page_count": "integer",
+        "pipeline": "string",
+        "priority": "number",
+        "repeat_finding_ids": [],
+        "repeat_page_count": "integer",
+        "responsibility": "string",
+        "review_lane": "string",
+        "status_summary": {
+          "accepted_risk": "integer",
+          "false_positive": "integer",
+          "in_progress": "integer",
+          "new": "integer",
+          "remediated": "integer",
+          "reviewing": "integer"
+        },
+        "title": "string",
+        "wcag_name": "null",
+        "wcag_sc": "null",
+        "why_matters": "string"
+      },
+      "screen_reader_check": {
+        "id": "string",
+        "platforms": [
+          {
+            "id": "string",
+            "intro": "string",
+            "link_text": "null|string",
+            "link_url": "null|string",
+            "name": "string",
+            "steps": ["string"]
+          }
+        ],
+        "title": "string"
       },
       "verify_automated": "string",
       "verify_manual": "string",
@@ -657,6 +807,7 @@
         "wcag_sc": "string",
         "why_matters": "string"
       },
+      "screen_reader_check": "null",
       "verify_automated": "string",
       "verify_manual": "string",
       "why_matters": "string"
@@ -816,8 +967,8 @@
             }
           ],
           "violation_count": "integer",
-          "wcag_level": "string",
-          "wcag_sc": "string",
+          "wcag_level": "null|string",
+          "wcag_sc": "null|string",
           "worst_impact": "null|string"
         }
       ]
@@ -875,9 +1026,9 @@
             "reviewing": "integer"
           },
           "violation_count": "integer",
-          "wcag_level": "string",
-          "wcag_sc": "string",
-          "wcag_scs": "string"
+          "wcag_level": "null|string",
+          "wcag_sc": "null|string",
+          "wcag_scs": "null|string"
         }
       ]
     }
@@ -967,8 +1118,8 @@
           "status": "string",
           "target_display": "absent|string",
           "target_selector": "string",
-          "wcag_level": "string",
-          "wcag_sc": "string"
+          "wcag_level": "null|string",
+          "wcag_sc": "null|string"
         }
       ],
       "image_occurrences": [
@@ -1149,6 +1300,74 @@
                 "issues": [{"label": "string", "url": "string"}],
                 "occurrences": "integer",
                 "outcomes": {"failed": "integer"},
+                "pages": "integer",
+                "statuses": {"new": "integer"}
+              }
+            ]
+          },
+          "category": "string",
+          "change": "string",
+          "conformance": "string",
+          "key": "string",
+          "limitations": ["string"],
+          "pipeline": "string",
+          "title": "string",
+          "wcag_name": "null|string",
+          "wcag_sc": "null|string"
+        }
+      ],
+      "settings_changed": ["string"],
+      "total": "integer"
+    }
+  },
+  "GET /api/scans/{scan_id}/comparison (image groups)": {
+    "status": 200,
+    "content_type": "application/json",
+    "body": {
+      "after_totals": {"groups": "integer", "occurrences": "integer"},
+      "baseline": {"id": "integer", "seed_url": "string", "started_at": "string"},
+      "before_totals": {"groups": "integer", "occurrences": "integer"},
+      "changes": {"new": "integer", "remaining": "integer", "resolved": "integer"},
+      "counts": {
+        "cannot_compare": "integer",
+        "changed": "integer",
+        "new": "integer",
+        "no_longer_detected": "integer",
+        "still_detected": "integer"
+      },
+      "coverage": [
+        {
+          "after": {"checked": "integer|null", "state": "string", "total": "integer"},
+          "before": {"checked": "integer|null", "state": "string", "total": "integer"},
+          "pipeline": "string"
+        }
+      ],
+      "current": {"id": "integer", "seed_url": "string", "started_at": "string"},
+      "limitations": ["string"],
+      "notes": [{"differs": "boolean", "scans": ["integer"], "text": "string"}],
+      "page": "integer",
+      "page_size": "integer",
+      "pipeline_counts": {"alfa": "integer", "axe": "integer", "forms": "integer", "image": "integer"},
+      "rows": [
+        {
+          "after": {
+            "evidence": [{"label": "string", "url": "string"}],
+            "issue_occurrences": "integer",
+            "issues": [{"label": "string", "url": "string"}],
+            "occurrences": "integer",
+            "outcomes": {},
+            "pages": "integer",
+            "statuses": {"new": "absent|integer", "reviewing": "absent|integer"}
+          },
+          "before": {
+            "anyOf": [
+              "null",
+              {
+                "evidence": [{"label": "string", "url": "string"}],
+                "issue_occurrences": "integer",
+                "issues": [{"label": "string", "url": "string"}],
+                "occurrences": "integer",
+                "outcomes": {},
                 "pages": "integer",
                 "statuses": {"new": "integer"}
               }
@@ -1351,6 +1570,200 @@
           "scs": "string"
         }
       ]
+    }
+  },
+  "GET /api/coverage/checks": {
+    "status": 200,
+    "content_type": "application/json",
+    "body": {
+      "axe_version": "string",
+      "common_problems": [{"label": "string", "rule": "string", "sc": "string", "share_of_sites": "number"}],
+      "common_source_url": "string",
+      "criteria": [
+        {
+          "apg": [{"title": "string", "url": "string"}],
+          "checks": ["string"],
+          "confidence": "string",
+          "does": "string",
+          "guideline": "string",
+          "level": "string",
+          "method": "string",
+          "name": "string",
+          "principle": "string",
+          "rules": [{"description": "string", "help": "string", "id": "string", "url": "string"}],
+          "sc": "string",
+          "study": {
+            "anyOf": [
+              "null",
+              {
+                "checks": ["string"],
+                "other_checks": "number",
+                "rule_check": "number",
+                "sc": "string",
+                "share": "number"
+              }
+            ]
+          },
+          "technical": "string",
+          "understanding_url": "string",
+          "you": "string"
+        }
+      ],
+      "other_checks_hit_rate": "number",
+      "scan_default_version": "string",
+      "study": [
+        {
+          "checks": ["string"],
+          "other_checks": "number",
+          "rule_check": "number",
+          "sc": "string",
+          "share": "number"
+        }
+      ],
+      "study_source_url": "string",
+      "wcag_version": "string"
+    }
+  },
+  "GET /api/coverage/checks (WCAG 2.2)": {
+    "status": 200,
+    "content_type": "application/json",
+    "body": {
+      "axe_version": "string",
+      "common_problems": [{"label": "string", "rule": "string", "sc": "string", "share_of_sites": "number"}],
+      "common_source_url": "string",
+      "criteria": [
+        {
+          "apg": [{"title": "string", "url": "string"}],
+          "checks": ["string"],
+          "confidence": "string",
+          "does": "string",
+          "guideline": "string",
+          "level": "string",
+          "method": "string",
+          "name": "string",
+          "principle": "string",
+          "rules": [{"description": "string", "help": "string", "id": "string", "url": "string"}],
+          "sc": "string",
+          "study": {
+            "anyOf": [
+              "null",
+              {
+                "checks": ["string"],
+                "other_checks": "number",
+                "rule_check": "number",
+                "sc": "string",
+                "share": "number"
+              }
+            ]
+          },
+          "technical": "string",
+          "understanding_url": "string",
+          "you": "string"
+        }
+      ],
+      "other_checks_hit_rate": "number",
+      "scan_default_version": "string",
+      "study": [
+        {
+          "checks": ["string"],
+          "other_checks": "number",
+          "rule_check": "number",
+          "sc": "string",
+          "share": "number"
+        }
+      ],
+      "study_source_url": "string",
+      "wcag_version": "string"
+    }
+  },
+  "GET /api/coverage/found": {
+    "status": 200,
+    "content_type": "application/json",
+    "body": {
+      "axe_rules": [
+        {
+          "category": "string",
+          "click_through": "integer",
+          "criteria": ["string"],
+          "help": "string",
+          "loaded": "integer",
+          "rule_id": "string"
+        }
+      ],
+      "estimate": {
+        "available": "boolean",
+        "axe_sample": "integer",
+        "criteria": [],
+        "estimated_total": "null",
+        "found": "integer",
+        "min_sample": "integer",
+        "share": "null",
+        "source_title": "string",
+        "source_url": "string"
+      },
+      "found_by_criterion": [{"count": "integer", "sc": "string"}],
+      "layers": {
+        "excluded_not_a_problem": "integer",
+        "excluded_records": "integer",
+        "layers": [{"count": "integer", "layer": "string", "share": "number"}],
+        "total": "integer"
+      },
+      "manual_review": {
+        "evaluations": "integer",
+        "failed": "integer",
+        "found": "integer",
+        "scans": [{"failed": "integer", "found": "integer", "scan_id": "integer", "seed_url": "string"}],
+        "share": "number"
+      },
+      "scan_id": "null",
+      "scans": [{"finished_at": "string", "id": "integer", "seed_url": "string"}],
+      "scans_completed": "integer",
+      "scans_included": "integer"
+    }
+  },
+  "GET /api/coverage/found (one report)": {
+    "status": 200,
+    "content_type": "application/json",
+    "body": {
+      "axe_rules": [
+        {
+          "category": "string",
+          "click_through": "integer",
+          "criteria": ["string"],
+          "help": "string",
+          "loaded": "integer",
+          "rule_id": "string"
+        }
+      ],
+      "estimate": {
+        "available": "boolean",
+        "axe_sample": "integer",
+        "criteria": [],
+        "estimated_total": "null",
+        "found": "integer",
+        "min_sample": "integer",
+        "share": "null",
+        "source_title": "string",
+        "source_url": "string"
+      },
+      "found_by_criterion": [{"count": "integer", "sc": "string"}],
+      "layers": {
+        "excluded_not_a_problem": "integer",
+        "excluded_records": "integer",
+        "layers": [{"count": "integer", "layer": "string", "share": "number"}],
+        "total": "integer"
+      },
+      "manual_review": {
+        "evaluations": "integer",
+        "failed": "integer",
+        "found": "integer",
+        "scans": [{"failed": "integer", "found": "integer", "scan_id": "integer", "seed_url": "string"}],
+        "share": "number"
+      },
+      "scan_id": "integer",
+      "scans": [{"finished_at": "string", "id": "integer", "seed_url": "string"}],
+      "scans_completed": "integer",
+      "scans_included": "integer"
     }
   },
   "GET /api/scope-preview (empty)": {

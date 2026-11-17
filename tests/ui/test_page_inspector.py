@@ -70,23 +70,6 @@ def _unfinished_scan_with_page(
         conn.close()
 
 
-def test_inspect_refuses_to_render_a_page_an_unfinished_scan_never_stored(
-    client: TestClient, seeded_db: tuple[Path, Path, int]
-) -> None:
-    """The on-demand render is what needs a finished report.
-
-    It leaves this machine to fetch a page a partial report cannot vouch for,
-    so with nothing stored there is nothing to show and nothing safe to fetch.
-    """
-    db, _, _ = seeded_db
-    scan_id, page_id = _unfinished_scan_with_page(db, "running", stored=None)
-
-    resp = client.get(f"/api/scans/{scan_id}/pages/{page_id}/inspect")
-
-    assert resp.status_code == 409
-    assert "no stored capture" in resp.json()["detail"]
-
-
 def test_a_stopped_scan_can_still_show_what_it_captured(
     client: TestClient, seeded_db: tuple[Path, Path, int]
 ) -> None:
@@ -159,6 +142,52 @@ def test_inspect_returns_render_payload_without_storing(
     finally:
         conn.close()
     assert before == 2  # the two seeded banner/logo images, and only those
+
+
+@pytest.mark.parametrize("chosen", [True, False])
+def test_a_live_render_sends_the_browser_name_the_scan_chose(
+    client: TestClient,
+    seeded_db: tuple[Path, Path, int],
+    monkeypatch: pytest.MonkeyPatch,
+    chosen: bool,
+) -> None:
+    """A site can serve another page to another browser name, so the live
+    render uses the scan's own; a scan that kept Axcess's name uses the
+    server's."""
+    import json
+
+    from audit.config import get_settings
+
+    safari = (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 "
+        "(KHTML, like Gecko) Version/27.2 Safari/605.1.15"
+    )
+    db, _, scan_id = seeded_db
+    conn = connect(db)
+    try:
+        page_id = _page_id(conn, scan_id, "http://example.com/")
+        config = json.loads(
+            conn.execute("SELECT config_json FROM scans WHERE id = ?", (scan_id,)).fetchone()[0]
+            or "{}"
+        )
+        config["user_agent"] = safari
+        if chosen:
+            config["user_agent_choice"] = "safari_mac"
+        conn.execute("UPDATE scans SET config_json = ? WHERE id = ?", (json.dumps(config), scan_id))
+        conn.commit()
+    finally:
+        conn.close()
+
+    sent: list[str] = []
+
+    async def fake_render(url: str, *, user_agent: str, **_: Any) -> tuple[dict[str, Any], None]:
+        sent.append(user_agent)
+        return ({"dom_html": "<html></html>", "final_url": url, "status_code": 200}, None)
+
+    monkeypatch.setattr(pi, "_render_page", fake_render)
+    resp = client.get(f"/api/scans/{scan_id}/pages/{page_id}/inspect")
+    assert resp.status_code == 200
+    assert sent == [safari if chosen else get_settings().user_agent]
 
 
 def test_inspect_serves_stored_html_without_render(

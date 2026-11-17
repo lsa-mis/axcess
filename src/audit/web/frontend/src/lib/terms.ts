@@ -2,14 +2,26 @@ import type {
   AiInstallState,
   AiInstallStep,
   AiTierId,
+  AltVerdict,
+  AltVerdictSource,
   AxeImpact,
+  CheckMethod,
   DetectionPipeline,
   ExportFormat,
   FindingStatus,
+  FoundLayer,
+  ImageGroup,
+  LinkedFileCheck,
+  LinkedFileReason,
+  LinkedFileRefKind,
+  LinkedFileStatus,
+  LinkedFileType,
   ReviewDecision,
   ReviewLane,
   RuleCheck,
+  ScanEndReason,
   ScanStatus,
+  StudyCheck,
   SuggestionAudience,
   SuggestionCheckOutcome,
   SuggestionErrorCode,
@@ -75,11 +87,192 @@ export const STATUS_OPTION_LABEL: Record<FindingStatus, string> = {
  * https://www.w3.org/TR/coga-usable/: use the same word for the same thing;
  * docs/plain-language.md). The full reasoning is in docs/plain-language.md,
  * "Why Mostly sure, Not sure, and For information".
+ *
+ * "Measured" (2026-11-10) is the level between Mostly sure and Not sure: a
+ * browser check measured the page and no AI model judged it. The word says
+ * what happened, not how likely the problem is, so it cannot be confused
+ * with the two "sure" words. Rejected: "Likely", which the pair "Likely
+ * problem" / "Possible problem" above already showed readers cannot rank
+ * against "Mostly sure"; and "Sure" for the rule checks with "Mostly sure"
+ * here, which claims more than a rule check can show (the developer chose
+ * to keep "Mostly sure" on top). A Measured row still says "check before
+ * you report" wherever it is shown (REVIEW_LANE_HELP in labels.ts).
  */
 export const REVIEW_TYPE_LABEL: Record<ReviewLane, string> = {
   likely_barrier: "Mostly sure",
+  measured: "Measured",
   expert_review: "Not sure",
   informational: "For information",
+};
+
+/**
+ * The Documents tab's three "How sure" values: how sure Axcess is that a
+ * linked file (a PDF, Word, Excel or Google file) has accessibility
+ * problems.
+ *
+ * The first two are the same words as the Issues table's (REVIEW_TYPE_LABEL)
+ * because they mean the same thing: "Mostly sure" is a machine check that
+ * proves a problem, "Not sure" needs a person. One word for one thing (W3C
+ * COGA "Making Content Usable", https://www.w3.org/TR/coga-usable/,
+ * paraphrased: use the same word for the same thing). The third differs on
+ * purpose: Issues' "For information" is a result, and here Axcess has no
+ * result at all, so the words say that. There is no "Accessible" value: a
+ * machine check cannot prove a file is accessible (AGENTS.md, Interface
+ * language rule 4).
+ */
+export const LINKED_FILE_STATUS_LABEL: Record<LinkedFileStatus, string> = {
+  mostly_sure: "Mostly sure",
+  not_sure: "Not sure",
+  could_not_check: "Could not check",
+};
+
+/**
+ * Each value finished as a sentence about the file, for the summary numbers
+ * on the Documents tab, where the value stands without its column's
+ * question ("Accessibility problems?"): "Mostly sure" / "it has
+ * accessibility problems". Each phrase fits its value's grammar, so the
+ * pair reads as one plain statement.
+ */
+export const LINKED_FILE_STATUS_NOTE: Record<LinkedFileStatus, string> = {
+  mostly_sure: "it has accessibility problems",
+  not_sure: "if it has accessibility problems",
+  could_not_check: "for accessibility problems",
+};
+
+/** What each value means, in one sentence: the hover hint and the page's key. */
+export const LINKED_FILE_STATUS_HELP: Record<LinkedFileStatus, string> = {
+  mostly_sure: "A machine check found a problem that makes the file hard or impossible to use with a screen reader.",
+  not_sure:
+    "The file passed the machine checks. A person must still check it: the reading order, the image descriptions (alt text) and the table headers.",
+  could_not_check: "Axcess could not check the file. The row says why.",
+};
+
+/** The Documents tab's Type filter groups: one per program, every format of it together. */
+export type LinkedFileKind = "pdf" | "word" | "excel" | "powerpoint" | "opendocument" | "rtf" | "google";
+
+/**
+ * Each Type filter group's name. The program's plain name, without the
+ * extensions the table's Type column adds (a filter for "Word" takes both
+ * .docx and .doc). Google's four kinds of file are one group: Axcess cannot
+ * check any of them, for the same reason.
+ */
+export const LINKED_FILE_KIND_LABEL: Record<LinkedFileKind, string> = {
+  pdf: "PDF",
+  word: "Word",
+  excel: "Excel",
+  powerpoint: "PowerPoint",
+  opendocument: "OpenDocument",
+  rtf: "Rich Text Format (RTF)",
+  google: "Google Docs, Sheets, Slides and Drive",
+};
+
+/** A linked file's type: the plain name first, the file extension after. */
+export const LINKED_FILE_TYPE_LABEL: Record<LinkedFileType, string> = {
+  pdf: "PDF",
+  docx: "Word (.docx)",
+  doc: "Word, old format (.doc)",
+  pptx: "PowerPoint (.pptx)",
+  ppt: "PowerPoint, old format (.ppt)",
+  xlsx: "Excel (.xlsx)",
+  xls: "Excel, old format (.xls)",
+  odt: "OpenDocument text (.odt)",
+  odp: "OpenDocument slides (.odp)",
+  ods: "OpenDocument spreadsheet (.ods)",
+  rtf: "Rich Text Format (.rtf)",
+  google_doc: "Google Docs",
+  google_sheet: "Google Sheets",
+  google_slides: "Google Slides",
+  google_drive: "Google Drive file",
+};
+
+/**
+ * Why a file could not be checked. Two groups read differently on purpose,
+ * as the developer asked: "does not check this file type yet" (a later
+ * version may) and "cannot check" (no machine check can read it). A
+ * reason that names a server answer gets its status code added by
+ * ``linkedFileReasonText``.
+ */
+export const LINKED_FILE_REASON_TEXT: Record<LinkedFileReason, string> = {
+  type_not_checked_yet: "Axcess does not check this file type yet. Only PDF files are checked.",
+  old_format:
+    "Axcess cannot check this file type. Old Office files (.doc, .xls, .ppt) do not store the structure that a check needs.",
+  google_file: "Axcess cannot check files kept in Google Docs, Sheets, Slides or Drive. It cannot download them.",
+  broken_link: "Broken link: the file could not be downloaded.",
+  http_error: "Broken link: the site answered with an error",
+  password: "The file needs a password to open.",
+  too_large: "The file is larger than 10 MB, the most Axcess downloads.",
+  timed_out: "Downloading or checking the file took too long.",
+  not_a_pdf: "The link did not lead to a PDF file. The site sent something else, such as a web page.",
+  damaged: "Axcess could not read the file. It may be damaged.",
+  robots: "The site asks scanners not to open this file (in its robots.txt file).",
+  blocked: "The scan's settings say not to visit this address.",
+  limit: "The scan reached its limit of 200 files to download.",
+  not_checked: "The scan stopped before Axcess checked this file.",
+};
+
+/** The reason in words, with the server's status code where there is one. */
+export function linkedFileReasonText(reason: LinkedFileReason, httpStatus: number | null): string {
+  if (reason === "http_error") {
+    return `${LINKED_FILE_REASON_TEXT.http_error}${httpStatus != null ? ` (HTTP ${httpStatus})` : ""}.`;
+  }
+  return LINKED_FILE_REASON_TEXT[reason];
+}
+
+/**
+ * The five machine checks Axcess runs on every PDF it can open, most
+ * serious first: the order the report ranks them in (SEVERE_CHECKS in
+ * audit/linked_files/formats.py) and the order the server returns a file's
+ * failed checks in (ALL_CHECKS in pdf_check.py). Every check runs on every
+ * PDF Axcess opens, so a check a file did not fail found no problem.
+ */
+export const LINKED_FILE_CHECKS: readonly LinkedFileCheck[] = [
+  "not_tagged",
+  "no_text",
+  "blocks_assistive_tech",
+  "no_title",
+  "no_language",
+];
+
+/**
+ * A failed check, as a short name for the Documents table's "What Axcess
+ * found" column: a few words, so a column of hundreds of files can be
+ * scanned. Why each one matters is on the document's own page
+ * (LINKED_FILE_CHECK_WHY). Until 2026-11-14 the cell held name and reason
+ * in one sentence ("Not tagged: a screen reader cannot tell…"), which was
+ * hard to scan in a narrow column (the developer's choice).
+ */
+export const LINKED_FILE_CHECK_PROBLEM: Record<LinkedFileCheck, string> = {
+  not_tagged: "Not tagged",
+  no_text: "No text a screen reader can read",
+  blocks_assistive_tech: "Security settings block screen readers",
+  no_title: "No document title",
+  no_language: "No language set",
+};
+
+/** What each check looks at, for the "Check" column on a document's page. */
+export const LINKED_FILE_CHECK_NAME: Record<LinkedFileCheck, string> = {
+  not_tagged: "Tags",
+  no_text: "Text a screen reader can read",
+  blocks_assistive_tech: "Security settings",
+  no_title: "Document title",
+  no_language: "Language",
+};
+
+/** Why each check matters to a reader, in one sentence, for a document's page. */
+export const LINKED_FILE_CHECK_WHY: Record<LinkedFileCheck, string> = {
+  not_tagged: "Tags mark the headings, lists and tables, so a screen reader can tell them apart.",
+  no_text:
+    "A file whose pages are only pictures, as in a scan, has no text a screen reader can read. Axcess looks at the first 50 pages.",
+  blocks_assistive_tech: "Some security settings stop screen readers from reading the file.",
+  no_title: "A title tells people which file they have open.",
+  no_language: "The language tells a screen reader which voice to read the file in.",
+};
+
+/** How a page shows a file other than by a plain link. A plain link needs no note. */
+export const LINKED_FILE_REF_LABEL: Record<Exclude<LinkedFileRefKind, "link" | "revealed_link">, string> = {
+  iframe: "Shown inside the page (in a frame)",
+  object: "Shown inside the page (as an object)",
+  embed: "Shown inside the page (embedded)",
 };
 
 /**
@@ -216,6 +409,34 @@ export const REDACTION_LIMITS =
 export const FIX_BRIEF_SCOPE_NOTE =
   "The fix brief is not the whole report. It lists open issue types only, most important first, stops at a limit, and shows a few places for each. It says what it left out.";
 
+/**
+ * How a scan ended, said as what happened to its coverage, for the report's
+ * "Pages visited" line and "How this scan ran". This replaces calling a
+ * stopped scan a "partial report": a scan stopped after 100 pages covers more
+ * than one that completed at a 10-page limit, so the words say what the scan
+ * did, and the numbers beside them say how far it got.
+ *
+ * "Stopped" cannot say who stopped it: the status is the same when someone
+ * pressed Stop and when Axcess closed while the scan ran, so the words do not
+ * claim either.
+ */
+export const SCAN_END_LABEL: Record<ScanEndReason, string> = {
+  running: "Still scanning",
+  all_found: "Visited every page it found",
+  page_limit: "Stopped at its page limit",
+  stopped: "Stopped before the scan finished",
+  failed: "Failed before the scan finished",
+};
+
+/**
+ * Whether a scan has a report to open: it completed, or it ended with pages
+ * saved, however it ended (a running scan's stored page count stays 0 until
+ * it ends). The server uses the same rule (sites.py, comparison.py).
+ */
+export function isReport(scan: { status: ScanStatus; page_count: number }): boolean {
+  return scan.status === "completed" || scan.page_count > 0;
+}
+
 /** A scan's progress, for status badges. */
 export const SCAN_STATUS_LABEL: Record<ScanStatus, string> = {
   running: "Scanning",
@@ -224,6 +445,132 @@ export const SCAN_STATUS_LABEL: Record<ScanStatus, string> = {
   interrupted: "Stopped",
 };
 
+/**
+ * The Images tab's groups (routes/Images.tsx). Each is a question asked of
+ * the report's images, so an image can be in two: "Images with text" and
+ * one of the other two.
+ */
+export const IMAGE_GROUP_LABEL: Record<ImageGroup, string> = {
+  with_text: "Images with text",
+  missing_alt: "Images without alt text",
+  with_alt: "Images with alt text",
+};
+
+/**
+ * One verdict on an image's alt text (the text a screen reader reads for
+ * an image). "Needs alt text" and "Needs better alt text" are two verdicts,
+ * not one (the developer's call, 2026-11-13): an image with no alt text has
+ * nothing to improve, it needs alt text written. "Needs a person to check",
+ * not "Adequate": the text match cannot judge an image with no text in it, and
+ * a word that sounds like a pass would claim a check that did not run. It
+ * was "Not checked yet" until 2026-11-16, when the developer renamed it to
+ * say who acts: most of a report's images land here, and "not checked yet"
+ * read as Axcess still working on them. The new words also part it from the
+ * "Checked by a person" value "Not checked yet" (REVIEW_DECISION_LABEL),
+ * which is about an occurrence, not an image.
+ * Rejected: "Bad alt text", which blames, and says less than "needs better".
+ */
+export const ALT_VERDICT_LABEL: Record<AltVerdict, string> = {
+  needs_alt: "Needs alt text",
+  needs_better: "Needs better alt text",
+  not_checked: "Needs a person to check",
+  good: "Good alt text",
+};
+
+/**
+ * The same verdicts under a count of more than one image, as the Images
+ * tab's numbers show them ("41 / Need alt text"): the verb agrees with the
+ * number. One image takes ``ALT_VERDICT_LABEL``.
+ */
+export const ALT_VERDICT_COUNT_LABEL: Record<AltVerdict, string> = {
+  needs_alt: "Need alt text",
+  needs_better: "Need better alt text",
+  not_checked: "Need a person to check",
+  good: "Good alt text",
+};
+
+/** What decided a verdict, said plainly, for the line under the verdict. */
+export const ALT_VERDICT_SOURCE_LABEL: Record<AltVerdictSource, string> = {
+  page_code: "From the page code",
+  text_match: "Compared with the text in the image",
+  local_model: "Local AI model: check before you rely on it",
+};
+
+/**
+ * How Axcess checks a WCAG criterion (Coverage page), said as what it means
+ * for the person testing. The technical name follows in CHECK_METHOD_TECH, in
+ * smaller text, for developers (docs/plain-language.md rule 3).
+ */
+export const CHECK_METHOD_LABEL: Record<CheckMethod, string> = {
+  automated: "Axcess checks",
+  partial: "Axcess partly checks",
+  "ai-assisted": "AI gives hints",
+  manual: "You check",
+  not_needed: "No longer needed",
+};
+
+export const CHECK_METHOD_TECH: Record<CheckMethod, string> = {
+  automated: "Automated",
+  partial: "Partly automated",
+  "ai-assisted": "AI-assisted",
+  manual: "Manual only",
+  not_needed: "4.1.1 Parsing",
+};
+
+export const CHECK_METHOD_BLURB: Record<CheckMethod, string> = {
+  // Not "a full test": each of these still has a part only a person can
+  // judge (a title's meaning, nothing lost at 200% zoom), shown in the
+  // criterion's "You check" line (AGENTS.md, Interface language rule 4).
+  automated: "Tests it on every page. You still confirm the result.",
+  partial: "Finds some problems. You test the rest.",
+  "ai-assisted": "Points to possible problems. You decide.",
+  // "No proven check", not "can't test": a trial check may run but not count
+  // yet (3.3.1's form error check).
+  manual: "No proven check yet. You test these.",
+  not_needed: "Removed in WCAG 2.2. Today's HTML always meets it.",
+};
+
+/** Where an occurrence came from, for the Coverage page's count by check. */
+export const FOUND_LAYER_LABEL: Record<FoundLayer, string> = {
+  axe_loaded: "Rule check (axe), page as loaded",
+  axe_click_through: "Rule check (axe), after Click-Through",
+  alfa: "Rule check (Alfa)",
+  probes: "Browser checks: keyboard, zoom, focus, motion, forms and page code",
+  image: "Image text check",
+  semantic: "AI review",
+};
+
+/** The checks a study row credits beyond the rule check (Coverage page). */
+export const STUDY_CHECK_LABEL: Record<StudyCheck, string> = {
+  click_through: "Click-Through",
+  image: CHECK_LABEL.image,
+  focus: CHECK_LABEL.focus,
+  keyboard: CHECK_LABEL.keyboard,
+  visual: CHECK_LABEL.visual,
+  semantic: CHECK_LABEL.semantic,
+  responsive: CHECK_LABEL.responsive,
+};
+
+/**
+ * axe-core's own kinds of problem (its ``cat.*`` rule tags), in plain words.
+ * An unknown kind falls back to "Other" where it is read.
+ */
+export const AXE_CATEGORY_LABEL: Record<string, string> = {
+  color: "Colour and contrast",
+  "name-role-value": "Names, roles and values",
+  aria: "ARIA attributes and roles",
+  forms: "Forms",
+  "text-alternatives": "Text alternatives",
+  structure: "Page structure",
+  semantics: "Headings and landmarks",
+  keyboard: "Keyboard",
+  language: "Language",
+  tables: "Tables",
+  parsing: "Page code errors",
+  "time-and-media": "Time and media",
+  "sensory-and-visual-cues": "Size, zoom and visual cues",
+  other: "Other",
+};
 /** The feature's one name, on its button and in its heading. */
 export const AI_SUGGESTION = "AI suggestion";
 
@@ -293,6 +640,10 @@ export const AI_TIER_LABEL: Record<AiTierId, string> = {
 export const SUGGESTION_ERROR_LABEL: Record<SuggestionErrorCode, string> = {
   model_unavailable: "The AI service on this computer was not running. Start it, then try again.",
   model_missing: "The AI model was not installed. Install it, then try again.",
+  // A cloud model, or one Ollama's model list cannot confirm is on this
+  // computer. Says nothing was sent, because that is the privacy fact.
+  model_not_local:
+    "The AI model may run off this computer, so Axcess sent nothing. Choose a model installed on this computer in Settings.",
   timeout: "The AI model took too long to answer. Try again when the computer is less busy.",
   no_change: "The AI did not suggest a real change to the code, even when asked twice, so nothing is shown. A bigger AI model in Settings may do better. You can also fix it by hand with the rule guidance.",
   bad_answer: "The AI wrote an answer Axcess could not show safely, even when asked twice, so nothing is shown. A bigger AI model in Settings may do better. You can also fix it by hand with the rule guidance.",

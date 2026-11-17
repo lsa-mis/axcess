@@ -602,7 +602,7 @@
     "/api/scans/{scan_id}/issue-counts": {
       "get": {
         "summary": "Api Scan Issue Counts",
-        "description": "One completed report's two issue counts, for the Reports list.\n\nFetched when a site's list of scans is opened, not with ``/api/sites``:\ncounting means building the issue list, and the site list is fetched\nevery few seconds while a scan runs.",
+        "description": "One report's two issue counts, for the Reports list.\n\nFetched when a site's list of scans is opened, not with ``/api/sites``:\ncounting means building the issue list, and the site list is fetched\nevery few seconds while a scan runs.",
         "operationId": "api_scan_issue_counts_api_scans__scan_id__issue_counts_get",
         "parameters": [
           {
@@ -1071,6 +1071,145 @@
           "200": {
             "description": "Successful Response",
             "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ScanPagesResponse"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/documents": {
+      "get": {
+        "summary": "Api Scan Documents",
+        "description": "The files this report's pages link to (the Documents tab), in report order.",
+        "operationId": "api_scan_documents_api_scans__scan_id__documents_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "integer", "maximum": 5000, "minimum": 1, "default": 50, "title": "Limit"}
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "integer", "minimum": 0, "default": 0, "title": "Offset"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ScanDocumentsResponse"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/documents/{file_id}": {
+      "get": {
+        "summary": "Api Scan Document",
+        "description": "One file of this report and every page it appears on (its own page).",
+        "operationId": "api_scan_document_api_scans__scan_id__documents__file_id__get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "File Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/ScanDocumentResponse"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/documents/{file_id}/thumbnail": {
+      "get": {
+        "summary": "Api Document Thumbnail",
+        "description": "A JPEG of one file's first page (PDFs the check could read).\n\n``size=small`` is the Documents table's picture, ``large`` the one on\nthe document's own page.",
+        "operationId": "api_document_thumbnail_api_scans__scan_id__documents__file_id__thumbnail_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "File Id"}
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {"enum": ["large", "small"], "type": "string", "default": "large", "title": "Size"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/documents/{file_id}/pages/{page_id}": {
+      "get": {
+        "summary": "Api Document On Page",
+        "description": "Where one file of this report is linked on one of its pages, for the inspector.",
+        "operationId": "api_document_on_page_api_scans__scan_id__documents__file_id__pages__page_id__get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "File Id"}
+          },
+          {
+            "name": "page_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Page Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/DocumentOnPage"}}}
           },
           "422": {
             "description": "Validation Error",
@@ -1706,6 +1845,136 @@
         }
       }
     },
+    "/api/scans/{scan_id}/images": {
+      "get": {
+        "summary": "Api Scan Images",
+        "description": "One page of one group of the report's images, worst verdict first.",
+        "operationId": "api_scan_images_api_scans__scan_id__images_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "group",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "string", "default": "with_text", "title": "Group"}
+          },
+          {
+            "name": "verdict",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "string", "default": "", "title": "Verdict"}
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "string", "maxLength": 200, "default": "", "title": "Q"}
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "integer", "maximum": 50, "minimum": 1, "default": 25, "title": "Limit"}
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {"type": "integer", "maximum": 1000000, "minimum": 0, "default": 0, "title": "Offset"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/images/{image_id}": {
+      "get": {
+        "summary": "Api Scan Image",
+        "description": "One image of the report, and every page it appears on.",
+        "operationId": "api_scan_image_api_scans__scan_id__images__image_id__get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Image Id"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/images/{image_id}/alt-check": {
+      "post": {
+        "summary": "Api Check Image Alt",
+        "description": "Ask the local model about one image's alt text, keep and return its answer.\n\nA person's explicit request from the Images tab. Refused while the\nscan is still running, for a protected scan (its images do not leave\nthe protected store), and when no model is set. A timeout or an\nunusable answer saves nothing and says so; the tab keeps working.",
+        "operationId": "api_check_image_alt_api_scans__scan_id__images__image_id__alt_check_post",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "image_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Image Id"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/scans/{scan_id}/images/export.zip": {
+      "get": {
+        "summary": "Api Scan Images Zip",
+        "description": "The report's images in folders by group and verdict, with a sheet.\n\nA download a person asks for from the Images tab. Only for a completed,\nnon-protected report: a protected report's images stay in its store.\nBuilt in a temporary file, not in memory, because a report can hold\nthousands of images; the file is removed once it has been sent.",
+        "operationId": "api_scan_images_zip_api_scans__scan_id__images_export_zip_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
     "/api/findings/{finding_id}/status": {
       "post": {
         "summary": "Api Set Finding Status",
@@ -1973,6 +2242,58 @@
         }
       }
     },
+    "/api/coverage/checks": {
+      "get": {
+        "summary": "Api Coverage Checks",
+        "description": "What Axcess checks for each WCAG criterion, built from its own code.\n\nDescribes Axcess, not a scan, so it holds no report data\n(audit/web/coverage_checks.py).",
+        "operationId": "api_coverage_checks_api_coverage_checks_get",
+        "parameters": [
+          {
+            "name": "version",
+            "in": "query",
+            "required": false,
+            "schema": {"enum": ["2.1", "2.2"], "type": "string", "default": "2.1", "title": "Version"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {"schema": {"$ref": "#/components/schemas/CoverageChecksResponse"}}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/coverage/found": {
+      "get": {
+        "summary": "Api Coverage Found",
+        "description": "What Axcess found, counted on request from this computer's completed reports.\n\nAcross the most recent completed reports, or one of them. Nothing is\nsent anywhere (audit/web/issue_share.py).",
+        "operationId": "api_coverage_found_api_coverage_found_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "query",
+            "required": false,
+            "schema": {"anyOf": [{"type": "integer", "minimum": 1}, {"type": "null"}], "title": "Scan Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/IssueShareResponse"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
     "/api/scans/{scan_id}/exports": {
       "get": {
         "summary": "Export Options",
@@ -2141,6 +2462,48 @@
         "title": "AgentHeartbeatRequest",
         "description": "Opaque lease presentation for a companion liveness heartbeat."
       },
+      "CheckCriterion": {
+        "properties": {
+          "sc": {"type": "string", "title": "Sc"},
+          "name": {"type": "string", "title": "Name"},
+          "understanding_url": {"type": "string", "title": "Understanding Url"},
+          "apg": {"items": {"$ref": "#/components/schemas/Guidance"}, "type": "array", "title": "Apg"},
+          "level": {"type": "string", "title": "Level"},
+          "principle": {"type": "string", "title": "Principle"},
+          "guideline": {"type": "string", "title": "Guideline"},
+          "method": {
+            "type": "string",
+            "enum": ["automated", "partial", "ai-assisted", "manual", "not_needed"],
+            "title": "Method"
+          },
+          "checks": {"items": {"type": "string"}, "type": "array", "title": "Checks"},
+          "rules": {"items": {"$ref": "#/components/schemas/RuleInfo"}, "type": "array", "title": "Rules"},
+          "confidence": {"type": "string", "title": "Confidence"},
+          "does": {"type": "string", "title": "Does"},
+          "you": {"type": "string", "title": "You"},
+          "technical": {"type": "string", "title": "Technical"},
+          "study": {"anyOf": [{"$ref": "#/components/schemas/StudyFigures"}, {"type": "null"}]}
+        },
+        "type": "object",
+        "required": [
+          "sc",
+          "name",
+          "understanding_url",
+          "apg",
+          "level",
+          "principle",
+          "guideline",
+          "method",
+          "checks",
+          "rules",
+          "confidence",
+          "does",
+          "you",
+          "technical",
+          "study"
+        ],
+        "title": "CheckCriterion"
+      },
       "CheckedCodeOption": {
         "properties": {
           "kind": {"type": "string", "enum": ["minimal", "matches_pattern"], "title": "Kind"},
@@ -2174,6 +2537,17 @@
         "type": "object",
         "required": ["change_sentence", "options"],
         "title": "CheckedDeveloperViewV2"
+      },
+      "CommonProblem": {
+        "properties": {
+          "label": {"type": "string", "title": "Label"},
+          "share_of_sites": {"type": "number", "title": "Share Of Sites"},
+          "rule": {"type": "string", "title": "Rule"},
+          "sc": {"type": "string", "title": "Sc"}
+        },
+        "type": "object",
+        "required": ["label", "share_of_sites", "rule", "sc"],
+        "title": "CommonProblem"
       },
       "ComparisonResponse": {
         "properties": {
@@ -2276,6 +2650,44 @@
         ],
         "title": "ComparisonRow"
       },
+      "CoverageChecksResponse": {
+        "properties": {
+          "wcag_version": {"type": "string", "enum": ["2.1", "2.2"], "title": "Wcag Version"},
+          "scan_default_version": {"type": "string", "enum": ["2.1", "2.2"], "title": "Scan Default Version"},
+          "axe_version": {"type": "string", "title": "Axe Version"},
+          "criteria": {
+            "items": {"$ref": "#/components/schemas/CheckCriterion"},
+            "type": "array",
+            "title": "Criteria"
+          },
+          "study": {
+            "items": {"$ref": "#/components/schemas/StudyFigures"},
+            "type": "array",
+            "title": "Study"
+          },
+          "study_source_url": {"type": "string", "title": "Study Source Url"},
+          "other_checks_hit_rate": {"type": "number", "title": "Other Checks Hit Rate"},
+          "common_problems": {
+            "items": {"$ref": "#/components/schemas/CommonProblem"},
+            "type": "array",
+            "title": "Common Problems"
+          },
+          "common_source_url": {"type": "string", "title": "Common Source Url"}
+        },
+        "type": "object",
+        "required": [
+          "wcag_version",
+          "scan_default_version",
+          "axe_version",
+          "criteria",
+          "study",
+          "study_source_url",
+          "other_checks_hit_rate",
+          "common_problems",
+          "common_source_url"
+        ],
+        "title": "CoverageChecksResponse"
+      },
       "CoverageNote": {
         "properties": {
           "text": {"type": "string", "title": "Text"},
@@ -2312,6 +2724,26 @@
         "required": ["pipeline", "before", "after"],
         "title": "CoveragePair"
       },
+      "CriterionCount": {
+        "properties": {"sc": {"type": "string", "title": "Sc"}, "count": {"type": "integer", "title": "Count"}},
+        "type": "object",
+        "required": ["sc", "count"],
+        "title": "CriterionCount"
+      },
+      "CriterionEstimate": {
+        "properties": {
+          "sc": {"type": "string", "title": "Sc"},
+          "deque_share": {"type": "number", "title": "Deque Share"},
+          "axe_rate": {"type": "number", "title": "Axe Rate"},
+          "axe_found": {"type": "integer", "title": "Axe Found"},
+          "found": {"type": "integer", "title": "Found"},
+          "estimated_total": {"type": "number", "title": "Estimated Total"},
+          "method": {"type": "string", "enum": ["axe_rate", "issue_share"], "title": "Method"}
+        },
+        "type": "object",
+        "required": ["sc", "deque_share", "axe_rate", "axe_found", "found", "estimated_total", "method"],
+        "title": "CriterionEstimate"
+      },
       "CurrentLocalSignInResponse": {
         "properties": {
           "sign_in": {"anyOf": [{"$ref": "#/components/schemas/LocalSignInResponse"}, {"type": "null"}]}
@@ -2341,6 +2773,59 @@
         "required": ["explanation"],
         "title": "DeveloperView"
       },
+      "DocumentOnPage": {
+        "properties": {
+          "file_id": {"type": "integer", "title": "File Id"},
+          "page_id": {"type": "integer", "title": "Page Id"},
+          "name": {"type": "string", "title": "Name"},
+          "refs": {
+            "items": {"$ref": "#/components/schemas/LinkedFileRef"},
+            "type": "array",
+            "title": "Refs"
+          },
+          "saved_copy": {"type": "boolean", "title": "Saved Copy"},
+          "places": {
+            "items": {"$ref": "#/components/schemas/ElementPlaceModel"},
+            "type": "array",
+            "title": "Places"
+          }
+        },
+        "type": "object",
+        "required": ["file_id", "page_id", "name", "refs", "saved_copy", "places"],
+        "title": "DocumentOnPage",
+        "description": "Where one file of a report is reached on one page of that report."
+      },
+      "DocumentPage": {
+        "properties": {
+          "page_id": {"type": "integer", "title": "Page Id"},
+          "page_url": {"type": "string", "title": "Page Url"},
+          "page_title": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Page Title"},
+          "ways": {
+            "items": {"$ref": "#/components/schemas/DocumentRefWay"},
+            "type": "array",
+            "title": "Ways"
+          }
+        },
+        "type": "object",
+        "required": ["page_id", "page_url", "page_title", "ways"],
+        "title": "DocumentPage",
+        "description": "One page of the report the file appears on, and every way it does."
+      },
+      "DocumentRefWay": {
+        "properties": {
+          "how": {
+            "type": "string",
+            "enum": ["link", "revealed_link", "iframe", "object", "embed"],
+            "title": "How"
+          },
+          "link_text": {"type": "string", "title": "Link Text"},
+          "revealed_by": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Revealed By"}
+        },
+        "type": "object",
+        "required": ["how", "link_text", "revealed_by"],
+        "title": "DocumentRefWay",
+        "description": "One way a page reaches the file: a link, a revealed link, a frame…"
+      },
       "EditorView": {
         "properties": {
           "steps": {"items": {"type": "string"}, "type": "array", "maxItems": 6, "title": "Steps"},
@@ -2355,6 +2840,47 @@
         "additionalProperties": false,
         "type": "object",
         "title": "EditorView"
+      },
+      "ElementPlaceModel": {
+        "properties": {
+          "selector": {"type": "string", "title": "Selector"},
+          "index": {"type": "integer", "title": "Index"},
+          "total": {"type": "integer", "title": "Total"}
+        },
+        "type": "object",
+        "required": ["selector", "index", "total"],
+        "title": "ElementPlaceModel",
+        "description": "The ``index``th of ``total`` elements a plain tag selector matches.\n\nThe inspector's ``ElementPlace``: it outlines that element only when its\nown count of ``selector`` is ``total``."
+      },
+      "EstimateShare": {
+        "properties": {
+          "available": {"type": "boolean", "title": "Available"},
+          "axe_sample": {"type": "integer", "title": "Axe Sample"},
+          "min_sample": {"type": "integer", "title": "Min Sample"},
+          "found": {"type": "integer", "title": "Found"},
+          "estimated_total": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Estimated Total"},
+          "share": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Share"},
+          "criteria": {
+            "items": {"$ref": "#/components/schemas/CriterionEstimate"},
+            "type": "array",
+            "title": "Criteria"
+          },
+          "source_title": {"type": "string", "title": "Source Title"},
+          "source_url": {"type": "string", "title": "Source Url"}
+        },
+        "type": "object",
+        "required": [
+          "available",
+          "axe_sample",
+          "min_sample",
+          "found",
+          "estimated_total",
+          "share",
+          "criteria",
+          "source_title",
+          "source_url"
+        ],
+        "title": "EstimateShare"
       },
       "EvaluationUpdate": {
         "properties": {
@@ -2458,6 +2984,12 @@
         "title": "GroupTotals",
         "description": "A report's issue groups and occurrences, counted as the Issues table does."
       },
+      "Guidance": {
+        "properties": {"title": {"type": "string", "title": "Title"}, "url": {"type": "string", "title": "Url"}},
+        "type": "object",
+        "required": ["title", "url"],
+        "title": "Guidance"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -2481,6 +3013,182 @@
         "required": ["id", "started_at", "finished_at", "groups", "occurrences"],
         "title": "HistoryPoint"
       },
+      "IssueShareResponse": {
+        "properties": {
+          "scan_id": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "Scan Id"},
+          "scans": {"items": {"$ref": "#/components/schemas/ScanOption"}, "type": "array", "title": "Scans"},
+          "scans_included": {"type": "integer", "title": "Scans Included"},
+          "scans_completed": {"type": "integer", "title": "Scans Completed"},
+          "layers": {"$ref": "#/components/schemas/LayerShare"},
+          "axe_rules": {
+            "items": {"$ref": "#/components/schemas/RuleCount"},
+            "type": "array",
+            "title": "Axe Rules"
+          },
+          "found_by_criterion": {
+            "items": {"$ref": "#/components/schemas/CriterionCount"},
+            "type": "array",
+            "title": "Found By Criterion"
+          },
+          "estimate": {"$ref": "#/components/schemas/EstimateShare"},
+          "manual_review": {"$ref": "#/components/schemas/ManualReviewShare"}
+        },
+        "type": "object",
+        "required": [
+          "scan_id",
+          "scans",
+          "scans_included",
+          "scans_completed",
+          "layers",
+          "axe_rules",
+          "found_by_criterion",
+          "estimate",
+          "manual_review"
+        ],
+        "title": "IssueShareResponse"
+      },
+      "LayerCount": {
+        "properties": {
+          "layer": {
+            "type": "string",
+            "enum": ["axe_loaded", "axe_click_through", "alfa", "probes", "image", "semantic"],
+            "title": "Layer"
+          },
+          "count": {"type": "integer", "title": "Count"},
+          "share": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Share"}
+        },
+        "type": "object",
+        "required": ["layer", "count", "share"],
+        "title": "LayerCount"
+      },
+      "LayerShare": {
+        "properties": {
+          "total": {"type": "integer", "title": "Total"},
+          "layers": {"items": {"$ref": "#/components/schemas/LayerCount"}, "type": "array", "title": "Layers"},
+          "excluded_not_a_problem": {"type": "integer", "title": "Excluded Not A Problem"},
+          "excluded_records": {"type": "integer", "title": "Excluded Records"}
+        },
+        "type": "object",
+        "required": ["total", "layers", "excluded_not_a_problem", "excluded_records"],
+        "title": "LayerShare"
+      },
+      "LinkedFileCounts": {
+        "properties": {
+          "mostly_sure": {"type": "integer", "title": "Mostly Sure", "default": 0},
+          "not_sure": {"type": "integer", "title": "Not Sure", "default": 0},
+          "could_not_check": {"type": "integer", "title": "Could Not Check", "default": 0}
+        },
+        "type": "object",
+        "title": "LinkedFileCounts",
+        "description": "Files per status, across the whole report."
+      },
+      "LinkedFileRef": {
+        "properties": {
+          "page_id": {"type": "integer", "title": "Page Id"},
+          "page_url": {"type": "string", "title": "Page Url"},
+          "page_title": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Page Title"},
+          "how": {
+            "type": "string",
+            "enum": ["link", "revealed_link", "iframe", "object", "embed"],
+            "title": "How"
+          },
+          "link_text": {"type": "string", "title": "Link Text"},
+          "revealed_by": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Revealed By"}
+        },
+        "type": "object",
+        "required": ["page_id", "page_url", "page_title", "how", "link_text", "revealed_by"],
+        "title": "LinkedFileRef",
+        "description": "One place a page of this report reaches the file."
+      },
+      "LinkedFileRow": {
+        "properties": {
+          "file_id": {"type": "integer", "title": "File Id"},
+          "url": {"type": "string", "title": "Url"},
+          "name": {"type": "string", "title": "Name"},
+          "file_type": {
+            "type": "string",
+            "enum": [
+              "pdf",
+              "docx",
+              "doc",
+              "pptx",
+              "ppt",
+              "xlsx",
+              "xls",
+              "odt",
+              "odp",
+              "ods",
+              "rtf",
+              "google_doc",
+              "google_sheet",
+              "google_slides",
+              "google_drive"
+            ],
+            "title": "File Type"
+          },
+          "off_site": {"type": "boolean", "title": "Off Site"},
+          "status": {
+            "type": "string",
+            "enum": ["mostly_sure", "not_sure", "could_not_check"],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "type_not_checked_yet",
+                  "old_format",
+                  "google_file",
+                  "broken_link",
+                  "http_error",
+                  "password",
+                  "too_large",
+                  "timed_out",
+                  "not_a_pdf",
+                  "damaged",
+                  "robots",
+                  "blocked",
+                  "limit",
+                  "not_checked"
+                ]
+              },
+              {"type": "null"}
+            ],
+            "title": "Reason"
+          },
+          "failed_checks": {
+            "items": {
+              "type": "string",
+              "enum": ["not_tagged", "no_text", "blocks_assistive_tech", "no_title", "no_language"]
+            },
+            "type": "array",
+            "title": "Failed Checks"
+          },
+          "http_status": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "Http Status"},
+          "is_form": {"anyOf": [{"type": "boolean"}, {"type": "null"}], "title": "Is Form"},
+          "page_count": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "Page Count"},
+          "referring_page_count": {"type": "integer", "title": "Referring Page Count"},
+          "same_as": {"anyOf": [{"$ref": "#/components/schemas/SameFile"}, {"type": "null"}]},
+          "has_thumbnail": {"type": "boolean", "title": "Has Thumbnail", "default": false}
+        },
+        "type": "object",
+        "required": [
+          "file_id",
+          "url",
+          "name",
+          "file_type",
+          "off_site",
+          "status",
+          "reason",
+          "failed_checks",
+          "http_status",
+          "is_form",
+          "page_count",
+          "referring_page_count"
+        ],
+        "title": "LinkedFileRow"
+      },
       "LocalLoginScanRequest": {
         "properties": {
           "seed_url": {"type": "string", "maxLength": 2048, "minLength": 12, "title": "Seed Url"},
@@ -2494,16 +3202,36 @@
           "authorization_acknowledged": {"type": "boolean", "title": "Authorization Acknowledged"},
           "max_pages": {
             "type": "integer",
-            "maximum": 2500.0,
+            "maximum": 10000.0,
             "minimum": 1.0,
             "title": "Max Pages",
-            "default": 2500
+            "default": 10000
           },
+          "all_pages": {"type": "boolean", "title": "All Pages", "default": false},
           "max_depth": {"type": "integer", "maximum": 20.0, "minimum": 1.0, "title": "Max Depth", "default": 10},
           "rps": {"type": "number", "maximum": 5.0, "minimum": 0.1, "title": "Rps", "default": 1.0},
-          "workers": {"type": "integer", "maximum": 4.0, "minimum": 1.0, "title": "Workers", "default": 2},
+          "workers": {"type": "integer", "maximum": 8.0, "minimum": 1.0, "title": "Workers", "default": 4},
           "show_browser": {"type": "boolean", "title": "Show Browser", "default": false},
           "whole_host": {"type": "boolean", "title": "Whole Host", "default": false},
+          "include_subdomain": {"type": "boolean", "title": "Include Subdomain", "default": false},
+          "ignore_robots": {"type": "boolean", "title": "Ignore Robots", "default": true},
+          "static_only": {"type": "boolean", "title": "Static Only", "default": false},
+          "skip_focus": {"type": "boolean", "title": "Skip Focus", "default": false},
+          "skip_markup": {"type": "boolean", "title": "Skip Markup", "default": false},
+          "skip_documents": {"type": "boolean", "title": "Skip Documents", "default": false},
+          "skip_semantic": {"type": "boolean", "title": "Skip Semantic", "default": true},
+          "skip_visual": {"type": "boolean", "title": "Skip Visual", "default": true},
+          "skip_forms": {"type": "boolean", "title": "Skip Forms", "default": true},
+          "send_empty_forms": {"type": "boolean", "title": "Send Empty Forms", "default": false},
+          "user_agent_choice": {
+            "anyOf": [{"type": "string"}, {"type": "null"}],
+            "title": "User Agent Choice",
+            "default": "chrome"
+          },
+          "user_agent": {
+            "anyOf": [{"type": "string", "maxLength": 1024}, {"type": "null"}],
+            "title": "User Agent"
+          },
           "scan_engine": {
             "type": "string",
             "enum": ["axe", "alfa", "both"],
@@ -2572,6 +3300,33 @@
         "type": "object",
         "required": ["note"],
         "title": "ManualEvidenceCreate"
+      },
+      "ManualReviewScan": {
+        "properties": {
+          "scan_id": {"type": "integer", "title": "Scan Id"},
+          "seed_url": {"type": "string", "title": "Seed Url"},
+          "failed": {"type": "integer", "title": "Failed"},
+          "found": {"type": "integer", "title": "Found"}
+        },
+        "type": "object",
+        "required": ["scan_id", "seed_url", "failed", "found"],
+        "title": "ManualReviewScan"
+      },
+      "ManualReviewShare": {
+        "properties": {
+          "evaluations": {"type": "integer", "title": "Evaluations"},
+          "failed": {"type": "integer", "title": "Failed"},
+          "found": {"type": "integer", "title": "Found"},
+          "share": {"anyOf": [{"type": "number"}, {"type": "null"}], "title": "Share"},
+          "scans": {
+            "items": {"$ref": "#/components/schemas/ManualReviewScan"},
+            "type": "array",
+            "title": "Scans"
+          }
+        },
+        "type": "object",
+        "required": ["evaluations", "failed", "found", "share", "scans"],
+        "title": "ManualReviewShare"
       },
       "MethodCoverage": {
         "properties": {
@@ -2809,6 +3564,75 @@
         "required": ["id", "seed_url", "started_at"],
         "title": "ReportIdentity"
       },
+      "RuleCount": {
+        "properties": {
+          "rule_id": {"type": "string", "title": "Rule Id"},
+          "help": {"type": "string", "title": "Help"},
+          "category": {"type": "string", "title": "Category"},
+          "criteria": {"items": {"type": "string"}, "type": "array", "title": "Criteria"},
+          "loaded": {"type": "integer", "title": "Loaded"},
+          "click_through": {"type": "integer", "title": "Click Through"}
+        },
+        "type": "object",
+        "required": ["rule_id", "help", "category", "criteria", "loaded", "click_through"],
+        "title": "RuleCount",
+        "description": "One axe-core rule's counted occurrences, split by page state."
+      },
+      "RuleInfo": {
+        "properties": {
+          "id": {"type": "string", "title": "Id"},
+          "help": {"type": "string", "title": "Help"},
+          "description": {"type": "string", "title": "Description"},
+          "url": {"type": "string", "title": "Url"}
+        },
+        "type": "object",
+        "required": ["id", "help", "description", "url"],
+        "title": "RuleInfo",
+        "description": "One axe-core rule a scan runs for a criterion."
+      },
+      "SameFile": {
+        "properties": {
+          "file_id": {"type": "integer", "title": "File Id"},
+          "name": {"type": "string", "title": "Name"}
+        },
+        "type": "object",
+        "required": ["file_id", "name"],
+        "title": "SameFile",
+        "description": "The first file of the report with the same bytes as this one."
+      },
+      "ScanDocumentResponse": {
+        "properties": {
+          "scan_id": {"type": "integer", "title": "Scan Id"},
+          "file": {"$ref": "#/components/schemas/LinkedFileRow"},
+          "pages": {
+            "items": {"$ref": "#/components/schemas/DocumentPage"},
+            "type": "array",
+            "title": "Pages"
+          }
+        },
+        "type": "object",
+        "required": ["scan_id", "file", "pages"],
+        "title": "ScanDocumentResponse",
+        "description": "One file of a report, for its own page in the Documents tab."
+      },
+      "ScanDocumentsResponse": {
+        "properties": {
+          "scan_id": {"type": "integer", "title": "Scan Id"},
+          "recorded": {"type": "boolean", "title": "Recorded"},
+          "total": {"type": "integer", "title": "Total"},
+          "counts": {"$ref": "#/components/schemas/LinkedFileCounts"},
+          "limit": {"type": "integer", "title": "Limit"},
+          "offset": {"type": "integer", "title": "Offset"},
+          "files": {
+            "items": {"$ref": "#/components/schemas/LinkedFileRow"},
+            "type": "array",
+            "title": "Files"
+          }
+        },
+        "type": "object",
+        "required": ["scan_id", "recorded", "total", "counts", "limit", "offset", "files"],
+        "title": "ScanDocumentsResponse"
+      },
       "ScanFormSettings": {
         "properties": {
           "url": {"type": "string", "title": "Url"},
@@ -2832,12 +3656,15 @@
           "skip_semantic": {"type": "boolean", "title": "Skip Semantic"},
           "skip_focus": {"type": "boolean", "title": "Skip Focus"},
           "skip_markup": {"type": "boolean", "title": "Skip Markup", "default": false},
+          "skip_documents": {"type": "boolean", "title": "Skip Documents", "default": false},
           "skip_visual": {"type": "boolean", "title": "Skip Visual"},
           "skip_forms": {"type": "boolean", "title": "Skip Forms", "default": true},
           "send_empty_forms": {"type": "boolean", "title": "Send Empty Forms", "default": false},
           "skip_rendered_storage": {"type": "boolean", "title": "Skip Rendered Storage"},
           "axe_level": {"type": "string", "enum": ["A", "AA", "AAA"], "title": "Axe Level"},
-          "wcag_version": {"type": "string", "enum": ["2.1", "2.2"], "title": "Wcag Version"}
+          "wcag_version": {"type": "string", "enum": ["2.1", "2.2"], "title": "Wcag Version"},
+          "user_agent_choice": {"type": "string", "title": "User Agent Choice", "default": "axcess"},
+          "user_agent": {"type": "string", "title": "User Agent", "default": ""}
         },
         "additionalProperties": false,
         "type": "object",
@@ -2867,6 +3694,16 @@
         ],
         "title": "ScanFormSettings",
         "description": "The New scan form's fields (``NewScanPayload`` in the SPA)."
+      },
+      "ScanOption": {
+        "properties": {
+          "id": {"type": "integer", "title": "Id"},
+          "seed_url": {"type": "string", "title": "Seed Url"},
+          "finished_at": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Finished At"}
+        },
+        "type": "object",
+        "required": ["id", "seed_url", "finished_at"],
+        "title": "ScanOption"
       },
       "ScanPageRow": {
         "properties": {
@@ -3021,7 +3858,7 @@
         "type": "object",
         "required": ["site_url", "total", "scans"],
         "title": "SiteHistory",
-        "description": "Completed public reports of one site, oldest first, for the trend."
+        "description": "Public reports of one site, oldest first, for the trend."
       },
       "Snapshot": {
         "properties": {
@@ -3046,6 +3883,26 @@
         "type": "object",
         "required": ["occurrences", "issue_occurrences", "pages", "statuses", "outcomes", "issues", "evidence"],
         "title": "Snapshot"
+      },
+      "StudyFigures": {
+        "properties": {
+          "sc": {"type": "string", "title": "Sc"},
+          "share": {"type": "number", "title": "Share"},
+          "rule_check": {"type": "number", "title": "Rule Check"},
+          "other_checks": {"type": "number", "title": "Other Checks"},
+          "checks": {
+            "items": {
+              "type": "string",
+              "enum": ["click_through", "image", "focus", "keyboard", "visual", "semantic", "responsive"]
+            },
+            "type": "array",
+            "title": "Checks"
+          }
+        },
+        "type": "object",
+        "required": ["sc", "share", "rule_check", "other_checks", "checks"],
+        "title": "StudyFigures",
+        "description": "One study row as shares of all problems (4.1.1 left out), each 0-1."
       },
       "SuggestionAvailability": {
         "properties": {
@@ -3109,6 +3966,7 @@
                 "enum": [
                   "model_unavailable",
                   "model_missing",
+                  "model_not_local",
                   "timeout",
                   "bad_answer",
                   "no_change",

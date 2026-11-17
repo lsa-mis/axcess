@@ -1,17 +1,23 @@
 # Reading your Axcess report
 
-A report is one completed scan: the pages Axcess tested, what each check
-found, and the [evidence](glossary.md#evidence) behind each result. This guide
+A report is one completed scan, or a stopped or failed scan that saved at
+least one page: the pages Axcess tested, what each check
+found, and the [evidence](glossary.md#evidence) behind each result. Under
+**Pages visited**, the report says how many pages the scan found and how it
+ended, and **How this scan ran** lists its maximum pages and maximum link
+depth. A stopped scan's report covers the pages it visited, the same way a
+report with a page limit does. This guide
 explains every screen, column, and export, and what to do next. Terms link to
 the [Axcess glossary](glossary.md). A report is evidence for people to review;
 it never proves [WCAG](glossary.md#wcag) conformance or legal compliance.
 
 ## On this page
 
-- [The three report groups at a glance](#the-three-report-groups-at-a-glance)
+- [The report groups at a glance](#the-report-groups-at-a-glance)
 - [Find a problem and fix it (for developers)](#find-a-problem-and-fix-it-for-developers)
 - [The report summary](#the-report-summary)
 - [The Issues tab](#the-issues-tab)
+- [The Documents tab](#the-documents-tab)
 - [The full evidence record](#the-full-evidence-record)
 - [The note that shows which button revealed a problem](#the-note-that-shows-which-button-revealed-a-problem)
 - [Recording decisions](#recording-decisions)
@@ -21,21 +27,27 @@ it never proves [WCAG](glossary.md#wcag) conformance or legal compliance.
 - [Delete a report](#delete-a-report)
 - [What the report cannot tell you](#what-the-report-cannot-tell-you)
 
-## The three report groups at a glance
+## The report groups at a glance
 
 ![Diagram of the three report groups in the How sure column. Mostly sure holds rule-engine failures from axe-core and Siteimprove Alfa, including problems found after clicking or after a configured search, and clear form errors, where a field is marked in error with no text that says what is wrong; confirm them on the page, fix, and rescan. Not sure holds browser checks, the keyboard trap check, form errors that are unclear, motion checks, text in images whose alt text is missing or does not match, AI checks, and Alfa "cannot tell" results; a person tests and records a decision. For information holds images whose alt text already matches and older records kept for history; no action is needed.](images/diagrams/report-groups.png)
 
 Each [issue type](glossary.md#issue-type) lands in one report group,
 based on the check that found it and its result. Only rule-engine failures,
 the form error check's clear failures, and the page code check's facts (such as
-a field named only by its placeholder text) are marked Mostly sure; anything a
-person has to judge is marked Not sure. The app
+a field named only by its placeholder text) are marked Mostly sure. Most
+browser checks that measure the page with no AI are marked
+[Measured](glossary.md#measured); the glossary names the three that are not.
+Anything a model or a person has to judge is marked Not sure. The Issues table
+opens showing every issue type; a line over the table counts each kind, and
+**Show only Mostly sure and Measured** narrows it. (The diagram above predates
+Measured.) The app
 shows the report group in the Issues table's **How sure** column: how sure
 Axcess is that the issue type is a real problem.
 
 | Report group | What to do |
 | --- | --- |
 | [Mostly sure](glossary.md#mostly-sure) | Start here. Confirm it on the page, fix it, and rescan. |
+| [Measured](glossary.md#measured) | A browser check measured it with no AI. Check it on the page before you report it. |
 | [Not sure](glossary.md#not-sure) | Test it on the page and record a decision before anyone calls it a problem. |
 | [For information](glossary.md#for-information) | Nothing to fix. It shows you what was checked. |
 
@@ -100,7 +112,8 @@ with this issue**), on the **Saved copy** tab.
 
 When the rest of the elements are repeats, such as the same menu again,
 report the first one, step through the others with the arrow buttons, then
-choose **Mark 9 not checked as repeats** (the number is how many). Every
+choose **Mark 9 elements not checked yet as repeats** (the number is how
+many). Every
 flagged element in the page state on screen with no review yet becomes
 **Checked: a repeat of one already reported**, in one press. Elements
 already checked, and every note, are left as they are. It is offered once
@@ -147,8 +160,8 @@ column. Three numbers above the table count:
 
 | Number | What it counts |
 | --- | --- |
-| Issue types | Rows in the Issues table, across all three report groups. |
-| Issue occurrences | Every [occurrence](glossary.md#occurrence): one place a problem appears, such as one element on one page. It counts every report group, including Not sure and For information, so it is not a count of confirmed problems. |
+| Issue types | Every row the Issues table shows when it opens: all four report groups. |
+| Issue occurrences | Every [occurrence](glossary.md#occurrence): one place a problem appears, such as one element on one page. It counts the same rows as Issue types, in all four report groups. It is not a count of confirmed problems: a person still checks each one. |
 | Pages visited | Every page the scan recorded, including pages that answered with an error and most pages that failed to load. |
 
 Two lines under **Pages visited** say more about it:
@@ -200,7 +213,7 @@ summary counts issue types, then occurrences. The table's columns, in order:
 | Column | What it shows |
 | --- | --- |
 | Issue type | Its name. Select it to open its page. |
-| How sure | The report group: Mostly sure, Not sure, or For information. |
+| How sure | The report group: Mostly sure, Measured, Not sure, or For information. |
 | Priority | High, Medium, or Low (see [priority](glossary.md#priority)); "Does not apply" for rows marked For information. |
 | Issue occurrences | How many [occurrences](glossary.md#occurrence) of this issue type the scan found: how many places it appears. |
 | Affected pages | How many pages have it. The issue type's page lists them. |
@@ -214,16 +227,113 @@ or Best practice), **How sure** (a report group), and **Where it shows**. When y
 one **Where it shows** value, a link to its detailed view appears above the table:
 **Rule check issues by WCAG criterion**, or **Images** for In an image.
 
-The table opens in the recommended order: Mostly sure, then Not sure, then
-For information, each by priority. Select a column header to sort by that
+The table opens showing every issue type. With nothing checked under **How
+sure**, all four report groups show, and a note over the table counts each
+one and says what Not sure and For information mean. When search, **Level**
+or **Where it shows** narrows the rows, the note says it shows every issue
+type that matches your filters. **Show only Mostly sure and Measured** in the
+note narrows the table to those two. The recommended order is Mostly sure,
+then Measured, then Not sure, then For information, each by priority. Select a column header to sort by that
 column, and **Back to recommended order** to return. As the filters change, a
 screen reader hears how many issue types show and how many of them are in
 each report group, such as "12 of 40 issue types shown, filtered: Mostly
-sure 3, Not sure 7, For information 2".
+sure 3, Measured 2, Not sure 5, For information 2".
 
 The name of each issue type opens [its page](#the-full-evidence-record).
 **Delete report**, at the end of the Issues page, is described under
 [Delete a report](#delete-a-report).
+
+## The Documents tab
+
+**Documents**, the third tab, lists the files the scanned pages link to or
+show inside the page: PDF, Word, Excel, PowerPoint, OpenDocument, Rich Text
+Format (RTF), and Google Docs, Sheets, Slides and Drive files. Use it to decide
+which file to fix first. Axcess checks only the PDF files; see
+[Document check](glossary.md#document-check) for what it checks.
+
+The tab is laid out like the Issues tab. Four numbers above the table count
+the documents, then how many are Mostly sure (it has accessibility problems),
+Not sure (if it has accessibility problems) and Could not check (for
+accessibility problems).
+Under the table, two closed rows open more detail. **What was checked** shows
+"Only PDFs checked" and opens what the list covers, what Axcess downloaded and
+kept, and what the list can miss (the same facts as below). **What "Mostly
+sure", "Not sure" and the other labels mean** explains a document, the
+values of the "Accessibility problems?" column, and the order. A report that did not look for documents shows no
+numbers, and its empty table says so.
+
+Each row shows:
+
+- **Document**: the file's name, which opens the document's own page (see
+  below).
+- **Type**: such as "PDF" or "Word, old format (.doc)", with "Has a form to
+  fill in" under it for a PDF with form fields.
+- **Hosted on**: the site the file itself is kept on, such as
+  "docs.google.com", and whether that is "This site" or "Another site". Not
+  the pages that link to it, which are in "Pages it appears on".
+- **Accessibility problems?**: how sure Axcess is that the file has
+  accessibility problems. The values are the same words as the Issues table's
+  How sure column.
+  - **Mostly sure**: a machine check found a problem, such as a PDF with no
+    tags or no text a screen reader can read.
+  - **Not sure**: the PDF passed the machine checks. A person must still check
+    the reading order, the image descriptions (alt text) and the table headers.
+    Not sure never means the file is accessible.
+  - **Could not check**: the row says why. "Axcess does not check this file
+    type yet" (Word .docx, Excel .xlsx, PowerPoint .pptx, OpenDocument, RTF)
+    is different from "Axcess cannot check" (old .doc, .xls and .ppt files,
+    and Google files). A broken link, a password, a file over 10 MB, or a slow
+    download are reasons too.
+- **What Axcess found**: each problem the checks found, by a short name, most
+  serious first ("Not tagged", "No language set"); for a Not sure file, what a
+  person must still check; for a file Axcess could not check, why. Why each
+  problem matters is on the document's own page. A file with the same contents as
+  one earlier in the list (the same PDF at another address) says "Same file
+  as …" and shares that file's result.
+- **Pages it appears on**: how many pages link to the file or show it inside
+  the page. The pages are listed on the document's own page.
+
+The table opens in the recommended order: Mostly sure, then Not sure, then
+Could not check. Within each, files that appear on more pages come first, then
+files with a form to fill in, then files with more serious problems. There is
+no single score.
+
+As on the Issues tab, every column header sorts the table (What Axcess found
+sorts by how many problems the checks found), and **Back to recommended
+order** above the table undoes it. **Filter documents** narrows the list by
+Accessibility problems?, Type (PDF, Word, Excel and so on) and Hosted on (this
+site or another site), with how many documents have each value. What is
+filtered is written under the bar, with **Clear filters**. The numbers above
+the table always count the whole report.
+
+A document's own page works like an issue type's page. At the top right,
+**Open the file** opens it in a new tab. Under the heading are its facts
+(Accessibility problems?, Type, Hosted on, Pages it appears on). **What Axcess
+found** is a table of the five checks Axcess runs on every PDF it opens (Tags,
+Text a screen reader can read, Security settings, Document title, Language),
+each with its result ("Problem found" or "No problem found") and why it
+matters. "No problem found" is not a pass: a person must still check the file.
+For a file Axcess could not check, it says why instead. Then a table lists
+every page the file appears on, one row per page (up to 2,000), with a search
+box and sortable columns:
+
+- **Page title**: opens the page inspector with the link to this file
+  outlined on the page.
+- **Page URL**: the page's address.
+- **How it appears**: "Link" with the link's own words, "Shown inside the
+  page" for a frame or embedded file, and "Appears only after pressing" a
+  named button for a link that shows only after a click. A page that reaches
+  the file in more than one way has one line for each.
+
+To check a PDF, Axcess downloads it once to your computer, checks it, and
+keeps only the result, not the file. A PDF on another site is downloaded once;
+that site is not scanned. Nothing is sent to any other service.
+
+Limits: a link that appears only after pressing a button is found only if the
+scan pressed that button, and the scan never presses buttons that may
+download, buy or delete something. A file whose address has no file extension
+is found only on the scanned site. Sign-in scans, and reports made before this
+tab existed, do not list documents.
 
 ## The full evidence record
 
@@ -408,8 +518,8 @@ Notes on the exports:
 ### Draft labels
 
 Export menu downloads are labeled a [draft](glossary.md#draft-export) until
-the report's expert review is complete and every Mostly sure and Not sure
-occurrence has a status other than New or Reviewing. A draft has `_DRAFT` in
+the report's expert review is complete and every Mostly sure, Measured and
+Not sure occurrence has a status other than New or Reviewing. A draft has `_DRAFT` in
 its file name and a notice inside, such as a "DRAFT NOTICE" sheet or an
 "Axcess export state" CSV column. The app has no screen for completing the
 review yet, so for now every download from the **Export report** menu is a
@@ -423,7 +533,7 @@ side, each in its own panel. There are two ways to open it:
 
 - From a report, choose the **Compare reports** tab. The report opens in the
   first panel. The second panel is empty and lists the site's other
-  completed reports, newest first. Choose one to show it there.
+  reports, newest first. Choose one to show it there.
 - On **Reports**, open a site and choose **Compare with** on one of its
   scans, then the report to compare it with. Both panels open at once.
 
@@ -449,7 +559,7 @@ each [issue type](glossary.md#issue-type), not each occurrence, as one of these:
 | No longer found | Found in the earlier report but not found again in this one. That is not proof of a fix. Check the page yourself before you mark its occurrences Fixed. |
 | Still found | Found in both reports. Its number of occurrences can still go up or down. |
 
-What changed opens with **Trend over time**, which plots every completed scan of
+What changed opens with **Trend over time**, which plots every report of
 the site. Select a point in the trend, or use **Show as data table**, to open
 that scan's issues or compare it with this report. Below it are the three
 numbers; each is also a filter for the table under them. The table has one
@@ -471,12 +581,14 @@ Progress Over Perfection: each barrier you fix helps someone use the site today.
 1. **Mostly sure first.** They top the Issues table; confirm each one, then fix
    it, starting with High [priority](glossary.md#priority). Priority starts
    from the impact rating, so a critical problem on a single page is High.
-2. **Then Not sure.** Check each one on the page and record a decision.
-3. **Batch shared fixes.** Axcess groups by check, not by
+2. **Then Measured.** A browser check measured these with no AI. Check each
+   one on the page and record a decision.
+3. **Then Not sure.** Check each one on the page and record a decision.
+4. **Batch shared fixes.** Axcess groups by check, not by
    [root cause](glossary.md#root-cause), so look for one template or component
    behind an issue type on many pages, and route the fix to whoever owns
    it.
-4. **Rescan** and check your work in **Compare reports** and **What changed**.
+5. **Rescan** and check your work in **Compare reports** and **What changed**.
 
 ## Delete a report
 

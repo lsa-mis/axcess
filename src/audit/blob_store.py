@@ -57,6 +57,10 @@ class BlobStore:
     def path_for(self, rel_path: str) -> Path:
         return self.root / rel_path
 
+    def path_of(self, content_hash: str, mime: str | None) -> Path:
+        """Where a blob stored with ``mime`` lives (it may not exist)."""
+        return self.root / self._rel_path(content_hash, ext_from_mime(mime))
+
     def exists(self, content_hash: str, mime: str | None) -> bool:
         return (self.root / self._rel_path(content_hash, ext_from_mime(mime))).exists()
 

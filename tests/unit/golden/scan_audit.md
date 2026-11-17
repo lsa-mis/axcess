@@ -79,21 +79,22 @@ Across all **55** Level A/AA success criteria, here is exactly what Axcess can a
 | Coverage | Criteria | What it means |
 |---|---:|---|
 | **Automated** | 5 | Deterministic checks cover defined machine-testable conditions; an expert verifies applicability and remaining states. |
-| **Partly automated** | 18 | Automated checks catch the mechanical failures; the rest needs a human. |
+| **Partly automated** | 17 | Automated checks catch the mechanical failures; the rest needs a human. |
 | **AI-assisted** | 6 | A local model flags candidates, a human confirms before counting them. |
-| **Manual only** | 26 | No automated detection, a human must test this criterion. |
+| **Manual only** | 27 | No automated detection, a human must test this criterion. |
 
-### Automated &amp; AI-assisted (29 criteria)
+### Automated &amp; AI-assisted (28 criteria)
 
 | SC | Criterion | Lvl | Coverage | What Axcess does | Still verify by hand |
 |---|---|---|---|---|---|
 | 1.1.1 | Non-text Content | A | Partly automated | axe flags missing alt on img / area / input[type=image] and unlabelled SVGs; the image-of-text VLM separately flags pictures that are really text. | Whether the alt text that IS present is a meaningful equivalent, and the decorative-vs-informative call, needs a human. |
 | 1.2.1 | Audio-only and Video-only (Prerecorded) | A | AI-assisted | For <audio> elements, the semantic LLM checks whether a transcript or text alternative is reachable (nearby "Transcript" link / surrounding text). | Confirm the transcript is accurate and equivalent. Video-only (silent video) can't be detected from the DOM, still a manual check. |
+| 1.2.2 | Captions (Prerecorded) | A | Partly automated | axe flags <video> elements with no captions track (video-caption). It checks only that a track is present, not that captions exist or are right. | Play each video and confirm synchronized, accurate captions, including captions burned into the video or provided by an embedded player. Auto-caption diffing (Whisper) is on the roadmap. |
 | 1.3.1 | Info and Relationships | A | Partly automated | axe checks list, table-header, definition-list, required-ARIA-children and heading-structure markup on the rendered DOM. The page code check flags a label whose for value is tied to no field, and guesses at text styled as a heading without heading markup (failure F2), for a human to confirm. | Relationships conveyed only visually (grouped fields, columns, emphasis that implies meaning) need a human to confirm they're also programmatic. |
 | 1.3.2 | Meaningful Sequence | A | AI-assisted | The visual probe screenshots the page and asks a local vision model whether the visual reading order matches the DOM/source order (CSS can reorder content so screen readers hear a different sequence). | Confirm the model's call by tabbing/reading with a screen reader. Subtle reorderings and content below the fold still need a human, and the probe only runs when a local vision model is available. |
 | 1.3.5 | Identify Input Purpose | AA | Partly automated | axe validates that any autocomplete tokens used are valid. | Confirm autocomplete IS present on fields collecting the user's own info (name, email, address), missing autocomplete isn't auto-detected. |
 | 1.4.1 | Use of Color | A | Partly automated | axe flags links distinguished from surrounding text by colour alone (a narrow heuristic). | Most colour-only meaning, form errors, chart series, required-field markers, status, needs a human to confirm a non-colour cue exists. |
-| 1.4.2 | Audio Control | A | Partly automated | The visual probe measures actual playback advancement and flags audible audio longer than three seconds when no native or explicitly associated custom control is detected. Autoplay markup alone is not flagged. | Confirm every audible autoplay source can be paused, stopped, or volume controlled independently; test custom controls and browser autoplay policy. |
+| 1.4.2 | Audio Control | A | Partly automated | The visual probe measures actual playback advancement and flags audible audio longer than three seconds when no native or explicitly associated custom control is detected. axe separately flags autoplaying audio or video markup that lacks controls or a short duration (no-autoplay-audio). | Confirm every audible autoplay source can be paused, stopped, or volume controlled independently; test custom controls and browser autoplay policy. |
 | 1.4.3 | Contrast (Minimum) | AA | Partly automated | axe measures text/background contrast on the rendered DOM against the 4.5:1 (3:1 large-text) thresholds. | Text baked into images, hover/focus/disabled states, and text over gradients or photos need a human to check. |
 | 1.4.4 | Resize Text | AA | Automated | The responsive probe zooms to a 200% proxy viewport and flags text that clips or overflows its container. | Confirm no loss of content or function across the full zoom range in your target browsers. |
 | 1.4.5 | Images of Text | AA | AI-assisted | OCR + a local vision model judge whether each image is really rendered text rather than a photo/diagram. | Confirm flagged images aren't the allowed exceptions (logos, or text that's essential to a particular presentation). |
@@ -101,29 +102,26 @@ Across all **55** Level A/AA success criteria, here is exactly what Axcess can a
 | 1.4.12 | Text Spacing | AA | Automated | The responsive probe injects the WCAG text-spacing override CSS (line-height 1.5, etc.) and flags clipping/overlap. | Confirm no text is cut off or overlapping with the spacing applied. |
 | 2.1.1 | Keyboard | A | Partly automated | axe flags some keyboard-inaccessible patterns; the keyboard probe confirms focus can move through the page. | Confirm every control (menus, custom widgets, drag handles) is fully operable by keyboard, the deepest part of this SC is manual. |
 | 2.1.2 | No Keyboard Trap | A | Partly automated | The keyboard probe emits a review lead only when the same observable element resists repeated Tab and Shift+Tab exit attempts. It suppresses normal focus wrapping, small focus cycles, modal containment, and opaque iframe or closed-shadow focus. | Reproduce every lead and test components that appear after interaction. Confirm whether arrow keys, Escape, a close control, or a documented non-standard command lets the user leave before recording a failure. |
+| 2.2.1 | Timing Adjustable | A | Partly automated | axe flags a timed <meta http-equiv="refresh"> redirect or reload (meta-refresh). Script-driven time limits are not detected. | For any time limit (session timeouts, timed forms, auto-advancing content), confirm it can be turned off, adjusted, or extended. |
 | 2.2.2 | Pause, Stop, Hide | A | Partly automated | The visual probe measures actual playback advancement for visible video longer than five seconds without a detected control. It also records <marquee> as an expert-review lead. | CSS animations, auto-advancing carousels, and auto-updating regions aren't auto-detected, confirm any content that moves >5s can be paused, stopped, or hidden. |
 | 2.4.1 | Bypass Blocks | A | Partly automated | axe checks for a skip link, landmark regions, and a heading structure that lets users bypass repeated content. | Confirm the skip link actually moves focus and works with the keyboard. |
 | 2.4.2 | Page Titled | A | Automated | axe checks that every page has a non-empty <title>. | Confirm the title is descriptive and distinguishes the page (a light human check). |
 | 2.4.3 | Focus Order | A | Partly automated | The focus probe flags positive tabindex (WCAG failure F44), a manual tab order that overrides the natural DOM order and usually breaks the sequence. | Tab through the whole page and confirm the focus order preserves meaning and operability, the order can break without a positive tabindex (e.g. CSS-reordered columns), which still needs a human. |
 | 2.4.4 | Link Purpose (In Context) | A | AI-assisted | axe flags empty/unnamed links; the semantic LLM judges whether the link text plus its context conveys where it goes. | Confirm the LLM's borderline calls ("read more", icon links), it flags strong leads, not verdicts. |
 | 2.4.6 | Headings and Labels | AA | AI-assisted | axe flags empty headings / unlabelled controls; the semantic LLM judges whether each heading actually describes the content it introduces. | Confirm the LLM's borderline heading calls, and check that form-control LABELS are descriptive, label descriptiveness is not yet AI-assisted. |
-| 2.4.7 | Focus Visible | AA | Partly automated | axe has limited checks for suppressed focus indicators. | Tab the whole page and confirm a clearly visible focus indicator on every interactive element, largely manual. |
 | 2.4.11 | Focus Not Obscured (Minimum) | AA | Partly automated | The live-page focus probe focuses each element and flags any whose centre is covered by a position:fixed/sticky overlay (the classic "focus hidden behind the sticky header" failure). | Confirm partial-overlap cases the centre-point check can miss, and tab through interactively, overlays that appear only after a click still need a human. |
-| 2.5.3 | Label in Name | A | Partly automated | axe flags controls whose accessible name doesn't contain the visible label text (label-content-name-mismatch). | Confirm the visible text is fully contained in the accessible name for voice-control users. |
 | 2.5.8 | Target Size (Minimum) | AA | Partly automated | axe checks interactive targets are at least 24x24 CSS px (with spacing). | Confirm the inline / essential / equivalent-control exceptions are genuinely met for any flagged small targets. |
 | 3.1.1 | Language of Page | A | Automated | axe checks <html> has a present and valid lang attribute. | Confirm the declared language actually matches the page's main content. |
 | 3.1.2 | Language of Parts | AA | Partly automated | axe validates lang attributes that are present on parts of the page. | Detecting foreign-language passages that are *missing* a lang attribute needs a human reader. |
 | 3.3.2 | Labels or Instructions | A | AI-assisted | axe checks a programmatic label exists; the page code check flags a field whose only name is its placeholder text, which axe accepts as a label; the semantic LLM judges whether each control's label/instructions are sufficient to know what to enter. | Confirm the LLM's sufficiency calls, and test real form submissions, error-time instructions (SC 3.3.x) still need a human. |
 | 4.1.2 | Name, Role, Value | A | Partly automated | axe checks names/roles/values for standard controls and ARIA widgets (button-name, link-name, aria-* validity, roles). | Custom widgets' state changes (expanded, selected, checked) need a screen reader to confirm they're announced. |
-| 4.1.3 | Status Messages | AA | Partly automated | axe checks for some live-region / role=status markup. | Confirm dynamic updates (added-to-cart, validation, search counts) are actually announced, needs screen-reader testing. |
 
-### Needs manual testing (26 criteria)
+### Needs manual testing (27 criteria)
 
 No Axcess pipeline detects these, they require a human. Treat this as your manual-test checklist for full Level A/AA conformance.
 
 | SC | Criterion | Lvl | What to test |
 |---|---|---|---|
-| 1.2.2 | Captions (Prerecorded) | A | Play each video and confirm synchronized, accurate captions. Auto-caption diffing (Whisper) is on the roadmap. |
 | 1.2.3 | Audio Description or Media Alternative (Prerecorded) | A | Confirm an audio description or full text alternative for prerecorded video. |
 | 1.2.4 | Captions (Live) | AA | Confirm live audio in synchronized media has real-time captions. |
 | 1.2.5 | Audio Description (Prerecorded) | AA | Confirm prerecorded video has a synchronized audio description track. |
@@ -132,11 +130,12 @@ No Axcess pipeline detects these, they require a human. Treat this as your manua
 | 1.4.11 | Non-text Contrast | AA | Check that UI component boundaries (inputs, buttons, focus rings) and meaningful graphics meet 3:1. No reliable automated rule exists yet. |
 | 1.4.13 | Content on Hover or Focus | AA | For tooltips/popovers triggered by hover/focus, confirm they're dismissable, hoverable, and persistent. |
 | 2.1.4 | Character Key Shortcuts | A | If single-character shortcuts exist, confirm they can be turned off, remapped, or are active only on focus. |
-| 2.2.1 | Timing Adjustable | A | For any time limit, confirm it can be turned off, adjusted, or extended. |
 | 2.3.1 | Three Flashes or Below Threshold | A | Confirm nothing flashes more than three times per second. Flash analysis is not implemented. |
 | 2.4.5 | Multiple Ways | AA | Confirm at least two ways to find pages (nav + search, or sitemap), except for steps in a process. |
+| 2.4.7 | Focus Visible | AA | Tab the whole page and confirm a clearly visible focus indicator on every interactive element, largely manual. |
 | 2.5.1 | Pointer Gestures | A | For any multipoint/path gesture (swipe, pinch), confirm a single-pointer alternative exists. |
 | 2.5.2 | Pointer Cancellation | A | Confirm actions fire on the up-event and can be aborted (no critical action on down-press). |
+| 2.5.3 | Label in Name | A | Confirm the visible text is fully contained in the accessible name for voice-control users. |
 | 2.5.4 | Motion Actuation | A | If a function is triggered by device motion (shake/tilt), confirm a UI alternative and a way to disable motion actuation. |
 | 2.5.7 | Dragging Movements | AA | For any drag operation (sliders, reorder, kanban), confirm a single-pointer alternative (tap/click) exists. |
 | 3.2.1 | On Focus | A | Confirm moving focus to a control doesn't trigger an unexpected context change (auto-submit, new window). |
@@ -149,6 +148,7 @@ No Axcess pipeline detects these, they require a human. Treat this as your manua
 | 3.3.4 | Error Prevention (Legal, Financial, Data) | AA | For legal/financial/data submissions, confirm reversal, checking, or confirmation is available. |
 | 3.3.7 | Redundant Entry | A | In multi-step flows, confirm previously-entered info is auto-populated or selectable rather than re-typed. |
 | 3.3.8 | Accessible Authentication (Minimum) | AA | Manually test each in-scope sign-in and MFA step. Confirm it does not require a cognitive function test (for example, solving a puzzle or memorizing/transcribing information) without an accessible alternative. A successful post-MFA crawl only proves that an auditor established a temporary browser session; it does not automatically evaluate or pass the authentication experience. Do not record passwords, OTPs, passkeys, recovery codes, cookies, or session details in this report. |
+| 4.1.3 | Status Messages | AA | Confirm dynamic updates (added-to-cart, validation, search counts) are actually announced, needs screen-reader testing. |
 
 ## Page hotspots
 
@@ -315,7 +315,7 @@ These issue types *were* detected but every finding in them has already been tri
 These results are preserved for transparency but are not included in the remediation scorecard. They are AI-assisted or ambiguous review leads, informational/pass evidence, or best-practice observations with no criterion mapping. An expert decision is required before a review lead can be described as a barrier.
 
 - **The page has no main heading (h1)** (`page-has-heading-one`), 1 finding(s) on 1 page; **Mostly sure / high confidence**. The rule check (axe) found the page code breaks this rule.
-- **Keyboard focus may be stuck on one element** (`keyboard-trap-stuck`), 1 finding(s) on 1 page; **Not sure / medium confidence**. Pressing Tab and pressing Shift+Tab both left focus on the same element. Check by hand whether another key, such as Escape, moves focus out.
+- **Keyboard focus may be stuck on one element** (`keyboard-trap-stuck`), 1 finding(s) on 1 page; **Measured / medium confidence**. Pressing Tab and pressing Shift+Tab both left focus on the same element. Check by hand whether another key, such as Escape, moves focus out.
 - **Images with important text have no alt text** (`essential_missing`), 1 finding(s) on 1 page; **Not sure / medium confidence**. Text recognition (OCR) and a vision model found text in this image. Check what the image is for and whether its alt text says the same.
 - **Link text may not say where the link goes** (`2.4.4`), 1 finding(s) on 1 page; **Not sure / medium confidence**. The AI review (a language model on this computer) judged this. Check it on the page before you report it.
 

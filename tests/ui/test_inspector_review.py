@@ -379,7 +379,7 @@ async def test_mark_not_checked_as_repeats_in_one_press(
     panel = page.get_by_role("group", name="The flagged element you are on")
     opener = panel.get_by_role("button", name="Review this element")
     dialog = page.get_by_role("dialog", name="Review this element")
-    bulk = panel.get_by_role("button", name=re.compile(r"^Mark \d+ not checked as"))
+    bulk = panel.get_by_role("button", name=re.compile(r"^Mark \d+ elements? not checked yet as"))
 
     # Nothing reported in this issue yet: a repeat would be a repeat of
     # nothing, so the bulk button is not offered.
@@ -397,7 +397,7 @@ async def test_mark_not_checked_as_repeats_in_one_press(
     await dialog.get_by_role("textbox", name="Issue notes").fill("Looked at it.")
     await dialog.get_by_role("button", name="Save review").click()
 
-    await expect(bulk).to_have_text("Mark 2 not checked as repeats")
+    await expect(bulk).to_have_text("Mark 2 elements not checked yet as repeats")
     await expect(bulk).to_have_accessible_description(
         re.compile(r"^Every flagged element in this page state with no review yet")
     )

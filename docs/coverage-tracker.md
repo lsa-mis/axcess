@@ -1,6 +1,6 @@
 # Axcess coverage and feature tracker
 
-> Last reconciled: **2026-09-24** against the shipped code, WCAG matrix,
+> Last reconciled: **2026-11-13** against the shipped code, WCAG matrix,
 > semantic registry, migrations, desktop package, and release workflow.
 
 Axcess targets **WCAG 2.2 Level A and AA** for report coverage. It is an
@@ -28,12 +28,12 @@ unavailable are different states.
 
 | Scope | Total | Automated | Partly automated | AI-assisted | Manual only | Any Axcess contribution |
 |---|---:|---:|---:|---:|---:|---:|
-| Level A | 31 | 2 | 11 | 4 | 14 | 17 |
-| Level AA | 24 | 3 | 7 | 2 | 12 | 12 |
-| **A + AA** | **55** | **5** | **18** | **6** | **26** | **29** |
+| Level A | 31 | 2 | 12 | 4 | 13 | 18 |
+| Level AA | 24 | 3 | 5 | 2 | 14 | 10 |
+| **A + AA** | **55** | **5** | **17** | **6** | **27** | **28** |
 
-The 29-criterion figure means that at least one Axcess layer contributes
-evidence. It does **not** mean 29 criteria can be fully decided without an
+The 28-criterion figure means that at least one Axcess layer contributes
+evidence. It does **not** mean 28 criteria can be fully decided without an
 expert. Every matrix row includes a residual manual check.
 
 ### Classification rules
@@ -67,11 +67,14 @@ expert. Every matrix row includes a residual manual check.
 | 2.4.6 Headings and Labels | axe checks structural/name failures; semantic review judges heading descriptiveness. | Confirm heading calls and review label descriptiveness manually. |
 | 3.3.2 Labels or Instructions | axe checks programmatic labels; semantic review judges instruction sufficiency. | Confirm sufficiency and test real form states/submissions. |
 
-### Partly automated criteria (18)
+### Partly automated criteria (17)
 
-1.1.1, 1.3.1, 1.3.5, 1.4.1, 1.4.2, 1.4.3, 2.1.1, 2.1.2,
-2.2.2, 2.4.1, 2.4.3, 2.4.7, 2.4.11, 2.5.3, 2.5.8, 3.1.2,
-4.1.2, and 4.1.3.
+1.1.1, 1.2.2, 1.3.1, 1.3.5, 1.4.1, 1.4.2, 1.4.3, 2.1.1,
+2.1.2, 2.2.1, 2.2.2, 2.4.1, 2.4.3, 2.4.11, 2.5.8, 3.1.2,
+and 4.1.2.
+
+1.2.2 and 2.2.1 are low-confidence: axe-core catches only a `<video>`
+with no captions track and a timed `<meta http-equiv="refresh">`.
 
 See the matrix for the exact automated condition and residual manual test for
 each criterion. In particular, a keyboard-trap lead is intentionally
@@ -80,11 +83,17 @@ observable element and suppresses ordinary focus wrapping, small cycles,
 modal containment, and opaque iframe/closed-shadow focus. Every lead still
 requires manual reproduction.
 
-### Manual-only criteria (26)
+### Manual-only criteria (27)
 
-1.2.2, 1.2.3, 1.2.4, 1.2.5, 1.3.3, 1.3.4, 1.4.11, 1.4.13, 2.1.4,
-2.2.1, 2.3.1, 2.4.5, 2.5.1, 2.5.2, 2.5.4, 2.5.7, 3.2.1, 3.2.2,
-3.2.3, 3.2.4, 3.2.6, 3.3.1, 3.3.3, 3.3.4, 3.3.7, and 3.3.8.
+1.2.3, 1.2.4, 1.2.5, 1.3.3, 1.3.4, 1.4.11, 1.4.13, 2.1.4, 2.3.1,
+2.4.5, 2.4.7, 2.5.1, 2.5.2, 2.5.3, 2.5.4, 2.5.7, 3.2.1, 3.2.2,
+3.2.3, 3.2.4, 3.2.6, 3.3.1, 3.3.3, 3.3.4, 3.3.7, 3.3.8, and 4.1.3.
+
+For 2.4.7, 2.5.3 and 4.1.3, axe-core 4.10.2 has no rule that Axcess
+runs: it has none tagged 2.4.7 or 4.1.3, and its 2.5.3 rule
+(`label-content-name-mismatch`) is experimental, which tag-filtered runs
+skip. Siteimprove Alfa may add evidence for these when selected, but the
+matrix does not count engine overlap.
 
 ## Detection and evidence layers
 

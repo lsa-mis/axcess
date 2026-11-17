@@ -68,9 +68,11 @@ SITE_NAMES = {
     *("React", "Vue", "Angular", "Michigan", "University"),
     # A11y Crawler, one of the two projects Axcess merged (About page).
     "Crawler",
-    # Named parts the guides refer to: the app's "Issues" tab, and the hosting
-    # guide's options "Path A", "Path B" and "Path C".
-    *("Issues", "Path"),
+    # Named parts the guides refer to: the app's "Issues" and "Documents"
+    # tabs, and the hosting guide's options "Path A", "Path B" and "Path C".
+    *("Issues", "Documents", "Path"),
+    # Apple's screen reader, named in the glossary's "Rotor (VoiceOver)".
+    "VoiceOver",
 }
 # WCAG criterion names are W3C titles ("Focus Visible") and keep their capitals.
 CRITERION_NAMES = sorted(
