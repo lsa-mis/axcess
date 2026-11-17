@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Check, Copy, Sparkles, X } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Check, Copy, Sparkles, X, ZoomIn, ZoomOut } from "lucide-react";
 import { blobUrl } from "../api/client";
 import type { AltVerdict, ReportImage } from "../api/types";
 import { useAiSetup } from "../hooks/useAiSetup";
@@ -221,10 +221,66 @@ export function CurrentAlt({ image }: { image: ReportImage }) {
  * alt="": the dialog's heading names it, and its current alt text and the
  * text read from it are written out below, so a screen reader user gets the
  * same facts without the picture claiming one of them as its description.
+ *
+ * Zoom (the developer's request, 2026-11-17). "Zoom out" and "Zoom in" step
+ * the picture through ZOOM_STEPS, from fitted to the window (100%) to four
+ * times that, so small text in an image can be read; there is no other zoom
+ * control, so no two controls do one job (AGENTS.md, "One control, one
+ * job"). The words say what they do; the screen-reader-only "image" names
+ * the object (technique C7). At its limit a button stays focusable and says
+ * it is unavailable (aria-disabled) instead of becoming disabled, which
+ * would drop focus out of the dialog. The size is written beside them
+ * ("Shown at 150%") in a polite live region, so it is seen and heard
+ * (SC 4.1.3 Status Messages, Level AA).
+ *
+ * Zoomed, the picture scrolls inside its own box, sideways and up and down,
+ * with the app's scroll bars (.ax-scrollbar in styles.css: 24px, always
+ * shown, 3:1 contrast), the style first made for wide tables. While it
+ * scrolls, the box is a named region in the Tab order, so the arrow keys
+ * scroll it (SC 2.1.1 Keyboard, Level A), as a wide table's region does;
+ * fitted, it is neither. Each step keeps the middle of the view in the
+ * middle. Browser zoom still works as well: this enlarges only the picture.
  */
+const ZOOM_STEPS = [1, 1.5, 2, 3, 4] as const;
+
 export function ImageViewer({ image, onClose }: { image: ReportImage | null; onClose: () => void }) {
   const ref = useModalDialog(image != null);
   const name = image ? imageName(image) : "";
+  const [step, setStep] = useState(0);
+  // The picture's width when fitted, measured, so a zoom step is a multiple
+  // of what the reader saw at 100%.
+  const [fitWidth, setFitWidth] = useState(0);
+  const view = useRef<HTMLDivElement>(null);
+  const picture = useRef<HTMLImageElement>(null);
+  const zoom = ZOOM_STEPS[step];
+  const zoomed = step > 0;
+  // A new picture opens fitted.
+  useEffect(() => {
+    setStep(0);
+    setFitWidth(0);
+  }, [image?.image_id]);
+  // Keep the middle of the view in the middle when the size changes.
+  const centre = useRef<{ x: number; y: number } | null>(null);
+  const zoomTo = (next: number) => {
+    const box = view.current;
+    if (box) {
+      centre.current = {
+        x: (box.scrollLeft + box.clientWidth / 2) / Math.max(1, box.scrollWidth),
+        y: (box.scrollTop + box.clientHeight / 2) / Math.max(1, box.scrollHeight),
+      };
+    }
+    // Leaving 100%: take the fitted width now, as the reader sees it.
+    if (step === 0 && picture.current) setFitWidth(picture.current.clientWidth);
+    setStep(next);
+  };
+  useLayoutEffect(() => {
+    const box = view.current;
+    const at = centre.current;
+    if (!box || !at) return;
+    box.scrollLeft = at.x * box.scrollWidth - box.clientWidth / 2;
+    box.scrollTop = at.y * box.scrollHeight - box.clientHeight / 2;
+    centre.current = null;
+  }, [step]);
   return (
     // The click handler only catches clicks on the dimmed backdrop, a mouse
     // extra. Keyboard users close the dialog with Escape (native to a modal
@@ -251,11 +307,48 @@ export function ImageViewer({ image, onClose }: { image: ReportImage | null; onC
             </Button>
           </div>
           <div className="px-5 py-4">
-            <img
-              src={blobUrl(image.content_hash)}
-              alt=""
-              className="mx-auto max-h-[65vh] max-w-full rounded-xs border border-border bg-white object-contain"
-            />
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                aria-disabled={step === 0 || undefined}
+                className="aria-disabled:cursor-not-allowed aria-disabled:opacity-60"
+                onClick={() => step > 0 && zoomTo(step - 1)}
+              >
+                <ZoomOut className="h-4 w-4" aria-hidden />
+                Zoom out<span className="sr-only"> of the image</span>
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                aria-disabled={step === ZOOM_STEPS.length - 1 || undefined}
+                className="aria-disabled:cursor-not-allowed aria-disabled:opacity-60"
+                onClick={() => step < ZOOM_STEPS.length - 1 && zoomTo(step + 1)}
+              >
+                <ZoomIn className="h-4 w-4" aria-hidden />
+                Zoom in<span className="sr-only"> on the image</span>
+              </Button>
+              <p role="status" aria-live="polite" className="text-sm text-fg-muted tabular-nums">
+                Shown at {Math.round(zoom * 100)}%
+              </p>
+            </div>
+            <div
+              ref={view}
+              role="region"
+              aria-label={`${name}, zoomed in`}
+              // In the Tab order only while it scrolls (see the comment above).
+              // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+              tabIndex={zoomed ? 0 : -1}
+              className="ax-scrollbar max-h-[65vh] overflow-auto rounded-xs focus:outline-none focus-visible:shadow-focus"
+            >
+              <img
+                ref={picture}
+                src={blobUrl(image.content_hash)}
+                alt=""
+                style={zoomed && fitWidth ? { width: fitWidth * zoom, maxWidth: "none", maxHeight: "none" } : undefined}
+                className="mx-auto max-h-[65vh] max-w-full rounded-xs border border-border bg-white object-contain"
+              />
+            </div>
             <dl className="mt-4 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[max-content_minmax(0,1fr)]">
               <dt className="font-semibold text-fg-muted">Current alt text</dt>
               <dd className="min-w-0">

@@ -324,7 +324,7 @@ export function TableRegion({
           browser's own scroll bar, on a strip as wide as the region with a
           track as wide as the table, kept in step with the region (the
           effect above), and styled thin and always visible
-          (.table-scrollbar in styles.css), so it does not fade away as
+          (.ax-scrollbar in styles.css), so it does not fade away as
           overlay scroll bars do on a Mac. Its target size, contrast and
           forced-colours behaviour are set out there.
           It is for the pointer only, as a browser's own scroll bar is: a
@@ -347,7 +347,7 @@ export function TableRegion({
           ref={setTop}
           aria-hidden="true"
           tabIndex={-1}
-          className={cn("table-scrollbar overflow-x-auto overflow-y-hidden border-b border-border", CARD_EDGE)}
+          className={cn("ax-scrollbar overflow-x-auto overflow-y-hidden border-b border-border", CARD_EDGE)}
         >
           <div style={{ width: scrollWidth, height: 1 }} />
         </div>

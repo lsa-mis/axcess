@@ -240,6 +240,59 @@ async def test_image_viewer_opens_and_closes(images_server: tuple[str, int], new
         await page.context.close()
 
 
+async def test_image_viewer_zooms_and_scrolls_by_keyboard(
+    images_server: tuple[str, int], new_page: Any
+) -> None:
+    """Zoom out and Zoom in step the picture from 100% to 400%; zoomed, it
+    scrolls in a named region in the Tab order, with the app's scroll bars;
+    a button at its limit stays focusable (2026-11-17)."""
+    base, scan_id = images_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    try:
+        await _photo_page(page, base, scan_id)
+        await page.get_by_role("button", name=re.compile(r"^View larger image")).click()
+        viewer = page.get_by_role("dialog")
+        await playwright_async.expect(viewer).to_be_visible()
+        status = viewer.get_by_role("status")
+        zoom_in = viewer.get_by_role("button", name="Zoom in on the image")
+        zoom_out = viewer.get_by_role("button", name="Zoom out of the image")
+        await playwright_async.expect(status).to_have_text("Shown at 100%")
+        await playwright_async.expect(zoom_out).to_have_attribute("aria-disabled", "true")
+        region = viewer.get_by_role("region", name=re.compile(r", zoomed in$"))
+        await playwright_async.expect(region).to_have_attribute("tabindex", "-1")
+        assert "ax-scrollbar" in (await region.get_attribute("class") or "")
+
+        await zoom_in.focus()
+        for shown in ("150%", "200%", "300%", "400%"):
+            await page.keyboard.press("Enter")
+            await playwright_async.expect(status).to_have_text(f"Shown at {shown}")
+        # At its limit: still focused, says it is unavailable, does nothing.
+        await playwright_async.expect(zoom_in).to_have_attribute("aria-disabled", "true")
+        await page.keyboard.press("Enter")
+        await playwright_async.expect(status).to_have_text("Shown at 400%")
+        assert await zoom_in.evaluate("el => el === document.activeElement")
+
+        # Zoomed: the region scrolls both ways and takes a Tab stop.
+        await playwright_async.expect(region).to_have_attribute("tabindex", "0")
+        sizes = await region.evaluate(
+            "el => [el.scrollWidth > el.clientWidth, el.scrollHeight > el.clientHeight]"
+        )
+        assert sizes == [True, True], sizes
+        await region.focus()
+        before = await region.evaluate("el => el.scrollLeft")
+        await page.keyboard.press("ArrowRight")
+        await page.wait_for_function(
+            "([el, x]) => el.scrollLeft > x", arg=[await region.element_handle(), before]
+        )
+        violations = await _run_axe(page)
+        assert not violations, _render_violations(violations)
+
+        await zoom_out.click()
+        await playwright_async.expect(status).to_have_text("Shown at 300%")
+    finally:
+        await page.context.close()
+
+
 _IMAGES_HELP = "What does the Images tab show?"
 # The numbers' labels for more than one image; one image takes the verdict's
 # own label ("Needs alt text").

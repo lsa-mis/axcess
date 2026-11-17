@@ -23,7 +23,7 @@ playwright_async = pytest.importorskip("playwright.async_api")
 _SCROLLBAR_HEIGHT = r"""() => {
   const walk = (rules) => {
     for (const rule of rules) {
-      if (rule.selectorText === '.table-scrollbar::-webkit-scrollbar') return rule.style.height;
+      if (rule.selectorText === '.ax-scrollbar::-webkit-scrollbar') return rule.style.height;
       if (rule.cssRules) {
         const found = walk(rule.cssRules);
         if (found) return found;
@@ -38,7 +38,7 @@ _SCROLLBAR_HEIGHT = r"""() => {
   return null;
 }"""
 
-_BAR = "xpath=preceding-sibling::div[contains(@class, 'table-scrollbar')][1]"
+_BAR = "xpath=preceding-sibling::div[contains(@class, 'ax-scrollbar')][1]"
 
 
 async def test_the_top_scroll_bar_is_a_pointer_aid_and_never_a_tab_stop(
