@@ -13,14 +13,15 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from audit.ai.catalog import Catalog, Tier
+from audit.ai.catalog import Catalog, ModelEntry, Tier
 from audit.ai.downloader import download_model
 from audit.ai.runtime import LlamaRuntime, PausedError, RuntimeSetupError
 from audit.ai.sandbox import IsolationError
 from audit.ai.state import SOCKET_BASE_URL, AIConfig
 
 InstallState = Literal["idle", "running", "paused", "failed", "done"]
-InstallStep = Literal["program", "starting", "text_model", "vision_model", "finishing"]
+# "model": one model that does both jobs (Small); otherwise text, then vision.
+InstallStep = Literal["program", "starting", "model", "text_model", "vision_model", "finishing"]
 
 
 class InstallStatus(BaseModel):
@@ -68,7 +69,7 @@ class Installer:
             self.status = InstallStatus(
                 state="running",
                 tier=tier.id,
-                total_bytes=program + tier.text.size + tier.vision.size,
+                total_bytes=program + tier.size,
             )
             self._thread = threading.Thread(
                 target=self._run,
@@ -112,14 +113,19 @@ class Installer:
             base += before
             if cancel.is_set():
                 raise PausedError
-            for name, model in (("text_model", tier.text), ("vision_model", tier.vision)):
-                report = step(name)  # type: ignore[arg-type]
+            steps: tuple[tuple[InstallStep, ModelEntry], ...] = (
+                (("model", tier.text),)
+                if len(tier.models) == 1
+                else (("text_model", tier.text), ("vision_model", tier.vision))
+            )
+            for name, model in steps:
+                report = step(name)
                 self.pull(self.runtime.models_dir, model, report, cancel)
                 base += model.size
                 self.status.done_bytes = min(base, self.status.total_bytes)
             step("starting")
             self.runtime.stop()  # A service started for another size.
-            self.runtime.start((tier.text, tier.vision))
+            self.runtime.start(tier.models)
             step("finishing")
             config = AIConfig(
                 source="private",

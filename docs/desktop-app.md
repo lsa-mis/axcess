@@ -30,14 +30,16 @@ React workbench in a sandboxed Electron window.
   is the included AI program (llama.cpp). The optional AI models are not silently
   downloaded. **Settings > AI features** (on because `desktopEnvironment`
   sets `AUDIT_DESKTOP=1`) checks memory, disk and graphics chip, and
-  suggests a size: Small, Standard or Large. Only after the person selects
-  **Download and set up** does it download the two AI models for that size
+  suggests a size: Small, Standard, Large or Extra large. Only after the person selects
+  **Download and set up** does it download the AI models for that size
   (GGUF files) from Hugging Face. Each file is pinned to an exact version
   and checked against its SHA-256 before use.
 - The AI models, all under the Apache 2.0 licence, are a text model and an
-  image model for each size. Small: Qwen3-4B-Instruct-2507 and Qwen3-VL-2B.
-  Standard: Qwen2.5-Coder-7B and Qwen3-VL-4B. Large: Qwen2.5-Coder-14B and
-  Qwen3-VL-8B.
+  image model for each size, except Small, where one model does both.
+  Small: Qwen3.5-2B. Standard: Qwen3-4B-Instruct-2507 and Qwen3-VL-2B.
+  Large: Qwen2.5-Coder-7B and Qwen3-VL-4B. Extra large: Qwen2.5-Coder-14B
+  and Qwen3-VL-8B. The sizes were renamed on 2026-11-17 (each moved up one
+  name); a setup saved before keeps its models under the new name.
 - The private AI service runs in an operating-system sandbox with no
   internet access: Bubblewrap with no network on Linux (Bubblewrap must be
   installed, or AI does not start), and a deny-by-default `sandbox-exec`

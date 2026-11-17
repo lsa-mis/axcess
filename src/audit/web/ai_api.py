@@ -13,6 +13,7 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from audit.ai.catalog import TierId
 from audit.ai.installer import InstallStatus
 from audit.ai.manager import (
     AIBusyError,
@@ -30,7 +31,7 @@ from audit.ai.state import AIPreferences, AIStateError
 class InstallRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    tier: Literal["small", "standard", "large"]
+    tier: TierId
 
 
 class PreferenceRequest(BaseModel):

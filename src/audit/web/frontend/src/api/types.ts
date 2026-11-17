@@ -2050,9 +2050,9 @@ export interface SuggestionAvailability {
 }
 
 /** Desktop AI setup (`/api/ai/*`). Only the desktop app serves these. */
-export type AiTierId = "small" | "standard" | "large";
+export type AiTierId = "small" | "standard" | "large" | "extra_large";
 export type AiInstallState = "idle" | "running" | "paused" | "failed" | "done";
-export type AiInstallStep = "program" | "starting" | "text_model" | "vision_model" | "finishing";
+export type AiInstallStep = "program" | "starting" | "model" | "text_model" | "vision_model" | "finishing";
 
 export interface AiModelInfo {
   tag: string;

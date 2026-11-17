@@ -105,9 +105,13 @@ Choosing to continue keeps AI off. You can change your choice in Settings.
 
    | Size | Needs at least | Text model | Image model | Download |
    | --- | --- | --- | --- | --- |
-   | Small | 8 GB memory | `qwen3:4b-instruct-2507-q4_K_M` | `qwen3-vl:2b-instruct` | about 4.4 GB |
-   | Standard | 16 GB memory | `qwen2.5-coder:7b-instruct` | `qwen3-vl:4b-instruct` | about 8 GB |
-   | Large | 32 GB memory | `qwen2.5-coder:14b-instruct` | `qwen3-vl:8b-instruct` | about 15 GB |
+   | Small | 8 GB memory | `qwen3.5:2b` (one model reads text and images) | the same model | about 2 GB |
+   | Standard | 16 GB memory | `qwen3:4b-instruct-2507-q4_K_M` | `qwen3-vl:2b-instruct` | about 4.4 GB |
+   | Large | 32 GB memory | `qwen2.5-coder:7b-instruct` | `qwen3-vl:4b-instruct` | about 8 GB |
+   | Extra large | 32 GB memory | `qwen2.5-coder:14b-instruct` | `qwen3-vl:8b-instruct` | about 15 GB |
+
+   Both models stay loaded at once, and each needs working memory beyond its
+   download size, so a size needs much more memory than it downloads.
 
    Without a graphics chip Axcess suggests Small, because larger models are
    very slow on the processor alone. All models use the Apache 2.0 licence.

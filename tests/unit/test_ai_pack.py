@@ -52,11 +52,15 @@ def test_catalog_pins_every_platform_and_only_open_licences() -> None:
         for asset in builds:
             assert len(asset.sha256) == 64
             assert catalog.llama_cpp.version in asset.name
-    assert [t.id for t in catalog.tiers] == ["small", "standard", "large"]
+    assert [t.id for t in catalog.tiers] == ["small", "standard", "large", "extra_large"]
     for tier in catalog.tiers:
         assert tier.text.licence == tier.vision.licence == "Apache-2.0"
-        # Text models have no image add-on; image models need theirs.
-        assert tier.text.mmproj is None and tier.vision.mmproj is not None
+        # Image models need their add-on; a text-only model has none. One
+        # model may do both jobs (Small), and is then listed once.
+        assert tier.vision.mmproj is not None
+        assert tier.text.mmproj is None or tier.text == tier.vision
+        assert len(tier.models) == (1 if tier.text == tier.vision else 2)
+        assert tier.size == sum(m.size for m in tier.models)
         for model in (tier.text, tier.vision):
             assert model.size == sum(f.size for f in model.files)
             for f in model.files:
@@ -65,7 +69,7 @@ def test_catalog_pins_every_platform_and_only_open_licences() -> None:
 
 
 def test_preset_names_each_model_by_its_served_name_and_turns_reasoning_off(tmp_path: Path) -> None:
-    tier = load_catalog().tier("small")
+    tier = load_catalog().tier("standard")
     text = preset_text(
         [
             (tier.text, tmp_path / "t.gguf", None),
@@ -95,9 +99,9 @@ def test_preset_names_each_model_by_its_served_name_and_turns_reasoning_off(tmp_
         (8, True, None, "small"),
         (16, True, None, "standard"),
         (24, True, None, "standard"),
-        (36, True, None, "large"),
+        (36, True, None, "extra_large"),
         (64, False, None, "small"),  # no GPU: bigger models are too slow
-        (64, False, "NVIDIA", "large"),
+        (64, False, "NVIDIA", "extra_large"),
     ],
 )
 def test_recommend_picks_the_largest_tier_that_fits(memory, apple, gpu, expected) -> None:
@@ -107,8 +111,8 @@ def test_recommend_picks_the_largest_tier_that_fits(memory, apple, gpu, expected
 
 def test_recommend_respects_free_disk_space() -> None:
     catalog = load_catalog()
-    assert hw.recommend(machine(64, disk_gb=12), catalog).id == "standard"  # type: ignore[union-attr]
-    assert hw.recommend(machine(64, disk_gb=5), catalog) is None
+    assert hw.recommend(machine(64, disk_gb=12), catalog).id == "large"  # type: ignore[union-attr]
+    assert hw.recommend(machine(64, disk_gb=4), catalog) is None
 
 
 def _config(tmp_path: Path, **extra) -> AIConfig:
@@ -271,7 +275,9 @@ def test_remove_legacy_ollama_keeps_llama_files(tmp_path: Path) -> None:
     assert (tmp_path / "ai" / "gguf" / "x").is_dir()
 
 
-def test_install_saves_private_llama_cpp_setup(tmp_path: Path) -> None:
+@pytest.mark.parametrize("size", ["small", "standard"])
+def test_install_saves_private_llama_cpp_setup(tmp_path: Path, size: str) -> None:
+    """Standard downloads a text and an image model; Small one model for both."""
     settings = Settings(data_dir=tmp_path, desktop=True)
     changes: list[AIConfig | None] = []
     pulled: list[str] = []
@@ -298,14 +304,14 @@ def test_install_saves_private_llama_cpp_setup(tmp_path: Path) -> None:
     assert plan.program.download_bytes == manager.runtime.download_remaining()
     assert plan.program.version == load_catalog().llama_cpp.version
 
-    manager.install("small")
+    manager.install(size)
     manager.installer._thread.join(5)  # type: ignore[union-attr]
     assert manager.installer.status.state == "done", manager.installer.status.error
-    tier = load_catalog().tier("small")
-    assert pulled == [tier.text.tag, tier.vision.tag]
-    assert started == [[tier.text.tag, tier.vision.tag]]
+    tier = load_catalog().tier(size)
+    assert pulled == [m.tag for m in tier.models]
+    assert started == [[m.tag for m in tier.models]]
     saved = load_config(settings)
-    assert saved is not None and saved.source == "private" and saved.tier == "small"
+    assert saved is not None and saved.source == "private" and saved.tier == size
     assert saved.backend == "llama_cpp" and saved.socket_path == socket
     # The saved setup names the models as the private service serves them.
     assert (saved.text_model, saved.vision_model) == (
@@ -342,8 +348,10 @@ def test_install_failure_is_reported_in_plain_words(tmp_path: Path) -> None:
 def test_install_refuses_to_start_without_disk_space(tmp_path: Path) -> None:
     settings = Settings(data_dir=tmp_path, desktop=True)
     manager = AIManager(settings, lambda _c: None, probe=lambda: machine(64, disk_gb=5))
-    with pytest.raises(NotEnoughSpaceError, match="Not enough free disk space for the Large size"):
-        manager.install("large")
+    with pytest.raises(
+        NotEnoughSpaceError, match="Not enough free disk space for the Extra large size"
+    ):
+        manager.install("extra_large")
     assert manager.installer.status.state == "idle"
     assert not manager.installer.running
 
@@ -364,7 +372,33 @@ def test_plan_marks_a_size_installed_only_when_every_file_is_here(tmp_path: Path
         "small": True,
         "standard": False,
         "large": False,
+        "extra_large": False,
     }
 
     present.discard(small.vision.tag)
     assert not any(t.installed for t in manager.plan().tiers)
+
+
+def test_a_setup_saved_before_the_rename_keeps_its_models_under_the_new_name(
+    tmp_path: Path,
+) -> None:
+    """Small became Standard on 2026-11-17: a saved Small setup running
+    Qwen3-4B and Qwen3-VL-2B is now the Standard size, saved again."""
+    settings = Settings(data_dir=tmp_path, desktop=True)
+    standard = load_catalog().tier("standard")
+    save_config(
+        settings,
+        AIConfig(
+            source="private",
+            base_url="http://localhost",
+            backend="llama_cpp",
+            tier="small",
+            text_model=standard.text.served_name,
+            vision_model=standard.vision.served_name,
+        ),
+    )
+    manager = AIManager(settings, lambda _c: None, probe=lambda: machine(24))
+    config = manager.config()
+    assert config is not None and config.tier == "standard"
+    assert load_config(settings).tier == "standard"  # type: ignore[union-attr]
+    assert manager._models(config) == standard.models

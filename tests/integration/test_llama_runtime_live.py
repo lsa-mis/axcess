@@ -92,7 +92,7 @@ def test_router_answers_through_its_socket_inside_the_sandbox() -> None:
 @pytest.mark.skipif(not AI_DIR, reason="set AXCESS_LLAMA_AI_DIR with Small models downloaded")
 def test_small_models_load_and_answer() -> None:
     assert SERVER_DIR and AI_DIR
-    tier = load_catalog().tier("small")
+    tier = load_catalog().tier("standard")
     runtime = LlamaRuntime(Path(AI_DIR), load_catalog(), bundled_dir=Path(SERVER_DIR))
     socket = runtime.start((tier.text, tier.vision))
     schema = {

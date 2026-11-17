@@ -609,6 +609,7 @@ export const SUGGESTION_OPTION_LABEL = {
 export const AI_INSTALL_STEP_LABEL: Record<AiInstallStep, string> = {
   program: "Downloading the AI program",
   starting: "Starting the private AI service",
+  model: "Downloading the AI model",
   text_model: "Downloading the text model",
   vision_model: "Downloading the image model",
   finishing: "Finishing setup",
@@ -634,6 +635,7 @@ export const AI_TIER_LABEL: Record<AiTierId, string> = {
   small: "Small",
   standard: "Standard",
   large: "Large",
+  extra_large: "Extra large",
 };
 
 /** Why a suggestion failed, in words that say what to do next. */

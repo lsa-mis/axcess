@@ -25,7 +25,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 CATALOG_PATH = Path(__file__).with_name("catalog.json")
-TierId = Literal["small", "standard", "large"]
+TierId = Literal["small", "standard", "large", "extra_large"]
 Accelerator = Literal["metal", "vulkan", "cpu"]
 
 
@@ -101,8 +101,17 @@ class Tier(_Frozen):
     vision: ModelEntry
 
     @property
+    def models(self) -> tuple[ModelEntry, ...]:
+        """The models to download and run, each once.
+
+        One model can do both jobs (Small: Qwen3.5-2B reads images too); it
+        is then both ``text`` and ``vision``, downloaded and loaded once.
+        """
+        return (self.text,) if self.text == self.vision else (self.text, self.vision)
+
+    @property
     def size(self) -> int:
-        return self.text.size + self.vision.size
+        return sum(m.size for m in self.models)
 
 
 class Catalog(_Frozen):

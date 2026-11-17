@@ -17,6 +17,7 @@ from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
 
+from audit.ai.catalog import TierId
 from audit.config import Settings
 
 SYSTEM_OLLAMA_URL = "http://127.0.0.1:11434"
@@ -144,7 +145,7 @@ class AIConfig(BaseModel):
             raise ValueError("The desktop AI service must use a local address on this computer.")
         return value.rstrip("/")
 
-    tier: Literal["small", "standard", "large"]
+    tier: TierId
     text_model: str
     vision_model: str
     ollama_version: str | None = None

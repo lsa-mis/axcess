@@ -397,7 +397,8 @@ class LlamaRuntime:
         Tries the GPU build first. If a model cannot load with it (for
         example no Vulkan driver), stops it and uses the CPU build.
         """
-        models = list(models)
+        # Each model once: one model can do both jobs (the Small size).
+        models = list({m.served_name: m for m in models}.values())
         with self._lock:
             if self.running() and (self.socket_path or self.routes):
                 return self.socket_path or json.dumps(self.routes, sort_keys=True)

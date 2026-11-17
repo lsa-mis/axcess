@@ -73,7 +73,7 @@ def test_saved_windows_routes_fail_closed_until_this_process_started_them(tmp_pa
         base_url="http://localhost",
         backend="llama_cpp",
         routes=ROUTES,
-        tier="small",
+        tier="standard",
         text_model="text",
         vision_model="vision",
     )

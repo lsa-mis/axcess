@@ -6,6 +6,7 @@ drive it with fakes.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import threading
 from collections.abc import Callable
@@ -14,7 +15,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from audit.ai import hardware as hw
-from audit.ai.catalog import Catalog, ModelEntry, Tier, load_catalog
+from audit.ai.catalog import Catalog, ModelEntry, Tier, TierId, load_catalog
 from audit.ai.installer import Installer, InstallStatus
 from audit.ai.runtime import LlamaRuntime, RuntimeSetupError
 from audit.ai.sandbox import IsolationError
@@ -42,7 +43,7 @@ class ModelInfo(BaseModel):
 
 
 class TierPlan(BaseModel):
-    id: Literal["small", "standard", "large"]
+    id: TierId
     label: str
     min_memory_gb: int
     text: ModelInfo
@@ -79,7 +80,7 @@ class AIPlan(BaseModel):
     hardware: HardwareInfo
     program: ProgramInfo
     tiers: list[TierPlan]
-    recommended: Literal["small", "standard", "large"] | None
+    recommended: TierId | None
     current: AIConfig | None
     install: InstallStatus
 
@@ -104,7 +105,7 @@ class AiRuntimeStartResponse(BaseModel):
     isolated: bool = False
     reason: str | None = None
     download_bytes: int | None = None
-    tier: Literal["small", "standard", "large"] | None = None
+    tier: TierId | None = None
 
 
 class NotEnoughSpaceError(Exception):
@@ -213,7 +214,34 @@ class AIManager:
         return next_preferences
 
     def config(self) -> AIConfig | None:
-        return load_config(self.settings)
+        config = load_config(self.settings)
+        if config is None:
+            return None
+        # The sizes were renamed on 2026-11-17 (Small became Standard,
+        # Standard became Large, Large became Extra large) and a new Small
+        # added. A setup saved before keeps its models; its size is the one
+        # whose models it runs, saved again under the new name.
+        tier = self._tier_running(config)
+        if tier is not None and tier.id != config.tier:
+            config = config.model_copy(update={"tier": tier.id})
+            with contextlib.suppress(OSError):
+                save_config(self.settings, config)
+        return config
+
+    def _tier_running(self, config: AIConfig) -> Tier | None:
+        """The catalog size whose two models this setup names, if any.
+
+        Private setups name llama.cpp's served names; a setup with your own
+        Ollama names the Ollama tags.
+        """
+        pair = (config.text_model, config.vision_model)
+        for tier in self.catalog.tiers:
+            if pair in {
+                (tier.text.served_name, tier.vision.served_name),
+                (tier.text.tag, tier.vision.tag),
+            }:
+                return tier
+        return None
 
     def _trust(self, config: AIConfig) -> None:
         """Trust the service this process just started, at its address."""
@@ -221,7 +249,7 @@ class AIManager:
         if address:
             trust_private_runtime(self.settings, address, self.runtime.running)
 
-    def _models(self, config: AIConfig) -> tuple[ModelEntry, ModelEntry] | None:
+    def _models(self, config: AIConfig) -> tuple[ModelEntry, ...] | None:
         """The catalog models a private llama.cpp setup runs, if still current.
 
         None for a private Ollama setup from before llama.cpp, or when the
@@ -236,7 +264,7 @@ class AIManager:
         names = (tier.text.served_name, tier.vision.served_name)
         if names != (config.text_model, config.vision_model):
             return None
-        return tier.text, tier.vision
+        return tier.models
 
     def plan(self) -> AIPlan:
         machine = self.probe()

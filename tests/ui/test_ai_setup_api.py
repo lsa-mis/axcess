@@ -30,7 +30,7 @@ def db(seeded_db: tuple[Path, Path, int], tmp_path: Path, monkeypatch: pytest.Mo
 def test_ai_routes_are_absent_outside_the_desktop_app(db: Path, tmp_path: Path) -> None:
     with TestClient(create_app(db_path=db, blob_dir=tmp_path / "blobs")) as client:
         assert client.get("/api/ai/plan").status_code == 404
-        assert client.post("/api/ai/install", json={"tier": "small"}).status_code in {404, 405}
+        assert client.post("/api/ai/install", json={"tier": "standard"}).status_code in {404, 405}
 
 
 def test_plan_describes_this_computer_and_every_size(
@@ -39,7 +39,7 @@ def test_plan_describes_this_computer_and_every_size(
     monkeypatch.setenv("AUDIT_DESKTOP", "1")
     with TestClient(create_app(db_path=db, blob_dir=tmp_path / "blobs")) as client:
         plan = client.get("/api/ai/plan").json()
-        assert [t["id"] for t in plan["tiers"]] == ["small", "standard", "large"]
+        assert [t["id"] for t in plan["tiers"]] == ["small", "standard", "large", "extra_large"]
         assert plan["current"] is None
         assert plan["install"]["state"] == "idle"
         assert plan["program"]["licence"] == "MIT"
@@ -63,7 +63,7 @@ def test_saved_setup_chooses_the_models_the_app_uses(
         AIConfig(
             source="system",
             base_url="http://127.0.0.1:1",
-            tier="small",
+            tier="standard",
             text_model="text:test",
             vision_model="vision:test",
         ),
@@ -310,7 +310,7 @@ def test_runtime_start_states(
     monkeypatch.setenv("AUDIT_DESKTOP", "1")
     settings = Settings(data_dir=tmp_path, desktop=True)
     save_preferences(settings, AIPreferences(enabled=True, choice_recorded=True))
-    small = load_catalog().tier("small")
+    small = load_catalog().tier("standard")
     socket = str(tmp_path / "ai" / "scratch" / "llama.sock")
     system = state == "system_ollama_not_managed"
     save_config(
@@ -320,7 +320,7 @@ def test_runtime_start_states(
             base_url="http://127.0.0.1:12345" if system else "http://localhost",
             backend="ollama" if system else "llama_cpp",
             socket_path=None if system else socket,
-            tier="small",
+            tier="standard",
             text_model=small.text.served_name,
             vision_model=small.vision.served_name,
         ),
@@ -354,8 +354,8 @@ def test_runtime_start_states(
         assert result["isolated"] is (state in {"started", "already_running"})
         assert result["reason"] == ("network_test_failed" if state == "not_isolated" else None)
         if state == "model_missing":
-            assert result["tier"] == "small"
-            assert result["download_bytes"] == load_catalog().tier("small").size
+            assert result["tier"] == "standard"
+            assert result["download_bytes"] == load_catalog().tier("standard").size
         if state not in {"started", "not_isolated"}:
             runtime.start.assert_not_called()
         else:

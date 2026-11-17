@@ -48,7 +48,7 @@ def set_up(desktop: Path) -> Path:
         AIConfig(
             source="system",
             base_url="http://127.0.0.1:9",
-            tier="small",
+            tier="standard",
             text_model="qwen3:4b-instruct-2507-q4_K_M",
             vision_model="qwen3-vl:2b-instruct",
         ),
@@ -159,7 +159,7 @@ async def test_settings_toggle_keeps_models_and_keyboard_focus(
         turn_on = page.get_by_role("button", name="Turn AI on")
         assert await turn_on.evaluate("e => e === document.activeElement")
         plan = await (await page.request.get(f"{server_set_up}/api/ai/plan")).json()
-        assert plan["current"]["tier"] == "small"
+        assert plan["current"]["tier"] == "standard"
         assert plan["preferences"]["enabled"] is False
         await page.reload(wait_until="networkidle")
         await page.get_by_role("heading", name="AI features are off").wait_for()
@@ -276,7 +276,8 @@ async def test_choose_a_size_by_keyboard_without_downloading(new_page: Any, serv
         version = load_catalog().llama_cpp.version
         await page.get_by_text(
             f"Downloads: the AI program (llama.cpp {version}, MIT licence) from GitHub and "
-            "two AI models from Hugging Face, a website that shares AI models. "
+            "the AI models for the size you choose, from Hugging Face, "
+            "a website that shares AI models. "
             "Axcess checks every file first.",
             exact=True,
         ).wait_for()
@@ -374,19 +375,19 @@ async def test_a_size_that_is_set_up_offers_no_download(new_page: Any, server_se
         async def plan(route):
             response = await route.fetch()
             body = await response.json()
-            body["current"].update(source="private", backend="llama_cpp", tier="small")
+            body["current"].update(source="private", backend="llama_cpp", tier="standard")
             for tier in body["tiers"]:
-                tier["installed"] = tier["id"] == "small"
+                tier["installed"] = tier["id"] == "standard"
             await route.fulfill(response=response, json=body)
 
         await page.route("**/api/ai/plan", plan)
         await page.goto(f"{server_set_up}/app/settings/ai", wait_until="networkidle")
         await page.get_by_text(
-            "Small is set up on this computer. Nothing to download.", exact=True
+            "Standard is set up on this computer. Nothing to download.", exact=True
         ).wait_for()
         assert await page.get_by_role("button", name="Download and set up").count() == 0
         group = page.get_by_role("group", name="Change the size of the AI models")
-        await group.locator("input[value='standard']").check()
+        await group.locator("input[value='large']").check()
         assert await page.get_by_role("button", name="Download and set up").count() == 1
         violations = await _run_axe(page)
         assert not violations, _render_violations(violations)

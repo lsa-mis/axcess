@@ -272,8 +272,8 @@ function AiSetupPage({
           <ul className="list-disc space-y-1 pl-5">
             <li>
               {plan.program.included
-                ? `Downloads: two AI models from Hugging Face, a website that shares AI models. The AI program (llama.cpp ${plan.program.version}, ${plan.program.licence} licence) comes with Axcess. Axcess checks every file first.`
-                : `Downloads: the AI program (llama.cpp ${plan.program.version}, ${plan.program.licence} licence) from GitHub and two AI models from Hugging Face, a website that shares AI models. Axcess checks every file first.`}
+                ? `Downloads: the AI models for the size you choose, from Hugging Face, a website that shares AI models. The AI program (llama.cpp ${plan.program.version}, ${plan.program.licence} licence) comes with Axcess. Axcess checks every file first.`
+                : `Downloads: the AI program (llama.cpp ${plan.program.version}, ${plan.program.licence} licence) from GitHub and the AI models for the size you choose, from Hugging Face, a website that shares AI models. Axcess checks every file first.`}
             </li>
             <li>The private AI service cannot reach the internet.</li>
             <li>Your reports, pages and screenshots are never sent anywhere.</li>
@@ -362,10 +362,20 @@ function AiSetupPage({
               {plan.tiers.map((tier) => (
                 <li key={tier.id} className="break-all">
                   <span className="font-semibold">{AI_TIER_LABEL[tier.id]}:</span>{" "}
-                  text <span className="font-mono">{tier.text.tag}</span> (
-                  {licenceName(tier.text.licence)}), image{" "}
-                  <span className="font-mono">{tier.vision.tag}</span> (
-                  {licenceName(tier.vision.licence)})
+                  {tier.text.tag === tier.vision.tag ? (
+                    // One model that reads text and images (Small).
+                    <>
+                      text and image <span className="font-mono">{tier.text.tag}</span> (
+                      {licenceName(tier.text.licence)})
+                    </>
+                  ) : (
+                    <>
+                      text <span className="font-mono">{tier.text.tag}</span> (
+                      {licenceName(tier.text.licence)}), image{" "}
+                      <span className="font-mono">{tier.vision.tag}</span> (
+                      {licenceName(tier.vision.licence)})
+                    </>
+                  )}
                 </li>
               ))}
             </ul>
