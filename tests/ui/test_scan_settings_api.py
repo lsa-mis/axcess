@@ -217,20 +217,33 @@ def test_a_typed_browser_name_is_never_sent_back(
     assert "allow-token" not in response.text
 
 
-def test_without_a_choice_the_scan_sends_its_own_name(
+def test_without_a_choice_the_scan_sends_chromes_name(
+    client: TestClient, seeded_db: tuple[Path, Path, int], no_crawl: None
+) -> None:
+    """Chrome's name is the default since 6eff256 (2026-11-16): a request
+    with no choice, such as one from an older New scan, gets it."""
+    from audit.crawler.user_agent import chromium_user_agent
+
+    scan_id = _create(client)
+    config = _config(seeded_db[0], scan_id)
+    assert config["user_agent"] == chromium_user_agent()
+    _stop(seeded_db[0], scan_id, "failed")
+    settings = client.get(f"/api/scans/{scan_id}/settings").json()["settings"]
+    assert settings["user_agent_choice"] == "chrome"
+
+
+def test_axcess_choice_sends_its_own_name_and_ignores_a_string(
     client: TestClient, seeded_db: tuple[Path, Path, int], no_crawl: None
 ) -> None:
     from audit.config import get_settings
 
-    # A string with no choice, or with Axcess's own, is ignored.
-    for extra in ({}, {"user_agent_choice": "axcess", "user_agent": CHROME_WINDOWS}):
-        scan_id = _create(client, **extra)
-        config = _config(seeded_db[0], scan_id)
-        assert config["user_agent"] == get_settings().user_agent
-        assert "user_agent_choice" not in config
-        _stop(seeded_db[0], scan_id, "failed")
-        settings = client.get(f"/api/scans/{scan_id}/settings").json()["settings"]
-        assert settings["user_agent_choice"] == "axcess"
+    scan_id = _create(client, user_agent_choice="axcess", user_agent=CHROME_WINDOWS)
+    config = _config(seeded_db[0], scan_id)
+    assert config["user_agent"] == get_settings().user_agent
+    assert "user_agent_choice" not in config
+    _stop(seeded_db[0], scan_id, "failed")
+    settings = client.get(f"/api/scans/{scan_id}/settings").json()["settings"]
+    assert settings["user_agent_choice"] == "axcess"
 
 
 @pytest.mark.parametrize(
