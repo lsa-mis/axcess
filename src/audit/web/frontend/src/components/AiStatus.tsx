@@ -167,6 +167,10 @@ export function AiStatus({ heading = false }: { heading?: boolean }) {
       ? <h2 ref={headingRef} tabIndex={-1} className="font-semibold">{AI_STATE_LABEL[kind]}</h2>
       : <p ref={lineRef} tabIndex={-1} className="font-semibold">{AI_STATE_LABEL[kind]}</p>}
     <p>{detail}</p>
+    {/* Low free memory warns instead of refusing (developer, 2026-11-18:
+        the operating system makes room). Said in words, with what helps,
+        not by colour (WCAG 2.2 SC 1.4.1 Use of Color, Level A). */}
+    {kind === "on" && status?.memory_warning && <p>{status.memory_warning}</p>}
     {kind === "stopped" && <Button type="button" aria-disabled={start.isPending || undefined}
       onClick={() => { if (!start.isPending) start.mutate(); }}>
       Start AI again

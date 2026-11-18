@@ -36,6 +36,9 @@ def desktop(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     monkeypatch.setenv("AUDIT_DESKTOP", "1")
     monkeypatch.setenv("AUDIT_DATA_DIR", str(data))
     monkeypatch.setenv("AUDIT_ACCESS_TOKEN", "")
+    # A 16 GB computer, like the developer's: Small and Standard can run,
+    # Large (for 32 GB or more) cannot. The test server runs in this process.
+    monkeypatch.setattr("audit.ai.hardware._memory_bytes", lambda: 16 * 1024**3)
     save_preferences(Settings(data_dir=data, desktop=True), AIPreferences())
     yield data
 
@@ -433,9 +436,18 @@ async def test_a_size_that_is_set_up_offers_no_download(new_page: Any, server_se
         download = page.get_by_role("button", name=re.compile("^Download "))
         assert await download.count() == 0
         group = page.get_by_role("group", name="Choose the AI models")
-        await group.locator("input[value='large']").check()
+        await group.locator("input[value='small']").check()
         # AI is on, so the download switches to the new size.
-        await page.get_by_role("button", name="Download Large and switch to it").wait_for()
+        await page.get_by_role("button", name="Download Small and switch to it").wait_for()
+        # Large is for 32 GB or more: on this 16 GB computer it says so where
+        # the button was, and offers no download (developer, 2026-11-18).
+        await group.locator("input[value='large']").check()
+        await page.get_by_text(
+            "Large is for computers with 32 GB of memory or more, and this computer has "
+            "16 GB. Choose a smaller size.",
+            exact=True,
+        ).wait_for()
+        assert await download.count() == 0
         violations = await _run_axe(page)
         assert not violations, _render_violations(violations)
     finally:
@@ -651,11 +663,13 @@ async def test_a_refusal_for_low_memory_appears_right_under_its_button(
     new_page: Any, server_set_up: str
 ) -> None:
     """Developer, 2026-11-17: the error ... should appear right above or under
-    the button, not at the top of the page (SC 3.3.1, SC 4.1.3)."""
+    the button, not at the top of the page (SC 3.3.1, SC 4.1.3). Since
+    2026-11-18 the only memory refusal is a size on a computer with less
+    memory than it is for; low free memory warns instead."""
     page = await new_page()
     refusal = (
-        "The AI models need about 8.7 GB of free memory, and 5.1 GB is free now. AI was not "
-        "started. Close other programs and try again, or choose a smaller size."
+        "The Standard size is for computers with 16 GB of memory or more, and this computer "
+        "has 8 GB. Choose a smaller size."
     )
     try:
 

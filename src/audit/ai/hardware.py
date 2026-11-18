@@ -111,6 +111,28 @@ def _macos_available(vm_stat: str, total: int) -> int:
     return max(quick * page, reclaimable)
 
 
+# Memory sizes computers are sold with, in GB.
+SOLD_MEMORY_GB = (4, 6, 8, 12, 16, 18, 24, 32, 36, 48, 64, 96, 128, 192, 256)
+
+
+def memory_gb(memory_bytes: int) -> int:
+    """Memory as computers are sold: 16, not the 15 the system reports.
+
+    The system keeps some memory for itself, so a 16 GB computer reports
+    about 15.3 GiB. A total within 10% below a sold size is that size;
+    anything else is rounded. 0 when the memory is unknown. The AI features
+    page shows this number next to each size's "for computers with 16 GB of
+    memory or more", and the manager refuses a size on a computer with less,
+    so both use the same figure (developer, 2026-11-18: a 16 GB computer
+    read "15 GB" and looked too small for Standard).
+    """
+    if memory_bytes <= 0:
+        return 0
+    gib = memory_bytes / 1024**3
+    sold = next((size for size in SOLD_MEMORY_GB if size >= gib - 0.05), None)
+    return sold if sold is not None and sold - gib <= sold * 0.1 else round(gib)
+
+
 def dedicated_gpu() -> bool:
     """A separate graphics card with its own memory (NVIDIA, AMD)."""
     return _gpu() in ("NVIDIA", "AMD")
@@ -187,7 +209,8 @@ def probe(data_dir: Path) -> Hardware:
 
 def fits(hardware: Hardware, tier: Tier, extra_bytes: int = 0) -> bool:
     """Enough memory to run the tier and enough disk to download it."""
-    enough_memory = hardware.memory_bytes >= tier.min_memory_gb * GB * 0.95
+    # The same figure the page shows and AIManager._require_size_fits uses.
+    enough_memory = memory_gb(hardware.memory_bytes) >= tier.min_memory_gb
     enough_disk = hardware.free_disk_bytes >= tier.size + extra_bytes + DISK_MARGIN
     return enough_memory and enough_disk
 

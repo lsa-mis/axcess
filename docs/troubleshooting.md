@@ -109,12 +109,17 @@ and continues without those checks.
   starts only Axcess's private AI service. It never starts or stops your own
   Ollama. When the app opens with AI on, the service starts in the background;
   until it is ready, AI requests say it is not running.
-- **The AI models would not fit in the memory that is free now**: Axcess
-  checks free memory before it starts the models and refuses rather than
-  make the computer swap or stop responding. The log
-  (`data/ai/llama-server.log`) says how much they need and how much was
-  free. Close other programs and select **Start AI again**, or
-  choose a smaller size.
+- **"This computer has less memory than this size is for"**: each size says
+  which computers it is for (for example, Standard is for computers with
+  16 GB of memory or more). On a computer with less, Axcess does not
+  download or start that size. Choose a smaller size, such as Small on an
+  8 GB laptop.
+- **"Memory was low when AI started"**: AI started anyway, but the models
+  need more free memory than there was, so answers may be slow. The
+  operating system makes room by compressing or moving other programs'
+  memory. Closing other programs helps. The log
+  (`data/ai/llama-server.log`) says how much the models need and how much
+  was free.
 - **Private models are missing**: choose a size in **AI features**. Check the
   download size above the button, then select the download button. Starting the service
   never downloads files without that separate choice.

@@ -55,10 +55,14 @@ import {
  *   question first. W3C "Using ARIA", rule 1
  *   (https://www.w3.org/TR/using-aria/#rule1, paraphrased: use the native
  *   element when it has the behaviour you need); WCAG technique H71.
- * - A size that may not fit is still choosable but says why in text, not
- *   by colour or by disabling it: the hardware check can be wrong, and a
- *   disabled option cannot be focused or explained. WCAG 2.2 SC 1.4.1 Use of
- *   Color, Level A.
+ * - A size this computer has too little memory for is still a choice you
+ *   can focus and read, and says why in text, not by colour or by disabling
+ *   it: a disabled option cannot be focused or explained. WCAG 2.2 SC 1.4.1
+ *   Use of Color, Level A. Since 2026-11-18 (the developer's decision) such
+ *   a size cannot be downloaded or started: an 8 GB laptop is refused
+ *   Standard and Large. In place of its download button, a line says what
+ *   the size is for and what this computer has. Low free memory, which
+ *   changes from minute to minute, only warns once AI runs.
  * - Progress is a native <progress> with a visible text value, and changes of
  *   step or state (not every byte) are said in a polite live region. WCAG 2.2
  *   SC 4.1.3 Status Messages, Level AA. Announcing every percent would talk
@@ -287,7 +291,7 @@ function AiSetupPage({
               recommended={tier.id === plan.recommended}
               current={tier.id === current?.tier}
               checked={tier.id === chosen}
-              memoryBytes={plan.hardware.memory_bytes}
+              memoryGb={plan.hardware.memory_gb}
               onChoose={() => setChosen(tier.id)}
             />
           ))}
@@ -321,9 +325,9 @@ function AiSetupPage({
         </fieldset>
         {plan.recommended === null && (
           <p className="mt-3 text-xs leading-5 text-fg">
-            This computer has less memory or free disk space than even the
-            smallest size needs. You can still try it, but it may be very
-            slow or fail.
+            {plan.tiers[0] && tooLittleMemory(plan, plan.tiers[0])
+              ? "This computer has less memory than even the smallest size is for, so no size can run here. You can try a smaller model file of your own."
+              : "This computer has less free disk space than even the smallest size needs. Free up space before you download."}
           </p>
         )}
       </fieldset>
@@ -395,6 +399,13 @@ function AiSetupPage({
                 <Pause className="h-4 w-4" aria-hidden />
                 Pause download
               </Button>
+            ) : chosenTier && tooLittleMemory(plan, chosenTier) ? (
+              // A size this computer has too little memory for: no download,
+              // and a line that says why and what to do, where the button
+              // was (developer, 2026-11-18; see the rationale at the top).
+              <p className="min-h-target content-center text-sm font-semibold text-fg">
+                {`${AI_TIER_LABEL[chosenTier.id]} is for computers with ${chosenTier.min_memory_gb} GB of memory or more, and this computer has ${plan.hardware.memory_gb} GB. Choose a smaller size.`}
+              </p>
             ) : chosenIsSetUp ? (
               // The chosen size is set up and every file is checked: a line
               // says so where the button was (2026-11-17, the developer's
@@ -981,7 +992,7 @@ function TierOption({
   recommended,
   current,
   checked,
-  memoryBytes,
+  memoryGb,
   onChoose,
 }: {
   tier: AiTierPlan;
@@ -989,10 +1000,10 @@ function TierOption({
   recommended: boolean;
   current: boolean;
   checked: boolean;
-  memoryBytes: number;
+  memoryGb: number;
   onChoose: () => void;
 }) {
-  const tooSmall = memoryGb(memoryBytes) < tier.min_memory_gb;
+  const tooSmall = memoryGb > 0 && memoryGb < tier.min_memory_gb;
   return (
     <ModelOption
       name={name}
@@ -1009,7 +1020,7 @@ function TierOption({
         `${AI_TIER_DESCRIPTION[tier.id]} For computers with ${tier.min_memory_gb} GB of memory or more. ` +
         `${formatBytes(tier.download_bytes)} download.` +
         (tooSmall
-          ? " This computer has less memory than this size needs, so it may be slow or fail."
+          ? " This computer has less memory than this size is for, so it cannot be used here."
           : !tier.fits
             ? " There may not be enough free disk space for this size."
             : "")
@@ -1104,18 +1115,13 @@ function ProgressBlock({ status }: { status: AiInstallStatus }) {
 }
 
 /**
- * Memory as computers are sold: 16 GB, not the 15 GB the system reports
- * once it keeps some for itself, and in the same unit as the sizes'
- * "16 GB of memory or more". Before, a 16 GB computer read "15 GB" next to
- * Standard's "16 GB" and looked too small for it (developer, 2026-11-18).
- * A total within 10% below a common size is that size; anything else is
- * rounded.
+ * This computer has less memory than the size is for, so the size cannot
+ * be downloaded or started (the server refuses it too). Memory is as
+ * computers are sold (the server's hardware.memory_gb), so a 16 GB
+ * computer reads 16, not 15. 0 means unknown, which never refuses.
  */
-const SOLD_MEMORY_GB = [4, 6, 8, 12, 16, 18, 24, 32, 36, 48, 64, 96, 128, 192, 256];
-export function memoryGb(bytes: number): number {
-  const gib = bytes / 1024 ** 3;
-  const sold = SOLD_MEMORY_GB.find((size) => size >= gib - 0.05);
-  return sold !== undefined && sold - gib <= sold * 0.1 ? sold : Math.round(gib);
+function tooLittleMemory(plan: AiPlan, tier: AiTierPlan): boolean {
+  return plan.hardware.memory_gb > 0 && plan.hardware.memory_gb < tier.min_memory_gb;
 }
 
 /**
@@ -1126,7 +1132,7 @@ export function memoryGb(bytes: number): number {
  * does not fit" (developer, 2026-11-18).
  */
 function hardwareSentence(plan: AiPlan): string {
-  const memory = memoryGb(plan.hardware.memory_bytes);
+  const memory = plan.hardware.memory_gb;
   const disk = formatBytes(plan.hardware.free_disk_bytes);
   const chip = {
     apple: "an Apple chip",
