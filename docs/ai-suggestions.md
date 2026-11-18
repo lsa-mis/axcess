@@ -98,6 +98,20 @@ Axcess offers **Set up AI features** or **Continue without AI** when it first
 opens. Choosing setup opens the size page; it does not start a download.
 Choosing to continue keeps AI off. You can change your choice in Settings.
 
+Settings and **AI features** show one state for AI, with the one action it
+needs:
+
+| State | What it means | Action |
+| --- | --- | --- |
+| AI is not set up | No size is downloaded yet. | **Set up AI features** (Settings), then choose a size. |
+| AI is off | A size is kept on this computer; nothing runs. | **Turn AI on** (downloads nothing). |
+| AI is starting | The models are loading, for example just after the app opens. | Wait; this can take a minute. |
+| AI is on | The private AI service runs the size in use. | **Turn AI off** when you want. |
+| AI has stopped | AI is on, but its service stopped or could not start. The reason is shown. | **Start AI again**. |
+
+Once a size is set up, **AI features** shows this state first, and the size
+choice moves into **Change the AI models**.
+
 1. Axcess checks this computer: memory (RAM), free disk space, and whether
    there is a graphics chip that speeds AI up (an Apple chip, or an NVIDIA or
    AMD card).
@@ -108,14 +122,23 @@ Choosing to continue keeps AI off. You can change your choice in Settings.
    | Small | 8 GB memory | `bonsai2:4b-ternary-q2_0` (one model reads text and images) | the same model | about 1.6 GB |
    | Standard | 16 GB memory | `bonsai2:9b-ternary-q2_0` (one model reads text and images) | the same model | about 3.2 GB |
    | Large | 32 GB memory | `bonsai2:27b-ternary-q2_0` (one model reads text and images) | the same model | about 8.3 GB |
-   | Extra large | 32 GB memory | `qwen2.5-coder:14b-instruct` | `qwen3-vl:8b-instruct` | about 15 GB |
 
-   Both models stay loaded at once, and each needs working memory beyond its
-   download size, so a size needs much more memory than it downloads.
+   A model needs working memory beyond its download size, so a size needs
+   much more memory than it downloads. Each size says how fast it is and
+   how good its answers were in our real-page trials
+   (`docs/internal/model-trials-2026-11.md`): Standard took about 1.5 times
+   as long as Small to answer, and wrote more usable fixes. Extra large, two
+   models at once, was removed on 2026-11-18: it was not tested against the
+   Bonsai 2 sizes and does not fit a 16 GB computer. A setup saved under it
+   asks for a new download.
 
    Without a graphics chip Axcess suggests Small, because larger models are
-   very slow on the processor alone. All models use the Apache 2.0 licence.
-3. Select **Download and set up** after checking the size shown on the button.
+   slow on the processor alone, and the page says so. All models use the
+   Apache 2.0 licence.
+3. Check the download size, shown just above the button, then select
+   **Download Small and turn AI on** (the button names the size you chose;
+   if AI is already on, it says **Download Standard and switch to it**, for
+   example).
    Axcess downloads only the AI models for that size, as GGUF files, from
    Hugging Face, a website that shares AI models. Each file is pinned to an
    exact version. Axcess checks each file against its SHA-256 checksum
@@ -178,7 +201,7 @@ was. It does not switch off later without another click.
 
 Select **Turn AI on** to reuse the kept models. This starts the private AI
 service again. If there is no setup yet,
-choose a size and select **Download and set up** instead. AI becomes available
+choose a size and download it instead. AI becomes available
 only when the required local models are ready. Scan-time AI checks are still
 off for each new scan until you choose them. Existing installations keep
 their setup and do not repeat the first-launch choice.
@@ -187,13 +210,14 @@ their setup and do not repeat the first-launch choice.
 
 When AI is on, Axcess starts the private AI service by itself: when you turn
 AI on, and in the background when the app opens. Until the service is ready,
-AI requests say that it is not running. To start it yourself, select
-**Start AI service** in Settings or AI features. This starts only Axcess's
-own service and never downloads anything. It does not start, stop or
-download into your own Ollama. While the service runs, the button is gone
-and the page says "AI service is running." Once a size is downloaded and in
-use, AI features says it is set up and offers no download for it; choose
-another size to download that one.
+AI requests say that it is not running, and the state is "AI is
+starting". If AI is on but its service stopped, the state is "AI has
+stopped" with the reason; select **Start AI again** in Settings, AI features
+or on the suggestion. This starts only Axcess's own service and never
+downloads anything. It does not start, stop or download into your own
+Ollama. The button shows only in that state. Once a size is downloaded and
+in use, **Change the AI models** says it is set up and offers no download
+for it; choose another size to download that one.
 
 ### Use your own model
 

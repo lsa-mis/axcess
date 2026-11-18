@@ -76,15 +76,17 @@ class RuntimeSetupError(Exception):
 
 
 class NotEnoughMemoryError(RuntimeSetupError):
-    """The models would not fit in the memory free now; nothing started."""
+    """This computer has less memory than the chosen size is for; nothing started."""
 
 
 # Memory a running model needs beyond its file: the 8,192-token context
 # (its KV cache) and compute buffers. About 1-2.5 GB for the catalogue's
 # models by their published shapes; 1.5 GB per model plus a 1 GB margin.
+# Since 2026-11-18 this only decides whether to warn that memory is low;
+# it no longer stops a start (see LlamaRuntime._note_memory).
 WORKING_BYTES_PER_MODEL = 1_500_000_000
 MEMORY_MARGIN_BYTES = 1_000_000_000
-# How long a start waits for memory to come back before refusing.
+# How long a start waits for memory to come back before it warns.
 MEMORY_SETTLE_S = 10.0
 # The service's process group, kept so a later start can end what an
 # earlier run left behind (a crash, a killed app).
@@ -272,6 +274,8 @@ class LlamaRuntime:
         self.accelerator: str | None = None
         self.isolated = False
         self.isolation_reason: str | None = None
+        # Said while the service runs, when it started with little free memory.
+        self.memory_warning: str | None = None
 
     # -- the program -------------------------------------------------------
 
@@ -501,7 +505,7 @@ class LlamaRuntime:
             if not all(self.has_model(m) for m in models):
                 raise RuntimeSetupError("The AI models are not downloaded yet.")
             self._end_leftovers()
-            self._require_memory(models)
+            self._note_memory(models)
             last: RuntimeSetupError | None = None
             start = (
                 self._start_windows_locked if sys.platform.startswith("win") else self._start_locked
@@ -707,6 +711,7 @@ class LlamaRuntime:
         return self._process is not None and self._process.poll() is None and self.isolated
 
     def stop(self) -> None:
+        self.memory_warning = None
         self._abort.set()
         with self._lock:
             try:
@@ -756,34 +761,38 @@ class LlamaRuntime:
         with contextlib.suppress(OSError):
             marker.unlink(missing_ok=True)
 
-    def _require_memory(self, models: list[ModelEntry]) -> None:
-        """Refuse to start models that would not fit in the memory free now.
+    def _note_memory(self, models: list[ModelEntry]) -> None:
+        """Warn, without stopping the start, when free memory looks too low.
 
-        Starting them anyway makes the computer swap or stop responding;
-        a plain refusal leaves everything else working.
+        This used to refuse the start (2026-11-17). On an 8 GB MacBook Air it
+        refused even Small, though macOS makes room by compressing other
+        programs' memory. The developer chose, on 2026-11-18, to warn and let
+        the operating system manage memory. The one refusal left is a size
+        on a computer with less memory than the size is for
+        (AIManager._require_size_fits).
         """
         need = memory_needed(models, dedicated_gpu=hardware.dedicated_gpu())
         # Memory a model just stopped holds comes back over a few seconds
         # (integrated graphics frees its part late), so a switch measured at
-        # once was refused with room to spare (end-to-end test, 2026-11-17).
+        # once would warn with room to spare (end-to-end test, 2026-11-17).
         deadline = time.monotonic() + MEMORY_SETTLE_S
         while True:
             free = hardware.available_memory_bytes()
             if free is None or free >= need:
+                self.memory_warning = None
                 return
             if time.monotonic() >= deadline:
                 break
             time.sleep(0.5)
-        self.isolation_reason = "not_enough_memory"
         note(
             self.ai_dir / "llama-server.log",
-            f"not started: the models need about {need / 1e9:.1f} GB of free memory, "
-            f"{free / 1e9:.1f} GB is free",
+            f"starting with little memory: the models need about {need / 1e9:.1f} GB of "
+            f"free memory, {free / 1e9:.1f} GB is free",
         )
-        raise NotEnoughMemoryError(
-            f"The AI models need about {need / 1e9:.1f} GB of free memory, and "
-            f"{free / 1e9:.1f} GB is free now. AI was not started. Close other programs "
-            "and try again, or choose a smaller size."
+        self.memory_warning = (
+            f"Memory was low when AI started: the models need about {need / 1e9:.1f} GB, "
+            f"and {free / 1e9:.1f} GB was free. AI may answer slowly. Closing other "
+            "programs helps."
         )
 
     def remove(self) -> None:

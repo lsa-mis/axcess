@@ -12,6 +12,7 @@ from unittest.mock import Mock
 import httpx
 import pytest
 from pydantic import ValidationError
+from support.two_model import TWO_MODEL, two_model_catalog
 
 from audit.ai import downloader
 from audit.ai import sandbox as sandbox_module
@@ -383,7 +384,11 @@ def test_every_catalog_model_is_pinned_to_a_commit_over_https(tmp_path, model) -
 
 # -- the manager and the service ---------------------------------------------
 
-TWO_MODEL = load_catalog().tier("extra_large")
+
+@pytest.fixture(autouse=True)
+def _two_model_size(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The manager's catalogue includes a two-model size (see support.two_model)."""
+    monkeypatch.setattr("audit.ai.manager.load_catalog", two_model_catalog)
 
 
 def manager_for(tmp_path, *, enabled=True, desktop=True, source="private", backend="llama_cpp"):
@@ -435,10 +440,7 @@ def test_start_states_and_download_size(tmp_path) -> None:
     manager, runtime = manager_for(tmp_path)
     runtime.has_model.return_value = False
     missing = manager.start_runtime()
-    assert (
-        missing.state == "model_missing"
-        and missing.download_bytes == load_catalog().tier("extra_large").size
-    )
+    assert missing.state == "model_missing" and missing.download_bytes == TWO_MODEL.size
     runtime.start.assert_not_called()
     runtime.has_model.return_value = True
     runtime.start.side_effect = IsolationError("network_test_failed", "blocked")
@@ -766,31 +768,72 @@ def test_the_linux_sandbox_ends_every_process_in_it(
 def test_memory_needed_counts_files_only_without_a_graphics_card() -> None:
     from audit.ai.runtime import MEMORY_MARGIN_BYTES, WORKING_BYTES_PER_MODEL, memory_needed
 
-    models = list(load_catalog().tier("extra_large").models)
+    models = list(TWO_MODEL.models)
     files = sum(m.size for m in models)
     working = WORKING_BYTES_PER_MODEL * len(models) + MEMORY_MARGIN_BYTES
     assert memory_needed(models, dedicated_gpu=False) == files + working
     assert memory_needed(models, dedicated_gpu=True) == working
 
 
-def test_a_start_that_would_not_fit_in_free_memory_is_refused(
+def test_low_free_memory_warns_but_never_stops_a_start(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """2026-11-18: free memory warns instead of refusing; the operating
+    system makes room (it refused even Small on an 8 GB MacBook Air)."""
     from audit.ai import hardware
-    from audit.ai.runtime import NotEnoughMemoryError
-
-    runtime = LlamaRuntime(tmp_path / "ai", load_catalog())
     from audit.ai import runtime as runtime_module
 
+    runtime = LlamaRuntime(tmp_path / "ai", load_catalog())
     monkeypatch.setattr(runtime_module, "MEMORY_SETTLE_S", 0.0)
     monkeypatch.setattr(hardware, "available_memory_bytes", lambda: 2_000_000_000)
     monkeypatch.setattr(hardware, "dedicated_gpu", lambda: False)
-    with pytest.raises(NotEnoughMemoryError, match="free memory"):
-        runtime._require_memory(list(load_catalog().tier("extra_large").models))
-    assert runtime.isolation_reason == "not_enough_memory"
-    # Unknown free memory never blocks a start.
+    runtime._note_memory(list(TWO_MODEL.models))
+    assert runtime.memory_warning is not None
+    assert runtime.memory_warning.startswith("Memory was low when AI started")
+    assert "2.0 GB was free" in runtime.memory_warning
+    assert runtime.isolation_reason is None
+    # Enough memory, or unknown: no warning.
     monkeypatch.setattr(hardware, "available_memory_bytes", lambda: None)
-    runtime._require_memory(list(load_catalog().tier("extra_large").models))
+    runtime._note_memory(list(TWO_MODEL.models))
+    assert runtime.memory_warning is None
+
+
+def test_a_size_is_refused_only_on_a_computer_with_less_memory_than_it_is_for(
+    tmp_path: Path,
+) -> None:
+    """The one memory refusal left (developer, 2026-11-18): an 8 GB laptop
+    cannot download or start Standard or Large; Small still starts."""
+    from audit.ai.hardware import Hardware
+    from audit.ai.runtime import NotEnoughMemoryError
+
+    def laptop(gb: int) -> Hardware:
+        return Hardware(gb * 1024**3, 100 * 10**9, True, None, "darwin", "arm64")
+
+    manager, runtime = manager_for(tmp_path)
+    manager.probe = lambda: laptop(8)  # type: ignore[method-assign]
+    with pytest.raises(NotEnoughMemoryError, match="for computers with 16 GB"):
+        manager.install("standard")
+    with pytest.raises(NotEnoughMemoryError, match="this computer has 8 GB"):
+        manager.install("large")
+    # The saved setup is the two-model size (32 GB): Start AI again refuses
+    # and the AI state says why.
+    refused = manager.start_runtime()
+    assert (refused.state, refused.reason) == ("not_isolated", "not_enough_memory")
+    assert runtime.isolation_reason == "not_enough_memory"
+    runtime.start.assert_not_called()
+    # Unknown memory never refuses.
+    manager.probe = lambda: laptop(0)  # type: ignore[method-assign]
+    assert manager.start_runtime().state == "started"
+
+
+@pytest.mark.parametrize(
+    ("gib", "sold"),
+    [(15.3, 16), (16.0, 16), (7.6, 8), (8.0, 8), (31.2, 32), (12.7, 13), (0, 0)],
+)
+def test_memory_reads_as_computers_are_sold(gib: float, sold: int) -> None:
+    from audit.ai.hardware import memory_gb
+
+    assert memory_gb(int(gib * 1024**3)) == sold
 
 
 def test_a_service_left_running_is_ended_before_a_new_one(
@@ -817,7 +860,8 @@ def test_a_service_left_running_is_ended_before_a_new_one(
 def test_a_start_waits_briefly_for_memory_a_stop_gives_back(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Memory comes back a moment after a model stops; the check waits for it."""
+    """Memory comes back a moment after a model stops; the check waits for it
+    before it warns."""
     from audit.ai import hardware
     from audit.ai import runtime as runtime_module
 
@@ -826,4 +870,5 @@ def test_a_start_waits_briefly_for_memory_a_stop_gives_back(
     monkeypatch.setattr(hardware, "dedicated_gpu", lambda: False)
     monkeypatch.setattr(runtime_module.time, "sleep", lambda _s: None)
     runtime = LlamaRuntime(tmp_path / "ai", load_catalog())
-    runtime._require_memory(list(load_catalog().tier("extra_large").models))
+    runtime._note_memory(list(TWO_MODEL.models))
+    assert runtime.memory_warning is None

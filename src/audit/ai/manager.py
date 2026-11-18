@@ -60,6 +60,8 @@ class TierPlan(BaseModel):
 
 class HardwareInfo(BaseModel):
     memory_bytes: int
+    # Memory as computers are sold (hardware.memory_gb); 0 when unknown.
+    memory_gb: int = 0
     free_disk_bytes: int
     accelerator: Literal["apple", "nvidia", "amd", "none"]
 
@@ -95,6 +97,8 @@ class AiRuntimeStatus(BaseModel):
     reason: str | None = None
     # A start is loading the models (at launch it runs in the background).
     starting: bool = False
+    # While running: the service started with little free memory.
+    memory_warning: str | None = None
 
 
 class AiRuntimeStartResponse(BaseModel):
@@ -195,16 +199,15 @@ class AIManager:
             if models is None:
                 raise RuntimeSetupError(
                     "The AI models need to be downloaded again for this version of Axcess. "
-                    "Choose a size and select Download and set up."
+                    "Choose a size and download it."
                 )
+            self._require_size_fits(self._tier_of(config), starting=True)
             self.runtime.start(models)
             config = config.model_copy(update=self.runtime.service_fields())
             self._trust(config)
             save_config(self.settings, config)
         elif enabled and config is None:
-            raise RuntimeSetupError(
-                "AI is not set up yet. Choose a size and select Download and set up."
-            )
+            raise RuntimeSetupError("AI is not set up yet. Choose a size and download it.")
         next_preferences = AIPreferences(enabled=enabled, choice_recorded=True)
         try:
             save_preferences(self.settings, next_preferences)
@@ -226,7 +229,9 @@ class AIManager:
         # The sizes were renamed on 2026-11-17 (Small became Standard,
         # Standard became Large, Large became Extra large) and a new Small
         # added. A setup saved before keeps its models; its size is the one
-        # whose models it runs, saved again under the new name.
+        # whose models it runs, saved again under the new name. Extra large
+        # was removed on 2026-11-18: a setup naming its models matches no
+        # size, keeps what it saved, and asks for a new download.
         tier = self._tier_running(config)
         if tier is not None and tier.id != config.tier:
             config = config.model_copy(update={"tier": tier.id})
@@ -298,6 +303,7 @@ class AIManager:
             preferences=self.preferences(),
             hardware=HardwareInfo(
                 memory_bytes=machine.memory_bytes,
+                memory_gb=hw.memory_gb(machine.memory_bytes),
                 free_disk_bytes=machine.free_disk_bytes,
                 accelerator=accelerator,
             ),
@@ -339,9 +345,37 @@ class AIManager:
         status = self.installer.status
         if not (self.installer.running and status.tier == tier_id):
             self._require_idle()
+            self._require_size_fits(tier)
             self._check_space(tier, status)
         save_preferences(self.settings, preferences.model_copy(update={"choice_recorded": True}))
         return self.installer.start(tier)
+
+    def _tier_of(self, config: AIConfig) -> Tier | None:
+        """The catalogue size a setup uses; None for your own model."""
+        return next((t for t in self.catalog.tiers if t.id == config.tier), None)
+
+    def _require_size_fits(self, tier: Tier | None, *, starting: bool = False) -> None:
+        """Refuse a size on a computer with less memory than the size is for.
+
+        The one memory refusal left (developer, 2026-11-18): free memory only
+        warns now, because the operating system makes room, but an 8 GB
+        laptop never runs Standard or Large well. The rule follows the words
+        each size shows, "for computers with 16 GB of memory or more", so the
+        page and this check agree. Unknown memory never refuses, and your own
+        model has no such limit. ``starting`` marks the service as stopped
+        for this reason, so the AI state says why.
+        """
+        if tier is None:
+            return
+        have = hw.memory_gb(self.probe().memory_bytes)
+        if have == 0 or have >= tier.min_memory_gb:
+            return
+        if starting:
+            self.runtime.isolation_reason = "not_enough_memory"
+        raise NotEnoughMemoryError(
+            f"The {tier.label} size is for computers with {tier.min_memory_gb} GB of memory "
+            f"or more, and this computer has {have} GB. Choose a smaller size."
+        )
 
     def _check_space(self, tier: Tier, status: InstallStatus) -> None:
         # What a paused run of the same size already wrote is on disk, so
@@ -422,7 +456,7 @@ class AIManager:
         try:
             self.runtime.start(models)
         except (RuntimeSetupError, IsolationError):
-            return "The model used before is not running either; select Start AI service."
+            return "The model used before is not running either; select Start AI again."
         return "The model used before is running again."
 
     def remove(self) -> None:
@@ -449,11 +483,14 @@ class AIManager:
             except IsolationError as exc:
                 reason = exc.reason
         running = self.runtime.running()
+        # Only a message the runtime wrote, and only while it runs.
+        warning = self.runtime.memory_warning
         return AiRuntimeStatus(
             running=running,
             isolated=running,
             reason=None if self.runtime.starting else reason,
             starting=self.runtime.starting and not running,
+            memory_warning=warning if running and isinstance(warning, str) else None,
         )
 
     def start_runtime(self) -> AiRuntimeStartResponse:
@@ -496,6 +533,7 @@ class AIManager:
                     else None,
                 )
             try:
+                self._require_size_fits(tier, starting=True)
                 self.runtime.start(models)
             except IsolationError as exc:
                 return AiRuntimeStartResponse(state="not_isolated", reason=exc.reason)
@@ -531,6 +569,7 @@ class AIManager:
         if models is None or not all(self.runtime.has_model(m) for m in models):
             return
         try:
+            self._require_size_fits(self._tier_of(config), starting=True)
             self.runtime.start(models)
         except (RuntimeSetupError, IsolationError):
             logging.getLogger(__name__).exception("ai.runtime_start_failed")

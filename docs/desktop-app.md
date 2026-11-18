@@ -30,8 +30,9 @@ React workbench in a sandboxed Electron window.
   is the included AI program (llama.cpp). The optional AI models are not silently
   downloaded. **Settings > AI features** (on because `desktopEnvironment`
   sets `AUDIT_DESKTOP=1`) checks memory, disk and graphics chip, and
-  suggests a size: Small, Standard, Large or Extra large. Only after the person selects
-  **Download and set up** does it download the AI models for that size
+  suggests a size: Small, Standard or Large. Only after the person selects
+  the download button (**Download Small and turn AI on**, named for the size)
+  does it download the AI models for that size
   (GGUF files) from Hugging Face. Each file is pinned to an exact version
   and checked against its SHA-256 before use.
 - The AI models are all under the Apache 2.0 licence. Small, Standard and
@@ -39,10 +40,11 @@ React workbench in a sandboxed Electron window.
   or +1, file type Q2_0, which stock llama.cpp runs), each with its image
   add-on (mmproj Q8_0), so one model does both jobs. They run with their
   maker's non-thinking settings (temperature 0.7, top-p 0.8, top-k 20,
-  presence penalty 1.5; min-p 0.05 for the 27B). Extra large is
-  Qwen2.5-Coder-14B with Qwen3-VL-8B. Chosen 2026-11-17 from real-page trials
-  (`docs/internal/model-trials-2026-11.md`); a setup saved before keeps its
-  models under the size whose models it names.
+  presence penalty 1.5; min-p 0.05 for the 27B). Chosen 2026-11-17 from
+  real-page trials (`docs/internal/model-trials-2026-11.md`); a setup saved
+  before keeps its models under the size whose models it names. Extra large
+  (Qwen2.5-Coder-14B with Qwen3-VL-8B, two models at once) was removed on
+  2026-11-18; a setup saved under it asks for a new download.
 - The private AI service runs in an operating-system sandbox with no
   internet access: Bubblewrap with no network on Linux (Bubblewrap must be
   installed, or AI does not start), and a deny-by-default `sandbox-exec`
@@ -60,8 +62,10 @@ React workbench in a sandboxed Electron window.
   uses the processor-only (CPU) build. There are no CUDA or ROCm builds.
   On macOS the sandbox allows only the Mac graphics driver and shader
   compiler, so models still run on the graphics chip (Metal).
-- **Start AI service** starts the private AI service without downloading
-  anything. It shows only while the service is not running. When the app opens with AI on, the service starts in the
+- Settings and AI features show one AI state: not set up, off, starting,
+  on, or stopped. **Start AI again** starts the private AI service without
+  downloading anything. It shows only when AI is on and set up but its
+  service has stopped. When the app opens with AI on, the service starts in the
   background; until it is ready, AI requests say it is not running.
   Model-assisted scan checks stay off for each new scan and report when the
   AI service is unavailable.

@@ -2115,6 +2115,8 @@ export interface AiPlan {
   preferences: AiPreferences;
   hardware: {
     memory_bytes: number;
+    /** Memory as computers are sold (16, not 15.3); 0 when unknown. */
+    memory_gb: number;
     free_disk_bytes: number;
     accelerator: "apple" | "nvidia" | "amd" | "none";
   };
@@ -2167,4 +2169,6 @@ export interface AiRuntimeStatus {
   reason: string | null;
   /** A start is loading the models (at launch it runs in the background). */
   starting: boolean;
+  /** While running: the service started with little free memory. */
+  memory_warning?: string | null;
 }

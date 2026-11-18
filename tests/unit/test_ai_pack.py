@@ -54,7 +54,7 @@ def test_catalog_pins_every_platform_and_only_open_licences() -> None:
         for asset in builds:
             assert len(asset.sha256) == 64
             assert catalog.llama_cpp.version in asset.name
-    assert [t.id for t in catalog.tiers] == ["small", "standard", "large", "extra_large"]
+    assert [t.id for t in catalog.tiers] == ["small", "standard", "large"]
     for tier in catalog.tiers:
         assert tier.text.licence == tier.vision.licence == "Apache-2.0"
         # Image models need their add-on; a text-only model has none. One
@@ -101,9 +101,9 @@ def test_preset_names_each_model_by_its_served_name_and_turns_reasoning_off(tmp_
         (8, True, None, "small"),
         (16, True, None, "standard"),
         (24, True, None, "standard"),
-        (36, True, None, "extra_large"),
+        (36, True, None, "large"),
         (64, False, None, "small"),  # no GPU: bigger models are too slow
-        (64, False, "NVIDIA", "extra_large"),
+        (64, False, "NVIDIA", "large"),
     ],
 )
 def test_recommend_picks_the_largest_tier_that_fits(memory, apple, gpu, expected) -> None:
@@ -350,10 +350,8 @@ def test_install_failure_is_reported_in_plain_words(tmp_path: Path) -> None:
 def test_install_refuses_to_start_without_disk_space(tmp_path: Path) -> None:
     settings = Settings(data_dir=tmp_path, desktop=True)
     manager = AIManager(settings, lambda _c: None, probe=lambda: machine(64, disk_gb=5))
-    with pytest.raises(
-        NotEnoughSpaceError, match="Not enough free disk space for the Extra large size"
-    ):
-        manager.install("extra_large")
+    with pytest.raises(NotEnoughSpaceError, match="Not enough free disk space for the Large size"):
+        manager.install("large")
     assert manager.installer.status.state == "idle"
     assert not manager.installer.running
 
@@ -374,7 +372,6 @@ def test_plan_marks_a_size_installed_only_when_every_file_is_here(tmp_path: Path
         "small": False,
         "standard": True,
         "large": False,
-        "extra_large": False,
     }
 
     present.discard(standard.vision.tag)

@@ -4,8 +4,8 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
+from support.two_model import TWO_MODEL, two_model_catalog
 
-from audit.ai.catalog import load_catalog
 from audit.ai.hardware import Hardware
 from audit.ai.manager import AIBusyError, AIManager
 from audit.ai.runtime import LlamaRuntime, RuntimeSetupError
@@ -24,7 +24,11 @@ from audit.ai.state import (
 from audit.config import Settings
 from audit.web.server import _build_crawl_config
 
-TWO_MODEL = load_catalog().tier("extra_large")
+
+@pytest.fixture(autouse=True)
+def _two_model_size(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The manager's catalogue includes a two-model size (see support.two_model)."""
+    monkeypatch.setattr("audit.ai.manager.load_catalog", two_model_catalog)
 
 
 def socket_path(settings: Settings) -> str:
@@ -195,7 +199,7 @@ def test_failed_setup_stops_private_runtime_while_ai_is_off(tmp_path: Path) -> N
         settings,
         Mock(),
         runtime=runtime,
-        probe=lambda: Hardware(16 * 1024**3, 100 * 10**9, True, None, "darwin", "arm64"),
+        probe=lambda: Hardware(64 * 1024**3, 100 * 10**9, True, None, "darwin", "arm64"),
     )
     runtime.download_remaining.return_value = 0
     manager.installer.pull = Mock(side_effect=RuntimeSetupError("download stopped"))

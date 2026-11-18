@@ -624,10 +624,19 @@ export const AI_INSTALL_STATE_LABEL: Record<AiInstallState, string> = {
   done: "Ready",
 };
 
-/** Saved desktop AI choice, separate from whether models are ready. */
-export const AI_FEATURE_STATE_LABEL = {
-  on: "AI features are on",
-  off: "AI features are off",
+/**
+ * Desktop AI: the one state a person sees. It combines three facts that
+ * used to be shown one by one (the on/off choice, whether the models are
+ * downloaded, whether the AI service runs), which made people work out for
+ * themselves which button could do anything (developer, 2026-11-18).
+ */
+export type AiStateKind = "not_set_up" | "off" | "starting" | "on" | "stopped";
+export const AI_STATE_LABEL: Record<AiStateKind, string> = {
+  not_set_up: "AI is not set up",
+  off: "AI is off",
+  starting: "AI is starting",
+  on: "AI is on",
+  stopped: "AI has stopped",
 };
 
 /** Desktop AI setup: the size of the AI models. */
@@ -635,7 +644,23 @@ export const AI_TIER_LABEL: Record<AiTierId, string> = {
   small: "Small",
   standard: "Standard",
   large: "Large",
+  // No longer offered (2026-11-18); kept so a setup saved under it is named.
   extra_large: "Extra large",
+};
+/**
+ * What each size is like, said the same way for each: speed first, then
+ * answers. From the real-page trials in docs/internal/model-trials-2026-11.md
+ * on this project's 16 GB test computer, without a graphics card: Small
+ * (Bonsai 2 4B) took 26 to 95 s an answer, Standard (Bonsai 2 9B) 40 to 163 s,
+ * and Standard wrote more usable fixes (5 of 10 against 3). Large (27B) was
+ * not timed, so its line says only what is certain: it is the biggest model
+ * (three times Standard) and the slowest. Update these with the trials.
+ */
+export const AI_TIER_DESCRIPTION: Record<AiTierId, string> = {
+  small: "Fastest, but fewer usable answers than Standard.",
+  standard: "Better answers than Small in our tests. Takes about 1.5 times as long to answer.",
+  large: "The biggest model, three times the size of Standard, and the slowest.",
+  extra_large: "",
 };
 /** Desktop AI setup: a GGUF file the person chose instead of a size. */
 export const AI_MY_MODEL_LABEL = "Your own model";
@@ -656,11 +681,6 @@ export const SUGGESTION_ERROR_LABEL: Record<SuggestionErrorCode, string> = {
   internal: "Something went wrong in Axcess. Try again.",
 };
 
-// The AI service's state while it runs, where the Start button was.
-export const AI_RUNTIME_RUNNING = "AI service is running. It is isolated and stays on this computer.";
-// While the service loads its models, for example right after the app opens.
-export const AI_RUNTIME_STARTING = "AI service is starting. This can take a minute.";
-
 export const AI_RUNTIME_START_LABEL: Record<import("../api/types").AiRuntimeStartState, string> = {
   started: "AI service started. It is isolated and stays on this computer.",
   already_running: "AI service is running. It is isolated and stays on this computer.",
@@ -676,7 +696,9 @@ export const AI_ISOLATION_REASON_LABEL: Record<string, string> = {
   network_test_failed: "The isolation check could not prove that outside connections are blocked. AI was not started.",
   namespace_unreachable: "Axcess cannot reach the AI service inside its private network on this computer. AI was not started.",
   runtime_failed: "The isolated AI service could not start. Check the application log.",
-  not_enough_memory: "The AI models would not fit in the memory that is free now, so AI was not started. Close other programs and try again, or choose a smaller size.",
+  // The one memory refusal left (2026-11-18): a size on a computer with
+  // less memory than the size is for. Low free memory only warns.
+  not_enough_memory: "This computer has less memory than this size is for, so AI was not started. Choose a smaller size in Change the AI models.",
   system_ollama_not_managed: "Your own Ollama is not isolated by Axcess. Axcess never starts or stops it.",
 };
 

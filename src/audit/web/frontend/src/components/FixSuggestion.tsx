@@ -21,7 +21,7 @@ import { OPENS_NEW_WINDOW,
   AI_RUNTIME_START_LABEL,
 } from "../lib/terms";
 import { useAiSetup } from "../hooks/useAiSetup";
-import { AiRuntimeControls } from "./AiRuntimeControls";
+import { AiStatus } from "./AiStatus";
 import Tabs from "./Tabs";
 import { Button, Card, ExternalLinkButton, LinkButton, relativeTime } from "./ui";
 
@@ -172,7 +172,7 @@ export default function FixSuggestion({
   const [startMessage, setStartMessage] = useState("");
   const startService = useMutation({
     mutationFn: api.startAiRuntime,
-    onMutate: () => setStartMessage("Starting the AI service. You can keep browsing other issues."),
+    onMutate: () => setStartMessage("Starting AI. You can keep browsing other issues."),
     onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: ["ai-runtime"] });
       if (result.state === "started" || result.state === "already_running") {
@@ -286,7 +286,7 @@ export default function FixSuggestion({
       )}
 
       {/* When the service is simply not running, the fix sits next to the
-          error: one "Start AI service" button that starts Axcess's own
+          error: one "Start AI again" button that starts Axcess's own
           isolated service and then writes this suggestion, so people do not
           have to leave the issue (W3C COGA Making Content Usable,
           https://www.w3.org/TR/coga-usable/, paraphrased: make it easy to
@@ -297,7 +297,9 @@ export default function FixSuggestion({
           the size is shown before you confirm. aria-disabled plus a click
           guard keep focus on the button while it works (SC 2.4.3 Focus
           Order, Level A), and the polite status region announces progress
-          (SC 4.1.3 Status Messages, Level AA). */}
+          (SC 4.1.3 Status Messages, Level AA). Its words match the shared
+          AI state's button (components/AiStatus.tsx), since both start the
+          same service (SC 3.2.4 Consistent Identification, Level AA). */}
       {record.status === "failed" && availability.enabled && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           {record.error_code === "model_unavailable" && aiSetup && (
@@ -309,7 +311,7 @@ export default function FixSuggestion({
                 if (!startService.isPending && !ask.isPending) startService.mutate();
               }}
             >
-              Start AI service
+              Start AI again
             </Button>
           )}
           <Button type="button" onClick={() => ask.mutate()} disabled={ask.isPending}>
@@ -797,7 +799,7 @@ export function SuggestionsBlockedNote({
           AI fix suggestions are turned on, but the private AI service on this computer is not
           ready yet. Starting it never downloads anything.
         </p>
-        {aiSetup ? <AiRuntimeControls setupPage /> : null}
+        {aiSetup ? <AiStatus /> : null}
         {setupLink}
       </Card>
     );

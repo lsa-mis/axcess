@@ -26,9 +26,11 @@ from pydantic import BaseModel, ConfigDict, Field
 
 CATALOG_PATH = Path(__file__).with_name("catalog.json")
 SamplingKey = Literal["temp", "top-p", "top-k", "min-p", "presence-penalty", "repeat-penalty"]
-# "small" is no longer offered (2026-11-17: no 2B model wrote usable fixes in
-# real-page tests); it stays readable so a setup saved under it still loads
-# and is mapped to the size whose models it names.
+# "extra_large" is no longer offered (2026-11-18, the developer's decision: its
+# two models were not tested against Bonsai 2, and two models at once do not
+# fit a 16 GB computer). It stays readable so a setup saved under it still
+# loads; its models are no longer in the catalogue, so turning AI on asks
+# for a new download.
 TierId = Literal["small", "standard", "large", "extra_large"]
 Accelerator = Literal["metal", "vulkan", "cpu"]
 

@@ -24,7 +24,7 @@ from audit.ai.manager import (
     AiRuntimeStatus,
     NotEnoughSpaceError,
 )
-from audit.ai.runtime import RuntimeSetupError
+from audit.ai.runtime import NotEnoughMemoryError, RuntimeSetupError
 from audit.ai.sandbox import IsolationError
 from audit.ai.state import AIPreferences, AIStateError
 
@@ -144,6 +144,9 @@ def build_ai_router(manager: AIManager) -> APIRouter:
             raise HTTPException(503, str(exc)) from exc
         except NotEnoughSpaceError as exc:
             raise HTTPException(507, str(exc)) from exc
+        except NotEnoughMemoryError as exc:
+            # This computer has less memory than the size is for.
+            raise HTTPException(409, str(exc)) from exc
 
     @router.delete("/ai/install")
     async def ai_pause() -> InstallStatus:
