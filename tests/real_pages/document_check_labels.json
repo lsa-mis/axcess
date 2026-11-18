@@ -1,0 +1,322 @@
+{
+ "about": "Real PDFs downloaded by a real Axcess scan of https://hr.umich.edu/ (max 20 pages, public defaults, 2026-11-17), including files those pages link to on www.dol.gov, menopause.org and www.ssa.gov: 28 distinct files (by SHA-256), 21 from hr.umich.edu. Chosen when veraPDF was being tried: every file where pypdf failed a check or veraPDF failed a rule outside 5-1, 7.21.4.x, 7.18.4-2 and 6.2-1, plus 12 chosen across publishers where both passed. Per file: does it have a problem that stops or misleads a screen reader or keyboard user (has_reader_problem; null = the labeller was unsure, not scored), and which of Axcess's checks it should fail (expected_failed_checks), read from the labeller's reader_problems. Judged by an agent inspecting each file's structure, not by a person with a screen reader. Limits: one site, mostly one publisher's forms; few failures per check (field_no_name 3 files, link_no_description 2, untagged_text 2, image_no_description 0, table_cells_misplaced 1, formula_no_description 0); and the four structure checks were tuned on these same files (the 5% header and footer band, MCIDs no tag refers to, parent-tree Artifact elements), so their scores here are not independent.",
+ "labelled": "2026-11-17",
+ "files": [
+  {
+   "url": "https://hr.umich.edu/sites/default/files/2026_benefit-highlights_1-pager.pdf",
+   "sha256": "81f39e3d8d180b48104ed8b85bf02db8e5e21dcfadca15f798079f40d2efdd61",
+   "has_reader_problem": false,
+   "expected_failed_checks": [],
+   "reader_problems": [],
+   "basis": "structure inspected by agent (pypdf structure tree, annotations, form fields; pypdfium2 page renders for untagged content). Not opened in a screen reader or Acrobat by a person.",
+   "notes": "Callout numbers ('2025', '2:1', 'NATIONALLY', 'RECOGNIZED') are tagged as four H1s: odd heading semantics, no content lost. Footer URL is plain text, not a link. Page rendering (pypdfium2) used to see untagged content and some fields."
+  },
+  {
+   "url": "https://hr.umich.edu/sites/default/files/uhr-infographic-2026-04.pdf",
+   "sha256": "00fd8d8780c6fda273b670453e473db96ca3232f86a85694ed6adedffe464242",
+   "has_reader_problem": false,
+   "expected_failed_checks": [],
+   "reader_problems": [],
+   "basis": "structure inspected by agent (pypdf structure tree, annotations, form fields; pypdfium2 page renders for untagged content). Not opened in a screen reader or Acrobat by a person.",
+   "notes": "Figure /Alt values are ASCII bytes with a trailing NUL and no BOM ('HR Logo\\x00'); a conforming reader reads them as PDFDocEncoding and they are fine, but pypdf's str() mis-decodes them as UTF-16 (CJK mojibake) - a tool artefact to watch for in our own code. Reading order of the treemap labels not verified. Page rendering (pypdfium2) used to see untagged content and some fields."
+  },
+  {
+   "url": "http://www.dol.gov/whd/forms/WH-380-E.pdf",
+   "sha256": "9f09aac895386bd95767545012575300820d8e99140397139266c786052c5353",
+   "has_reader_problem": false,
+   "expected_failed_checks": [],
+   "reader_problems": [],
+   "basis": "structure inspected by agent (pypdf structure tree, annotations, form fields; pypdfium2 page renders for untagged content). Not opened in a screen reader or Acrobat by a person.",
+   "notes": "77 widgets, all in Form tags with descriptive TU. Radio options in a group share one TU (e.g. 'Job description' x2); option names not checked. Page rendering (pypdfium2) used to see untagged content and some fields."
+  },
+  {
+   "url": "http://www.dol.gov/whd/forms/WH-384.pdf",
+   "sha256": "0e64f0cae2fbcc06ceccbe0fd3b18fe7f20ded810787330bd9d18d471987d2f6",
+   "has_reader_problem": true,
+   "expected_failed_checks": [
+    "field_no_name"
+   ],
+   "reader_problems": [
+    "Telephone and Fax fields on page 4 have TU 'undefined' (confirmed by rendering the row 'Telephone: (__) ___ Fax: (__) ___')",
+    "Keyboard (Tab) order follows the structure order, which jumps from page 4 back to page 1-3 radio groups and puts Area Code after the signature (WCAG 2.4.3)"
+   ],
+   "basis": "structure inspected by agent (pypdf structure tree, annotations, form fields; pypdfium2 page renders for untagged content). Not opened in a screen reader or Acrobat by a person.",
+   "notes": "Its tab-order problem is one no check here tests. 6 empty H3 tags (no tool reports these). A /Link tag holds the WHD URL text but there is no link annotation, so the URL is not clickable. Page rendering (pypdfium2) used to see untagged content and some fields."
+  },
+  {
+   "url": "http://www.dol.gov/whd/forms/WH-385.pdf",
+   "sha256": "a636db3d4355fcca403f1c854ff348c5e372f253473663ac4c81bcc96ad8a8db",
+   "has_reader_problem": true,
+   "expected_failed_checks": [
+    "field_no_name",
+    "untagged_text"
+   ],
+   "reader_problems": [
+    "Heading 'PART A: HEALTH CARE PROVIDER INFORMATION' (p3) is outside the tag tree",
+    "4 text fields have TU 'undefined' (p2, p3 x2, p4)",
+    "Every radio group (II A 2, II B 3, II B 4, III B 4, III B 5, III C 9) has TU 'RELATIONSHIP', though only II A 2 asks about relationship (others are IS/IS NOT, 0-3, D/W/M, H/D): fields are announced with a wrong name"
+   ],
+   "basis": "structure inspected by agent (pypdf structure tree, annotations, form fields; pypdfium2 page renders for untagged content). Not opened in a screen reader or Acrobat by a person.",
+   "notes": "Three H1s split one title over three lines. Page rendering (pypdfium2) used to see untagged content and some fields."
+  },
+  {
+   "url": "https://hr.umich.edu/sites/default/files/2027_group_health-insurance-special-enrollment_form_accessible.pdf",
+   "sha256": "cbd6950cc549856e954a13e94d9956fe9f26497402a1a3d6c6907cbb73ad1b70",
+   "has_reader_problem": false,
+   "expected_failed_checks": [],
+   "reader_problems": [],
+   "basis": "structure inspected by agent (pypdf structure tree, annotations, form fields; pypdfium2 page renders for untagged content). Not opened in a screen reader or Acrobat by a person.",
+   "notes": "1 empty H2 tag (minor). Yes/No checkbox pairs: question in the first box's TU, 'No' alone on the second (consistent U-M pattern). Page rendering (pypdfium2) used to see untagged content and some fields."
+  },
+  {
+   "url": "https://hr.umich.edu/sites/default/files/2026_gv_benefits-enrollment-change-form_02032026_accessible.pdf",
+   "sha256": "814bb50cf646eb537f6845d579d9a90ee3674354f9ca70a8174716618493b4a9",
+   "has_reader_problem": false,
+   "expected_failed_checks": [],
+   "reader_problems": [],
+   "basis": "structure inspected by agent (pypdf structure tree, annotations, form fields; pypdfium2 page renders for untagged content). Not opened in a screen reader or Acrobat by a person.",
+   "notes": "Tables used for the dependant grid have TH row/column headers. TU typo 'Socail'. Page rendering (pypdfium2) used to see untagged content and some fields."
+  },
+  {
+   "url": "https://menopause.org/wp-content/uploads/for-women/MenoNote-GSM.pdf",
+   "sha256": "2acc15f587390fdb1fb35b087030d68a718ba2770ef999ccd429dc46c1e35df0",
+   "has_reader_problem": true,
+   "expected_failed_checks": [
+    "no_title"
+   ],
+   "reader_problems": [
+    "No document title (file name is announced)",
+    "Logo alt texts are Office auto-captions that do not identify the logos: MenoNote logo = 'A blue text on a black background. Description automatically generated'; The Menopause Society logo = 'A logo for a company...'; Education and Research Fund logo = 'A blue and white logo...' (WCAG 1.1.1; no tool reports this)"
+   ],
+   "basis": "structure inspected by agent (pypdf structure tree, annotations, form fields; pypdfium2 page renders for untagged content). Not opened in a screen reader or Acrobat by a person.",
+   "notes": "image_no_description fails here (a Figure tag with no alt text), but the figure is the border box around 'Treatment Options Summary': decoration, so the labeller judged it no reader problem. Counted as a false alarm for that check. One empty H1 tag; all headings H1. Page rendering (pypdfium2) used to see untagged content and some fields."
+  },
+  {
+   "url": "https://hr.umich.edu/sites/default/files/2026_planning_for_retirement_pocket_guide_042026_accessible.pdf",
+   "sha256": "16634946de2fe8de8b9675b69494fc35daa3c1a72af53e40314b579297323f19",
+   "has_reader_problem": false,
+   "expected_failed_checks": [],
+   "reader_problems": [],
+   "basis": "structure inspected by agent (pypdf structure tree, annotations, form fields; pypdfium2 page renders for untagged content). Not opened in a screen reader or Acrobat by a person.",
+   "notes": "36 links all tagged with text and Contents; 3 tables with TH Column/Row scopes. 5 empty H3 tags on page 6 (minor); one H4 is a URL. Page rendering (pypdfium2) used to see untagged content and some fields."
+  },
+  {
+   "url": "https://www.dol.gov/whd/regs/compliance/posters/fmlaen.pdf",
+   "sha256": "0429a0fdc4970f6a2617d5c57eeecf67764d5dfdaf51bd6af4ae43a74857d57c",
+   "has_reader_problem": true,
+   "expected_failed_checks": [],
+   "reader_problems": [
+    "No heading tags at all: the title and the six visual headings ('What is FMLA leave?' etc.) are P/Span, so heading navigation finds nothing (WCAG 1.3.1; no tool reports this)",
+    "Bulleted lists are not tagged as L/LI (list structure lost)"
+   ],
+   "basis": "structure inspected by agent (pypdf structure tree, annotations, form fields; pypdfium2 page renders for untagged content). Not opened in a screen reader or Acrobat by a person.",
+   "notes": "Its reader problems (no heading tags, lists not tagged as lists) are ones no check here tests. QR code is a Figure with Alt 'dol.gov/fmla' (acceptable). Neither pypdf nor veraPDF flags the missing headings. Page rendering (pypdfium2) used to see untagged content and some fields."
+  },
+  {
+   "url": "https://hr.umich.edu/sites/default/files/2026_health_plan_profiles.pdf",
+   "sha256": "68263d11956c260d6abd55e4e39b0331cd338953fad9b5c47ab2aea4dcc8df9d",
+   "has_reader_problem": true,
+   "expected_failed_checks": [
+    "not_tagged",
+    "no_title"
+   ],
+   "reader_problems": [
+    "Untagged: comparison table has no table structure, no headings, reading order not defined",
+    "No document title"
+   ],
+   "basis": "structure inspected by agent (pypdf structure tree, annotations, form fields; pypdfium2 page renders for untagged content). Not opened in a screen reader or Acrobat by a person.",
+   "notes": "Lang en-US is set. Page rendering (pypdfium2) used to see untagged content and some fields."
+  },
+  {
+   "url": "https://hr.umich.edu/sites/default/files/2026_health_plan_coverage_comparison_chart_09202026.pdf",
+   "sha256": "8e54796029ef7cda483bd881ec9e7ea43477a6afcac7d050ec5202ec0349b932",
+   "has_reader_problem": true,
+   "expected_failed_checks": [
+    "not_tagged",
+    "no_title"
+   ],
+   "reader_problems": [
+    "Untagged: comparison table has no table structure, no headings, reading order not defined",
+    "No document title"
+   ],
+   "basis": "structure inspected by agent (pypdf structure tree, annotations, form fields; pypdfium2 page renders for untagged content). Not opened in a screen reader or Acrobat by a person.",
+   "notes": "Lang en-US is set. Page rendering (pypdfium2) used to see untagged content and some fields."
+  },
+  {
+   "url": "https://hr.umich.edu/sites/default/files/2027_active_health_plan_profiles_1.pdf",
+   "sha256": "0f176e796aa184d59fe582805277b29f3ac7e66c6fb91f5d6907c851cf54f811",
+   "has_reader_problem": true,
+   "expected_failed_checks": [
+    "not_tagged",
+    "no_language"
+   ],
+   "reader_problems": [
+    "Untagged (no table structure, no headings)",
+    "No document language",
+    "12 links have no accessible name and no tag"
+   ],
+   "basis": "structure inspected by agent (pypdf structure tree, annotations, form fields; pypdfium2 page renders for untagged content). Not opened in a screen reader or Acrobat by a person.",
+   "notes": "Its 12 untagged links are covered by not_tagged; the link check runs on tagged files only. Several links point to 'http://8045bcbsm.com/' (looks like a broken address; not an accessibility finding). Page rendering (pypdfium2) used to see untagged content and some fields."
+  },
+  {
+   "url": "https://hr.umich.edu/sites/default/files/2027_active_health_plan_coverage_comparison_chart_09232026.pdf",
+   "sha256": "c94d844e6eb06575c3ee2e8dc2e89ac5ca50e7c43ccef0ef0c8698215356e023",
+   "has_reader_problem": true,
+   "expected_failed_checks": [],
+   "reader_problems": [
+    "Comparison tables have wrong headers: only row 1 is TH, with no ColSpan, so the GradCare and Out-of-Network columns get an empty header; the plan names (row 3) and row labels (Deductible etc.) are TD, so moving through a column a screen reader does not say which plan or which benefit a value belongs to (WCAG 1.3.1; no tool reports this)"
+   ],
+   "basis": "structure inspected by agent (pypdf structure tree, annotations, form fields; pypdfium2 page renders for untagged content). Not opened in a screen reader or Acrobat by a person.",
+   "notes": "Its reader problem (wrong table headers) is one no check here tests. Moderate confidence: judged from the tag tree and the rendered page, not with a screen reader. Page rendering (pypdfium2) used to see untagged content and some fields."
+  },
+  {
+   "url": "https://hr.umich.edu/sites/default/files/2027_medicare_enrolled_plan_profiles_2_0.pdf",
+   "sha256": "a474fdf0fb4b26dd81360a40d94ee53fecf45414c943ff6e4ed78538849ee4ce",
+   "has_reader_problem": true,
+   "expected_failed_checks": [
+    "link_no_description",
+    "table_cells_misplaced",
+    "untagged_text",
+    "no_language"
+   ],
+   "reader_problems": [
+    "No document language",
+    "Priority Health website text and link are untagged (skipped)",
+    "Website row is short one cell, so the next cell is read under the wrong plan"
+   ],
+   "basis": "structure inspected by agent (pypdf structure tree, annotations, form fields; pypdfium2 page renders for untagged content). Not opened in a screen reader or Acrobat by a person.",
+   "notes": "Row labels are TD, not TH. A tagged Link whose text is 'bcbsm.com/UMichMAplans' points to a healthsparq.com address (unsure whether annotation rectangles are swapped). Title 'Open Enrollment Retirees 2026' for a 2027 chart. Page rendering (pypdfium2) used to see untagged content and some fields."
+  },
+  {
+   "url": "https://hr.umich.edu/sites/default/files/2027_medicare_health_plan_coverage_comparison_chart_1.pdf",
+   "sha256": "f45e539641fa7e3059e1aefd713ec383f210f8ae2581c38a37401a698bbd17ad",
+   "has_reader_problem": null,
+   "expected_failed_checks": null,
+   "reader_problems": [
+    "Row labels (Plan Name, Deductible, ...) are TD, not TH: moving down a column the benefit name is not announced"
+   ],
+   "basis": "structure inspected by agent (pypdf structure tree, annotations, form fields; pypdfium2 page renders for untagged content). Not opened in a screen reader or Acrobat by a person.",
+   "notes": "Unsure: column headers (plan types) are TH with Scope Column, so cells are tied to their plan; missing row headers is a weaker 1.3.1 issue. Title 'Open Enrollment Retirees 2026' for a 2027 chart. Page rendering (pypdfium2) used to see untagged content and some fields. Label: unsure, not scored."
+  },
+  {
+   "url": "https://hr.umich.edu/sites/default/files/faculty-personnel-record_2026_accessible.pdf",
+   "sha256": "818a1b475381ae25a0fd779dca1763593def7d2295d0aa7dcf90850739ab61cb",
+   "has_reader_problem": false,
+   "expected_failed_checks": [],
+   "reader_problems": [],
+   "basis": "structure inspected by agent (pypdf structure tree, annotations, form fields; pypdfium2 page renders for untagged content). Not opened in a screen reader or Acrobat by a person.",
+   "notes": "233 widgets with TU; 7 layout tables with TH headers. Page rendering (pypdfium2) used to see untagged content and some fields."
+  },
+  {
+   "url": "https://hr.umich.edu/sites/default/files/request_for_reinstatement_form_accessible.pdf",
+   "sha256": "630abe923c0950b960df50eb29274dba3473a91b2f0431ad696371655547c842",
+   "has_reader_problem": false,
+   "expected_failed_checks": [],
+   "reader_problems": [],
+   "basis": "structure inspected by agent (pypdf structure tree, annotations, form fields; pypdfium2 page renders for untagged content). Not opened in a screen reader or Acrobat by a person.",
+   "notes": "15 fields in Form tags with TU. Page rendering (pypdfium2) used to see untagged content and some fields."
+  },
+  {
+   "url": "https://hr.umich.edu/sites/default/files/supplemental-appointment-information-accessible-9.17.26.pdf",
+   "sha256": "337dbce67ac70935941d9efb4f45663281f0019cd09be98a4070e7ef3e7c9a12",
+   "has_reader_problem": true,
+   "expected_failed_checks": [
+    "field_no_name",
+    "link_no_description"
+   ],
+   "reader_problems": [
+    "Male and Female checkboxes have TU 'undefined' (no tool reports this)",
+    "8 links have no accessible name"
+   ],
+   "basis": "structure inspected by agent (pypdf structure tree, annotations, form fields; pypdfium2 page renders for untagged content). Not opened in a screen reader or Acrobat by a person.",
+   "notes": "Visa option TU '0-1' (zero-one) matches the visible text; the visa is O-1. Page rendering (pypdfium2) used to see untagged content and some fields."
+  },
+  {
+   "url": "https://www.dol.gov/sites/dolgov/files/WHD/legacy/files/WH-380-F.pdf",
+   "sha256": "a585a9b69c9baac97e37a82243f3efb25bd87b082bc457c28497620a60584fe6",
+   "has_reader_problem": false,
+   "expected_failed_checks": [],
+   "reader_problems": [],
+   "basis": "structure inspected by agent (pypdf structure tree, annotations, form fields; pypdfium2 page renders for untagged content). Not opened in a screen reader or Acrobat by a person.",
+   "notes": "85 widgets in Form tags, all with TU. Page rendering (pypdfium2) used to see untagged content and some fields."
+  },
+  {
+   "url": "https://hr.umich.edu/sites/default/files/form_hr36400_07.08.2026_accessible.pdf",
+   "sha256": "d406cb3ebf61aa914fe1184a5e796d79e8630c2fb411b9625dc93a425bd620a8",
+   "has_reader_problem": false,
+   "expected_failed_checks": [],
+   "reader_problems": [],
+   "basis": "structure inspected by agent (pypdf structure tree, annotations, form fields; pypdfium2 page renders for untagged content). Not opened in a screen reader or Acrobat by a person.",
+   "notes": "Page rendering (pypdfium2) used to see untagged content and some fields."
+  },
+  {
+   "url": "https://hr.umich.edu/sites/default/files/mm-staff-leave-of-absence-and-layoff_updated_accessible.pdf",
+   "sha256": "fea89091ed69a468f82e969d7155a689a2237ae3517ade15b7f1c665d230bb24",
+   "has_reader_problem": false,
+   "expected_failed_checks": [],
+   "reader_problems": [],
+   "basis": "structure inspected by agent (pypdf structure tree, annotations, form fields; pypdfium2 page renders for untagged content). Not opened in a screen reader or Acrobat by a person.",
+   "notes": "Page rendering (pypdfium2) used to see untagged content and some fields."
+  },
+  {
+   "url": "https://hr.umich.edu/sites/default/files/10.2026_edited-request-for-sabbatical-leave-hr36620_accessible.pdf",
+   "sha256": "62df6dcc9ab8554c8351eefc3cdc4e4813b52cb87a5fc46e820de077c8d098a0",
+   "has_reader_problem": false,
+   "expected_failed_checks": [],
+   "reader_problems": [],
+   "basis": "structure inspected by agent (pypdf structure tree, annotations, form fields; pypdfium2 page renders for untagged content). Not opened in a screen reader or Acrobat by a person.",
+   "notes": "Page rendering (pypdfium2) used to see untagged content and some fields."
+  },
+  {
+   "url": "https://hr.umich.edu/sites/default/files/tuition-support-request_updated_form-field_accessible.pdf",
+   "sha256": "b93b84e16e6882e78196ca881502e2bb5ddd5097527676950b8a4f13c196b35a",
+   "has_reader_problem": null,
+   "expected_failed_checks": null,
+   "reader_problems": [
+    "Two stray editable fields named 'PERSONAL INFORMATION' and 'Revised 6/2026 for digital accessibility' are keyboard stops that are not part of the form"
+   ],
+   "basis": "structure inspected by agent (pypdf structure tree, annotations, form fields; pypdfium2 page renders for untagged content). Not opened in a screen reader or Acrobat by a person.",
+   "notes": "Unsure: confusing, but nothing is unreadable. Some line-end hyphens map to U+0002 (e.g. 'Michi\\x02gan'), which may be read as a split word. Page rendering (pypdfium2) used to see untagged content and some fields. Label: unsure, not scored."
+  },
+  {
+   "url": "https://hr.umich.edu/sites/default/files/self-identification-form_accessible.pdf",
+   "sha256": "8512a2b0224bfebba2639808d5efc7cacdc49494715291cd2a7f369c37e4edcf",
+   "has_reader_problem": false,
+   "expected_failed_checks": [],
+   "reader_problems": [],
+   "basis": "structure inspected by agent (pypdf structure tree, annotations, form fields; pypdfium2 page renders for untagged content). Not opened in a screen reader or Acrobat by a person.",
+   "notes": "Page rendering (pypdfium2) used to see untagged content and some fields."
+  },
+  {
+   "url": "https://hr.umich.edu/sites/default/files/afscme-notice-proof-of-disability_updated_accessible.pdf",
+   "sha256": "8b6dc12f5cee0f8ed3c8ef643bb6b3a56ea1aa123bcf7e8fbdc8729b5e099102",
+   "has_reader_problem": false,
+   "expected_failed_checks": [],
+   "reader_problems": [],
+   "basis": "structure inspected by agent (pypdf structure tree, annotations, form fields; pypdfium2 page renders for untagged content). Not opened in a screen reader or Acrobat by a person.",
+   "notes": "29 fields in Form tags with descriptive TU. Page rendering (pypdfium2) used to see untagged content and some fields."
+  },
+  {
+   "url": "https://hr.umich.edu/sites/default/files/seiu_mid-probationary_period_eval_002_updated_accessible.pdf",
+   "sha256": "76652778fcb680ac03d2b03bdbbf48a950ff3eb03a5967ac6351d73fff24972e",
+   "has_reader_problem": false,
+   "expected_failed_checks": [],
+   "reader_problems": [],
+   "basis": "structure inspected by agent (pypdf structure tree, annotations, form fields; pypdfium2 page renders for untagged content). Not opened in a screen reader or Acrobat by a person.",
+   "notes": "14 fields with TU. Page rendering (pypdfium2) used to see untagged content and some fields."
+  },
+  {
+   "url": "https://www.ssa.gov/forms/ss-5.pdf",
+   "sha256": "281da43ef49cb74103515b9a6a27c70fc429070dbf93f6758dc425d47fb8620b",
+   "has_reader_problem": true,
+   "expected_failed_checks": [
+    "no_language"
+   ],
+   "reader_problems": [
+    "No document language (pages 1-5 except 9 elements)"
+   ],
+   "basis": "structure inspected by agent (pypdf structure tree, annotations, form fields; pypdfium2 page renders for untagged content). Not opened in a screen reader or Acrobat by a person.",
+   "notes": "Encrypted; accessibility extraction permitted. Static XFA form with AcroForm widgets; several read-only fields repeat whole instruction paragraphs as TU (heard twice). Yes/No pairs give the question only in the first option's TU. Page rendering (pypdfium2) used to see untagged content and some fields."
+  }
+ ]
+}

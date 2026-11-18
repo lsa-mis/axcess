@@ -162,3 +162,174 @@ most 4 downloads run at once. The rate limit is the floor.
 - Making the page wait for its PDFs (the second version) let one page with
   many new PDFs hold up a page worker. Queuing them keeps the crawl moving
   (the developer's request, 2026-11-14).
+
+## The structure checks (2026-11-17)
+
+Seven checks read a PDF's tags and page contents beside the five catalog
+checks: `field_no_name`, `link_no_description`, `image_no_description`,
+`formula_no_description`, `table_cells_misplaced`, `table_uneven_rows` and
+`untagged_text` (`linked_files/pdf_structure.py`, whose docstring defines
+each). They run only where they apply, so each file stores the checks it was
+given (`linked_files.checks_run`, migration 0045); a file checked before then
+has none stored and ran the five (`pdf_check.BASE_CHECKS`). The document's
+page lists only the checks the file was given.
+
+**Why not veraPDF.** veraPDF (PDF/UA-1) was tried and built in on
+2026-11-17, then removed the same day at the developer's request: on the
+labelled set its curated rules caught no reader problem the five pypdf
+checks missed (6 of 11 either way), and it needs a Java runtime (about
+177 MB) and 2 to 3.4 s per call. Its commits were taken out of history
+(kept on the local branch `backup/documents-with-verapdf`); migration 0044
+drops what its migration 0042 left in databases that ran it. The experiment
+that led to it: branch `verapdf-experiment`,
+`docs/experiments/verapdf-hr-umich-2026-11-14.md`.
+
+**Built on real files.** Tuned on the 59 PDFs a 20-page scan of hr.umich.edu
+reached (2026-11-14), checked against the labelled set
+(`tests/real_pages/document_check_labels.json`). What the real files
+changed:
+
+- pypdf's own text extraction hands text to a visitor after the
+  marked-content sequence may have closed, so it put tagged text outside
+  its tag (50 of 56 tagged files "had untagged text"). The checks read
+  page contents one operator at a time instead.
+- Untagged revision footers ("Revised 06/2026 for digital accessibility")
+  sat 0.8% to 3.4% from the bottom of seven hr.umich.edu forms; the
+  labeller judged them no reader problem. Text in the top and bottom 5% is
+  not counted; the one untagged body text found sat at 46%.
+- WH-385's "PART A" heading is marked with an MCID no tag refers to, so a
+  screen reader never reaches it: counted as untagged.
+- hr.umich.edu's supplemental appointment form marks its repeated page-3
+  title with an MCID whose only parent is an "/Artifact" element: not
+  counted (decoration by intent).
+- Its logo alt text ends in a NUL byte, so pypdf returns bytes. An earlier
+  probe that printed those bytes with `str()` showed Chinese characters and
+  was wrongly reported as garbled alt text; a screen reader reads the
+  words. There is no real example of garbled alt text, so there is no check
+  for it.
+
+**Measured** (2026-11-17, the 28 labelled files from the disk copies the
+scan downloaded; 26 with a decided label, 11 with a reader problem):
+
+| Score | Precision | Recall |
+| --- | --- | --- |
+| File: any failed check (before these four) | 6/6 | 6/11 |
+| File: any failed check | 9/9 | 9/11 |
+| `field_no_name` | 3/3 | 3/3 |
+| `link_no_description` | 2/2 | 2/2 |
+| `untagged_text` | 2/2 | 2/2 |
+| `image_no_description` | 0/1 | no real failure |
+
+The two files still missed have problems no check tests (no heading tags;
+wrong table headers). Limits: the set is small, mostly one publisher's forms,
+judged by an agent reading each file's structure, not by a person with a
+screen reader, and the four checks were tuned on these same files, so their
+scores here are not independent. `image_no_description`'s one hit is a
+decorative border box tagged as a figure. Each check needs more real failing
+files, from other publishers, before its number means much.
+
+**Time.** All 59 files in 6.1 s; the slowest 0.26 s. The structure checks
+have their own budget (`pdf_structure.TIME_BUDGET_S`, 8 s): past it they are
+recorded as not run and the five catalog checks keep their result, where the
+whole check's limit (`tracker.CHECK_TIMEOUT_S`) would mark the file "Could
+not check". IRS Publication 15-T (71 pages, 57,727 tags) took 6.8 s to 17 s
+on this machine from run to run, so it can run out; its tag count is why
+`MAX_ELEMENTS` is 200,000.
+
+### Tables and formulas (2026-11-18)
+
+`table_uneven_rows` and `formula_no_description` were added after the
+hr.umich.edu files showed one table veraPDF faulted (file 23, a row a cell
+short) and none with formulas. An agent collected 54 more PDFs from 25 hosts
+(manifest: `artifacts/real-pdfs/manifest.jsonl` in the `verapdf-experiment`
+worktree, not in git): 28 real-world from 22 publishers (US and UK
+government, NIST, Census, universities, Pew, ETSI, TUG, texdoc) and 26
+test-suite files (veraPDF's corpus, the PDF/UA Reference Suite, W3C's PDF
+technique examples, the LaTeX Project's tagged demos). The labelled set is
+`tests/real_pages/document_structure_labels.json`; each file is judged only
+on the checks it names.
+
+What the files changed:
+
+- Tagged LaTeX (LaTeX News, TUGboat, the STEM demos) describes formulas with
+  MathML, as associated files or MathML elements inside the formula, and no
+  alt text: PDF 2.0's and PDF/UA-2's way. 470 formulas failed until MathML
+  counted as a description. TeX source alone (latex-lab-math, latex-lab-table)
+  does not count; those two are labelled unsure.
+- veraPDF's corpus passes a formula whose ActualText is present but empty
+  (7.7-t01-pass-c). A screen reader reads nothing, so Axcess fails it; the
+  file is listed as disputed.
+
+**Measured** (from the downloaded copies):
+
+| Check | Files | Precision | Recall |
+| --- | --- | --- | --- |
+| Either table check, test-suite (outside verdicts) | 16 | 11/11 | 11/11 |
+| `table_cells_misplaced`, real-world (looked at) | 5 | 5/5 | not measured |
+| `table_uneven_rows`, real-world (looked at) | 1 | 1/1 | not measured |
+| `formula_no_description`, test-suite (outside verdicts) | 6 | 2/2 | 2/2 |
+| `formula_no_description`, real-world (tags read) | 5 | 1/1 | 1/1 |
+
+Read these with their limits. Test-suite files each show one fault, so they
+are not real-world accuracy. The real-world tables are only ones the check
+flagged and an agent then looked at (rendered page and tags), so they show
+the flags were right, not what the check misses; no real-world file has an
+outside verdict. The one real-world formula failure (NIST FIPS 203: 34
+formulas, no alt text, no MathML) rests on its tags alone.
+
+**What a flagged table means.** The check fired on 15 of the 24 real-world
+files with tables. Two kinds of fault, both failures of PDF/UA-1 7.2:
+
+- Header cells without their spans (the Australian Budget's "Projections"
+  falls on 2029-30's column; NIST SP 800-90B's "Non-binary data" heads the
+  binary "Cutoff Value C"; W3C's table.pdf), or a data row missing a cell
+  (hr.umich.edu file 23). These mislead: a value is read under the wrong
+  heading.
+- A label row across the table tagged as one or two cells with no span (Pew
+  Research's "PHONE TREND PRESENTED FOR COMPARISON", St Albans' "This Capital
+  Programme was financed as follows:"). These fail the rule but a reader
+  hears the label under the first column; no other cell moves.
+
+**The split (2026-11-18).** Each table cell's text now has a left and
+right edge on the page (text position plus the font's glyph widths,
+clamped to the page: one run on Pew's topline was estimated to end at x
+1626 on a 612 pt page). The full rows' cells give each column's extent. A
+cell of a short row whose text sits under another column than its tags
+give it fails `table_cells_misplaced`; text wider than its columns (a
+label, a heading over several columns) is placed by its left edge, other
+text by its centre. Uneven tables with no cell out of place fail
+`table_uneven_rows`, and so do those whose text could not be placed: the
+checks read text from the first 50 pages only, so St Albans' 118-page
+accounts have 33 uneven tables past page 50 that can only be "uneven".
+"Misplaced" needs a cell seen out of place; uneven rows are a fact from
+the tags alone. On the tables looked at, the split matched the page every
+time, and corrected one call made by eye: Pew's label row is the second
+cell after an empty one, so it is read under "At least once a week".
+
+### Cost of the structure checks (hr.umich.edu, 50-page cap, 2026-11-18)
+
+Four CLI scans (`audit crawl --max-pages 50 --skip-ocr --skip-vlm
+--skip-semantic`, a fresh database each), alternating the old checker
+(`documents`, five catalog checks) and the new one:
+
+| Run | Wall time | Last page | Last PDF checked |
+| --- | --- | --- | --- |
+| new 1 | 204 s | 15:25:48 | 15:25:33 |
+| old 1 | 265 s | 15:31:17 | 15:31:14 |
+| new 2 | 159 s | 15:35:04 | 15:34:56 |
+| old 2 | 267 s | 15:40:36 | 15:40:34 |
+
+Each scan crawled 52 or 53 pages and checked 104 to 107 of 111 to 115 PDFs.
+The old runs were slower, which the checker cannot cause: same commit
+otherwise, same packages and settings, the same work in the crawl summary.
+So two runs each cannot measure the checker in wall time; the site and this
+machine vary more than it costs. In every run the last PDF was checked
+before the last page was crawled, so the checks, which run beside the crawl,
+added nothing to when the scan ended.
+
+The checker alone, on the same 101 PDFs (best of three per file, two
+rounds): old 7.8 s and 8.0 s in all, new 17.2 s and 21.6 s (2.2 to 2.7
+times); median per file 0.04 s old, 0.08 to 0.10 s new; the most added to
+one file 1.5 s. About 10 to 14 s more CPU across a 50-page scan, in the
+check's own thread. A scan with many more PDFs per page could make that
+compete with the crawl for the CPU; not seen here.
