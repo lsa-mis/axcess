@@ -24,7 +24,10 @@ def test_forward_and_rollback(tmp_path: Path) -> None:
         backend.apply_migrations(backend.to_apply(migrations))
     assert "checked_as" in _columns(db)
     with sqlite3.connect(db) as conn:
-        conn.execute("INSERT INTO scans (seed_url, status) VALUES ('https://a.test/', 'completed')")
+        conn.execute(
+            "INSERT INTO scans (seed_url, status, config_json) "
+            "VALUES ('https://a.test/', 'completed', '{}')"
+        )
         conn.execute(
             "INSERT INTO linked_files (scan_id, url, file_type, found_by, checked_as) "
             "VALUES (1, 'https://a.test/a.docx', 'docx', 'extension', 'docx')"

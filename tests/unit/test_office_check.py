@@ -10,6 +10,7 @@ wrong, kept so the fix stays fixed.
 from __future__ import annotations
 
 import io
+import re
 import zipfile
 
 import pytest
@@ -189,9 +190,14 @@ def _replace_part(data: bytes, name: str, change: object) -> bytes:
     out = io.BytesIO()
     with zipfile.ZipFile(out, "w") as target:
         for info in source.infolist():
-            if info.filename == "docProps/core.xml" and change is None:
-                continue
             body = source.read(info.filename)
+            if change is None and name == "docProps/core.xml":
+                # A file with no core properties at all, as Google exports
+                # them: no part, no relationship to it, no content type.
+                if info.filename == name:
+                    continue
+                if info.filename in {"_rels/.rels", "[Content_Types].xml"}:
+                    body = re.sub(rb"<[^<>]*core[^<>]*/>", b"", body)
             if info.filename == name and callable(change):
                 body = change(body)
             target.writestr(info, body)
