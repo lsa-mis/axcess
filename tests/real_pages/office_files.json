@@ -1147,7 +1147,9 @@
     "other": "Google Doc export. Nothing else odd."
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: no); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "content_key": "09206be9aa0c29a04d23b70e483b5621b22ae5ada6075a2844bdd390fe10ccd8",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "16c9d64f7af4",
@@ -1184,7 +1186,9 @@
     "other": "Header/footer logos lack alt text (out of scope)."
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: yes); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "content_key": "129c2b3ebcd66e8464beebb55e8dfbd0665ecb42c47b0574867c46fd2e1a28c0",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "26837b140201",
@@ -1221,7 +1225,9 @@
     "other": "Google Doc export. Screenshot carries the example the text describes."
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: yes); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "content_key": "1caa785ea9bc7ae7e0377827c54dbc1820a960505e7d62c541b500e45b658d2a",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "2fa419079a97",
@@ -1258,7 +1264,9 @@
     "other": "Instructions depend on screenshots."
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: yes); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "content_key": "9826e5202a4dac998d5a802789f91c760fdfd5764e862e2fdc21d35c6dff631d",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "309dda8d638a",
@@ -1295,7 +1303,9 @@
     "other": "Google Doc export."
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: no); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "content_key": "c8802bad8d61c9079c6e48069c02bcabc7215e96cb047891a3d5ac191033f9e2",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "32d896595d27",
@@ -1332,7 +1342,9 @@
     "other": ""
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: no); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "content_key": "070090ae855ba8baacd9e4e338cbbeb1ac2d23f435517cc1142878e175e702cf",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "34aabad13663",
@@ -1369,7 +1381,9 @@
     "other": "Google Doc export."
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: no); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "content_key": "5cfe8734af406424f7819cf3aaf170fdec0d34dfba41ea9bdbdeb202876568e4",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "3828c86e0f47",
@@ -1406,7 +1420,9 @@
     "other": "Google Doc export, Winter 2026 graduate course descriptions. Headers say 'Winter 2025' (header1) and 'Winter 2026' (header2). Barrier from headings."
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: no); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "content_key": "b7209ec76691650c756dca12f5bcc6693d97994aef7039b0434d5b54a584add4",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "3b95c7d5b42d",
@@ -1443,7 +1459,9 @@
     "other": "Google Doc export, Winter 2025 graduate course descriptions. Stray text 'ekre' at 1pt size (sz=2) in the first paragraph, invisible but read by screen readers. Barrier from headings."
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: no); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "content_key": "c371982da31ce59c90c00838540746ade8fa4eb82daf3be10aef09b77bcd5024",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "3cebadfc76c8",
@@ -1480,7 +1498,9 @@
     "other": "Google Doc export."
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: no); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "content_key": "3a5dfaa7ffd569de09db01a210658e6d206d65a5c0d52d04be295f797f7eb1eb",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "41ede4324052",
@@ -1517,7 +1537,9 @@
     "other": "Mostly pictures; text is 4 one-line steps."
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: yes); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "content_key": "2f56abcffb5f07562f8cb9ea1c2e776b8b264997134b311e968d131d0e77d7a9",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "55030d46281a",
@@ -1554,7 +1576,9 @@
     "other": "Google Doc export, Fall 2025 graduate course descriptions (header1 still says Winter 2025). One entry has an empty 'Topic -' line. Barrier from headings."
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: no); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "content_key": "02b604f0c04171edefc0e91db6f28b31aedf624149b7ff8236d664012df90936",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "565ebcec4883",
@@ -1591,7 +1615,9 @@
     "other": "Google Doc export. Footer text 'hr.umich.edu/development-journey' is plain text. Barrier from alt_text and table_header."
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: yes); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "content_key": "1833186dab5d746dedde01a060a9094ec65d45c6896f8a23810aad1f80583611",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "5a53ca933612",
@@ -1628,7 +1654,9 @@
     "other": "Google Doc export."
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: no); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "content_key": "9c03d72f42444762043e0920c7982730e0d129576ea5afbad5e82409c0f86c84",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "642fecaa7fda",
@@ -1665,7 +1693,9 @@
     "other": "Google Doc export."
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: yes); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "content_key": "314f8b9dd2adc34cbc4da28f1f0d06c3741e16d00da82cb63d57d9d7d8b10a48",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "69c7e9aa5f04",
@@ -1702,7 +1732,9 @@
     "other": "Google Doc export."
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: no); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "content_key": "0ad85f52b653cdf922d88500fc7955bcaf58220306cf8fb863aac7197eadf7b8",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "69ca0335378e",
@@ -1749,7 +1781,9 @@
      "why": "review by a second labelling agent of every table: the first labeller read <w:tblHeader w:val=\"0\"/> (off) as a header marker; data/layout judgements kept",
      "barrier": "False -> True"
     }
-   ]
+   ],
+   "content_key": "3378f92fa3a23229d8b5c35d721bca96bc347f2eefb5163e526c474a13dcbcf5",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "6b97e6196dc6",
@@ -1795,7 +1829,9 @@
      "date": "2026-11-17",
      "why": "review by a second labelling agent of every table: the first labeller read <w:tblHeader w:val=\"0\"/> (off) as a header marker; data/layout judgements kept"
     }
-   ]
+   ],
+   "content_key": "db25095ffbfb35df6bca6cffd42006032010819e7612fd046c1ab59b84647af2",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "73009f0abf8a",
@@ -1832,7 +1868,9 @@
     "other": "Google Doc export; only file in batch with no language at all."
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: no); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "content_key": "8fd7d9a96e0c8c0a896e4a54c435ae441b3cbf54d25e05252437ea0764eb6f9e",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "73c15e53a8c1",
@@ -1869,7 +1907,9 @@
     "other": ""
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: no); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "content_key": "310830169758cd1af98150f0bc91a6c60c7fcc3a55dbb6c0395351761bc7df69",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "79648cdfd00f",
@@ -1906,7 +1946,9 @@
     "other": "Google Doc export. Mostly pictures."
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: yes); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "content_key": "1ccfea2c0e5afa8b9960ff2773305a514a41ee337e68703b43eb84203578cb79",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "7c04631b882c",
@@ -1943,7 +1985,9 @@
     "other": "Google Doc export, Fall 2026 graduate course descriptions. Barrier from headings."
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: no); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "content_key": "21ceb7af5185d6eba1f07e58a23ea200aeef1d11ce5d881974844ec3238b3ba6",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "9a42623b461e",
@@ -1989,7 +2033,9 @@
      "date": "2026-11-17",
      "why": "review by a second labelling agent of every table: the first labeller read <w:tblHeader w:val=\"0\"/> (off) as a header marker; data/layout judgements kept"
     }
-   ]
+   ],
+   "content_key": "da7518a44c01c7893d289a8ea1d1aa31c73b1cf35ec270e512de143838de72cf",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "9afb8c81d08a",
@@ -2026,7 +2072,9 @@
     "other": "Google Doc export."
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: no); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "content_key": "3bcb5903949e21b09399f23028802d6affb4ac232a5c5923796279a7fc1e2405",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "a24f946e2c7e",
@@ -2063,7 +2111,9 @@
     "other": "Google Doc export. Text in image: guest login credentials only in a picture."
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: yes); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "content_key": "6e2e2d15c63030346848f1aded294b63600ecbca4bb316de44907ff910239233",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "abec33f170aa",
@@ -2110,7 +2160,9 @@
      "why": "review by a second labelling agent of every table: the first labeller read <w:tblHeader w:val=\"0\"/> (off) as a header marker; data/layout judgements kept",
      "barrier": "False -> True"
     }
-   ]
+   ],
+   "content_key": "cc69feaea27686af35132c9dc20b042e4659f6bb74e92f779df0397fc6673b56",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "b2a58133948c",
@@ -2157,7 +2209,9 @@
      "why": "review by a second labelling agent of every table: the first labeller read <w:tblHeader w:val=\"0\"/> (off) as a header marker; data/layout judgements kept",
      "barrier": "False -> True"
     }
-   ]
+   ],
+   "content_key": "6fc35425645c0d77fabb7e7ee22f8c425153c9da3bcbd76637702aede34b4c1d",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "b917977f6ec3",
@@ -2194,7 +2248,9 @@
     "other": ""
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: no); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "content_key": "c62c72663aa6165e827c7b1e509d5b2d33294582d4e9c96d7c70371b7f08701b",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "ba134cc94975",
@@ -2231,7 +2287,9 @@
     "other": "Google Doc export. Worksheet with underscore answer lines."
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: no); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "content_key": "afdcfebc1c832ad33ec5b179b9b53c1ae103c6dd01325b32b65708c06efa8c97",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "cec962f50bc0",
@@ -2278,7 +2336,9 @@
      "why": "review by a second labelling agent of every table: the first labeller read <w:tblHeader w:val=\"0\"/> (off) as a header marker; data/layout judgements kept",
      "barrier": "False -> True"
     }
-   ]
+   ],
+   "content_key": "4495f6e9902ae67ce25462e354dddf730edb1ccf07b96e452d7fdc1f6d3eacb9",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "d0a3b74aa92b",
@@ -2315,7 +2375,9 @@
     "other": "Google Doc export; very large (document.xml 5.5 MB). Embedded fonts (Roboto, Comic Neue). Barrier from alt_text."
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: yes); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "content_key": "ed50d1b1d0185e62d34d9eb130f7b29215cbdca8844afcf38a5d3373676d0f7f",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "d986846522f9",
@@ -2352,7 +2414,9 @@
     "other": "Google Doc export."
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: no); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "content_key": "72407e604a4ac9c6b571ce1329974b7796404d6846f9c440d01ce64e12261c8b",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "e7e5ef27eea4",
@@ -2389,7 +2453,9 @@
     "other": "Google Doc export."
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: no); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "content_key": "6129414d70aaf4deca3ee651cbbc6d48daab842c2c9d1d067fa093017439bfcb",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "ea84952c0fa3",
@@ -2426,7 +2492,9 @@
     "other": "Google Doc export."
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: no); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "content_key": "f3f37e344afc6c9b215f08886bf151b67e71f74f0af3bd253daf09e8d9ebed7f",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "f2439f2904e0",
@@ -2463,7 +2531,9 @@
     "other": ""
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: no); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "content_key": "ebbdfb4ccc927e86cec676ef0c955ecb66a059d6a41d1dec621a60327d9d1878",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "f9e21cbacfb9",
@@ -2500,7 +2570,9 @@
     "other": "Google Doc export. Fill-in blanks drawn with underscores. Typo in text: 'valid for 365 delays'."
    },
    "basis": "structure inspected by a labelling agent separate from the detector's author: raw XML read with unzip/xmllint, embedded pictures viewed where needed (raw XML inspected; pictures viewed: no); not opened in Word, PowerPoint or a screen reader",
-   "labelled": "2026-11-17"
+   "labelled": "2026-11-17",
+   "content_key": "bff3410c1f2dfaa5c20731ff90b673923b77448f48910e4bcc6826a2ff803e91",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   },
   {
    "id": "fb25589d2ec0",
@@ -2547,7 +2619,9 @@
      "why": "review by a second labelling agent of every table: the first labeller read <w:tblHeader w:val=\"0\"/> (off) as a header marker; data/layout judgements kept",
      "barrier": "False -> True"
     }
-   ]
+   ],
+   "content_key": "1c1c3e820513277103e3614d6c4f4a3c16f697f826465429574ab86182cacebf",
+   "content_key_note": "Taken 2026-11-18 from a new export, a day after labelling: Google changes an export's bytes every time (sha256 is the labelled export's, and fixes the split). The labelled bytes were not kept, so that the content did not change in that day is assumed, not verified."
   }
  ]
 }
