@@ -14,6 +14,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from audit.linked_files.formats import (
+    CheckedAs,
     FailedCheck,
     FileType,
     FoundBy,
@@ -50,6 +51,9 @@ class CheckResult:
     thumbnail_hash: str | None = None
     # The same page, small, for the Documents table.
     thumbnail_small_hash: str | None = None
+    # Which check read the file: "pdf", "docx" or "pptx" (migration 0045).
+    # The bytes decide, not the link: a Google Doc is checked as "docx".
+    checked_as: CheckedAs | None = None
 
 
 def file_count(conn: sqlite3.Connection, scan_id: int) -> int:
@@ -137,7 +141,7 @@ def set_result(
     cur = conn.execute(
         "UPDATE linked_files SET status = ?, reason = ?, failed_checks = ?, "
         "http_status = ?, content_type = ?, byte_size = ?, sha256 = ?, is_form = ?, "
-        "page_count = ?, thumbnail_hash = ?, thumbnail_small_hash = ?, "
+        "page_count = ?, thumbnail_hash = ?, thumbnail_small_hash = ?, checked_as = ?, "
         "checked_at = CURRENT_TIMESTAMP "
         "WHERE id = ? AND scan_id = ?",
         (
@@ -152,6 +156,7 @@ def set_result(
             result.page_count,
             result.thumbnail_hash,
             result.thumbnail_small_hash,
+            result.checked_as,
             file_id,
             scan_id,
         ),
@@ -171,7 +176,7 @@ def checked_copy(
     """
     row = conn.execute(
         "SELECT status, failed_checks, is_form, page_count, thumbnail_hash, "
-        "thumbnail_small_hash FROM linked_files "
+        "thumbnail_small_hash, checked_as FROM linked_files "
         "WHERE scan_id = ? AND sha256 = ? AND id != ? "
         "AND status IN ('mostly_sure', 'not_sure') ORDER BY id LIMIT 1",
         (scan_id, sha256, file_id),
@@ -185,6 +190,7 @@ def checked_copy(
         page_count=row[3],
         thumbnail_hash=row[4],
         thumbnail_small_hash=row[5],
+        checked_as=row[6],
     )
 
 

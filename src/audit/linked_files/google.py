@@ -1,4 +1,17 @@
-"""Download a file kept in Google Drive (``drive.google.com/file/d/ID/...``).
+"""Download a file kept in Google Drive, and a Google Doc or Slides deck.
+
+Google Docs and Slides (``export_address``, since 2026-11-17): a Doc is
+downloaded as the Word file (.docx) and a Slides deck as the PowerPoint file
+(.pptx) that the editor's File > Download menu gives, from
+``docs.google.com/document/d/ID/export?format=docx`` and
+``docs.google.com/presentation/d/ID/export/pptx``. Google's robots.txt
+allows ``/document`` and ``/presentation`` on that host, and the tracker
+asks it about the export address as about any download. A Doc shared only
+with signed-in accounts answers 401, reported as needing a sign-in, as a
+private Drive file is. A Google file has no original file: what is checked
+is Google's export of it, and the report says so.
+
+Drive files (``drive.google.com/file/d/ID/...``):
 
 Research and the real links it was tested on:
 docs/internal/google-files-research.md. In short:
@@ -70,6 +83,48 @@ def drive_file_id(url: str) -> str | None:
     else:
         candidate = (parse_qs(parts.query).get("id") or [""])[0]
     return candidate if _FILE_ID.match(candidate) else None
+
+
+_EXPORT_PATH = re.compile(r"/(document|presentation)/(?:u/\d+/)?d/([A-Za-z0-9_-]{10,})(?:/|$)")
+
+
+def export_address(url: str) -> str | None:
+    """Where Google exports the Doc or Slides deck ``url`` names, or None.
+
+    A Doc as Word (.docx), a deck as PowerPoint (.pptx). The ID is read from
+    the editor's address in any of the forms pages link with
+    (``/document/d/ID/edit``, ``/a/example.edu/document/d/ID``,
+    ``/document/u/0/d/ID``). None for any other address, including a copy
+    published to the web (``/document/d/e/…/pub``), which has no export.
+    """
+    parts = urlsplit(url)
+    if (parts.hostname or "").lower() != "docs.google.com":
+        return None
+    match = _EXPORT_PATH.search(parts.path)
+    if match is None:
+        return None
+    kind, file_id = match.groups()
+    if kind == "document":
+        return f"https://docs.google.com/document/d/{file_id}/export?format=docx"
+    return f"https://docs.google.com/presentation/d/{file_id}/export/pptx"
+
+
+async def fetch_export(
+    client: httpx.AsyncClient,
+    address: str,
+    *,
+    max_bytes: int = MAX_FILE_BYTES,
+    timeout_s: float = FETCH_TIMEOUT_S,
+) -> FetchedFile:
+    """Download a Google export (``export_address``); a sign-in page reads as 401."""
+    try:
+        async with asyncio.timeout(timeout_s):
+            fetched, _final = await _get(client, address, max_bytes=max_bytes)
+    except TimeoutError:
+        return FetchedFile("timed_out")
+    except (httpx.HTTPError, ValueError):
+        return FetchedFile("broken_link")
+    return fetched
 
 
 def view_url(file_id: str) -> str:

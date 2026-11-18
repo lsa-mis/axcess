@@ -53,8 +53,8 @@ import math
 import os
 import re
 import time
-import zipfile
 import urllib.robotparser
+import zipfile
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -81,7 +81,9 @@ class _Polite:
     """One request at a time, at most one a second, robots.txt obeyed."""
 
     def __init__(self) -> None:
-        self._client = httpx.Client(headers={"User-Agent": _AGENT}, timeout=30, follow_redirects=True)
+        self._client = httpx.Client(
+            headers={"User-Agent": _AGENT}, timeout=30, follow_redirects=True
+        )
         self._robots: dict[str, urllib.robotparser.RobotFileParser] = {}
         self._last = 0.0
 
@@ -139,7 +141,11 @@ def content_key(data: bytes) -> str:
             body = package.read(name)
             if "/media/" in name:
                 pictures.append(hashlib.sha256(body).hexdigest())
-            elif not (name.endswith(".rels") or name.startswith("docProps/") or name == "[Content_Types].xml"):
+            elif not (
+                name.endswith(".rels")
+                or name.startswith("docProps/")
+                or name == "[Content_Types].xml"
+            ):
                 body = re.sub(rb'(r:(id|embed|link|pict)|Id)="[^"]*"', b"", body)
                 digest.update(name.encode() + re.sub(rb"image\d+\.\w+", b"image", body))
     for picture in sorted(pictures):
@@ -216,7 +222,9 @@ def run_set() -> dict[str, Any]:
             "files": len([r for r in rows if r["split"] == split]),
             "scored": len(scored),
             "not_scored": dict(
-                Counter(r["outcome"] for r in rows if r["split"] == split and r["outcome"] != "checked")
+                Counter(
+                    r["outcome"] for r in rows if r["split"] == split and r["outcome"] != "checked"
+                )
             ),
             "mostly_sure": score(
                 [(by_id[r["id"]]["barrier"], r["status"] == "mostly_sure", r["id"]) for r in scored]
@@ -238,11 +246,14 @@ def test_office_check_on_real_files() -> None:
     _DIR.mkdir(parents=True, exist_ok=True)
     (_DIR / "office_real_files.json").write_text(json.dumps(report, indent=1), encoding="utf-8")
     for split, part in report["scores"].items():
-        print(f"\n== {split}: {part['scored']} of {part['files']} files scored {part['not_scored']}")
+        print(
+            f"\n== {split}: {part['scored']} of {part['files']} files scored {part['not_scored']}"
+        )
         for name, s in part.items():
             if isinstance(s, dict) and "tp" in s:
                 print(
-                    f"  {name:24} n={s['n']:3} pos={s['positives']:3} tp={s['tp']:3} fp={s['fp']:3} "
+                    f"  {name:24} n={s['n']:3} pos={s['positives']:3} tp={s['tp']:3} "
+                    f"fp={s['fp']:3} "
                     f"fn={s['fn']:3} precision={s['precision']} recall={s['recall']}"
                 )
     damaged = [r["id"] for r in report["files"] if r.get("outcome") == "damaged"]
