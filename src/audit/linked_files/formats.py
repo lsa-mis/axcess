@@ -9,12 +9,18 @@ below, that answer decides (``classify_content_type``).
 Each type falls into one of three groups, which decide its status before any
 download:
 
-* ``pdf``: downloaded and checked (:mod:`audit.linked_files.pdf_check`).
-* ``CHECKED_LATER``: modern Office and OpenDocument files and RTF. Axcess
-  does not check them *yet*; nothing stops a later build from doing so.
-* ``CANNOT_CHECK``: old binary Office files (.doc, .xls, .ppt) and Google
-  files. Old binary files have no accessibility structure a machine check
-  could read, and a Google file is not a file Axcess can download.
+* ``CHECKED``: downloaded and checked. A PDF with
+  :mod:`audit.linked_files.pdf_check`; a Word file (.docx), a PowerPoint file
+  (.pptx), a Google Doc and a Google Slides deck with
+  :mod:`audit.linked_files.office_check` (a Google file as the Word or
+  PowerPoint file Google exports, ``google.export_address``); a file kept in
+  Google Drive by what its bytes turn out to be. Since 2026-11-17 for Word,
+  PowerPoint, Docs and Slides.
+* ``CHECKED_LATER``: Excel, OpenDocument files and RTF. Axcess does not
+  check them *yet*; nothing stops a later build from doing so.
+* Cannot check: old binary Office files (.doc, .xls, .ppt), which have no
+  accessibility structure a machine check could read, and Google Sheets,
+  which Google's robots.txt asks scanners not to download.
 """
 
 from __future__ import annotations
@@ -39,6 +45,11 @@ FileType = Literal[
     "google_slides",
     "google_drive",
 ]
+
+#: Which check read a file (``linked_files.checked_as``, migration 0045):
+#: decided by its bytes, so a Google Doc is "docx" and a Drive file is
+#: whatever it turned out to be.
+CheckedAs = Literal["pdf", "docx", "pptx"]
 
 #: How a scan first knew a URL was a linked file.
 FoundBy = Literal["extension", "host", "content_type"]
@@ -73,15 +84,24 @@ Reason = Literal[
     "not_checked",
 ]
 
-#: Machine checks a PDF can fail. The first three stop a screen reader user
-#: reading the file at all; the last two make it harder to find and to hear
-#: correctly. ``SEVERE_CHECKS`` orders the report.
+#: Machine checks a file can fail. The PDF checks (pdf_check.py): the first
+#: three stop a screen reader user reading the file at all; the last two
+#: make it harder to find and to hear correctly. The Word and PowerPoint
+#: checks (office_check.py, since 2026-11-17) share ``no_title`` and
+#: ``no_language`` with the PDF checks: the same fact, so the same key and
+#: the same words in the report. ``SEVERE_CHECKS`` orders the report.
 FailedCheck = Literal[
     "not_tagged",
     "no_text",
     "blocks_assistive_tech",
     "no_title",
     "no_language",
+    "no_alt_text",
+    "table_no_header",
+    "slide_no_title",
+    "no_headings",
+    "skipped_heading_level",
+    "unclear_link_text",
 ]
 SEVERE_CHECKS: frozenset[str] = frozenset({"not_tagged", "no_text", "blocks_assistive_tech"})
 
@@ -115,7 +135,11 @@ _CONTENT_TYPES: dict[str, FileType] = {
     "text/rtf": "rtf",
 }
 
-CHECKED_LATER: frozenset[str] = frozenset({"docx", "pptx", "xlsx", "odt", "odp", "ods", "rtf"})
+#: Types downloaded and checked (see the module docstring).
+CHECKED: frozenset[str] = frozenset(
+    {"pdf", "docx", "pptx", "google_doc", "google_slides", "google_drive"}
+)
+CHECKED_LATER: frozenset[str] = frozenset({"xlsx", "odt", "odp", "ods", "rtf"})
 OLD_FORMATS: frozenset[str] = frozenset({"doc", "xls", "ppt"})
 GOOGLE_TYPES: frozenset[str] = frozenset(
     {"google_doc", "google_sheet", "google_slides", "google_drive"}
@@ -180,16 +204,16 @@ def classify_content_type(content_type: str | None) -> FileType | None:
 def initial_status(file_type: FileType) -> tuple[Status, Reason | None]:
     """The status a file of this type gets before anything is downloaded.
 
-    A PDF, and a Google Drive file (which may be one), waits to be checked.
-    Every other type is "Could not check" at once, with the reason that says
-    whether a later build may check it.
+    A type Axcess checks (``CHECKED``) waits to be checked. Every other type
+    is "Could not check" at once, with the reason that says whether a later
+    build may check it.
     """
-    if file_type == "pdf":
+    # A Google Drive file can be a PDF, a Word or a PowerPoint file: it is
+    # downloaded to find out (google.fetch_drive_file).
+    if file_type in CHECKED:
         return "pending", None
-    # A Google Drive file can be a PDF: it is downloaded to find out
-    # (google.fetch_drive_file). Docs, Sheets and Slides are not, yet.
-    if file_type == "google_drive":
-        return "pending", None
+    # Google Sheets: Google's robots.txt does not allow /spreadsheets
+    # (docs/internal/google-files-research.md), so a Sheet is never asked for.
     if file_type in GOOGLE_TYPES:
         return "could_not_check", "google_file"
     if file_type in OLD_FORMATS:

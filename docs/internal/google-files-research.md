@@ -7,7 +7,8 @@ link: Google's download addresses, or Axcess's own browser finding and
 pressing the download button.
 
 Decided and built for Drive files on 2026-11-16 (`linked_files/google.py`,
-"Decisions" at the end). Docs, Sheets and Slides are next.
+"Decisions" at the end), and for Docs and Slides on 2026-11-17. Sheets
+stay unchecked: robots.txt refuses them.
 
 ## What was tested
 
@@ -108,8 +109,15 @@ So, while robots.txt is obeyed:
    in Drive is downloaded and identified, and waits for a check of its
    format.
 3. **Docs and Slides: export them as .docx and .pptx and check them with
-   another engine.** Not built yet. Axcess has no .docx or .pptx check, and
-   which engine to use is the next decision.
+   another engine.** Built 2026-11-17: `google.export_address` and
+   `office_check.py`, Axcess's own rules on python-docx and python-pptx
+   (why not an existing checker: `office-check-research.md`). On
+   2026-11-17 the export of a public Doc linked from the U-M sites answered
+   200 with a .docx, a private one 401, a deleted one 410, and a copy
+   published to the web (`/d/e/…/pub?output=docx`) only an HTML page. Two
+   exports of one Doc a minute apart differ in bytes (Google renames
+   pictures and relationship IDs), so a Google file's SHA-256 is no
+   identity across scans.
 4. **Not built, an option:** Google's Drive API
    (`www.googleapis.com/drive/v3/files/ID?alt=media`) has no robots.txt, so
    it could download public Drive files while robots.txt is followed. It

@@ -12,6 +12,7 @@ import type {
   FoundLayer,
   ImageGroup,
   LinkedFileCheck,
+  LinkedFileCheckedAs,
   LinkedFileReason,
   LinkedFileRefKind,
   LinkedFileStatus,
@@ -142,8 +143,11 @@ export const LINKED_FILE_STATUS_NOTE: Record<LinkedFileStatus, string> = {
 /** What each value means, in one sentence: the hover hint and the page's key. */
 export const LINKED_FILE_STATUS_HELP: Record<LinkedFileStatus, string> = {
   mostly_sure: "A machine check found a problem that makes the file hard or impossible to use with a screen reader.",
+  // "found no problem that…" rather than "passed the machine checks" since
+  // 2026-11-17: a Word or PowerPoint file can be Not sure and still show
+  // possible problems (office_check.COUNTED), which it did not "pass".
   not_sure:
-    "The file passed the machine checks. A person must still check it: the reading order, the image descriptions (alt text) and the table headers.",
+    "The machine checks found no problem that makes the file hard to use with a screen reader. A person must still check it: the reading order, the image descriptions (alt text) and the table headers.",
   could_not_check: "Axcess could not check the file. The row says why.",
 };
 
@@ -186,6 +190,16 @@ export const LINKED_FILE_TYPE_LABEL: Record<LinkedFileType, string> = {
 };
 
 /**
+ * The type a check read a file as, in the words of LINKED_FILE_TYPE_LABEL,
+ * for "Checked as the Word (.docx) file that Google exports".
+ */
+export const LINKED_FILE_CHECKED_AS_LABEL: Record<LinkedFileCheckedAs, string> = {
+  pdf: "PDF",
+  docx: "Word (.docx)",
+  pptx: "PowerPoint (.pptx)",
+};
+
+/**
  * Why a file could not be checked. Two groups read differently on purpose,
  * as the developer asked: "does not check this file type yet" (a later
  * version may) and "cannot check" (no machine check can read it). A
@@ -193,17 +207,23 @@ export const LINKED_FILE_TYPE_LABEL: Record<LinkedFileType, string> = {
  * ``linkedFileReasonText``.
  */
 export const LINKED_FILE_REASON_TEXT: Record<LinkedFileReason, string> = {
-  type_not_checked_yet: "Axcess does not check this file type yet. Only PDF files are checked.",
+  type_not_checked_yet:
+    "Axcess does not check this file type yet. It checks PDF, Word (.docx) and PowerPoint (.pptx) files.",
   old_format:
     "Axcess cannot check this file type. Old Office files (.doc, .xls, .ppt) do not store the structure that a check needs.",
-  // Drive files are downloaded since 2026-11-16 (linked_files/google.py);
-  // Docs, Sheets and Slides are not yet.
-  google_file: "Axcess cannot check files made in Google Docs, Sheets or Slides yet.",
+  // Drive files are downloaded since 2026-11-16, Docs and Slides since
+  // 2026-11-17 (linked_files/google.py). Sheets are not: Google's
+  // robots.txt does not allow /spreadsheets. A Doc or deck gets this reason
+  // only when its address has no export (a copy published to the web);
+  // linkedFileReasonText words that case.
+  google_file: "Axcess does not check Google Sheets. Google asks scanners not to download them.",
   broken_link: "Broken link: the file could not be downloaded.",
   http_error: "Broken link: the site answered with an error",
   password: "The file needs a password to open.",
   too_large: "The file is larger than 10 MB, the most Axcess downloads.",
   timed_out: "Downloading or checking the file took too long.",
+  // For a link to any other type, linkedFileReasonText says "a file Axcess
+  // can check" (the key's name predates the Word and PowerPoint check).
   not_a_pdf: "The link did not lead to a PDF file. The site sent something else, such as a web page.",
   damaged: "Axcess could not read the file. It may be damaged.",
   // Says what to do, not only why (the developer's request, 2026-11-16):
@@ -219,8 +239,21 @@ export const LINKED_FILE_REASON_TEXT: Record<LinkedFileReason, string> = {
   not_checked: "Axcess did not finish checking this file. The scan stopped first, or the check ran into an error.",
 };
 
-/** The reason in words, with the server's status code where there is one. */
-export function linkedFileReasonText(reason: LinkedFileReason, httpStatus: number | null): string {
+/**
+ * The reason in words, with the server's status code where there is one.
+ * ``fileType`` words the reasons that depend on what the link named.
+ */
+export function linkedFileReasonText(
+  reason: LinkedFileReason,
+  httpStatus: number | null,
+  fileType?: LinkedFileType,
+): string {
+  if (reason === "not_a_pdf" && fileType && fileType !== "pdf") {
+    return "The link did not lead to a file Axcess can check. The site sent something else, such as a web page.";
+  }
+  if (reason === "google_file" && (fileType === "google_doc" || fileType === "google_slides")) {
+    return "Axcess cannot download this Google file. A copy published to the web has no file to download.";
+  }
   // 401 and 403 are not broken links: the file is there, for people who
   // may open it (a Google Drive file shared only with signed-in accounts
   // redirects to Google's sign-in page, which Axcess reports as 401).
@@ -234,19 +267,16 @@ export function linkedFileReasonText(reason: LinkedFileReason, httpStatus: numbe
 }
 
 /**
- * The five machine checks Axcess runs on every PDF it can open, most
- * serious first: the order the report ranks them in (SEVERE_CHECKS in
- * audit/linked_files/formats.py) and the order the server returns a file's
- * failed checks in (ALL_CHECKS in pdf_check.py). Every check runs on every
- * PDF Axcess opens, so a check a file did not fail found no problem.
+ * The checks a file can fail, in the server's words (FailedCheck in
+ * audit/linked_files/formats.py). Which ones ran on a file is the row's
+ * ``checks_run``, in the server's order (pdf_check.ALL_CHECKS for a PDF,
+ * office_check.WORD_CHECKS and SLIDES_CHECKS for Word and PowerPoint), so
+ * the document page lists exactly the checks that apply to that file type;
+ * this file only names them. "Document title" and "Language" are one check
+ * for every type: the same fact gets the same words (W3C COGA, "Making
+ * Content Usable", https://www.w3.org/TR/coga-usable/, paraphrased: the
+ * same word for the same thing).
  */
-export const LINKED_FILE_CHECKS: readonly LinkedFileCheck[] = [
-  "not_tagged",
-  "no_text",
-  "blocks_assistive_tech",
-  "no_title",
-  "no_language",
-];
 
 /**
  * A failed check, as a short name for the Documents table's "What Axcess
@@ -255,6 +285,8 @@ export const LINKED_FILE_CHECKS: readonly LinkedFileCheck[] = [
  * (LINKED_FILE_CHECK_WHY). Until 2026-11-14 the cell held name and reason
  * in one sentence ("Not tagged: a screen reader cannot tell…"), which was
  * hard to scan in a narrow column (the developer's choice).
+ * "Images without alt text" is the Images tab's own group name
+ * (docs/plain-language.md), so one problem has one name across the report.
  */
 export const LINKED_FILE_CHECK_PROBLEM: Record<LinkedFileCheck, string> = {
   not_tagged: "Not tagged",
@@ -262,6 +294,12 @@ export const LINKED_FILE_CHECK_PROBLEM: Record<LinkedFileCheck, string> = {
   blocks_assistive_tech: "Security settings block screen readers",
   no_title: "No document title",
   no_language: "No language set",
+  no_alt_text: "Images without alt text",
+  table_no_header: "Tables without a header row",
+  slide_no_title: "Slides without a title",
+  no_headings: "No headings",
+  skipped_heading_level: "Heading levels skipped",
+  unclear_link_text: "Links that do not say where they go",
 };
 
 /** What each check looks at, for the "Check" column on a document's page. */
@@ -271,9 +309,21 @@ export const LINKED_FILE_CHECK_NAME: Record<LinkedFileCheck, string> = {
   blocks_assistive_tech: "Security settings",
   no_title: "Document title",
   no_language: "Language",
+  no_alt_text: "Alt text for images",
+  table_no_header: "Table header rows",
+  slide_no_title: "Slide titles",
+  no_headings: "Headings",
+  skipped_heading_level: "Heading levels",
+  unclear_link_text: "Link text",
 };
 
-/** Why each check matters to a reader, in one sentence, for a document's page. */
+/**
+ * Why each check matters to a reader, in one sentence or two, for a
+ * document's page. A Word or PowerPoint check says what it looks at where
+ * the name alone could mislead (which images, which headings, how long a
+ * document), so a reader knows what "No problem found" covers. Each is
+ * true to office_check.py; change them together.
+ */
 export const LINKED_FILE_CHECK_WHY: Record<LinkedFileCheck, string> = {
   not_tagged: "Tags mark the headings, lists and tables, so a screen reader can tell them apart.",
   no_text:
@@ -281,6 +331,17 @@ export const LINKED_FILE_CHECK_WHY: Record<LinkedFileCheck, string> = {
   blocks_assistive_tech: "Some security settings stop screen readers from reading the file.",
   no_title: "A title tells people which file they have open.",
   no_language: "The language tells a screen reader which voice to read the file in.",
+  no_alt_text:
+    "Alt text is the text a screen reader reads aloud for an image. Every picture, chart and diagram needs it, unless it is marked as decorative.",
+  table_no_header:
+    "A header row lets a screen reader say which column each cell is in. Axcess looks at tables with at least 2 rows and 2 columns.",
+  slide_no_title: "Slide titles let a screen reader user find a slide and know where they are.",
+  no_headings:
+    "Headings let a screen reader user jump between the parts of a long document. Axcess looks for heading styles in Word documents of more than 400 words.",
+  skipped_heading_level:
+    "Headings that skip a level, such as Heading 1 then Heading 3, make the outline harder to follow.",
+  unclear_link_text:
+    "Screen reader users often list a file's links. Words such as “click here”, or a whole web address, do not say where a link goes.",
 };
 
 /** How a page shows a file other than by a plain link. A plain link needs no note. */

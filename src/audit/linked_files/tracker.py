@@ -1,4 +1,9 @@
-"""Record a crawl's linked files as it runs, and check each PDF as it is found.
+"""Record a crawl's linked files as it runs, and check each one as it is found.
+
+Since 2026-11-17 "PDF" below stands for every file Axcess checks: PDFs,
+Word (.docx) and PowerPoint (.pptx) files, and Google Docs and Slides
+(downloaded as the .docx or .pptx Google exports). The bytes decide which
+check reads a file (``office_check.sniff``), not its address.
 
 One :class:`LinkedFileTracker` per crawl. The orchestrator calls it at three
 points, and nothing else in the crawl changes:
@@ -63,8 +68,14 @@ from audit.linked_files import formats
 from audit.linked_files.discovery import FoundLink, find_links, resolve
 from audit.linked_files.fetch import MAX_FILE_BYTES, FetchedFile, FileFetcher, fetch_file
 from audit.linked_files.google import DOWNLOAD_URL as DRIVE_DOWNLOAD_URL
-from audit.linked_files.google import ButtonDownload, fetch_drive_file
-from audit.linked_files.pdf_check import PdfCheck, check_pdf, looks_like_pdf
+from audit.linked_files.google import (
+    ButtonDownload,
+    export_address,
+    fetch_drive_file,
+    fetch_export,
+)
+from audit.linked_files.office_check import OfficeCheck, check_office, sniff
+from audit.linked_files.pdf_check import PdfCheck, check_pdf
 from audit.linked_files.thumbnail import first_page_jpegs
 from audit.logging import get_logger
 
@@ -442,7 +453,6 @@ class LinkedFileTracker:
         ):
             self._store(file_id, store.CheckResult("could_not_check", "blocked"))
             return
-        self._started += 1
         # A Google Drive file, in a public scan: Google's download address,
         # not the link (google.fetch_drive_file). robots.txt is asked about
         # that address, the one actually downloaded from. Google's says
@@ -451,37 +461,36 @@ class LinkedFileTracker:
         # downloads them (the developer's decision, 2026-11-16). A sign-in
         # scan keeps its own fetcher, whose egress policy refuses a file on
         # another site.
-        drive = downloads.fetch is None and formats.classify_url(url) == "google_drive"
+        # A Google Doc or Slides deck: the Word or PowerPoint file Google
+        # exports (google.export_address), and robots.txt is asked about
+        # that address; Google's allows /document and /presentation
+        # (2026-11-16). One with no export address (a copy published to the
+        # web) is not a file Axcess can download.
+        file_type = formats.classify_url(url)
+        drive = downloads.fetch is None and file_type == "google_drive"
+        export = None
+        if file_type in {"google_doc", "google_slides"}:
+            export = export_address(url)
+            if export is None:
+                self._store(file_id, store.CheckResult("could_not_check", "google_file"))
+                return
+        self._started += 1
+        target = DRIVE_DOWNLOAD_URL if drive else export or url
         async with self._semaphore:
-            if not downloads.ignore_robots and not await downloads.robots.allowed(
-                DRIVE_DOWNLOAD_URL if drive else url
-            ):
+            if not downloads.ignore_robots and not await downloads.robots.allowed(target):
                 self._store(file_id, store.CheckResult("could_not_check", "robots"))
                 return
-            async with downloads.limiter.throttle(DRIVE_DOWNLOAD_URL if drive else url):
+            async with downloads.limiter.throttle(target):
                 if drive:
                     fetched = await fetch_drive_file(
                         downloads.client, url, button=downloads.drive_button
                     )
                 elif downloads.fetch is not None:
-                    fetched = await downloads.fetch(url)
+                    fetched = await downloads.fetch(target)
+                elif export is not None:
+                    fetched = await fetch_export(downloads.client, export)
                 else:
                     fetched = await fetch_file(downloads.client, url)
-            if drive and fetched.outcome == "ok" and _is_office_file(fetched.body):
-                # A Word, PowerPoint or Excel file kept in Drive: downloaded
-                # and identified, checked once Axcess checks that format.
-                self._store(
-                    file_id,
-                    store.CheckResult(
-                        "could_not_check",
-                        "type_not_checked_yet",
-                        http_status=fetched.http_status,
-                        content_type=fetched.content_type,
-                        byte_size=len(fetched.body),
-                        sha256=hashlib.sha256(fetched.body).hexdigest(),
-                    ),
-                )
-                return
             await self._check_fetched(file_id, fetched)
 
     # -- shared -----------------------------------------------------------
@@ -508,8 +517,12 @@ class LinkedFileTracker:
             byte_size=len(body),
             sha256=digest,
         )
-        if not looks_like_pdf(body):
-            self._store(file_id, downloaded)
+        # The bytes decide which check reads the file, not the address: a
+        # Drive file can be any type, and a link named .docx can lead to a
+        # PDF or to a web page.
+        kind = sniff(body)
+        if kind in _NOT_READ:
+            self._store(file_id, replace(downloaded, reason=_NOT_READ[kind]))
             return
         # The same bytes at another address, already checked: the same
         # result, without reading the file again. The link stays the file's
@@ -536,41 +549,81 @@ class LinkedFileTracker:
                     page_count=copy.page_count,
                     thumbnail_hash=copy.thumbnail_hash,
                     thumbnail_small_hash=copy.thumbnail_small_hash,
+                    checked_as=copy.checked_as,
                 ),
             )
             return
         mine: asyncio.Future[None] = asyncio.get_running_loop().create_future()
         self._reading[digest] = mine
         try:
-            try:
-                result: PdfCheck = await asyncio.wait_for(
-                    asyncio.to_thread(check_pdf, body), timeout=CHECK_TIMEOUT_S
-                )
-            except TimeoutError:
-                self._store(file_id, replace(downloaded, reason="timed_out"))
-                return
-            if result.outcome == "checked":
-                large, small = await self._thumbnails(body)
-                self._store(
-                    file_id,
-                    replace(
-                        downloaded,
-                        status="mostly_sure" if result.failed else "not_sure",
-                        reason=None,
-                        failed_checks=result.failed,
-                        is_form=result.is_form,
-                        page_count=result.page_count,
-                        thumbnail_hash=large,
-                        thumbnail_small_hash=small,
-                    ),
-                )
-                return
-            self._store(file_id, replace(downloaded, reason=_CHECK_REASON[result.outcome]))
+            if kind == "pdf":
+                await self._check_pdf(file_id, body, downloaded)
+            elif kind in ("docx", "pptx"):
+                await self._check_office(file_id, body, kind, downloaded)
         finally:
             if self._reading.get(digest) is mine:
                 del self._reading[digest]
             if not mine.done():
                 mine.set_result(None)
+
+    async def _check_pdf(self, file_id: int, body: bytes, downloaded: store.CheckResult) -> None:
+        try:
+            result: PdfCheck = await asyncio.wait_for(
+                asyncio.to_thread(check_pdf, body), timeout=CHECK_TIMEOUT_S
+            )
+        except TimeoutError:
+            self._store(file_id, replace(downloaded, reason="timed_out"))
+            return
+        if result.outcome != "checked":
+            self._store(file_id, replace(downloaded, reason=_CHECK_REASON[result.outcome]))
+            return
+        large, small = await self._thumbnails(body)
+        self._store(
+            file_id,
+            replace(
+                downloaded,
+                # Every PDF check proves a barrier on its own (pdf_check.py).
+                status="mostly_sure" if result.failed else "not_sure",
+                reason=None,
+                failed_checks=result.failed,
+                is_form=result.is_form,
+                page_count=result.page_count,
+                thumbnail_hash=large,
+                thumbnail_small_hash=small,
+                checked_as="pdf",
+            ),
+        )
+
+    async def _check_office(
+        self,
+        file_id: int,
+        body: bytes,
+        kind: formats.CheckedAs,
+        downloaded: store.CheckResult,
+    ) -> None:
+        """A Word or PowerPoint file: ``office_check``. No first-page picture:
+        Axcess has nothing that draws one."""
+        try:
+            result: OfficeCheck = await asyncio.wait_for(
+                asyncio.to_thread(check_office, body, kind), timeout=CHECK_TIMEOUT_S
+            )
+        except TimeoutError:
+            self._store(file_id, replace(downloaded, reason="timed_out"))
+            return
+        if result.outcome != "checked":
+            self._store(file_id, replace(downloaded, reason="damaged"))
+            return
+        self._store(
+            file_id,
+            replace(
+                downloaded,
+                status=result.status,
+                reason=None,
+                failed_checks=result.failed,
+                page_count=result.page_count,
+                checked_as=kind,
+            ),
+        )
 
     async def _thumbnails(self, body: bytes) -> tuple[str | None, str | None]:
         """Draw and keep the first page of a PDF the check could read.
@@ -602,9 +655,17 @@ class LinkedFileTracker:
         store.set_result(self._conn, scan_id=self._scan_id, file_id=file_id, result=result)
 
 
-def _is_office_file(body: bytes) -> bool:
-    """A Word, PowerPoint or Excel file (.docx, .pptx, .xlsx: a ZIP of XML parts)."""
-    return body[:4] == b"PK\x03\x04" and b"[Content_Types].xml" in body[:4096]
+#: Bytes no check reads, and the reason each gets. ``not_a_pdf`` is any
+#: answer that is not a file Axcess checks (a web page, an image); the
+#: report words it by the type the link named (``linkedFileReasonText``).
+_NOT_READ: dict[str, formats.Reason] = {
+    # An Excel file, here or kept in Drive: identified, checked once Axcess
+    # checks that format.
+    "office_other": "type_not_checked_yet",
+    "encrypted": "password",
+    "old_office": "old_format",
+    "unknown": "not_a_pdf",
+}
 
 
 _FETCH_REASON: dict[str, formats.Reason] = {
