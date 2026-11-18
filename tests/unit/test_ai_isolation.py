@@ -798,11 +798,13 @@ def test_low_free_memory_warns_but_never_stops_a_start(
     assert runtime.memory_warning is None
 
 
-def test_a_size_is_refused_only_on_a_computer_with_less_memory_than_it_is_for(
+def test_a_size_is_refused_only_on_an_8_gb_computer(
     tmp_path: Path,
 ) -> None:
-    """The one memory refusal left (developer, 2026-11-18): an 8 GB laptop
-    cannot download or start Standard or Large; Small still starts."""
+    """The one memory refusal left (developer, 2026-11-18: "only refuse to
+    start 16 gb and above on a 8gb laptop"): an 8 GB laptop cannot download
+    or start Standard or Large. A bigger computer starts a size it has less
+    memory than, with a warning on the setup page."""
     from audit.ai.hardware import Hardware
     from audit.ai.runtime import NotEnoughMemoryError
 
@@ -824,6 +826,33 @@ def test_a_size_is_refused_only_on_a_computer_with_less_memory_than_it_is_for(
     # Unknown memory never refuses.
     manager.probe = lambda: laptop(0)  # type: ignore[method-assign]
     assert manager.start_runtime().state == "started"
+    # 16 GB and 12 GB start the 32 GB size: memory only warns there.
+    for gb in (16, 12):
+        runtime.reset_mock()
+        manager.probe = lambda gb=gb: laptop(gb)  # type: ignore[method-assign]
+        assert manager.start_runtime().state == "started"
+
+
+@pytest.mark.parametrize(
+    ("memory", "tier", "refused"),
+    [
+        (8, "standard", True),
+        (8, "large", True),
+        (6, "standard", True),
+        (8, "small", False),
+        (4, "small", False),
+        (12, "standard", False),
+        (12, "large", False),
+        (16, "large", False),
+        (0, "large", False),
+    ],
+)
+def test_only_8_gb_or_less_refuses_a_size_for_16_gb_or_more(
+    memory: int, tier: str, refused: bool
+) -> None:
+    from audit.ai.hardware import size_refused
+
+    assert size_refused(memory, load_catalog().tier(tier)) is refused
 
 
 @pytest.mark.parametrize(

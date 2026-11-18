@@ -308,10 +308,21 @@ async def test_page_inspector_suggests_a_fix_for_the_element_you_are_on(
     await button.focus()
     await page.keyboard.press("Enter")
 
-    heading = box.get_by_role("heading", name="AI suggestion", level=2)
-    await heading.wait_for()
-    assert await heading.evaluate("el => el === document.activeElement")
+    # The idle card already has the "AI suggestion" heading, so waiting for it
+    # proves nothing. The button goes away once pressed; focus must land in
+    # the card (its heading while waiting, the lead fix sentence once this
+    # fast fake answers), never on the page body.
     await box.get_by_text('<input id="q" aria-label="Search">').wait_for(timeout=15000)
+    await page.wait_for_function(
+        """() => {
+            const el = document.activeElement;
+            const card = el && el.closest("section[aria-labelledby]");
+            return !!card && el.tabIndex === -1
+              && card.querySelector("h2")?.textContent?.includes("AI suggestion");
+        }""",
+        timeout=5000,
+    )
+    assert await button.count() == 0
 
     violations = await _run_axe(page)
     assert not violations, _render_violations(violations)

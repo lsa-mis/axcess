@@ -439,15 +439,18 @@ async def test_a_size_that_is_set_up_offers_no_download(new_page: Any, server_se
         await group.locator("input[value='small']").check()
         # AI is on, so the download switches to the new size.
         await page.get_by_role("button", name="Download Small and switch to it").wait_for()
-        # Large is for 32 GB or more: on this 16 GB computer it says so where
-        # the button was, and offers no download (developer, 2026-11-18).
+        # Large is for 32 GB or more: on this 16 GB computer it can still be
+        # downloaded, and the note before the button warns (developer,
+        # 2026-11-18: refuse only Standard and Large on 8 GB or less).
         await group.locator("input[value='large']").check()
-        await page.get_by_text(
+        large = page.get_by_role("button", name="Download Large and switch to it")
+        await large.wait_for()
+        note = await page.locator(f"#{await large.get_attribute('aria-describedby')}").inner_text()
+        assert note.endswith(
             "Large is for computers with 32 GB of memory or more, and this computer has "
-            "16 GB. Choose a smaller size.",
-            exact=True,
-        ).wait_for()
-        assert await download.count() == 0
+            "16 GB, so it may answer very slowly or stop."
+        )
+        assert await page.get_by_text("Choose a smaller size.").count() == 0
         violations = await _run_axe(page)
         assert not violations, _render_violations(violations)
     finally:

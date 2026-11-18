@@ -132,6 +132,11 @@ choice moves into **Change the AI models**.
    Bonsai 2 sizes and does not fit a 16 GB computer. A setup saved under it
    asks for a new download.
 
+   A size bigger than this computer's memory can still be chosen: the page
+   warns before the download that it may answer very slowly or stop. The
+   one exception is a computer with 8 GB of memory or less, which cannot
+   download or start Standard or Large.
+
    Without a graphics chip Axcess suggests Small, because larger models are
    slow on the processor alone, and the page says so. All models use the
    Apache 2.0 licence.

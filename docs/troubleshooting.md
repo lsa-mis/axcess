@@ -110,10 +110,11 @@ and continues without those checks.
   Ollama. When the app opens with AI on, the service starts in the background;
   until it is ready, AI requests say it is not running.
 - **"This computer has less memory than this size is for"**: each size says
-  which computers it is for (for example, Standard is for computers with
-  16 GB of memory or more). On a computer with less, Axcess does not
-  download or start that size. Choose a smaller size, such as Small on an
-  8 GB laptop.
+  which computers it is for (for example, Large is for computers with
+  32 GB of memory or more). On a computer with less, you can still
+  download and start that size, but it may answer very slowly or stop.
+  The one exception: on a computer with 8 GB of memory or less, Axcess
+  does not download or start Standard or Large. Choose Small there.
 - **"Memory was low when AI started"**: AI started anyway, but the models
   need more free memory than there was, so answers may be slow. The
   operating system makes room by compressing or moving other programs'

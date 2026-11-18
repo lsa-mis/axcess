@@ -76,7 +76,7 @@ class RuntimeSetupError(Exception):
 
 
 class NotEnoughMemoryError(RuntimeSetupError):
-    """This computer has less memory than the chosen size is for; nothing started."""
+    """A size for 16 GB or more on a computer with 8 GB or less; nothing started."""
 
 
 # Memory a running model needs beyond its file: the 8,192-token context
@@ -768,8 +768,8 @@ class LlamaRuntime:
         refused even Small, though macOS makes room by compressing other
         programs' memory. The developer chose, on 2026-11-18, to warn and let
         the operating system manage memory. The one refusal left is a size
-        on a computer with less memory than the size is for
-        (AIManager._require_size_fits).
+        for 16 GB or more on a computer with 8 GB or less
+        (AIManager._require_size_fits, hardware.size_refused).
         """
         need = memory_needed(models, dedicated_gpu=hardware.dedicated_gpu())
         # Memory a model just stopped holds comes back over a few seconds
