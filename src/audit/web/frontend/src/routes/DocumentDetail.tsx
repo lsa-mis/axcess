@@ -280,7 +280,7 @@ function ChecksTable({ row, scanId }: { row: LinkedFileRow; scanId: number }) {
       {/* A Google file has no original: the checks below read the Word or
           PowerPoint file Google exports, and the reader needs that to know
           what the results are about and what to fix. */}
-      {checkedAs && <p className="max-w-prose px-4 pt-3 text-sm leading-6">{checkedAs}.</p>}
+      {checkedAs && <p className="max-w-prose px-4 py-3 text-sm leading-6">{checkedAs}.</p>}
       {row.status === "not_sure" && (
         <p className="max-w-prose px-4 py-3 text-sm leading-6">{LINKED_FILE_STATUS_HELP.not_sure}</p>
       )}

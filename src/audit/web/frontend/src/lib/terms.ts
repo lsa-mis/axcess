@@ -332,7 +332,7 @@ export const LINKED_FILE_CHECK_WHY: Record<LinkedFileCheck, string> = {
   no_title: "A title tells people which file they have open.",
   no_language: "The language tells a screen reader which voice to read the file in.",
   no_alt_text:
-    "A screen reader reads an image's alt text (the text a screen reader reads for an image) aloud. Every picture, chart and diagram needs it, unless it is marked as decorative.",
+    "Alt text is the text a screen reader reads aloud for an image. Every picture, chart and diagram needs it, unless it is marked as decorative.",
   table_no_header:
     "A header row lets a screen reader say which column each cell is in. Axcess looks at tables with at least 2 rows and 2 columns.",
   slide_no_title: "Slide titles let a screen reader user find a slide and know where they are.",
