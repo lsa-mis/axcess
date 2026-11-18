@@ -87,7 +87,12 @@ class Settings(BaseSettings):
     suggestions_enabled: bool = False
     suggestion_text_model: str = "qwen2.5-coder:7b-instruct"
     suggestion_vision_model: str = "qwen2.5vl:7b"
-    suggestion_timeout_s: float = Field(default=120.0, ge=10.0, le=600.0)
+    # The whole suggestion, its second try included. 300 s: on a laptop
+    # without a separate graphics card a local model writes 10-16 tokens a
+    # second, and an answer that needs its second try took over 150 s; at
+    # 120 s it failed as "Could not write a suggestion" (2026-11-18). Stop
+    # ends a wait sooner.
+    suggestion_timeout_s: float = Field(default=300.0, ge=10.0, le=600.0)
     # Sent with each fix-suggestion request. None: not sent, so the model's
     # own sampling applies (your own model with recommended settings).
     suggestion_temperature: float | None = 0.0
