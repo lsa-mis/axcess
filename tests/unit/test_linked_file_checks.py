@@ -129,8 +129,9 @@ def test_classify_content_type(content_type: str | None, expected: str | None) -
     ("file_type", "status", "reason"),
     [
         ("pdf", "pending", None),
-        ("docx", "could_not_check", "type_not_checked_yet"),
-        ("pptx", "could_not_check", "type_not_checked_yet"),
+        # Word and PowerPoint, Google Docs and Slides: checked since 2026-11-17.
+        ("docx", "pending", None),
+        ("pptx", "pending", None),
         ("xlsx", "could_not_check", "type_not_checked_yet"),
         ("odt", "could_not_check", "type_not_checked_yet"),
         ("odp", "could_not_check", "type_not_checked_yet"),
@@ -139,9 +140,10 @@ def test_classify_content_type(content_type: str | None, expected: str | None) -
         ("doc", "could_not_check", "old_format"),
         ("xls", "could_not_check", "old_format"),
         ("ppt", "could_not_check", "old_format"),
-        ("google_doc", "could_not_check", "google_file"),
+        ("google_doc", "pending", None),
+        # Google's robots.txt does not allow /spreadsheets.
         ("google_sheet", "could_not_check", "google_file"),
-        ("google_slides", "could_not_check", "google_file"),
+        ("google_slides", "pending", None),
         ("google_drive", "pending", None),
     ],
 )
