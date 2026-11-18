@@ -166,13 +166,40 @@ def _seed_documents(db_path: Path, scan_id: int, blob_dir: Path | None = None) -
             ),
             [(home, "iframe", "Course map", None)],
         )
+        # A Word file the check read (since 2026-11-17): one problem that
+        # makes it Mostly sure, and two possible problems that do not.
         _file(
             conn,
             scan_id,
-            "http://example.com/files/report.docx",
+            "http://example.com/files/welcome-guide.docx",
             "docx",
-            None,
-            [(home, "link", "Committee report (Word)", None)],
+            store.CheckResult(
+                "mostly_sure",
+                failed_checks=["no_alt_text", "unclear_link_text", "no_title"],
+                http_status=200,
+                checked_as="docx",
+            ),
+            [(home, "link", "Welcome guide (Word)", None)],
+        )
+        # A Google Slides deck, checked as the PowerPoint file Google exports.
+        _file(
+            conn,
+            scan_id,
+            "https://docs.google.com/presentation/d/xyz/edit",
+            "google_slides",
+            store.CheckResult(
+                "not_sure", failed_checks=["no_title"], http_status=200, checked_as="pptx"
+            ),
+            [(about, "link", "Orientation slides", None)],
+            off_site=True,
+        )
+        _file(
+            conn,
+            scan_id,
+            "http://example.com/files/report.xlsx",
+            "xlsx",
+            store.CheckResult("could_not_check", "type_not_checked_yet"),
+            [(home, "link", "Committee report (Excel)", None)],
         )
         _file(
             conn,
@@ -185,9 +212,9 @@ def _seed_documents(db_path: Path, scan_id: int, blob_dir: Path | None = None) -
         _file(
             conn,
             scan_id,
-            "https://docs.google.com/document/d/abc/edit",
-            "google_doc",
-            None,
+            "https://docs.google.com/spreadsheets/d/abc/edit",
+            "google_sheet",
+            store.CheckResult("could_not_check", "google_file"),
             [(about, "link", "Meeting notes", None)],
             off_site=True,
         )
@@ -211,18 +238,20 @@ def documents(seeded_db: tuple[Path, Path, int]) -> int:
 def test_files_come_in_the_recommended_order(client: TestClient, documents: int) -> None:
     body = client.get(f"/api/scans/{documents}/documents").json()
     assert body["recorded"] is True
-    assert body["total"] == 7
-    assert body["counts"] == {"mostly_sure": 2, "not_sure": 1, "could_not_check": 4}
+    assert body["total"] == 9
+    assert body["counts"] == {"mostly_sure": 3, "not_sure": 2, "could_not_check": 4}
     assert [(f["name"], f["status"], f["reason"]) for f in body["files"]] == [
         # Mostly sure: the form on two pages before the one on one page.
         ("permit-form.pdf", "mostly_sure", None),
         ("no-title.pdf", "mostly_sure", None),
+        ("welcome-guide.docx", "mostly_sure", None),
         ("map.pdf", "not_sure", None),
+        # A Google address has no file name, so the link's text names it.
+        ("Orientation slides", "not_sure", None),
         # Could not check: one page each, so by address.
         ("budget.xls", "could_not_check", "old_format"),
         ("missing.pdf", "could_not_check", "http_error"),
-        ("report.docx", "could_not_check", "type_not_checked_yet"),
-        # A Google address has no file name, so the link's text names it.
+        ("report.xlsx", "could_not_check", "type_not_checked_yet"),
         ("Meeting notes", "could_not_check", "google_file"),
     ]
     form = body["files"][0]
@@ -230,6 +259,39 @@ def test_files_come_in_the_recommended_order(client: TestClient, documents: int)
     assert (form["is_form"], form["referring_page_count"]) == (True, 2)
     # The pages themselves are on the file's own page, not in the list.
     assert "refs" not in form
+    # The server says which checks ran and splits what they found: the
+    # problems (they make the file Mostly sure) and the possible problems.
+    assert (form["checked_as"], form["possible_problems"]) == ("pdf", [])
+    assert form["checks_run"] == [
+        "not_tagged",
+        "no_text",
+        "blocks_assistive_tech",
+        "no_title",
+        "no_language",
+    ]
+    guide = next(f for f in body["files"] if f["name"] == "welcome-guide.docx")
+    assert guide["checked_as"] == "docx"
+    assert guide["failed_checks"] == ["no_alt_text"]
+    assert guide["possible_problems"] == ["unclear_link_text", "no_title"]
+    assert guide["checks_run"] == [
+        "no_alt_text",
+        "table_no_header",
+        "no_headings",
+        "no_language",
+        "skipped_heading_level",
+        "unclear_link_text",
+        "no_title",
+    ]
+    deck = next(f for f in body["files"] if f["name"] == "Orientation slides")
+    assert (deck["checked_as"], deck["failed_checks"], deck["possible_problems"]) == (
+        "pptx",
+        [],
+        ["no_title"],
+    )
+    assert "slide_no_title" in deck["checks_run"]
+    # A file no check read has none.
+    sheet = next(f for f in body["files"] if f["name"] == "Meeting notes")
+    assert (sheet["checked_as"], sheet["checks_run"]) == (None, [])
 
 
 def test_a_report_that_did_not_look_says_so(client: TestClient, seeded_db: Any) -> None:
@@ -258,7 +320,7 @@ def test_files_are_paged(client: TestClient, documents: int) -> None:
     rest = client.get(f"/api/scans/{documents}/documents?limit=3&offset=3").json()
     names = [f["name"] for f in first["files"] + rest["files"]]
     assert len(names) == 6 and len(set(names)) == 6
-    assert first["total"] == rest["total"] == 7
+    assert first["total"] == rest["total"] == 9
 
 
 @pytest.mark.parametrize("query", ["limit=5001", "limit=0", "offset=-1"])
@@ -470,7 +532,7 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
         ],
         use_inner_text=True,
     )
-    await expect(numbers.get_by_role("definition")).to_have_text(["7", "2", "1", "4"])
+    await expect(numbers.get_by_role("definition")).to_have_text(["9", "3", "2", "4"])
     numbers_box = await numbers.bounding_box()
     table_box = await table.bounding_box()
     assert numbers_box and table_box
@@ -498,7 +560,7 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
     labels_box = await labels.bounding_box()
     assert checked_box and labels_box
     assert table_box["y"] + table_box["height"] <= checked_box["y"] < labels_box["y"]
-    await expect(page.get_by_text("Only PDFs checked", exact=True)).to_be_visible()
+    await expect(page.get_by_text("3 types checked", exact=True)).to_be_visible()
 
     # Opened by keyboard, "What was checked" holds the caveat, what is
     # listed, the privacy fact and the limits, each said once.
@@ -507,8 +569,9 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
     panel = page.get_by_role("region", name=CHECKED)
     for text in (
         CAVEAT,
-        "Axcess checks only the PDF files.",
-        "To check a PDF, Axcess downloaded it to this computer once. It kept the results, "
+        "Axcess checks the PDF, Word (.docx) and PowerPoint (.pptx) files.",
+        "It also lists possible problems, such as link text, for a person to judge.",
+        "To check a file, Axcess downloaded it to this computer once. It kept the results, "
         "not the file.",
         "The list can miss files.",
         "Some reports do not look for documents",
@@ -545,10 +608,12 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
     names = [
         "permit-form.pdf",
         "no-title.pdf",
+        "welcome-guide.docx",
         "map.pdf",
+        "Orientation slides",
         "budget.xls",
         "missing.pdf",
-        "report.docx",
+        "report.xlsx",
         "Meeting notes",
     ]
     await expect(table.get_by_role("rowheader")).to_have_text(
@@ -570,18 +635,32 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
     await expect(form).not_to_contain_text(HOME)
     await expect(form).not_to_contain_text("Apply for a permit")
     await expect(form).not_to_contain_text("Appears only after pressing")
+    # A Word file: its problem, then its possible problems under their own
+    # words, so one is never read as the other.
+    guide = rows.nth(2).locator("td").nth(3)
+    await expect(guide.get_by_role("list").first.get_by_role("listitem")).to_have_text(
+        ["Images without alt text"]
+    )
+    await expect(guide.get_by_text("Possible problems:", exact=True)).to_be_visible()
+    await expect(guide.get_by_role("list").nth(1).get_by_role("listitem")).to_have_text(
+        ["Links that do not say where they go", "No document title"]
+    )
     # Not sure says what a person must still check: never read as a pass.
-    await expect(rows.nth(2)).to_contain_text("Not sure")
-    await expect(rows.nth(2)).to_contain_text(
+    await expect(rows.nth(3)).to_contain_text("Not sure")
+    await expect(rows.nth(3)).to_contain_text(
         "the reading order, the image descriptions (alt text) and the table headers"
     )
+    # A Google file says it was checked as the file Google exports.
+    await expect(rows.nth(4)).to_contain_text(
+        "Checked as the PowerPoint (.pptx) file that Google exports"
+    )
     # "Does not check yet" and "cannot check" read differently.
-    await expect(rows.nth(3)).to_contain_text("Axcess cannot check this file type.")
-    await expect(rows.nth(4)).to_contain_text("(HTTP 404)")
-    await expect(rows.nth(5)).to_contain_text("Axcess does not check this file type yet.")
-    await expect(rows.nth(6)).to_contain_text("Axcess cannot check files made in Google")
-    await expect(rows.nth(6)).to_contain_text("docs.google.com")
-    await expect(rows.nth(6)).to_contain_text("Another site")
+    await expect(rows.nth(5)).to_contain_text("Axcess cannot check this file type.")
+    await expect(rows.nth(6)).to_contain_text("(HTTP 404)")
+    await expect(rows.nth(7)).to_contain_text("Axcess does not check this file type yet.")
+    await expect(rows.nth(8)).to_contain_text("Axcess does not check Google Sheets.")
+    await expect(rows.nth(8)).to_contain_text("docs.google.com")
+    await expect(rows.nth(8)).to_contain_text("Another site")
     # The columns say what each value is; "How sure" alone did not.
     await expect(table.get_by_role("columnheader")).to_have_text(
         [
@@ -595,7 +674,7 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
     )
     # The row header is the file's name only: a screen reader reads it with
     # every cell, so no address, site or form line is in it.
-    await expect(table.get_by_role("rowheader").nth(6)).to_have_text(
+    await expect(table.get_by_role("rowheader").nth(8)).to_have_text(
         re.compile(r"^Meeting notes\b"), use_inner_text=True
     )
     await expect(table.get_by_role("rowheader").get_by_text("docs.google.com")).to_have_count(0)
@@ -732,7 +811,7 @@ async def test_a_report_that_found_none_says_what_that_does_not_mean(
         has=page.get_by_role("term").filter(has_text=re.compile(r"^Documents$"))
     )
     await expect(numbers.get_by_role("definition")).to_have_text(["0", "0", "0", "0"])
-    await expect(page.get_by_text("Only PDFs checked", exact=True)).to_be_visible()
+    await expect(page.get_by_text("3 types checked", exact=True)).to_be_visible()
     assert await page.evaluate(_TEXT_LAYOUT) == {"long": [], "tight": []}
 
 
@@ -865,6 +944,86 @@ async def test_a_documents_page_passes_axe_and_the_aaa_checks(
         assert await page.evaluate(_SHARED_NAMES) == []
         controls = await page.evaluate(_COLLECT)
         assert not [c for c in controls if vague(c["text"], in_nav=c["inNav"])], controls
+
+
+@on_module_loop
+@pytest.mark.parametrize("width", [1280, 320])
+async def test_a_word_and_a_powerpoint_page_list_their_own_checks(
+    documents: int, live_server: tuple[str, int], new_page: Any, width: int
+) -> None:
+    """A Word file's table lists the Word checks and a deck's the PowerPoint
+    ones (the row's ``checks_run``), each result in words: "Problem found"
+    for a check that proves a barrier, "Possible problem" for one that does
+    not, "No problem found" otherwise. A Google file says it was checked as
+    the file Google exports."""
+    from playwright.async_api import expect
+
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": width, "height": 800})
+    response = await page.request.get(f"{base}/api/scans/{scan_id}/documents?limit=200")
+    body = await response.json()
+    ids = {f["name"]: f["file_id"] for f in body["files"]}
+
+    await page.goto(
+        f"{base}/app/scans/{scan_id}/documents/{ids['welcome-guide.docx']}",
+        wait_until="networkidle",
+    )
+    checks = page.get_by_role("table", name="Machine checks on welcome-guide.docx")
+    await expect(checks.get_by_role("rowheader")).to_have_text(
+        [
+            "Alt text for images",
+            "Table header rows",
+            "Headings",
+            "Language",
+            "Heading levels",
+            "Link text",
+            "Document title",
+        ]
+    )
+    await expect(checks.locator("tbody tr td:nth-of-type(1)")).to_have_text(
+        [
+            "Problem found",
+            "No problem found",
+            "No problem found",
+            "No problem found",
+            "No problem found",
+            "Possible problem",
+            "Possible problem",
+        ]
+    )
+    await expect(checks).not_to_contain_text("Tags")
+    await expect(checks).not_to_contain_text("Passed")
+    for tags in (_AXE_TAGS_AA, None):
+        violations = await _run_axe(page, tags)
+        assert not violations, f"{width}px:\n{_render_violations(violations)}"
+    assert await page.evaluate(
+        "document.documentElement.scrollWidth <= document.documentElement.clientWidth"
+    )
+
+    await page.goto(
+        f"{base}/app/scans/{scan_id}/documents/{ids['Orientation slides']}",
+        wait_until="networkidle",
+    )
+    await expect(
+        page.get_by_text("Checked as the PowerPoint (.pptx) file that Google exports.")
+    ).to_be_visible()
+    checks = page.get_by_role("table", name="Machine checks on Orientation slides")
+    await expect(checks.get_by_role("rowheader")).to_have_text(
+        [
+            "Alt text for images",
+            "Slide titles",
+            "Table header rows",
+            "Language",
+            "Link text",
+            "Document title",
+        ]
+    )
+    await expect(checks.locator("tbody tr td:nth-of-type(1)")).to_have_text(
+        ["No problem found"] * 5 + ["Possible problem"]
+    )
+    for tags in (_AXE_TAGS_AA, None):
+        violations = await _run_axe(page, tags)
+        assert not violations, f"{width}px:\n{_render_violations(violations)}"
 
 
 _MARKED_COPY = b"""<!doctype html><html><head><title>Home</title></head><body>
@@ -1087,8 +1246,10 @@ async def test_the_table_sorts_by_any_column_and_goes_back(
                 "Meeting notes",
                 "missing.pdf",
                 "no-title.pdf",
+                "Orientation slides",
                 "permit-form.pdf",
-                "report.docx",
+                "report.xlsx",
+                "welcome-guide.docx",
             ]
         ],
         use_inner_text=True,
@@ -1149,22 +1310,22 @@ async def test_filter_documents_narrows_the_list_and_says_how(
     await expect(page).to_have_url(re.compile(r"hosted=this"))
     table = page.get_by_role("table")
     await expect(table.get_by_role("rowheader")).to_have_count(3)
-    await expect(page.get_by_text("3 of 7 shown", exact=True)).to_be_visible()
+    await expect(page.get_by_text("3 of 9 shown", exact=True)).to_be_visible()
     await expect(
         page.get_by_text(re.compile(r"Filtered by.*Could not check.*This site"))
     ).to_be_visible()
     # The numbers over the table still count the whole report.
     numbers = page.locator("main dl").first
-    await expect(numbers.get_by_role("definition").first).to_have_text("7")
+    await expect(numbers.get_by_role("definition").first).to_have_text("9")
     for tags in (_AXE_TAGS_AA, None):
         violations = await _run_axe(page, tags)
         assert not violations, _render_violations(violations)
     await page.keyboard.press("Escape")
     await page.get_by_role("button", name="Clear filters").click()
-    await expect(table.get_by_role("rowheader")).to_have_count(7)
+    await expect(table.get_by_role("rowheader")).to_have_count(9)
     # A filter that matches nothing says so, never an empty list.
     await page.goto(
-        f"{base}/app/scans/{scan_id}/documents?status=not_sure&kind=google",
+        f"{base}/app/scans/{scan_id}/documents?status=not_sure&kind=excel",
         wait_until="networkidle",
     )
     await expect(
@@ -1274,7 +1435,7 @@ async def test_the_first_page_shows_above_the_name_and_on_its_own_page(
     assert await picture.evaluate("img => img.naturalWidth") > 0
     # A Word file has no picture: an icon in the same box, hidden from
     # screen readers, and still one link with the file's name.
-    word = page.get_by_role("link", name=re.compile(r"^report\.docx\s*, full details$"))
+    word = page.get_by_role("link", name=re.compile(r"^welcome-guide\.docx\s*, full details$"))
     await expect(word.locator("img")).to_have_count(0)
     await expect(word.locator("[aria-hidden=true] svg")).to_have_count(1)
 
@@ -1334,7 +1495,7 @@ async def test_the_accessibility_problems_header_explains_its_values(
     await expect(panel).to_be_visible()
     for meaning in (
         "A machine check found a problem",
-        "The file passed the machine checks.",
+        "The machine checks found no problem that makes the file hard to use",
         "Axcess could not check the file.",
     ):
         await expect(page.get_by_text(meaning).first).to_be_visible()

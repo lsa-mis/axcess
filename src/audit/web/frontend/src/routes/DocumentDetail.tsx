@@ -13,6 +13,7 @@ import {
   RESULT_COLUMN,
   ResultTag,
   SiteCell,
+  checkedAsNote,
   documentPath,
 } from "../components/DocumentParts";
 import { FactTile } from "../components/IssueEvidence";
@@ -36,7 +37,6 @@ import { compareText, sortWords, type Sort, type SortKind } from "../components/
 import { Card, EmptyState, ExternalLinkButton, LinkButton } from "../components/ui";
 import { useScanQuery } from "../hooks/useScanQuery";
 import {
-  LINKED_FILE_CHECKS,
   LINKED_FILE_CHECK_NAME,
   LINKED_FILE_CHECK_WHY,
   LINKED_FILE_STATUS_HELP,
@@ -224,23 +224,30 @@ export default function DocumentDetailRoute() {
 }
 
 /**
- * What Axcess found, as a table of its five machine checks: what each looks
- * at, its result, and why it matters. Every check is listed, the ones with
- * no problem too, so a reader sees what was looked at, not only what
- * failed, and a Not sure file shows that its checks passed and what a
- * person must still check (said over the table). The developer chose this
- * on 2026-11-14 over a bullet list of sentences: the table's own cell keeps
- * a short name per problem (Found, DocumentParts.tsx) and the reasons live
- * here, where there is room.
+ * What Axcess found, as a table of the machine checks that ran on this file:
+ * what each looks at, its result, and why it matters. The checks are the
+ * row's ``checks_run``, the server's list for the type the check read the
+ * file as (five for a PDF, seven for a Word file, six for a PowerPoint
+ * file; office_check.checks_for), so the table shows the checks that apply
+ * to this file and no others (the developer's request, 2026-11-17). Every
+ * one is listed, the ones with no problem too, so a reader sees what was
+ * looked at, not only what failed, and a Not sure file shows that its
+ * checks passed and what a person must still check (said over the table).
+ * The developer chose this on 2026-11-14 over a bullet list of sentences:
+ * the table's own cell keeps a short name per problem (Found,
+ * DocumentParts.tsx) and the reasons live here, where there is room.
  *
- * Row header the check (technique H63), so "Problem found" is heard with
- * the check it belongs to. The result is in words, "Problem found" in bold
- * and "No problem found" muted, never colour alone (SC 1.4.1 Use of Color,
- * Level A), and never "Passed": a machine check cannot prove a file is
- * accessible (AGENTS.md, Interface language rule 4). The checks run on
- * every PDF Axcess opens (pdf_check.py), so a check the file did not fail
- * found no problem; a file Axcess could not check has no table, only why.
- * The same table parts as every table here, so it looks and reads the same.
+ * Row header the check (technique H63), so the result is heard with the
+ * check it belongs to. The result is in words, never colour alone (SC 1.4.1
+ * Use of Color, Level A): "Problem found" in bold for a check that proves a
+ * barrier; "Possible problem" for a Word or PowerPoint check that does not
+ * prove one on its own and never makes the file Mostly sure (the document
+ * title, link text, heading levels; office_check.COUNTED), so the two are
+ * told apart by their words, not their weight; "No problem found" muted.
+ * Never "Passed": a machine check cannot prove a file is accessible
+ * (AGENTS.md, Interface language rule 4). A file Axcess could not check has
+ * no table, only why. The same table parts as every table here, so it looks
+ * and reads the same.
  */
 function ChecksTable({ row, scanId }: { row: LinkedFileRow; scanId: number }) {
   if (row.status === "could_not_check") {
@@ -250,6 +257,8 @@ function ChecksTable({ row, scanId }: { row: LinkedFileRow; scanId: number }) {
       </div>
     );
   }
+  const possible = row.possible_problems ?? [];
+  const checkedAs = checkedAsNote(row);
   return (
     <>
       {/* A copy: the same bytes as an earlier file in the list, at another
@@ -268,6 +277,10 @@ function ChecksTable({ row, scanId }: { row: LinkedFileRow; scanId: number }) {
           , at another address. The results below are that file&rsquo;s.
         </p>
       )}
+      {/* A Google file has no original: the checks below read the Word or
+          PowerPoint file Google exports, and the reader needs that to know
+          what the results are about and what to fix. */}
+      {checkedAs && <p className="max-w-prose px-4 pt-3 text-sm leading-6">{checkedAs}.</p>}
       {row.status === "not_sure" && (
         <p className="max-w-prose px-4 py-3 text-sm leading-6">{LINKED_FILE_STATUS_HELP.not_sure}</p>
       )}
@@ -281,22 +294,21 @@ function ChecksTable({ row, scanId }: { row: LinkedFileRow; scanId: number }) {
             </tr>
           </TableHead>
           <tbody>
-            {LINKED_FILE_CHECKS.map((check, index) => {
-              const failed = row.failed_checks.includes(check);
-              return (
-                <Row key={check} index={index} className="align-top">
-                  <RowHeader className="min-w-[10rem] align-top">{LINKED_FILE_CHECK_NAME[check]}</RowHeader>
-                  <Cell className="whitespace-nowrap align-top">
-                    {failed ? (
-                      <span className="font-semibold text-fg">Problem found</span>
-                    ) : (
-                      <span className="text-fg-muted">No problem found</span>
-                    )}
-                  </Cell>
-                  <Cell className="min-w-[16rem] align-top text-sm">{LINKED_FILE_CHECK_WHY[check]}</Cell>
-                </Row>
-              );
-            })}
+            {(row.checks_run ?? []).map((check, index) => (
+              <Row key={check} index={index} className="align-top">
+                <RowHeader className="min-w-[10rem] align-top">{LINKED_FILE_CHECK_NAME[check]}</RowHeader>
+                <Cell className="whitespace-nowrap align-top">
+                  {row.failed_checks.includes(check) ? (
+                    <span className="font-semibold text-fg">Problem found</span>
+                  ) : possible.includes(check) ? (
+                    <span className="text-fg">Possible problem</span>
+                  ) : (
+                    <span className="text-fg-muted">No problem found</span>
+                  )}
+                </Cell>
+                <Cell className="min-w-[16rem] align-top text-sm">{LINKED_FILE_CHECK_WHY[check]}</Cell>
+              </Row>
+            ))}
           </tbody>
         </Table>
       </TableRegion>

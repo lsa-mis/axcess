@@ -1441,13 +1441,22 @@ export type LinkedFileReason =
   | "limit"
   | "not_checked";
 
-/** A machine check a PDF failed (`linked_files.formats.FailedCheck`). */
+/** A machine check a file can fail (`linked_files.formats.FailedCheck`). */
 export type LinkedFileCheck =
   | "not_tagged"
   | "no_text"
   | "blocks_assistive_tech"
   | "no_title"
-  | "no_language";
+  | "no_language"
+  | "no_alt_text"
+  | "table_no_header"
+  | "slide_no_title"
+  | "no_headings"
+  | "skipped_heading_level"
+  | "unclear_link_text";
+
+/** Which check read a file (`linked_files.formats.CheckedAs`): decided by its bytes. */
+export type LinkedFileCheckedAs = "pdf" | "docx" | "pptx";
 
 /** How a page reaches a file (`linked_files.formats.RefKind`). */
 export type LinkedFileRefKind = "link" | "revealed_link" | "iframe" | "object" | "embed";
@@ -1474,7 +1483,15 @@ export interface LinkedFileRow {
   off_site: boolean;
   status: LinkedFileStatus;
   reason: LinkedFileReason | null;
+  /** Failed checks that prove a problem: what makes the file "Mostly sure". */
   failed_checks: LinkedFileCheck[];
+  /** Failed checks that do not prove a barrier on their own (Word and
+   *  PowerPoint only); they never make a file "Mostly sure". */
+  possible_problems?: LinkedFileCheck[];
+  /** Which check read the file; null when none did. A Google Doc is "docx". */
+  checked_as?: LinkedFileCheckedAs | null;
+  /** Every check that ran on the file, in report order. */
+  checks_run?: LinkedFileCheck[];
   http_status: number | null;
   is_form: boolean | null;
   page_count: number | null;
