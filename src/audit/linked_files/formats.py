@@ -74,12 +74,21 @@ Reason = Literal[
 ]
 
 #: Machine checks a PDF can fail. The first three stop a screen reader user
-#: reading the file at all; the last two make it harder to find and to hear
-#: correctly. ``SEVERE_CHECKS`` orders the report.
+#: reading the file at all (``SEVERE_CHECKS`` orders the report by them); the
+#: next six hide or garble one part of it (a form field, a link, an image, a
+#: formula, a table's columns, some text);
+#: the last two make it harder to find and to hear correctly.
 FailedCheck = Literal[
     "not_tagged",
     "no_text",
     "blocks_assistive_tech",
+    "field_no_name",
+    "link_no_description",
+    "image_no_description",
+    "formula_no_description",
+    "table_cells_misplaced",
+    "table_uneven_rows",
+    "untagged_text",
     "no_title",
     "no_language",
 ]

@@ -80,7 +80,7 @@ const DEFAULT_SORT: PagesSort = { column: "Page URL", direction: "asc" };
  * value with its sentence ("Mostly sure" / "it has accessibility
  * problems"), type (with "Has a form to fill in" under it), where it is
  * hosted and how many pages; then what the checks found, as a table of the
- * five checks (ChecksTable), in a card with a titled bar like the pages
+ * checks (ChecksTable), in a card with a titled bar like the pages
  * table's.
  *
  * The pages table: one row per page, however many ways it reaches the file
@@ -224,8 +224,8 @@ export default function DocumentDetailRoute() {
 }
 
 /**
- * What Axcess found, as a table of its five machine checks: what each looks
- * at, its result, and why it matters. Every check is listed, the ones with
+ * What Axcess found, as a table of the machine checks it ran: what each looks
+ * at, its result, and why it matters. Every check the file was given is listed, the ones with
  * no problem too, so a reader sees what was looked at, not only what
  * failed, and a Not sure file shows that its checks passed and what a
  * person must still check (said over the table). The developer chose this
@@ -237,9 +237,15 @@ export default function DocumentDetailRoute() {
  * the check it belongs to. The result is in words, "Problem found" in bold
  * and "No problem found" muted, never colour alone (SC 1.4.1 Use of Color,
  * Level A), and never "Passed": a machine check cannot prove a file is
- * accessible (AGENTS.md, Interface language rule 4). The checks run on
- * every PDF Axcess opens (pdf_check.py), so a check the file did not fail
- * found no problem; a file Axcess could not check has no table, only why.
+ * accessible (AGENTS.md, Interface language rule 4). The table lists the
+ * checks the file was given (row.checks_run), so a check the file did not
+ * fail found no problem. A check that did not apply is left out rather than
+ * shown as "No problem found": a file with no form fields was not checked
+ * for field names, and saying it had no problem there would claim a check
+ * that never ran (plain-language rule 5, keep text accurate to the code).
+ * The rejected option, a "Did not apply" row for each, would add up to four
+ * rows of nothing to every file. A file Axcess could not check has no
+ * table, only why.
  * The same table parts as every table here, so it looks and reads the same.
  */
 function ChecksTable({ row, scanId }: { row: LinkedFileRow; scanId: number }) {
@@ -281,7 +287,7 @@ function ChecksTable({ row, scanId }: { row: LinkedFileRow; scanId: number }) {
             </tr>
           </TableHead>
           <tbody>
-            {LINKED_FILE_CHECKS.map((check, index) => {
+            {LINKED_FILE_CHECKS.filter((check) => row.checks_run.includes(check)).map((check, index) => {
               const failed = row.failed_checks.includes(check);
               return (
                 <Row key={check} index={index} className="align-top">

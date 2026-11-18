@@ -234,16 +234,25 @@ export function linkedFileReasonText(reason: LinkedFileReason, httpStatus: numbe
 }
 
 /**
- * The five machine checks Axcess runs on every PDF it can open, most
- * serious first: the order the report ranks them in (SEVERE_CHECKS in
+ * The machine checks Axcess runs on the PDFs it can open, most serious
+ * first: the order the report ranks them in (SEVERE_CHECKS in
  * audit/linked_files/formats.py) and the order the server returns a file's
- * failed checks in (ALL_CHECKS in pdf_check.py). Every check runs on every
- * PDF Axcess opens, so a check a file did not fail found no problem.
+ * failed and run checks in (ALL_CHECKS in pdf_check.py). The first three and
+ * the last two run on every PDF Axcess opens; the seven between run only
+ * where they apply (a file with form fields, links, images, formulas or
+ * tables, or a tagged file), so a file's own `checks_run` says which it was given.
  */
 export const LINKED_FILE_CHECKS: readonly LinkedFileCheck[] = [
   "not_tagged",
   "no_text",
   "blocks_assistive_tech",
+  "field_no_name",
+  "link_no_description",
+  "image_no_description",
+  "formula_no_description",
+  "table_cells_misplaced",
+  "table_uneven_rows",
+  "untagged_text",
   "no_title",
   "no_language",
 ];
@@ -260,6 +269,13 @@ export const LINKED_FILE_CHECK_PROBLEM: Record<LinkedFileCheck, string> = {
   not_tagged: "Not tagged",
   no_text: "No text a screen reader can read",
   blocks_assistive_tech: "Security settings block screen readers",
+  field_no_name: "Form fields without a name",
+  link_no_description: "Links without link text",
+  image_no_description: "Images without alt text",
+  formula_no_description: "Formulas without alt text",
+  table_cells_misplaced: "Table cells under the wrong heading",
+  table_uneven_rows: "Tables with rows of different lengths",
+  untagged_text: "Text a screen reader skips",
   no_title: "No document title",
   no_language: "No language set",
 };
@@ -269,6 +285,13 @@ export const LINKED_FILE_CHECK_NAME: Record<LinkedFileCheck, string> = {
   not_tagged: "Tags",
   no_text: "Text a screen reader can read",
   blocks_assistive_tech: "Security settings",
+  field_no_name: "Form field names",
+  link_no_description: "Link text",
+  image_no_description: "Alt text for images",
+  formula_no_description: "Alt text for formulas",
+  table_cells_misplaced: "Table headings",
+  table_uneven_rows: "Table rows",
+  untagged_text: "Text outside the tags",
   no_title: "Document title",
   no_language: "Language",
 };
@@ -279,6 +302,20 @@ export const LINKED_FILE_CHECK_WHY: Record<LinkedFileCheck, string> = {
   no_text:
     "A file whose pages are only pictures, as in a scan, has no text a screen reader can read. Axcess looks at the first 50 pages.",
   blocks_assistive_tech: "Some security settings stop screen readers from reading the file.",
+  field_no_name:
+    'A screen reader says each form field\'s name, so people know what to fill in. A name a script left behind, such as "undefined", counts as no name.',
+  link_no_description:
+    'With no text inside a link, a screen reader can only say "link", not where it goes.',
+  image_no_description:
+    'Alt text is the text a screen reader reads for an image. Without it, people hear only "graphic". Axcess does not judge whether alt text is good, or whether an image is only decoration.',
+  formula_no_description:
+    "A screen reader cannot read math drawn on the page. Alt text says the formula in words. Axcess does not judge whether it says the formula correctly.",
+  table_cells_misplaced:
+    "A cell sits under one column on the page but is tagged in another, often a heading that covers several columns but is tagged as one cell. A screen reader reads it, and often the cells after it, under the wrong heading.",
+  table_uneven_rows:
+    "Some rows have fewer or more cells than the others, such as a label across the table tagged as one cell. It breaks the rules for tables, but Axcess did not see any cell sit under the wrong heading.",
+  untagged_text:
+    "A screen reader that follows the tags skips text that is not tagged. Axcess does not count text at the very top or bottom of a page, where headers and footers go.",
   no_title: "A title tells people which file they have open.",
   no_language: "The language tells a screen reader which voice to read the file in.",
 };

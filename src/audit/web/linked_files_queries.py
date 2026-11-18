@@ -36,6 +36,7 @@ from urllib.parse import unquote, urlsplit
 from pydantic import BaseModel
 
 from audit.linked_files.formats import SEVERE_CHECKS, FailedCheck, FileType, Reason, RefKind
+from audit.linked_files.pdf_check import BASE_CHECKS
 
 #: Largest page of rows one request may ask for. The Documents tab asks
 #: for every file at once (up to this many) and sorts, filters and pages
@@ -78,6 +79,9 @@ class LinkedFileRow(BaseModel):
     status: ShownStatus
     reason: Reason | None
     failed_checks: list[FailedCheck]
+    #: Checks the file was given, in report order; empty when it was not
+    #: checked. A file checked before migration 0045 ran the first five.
+    checks_run: list[FailedCheck] = []
     http_status: int | None
     is_form: bool | None
     page_count: int | None
@@ -91,6 +95,16 @@ class LinkedFileRow(BaseModel):
     #: A picture of the first page is stored (PDFs the check could read);
     #: served by ``/api/scans/{scan}/documents/{file}/thumbnail``.
     has_thumbnail: bool = False
+
+
+def _checks_run(shown_status: str, stored: str | None) -> list[FailedCheck]:
+    """The checks a file was given. Before migration 0045 every checked file
+    got the first five, so a checked file with nothing stored ran those."""
+    if stored is not None:
+        return list(json.loads(stored))
+    if shown_status in ("mostly_sure", "not_sure"):
+        return list(BASE_CHECKS)
+    return []
 
 
 class LinkedFileCounts(BaseModel):
@@ -206,7 +220,8 @@ def _file_rows(
                f.failed_checks, f.http_status, f.is_form, f.page_count,
                (SELECT COUNT(DISTINCT r.page_id) FROM linked_file_refs r
                  WHERE r.file_id = f.id AND r.scan_id = f.scan_id) AS referring,
-               f.thumbnail_hash IS NOT NULL AS has_thumbnail
+               f.thumbnail_hash IS NOT NULL AS has_thumbnail,
+               f.checks_run
           FROM linked_files f
          WHERE f.scan_id = ? AND (? IS NULL OR f.id = ?)
          ORDER BY CASE {_SHOWN_STATUS_SQL}
@@ -248,6 +263,7 @@ def _file_rows(
                 page_count=row[9],
                 referring_page_count=int(row[10]),
                 has_thumbnail=bool(row[11]),
+                checks_run=_checks_run(row[4], row[12]),
             )
         )
     return files

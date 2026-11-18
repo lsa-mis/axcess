@@ -309,10 +309,18 @@ the table always count the whole report.
 A document's own page works like an issue type's page. At the top right,
 **Open the file** opens it in a new tab. Under the heading are its facts
 (Accessibility problems?, Type, Hosted on, Pages it appears on). **What Axcess
-found** is a table of the five checks Axcess runs on every PDF it opens (Tags,
-Text a screen reader can read, Security settings, Document title, Language),
-each with its result ("Problem found" or "No problem found") and why it
-matters. "No problem found" is not a pass: a person must still check the file.
+found** is a table of the checks Axcess ran on the file, each with its
+result ("Problem found" or "No problem found") and why it matters. Every PDF
+Axcess opens gets five (Tags, Text a screen reader can read, Security
+settings, Document title, Language). Up to seven more run where they apply:
+Form field names (a file with form fields); Link text, Alt text for images,
+Alt text for formulas, Table headings and Table rows (a tagged file with
+links, images, formulas or tables); and Text outside the tags (a tagged
+file). Table headings finds a cell that sits under one column on the page
+but is tagged in another, so a screen reader reads it under the wrong
+heading. Table rows finds rows with more or fewer cells than the others
+where no cell was seen out of place. A check that did not apply is not listed. A report made before
+2026-11-17 ran only the first five. "No problem found" is not a pass: a person must still check the file.
 For a file Axcess could not check, it says why instead. Then a table lists
 every page the file appears on, one row per page (up to 2,000), with a search
 box and sortable columns:

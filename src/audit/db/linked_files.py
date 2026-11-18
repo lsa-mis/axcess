@@ -40,6 +40,8 @@ class CheckResult:
     status: Status
     reason: Reason | None = None
     failed_checks: Sequence[FailedCheck] = ()
+    #: Checks the file was given (migration 0045); None for no check.
+    checks_run: Sequence[FailedCheck] | None = None
     http_status: int | None = None
     content_type: str | None = None
     byte_size: int | None = None
@@ -135,7 +137,7 @@ def set_result(
     if result.status == "could_not_check" and result.reason is None:
         raise ValueError("A file that could not be checked needs a reason")
     cur = conn.execute(
-        "UPDATE linked_files SET status = ?, reason = ?, failed_checks = ?, "
+        "UPDATE linked_files SET status = ?, reason = ?, failed_checks = ?, checks_run = ?, "
         "http_status = ?, content_type = ?, byte_size = ?, sha256 = ?, is_form = ?, "
         "page_count = ?, thumbnail_hash = ?, thumbnail_small_hash = ?, "
         "checked_at = CURRENT_TIMESTAMP "
@@ -144,6 +146,7 @@ def set_result(
             result.status,
             result.reason if result.status == "could_not_check" else None,
             json.dumps(list(result.failed_checks)),
+            None if result.checks_run is None else json.dumps(list(result.checks_run)),
             result.http_status,
             (result.content_type or "")[:200] or None,
             result.byte_size,
@@ -171,7 +174,7 @@ def checked_copy(
     """
     row = conn.execute(
         "SELECT status, failed_checks, is_form, page_count, thumbnail_hash, "
-        "thumbnail_small_hash FROM linked_files "
+        "thumbnail_small_hash, checks_run FROM linked_files "
         "WHERE scan_id = ? AND sha256 = ? AND id != ? "
         "AND status IN ('mostly_sure', 'not_sure') ORDER BY id LIMIT 1",
         (scan_id, sha256, file_id),
@@ -185,6 +188,7 @@ def checked_copy(
         page_count=row[3],
         thumbnail_hash=row[4],
         thumbnail_small_hash=row[5],
+        checks_run=None if row[6] is None else tuple(json.loads(row[6])),
     )
 
 

@@ -530,9 +530,34 @@ A PDF is marked [Mostly sure](#mostly-sure) when it fails one of these:
   scan saved as pictures (WCAG 1.1.1);
 - its security settings forbid copying text for accessibility;
 - no document title (WCAG 2.4.2, technique PDF18);
-- no language set (WCAG 3.1.1, technique PDF16).
+- no language set (WCAG 3.1.1, technique PDF16);
+- a form field without a name a screen reader can say: no tooltip, or a
+  tooltip a script left behind such as "undefined" (WCAG 4.1.2, technique
+  PDF12). Only files with form fields get this check;
+- a link with no text inside it, so a screen reader can only say "link"
+  (WCAG 2.4.4, technique PDF11). Only tagged files with links;
+- an image tagged as a figure with no alt text (WCAG 1.1.1, technique PDF1).
+  Only tagged files with images. Axcess does not judge whether alt text is
+  good, or whether an image is only decoration;
+- a formula tagged as one with no alt text, so a screen reader cannot read
+  the math (WCAG 1.1.1). Only tagged files with formulas;
+- a table cell under the wrong heading: a cell that sits under one column on
+  the page but is tagged in another, often a heading over several columns
+  tagged as one cell, so a screen reader reads it under the wrong heading
+  (WCAG 1.3.1). Axcess compares where each cell's text is on the page with
+  the column its tags give it;
+- a table whose rows have different numbers of cells, counting merged cells,
+  where Axcess did not see a cell out of place: for example a label across
+  the table tagged as one cell, or a table past the first 50 pages, whose
+  text Axcess does not place (WCAG 1.3.1). Both table checks run only on
+  tagged files with tables;
+- text a screen reader skips: visible text outside the tags, not counting the
+  top and bottom 5% of a page, where headers and footers go (WCAG 1.3.1).
+  Only tagged files.
 
-A PDF that passes all five is [Not sure](#not-sure): a person must still check
+The first five run on every PDF Axcess opens; the other seven were added
+from 2026-11-17, so a report made before then did not run them. A PDF that passes
+every check it was given is [Not sure](#not-sure): a person must still check
 its reading order, alt text and table headers. Every other file, and any PDF
 Axcess could not open, is "Could not check", with the reason. It is on by
 default for every scan that does not sign in (**Check the documents the pages

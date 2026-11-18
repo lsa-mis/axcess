@@ -1446,6 +1446,13 @@ export type LinkedFileCheck =
   | "not_tagged"
   | "no_text"
   | "blocks_assistive_tech"
+  | "field_no_name"
+  | "link_no_description"
+  | "image_no_description"
+  | "formula_no_description"
+  | "table_cells_misplaced"
+  | "table_uneven_rows"
+  | "untagged_text"
   | "no_title"
   | "no_language";
 
@@ -1475,6 +1482,11 @@ export interface LinkedFileRow {
   status: LinkedFileStatus;
   reason: LinkedFileReason | null;
   failed_checks: LinkedFileCheck[];
+  /**
+   * Checks the file was given, in report order; empty when it was not
+   * checked. A file checked before 2026-11-17 ran the first five.
+   */
+  checks_run: LinkedFileCheck[];
   http_status: number | null;
   is_form: boolean | null;
   page_count: number | null;
