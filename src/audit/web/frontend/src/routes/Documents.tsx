@@ -705,9 +705,10 @@ function DocumentsCoverageNote({ recorded }: { recorded: boolean }) {
             for a person to judge. True to office_check.py: change them
             together. */}
         <p>
-          In a Word or PowerPoint file, Axcess checks the alt text for images, table header rows,
-          headings, slide titles and the language. It also lists possible problems, such as link
-          text, for a person to judge. They do not make a file &ldquo;Mostly sure&rdquo;.
+          In a Word or PowerPoint file, Axcess checks the alt text for images, headings, slide
+          titles and the language. It also lists possible problems, such as tables without a header
+          row and link text, for a person to judge. They do not make a file &ldquo;Mostly
+          sure&rdquo;.
         </p>
         <p>
           To check a file, Axcess downloaded it to this computer once. It kept the results, not

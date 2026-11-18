@@ -74,3 +74,27 @@ def test_a_google_doc_does_not_list_a_title_its_author_cannot_set(
     assert doc.failed_checks == ["no_alt_text"]
     # A Word file kept in Drive is the author's own file, whose title they can set.
     assert drive.possible_problems == ["no_title"] and "no_title" in drive.checks_run
+
+
+def test_migration_0046_re_decides_files_whose_only_barrier_was_a_table(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    scan_id = _scan(tmp_db)
+    table_only = _file(
+        tmp_db, scan_id, "https://site.test/a.docx", "docx", ["table_no_header", "no_title"]
+    )
+    with_alt = _file(
+        tmp_db, scan_id, "https://site.test/b.docx", "docx", ["table_no_header", "no_alt_text"]
+    )
+    forward = (MIGRATIONS / "0046_office_table_header_possible.sql").read_text()
+    rollback = (MIGRATIONS / "0046_office_table_header_possible.rollback.sql").read_text()
+
+    def status(file_id: int) -> str:
+        return str(
+            tmp_db.execute("SELECT status FROM linked_files WHERE id = ?", (file_id,)).fetchone()[0]
+        )
+
+    tmp_db.executescript(forward)
+    assert (status(table_only), status(with_alt)) == ("not_sure", "mostly_sure")
+    tmp_db.executescript(rollback)
+    assert (status(table_only), status(with_alt)) == ("mostly_sure", "mostly_sure")

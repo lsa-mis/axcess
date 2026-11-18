@@ -90,13 +90,13 @@ reader user. The rest are "possible problems" a person must judge.
 | Check | Word | PowerPoint | Mostly sure? | Basis |
 |---|---|---|---|---|
 | Images without alt text | yes | yes | yes | Microsoft Error; WCAG 1.1.1 |
-| Tables without a header row (2+ rows, 2+ columns) | yes | yes | yes | Microsoft Error; WCAG 1.3.1 |
+| Tables without a header row (2+ rows, 2+ columns) | yes | yes | possible problem (since 2026-11-18) | Microsoft Error; WCAG 1.3.1. 4 of its 8 holdout flags were layout tables, which structure cannot tell from data tables |
 | Slides without a title | – | yes | yes | Microsoft Error; WCAG 2.4.6 |
 | No headings (Word, over 400 words) | yes | – | yes | Microsoft Tip; WCAG 1.3.1 |
 | No language set | yes | yes | yes | WCAG 3.1.1 (as the PDF check) |
 | Heading levels skipped | yes | – | possible problem | Microsoft guidance |
 | Links that do not say where they go | yes | yes | possible problem | Microsoft guidance; WCAG 2.4.4 lets context give the purpose |
-| No document title | yes | yes | possible problem | Word and PowerPoint show the file name; Google exports never have a title |
+| No document title | yes | yes | possible problem; not checked for Google Docs and Slides (since 2026-11-18) | Word and PowerPoint show the file name; Google exports never have a title, and the author cannot set one |
 
 Not checked: reading order (Microsoft lists it as a Warning for a person;
 shape order alone says nothing about sense), contrast, merged cells,

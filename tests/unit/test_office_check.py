@@ -94,15 +94,23 @@ def test_each_type_gets_its_own_checks() -> None:
 def test_only_barriers_count_and_every_pdf_check_does() -> None:
     assert {
         "no_alt_text",
-        "table_no_header",
         "slide_no_title",
         "no_headings",
         "no_language",
     } == COUNTED
+    # A possible problem since 2026-11-18: half its real flags were layout
+    # tables, which structure cannot tell from data tables.
+    assert not counts("docx", "table_no_header")
     assert counts("pdf", "no_title")
     assert not counts("docx", "no_title")
     assert not counts("pptx", "unclear_link_text")
     assert counts("docx", "no_alt_text")
+
+
+def test_a_table_without_a_header_row_alone_leaves_a_file_not_sure() -> None:
+    result = check_office(word(image="described", table="none", link_text="Benefits guide"), "docx")
+    assert "table_no_header" in result.failed
+    assert result.status == "not_sure"
 
 
 def test_a_possible_problem_alone_leaves_a_file_not_sure() -> None:
