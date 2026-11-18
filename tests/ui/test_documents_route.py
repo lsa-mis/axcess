@@ -512,7 +512,7 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
 
     table = page.get_by_role("table", name=f"Documents linked from report #{scan_id}", exact=False)
     rows = table.locator("tbody tr")
-    await expect(rows).to_have_count(7)
+    await expect(rows).to_have_count(9)
 
     # As on Issues: nothing under the heading, and the counts in the row of
     # summary numbers over the table, every value shown.
