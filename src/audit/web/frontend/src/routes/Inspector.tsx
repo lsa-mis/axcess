@@ -1643,6 +1643,7 @@ export default function InspectorRoute() {
                         occurrenceId={currentOccurrence.id}
                         availability={suggestions}
                         headingLevel={2}
+                        standalone
                       />
                     )}
                     {suggestionsBlocked && (
