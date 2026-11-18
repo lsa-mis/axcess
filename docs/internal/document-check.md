@@ -1,7 +1,11 @@
 # The document check (linked files)
 
 How the Documents tab's check finds files, decides which ones are the same,
-and when it downloads and checks them. Code: `src/audit/linked_files/`
+and when it downloads and checks them. Since 2026-11-17 it checks Word
+(.docx) and PowerPoint (.pptx) files and Google Docs and Slides as well as
+PDFs (see "Word, PowerPoint, Google Docs and Slides" below; research and
+measurements in `office-check-research.md`). Where this file says "PDF"
+about downloading and timing, read "every file Axcess checks". Code: `src/audit/linked_files/`
 (`tracker.py` is the part the crawl talks to), storage in
 `src/audit/db/linked_files.py`, the report's view in
 `src/audit/web/linked_files_queries.py`. In code these are "linked files",
@@ -69,6 +73,43 @@ host, so Drive files are checked only in a scan set to ignore robots.txt.
 New scan says so beside the switch. A file shared only with signed-in
 accounts reads "needs a sign-in (HTTP 401)". Research, the real pages it
 was tested on, and the decisions: `docs/internal/google-files-research.md`.
+
+## Word, PowerPoint, Google Docs and Slides
+
+- **Which check reads a file is decided by its bytes**
+  (`office_check.sniff`), not its address: a PDF goes to `pdf_check`, a
+  Word or PowerPoint file to `office_check`, an Excel file is identified
+  and waits for a check of its format, an encrypted Office file reads
+  "needs a password", an old binary one "old format", anything else (a web
+  page) "did not lead to a file Axcess can check" (`not_a_pdf`, worded by
+  the link's type in the interface). The check that ran is stored in
+  `linked_files.checked_as` (migration 0045; NULL on a checked row means a
+  PDF, the only type checked before). Copies by SHA-256 reuse the result,
+  `checked_as` included.
+- **Google Docs and Slides** are downloaded as the .docx and .pptx Google
+  exports (`google.export_address`:
+  `docs.google.com/document/d/ID/export?format=docx`,
+  `docs.google.com/presentation/d/ID/export/pptx`), with robots.txt asked
+  about that export address; Google's allows `/document` and
+  `/presentation`. A private Doc answers 401 and reads "needs a sign-in". A
+  copy published to the web (`/d/e/…/pub`) has no export and reads
+  `google_file`. Google Sheets are never asked for: Google's robots.txt does
+  not allow `/spreadsheets` (they read `google_file`, "Axcess does not check
+  Google Sheets"). The row says the file was checked as the file Google
+  exports.
+- **Word and PowerPoint files kept in Drive** are checked when downloaded
+  (still only in a scan set to ignore robots.txt), instead of waiting.
+- **Status.** A PDF is Mostly sure when any check fails. A Word or
+  PowerPoint file is Mostly sure only when a check in `office_check.COUNTED`
+  fails; the others (title, link text, heading levels) are stored in
+  `failed_checks` with the rest and sent to the browser as
+  `possible_problems`. The API also sends `checks_run`, the checks for the
+  type the file was read as, which the document page's table lists.
+- **No first-page picture** for Word or PowerPoint: nothing in Axcess draws
+  one.
+- **Untrusted bytes.** A ZIP that would unpack past 200 MB is not read, the
+  XML parsers do not resolve entities, the check runs in a thread under the
+  same 20-second limit as a PDF, and any exception reads "damaged".
 
 ## First-page pictures
 

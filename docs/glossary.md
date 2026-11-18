@@ -514,12 +514,15 @@ The check behind the report's **Documents** tab. While the scan runs, Axcess
 records every PDF, Word, Excel, PowerPoint, OpenDocument, RTF and Google file
 the scanned pages link to or show inside the page (in a frame, object or
 embed), including links that appear only after a click, and files on other
-sites. During the scan it downloads each PDF once (at most 10 MB, at most 200
-downloads a scan), checks it on your computer with no AI, and keeps only the
-result, in the background while the scan goes on to the next page. A link to
+sites. During the scan it downloads each PDF, Word (.docx) and PowerPoint
+(.pptx) file once (at most 10 MB, at most 200 downloads a scan), checks it on
+your computer with no AI, and keeps only the result, in the background while
+the scan goes on to the next page. A Google Doc or Google Slides file is
+downloaded as the Word or PowerPoint file Google exports, and checked as
+that; Google Sheets are not downloaded (Google asks scanners not to). A link to
 a document is never visited as a page, so documents take no part of the page
 limit and do not appear in Pages visited. A scan stopped part way keeps the
-results for the PDFs it reached. In code these are called *linked files*, because in the crawler a
+results for the files it reached. In code these are called *linked files*, because in the crawler a
 "document" means a web page.
 
 A PDF is marked [Mostly sure](#mostly-sure) when it fails one of these:
@@ -532,15 +535,35 @@ A PDF is marked [Mostly sure](#mostly-sure) when it fails one of these:
 - no document title (WCAG 2.4.2, technique PDF18);
 - no language set (WCAG 3.1.1, technique PDF16).
 
-A PDF that passes all five is [Not sure](#not-sure): a person must still check
-its reading order, alt text and table headers. Every other file, and any PDF
-Axcess could not open, is "Could not check", with the reason. It is on by
+A Word or PowerPoint file is marked [Mostly sure](#mostly-sure) when it fails
+one of these (Axcess's own rules, modelled on Microsoft's Accessibility
+Checker):
+
+- images without alt text: a picture, chart, diagram or video with no alt
+  text that is not marked as decorative (WCAG 1.1.1);
+- tables without a header row: a table of at least 2 rows and 2 columns
+  whose first row is not marked as a header row (WCAG 1.3.1);
+- slides without a title (PowerPoint; WCAG 2.4.6);
+- no headings: a Word document of more than 400 words with no heading style
+  (WCAG 1.3.1);
+- no language set (WCAG 3.1.1).
+
+It also lists **possible problems**, which a person must judge and which
+never make a file Mostly sure: link text that is a web address or "click
+here" (WCAG 2.4.4), heading levels skipped (Heading 1, then Heading 3), and
+no document title. Word and PowerPoint show the file name, not the title,
+and Google's exports never have one.
+
+A file that passes all its checks is [Not sure](#not-sure): a person must
+still check its reading order, how good its alt text is, and its table
+headers. Every other file, and any file Axcess could not open, is "Could not
+check", with the reason. It is on by
 default for every scan that does not sign in (**Check the documents the pages
 link to**, under Checks on the New scan page), and a sign-in scan never runs
 it. While a scan runs, the scanning page's **Document check** column shows it
-on each page: the page's document links are found and its PDFs are checked,
-each PDF once; a PDF on this site that a page links to is checked in its own
-row.
+on each page: the page's document links are found and its files are
+checked, each file once; a file on this site that a page links to is checked
+in its own row.
 
 ### Local AI model
 
