@@ -195,16 +195,14 @@ class AIManager:
             if models is None:
                 raise RuntimeSetupError(
                     "The AI models need to be downloaded again for this version of Axcess. "
-                    "Choose a size and select Download and set up."
+                    "Choose a size and download it."
                 )
             self.runtime.start(models)
             config = config.model_copy(update=self.runtime.service_fields())
             self._trust(config)
             save_config(self.settings, config)
         elif enabled and config is None:
-            raise RuntimeSetupError(
-                "AI is not set up yet. Choose a size and select Download and set up."
-            )
+            raise RuntimeSetupError("AI is not set up yet. Choose a size and download it.")
         next_preferences = AIPreferences(enabled=enabled, choice_recorded=True)
         try:
             save_preferences(self.settings, next_preferences)
@@ -226,7 +224,9 @@ class AIManager:
         # The sizes were renamed on 2026-11-17 (Small became Standard,
         # Standard became Large, Large became Extra large) and a new Small
         # added. A setup saved before keeps its models; its size is the one
-        # whose models it runs, saved again under the new name.
+        # whose models it runs, saved again under the new name. Extra large
+        # was removed on 2026-11-18: a setup naming its models matches no
+        # size, keeps what it saved, and asks for a new download.
         tier = self._tier_running(config)
         if tier is not None and tier.id != config.tier:
             config = config.model_copy(update={"tier": tier.id})
@@ -422,7 +422,7 @@ class AIManager:
         try:
             self.runtime.start(models)
         except (RuntimeSetupError, IsolationError):
-            return "The model used before is not running either; select Start AI service."
+            return "The model used before is not running either; select Start AI again."
         return "The model used before is running again."
 
     def remove(self) -> None:

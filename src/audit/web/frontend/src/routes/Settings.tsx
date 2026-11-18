@@ -1,9 +1,8 @@
 import { useId, useState } from "react";
 import { Check, RotateCcw } from "lucide-react";
 import { Button, Card, LinkButton, PageHeader } from "../components/ui";
-import { AiRuntimeControls } from "../components/AiRuntimeControls";
+import { AiStatus, aiIsSetUp } from "../components/AiStatus";
 import { useAiSetup } from "../hooks/useAiSetup";
-import { AI_FEATURE_STATE_LABEL, AI_MY_MODEL_LABEL, AI_TIER_LABEL } from "../lib/terms";
 import { cn } from "../lib/cn";
 import { PRESETS, presetIsOn, presetOffValues, type Preferences } from "../lib/preferences";
 import { SETTING_SECTIONS, type Setting } from "../lib/settingsCatalog";
@@ -101,23 +100,22 @@ export default function SettingsRoute() {
         {/* Desktop only. A link to its own page, not a row here: rows on
             this page apply at once and stay on this computer, while AI
             setup downloads gigabytes and needs a deliberate step. On/off
-            stays on that same page, next to setup and removal. The shared
-            service control starts only existing private models; it never
-            downloads files (WCAG 2.2 SC 3.2.4 Consistent Identification, Level AA). */}
+            stays on that same page, next to setup and removal. The card
+            shows the shared AI state (components/AiStatus.tsx) and one link
+            whose words follow it: "Set up AI features" before anything is
+            downloaded, the same words as the first-launch page, otherwise
+            "Change AI features" (developer, 2026-11-18: the card offered
+            "Start AI service" and "Change AI features" side by side, with AI
+            off and nothing downloaded). WCAG 2.2 SC 3.2.4 Consistent
+            Identification, Level AA. */}
         {aiSetup && (
           <Card className="px-4 py-4">
             <h2 className="text-sm font-semibold text-fg">AI features</h2>
-            <p className="mt-0.5 text-xs leading-5 text-fg-muted">
-              {AI_FEATURE_STATE_LABEL[aiSetup.preferences.enabled ? "on" : "off"]}.
-              {aiSetup.current
-                ? aiSetup.current.tier === "custom"
-                  ? ` Model: ${AI_MY_MODEL_LABEL}. Models are kept on this computer.`
-                  : ` Size: ${AI_TIER_LABEL[aiSetup.current.tier]}. Models are kept on this computer.`
-                : " Optional AI that suggests fixes and checks images and wording. It runs on this computer."}
-            </p>
-            <AiRuntimeControls setupPage />
+            <div className="mt-2">
+              <AiStatus />
+            </div>
             <LinkButton to="/settings/ai" className="mt-3">
-              Change AI features
+              {aiIsSetUp(aiSetup) ? "Change AI features" : "Set up AI features"}
             </LinkButton>
           </Card>
         )}

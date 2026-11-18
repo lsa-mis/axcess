@@ -22,8 +22,10 @@ from audit.config import Settings
 
 from .test_accessibility_axe import _render_violations, _run_axe
 
-# The line that replaces the Start button while the service runs (lib/terms.ts).
-RUNNING = "AI service is running. It is isolated and stays on this computer."
+# The AI state the page shows (lib/terms.ts AI_STATE_LABEL): one heading for
+# the on/off choice, the models and the service together (2026-11-18).
+ON = "AI is on"
+OFF = "AI is off"
 
 pytestmark = [pytest.mark.ui, pytest.mark.asyncio(loop_scope="module")]
 
@@ -91,7 +93,7 @@ async def test_set_up_page_and_reports_prompt_pass_axe(new_page: Any, server_set
     page = await new_page()
     try:
         await page.goto(f"{server_set_up}/app/settings/ai")
-        await page.get_by_role("heading", name="AI features are on").wait_for()
+        await page.get_by_role("heading", name=ON).wait_for()
         violations = await _run_axe(page)
         assert not violations, _render_violations(violations)
     finally:
@@ -141,8 +143,11 @@ async def test_first_launch_setup_never_downloads_without_confirmation(
         assert (await (await page.request.get(f"{server}/api/ai/preferences")).json())[
             "enabled"
         ] is False
-        await page.get_by_role("button", name="Continue without AI").click()
-        await page.get_by_role("heading", name="Reports").first.wait_for()
+        # Skipping AI is asked on the first-launch page only; the setup page
+        # leaves by Back to Settings (2026-11-18, one control, one job).
+        assert await page.get_by_role("button", name="Continue without AI").count() == 0
+        await page.get_by_role("link", name="Back to Settings").click()
+        await page.get_by_role("heading", name="Settings").first.wait_for()
     finally:
         await page.context.close()
 
@@ -153,20 +158,20 @@ async def test_settings_toggle_keeps_models_and_keyboard_focus(
     page = await new_page()
     try:
         await page.goto(f"{server_set_up}/app/settings/ai", wait_until="networkidle")
-        await page.get_by_role("heading", name="AI features are on").wait_for()
+        await page.get_by_role("heading", name=ON).wait_for()
         await _tab_to(page, "Turn AI off")
         await page.keyboard.press("Enter")
-        await page.get_by_role("heading", name="AI features are off").wait_for()
+        await page.get_by_role("heading", name=OFF).wait_for()
         turn_on = page.get_by_role("button", name="Turn AI on")
         assert await turn_on.evaluate("e => e === document.activeElement")
         plan = await (await page.request.get(f"{server_set_up}/api/ai/plan")).json()
         assert plan["current"]["tier"] == "standard"
         assert plan["preferences"]["enabled"] is False
         await page.reload(wait_until="networkidle")
-        await page.get_by_role("heading", name="AI features are off").wait_for()
+        await page.get_by_role("heading", name=OFF).wait_for()
         await _tab_to(page, "Turn AI on")
         await page.keyboard.press("Enter")
-        await page.get_by_role("heading", name="AI features are on").wait_for()
+        await page.get_by_role("heading", name=ON).wait_for()
         assert await page.get_by_role("button", name="Turn AI off").evaluate(
             "e => e === document.activeElement"
         )
@@ -185,7 +190,7 @@ async def test_busy_error_keeps_ai_on_and_preserves_focus(
     page = await new_page()
     try:
         await page.goto(f"{server_set_up}/app/settings/ai", wait_until="networkidle")
-        await page.get_by_role("heading", name="AI features are on").wait_for()
+        await page.get_by_role("heading", name=ON).wait_for()
 
         async def refuse_change(route):
             message = "Finish or stop the current scan before changing AI settings."
@@ -204,7 +209,7 @@ async def test_busy_error_keeps_ai_on_and_preserves_focus(
         await (
             page.get_by_role("status").filter(has_text="Finish or stop the current scan").wait_for()
         )
-        assert await page.get_by_role("heading", name="AI features are on").count() == 1
+        assert await page.get_by_role("heading", name=ON).count() == 1
         assert await page.get_by_role("button", name="Turn AI off").evaluate(
             "e => e === document.activeElement"
         )
@@ -255,6 +260,32 @@ async def _tab_to(page: Any, name: str, limit: int = 60) -> None:
     raise AssertionError(f"Could not reach {name!r} with Tab")
 
 
+async def _private_standard(page: Any, runtime: dict[str, Any] | None = None) -> None:
+    """The plan says the private Standard size is set up; the runtime answers
+    ``runtime`` (GET) unless the test routes it itself."""
+
+    async def plan(route: Any) -> None:
+        response = await route.fetch()
+        body = await response.json()
+        body["current"].update(source="private", backend="llama_cpp", tier="standard")
+        for tier in body["tiers"]:
+            tier["installed"] = tier["id"] == "standard"
+        await route.fulfill(response=response, json=body)
+
+    await page.route("**/api/ai/plan", plan)
+    if runtime is not None:
+
+        async def answer(route: Any) -> None:
+            await route.fulfill(json=runtime)
+
+        await page.route("**/api/ai/runtime", answer)
+
+
+async def _open_change(page: Any) -> None:
+    """Once AI is set up, the size choice is inside "Change the AI models"."""
+    await page.get_by_text("Change the AI models", exact=True).click()
+
+
 async def test_choose_a_size_by_keyboard_without_downloading(new_page: Any, server: str) -> None:
     page = await new_page()
     try:
@@ -262,17 +293,23 @@ async def test_choose_a_size_by_keyboard_without_downloading(new_page: Any, serv
         group = page.get_by_role("group", name="Choose the AI models")
         await group.wait_for()
         radios = group.get_by_role("radio")
-        # Small, Standard, Large, Extra large, and your own model: one choice.
-        assert await radios.count() == 5
+        # Small, Standard, Large, and your own model: one choice.
+        assert await radios.count() == 4
         await radios.first.focus()
         await page.keyboard.press("Home")
         await page.keyboard.press("ArrowDown")
         checked = await group.locator("input:checked").get_attribute("value")
         assert checked == "standard"
-        button = page.get_by_role("button", name="Download and set up")
+        button = page.get_by_role("button", name="Download Standard and turn AI on")
         assert await button.count() == 1
-        # The button says how big the download is before anything starts.
-        assert "GB" in (await button.inner_text())
+        # The download size is said before the button and tied to it, so it
+        # is read before anything starts (SC 3.3.2).
+        note = page.locator(f"#{await button.get_attribute('aria-describedby')}")
+        assert "Download size:" in await note.inner_text() and "GB" in await note.inner_text()
+        assert await note.evaluate(
+            "(n, b) => !!(n.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)",
+            await button.element_handle(),
+        )
         # Run from source, the program is not included: the page says what
         # comes from where, in plain words, and names no Ollama.
         version = load_catalog().llama_cpp.version
@@ -292,7 +329,9 @@ async def test_remove_by_keyboard_confirms_and_announces(new_page: Any, server_s
     page = await new_page()
     try:
         await page.goto(f"{server_set_up}/app/settings/ai")
-        await page.get_by_role("heading", name="AI features are on").wait_for()
+        await page.get_by_role("heading", name=ON).wait_for()
+        await _tab_to(page, "Change the AI models")
+        await page.keyboard.press("Enter")
         await _tab_to(page, "Remove AI features")
         await page.keyboard.press("Enter")
         confirm = page.get_by_role("button", name="Yes, remove AI features")
@@ -300,7 +339,7 @@ async def test_remove_by_keyboard_confirms_and_announces(new_page: Any, server_s
         assert await confirm.evaluate("e => e === document.activeElement")
         await page.keyboard.press("Enter")
         await page.get_by_role("status").filter(has_text="AI features removed.").wait_for()
-        await page.get_by_role("heading", name="AI features are on").wait_for(state="detached")
+        await page.get_by_role("heading", name=ON).wait_for(state="detached")
         focused = await page.evaluate("document.activeElement?.getAttribute('type')")
         assert focused == "radio"
     finally:
@@ -328,23 +367,33 @@ async def test_private_runtime_start_by_keyboard_preserves_focus_and_announces(
                 )
             else:
                 await route.fulfill(
-                    json={"running": bool(requests), "isolated": bool(requests), "reason": None}
+                    json={
+                        "running": bool(requests),
+                        "isolated": bool(requests),
+                        "reason": None,
+                        "starting": False,
+                    }
                 )
 
+        await _private_standard(page)
         await page.route("**/api/ai/runtime**", runtime)
-        await page.goto(f"{server_set_up}/app/settings/ai", wait_until="networkidle")
-        await _tab_to(page, "Start AI service")
+        await page.goto(f"{server_set_up}/app/settings/ai")
+        await page.get_by_role("heading", name="AI has stopped").wait_for()
+        await _tab_to(page, "Start AI again")
         await page.keyboard.press("Enter")
-        running = page.get_by_text(RUNNING, exact=True)
+        running = page.get_by_role("heading", name=ON)
         await running.wait_for()
         assert requests == [{"confirm": True}]
-        # The button is gone while the service runs (2026-11-17), and focus
-        # moved to the line that says so, not back to the top of the page.
-        assert await page.get_by_role("button", name="Start AI service").count() == 0
+        # The button is gone while AI runs (2026-11-17), and focus moved to
+        # the state that says so, not back to the top of the page.
+        assert await page.get_by_role("button", name="Start AI again").count() == 0
         assert await running.evaluate("e => e === document.activeElement")
+        await page.get_by_text(
+            "Using the Standard size. It is isolated and stays on this computer.", exact=True
+        ).wait_for()
         # A later status check keeps it that way.
         await page.wait_for_timeout(5500)
-        assert await page.get_by_role("button", name="Start AI service").count() == 0
+        assert await page.get_by_role("button", name="Start AI again").count() == 0
         violations = await _run_axe(page)
         assert not violations, _render_violations(violations)
     finally:
@@ -354,14 +403,14 @@ async def test_private_runtime_start_by_keyboard_preserves_focus_and_announces(
 async def test_a_running_service_shows_no_start_button(new_page: Any, server_set_up: str) -> None:
     page = await new_page()
     try:
-
-        async def runtime(route):
-            await route.fulfill(json={"running": True, "isolated": True, "reason": None})
-
-        await page.route("**/api/ai/runtime**", runtime)
-        await page.goto(f"{server_set_up}/app/settings/ai", wait_until="networkidle")
-        await page.get_by_text(RUNNING, exact=True).wait_for()
-        assert await page.get_by_role("button", name="Start AI service").count() == 0
+        running = {"running": True, "isolated": True, "reason": None, "starting": False}
+        await _private_standard(page, running)
+        await page.goto(f"{server_set_up}/app/settings/ai")
+        await page.get_by_role("heading", name=ON).wait_for()
+        await page.get_by_text(
+            "Using the Standard size. It is isolated and stays on this computer.", exact=True
+        ).wait_for()
+        assert await page.get_by_role("button", name="Start AI again").count() == 0
     finally:
         await page.context.close()
 
@@ -373,24 +422,20 @@ async def test_a_size_that_is_set_up_offers_no_download(new_page: Any, server_se
     """
     page = await new_page(viewport={"width": 320, "height": 900})
     try:
-
-        async def plan(route):
-            response = await route.fetch()
-            body = await response.json()
-            body["current"].update(source="private", backend="llama_cpp", tier="standard")
-            for tier in body["tiers"]:
-                tier["installed"] = tier["id"] == "standard"
-            await route.fulfill(response=response, json=body)
-
-        await page.route("**/api/ai/plan", plan)
-        await page.goto(f"{server_set_up}/app/settings/ai", wait_until="networkidle")
+        running = {"running": True, "isolated": True, "reason": None, "starting": False}
+        await _private_standard(page, running)
+        await page.goto(f"{server_set_up}/app/settings/ai")
+        await page.get_by_role("heading", name=ON).wait_for()
+        await _open_change(page)
         await page.get_by_text(
             "Standard is set up on this computer. Nothing to download.", exact=True
         ).wait_for()
-        assert await page.get_by_role("button", name="Download and set up").count() == 0
-        group = page.get_by_role("group", name="Change the AI models")
+        download = page.get_by_role("button", name=re.compile("^Download "))
+        assert await download.count() == 0
+        group = page.get_by_role("group", name="Choose the AI models")
         await group.locator("input[value='large']").check()
-        assert await page.get_by_role("button", name="Download and set up").count() == 1
+        # AI is on, so the download switches to the new size.
+        await page.get_by_role("button", name="Download Large and switch to it").wait_for()
         violations = await _run_axe(page)
         assert not violations, _render_violations(violations)
     finally:
@@ -416,20 +461,22 @@ async def test_missing_private_model_shows_size_without_downloading(
                     }
                 )
             else:
-                await route.fulfill(json={"running": False, "isolated": False, "reason": None})
+                await route.fulfill(
+                    json={"running": False, "isolated": False, "reason": None, "starting": False}
+                )
 
         async def install(route):
             if route.request.method == "POST":
                 downloads.append(route.request.post_data_json)
             await route.continue_()
 
+        await _private_standard(page)
         await page.route("**/api/ai/runtime**", runtime)
         await page.route("**/api/ai/install", install)
-        await page.goto(f"{server_set_up}/app/settings/ai", wait_until="networkidle")
-        await page.get_by_role("button", name="Start AI service", exact=True).click()
+        await page.goto(f"{server_set_up}/app/settings/ai")
+        await page.get_by_role("button", name="Start AI again", exact=True).click()
         await page.get_by_role("status").filter(has_text="4.4 GB").wait_for()
         assert downloads == []
-        assert await page.get_by_role("button", name="Download and set up").count() == 1
         assert (
             await page.evaluate(
                 "document.documentElement.scrollWidth - document.documentElement.clientWidth"
@@ -577,13 +624,22 @@ async def test_your_own_model_in_use_is_the_chosen_option(
             ]
             await route.fulfill(response=response, json=body)
 
+        async def runtime(route):
+            await route.fulfill(
+                json={"running": True, "isolated": True, "reason": None, "starting": False}
+            )
+
         await page.route("**/api/ai/plan", plan)
-        await page.goto(f"{server_set_up}/app/settings/ai", wait_until="networkidle")
+        await page.route("**/api/ai/runtime", runtime)
+        await page.goto(f"{server_set_up}/app/settings/ai")
+        await page.get_by_text(
+            "Using your own model (Qwen3.8 4B, text only). It is isolated and stays on this "
+            "computer.",
+            exact=True,
+        ).wait_for()
+        await _open_change(page)
         own = page.get_by_role("radio", name="Your own model (in use now)")
         assert await own.is_checked()
-        await page.get_by_text(
-            "Models in use: your own model, Qwen3.8 4B (text only).", exact=True
-        ).wait_for()
         assert await page.get_by_text("In use now", exact=True).count() == 1
         violations = await _run_axe(page)
         assert not violations, _render_violations(violations)

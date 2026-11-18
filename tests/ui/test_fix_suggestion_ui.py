@@ -450,7 +450,7 @@ async def test_each_option_shows_only_its_own_rule_result(
 
 
 @pytest.mark.parametrize("suggest_server", ["offline"], indirect=True)
-async def test_start_ai_service_then_writes_the_suggestion(
+async def test_start_ai_again_then_writes_the_suggestion(
     suggest_server: tuple[str, int, int, int], new_page: Any
 ) -> None:
     base, scan_id, page_id, finding_id = suggest_server
@@ -474,7 +474,7 @@ async def test_start_ai_service_then_writes_the_suggestion(
         await page.goto(f"{base}/app/scans/{scan_id}/pages/{page_id}", wait_until="networkidle")
         card = page.locator(f"#finding-{finding_id}")
         await card.get_by_role("button", name="Suggest a fix (AI)").click()
-        start = card.get_by_role("button", name="Start AI service")
+        start = card.get_by_role("button", name="Start AI again")
         await start.wait_for(timeout=10000)
         # The failure names the AI service on this computer, not Ollama.
         failed = await card.inner_text()

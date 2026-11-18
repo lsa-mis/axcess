@@ -105,7 +105,7 @@ and continues without those checks.
 
 ## AI features setup in the desktop app stopped or failed
 
-- **AI service is not running**: select **Start AI service** in Settings. This
+- **AI has stopped**: select **Start AI again** in Settings. This
   starts only Axcess's private AI service. It never starts or stops your own
   Ollama. When the app opens with AI on, the service starts in the background;
   until it is ready, AI requests say it is not running.
@@ -113,14 +113,14 @@ and continues without those checks.
   checks free memory before it starts the models and refuses rather than
   make the computer swap or stop responding. The log
   (`data/ai/llama-server.log`) says how much they need and how much was
-  free. Close other programs and select **Start AI service** again, or
+  free. Close other programs and select **Start AI again**, or
   choose a smaller size.
 - **Private models are missing**: choose a size in **AI features**. Check the
-  download size, then select **Download and set up**. Starting the service
+  download size above the button, then select the download button. Starting the service
   never downloads files without that separate choice.
 - **"The AI models need to be downloaded again for this version of Axcess"**:
   your AI setup was saved by an older version, which used a private copy of
-  Ollama. Choose a size and select **Download and set up**. When the download
+  Ollama. Choose a size and download it. When the download
   finishes, Axcess deletes the old private Ollama files.
 - **AI could not be isolated**: the service stays stopped. On Windows, AI
   needs Windows 10 version 1809 or later, and a copy of Axcess that includes
@@ -132,10 +132,9 @@ and continues without those checks.
   that the operating system blocks outside connections; a timeout does not
   count. Reports and saved suggestions remain readable.
 - **Your own Ollama is not managed**: Axcess leaves it alone. To use the
-  isolated private AI service instead, choose a size and select **Download
-  and set up**.
+  isolated private AI service instead, choose a size and download it.
 
-- **AI features are off**: open **Settings > AI features** and select
+- **AI is off**: open **Settings > AI features** and select
   **Turn AI on** to reuse kept models, or choose a size and download if you
   have not set AI up yet. The setting stays off after a restart.
 - **Cannot change the setting**: finish or stop the scan, finish or cancel

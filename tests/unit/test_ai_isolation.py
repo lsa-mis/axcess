@@ -12,6 +12,7 @@ from unittest.mock import Mock
 import httpx
 import pytest
 from pydantic import ValidationError
+from support.two_model import TWO_MODEL, two_model_catalog
 
 from audit.ai import downloader
 from audit.ai import sandbox as sandbox_module
@@ -383,7 +384,11 @@ def test_every_catalog_model_is_pinned_to_a_commit_over_https(tmp_path, model) -
 
 # -- the manager and the service ---------------------------------------------
 
-TWO_MODEL = load_catalog().tier("extra_large")
+
+@pytest.fixture(autouse=True)
+def _two_model_size(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The manager's catalogue includes a two-model size (see support.two_model)."""
+    monkeypatch.setattr("audit.ai.manager.load_catalog", two_model_catalog)
 
 
 def manager_for(tmp_path, *, enabled=True, desktop=True, source="private", backend="llama_cpp"):
@@ -435,10 +440,7 @@ def test_start_states_and_download_size(tmp_path) -> None:
     manager, runtime = manager_for(tmp_path)
     runtime.has_model.return_value = False
     missing = manager.start_runtime()
-    assert (
-        missing.state == "model_missing"
-        and missing.download_bytes == load_catalog().tier("extra_large").size
-    )
+    assert missing.state == "model_missing" and missing.download_bytes == TWO_MODEL.size
     runtime.start.assert_not_called()
     runtime.has_model.return_value = True
     runtime.start.side_effect = IsolationError("network_test_failed", "blocked")
@@ -766,7 +768,7 @@ def test_the_linux_sandbox_ends_every_process_in_it(
 def test_memory_needed_counts_files_only_without_a_graphics_card() -> None:
     from audit.ai.runtime import MEMORY_MARGIN_BYTES, WORKING_BYTES_PER_MODEL, memory_needed
 
-    models = list(load_catalog().tier("extra_large").models)
+    models = list(TWO_MODEL.models)
     files = sum(m.size for m in models)
     working = WORKING_BYTES_PER_MODEL * len(models) + MEMORY_MARGIN_BYTES
     assert memory_needed(models, dedicated_gpu=False) == files + working
@@ -786,11 +788,11 @@ def test_a_start_that_would_not_fit_in_free_memory_is_refused(
     monkeypatch.setattr(hardware, "available_memory_bytes", lambda: 2_000_000_000)
     monkeypatch.setattr(hardware, "dedicated_gpu", lambda: False)
     with pytest.raises(NotEnoughMemoryError, match="free memory"):
-        runtime._require_memory(list(load_catalog().tier("extra_large").models))
+        runtime._require_memory(list(TWO_MODEL.models))
     assert runtime.isolation_reason == "not_enough_memory"
     # Unknown free memory never blocks a start.
     monkeypatch.setattr(hardware, "available_memory_bytes", lambda: None)
-    runtime._require_memory(list(load_catalog().tier("extra_large").models))
+    runtime._require_memory(list(TWO_MODEL.models))
 
 
 def test_a_service_left_running_is_ended_before_a_new_one(
@@ -826,4 +828,4 @@ def test_a_start_waits_briefly_for_memory_a_stop_gives_back(
     monkeypatch.setattr(hardware, "dedicated_gpu", lambda: False)
     monkeypatch.setattr(runtime_module.time, "sleep", lambda _s: None)
     runtime = LlamaRuntime(tmp_path / "ai", load_catalog())
-    runtime._require_memory(list(load_catalog().tier("extra_large").models))
+    runtime._require_memory(list(TWO_MODEL.models))
