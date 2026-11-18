@@ -13,6 +13,7 @@ import sqlite3
 from pathlib import Path
 
 from yoyo import get_backend, read_migrations
+from yoyo.migrations import StepCollector
 
 MIGRATIONS = Path(__file__).parents[2] / "src/audit/db/migrations"
 REPAIR = MIGRATIONS / "0043_repair_linked_file_thumbnail_small.py"
@@ -22,6 +23,10 @@ def _repair_step():  # type: ignore[no-untyped-def]
     spec = importlib.util.spec_from_file_location("migration_0043", REPAIR)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
+    # yoyo's step() finds its collector in the module's globals, which yoyo
+    # sets before it runs a migration file; without it the import fails
+    # unless an earlier test happened to be inside yoyo's own load.
+    module.__yoyo_collector__ = StepCollector(migration=None)  # type: ignore[attr-defined]
     spec.loader.exec_module(module)
     return module.apply_step
 
