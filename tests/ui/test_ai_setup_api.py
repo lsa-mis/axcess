@@ -280,6 +280,7 @@ def test_runtime_start_requires_explicit_boolean_confirmation(
             "isolated",
             "reason",
             "starting",
+            "memory_warning",
         }
 
 
