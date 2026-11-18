@@ -90,13 +90,13 @@ def test_a_clean_tagged_file_runs_the_text_check_and_fails_nothing() -> None:
 
 def test_a_figure_without_alt_text_fails() -> None:
     data = _pdf(_FIGURE_CONTENT, (_P, _figure()))
-    assert _failed(data) == ("image_no_description",)
+    assert _failed(data) == ("no_alt_text",)
 
 
 def test_a_figure_with_alt_text_passes() -> None:
     data = _pdf(_FIGURE_CONTENT, (_P, _figure(" /Alt (University of Michigan logo)")))
     assert _failed(data) == ()
-    assert "image_no_description" in check_pdf(data).checks_run
+    assert "no_alt_text" in check_pdf(data).checks_run
 
 
 def test_alt_text_with_a_stray_nul_still_counts() -> None:
@@ -113,11 +113,11 @@ def test_alt_text_with_a_stray_nul_still_counts() -> None:
 def test_a_role_mapped_figure_is_a_figure() -> None:
     element = "<< /Type /StructElem /S /Picture /P 7 0 R /Pg 3 0 R /K 1 >>"
     data = _pdf(_FIGURE_CONTENT, (_P, element), role_map=" /RoleMap << /Picture /Figure >>")
-    assert _failed(data) == ("image_no_description",)
+    assert _failed(data) == ("no_alt_text",)
 
 
 def test_a_file_with_no_figures_is_not_given_the_image_check() -> None:
-    assert "image_no_description" not in check_pdf(_pdf()).checks_run
+    assert "no_alt_text" not in check_pdf(_pdf()).checks_run
 
 
 def test_a_formula_without_alt_text_fails() -> None:

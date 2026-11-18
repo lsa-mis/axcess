@@ -35,8 +35,15 @@ from urllib.parse import unquote, urlsplit
 
 from pydantic import BaseModel
 
-from audit.linked_files.formats import SEVERE_CHECKS, FailedCheck, FileType, Reason, RefKind
-from audit.linked_files.pdf_check import BASE_CHECKS
+from audit.linked_files.formats import (
+    SEVERE_CHECKS,
+    CheckedAs,
+    FailedCheck,
+    FileType,
+    Reason,
+    RefKind,
+)
+from audit.linked_files.office_check import checks_for, counts
 
 #: Largest page of rows one request may ask for. The Documents tab asks
 #: for every file at once (up to this many) and sorts, filters and pages
@@ -78,9 +85,22 @@ class LinkedFileRow(BaseModel):
     off_site: bool
     status: ShownStatus
     reason: Reason | None
+    #: The checks that failed and prove a problem: what makes the file
+    #: "Mostly sure". Every failed PDF check; for a Word or PowerPoint file,
+    #: the ones ``office_check.COUNTED`` names.
     failed_checks: list[FailedCheck]
-    #: Checks the file was given, in report order; empty when it was not
-    #: checked. A file checked before migration 0045 ran the first five.
+    #: Checks that failed but do not by themselves prove a barrier, for a
+    #: person to look at (Word and PowerPoint only, such as link text that
+    #: is a web address). They never make a file "Mostly sure".
+    possible_problems: list[FailedCheck] = []
+    #: Which check read the file: "pdf", "docx" or "pptx"; None when no
+    #: check read it. Decided by the bytes, so a Google Doc is "docx".
+    checked_as: CheckedAs | None = None
+    #: Every check that ran on the file, in report order, for the document
+    #: page's table of checks; empty when no check read it. A PDF stores its
+    #: own (the structure checks run only where they apply, migration 0046);
+    #: one checked before that, and every Word or PowerPoint file, ran all
+    #: the checks for its kind (``office_check.checks_for``).
     checks_run: list[FailedCheck] = []
     http_status: int | None
     is_form: bool | None
@@ -95,16 +115,6 @@ class LinkedFileRow(BaseModel):
     #: A picture of the first page is stored (PDFs the check could read);
     #: served by ``/api/scans/{scan}/documents/{file}/thumbnail``.
     has_thumbnail: bool = False
-
-
-def _checks_run(shown_status: str, stored: str | None) -> list[FailedCheck]:
-    """The checks a file was given. Before migration 0045 every checked file
-    got the first five, so a checked file with nothing stored ran those."""
-    if stored is not None:
-        return list(json.loads(stored))
-    if shown_status in ("mostly_sure", "not_sure"):
-        return list(BASE_CHECKS)
-    return []
 
 
 class LinkedFileCounts(BaseModel):
@@ -221,6 +231,10 @@ def _file_rows(
                (SELECT COUNT(DISTINCT r.page_id) FROM linked_file_refs r
                  WHERE r.file_id = f.id AND r.scan_id = f.scan_id) AS referring,
                f.thumbnail_hash IS NOT NULL AS has_thumbnail,
+               -- Rows checked before migration 0045 were PDFs: nothing
+               -- else was checked then.
+               CASE WHEN f.status IN ('mostly_sure', 'not_sure')
+                    THEN COALESCE(f.checked_as, 'pdf') END AS checked_as,
                f.checks_run
           FROM linked_files f
          WHERE f.scan_id = ? AND (? IS NULL OR f.id = ?)
@@ -243,6 +257,8 @@ def _file_rows(
     files = []
     for row in rows:
         first = copies.get(int(row[0]))
+        checked_as = row[12]
+        found = json.loads(row[6] or "[]")
         files.append(
             LinkedFileRow(
                 file_id=int(row[0]),
@@ -257,13 +273,17 @@ def _file_rows(
                 off_site=bool(row[3]),
                 status=row[4],
                 reason=row[5],
-                failed_checks=json.loads(row[6] or "[]"),
+                failed_checks=[check for check in found if counts(checked_as, check)],
+                possible_problems=[check for check in found if not counts(checked_as, check)],
+                checked_as=checked_as,
+                checks_run=(
+                    json.loads(row[13]) if row[13] is not None else list(checks_for(checked_as))
+                ),
                 http_status=row[7],
                 is_form=None if row[8] is None else bool(row[8]),
                 page_count=row[9],
                 referring_page_count=int(row[10]),
                 has_thumbnail=bool(row[11]),
-                checks_run=_checks_run(row[4], row[12]),
             )
         )
     return files

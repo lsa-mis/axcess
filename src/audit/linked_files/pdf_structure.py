@@ -3,7 +3,7 @@
 :mod:`audit.linked_files.pdf_check` runs these beside its five catalog
 checks. Each counts things a screen reader or keyboard user cannot use:
 
-``image_no_description``
+``no_alt_text``
     A ``Figure`` tag (after the role map) with no alternative text (``/Alt``)
     and no replacement text (``/ActualText``). PDF/UA-1 7.3; WCAG technique
     PDF1. Tagged files only. Not judged: whether a description is any good,

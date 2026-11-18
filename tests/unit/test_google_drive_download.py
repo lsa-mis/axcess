@@ -18,6 +18,7 @@ from typing import Any
 
 import httpx
 import pytest
+from support.office_docs import word
 
 from audit.linked_files.fetch import FetchedFile
 from audit.linked_files.google import (
@@ -200,7 +201,7 @@ async def _track_drive_links(
         "INSERT INTO pages (scan_id, url_normalized, render_mode) VALUES (?, ?, 'js')",
         (scan_id, "https://site.test/"),
     ).lastrowid
-    docx = b"PK\x03\x04" + b"\x00" * 26 + b"[Content_Types].xml" + b"\x00" * 100
+    docx = word(image="missing")
     asked: list[str] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -260,14 +261,11 @@ async def test_a_scan_that_follows_robots_txt_does_not_download_drive_files(
 async def test_a_scan_set_to_ignore_robots_txt_downloads_drive_files(
     tmp_db: sqlite3.Connection,
 ) -> None:
-    """With "Ignore the site's robots.txt rules", Drive files are downloaded:
-    a PDF is checked, and a Word file kept in Drive is identified, waiting
-    for a check of its format."""
+    """With "Ignore the site's robots.txt rules", Drive files are downloaded
+    and checked as what they are: a PDF as a PDF, a Word file kept in Drive
+    as a Word file (since 2026-11-17; it waited for that check before)."""
     rows = await _track_drive_links(tmp_db, ignore_robots=True)
     assert rows[VIEW][0] in {"mostly_sure", "not_sure", "could_not_check"}
     assert rows[VIEW][1] not in {"robots", "not_a_pdf"}
-    assert rows[f"https://drive.google.com/file/d/{DOCX_ID}/view"] == (
-        "could_not_check",
-        "type_not_checked_yet",
-    )
+    assert rows[f"https://drive.google.com/file/d/{DOCX_ID}/view"] == ("mostly_sure", None)
     assert rows["https://other.test/a.pdf"][1] != "robots"

@@ -1,4 +1,4 @@
--- 0045 — which checks ran on each linked PDF.
+-- 0046 — which checks ran on each linked PDF.
 --
 -- Until 2026-11-17 every PDF Axcess could open got the same five checks, so
 -- a check a file did not fail found no problem. The four checks added then

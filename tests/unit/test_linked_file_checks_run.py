@@ -1,5 +1,5 @@
-"""Which checks ran on a file (migration 0045): stored, shared by copies, and
-read back, with a file checked before 0045 reading as the first five."""
+"""Which checks ran on a file (migration 0046): stored, shared by copies, and
+read back, with a file checked before 0046 reading as the first five."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from audit.db import linked_files as store
 from audit.linked_files.pdf_check import BASE_CHECKS, check_pdf
 from audit.web.linked_files_queries import list_scan_documents
 
-MIGRATION = Path(__file__).parents[2] / "src/audit/db/migrations/0045_linked_file_checks_run.sql"
+MIGRATION = Path(__file__).parents[2] / "src/audit/db/migrations/0046_linked_file_checks_run.sql"
 FILES = Path(__file__).resolve().parents[1] / "fixtures" / "site" / "documents" / "files"
 
 
@@ -75,9 +75,9 @@ def test_a_copy_shares_the_checks_run(tmp_db: sqlite3.Connection) -> None:
     assert tuple(copy.checks_run or ()) == ("not_tagged",)
 
 
-def test_a_file_checked_before_0045_ran_the_first_five(tmp_db: sqlite3.Connection) -> None:
+def test_a_file_checked_before_0046_ran_the_first_five(tmp_db: sqlite3.Connection) -> None:
     scan, file_id = _file(tmp_db)
-    # As a report made before 0045 stored it: no checks_run.
+    # As a report made before 0046 stored it: no checks_run.
     tmp_db.execute(
         "UPDATE linked_files SET status = 'not_sure', checks_run = NULL WHERE id = ?", (file_id,)
     )

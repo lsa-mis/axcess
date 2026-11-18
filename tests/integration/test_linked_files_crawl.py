@@ -1,4 +1,4 @@
-"""A crawl finds every linked file on the fixture pages, and checks each PDF.
+"""A crawl finds every linked file on the fixture pages, and checks each PDF and Word file.
 
 tests/fixtures/site/documents/ reaches files every way R2 of the Documents
 brief lists: plain links, a link that exists only after a click, a frame, an
@@ -204,19 +204,23 @@ def test_every_linked_file_is_found_located_and_checked(
         ),
         f"{d}/files/password.pdf": ("pdf", "extension", 0, "could_not_check", "password", (), 200),
         f"{d}/files/missing.pdf": ("pdf", "extension", 0, "could_not_check", "http_error", (), 404),
+        # A Word file (tests/support/office_docs.word(image="missing")):
+        # downloaded and checked like a PDF since 2026-11-17.
         f"{d}/files/report.docx": (
             "docx",
             "extension",
             0,
-            "could_not_check",
-            "type_not_checked_yet",
-            (),
+            "mostly_sure",
             None,
+            ("no_alt_text",),
+            200,
         ),
         f"{d}/files/budget.xls": ("xls", "extension", 0, "could_not_check", "old_format", (), None),
         f"{d}/download?id=7": ("pdf", "content_type", 0, "not_sure", None, (), 200),
         off: ("pdf", "extension", 1, "mostly_sure", None, ("not_tagged",), 200),
-        google: ("google_doc", "host", 1, "could_not_check", "google_file", (), None),
+        # A Google Doc is asked for as the Word file Google exports; this
+        # test's network refuses every request off this computer.
+        google: ("google_doc", "host", 1, "could_not_check", "broken_link", (), None),
         f"{d}/files/scanned.pdf": ("pdf", "extension", 0, "mostly_sure", None, ("no_text",), 200),
         f"{d}/files/no-title.pdf": ("pdf", "extension", 0, "mostly_sure", None, ("no_title",), 200),
         f"{d}/files/no-language.pdf": (
@@ -261,8 +265,14 @@ def test_every_linked_file_is_found_located_and_checked(
     # and nothing else: it was checked, not crawled.
     other_host = [path for host, path in requests if host == "localhost"]
     assert sorted(other_host) == ["/documents/files/offsite.pdf", "/robots.txt"]
-    # Nothing left this computer: the Google file was never fetched.
-    assert not [url for url in transport.asked if "google" in url]
+    # The Google Doc was asked for only at Google's export address (and its
+    # robots.txt), never at the editor address the page links to; the
+    # transport refused both, so nothing left this computer.
+    google_asked = sorted(url for url in transport.asked if "google" in url)
+    assert google_asked == [
+        "https://docs.google.com/document/d/1AxcessFixture/export?format=docx",
+        "https://docs.google.com/robots.txt",
+    ]
 
     config = json.loads(
         tmp_db.execute("SELECT config_json FROM scans WHERE id = ?", (scan_id,)).fetchone()[0]

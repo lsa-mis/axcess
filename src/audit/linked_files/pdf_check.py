@@ -32,7 +32,7 @@ The checks, and the WCAG technique each one follows:
 
 Four more read the file's tags and page contents
 (:mod:`audit.linked_files.pdf_structure`): ``field_no_name``,
-``link_no_description``, ``image_no_description``,
+``link_no_description``, ``no_alt_text``,
 ``formula_no_description``, ``table_cells_misplaced``, ``table_uneven_rows``
 and ``untagged_text``.
 Each runs only where it applies (a file with form fields, a tagged file
@@ -90,7 +90,7 @@ ALL_CHECKS: tuple[FailedCheck, ...] = (
     "blocks_assistive_tech",
     "field_no_name",
     "link_no_description",
-    "image_no_description",
+    "no_alt_text",
     "formula_no_description",
     "table_cells_misplaced",
     "table_uneven_rows",
@@ -169,9 +169,9 @@ def _check(data: bytes) -> PdfCheck:
                 if structure.links_without_description:
                     failed.add("link_no_description")
             if structure.images:
-                ran.add("image_no_description")
+                ran.add("no_alt_text")
                 if structure.images_without_description:
-                    failed.add("image_no_description")
+                    failed.add("no_alt_text")
             if structure.formulas:
                 ran.add("formula_no_description")
                 if structure.formulas_without_description:

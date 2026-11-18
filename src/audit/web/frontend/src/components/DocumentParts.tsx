@@ -6,6 +6,7 @@ import BreakableUrl from "./BreakableUrl";
 import HowSureTag from "./HowSureTag";
 import ColumnHelp from "./table/ColumnHelp";
 import {
+  LINKED_FILE_CHECKED_AS_LABEL,
   LINKED_FILE_CHECK_PROBLEM,
   LINKED_FILE_REF_LABEL,
   LINKED_FILE_STATUS_HELP,
@@ -154,32 +155,95 @@ export function Found({ row }: { row: LinkedFileRow }) {
   );
 }
 
+/*
+ * Possible problems (Word and PowerPoint only: a document title, link text,
+ * heading levels) come after the problems, under their own words,
+ * "Possible problems:", so a reader never takes one for a proven problem:
+ * they do not make a file Mostly sure (office_check.COUNTED, the
+ * developer's rule of 2026-11-17: only a machine-checkable barrier to a
+ * screen reader user counts). A list of its own, so a screen reader says
+ * how many. Rejected: one list with both kinds, which would let a link's
+ * words look as serious as an image with no alt text; and leaving them to
+ * the document's page, which hides them from the table a reader works
+ * from (W3C COGA, "Making Content Usable", https://www.w3.org/TR/coga-usable/,
+ * paraphrased: group related content, and make the most important thing
+ * clear).
+ */
 function FoundResult({ row }: { row: LinkedFileRow }) {
-  if (row.status === "mostly_sure") {
+  const possible = row.possible_problems ?? [];
+  if (row.status === "could_not_check") {
     return (
-      <ul className="space-y-1">
-        {row.failed_checks.map((check) => (
-          <li key={check}>{LINKED_FILE_CHECK_PROBLEM[check]}</li>
-        ))}
-      </ul>
+      <p>
+        {row.reason ? linkedFileReasonText(row.reason, row.http_status, row.file_type) : LINKED_FILE_STATUS_HELP.could_not_check}
+      </p>
     );
   }
-  if (row.status === "not_sure") return <p>{LINKED_FILE_STATUS_HELP.not_sure}</p>;
-  return <p>{row.reason ? linkedFileReasonText(row.reason, row.http_status) : LINKED_FILE_STATUS_HELP.could_not_check}</p>;
+  return (
+    <>
+      {row.status === "mostly_sure" ? (
+        <ul className="space-y-1">
+          {row.failed_checks.map((check) => (
+            <li key={check}>{LINKED_FILE_CHECK_PROBLEM[check]}</li>
+          ))}
+        </ul>
+      ) : (
+        <p>{LINKED_FILE_STATUS_HELP.not_sure}</p>
+      )}
+      {possible.length > 0 && (
+        <>
+          <p className="mt-2 text-fg-muted">Possible problems:</p>
+          <ul className="space-y-1 text-fg-muted">
+            {possible.map((check) => (
+              <li key={check}>{LINKED_FILE_CHECK_PROBLEM[check]}</li>
+            ))}
+          </ul>
+        </>
+      )}
+    </>
+  );
 }
 
 /**
  * The file's type, and under it "Has a form to fill in" for a PDF with form
  * fields: what the file is, together. It used to sit with the problems in
  * "What Axcess found", where it read as one more problem.
+ *
+ * Also under it, when the check read the file as another type than its
+ * link names (``checkedAsNote``): a Google Doc "Checked as the Word file
+ * Google exports" (the developer's request, 2026-11-17), since a Google file
+ * has no original file and the results are about Google's export of it.
  */
 export function TypeCell({ row }: { row: LinkedFileRow }) {
+  const checkedAs = checkedAsNote(row);
   return (
     <>
       <span className="block">{LINKED_FILE_TYPE_LABEL[row.file_type]}</span>
+      {checkedAs && <span className="block text-2xs text-fg-muted">{checkedAs}</span>}
       {row.is_form && <span className="block text-2xs text-fg-muted">Has a form to fill in</span>}
     </>
   );
+}
+
+/** The type a link names, as the check would read it; null for one no check reads. */
+const NAMED_AS: Partial<Record<LinkedFileType, NonNullable<LinkedFileRow["checked_as"]>>> = {
+  pdf: "pdf",
+  docx: "docx",
+  pptx: "pptx",
+};
+
+/**
+ * What the check read a file as, when that is not what its link names; null
+ * otherwise. A Google Doc or Slides deck is checked as the Word or
+ * PowerPoint file Google exports (google.export_address); a file kept in
+ * Google Drive, or a link that led to another type, as what its bytes are.
+ */
+export function checkedAsNote(row: LinkedFileRow): string | null {
+  const as = row.checked_as;
+  if (!as || NAMED_AS[row.file_type] === as) return null;
+  if (row.file_type === "google_doc" || row.file_type === "google_slides") {
+    return `Checked as the ${LINKED_FILE_CHECKED_AS_LABEL[as]} file that Google exports`;
+  }
+  return `Checked as a ${LINKED_FILE_CHECKED_AS_LABEL[as]} file`;
 }
 
 /**

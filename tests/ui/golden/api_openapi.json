@@ -3166,17 +3166,53 @@
                 "blocks_assistive_tech",
                 "field_no_name",
                 "link_no_description",
-                "image_no_description",
+                "no_alt_text",
                 "formula_no_description",
                 "table_cells_misplaced",
                 "table_uneven_rows",
                 "untagged_text",
                 "no_title",
-                "no_language"
+                "no_language",
+                "table_no_header",
+                "slide_no_title",
+                "no_headings",
+                "skipped_heading_level",
+                "unclear_link_text"
               ]
             },
             "type": "array",
             "title": "Failed Checks"
+          },
+          "possible_problems": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "not_tagged",
+                "no_text",
+                "blocks_assistive_tech",
+                "field_no_name",
+                "link_no_description",
+                "no_alt_text",
+                "formula_no_description",
+                "table_cells_misplaced",
+                "table_uneven_rows",
+                "untagged_text",
+                "no_title",
+                "no_language",
+                "table_no_header",
+                "slide_no_title",
+                "no_headings",
+                "skipped_heading_level",
+                "unclear_link_text"
+              ]
+            },
+            "type": "array",
+            "title": "Possible Problems",
+            "default": []
+          },
+          "checked_as": {
+            "anyOf": [{"type": "string", "enum": ["pdf", "docx", "pptx"]}, {"type": "null"}],
+            "title": "Checked As"
           },
           "checks_run": {
             "items": {
@@ -3187,13 +3223,18 @@
                 "blocks_assistive_tech",
                 "field_no_name",
                 "link_no_description",
-                "image_no_description",
+                "no_alt_text",
                 "formula_no_description",
                 "table_cells_misplaced",
                 "table_uneven_rows",
                 "untagged_text",
                 "no_title",
-                "no_language"
+                "no_language",
+                "table_no_header",
+                "slide_no_title",
+                "no_headings",
+                "skipped_heading_level",
+                "unclear_link_text"
               ]
             },
             "type": "array",
