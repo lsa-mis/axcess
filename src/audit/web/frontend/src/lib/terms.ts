@@ -698,7 +698,7 @@ export const AI_ISOLATION_REASON_LABEL: Record<string, string> = {
   runtime_failed: "The isolated AI service could not start. Check the application log.",
   // The one memory refusal left (2026-11-18): a size on a computer with
   // less memory than the size is for. Low free memory only warns.
-  not_enough_memory: "This computer has less memory than this size is for, so AI was not started. Choose a smaller size in Change the AI models.",
+  not_enough_memory: "This computer has 8 GB of memory or less, and this size is for 16 GB or more, so AI was not started. Choose Small in Change the AI models.",
   system_ollama_not_managed: "Your own Ollama is not isolated by Axcess. Axcess never starts or stops it.",
 };
 

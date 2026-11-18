@@ -295,13 +295,34 @@ async def test_page_inspector_suggests_a_fix_for_the_element_you_are_on(
     box = page.locator("#inspect-panel-page")
     button = box.get_by_role("button", name="Suggest a fix (AI)")
     await button.wait_for()
+    # Before anything is asked, the panel is already the AI suggestion card:
+    # its heading and what will happen come before the button (developer,
+    # 2026-11-18: a bare button sat alone in the empty column).
+    card = box.get_by_role("region", name="AI suggestion")
+    intro = card.get_by_text("It can take a few minutes", exact=False)
+    await intro.wait_for()
+    assert await intro.evaluate(
+        "(el, b) => Boolean(el.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)",
+        await button.element_handle(),
+    )
     await button.focus()
     await page.keyboard.press("Enter")
 
-    heading = box.get_by_role("heading", name="AI suggestion", level=2)
-    await heading.wait_for()
-    assert await heading.evaluate("el => el === document.activeElement")
+    # The idle card already has the "AI suggestion" heading, so waiting for it
+    # proves nothing. The button goes away once pressed; focus must land in
+    # the card (its heading while waiting, the lead fix sentence once this
+    # fast fake answers), never on the page body.
     await box.get_by_text('<input id="q" aria-label="Search">').wait_for(timeout=15000)
+    await page.wait_for_function(
+        """() => {
+            const el = document.activeElement;
+            const card = el && el.closest("section[aria-labelledby]");
+            return !!card && el.tabIndex === -1
+              && card.querySelector("h2")?.textContent?.includes("AI suggestion");
+        }""",
+        timeout=5000,
+    )
+    assert await button.count() == 0
 
     violations = await _run_axe(page)
     assert not violations, _render_violations(violations)
@@ -338,6 +359,9 @@ async def test_suggestion_and_review_share_a_row_suggestion_first(
         assert right["x"] >= left["x"] + left["width"], (left, right)
         assert abs(right["y"] - left["y"]) < 2, (left, right)
         assert 1.6 < left["width"] / right["width"] < 2.4, (left, right)
+        # The card starts on the same line as the review (2026-11-18).
+        card = await page.get_by_role("region", name="AI suggestion").bounding_box()
+        assert card and abs(card["y"] - right["y"]) < 2, (card, right)
     else:
         # Stacked, suggestion first, nothing wider than the screen.
         assert right["y"] >= left["y"] + left["height"], (left, right)
@@ -390,7 +414,7 @@ async def test_writing_status_is_short_polite_and_keeps_focus(
         assert await card.get_by_role("heading", name="AI suggestion").evaluate(
             "el => el === document.activeElement"
         )
-        await card.get_by_role("button", name="Stop", exact=True).focus()
+        await card.get_by_role("button", name="Stop this suggestion", exact=True).focus()
         await page.keyboard.press("Enter")
         await card.get_by_role("button", name="Suggest a fix (AI)").wait_for()
     finally:

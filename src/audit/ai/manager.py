@@ -53,6 +53,9 @@ class TierPlan(BaseModel):
     models_bytes: int
     download_bytes: int
     fits: bool
+    # This computer has 8 GB of memory or less and the size is for 16 GB or
+    # more: it cannot be downloaded or started (hardware.size_refused).
+    refused: bool = False
     # Every file this size needs is on this computer and checked: the AI
     # program and both models. The setup page then has nothing to download.
     installed: bool = False
@@ -327,6 +330,7 @@ class AIManager:
                     models_bytes=t.size,
                     download_bytes=t.size + program_bytes,
                     fits=hw.fits(machine, t, program_bytes),
+                    refused=hw.size_refused(hw.memory_gb(machine.memory_bytes), t),
                     installed=program_ready
                     and self.runtime.has_model(t.text)
                     and self.runtime.has_model(t.vision),
@@ -355,20 +359,21 @@ class AIManager:
         return next((t for t in self.catalog.tiers if t.id == config.tier), None)
 
     def _require_size_fits(self, tier: Tier | None, *, starting: bool = False) -> None:
-        """Refuse a size on a computer with less memory than the size is for.
+        """Refuse a size for 16 GB or more on a computer with 8 GB or less.
 
-        The one memory refusal left (developer, 2026-11-18): free memory only
-        warns now, because the operating system makes room, but an 8 GB
-        laptop never runs Standard or Large well. The rule follows the words
-        each size shows, "for computers with 16 GB of memory or more", so the
-        page and this check agree. Unknown memory never refuses, and your own
-        model has no such limit. ``starting`` marks the service as stopped
-        for this reason, so the AI state says why.
+        The one memory refusal left (developer, 2026-11-18: "only refuse to
+        start 16 gb and above on a 8gb laptop"). Free memory only warns,
+        because the operating system makes room, and so does any other size
+        bigger than the computer's memory (Large on a 16 GB computer): the
+        setup page says so before the download (hardware.size_refused).
+        Unknown memory never refuses, and your own model has no such limit.
+        ``starting`` marks the service as stopped for this reason, so the AI
+        state says why.
         """
         if tier is None:
             return
         have = hw.memory_gb(self.probe().memory_bytes)
-        if have == 0 or have >= tier.min_memory_gb:
+        if not hw.size_refused(have, tier):
             return
         if starting:
             self.runtime.isolation_reason = "not_enough_memory"

@@ -18,8 +18,9 @@ def _free_memory_unknown(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture(autouse=True)
 def _a_large_computer(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A 64 GB computer, so no size is refused for this machine's memory
-    (AIManager._require_size_fits). Tests of that rule pass their own probe.
+    """A 64 GB computer, so no size is refused or warned about for this
+    machine's memory (hardware.size_refused). Tests of that rule pass their
+    own probe.
     """
     from audit.ai import hardware
 

@@ -2075,6 +2075,8 @@ export interface AiTierPlan {
   models_bytes: number;
   download_bytes: number;
   fits: boolean;
+  /** 8 GB of memory or less and a size for 16 GB or more: cannot be downloaded or started. */
+  refused: boolean;
   /** The AI program and both models are on this computer and checked. */
   installed: boolean;
 }

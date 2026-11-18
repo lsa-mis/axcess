@@ -58,11 +58,16 @@ import {
  * - A size this computer has too little memory for is still a choice you
  *   can focus and read, and says why in text, not by colour or by disabling
  *   it: a disabled option cannot be focused or explained. WCAG 2.2 SC 1.4.1
- *   Use of Color, Level A. Since 2026-11-18 (the developer's decision) such
- *   a size cannot be downloaded or started: an 8 GB laptop is refused
- *   Standard and Large. In place of its download button, a line says what
- *   the size is for and what this computer has. Low free memory, which
- *   changes from minute to minute, only warns once AI runs.
+ *   Use of Color, Level A. Memory only warns, with one exception (the
+ *   developer's decision, 2026-11-18: "only refuse to start 16 gb and above
+ *   on a 8gb laptop"): a computer with 8 GB or less is refused Standard and
+ *   Large (the server's tier.refused). In place of the download button, a
+ *   line says what the size is for and what this computer has. Any other
+ *   size bigger than the computer's memory (Large on 16 GB) can be
+ *   downloaded, and the note before the button warns that it may be slow,
+ *   so the risk is read before the button is pressed (WCAG 2.2 SC 3.3.2
+ *   Labels or Instructions, Level A). Low free memory, which changes from
+ *   minute to minute, only warns once AI runs.
  * - Progress is a native <progress> with a visible text value, and changes of
  *   step or state (not every byte) are said in a polite live region. WCAG 2.2
  *   SC 4.1.3 Status Messages, Level AA. Announcing every percent would talk
@@ -325,8 +330,8 @@ function AiSetupPage({
         </fieldset>
         {plan.recommended === null && (
           <p className="mt-3 text-xs leading-5 text-fg">
-            {plan.tiers[0] && tooLittleMemory(plan, plan.tiers[0])
-              ? "This computer has less memory than even the smallest size is for, so no size can run here. You can try a smaller model file of your own."
+            {plan.tiers[0] && belowMemory(plan, plan.tiers[0])
+              ? "This computer has less memory than even the smallest size is for. Small may answer very slowly or stop, or you can try a smaller model file of your own."
               : "This computer has less free disk space than even the smallest size needs. Free up space before you download."}
           </p>
         )}
@@ -399,10 +404,11 @@ function AiSetupPage({
                 <Pause className="h-4 w-4" aria-hidden />
                 Pause download
               </Button>
-            ) : chosenTier && tooLittleMemory(plan, chosenTier) ? (
-              // A size this computer has too little memory for: no download,
-              // and a line that says why and what to do, where the button
-              // was (developer, 2026-11-18; see the rationale at the top).
+            ) : chosenTier?.refused ? (
+              // A size for 16 GB or more on a computer with 8 GB or less: no
+              // download, and a line that says why and what to do, where the
+              // button was (developer, 2026-11-18; see the rationale at the
+              // top).
               <p className="min-h-target content-center text-sm font-semibold text-fg">
                 {`${AI_TIER_LABEL[chosenTier.id]} is for computers with ${chosenTier.min_memory_gb} GB of memory or more, and this computer has ${plan.hardware.memory_gb} GB. Choose a smaller size.`}
               </p>
@@ -438,7 +444,7 @@ function AiSetupPage({
               chosenTier && (
                 <>
                   <p id={`${headingId}-download`} className="mb-2 text-sm text-fg">
-                    {downloadNote(chosenTier, enabled)}
+                    {downloadNote(chosenTier, enabled, plan.hardware.memory_gb)}
                   </p>
                   <Button
                     type="button"
@@ -1003,7 +1009,7 @@ function TierOption({
   memoryGb: number;
   onChoose: () => void;
 }) {
-  const tooSmall = memoryGb > 0 && memoryGb < tier.min_memory_gb;
+  const below = memoryGb > 0 && memoryGb < tier.min_memory_gb;
   return (
     <ModelOption
       name={name}
@@ -1019,9 +1025,11 @@ function TierOption({
       description={
         `${AI_TIER_DESCRIPTION[tier.id]} For computers with ${tier.min_memory_gb} GB of memory or more. ` +
         `${formatBytes(tier.download_bytes)} download.` +
-        (tooSmall
+        (tier.refused
           ? " This computer has less memory than this size is for, so it cannot be used here."
-          : !tier.fits
+          : below
+            ? " This computer has less memory than this size is for, so it may answer very slowly or stop."
+            : !tier.fits
             ? " There may not be enough free disk space for this size."
             : "")
       }
@@ -1115,12 +1123,13 @@ function ProgressBlock({ status }: { status: AiInstallStatus }) {
 }
 
 /**
- * This computer has less memory than the size is for, so the size cannot
- * be downloaded or started (the server refuses it too). Memory is as
- * computers are sold (the server's hardware.memory_gb), so a 16 GB
- * computer reads 16, not 15. 0 means unknown, which never refuses.
+ * This computer has less memory than the size is for. Only a warning: the
+ * one refusal is the server's tier.refused (8 GB or less, and a size for
+ * 16 GB or more). Memory is as computers are sold (the server's
+ * hardware.memory_gb), so a 16 GB computer reads 16, not 15. 0 means
+ * unknown, which never warns.
  */
-function tooLittleMemory(plan: AiPlan, tier: AiTierPlan): boolean {
+function belowMemory(plan: AiPlan, tier: AiTierPlan): boolean {
   return plan.hardware.memory_gb > 0 && plan.hardware.memory_gb < tier.min_memory_gb;
 }
 
@@ -1154,12 +1163,18 @@ function hardwareSentence(plan: AiPlan): string {
   return sentence;
 }
 
-/** Said before the download button: the size, and what happens after. */
-function downloadNote(tier: AiTierPlan, enabled: boolean): string {
+/**
+ * Said before the download button: the size, what happens after, and a
+ * warning when this computer has less memory than the size is for.
+ */
+function downloadNote(tier: AiTierPlan, enabled: boolean, memoryGb: number): string {
   const size = `Download size: ${formatBytes(tier.download_bytes)}.`;
-  return enabled
+  const after = enabled
     ? `${size} Axcess checks each file, then switches AI to ${AI_TIER_LABEL[tier.id]}.`
     : `${size} Axcess checks each file, then turns AI on.`;
+  return memoryGb > 0 && memoryGb < tier.min_memory_gb
+    ? `${after} ${AI_TIER_LABEL[tier.id]} is for computers with ${tier.min_memory_gb} GB of memory or more, and this computer has ${memoryGb} GB, so it may answer very slowly or stop.`
+    : after;
 }
 
 function licenceName(spdx: string): string {

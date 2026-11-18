@@ -122,15 +122,33 @@ def memory_gb(memory_bytes: int) -> int:
     about 15.3 GiB. A total within 10% below a sold size is that size;
     anything else is rounded. 0 when the memory is unknown. The AI features
     page shows this number next to each size's "for computers with 16 GB of
-    memory or more", and the manager refuses a size on a computer with less,
-    so both use the same figure (developer, 2026-11-18: a 16 GB computer
-    read "15 GB" and looked too small for Standard).
+    memory or more", warns on a computer with less, and ``size_refused``
+    uses it too, so all agree (developer, 2026-11-18: a 16 GB computer read
+    "15 GB" and looked too small for Standard).
     """
     if memory_bytes <= 0:
         return 0
     gib = memory_bytes / 1024**3
     sold = next((size for size in SOLD_MEMORY_GB if size >= gib - 0.05), None)
     return sold if sold is not None and sold - gib <= sold * 0.1 else round(gib)
+
+
+# The one memory refusal (developer, 2026-11-18: "only refuse to start 16 gb
+# and above on a 8gb laptop"). A computer with this much memory or less is
+# refused every size that is for 16 GB or more.
+SMALL_COMPUTER_GB = 8
+REFUSED_ON_SMALL_COMPUTER_GB = 16
+
+
+def size_refused(memory_gb: int, tier: Tier) -> bool:
+    """This size cannot be downloaded or started on this computer.
+
+    Only an 8 GB (or smaller) computer and a size for 16 GB or more. Any
+    other size bigger than the computer's memory is allowed with a warning,
+    because the operating system makes room. ``memory_gb`` is as computers
+    are sold (``memory_gb()``); 0 means unknown and never refuses.
+    """
+    return 0 < memory_gb <= SMALL_COMPUTER_GB and tier.min_memory_gb >= REFUSED_ON_SMALL_COMPUTER_GB
 
 
 def dedicated_gpu() -> bool:
@@ -208,8 +226,12 @@ def probe(data_dir: Path) -> Hardware:
 
 
 def fits(hardware: Hardware, tier: Tier, extra_bytes: int = 0) -> bool:
-    """Enough memory to run the tier and enough disk to download it."""
-    # The same figure the page shows and AIManager._require_size_fits uses.
+    """Enough memory to run the tier and enough disk to download it.
+
+    Used to suggest a size and to warn; a size that does not fit can still
+    be chosen unless ``size_refused`` says otherwise.
+    """
+    # The same figure the page shows.
     enough_memory = memory_gb(hardware.memory_bytes) >= tier.min_memory_gb
     enough_disk = hardware.free_disk_bytes >= tier.size + extra_bytes + DISK_MARGIN
     return enough_memory and enough_disk
