@@ -11,6 +11,7 @@ from __future__ import annotations
 import importlib.util
 import sqlite3
 from pathlib import Path
+from unittest import mock
 
 from yoyo import get_backend, read_migrations
 
@@ -22,7 +23,11 @@ def _repair_step():  # type: ignore[no-untyped-def]
     spec = importlib.util.spec_from_file_location("migration_0043", REPAIR)
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
+    # The file registers its steps with yoyo as it loads (``step(...)``),
+    # which works only inside yoyo's own loader; here only the step
+    # functions are wanted, so registering is skipped.
+    with mock.patch("yoyo.step", lambda *args, **kwargs: None):
+        spec.loader.exec_module(module)
     return module.apply_step
 
 
