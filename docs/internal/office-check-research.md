@@ -194,3 +194,29 @@ grid), in a file that is a barrier anyway.
   answering the scanner's HTTP client with a bot challenge (HTTP 403) on
   2026-11-18, so the scorer cannot download their files again until that
   changes; rossweb and Google still answer.
+
+## Extra scan time (measured 2026-11-18)
+
+The real app on a fresh database each run, `https://rossweb.bus.umich.edu/ross-it/`,
+New scan's public defaults, a 25-page limit (32 pages saved: the limit
+counts pages visited). "Off" runs the same code with Word, PowerPoint,
+Docs and Slides left unchecked (`formats.CHECKED` cut back to PDF and Drive
+in the launcher), which is how the documents branch behaves: its 42 Google
+links read "google_file" and are never asked for. hr.umich.edu, the site
+the PDF timing used, answered the scanner with a bot challenge that day.
+
+| Run | Whole scan | Start to last page saved | Last document result before the last page | Files checked as Word |
+|---|---|---|---|---|
+| On 1 | 443 s | 442 s | 21 s before | 9 (+1 PDF) |
+| Off 1 | 455 s | 454 s | 52 s before | 0 (1 PDF) |
+| On 2 | 513 s | 510 s | 59 s before | 9 (+1 PDF) |
+| Off 2 | over 590 s (stopped by our 10-minute limit while finishing after the last page) | 479 s | 29 s before | 0 (1 PDF) |
+
+With the check on, the scan asks docs.google.com for 41 more files (9
+public Doc exports, 32 that answer "needs a sign-in"), on Google's host, so
+the site's own rate limit is not shared; reading a file takes a median of
+5 ms (at most 0.2 s on the 73 labelled files). In every run the last
+document was done 21 to 59 seconds before the last page, so the check
+never kept a scan waiting. The page crawl, with the click-through check,
+varies by more than the difference between on and off (442 to 510 s): the
+runs show no measurable extra time, which is not the same as none.
