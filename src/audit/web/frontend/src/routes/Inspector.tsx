@@ -1040,14 +1040,26 @@ export default function InspectorRoute() {
   // element the reader is on. Occurrences sharing an element are of the same
   // issue on the same markup, so one suggestion fixes them all.
   const currentOccurrence = useMemo((): { kind: SuggestionOccurrenceKind; id: number } | null => {
+    // Only an occurrence the server says can get a fix suggestion: one of
+    // an issue marked "for information" would be refused (can_suggest).
+    const imageOk = new Set(
+      (pageEvidence?.image_occurrences ?? []).filter((i) => i.can_suggest).map((i) => i.occurrence_id),
+    );
+    const findingOk = new Set(
+      (pageEvidence?.a11y_findings ?? []).filter((f) => f.can_suggest).map((f) => f.id),
+    );
     for (const index of highlight?.steps[pageMark]?.targets ?? []) {
       const target = scopedTargets[index];
-      if (target?.imageOccurrenceId !== undefined) return { kind: "image", id: target.imageOccurrenceId };
-      const findingId = target?.findingIds?.[0];
+      if (target?.imageOccurrenceId !== undefined) {
+        return imageOk.has(target.imageOccurrenceId)
+          ? { kind: "image", id: target.imageOccurrenceId }
+          : null;
+      }
+      const findingId = target?.findingIds?.find((id) => findingOk.has(id));
       if (findingId !== undefined) return { kind: "a11y", id: findingId };
     }
     return null;
-  }, [highlight, pageMark, scopedTargets]);
+  }, [highlight, pageMark, scopedTargets, pageEvidence]);
   // Same gating as the page details screen (PageEvidence): only an
   // unprotected report, and only when an administrator turned the feature on.
   const { data: suggestionStatus } = useQuery({

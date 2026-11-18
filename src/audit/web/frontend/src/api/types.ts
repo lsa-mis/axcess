@@ -1571,6 +1571,9 @@ export interface PageEvidence {
   };
   a11y_findings: Array<{
     id: number;
+    /** A fix suggestion can be asked for: false for an issue marked "for
+     *  information", which the suggestion service refuses. */
+    can_suggest: boolean;
     pipeline: string;
     rule_id: string;
     criterion_sc: string | null;
@@ -1617,6 +1620,9 @@ export interface PageEvidence {
     /** The Images with text issue this image is in; null when the scan made
      *  no finding for it. */
     issue_key: string | null;
+    /** A fix suggestion can be asked for: an image in an issue that is not
+     *  marked "for information" (an alt text that already matches is not). */
+    can_suggest: boolean;
     /** Which element of the saved copy the image came from; null when the
      *  page kept no copy or the copy disagrees with the stored occurrence. */
     locator: ImageLocator | null;

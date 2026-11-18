@@ -275,7 +275,12 @@ def test_runtime_start_requires_explicit_boolean_confirmation(
             "download_bytes": None,
             "tier": None,
         }
-        assert set(client.get("/api/ai/runtime").json()) == {"running", "isolated", "reason", "starting"}
+        assert set(client.get("/api/ai/runtime").json()) == {
+            "running",
+            "isolated",
+            "reason",
+            "starting",
+        }
 
 
 def test_runtime_routes_stay_desktop_only(db: Path, tmp_path: Path) -> None:

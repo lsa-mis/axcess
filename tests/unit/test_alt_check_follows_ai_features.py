@@ -106,4 +106,45 @@ async def test_the_alt_check_speaks_each_services_own_format(backend: str, path:
         parts = body["messages"][0]["content"]
         assert parts[0]["type"] == "image_url" and parts[1]["type"] == "text"
     else:
-        assert body["images"] and body["format"] == "json"
+        # The answer's exact shape, so the suggestion cannot be left out.
+        assert body["images"]
+        assert body["format"]["required"] == ["verdict", "reason", "suggestion"]
+
+
+def test_good_alt_text_with_no_suggestion_keeps_the_current_one() -> None:
+    """Bonsai 2 answered "good" with an empty suggestion (2026-11-17); the
+    prompt allows repeating good alt text, so that is what is kept."""
+    from audit.analyzer.vlm.alt_check import OllamaError, parse_answer
+
+    raw = '{"verdict": "good", "reason": "It says what it shows.", "suggestion": ""}'
+    result = parse_answer(
+        raw, has_alt=True, model="m", prompt_version="v", current_alt="Status legend"
+    )
+    assert result.suggestion == "Status legend" and result.verdict == "good"
+    with pytest.raises(OllamaError, match="no suggestion"):
+        parse_answer(
+            raw.replace('"good"', '"needs_better"'),
+            has_alt=True,
+            model="m",
+            prompt_version="v",
+            current_alt="x",
+        )
+
+
+def test_images_sent_to_a_model_are_at_most_1024_px() -> None:
+    import io
+
+    from PIL import Image
+
+    from audit.ai.model_image import fit_for_model
+
+    big = io.BytesIO()
+    Image.new("RGB", (1536, 1024), "white").save(big, format="PNG")
+    data, mime = fit_for_model(big.getvalue())
+    with Image.open(io.BytesIO(data)) as im:
+        assert max(im.size) == 1024 and im.size == (1024, 683)
+    assert mime == "image/jpeg"
+    small = io.BytesIO()
+    Image.new("RGBA", (300, 200)).save(small, format="PNG")
+    assert fit_for_model(small.getvalue()) == (small.getvalue(), "image/png")
+    assert fit_for_model(b"not an image") == (b"not an image", None)

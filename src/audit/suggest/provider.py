@@ -29,6 +29,7 @@ from audit.ai.model_client import (
     ModelTimeoutError,
     make_model_client,
 )
+from audit.ai.model_image import fit_for_model
 from audit.analyzer.ollama_base import prompt_content_version, why_not_local_service
 from audit.suggest.context import EvidenceBundle
 from audit.suggest.models import ErrorCode, ModelAnswer, ModelAnswerV2
@@ -217,10 +218,14 @@ class OllamaSuggestionProvider:
         reason = await why_not_local_service(self._model_client, self._client, model)
         if reason is not None:
             raise SuggestionError("model_not_local", reason)
+        mime = None
+        if image is not None:
+            image, mime = fit_for_model(image)
         request = GenerateRequest(
             model=model,
             prompt=prompt,
             image=image,
+            image_mime=mime,
             # The service constrains the output to this schema (structured
             # outputs), so the answer cannot drift from the shape Axcess
             # checks. With "json" alone the model sometimes wrote
