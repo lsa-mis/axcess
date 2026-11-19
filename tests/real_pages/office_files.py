@@ -31,6 +31,18 @@ evidence, not validation by accessibility experts.
 file is in the holdout part when its SHA-256 starts with 0-7, else in the
 tuning part. The check was written and tuned on the tuning part only; the
 holdout part is scored once and reported separately.
+
+Files with ``"source": "gov-org-2026-11-18"`` (77: 44 PowerPoint, 33
+Word) were added on 2026-11-18 and 19, after every rule existed, to test
+the check on files it was not tuned on. Sources (approved by the developer
+in general, 2026-11-18): files linked from www.section508.gov,
+grants.nih.gov (two hosted on osp.od.nih.gov), www.cdc.gov,
+stacks.cdc.gov, www.aaal.org (hosted on assets.noviams.com),
+isaac-online.org and accessible.org, read one at a time with robots.txt
+obeyed. Labelling agents labelled them under the same protocol, without
+access to the check's code and before the check was run on them. All are
+in the holdout part whatever their SHA-256, and no rule was changed after
+scoring them.
 """
 
 from __future__ import annotations
