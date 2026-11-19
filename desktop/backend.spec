@@ -12,6 +12,11 @@ datas = [
     (str(audit_source / "rules"), "audit/rules"),
     (str(audit_source / "exports" / "templates"), "audit/exports/templates"),
     (str(audit_source / "analyzer" / "vlm" / "prompts"), "audit/analyzer/vlm/prompts"),
+    # The semantic checks (wording and context) read their prompts through
+    # importlib resources. Missing here, every packaged scan with those
+    # checks on failed with "No module named audit.analyzer.semantic.prompts"
+    # (developer, 2026-11-19).
+    (str(audit_source / "analyzer" / "semantic" / "prompts"), "audit/analyzer/semantic/prompts"),
     (str(audit_source / "suggest" / "prompts"), "audit/suggest/prompts"),
     (str(audit_source / "web" / "frontend" / "dist"), "audit/web/frontend/dist"),
     (str(audit_source / "web" / "frontend" / "public"), "audit/web/frontend/public"),
