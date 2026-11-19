@@ -184,16 +184,127 @@ The errors:
 On the tuning part the only error is one layout table flagged (a form's
 grid), in a file that is a barrier anyway.
 
+## More files: government and non-profit sites (2026-11-18 and 19)
+
+To measure the check on files no rule was tuned on, 77 more files (by
+SHA-256) were added, all to the holdout part, with the rules as they
+stood at ed3d59d (tables without a header row counted). No rule was
+changed after scoring them. Each is marked `"source":
+"gov-org-2026-11-18"` in `office_files.json`.
+
+| Linked from | Word | PowerPoint | Barriers |
+|---|---|---|---|
+| www.section508.gov (presentations, IAAF 2023 and 2024, Accessible Presentations) | 16 | 38 | 4 |
+| grants.nih.gov forms directory and protocol templates (2 hosted on osp.od.nih.gov) | 16 | – | 1 |
+| www.cdc.gov, stacks.cdc.gov | – | 4 | 2 |
+| www.aaal.org (file hosted on assets.noviams.com), isaac-online.org | – | 2 | 2 |
+| accessible.org | 1 | – | 0 |
+| **Total** | **33** | **44** | **9** |
+
+How they were found: pages read one at a time, at most one request a
+second, robots.txt obeyed, read only. Not in the set: 4 section508.gov
+decks over 10 MB, a Dropbox file (Dropbox's robots.txt disallows it), old
+.doc files, and sites that answered with HTTP 403 (sites.ed.gov,
+printdisability.org, oercommons.org).
+
+Labelling: 7 agents, the same protocol as above (written out in full for
+them, Word and PowerPoint together), without access to the check's code,
+before the check was run on these files. No file was opened in Word,
+PowerPoint or a screen reader; no outside audit exists for any of them.
+No criterion was left disputed.
+
+### Results with the new files (rules at ed3d59d)
+
+File level, "Mostly sure" against `barrier`:
+
+| Part | Files scored | Barriers | Right | False alarms | Missed | Precision | Recall |
+|---|---|---|---|---|---|---|---|
+| Holdout, U-M files | 41 of 45 (4 Google files changed) | 23 | 23 | 1 | 0 | 95.8% (upper 95% bound on false alarms 16.7%) | 100% (upper 95% bound on misses 12.2%) |
+| Holdout, new files | 77 | 9 | 8 | 12 | 1 | 40.0% (bound 75.8%) | 88.9% (bound 37.7%) |
+| Holdout, all | 118 of 122 | 32 | 31 | 13 | 1 | **70.5%** (bound 41.8%) | **96.9%** (bound 12.9%) |
+| Tuning | 27 of 28 (1 changed) | 12 | 12 | 0 | 0 | 100% | 100% |
+| New Word files | 33 | 3 | 2 | 12 | 1 | 14.3% | 66.7% |
+| New PowerPoint files | 44 | 6 | 6 | 0 | 0 | 100% (bound 39.3%) | 100% (bound 39.3%) |
+| All PowerPoint | 46 of 50 | 8 | 8 | 0 | 0 | 100% (bound 31.2%) | 100% (bound 31.2%) |
+
+Holdout precision is below the 90% the developer asked for; recall is
+above it. Every false alarm is in a Word file.
+
+Per check on the new files (right, false alarms, missed): images without
+alt text 6, 0, 1; tables without a header row 1, 2, 0; slides without a
+title 1, 0, 0; no headings 0, 10, 0; skipped heading levels 2, 0, 0; link
+text 35, 0, 1; no title 10, 0, 0.
+
+The errors on the new files:
+
+- **No headings, 10 false alarms**: six section508.gov meeting
+  transcripts (12,000 to 17,000 words, one part, a Title line and speaker
+  turns) and four one-part NIH forms (520 to 1,400 words: a Title line,
+  then numbered questions or statements). The labellers found no visible
+  section headings in them, so nothing is lost to a screen reader user;
+  the check flags any document over 400 words with no heading style. Two
+  more transcripts were not flagged only because their author put
+  Heading 1 on the "--- BEGIN CAPTIONED TEXT ---" line.
+- **Tables, 2 false alarms**: two NIH forms (HHS 568, PHS 416-7) laid out
+  as one large table, with a small fill-in grid with column names inside
+  (inventions; stipend years). The labellers called them form layout
+  tables and said the inner grids could be read as data tables.
+- **Images, 1 missed** (the file-level miss): section508.gov's PowerPoint
+  2016 authoring guide gives 12 informative screenshots the alt text `"  "`
+  (two quote marks around spaces), a way of marking a picture decorative
+  that the guide itself teaches. The check counts any text as alt text;
+  the labeller counted this as none, since the pictures are not
+  decorative.
+- **Link text, 1 missed**: links whose words are "video" and "short
+  video".
+
+What this suggests (not changed; for the developer to decide, and to be
+measured on files not yet seen, since these are now seen):
+
+- "No headings" needs a sign of visible headings (for example short,
+  bold or larger lines that start a part), not a word count alone. Simply
+  not counting it is worse: holdout recall falls to 78.1% (25 of 32) and
+  tuning recall to 58.3%, while holdout precision is 92.6%.
+- Alt text made only of spaces and punctuation could count as none.
+
+### Two real scans (2026-11-19)
+
+Fresh databases, New scan's public defaults:
+
+- `https://www.section508.gov/training/presentations-workshops/`, 10-page
+  limit: 1 page in scope, 35 documents. 3 PowerPoint files were checked,
+  all "Not sure", each matching its label (one with a possible link text
+  problem, labelled as such). 2 decks were over 10 MB. 28 of the other
+  30 timed out: after the first 4 downloads (done in 3 seconds), every
+  download waited the full 30 s, four at a time, including 50 KB Word
+  files that the labelling downloads (one at a time) fetched at once. Why
+  was not found: the site slowing parallel downloads and a fault in the
+  scan's own downloader are both possible.
+- `https://grants.nih.gov/grants-process/write-application/forms-directory`,
+  15-page limit: 17 pages, 24 documents, 11 Word files checked, no
+  timeouts. Against the labels: the Chimpanzee research form ("Not sure",
+  no title as a possible problem), PHS 6031-1 ("Not sure", heading levels
+  and link text as possible problems) and SF424 additional locations
+  ("Not sure") are right; the 2026 data management plan page is "Mostly
+  sure" for no headings and HHS 568 for a table without a header row,
+  both false alarms by the labels (see the errors above).
+
 ## Limits
 
-- 73 files from one university's sites, 6 of them PowerPoint; most
-  barriers are images without alt text and long documents without
-  headings. Small numbers: a 95% bound is given beside each rate.
-- Labels are one agent's reading of the XML, reviewed only for tables.
+- 150 files: 73 from one university's sites and 77 from government and
+  non-profit sites, 50 of them PowerPoint. The new files are mostly from
+  accessibility teams (section508.gov) and have few barriers (9 of 77), so
+  recall rests mostly on the U-M files. Small numbers: a 95% bound is
+  given beside each rate.
+- Labels are one agent's reading of the XML, reviewed only for the U-M
+  Word tables.
 - hr.umich.edu, finance.umich.edu, lsa.umich.edu and its.umich.edu began
   answering the scanner's HTTP client with a bot challenge (HTTP 403) on
   2026-11-18, so the scorer cannot download their files again until that
-  changes; rossweb and Google still answer.
+  changes; rossweb and Google still answer. On 2026-11-18 a real Axcess
+  scan of hr.umich.edu (5-page limit, the scan's browser name set to
+  Axcess's own) got through: 11 pages saved with HTTP 200 and their
+  titles, and its linked files downloaded.
 
 ## Extra scan time (measured 2026-11-18)
 
