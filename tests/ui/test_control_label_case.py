@@ -48,6 +48,12 @@ _NAMES = {
     "Google",
     # Google Drive, named in the document check's hint (2026-11-16).
     "Drive",
+    # Microsoft PowerPoint, Google Docs and Google Slides, named in the
+    # document check's hint since the Word and PowerPoint check (2026-11-17).
+    "PowerPoint",
+    "Doc",
+    "Docs",
+    "Slides",
     "Siteimprove",
     "XPath",
     "Level",
