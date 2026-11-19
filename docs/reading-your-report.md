@@ -324,18 +324,19 @@ found** is a table of the checks that ran on the file, each with its result
 matters. A Word file gets seven (Alt text for images, Table header rows,
 Headings, Language, Heading levels, Link text, Document title) and a
 PowerPoint file six (Alt text for images, Slide titles, Table header rows,
-Language, Link text, Document title). Every PDF Axcess opens gets five (Tags,
-Text a screen reader can read, Security settings, Document title, Language),
-and up to seven more where they apply: Form field names (a file with form
-fields); Link text, Alt text for images, Alt text for formulas, Table
-headings and Table rows (a tagged file with links, images, formulas or
-tables); and Text outside the tags (a tagged file). Table headings finds a
-cell that sits under one column on the page but is tagged in another, so a
-screen reader reads it under the wrong heading. Table rows finds rows with
-more or fewer cells than the others where no cell was seen out of place. A
-check that did not apply is not listed, and a PDF checked before 2026-11-18
-ran only the first five. "No problem found" is not a pass: a person must
-still check the file.
+Language, Link text, Document title). A Google Doc or Slides deck has no
+Document title row: Google's exports never have a title, and its author
+cannot set one. Every PDF Axcess opens gets five (Tags, Text a screen reader
+can read, Security settings, Document title, Language), and up to seven more
+where they apply: Form field names (a file with form fields); Link text, Alt
+text for images, Alt text for formulas, Table headings and Table rows (a
+tagged file with links, images, formulas or tables); and Text outside the
+tags (a tagged file). Table headings finds a cell that sits under one column
+on the page but is tagged in another, so a screen reader reads it under the
+wrong heading. Table rows finds rows with more or fewer cells than the
+others where no cell was seen out of place. A check that did not apply is
+not listed, and a PDF checked before 2026-11-18 ran only the first five. "No
+problem found" is not a pass: a person must still check the file.
 For a file Axcess could not check, it says why instead. Then a table lists
 every page the file appears on, one row per page (up to 2,000), with a search
 box and sortable columns:

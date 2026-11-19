@@ -41,7 +41,7 @@ class CheckResult:
     status: Status
     reason: Reason | None = None
     failed_checks: Sequence[FailedCheck] = ()
-    #: Checks the file was given (migration 0046); None for no check.
+    #: Checks the file was given (migration 0048); None for no check.
     checks_run: Sequence[FailedCheck] | None = None
     http_status: int | None = None
     content_type: str | None = None

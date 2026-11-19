@@ -211,7 +211,7 @@ checks: `field_no_name`, `link_no_description`, `no_alt_text`,
 `formula_no_description`, `table_cells_misplaced`, `table_uneven_rows` and
 `untagged_text` (`linked_files/pdf_structure.py`, whose docstring defines
 each). They run only where they apply, so each file stores the checks it was
-given (`linked_files.checks_run`, migration 0046); a file checked before then
+given (`linked_files.checks_run`, migration 0048); a file checked before then
 has none stored and ran the five (`pdf_check.BASE_CHECKS`). The document's
 page lists only the checks the file was given.
 

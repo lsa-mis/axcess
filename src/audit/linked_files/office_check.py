@@ -31,7 +31,11 @@ count).
     Row" table style option (``tblLook firstRow``), which Microsoft's own
     instructions use ("Make your Word documents accessible"), or "Repeat as
     header row" (``tblHeader``) on the first row; PowerPoint: "Header Row"
-    (``a:tblPr firstRow``).
+    (``a:tblPr firstRow``). Counted, the developer's decision (2026-11-19,
+    after a day as a possible problem): a layout table can show "Problem
+    found" on its row, but on the labelled real files every such file was
+    "Mostly sure" for another real barrier, while as a possible problem the
+    rule missed every file whose only barrier was an unmarked data table.
 ``slide_no_title`` (PowerPoint)
     A slide has no title placeholder holding text. Microsoft: Error, "All
     slides have titles" (paraphrased: titles let people navigate a deck).
@@ -198,7 +202,7 @@ def checks_for(checked_as: CheckedAs | None) -> tuple[FailedCheck, ...]:
 
     For a PDF, the five checks every PDF gets: the structure checks
     (pdf_structure.py) run only where they apply, so a PDF stores the checks
-    it was given (``linked_files.checks_run``, migration 0046) and this is
+    it was given (``linked_files.checks_run``, migration 0048) and this is
     the answer only for a PDF checked before that.
     """
     if checked_as == "pdf":

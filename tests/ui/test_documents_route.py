@@ -283,10 +283,13 @@ def test_files_come_in_the_recommended_order(client: TestClient, documents: int)
         "no_title",
     ]
     deck = next(f for f in body["files"] if f["name"] == "Orientation slides")
+    # A Google export is not checked for a document title (Google's exports
+    # never have one; the developer's decision, 2026-11-18), so the stored
+    # no_title is not shown.
     assert (deck["checked_as"], deck["failed_checks"], deck["possible_problems"]) == (
         "pptx",
         [],
-        ["no_title"],
+        [],
     )
     assert "slide_no_title" in deck["checks_run"]
     # A file no check read has none.
@@ -1015,11 +1018,10 @@ async def test_a_word_and_a_powerpoint_page_list_their_own_checks(
             "Table header rows",
             "Language",
             "Link text",
-            "Document title",
         ]
     )
     await expect(checks.locator("tbody tr td:nth-of-type(1)")).to_have_text(
-        ["No problem found"] * 5 + ["Possible problem"]
+        ["No problem found"] * 5
     )
     for tags in (_AXE_TAGS_AA, None):
         violations = await _run_axe(page, tags)

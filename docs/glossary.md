@@ -578,8 +578,9 @@ Checker):
 It also lists **possible problems**, which a person must judge and which
 never make a file Mostly sure: link text that is a web address or "click
 here" (WCAG 2.4.4), heading levels skipped (Heading 1, then Heading 3), and
-no document title. Word and PowerPoint show the file name, not the title,
-and Google's exports never have one.
+no document title. Word and PowerPoint show the file name, not the title. A
+Google Doc or Slides deck is not checked for a title at all: Google's exports
+never have one, and its author cannot set one.
 
 A file that passes every check it was given is [Not sure](#not-sure): a
 person must still check its reading order, how good its alt text is, and its
