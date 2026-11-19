@@ -90,9 +90,9 @@ reader user. The rest are "possible problems" a person must judge.
 | Check | Word | PowerPoint | Mostly sure? | Basis |
 |---|---|---|---|---|
 | Images without alt text | yes | yes | yes | Microsoft Error; WCAG 1.1.1 |
-| Tables without a header row (2+ rows, 2+ columns) | yes | yes | yes | Microsoft Error; WCAG 1.3.1. Made a possible problem on 2026-11-18 and counted again on 2026-11-19 (migrations 0046, 0047): as a possible problem it missed every file whose only barrier was an unmarked data table (holdout recall 100% to 91.3%, tuning 100% to 66.7%) and removed no wrong verdict, since each layout-table file was already Mostly sure for another real barrier. The cost kept: a layout table can show "Problem found" on its row |
+| Tables without a header row (plain grids of 2+ rows, 2+ columns, since 2026-11-19; see "Why precision was low") | yes | yes | yes | Microsoft Error; WCAG 1.3.1, F91. Made a possible problem on 2026-11-18 and counted again on 2026-11-19 (migrations 0046, 0047): as a possible problem it missed every file whose only barrier was an unmarked data table (holdout recall 100% to 91.3%, tuning 100% to 66.7%) and removed no wrong verdict, since each layout-table file was already Mostly sure for another real barrier. The cost kept: a layout table can show "Problem found" on its row |
 | Slides without a title | – | yes | yes | Microsoft Error; WCAG 2.4.6 |
-| No headings (Word, over 400 words) | yes | – | yes | Microsoft Tip; WCAG 1.3.1 |
+| No headings (Word: until 2026-11-19 over 400 words; since then 2+ visual headings) | yes | – | yes | Microsoft Tip; WCAG 1.3.1, F2 |
 | No language set | yes | yes | yes | WCAG 3.1.1 (as the PDF check) |
 | Heading levels skipped | yes | – | possible problem | Microsoft guidance |
 | Links that do not say where they go | yes | yes | possible problem | Microsoft guidance; WCAG 2.4.4 lets context give the purpose |
@@ -289,10 +289,134 @@ Fresh databases, New scan's public defaults:
   sure" for no headings and HHS 568 for a table without a header row,
   both false alarms by the labels (see the errors above).
 
+## Why precision was low (2026-11-19)
+
+All 13 holdout false alarms at be31ee8 were Word files: 11 from "No
+headings" and 6 from "Tables without a header row" (some files had both).
+Each rule fired on a fact that does not decide whether a reader meets the
+barrier. WCAG 1.3.1 (Info and Relationships, Level A) fails when structure
+a reader can see is not in the markup; neither rule looked at what a
+reader sees.
+
+**No headings.** The rule failed any Word document over 400 words with no
+heading style. Length says nothing: the 11 false alarms ran from 442 to
+16,573 words, the 17 real failures from 421 to 7,255. What separates them
+is whether the document shows headings at all. Counting "visual headings"
+(a line of at most 12 words, at least 80% bold, underlined, in capitals or
+2 points larger than the body text, starting with a letter, digit or "(",
+followed by at least 20 words before the next such line) on every
+development Word file with no heading style:
+
+| Label | Visual headings found |
+|---|---|
+| Fail (17 files) | 3 to 39 (3: two short forms of 421 and 462 words) |
+| Pass, false alarm before (11 files) | 1 each: the transcripts' and forms' Title line |
+| Pass, other (15 files) | 0 or 1 |
+
+The six section508.gov transcripts are a Title line, a "--- BEGIN
+CAPTIONED TEXT ---" marker and plain speaker turns; the four NIH forms are
+a Title line and numbered questions in body text. The transcripts'
+marker and one transcript's "[LAUGHTER]" lines are in capitals, which is
+why a line must start with a letter, digit or "(". A policy whose
+sections are only underlined (2fb0c01f2fb2) shows 4, and the 421-word
+form the old rule missed by its word count (0e1588d7eae2) shows 3.
+
+**Tables.** The rule failed any table of 2+ rows and 2+ columns without a
+header row. Every table false alarm was a layout or form table with merged
+cells: the four Math course lists (a second row merged across all three
+columns, one course per table), a gift form's 12-by-2 grid (11 merged
+cells), and NIH's HHS 568 and PHS 416-7, each one table holding the whole
+form (64 and 95 merged cells). Every file with an unmarked data table had
+at least one plain grid: every row the same number of cells, none merged
+(budgets, contact lists, plan comparisons, Canvas feature tables). Merged
+cells are how Word builds a form or a layout; Microsoft's checker warns
+about them in any table ("Tables have a simple structure", paraphrased),
+and a layout table must not get a header row (WCAG failure F46).
+
+**Alt text.** The one missed barrier: section508.gov's PowerPoint guide
+gives 12 screenshots the alt text `"  "`. Alt text with no letter or digit
+gives a screen reader nothing to say (WCAG 1.1.1).
+
+## The rules since 2026-11-19 (commit 946ad6f)
+
+| Rule | Before | Now | Basis |
+|---|---|---|---|
+| No headings (Word) | no heading style and more than 400 words | no heading style and at least 2 visual headings (defined above), any length | WCAG 1.3.1, failure F2: a change in how text looks used to show structure without the markup |
+| Tables without a header row | any table of 2+ rows and 2+ columns | only a plain grid: same number of cells in every row, no cell merged across rows or columns, no table inside it; others are left to a person | WCAG 1.3.1, F91 (data table headers not marked), F46 (layout tables get no headers); Microsoft "Tables have a simple structure" (paraphrased) |
+| Images without alt text | alt text empty, a file name or a default name | also: alt text with no letter or digit (spaces, quote marks, dashes) | WCAG 1.1.1 |
+
+PowerPoint tables follow the same plain-grid rule (`gridSpan`, `rowSpan`,
+`hMerge`, `vMerge`). No PowerPoint score changed on the development set,
+and the fresh set has no PowerPoint files, so that part is not validated.
+
+These rules were chosen looking at all 150 labelled files, so those files
+are now the **development set**, not a test: every number on them below is
+how well the rules fit what they were made from.
+
+## Fresh validation set (2026-11-19)
+
+57 Word files no rule had seen (24 .gov and .org sites, none used before:
+federal agencies, state departments, counties, a school district and
+non-profits; `split: "fresh"` in `office_files.json`, sources in
+`office_files.py`). Order of work: files collected by source and type
+only; four labelling agents labelled them without the check's code; the
+labels were frozen (10:16) before the rules were committed (946ad6f,
+10:23) and before the check first ran on them (10:24). No rule was changed
+after. One file is disputed (a school policy whose section names are bold
+words starting their paragraphs) and not scored; one (a dol.gov guide) is
+a damaged ZIP as served (bad CRC on a picture), which the check, like the
+app, reads as "damaged"; it is a barrier by its label, so counted as a
+miss, recall would be 18 of 21 (85.7%).
+
+### Scores
+
+File level, "Mostly sure" against `barrier`, with the one-sided 95% upper
+bounds on false alarms among "Mostly sure" files and on missed barriers:
+
+| Set | Rules | Files scored | Barriers | Right | False alarms | Missed | Precision (false alarms at most) | Recall (misses at most) |
+|---|---|---|---|---|---|---|---|---|
+| Development | be31ee8 | 145 | 44 | 43 | 13 | 1 | 76.8% (33.6%) | 97.7% (9.6%) |
+| Development | 946ad6f | 145 | 44 | 44 | 0 | 0 | 100% (6.6%) | 100% (6.6%) |
+| Fresh | be31ee8 | 55 | 20 | 18 | 6 | 2 | 75.0% (41.5%) | 90.0% (26.2%) |
+| Fresh | 946ad6f | 55 | 20 | 18 | 4 | 2 | **81.8%** (34.9%) | **90.0%** (26.2%) |
+
+**The goal, precision and recall both above 90% on files the rules were
+not made on, is not met**: fresh precision 81.8%, recall exactly 90.0%.
+The new rules remove two of the six fresh false alarms and miss nothing
+the old rules found. The development score (100%) is fit, not evidence.
+
+Per check on the fresh set (right, false alarms, missed), old then new:
+no headings 9, 5, 2 then 9, 4, 2; tables without a header row 6, 5, 0
+then 5, 0, 1; images without alt text 10, 0, 0 both. The table rule now
+makes no false alarm on fresh files either (it had 5); all remaining
+errors are "No headings".
+
+### Why the fresh errors happen
+
+| File | Error | Mechanism | Labeller |
+|---|---|---|---|
+| 6f0eb2e36703, garfieldar.gov forum minutes | false alarm | two thirds of the body text is bold, so bold lines do not stand out; the rule compares size with the body text but not bold | close call |
+| d28372f96e20, dir.texas.gov fee schedule | false alarm | the column names of its data tables are in capitals ("PAYMENT CONVENIENCE FEES (Bankcard)") and its title is 24 pt: read as visual headings, though they sit in header rows that are marked | clear |
+| edd7d5cddc9c, Wisconsin court form GF-223 | false alarm | a form laid out in tables: bold caption lines and a bold "See attached" read as headings | clear |
+| ab47342fce67, utah.gov meeting minutes | false alarm | two bold lines ending in colons that introduce lists ("Immediate Action Items:") | close call |
+| 5b3220a52069, county pension checklist (71 words) | missed | "Income", "Assets", "Expenses" are bold, underlined and larger, but each is followed by a list of 12 to 17 words, under the 20-word minimum | clear |
+| a26b53665ba1, county incident report form (66 words) | missed | "WHEN:", "WHAT:" are bold capitals, but so are most field labels after them, so no line is followed by body text | close call |
+| 1dad5be3d018, energy.gov template | table missed (file still found, for alt text) | an 8-by-10 data table without a header row has one merged cell | clear |
+
+Three of the six file-level errors are close calls the labellers flagged
+themselves. Fixes these suggest, not made (each was found on the fresh
+files, so the fresh set can no longer test it): count bold, underline and
+capitals as standing out only when most body text lacks them; do not read
+lines in a table whose header row is marked as visual headings; a smaller
+body-text minimum for very short documents (the risk is a form's bold
+labels). Testing them needs another fresh set, collected and labelled the
+same way before the rules change.
+
 ## Limits
 
-- 150 files: 73 from one university's sites and 77 from government and
-  non-profit sites, 50 of them PowerPoint. The new files are mostly from
+- 207 files: 73 from one university's sites, 77 from government and
+  non-profit sites, 57 fresh Word files from other .gov and .org sites;
+  50 PowerPoint, all in the development set. The new files are mostly from
   accessibility teams (section508.gov) and have few barriers (9 of 77), so
   recall rests mostly on the U-M files. Small numbers: a 95% bound is
   given beside each rate.
