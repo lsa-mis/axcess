@@ -151,9 +151,40 @@ def test_word_tables_need_a_header_row(table: str, failed: tuple[str, ...]) -> N
     assert _failed(word(table=table), "docx") == failed  # type: ignore[arg-type]
 
 
-def test_a_long_word_file_without_headings_fails_and_a_short_one_does_not() -> None:
-    assert _failed(word(headings=(), words=600), "docx") == ("no_headings",)
-    assert _failed(word(headings=(), words=100), "docx") == ()
+def test_no_headings_needs_lines_that_look_like_headings() -> None:
+    """WCAG 1.3.1: headings a reader can see must be marked as headings. A
+    long document with no heading style and no visible parts fails nothing."""
+    assert _failed(word(headings=(), words=600), "docx") == ()
+    looks_like = _word_lines(
+        [("Benefits", "bold"), BODY, ("Costs", "bold"), BODY, ("Contacts", "bold"), BODY]
+    )
+    assert _failed(looks_like, "docx") == ("no_headings",)
+    styled = _word_lines(
+        [("Benefits", "Heading 1"), BODY, ("Costs", "bold"), BODY, ("Contacts", "bold"), BODY]
+    )
+    assert _failed(styled, "docx") == ()
+
+
+@pytest.mark.parametrize("look", ["bold", "underline", "capitals", "large", "all caps text"])
+def test_a_heading_can_stand_out_in_several_ways(look: str) -> None:
+    text = "PART ONE" if look == "all caps text" else "Part one"
+    lines = [(text, look), BODY, (text.replace("ONE", "TWO").replace("one", "two"), look), BODY]
+    assert _failed(_word_lines(lines), "docx") == ("no_headings",)
+
+
+def test_a_bold_line_with_no_text_under_it_is_not_a_heading() -> None:
+    """A form's bold labels ("Name:", "Date:") each followed by a short
+    field are labels, not the start of a part."""
+    lines = [(label, "bold") for label in ("Name:", "Date:", "Department:", "Signature:")]
+    assert _failed(_word_lines([*lines, BODY]), "docx") == ()
+
+
+def test_word_tables_that_are_not_plain_grids_are_not_counted() -> None:
+    """A table with merged cells or another table inside it is how Word
+    lays out a form or a page; only a plain grid is read as a data table."""
+    assert _failed(word(table="none", table_shape="merged_row"), "docx") == ()
+    assert _failed(word(table="none", table_shape="merged_column"), "docx") == ()
+    assert _failed(word(table="none", table_shape="nested"), "docx") == ()
 
 
 def test_skipped_heading_levels_are_a_possible_problem() -> None:
@@ -183,6 +214,71 @@ def test_word_language_and_title() -> None:
 
 
 # -- Word: cut-downs of real files ------------------------------------------
+
+
+#: Body text under a heading: more than the 20 words a heading needs under it.
+BODY = (" ".join(["text"] * 30), "plain")
+
+
+def _word_lines(lines: list[tuple[str, str]], *, title: str = "") -> bytes:
+    """A Word file of paragraphs, each (text, look): "plain", "bold",
+    "underline", "capitals" (the All caps font option), "large" (16 pt
+    against 11 pt body text), "all caps text" (plain, typed in capitals),
+    "list" (a numbered list item), or a paragraph style's name."""
+    from docx import Document
+    from docx.shared import Pt
+
+    document = Document()
+    document.core_properties.title = "Real file cut-down"
+    if title:
+        document.add_paragraph(title, style="Title")
+    for text, look in lines:
+        style = {"list": "List Number"}.get(look, look if look[0].isupper() else None)
+        paragraph = document.add_paragraph(style=style)
+        run = paragraph.add_run(text)
+        run.bold = look == "bold" or None
+        run.underline = look == "underline" or None
+        run.font.all_caps = look == "capitals" or None
+        run.font.size = Pt(16) if look == "large" else Pt(11)
+    out = io.BytesIO()
+    document.save(out)
+    return out.getvalue()
+
+
+def test_a_meeting_transcript_with_one_title_line_has_no_visible_parts() -> None:
+    """section508.gov's IT Accessibility Community Meeting transcripts
+    (2026-11-18): a Title line, a "--- BEGIN CAPTIONED TEXT ---" marker,
+    then hundreds of speaker turns. Nothing to move between, so no barrier,
+    whatever its length."""
+    turns = [(f">> SPEAKER {n}: " + " ".join(["said"] * 40), "plain") for n in range(40)]
+    lines = [("--- BEGIN CAPTIONED TEXT ---", "plain"), *turns, ("[LAUGHTER]", "plain"), BODY]
+    data = _word_lines(lines, title="June 2023 IT Accessibility Community Meeting Captioned Text")
+    assert _failed(data, "docx") == ()
+
+
+def test_a_one_part_form_of_numbered_questions_has_no_visible_parts() -> None:
+    """NIH's SBIR and STTR certification forms (grants.nih.gov, 2026-11-18):
+    a Title line, then numbered statements, each with Yes and No."""
+    questions = [
+        ("The small business concern meets the requirements " + "of the program " * 6, "list"),
+        ("Yes  No", "plain"),
+    ] * 20
+    data = _word_lines(questions, title="SBIR Funding Agreement Certification")
+    assert _failed(data, "docx") == ()
+
+
+def test_a_policy_with_underlined_section_names_fails_no_headings() -> None:
+    """A finance.umich.edu tax policy (2026-11-17): its sections are
+    underlined lines such as "B. Bereavement", with no heading style."""
+    lines = [
+        ("Policy on Taxation of Gifts, Prizes and Awards to Employees", "bold"),
+        BODY,
+        ("B. Bereavement", "underline"),
+        BODY,
+        ("D. Length of Service Award", "underline"),
+        BODY,
+    ]
+    assert _failed(_word_lines(lines), "docx") == ("no_headings",)
 
 
 def _replace_part(data: bytes, name: str, change: object) -> bytes:
@@ -260,6 +356,15 @@ def test_every_slide_needs_a_title() -> None:
 def test_slide_tables_need_the_header_row_option() -> None:
     assert _failed(slides(table="header"), "pptx") == ()
     assert _failed(slides(table="none"), "pptx") == ("table_no_header",)
+    assert _failed(slides(table="merged"), "pptx") == ()
+
+
+@pytest.mark.parametrize("alt", ['"  "', "  ", "-", "\u201c \u201d"])
+def test_alt_text_of_only_spaces_and_marks_is_none(alt: str) -> None:
+    """section508.gov's PowerPoint 2016 guide (2026-11-18) gives 12
+    screenshots the alt text '"  "': a screen reader has nothing to say."""
+    assert _failed(slides(image="described", alt=alt), "pptx") == ("no_alt_text",)
+    assert _failed(word(image="described", alt=alt), "docx") == ("no_alt_text",)
 
 
 def test_slide_language_link_text_and_title() -> None:

@@ -19,32 +19,51 @@ count).
     A picture, chart, diagram (SmartArt) or video has no alternative text
     and is not marked decorative. Microsoft: Error, "All non-text content
     has alternative text" (paraphrased: screen readers speak the alt text to
-    describe images). Text boxes and shapes holding text are text, not
-    images; plain shapes with no text and no picture (lines, boxes) are not
-    counted, as Microsoft's own fix for them is to mark them decorative and
-    a machine cannot tell a border from an arrow that means something.
+    describe images). Alt text with no letter or digit in it (spaces, quote
+    marks, a dash) is none: a screen reader has no words to say (WCAG 1.1.1,
+    Non-text Content, Level A). Text boxes and shapes holding text are text,
+    not images; plain shapes with no text and no picture (lines, boxes) are
+    not counted, as Microsoft's own fix for them is to mark them decorative
+    and a machine cannot tell a border from an arrow that means something.
     Word: the document body only, not page headers and footers, which
     screen readers do not read as part of the text.
 ``table_no_header`` (Word and PowerPoint)
-    A table of at least 2 rows and 2 columns has no header row. Microsoft:
-    Error, "Tables specify column header information". Word: the "Header
-    Row" table style option (``tblLook firstRow``), which Microsoft's own
-    instructions use ("Make your Word documents accessible"), or "Repeat as
-    header row" (``tblHeader``) on the first row; PowerPoint: "Header Row"
-    (``a:tblPr firstRow``). Counted, the developer's decision (2026-11-19,
-    after a day as a possible problem): a layout table can show "Problem
-    found" on its row, but on the labelled real files every such file was
-    "Mostly sure" for another real barrier, while as a possible problem the
-    rule missed every file whose only barrier was an unmarked data table.
+    A data table has no header row. Microsoft: Error, "Tables specify
+    column header information"; WCAG 1.3.1 (Info and Relationships, Level
+    A), failure F91 (table headers not marked). A data table here is a
+    plain grid of at least 2 rows and 2 columns: every row has the same
+    number of cells, no cell is merged across rows or columns, and no table
+    is inside it. A table with merged cells or a table inside it is how a
+    form or a page layout is built in Word, and a layout table must not
+    have a header row (WCAG failure F46); Microsoft's checker also warns
+    about merged cells and nested tables in any table (paraphrased:
+    "Tables have a simple structure"). So such a table is not counted, and
+    a person must check it: some are complex data tables. Measured
+    2026-11-19 on the labelled real files (docs/internal/office-check-
+    research.md, "Why precision was low"): every layout table the old rule
+    flagged had merged cells, and every unmarked data table was a plain
+    grid. Header row: Word's "Header Row" table style option (``tblLook
+    firstRow``), which Microsoft's own instructions use ("Make your Word
+    documents accessible"), or "Repeat as header row" (``tblHeader``) on
+    the first row; PowerPoint: "Header Row" (``a:tblPr firstRow``).
 ``slide_no_title`` (PowerPoint)
     A slide has no title placeholder holding text. Microsoft: Error, "All
     slides have titles" (paraphrased: titles let people navigate a deck).
 ``no_headings`` (Word)
-    A document of more than ``HEADINGS_MIN_WORDS`` words uses no heading
-    style at all, so a screen reader user cannot move between its parts.
-    Microsoft: Tip, "Documents use heading styles"; counted here because
-    in a long document it is a barrier (WCAG 1.3.1, 2.4.6 and technique
-    G130/G141), and the threshold was tuned on real files.
+    The document shows headings but uses no heading style, so a screen
+    reader user cannot move between the parts a sighted reader sees. WCAG
+    1.3.1 (Info and Relationships, Level A): "Information, structure, and
+    relationships conveyed through presentation can be programmatically
+    determined or are available in text"; failure F2 (a change in how text
+    looks used to convey structure without the markup). "Shows headings":
+    at least ``VISUAL_HEADINGS_MIN`` visual headings
+    (``_word_visual_headings``: short lines in bold, underlined, in
+    capitals or larger text, each followed by body text). A document with
+    no visible parts, such as a meeting transcript or a one-part form,
+    does not fail, however long: it has no structure to lose. Until
+    2026-11-19 this failed any document of more than 400 words with no
+    heading style, which flagged such transcripts and forms (half of its
+    failures on the labelled real files were false alarms).
 ``no_language`` (Word and PowerPoint)
     No language is set anywhere for the text, so a screen reader cannot
     choose a voice (WCAG 3.1.1, Language of Page, Level A). The same check
@@ -69,9 +88,9 @@ file "Mostly sure".
 
 Not checked: reading order (Microsoft lists it as a Warning for a person to
 check; the order shapes are stored in says nothing about whether it makes
-sense), contrast (needs the theme and layout resolved), merged cells and
-alt text quality. A file with no problem found is "Not sure", never
-"accessible".
+sense), contrast (needs the theme and layout resolved), tables with merged
+cells (see ``table_no_header``) and alt text quality. A file with no
+problem found is "Not sure", never "accessible".
 
 The bytes are untrusted: everything is read in a thread under a time limit
 by the caller, a ZIP that would unpack past ``MAX_UNPACKED_BYTES`` is not
@@ -149,9 +168,17 @@ def sniff(data: bytes) -> Sniffed:
 
 Outcome = Literal["checked", "damaged"]
 
-#: A Word document longer than this with no heading style fails
-#: ``no_headings``; shorter ones (a note, a one-part form) do not need any.
-HEADINGS_MIN_WORDS = 400
+#: A Word document with no heading style fails ``no_headings`` when it shows
+#: at least this many visual headings (``_word_visual_headings``). Two, not
+#: one: a single bold or large line at the top is the document's title, and
+#: a document with only a title has no parts to move between.
+VISUAL_HEADINGS_MIN = 2
+#: A visual heading is a line of at most this many words (a heading names a
+#: part; a longer line in bold is emphasis or an instruction)...
+VISUAL_HEADING_MAX_WORDS = 12
+#: ...followed by at least this many words before the next one (a heading
+#: starts a part; a form's bold labels, "Name:" then "Date:", start none).
+VISUAL_HEADING_MIN_BODY = 20
 
 
 @dataclass(frozen=True)
@@ -293,9 +320,15 @@ def _has_alt(props: Any) -> bool:
             return True
     for attribute in ("descr", "title"):
         value = (props.get(attribute) or "").strip()
-        if value and not _FILE_NAME.match(value) and not _DEFAULT_NAME.match(value):
+        if _says_something(value) and not _DEFAULT_NAME.match(value):
             return True
     return False
+
+
+def _says_something(alt: str) -> bool:
+    """Alt text a screen reader can read as words: a letter or digit in it,
+    and not only a file name. Spaces, quote marks or dashes alone are none."""
+    return any(c.isalnum() for c in alt) and not _FILE_NAME.match(alt)
 
 
 def _unclear_link(text: str) -> bool:
@@ -351,8 +384,7 @@ def _check_word(data: bytes) -> OfficeCheck:
         failed.add("table_no_header")
 
     levels = _word_heading_levels(part, body)
-    words = len(_text(body).split())
-    if not levels and words > HEADINGS_MIN_WORDS:
+    if not levels and _word_visual_headings(part, body) >= VISUAL_HEADINGS_MIN:
         failed.add("no_headings")
     if any(level > before + 1 for before, level in itertools.pairwise(levels)):
         failed.add("skipped_heading_level")
@@ -427,7 +459,7 @@ def _word_images_without_alt(body: Any) -> bool:
         if shape is None or shape.find(_q(_V, "textbox")) is not None:
             continue
         alt = (shape.get("alt") or image.get(_q(_O, "title")) or "").strip()
-        if not alt or _FILE_NAME.match(alt):
+        if not _says_something(alt):
             return True
     return False
 
@@ -435,11 +467,32 @@ def _word_images_without_alt(body: Any) -> bool:
 def _word_tables_without_header(body: Any) -> bool:
     for table in body.iter(_q(_W, "tbl")):
         rows = table.findall(_q(_W, "tr"))
-        if len(rows) < 2 or max(len(row.findall(_q(_W, "tc"))) for row in rows) < 2:
+        cells = [row.findall(_q(_W, "tc")) for row in rows]
+        if len(rows) < 2 or max(len(row) for row in cells) < 2:
+            continue
+        if not _word_plain_grid(table, cells):
             continue
         if not (_word_look_first_row(table) or _word_repeats_first_row(rows[0])):
             return True
     return False
+
+
+def _word_plain_grid(table: Any, cells: list[list[Any]]) -> bool:
+    """Every row has the same number of cells, no cell is merged across
+    columns or rows, and no table is inside it."""
+    if len({len(row) for row in cells}) != 1:
+        return False
+    for row in cells:
+        for cell in row:
+            props = cell.find(_q(_W, "tcPr"))
+            if props is None:
+                continue
+            span = props.find(_q(_W, "gridSpan"))
+            if span is not None and (span.get(_q(_W, "val")) or "1") != "1":
+                return False
+            if props.find(_q(_W, "vMerge")) is not None:
+                return False
+    return not any(inner is not table for inner in table.iter(_q(_W, "tbl")))
 
 
 def _on(value: str | None) -> bool:
@@ -491,6 +544,159 @@ def _word_heading_levels(part: Any, body: Any) -> list[int]:
         if level is not None and _text(paragraph).strip():
             levels.append(level)
     return levels
+
+
+class _RunLook:
+    """How a run of text looks: bold, underlined, in capitals, its size.
+
+    Resolved as Word does, last wins: the document defaults, then the
+    paragraph's style (and the styles it is based on), then the run's
+    character style, then the run's own properties.
+    """
+
+    def __init__(self, part: Any) -> None:
+        self.styles: dict[str, tuple[str | None, dict[str, Any]]] = {}
+        self.defaults: dict[str, Any] = {}
+        self.default_paragraph: str | None = None
+        styles = _styles_part(part)
+        if styles is None:
+            return
+        root = styles.element
+        defaults = root.find(f"{_q(_W, 'docDefaults')}/{_q(_W, 'rPrDefault')}/{_q(_W, 'rPr')}")
+        self.defaults = self.read(defaults)
+        for style in root.iter(_q(_W, "style")):
+            style_id = style.get(_q(_W, "styleId")) or ""
+            parent = style.find(_q(_W, "basedOn"))
+            self.styles[style_id] = (
+                parent.get(_q(_W, "val")) if parent is not None else None,
+                self.read(style.find(_q(_W, "rPr"))),
+            )
+            if style.get(_q(_W, "type")) == "paragraph" and _on(style.get(_q(_W, "default"))):
+                self.default_paragraph = style_id
+
+    @staticmethod
+    def read(props: Any) -> dict[str, Any]:
+        look: dict[str, Any] = {}
+        if props is None:
+            return look
+        for name in ("b", "caps", "smallCaps"):
+            node = props.find(_q(_W, name))
+            if node is not None:
+                value = node.get(_q(_W, "val"))
+                look[name] = value is None or _on(value)
+        underline = props.find(_q(_W, "u"))
+        if underline is not None:
+            look["u"] = (underline.get(_q(_W, "val")) or "single") != "none"
+        size = props.find(_q(_W, "sz"))
+        if size is not None and (size.get(_q(_W, "val")) or "").isdigit():
+            look["sz"] = int(size.get(_q(_W, "val")) or "0")
+        return look
+
+    def style(self, style_id: str | None) -> dict[str, Any]:
+        chain: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        while style_id and style_id not in seen and style_id in self.styles:
+            seen.add(style_id)
+            parent, look = self.styles[style_id]
+            chain.append(look)
+            style_id = parent
+        merged: dict[str, Any] = {}
+        for look in reversed(chain):
+            merged.update(look)
+        return merged
+
+    def runs(self, paragraph: Any) -> list[tuple[str, dict[str, Any]]]:
+        """Each run of the paragraph's own text (not a text box inside it) and its look."""
+        props = paragraph.find(_q(_W, "pPr"))
+        style = props.find(_q(_W, "pStyle")) if props is not None else None
+        base = dict(self.defaults)
+        base.update(
+            self.style(style.get(_q(_W, "val")) if style is not None else self.default_paragraph)
+        )
+        out = []
+        for run in paragraph.iter(_q(_W, "r")):
+            if next(run.iterancestors(_q(_W, "p")), None) is not paragraph:
+                continue
+            words = "".join(node.text or "" for node in run.findall(_q(_W, "t")))
+            if not words.strip():
+                continue
+            look = dict(base)
+            own = run.find(_q(_W, "rPr"))
+            if own is not None:
+                character = own.find(_q(_W, "rStyle"))
+                if character is not None:
+                    look.update(self.style(character.get(_q(_W, "val"))))
+                look.update(self.read(own))
+            out.append((words, look))
+        return out
+
+
+def _word_visual_headings(part: Any, body: Any) -> int:
+    """How many headings a sighted reader sees in the body, styled or not.
+
+    A visual heading is a line of at most ``VISUAL_HEADING_MAX_WORDS`` words
+    that stands out from the body text (at least 80% of its letters bold,
+    underlined or in capitals, or 2 points larger than the body text's usual
+    size), starts with a letter, digit or "(", and is followed by at least
+    ``VISUAL_HEADING_MIN_BODY`` words before the next such line.
+
+    These are the ways a heading is made to look like one by hand (the
+    labelling protocol's "bold/large/numbered lines that start sections").
+    80%, not all: a section letter or a space is often left plain ("B.
+    Bereavement" with only "Bereavement" underlined). The first character:
+    a transcript's "--- BEGIN CAPTIONED TEXT ---" and "[LAUGHTER]" are in
+    capitals but mark no part. Lines in tables count, as forms and course
+    lists put their part names in a table's cells. Not read: a table
+    style's own bold first row, colour, and centring. Each choice was made
+    on the labelled real files of 2026-11-19 and is measured on files it
+    was not made on (docs/internal/office-check-research.md).
+    """
+    look = _RunLook(part)
+    lines: list[tuple[int, list[tuple[str, dict[str, Any]]]]] = []
+    sizes: dict[int, int] = {}
+    for paragraph in body.iter(_q(_W, "p")):
+        runs = look.runs(paragraph)
+        text = "".join(chunk for chunk, _ in runs).strip()
+        if not text:
+            continue
+        lines.append((len(text.split()), runs))
+        for chunk, run_look in runs:
+            size = run_look.get("sz", 20)
+            sizes[size] = sizes.get(size, 0) + sum(c.isalnum() for c in chunk)
+    body_size = max(sizes, key=lambda size: sizes[size]) if sizes else 20
+
+    def stands_out(runs: list[tuple[str, dict[str, Any]]]) -> bool:
+        text = "".join(chunk for chunk, _ in runs).strip()
+        if not (text[0].isalnum() or text[0] == "("):
+            return False
+        letters = sum(c.isalnum() for c in text)
+        if not letters:
+            return False
+
+        def share(test: Any) -> float:
+            return sum(sum(c.isalnum() for c in w) for w, lk in runs if test(lk)) / letters
+
+        alphabetic = [c for c in text if c.isalpha()]
+        return (
+            share(lambda lk: lk.get("b")) >= 0.8
+            or share(lambda lk: lk.get("u")) >= 0.8
+            or share(lambda lk: lk.get("caps") or lk.get("smallCaps")) >= 0.8
+            or share(lambda lk: lk.get("sz", 20) >= body_size + 4) >= 0.8
+            or (len(alphabetic) >= 2 and all(c.isupper() for c in alphabetic))
+        )
+
+    count = 0
+    following: int | None = None  # words since the last line that stands out
+    for length, runs in lines:
+        if length <= VISUAL_HEADING_MAX_WORDS and stands_out(runs):
+            if following is not None and following >= VISUAL_HEADING_MIN_BODY:
+                count += 1
+            following = 0
+        elif following is not None:
+            following += length
+    if following is not None and following >= VISUAL_HEADING_MIN_BODY:
+        count += 1
+    return count
 
 
 def _outline(value: str | None) -> int | None:
@@ -625,10 +831,25 @@ def _slide_tables_without_header(tree: Any) -> bool:
         rows = table.findall(_q(_A, "tr"))
         if len(rows) < 2 or max(len(row.findall(_q(_A, "tc"))) for row in rows) < 2:
             continue
+        if not _slide_plain_grid(table):
+            continue
         props = table.find(_q(_A, "tblPr"))
         if props is None or not _on(props.get("firstRow")):
             return True
     return False
+
+
+def _slide_plain_grid(table: Any) -> bool:
+    """No cell merged across columns (``gridSpan``, ``hMerge``) or rows
+    (``rowSpan``, ``vMerge``)."""
+    for cell in table.iter(_q(_A, "tc")):
+        for name in ("gridSpan", "rowSpan"):
+            value = cell.get(name) or "1"
+            if value.isdigit() and int(value) > 1:
+                return False
+        if _on(cell.get("hMerge")) or _on(cell.get("vMerge")):
+            return False
+    return True
 
 
 def _slide_has_unclear_link(tree: Any) -> bool:
