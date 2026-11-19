@@ -172,6 +172,22 @@ async def test_the_answer_length_is_capped() -> None:
 
 @pytest.mark.asyncio
 @respx.mock
+async def test_a_schema_replaces_plain_json_mode() -> None:
+    """2026-11-19: with only "some JSON" the Small model answered {} or
+    {{{{{{{{ to most requests; the answer is now held to the shape."""
+    from audit.analyzer.semantic.budget import violations_schema
+
+    route = respx.post(f"{BASE}/api/generate").mock(
+        return_value=httpx.Response(200, json=_reply({"violations": []}))
+    )
+    async with httpx.AsyncClient() as client:
+        provider = OllamaTextProvider(client, model=MODEL, base_url=BASE)
+        await provider.generate_json("p", json_schema=violations_schema(3))
+    assert json.loads(route.calls[0].request.content)["format"] == violations_schema(3)
+
+
+@pytest.mark.asyncio
+@respx.mock
 async def test_a_timeout_is_not_sent_again() -> None:
     """At temperature 0 the same prompt times out the same way; a retry only
     repeats the wait (three 2-minute timeouts on one page, 2026-11-19)."""

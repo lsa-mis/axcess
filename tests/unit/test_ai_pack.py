@@ -80,6 +80,9 @@ def test_preset_names_each_model_by_its_served_name_and_turns_reasoning_off(tmp_
         gpu=True,
     )
     assert "c = 8192" in text and "reasoning = off" in text
+    # Nothing kept between requests (2026-11-19: the service grew about
+    # 600 MB over three wording-check requests with llama.cpp's defaults).
+    assert "cache-ram = 0" in text and "ctx-checkpoints = 0" in text
     # A graphics build leaves the layer count to llama.cpp's --fit, which
     # puts what fits on the card and the rest in memory (2026-11-19).
     assert "n-gpu-layers" not in text

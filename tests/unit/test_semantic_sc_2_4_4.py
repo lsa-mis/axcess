@@ -479,7 +479,10 @@ async def test_a_link_heavy_page_goes_in_requests_that_fit_the_window() -> None:
     request against an 8,192-token window. Now each request fits, every one
     of the 50 links is sent once, and a finding in a later request points at
     that request's link."""
-    from audit.analyzer.semantic.budget import PROMPT_CHARS
+    from audit.analyzer.semantic.budget import FALLBACK_CHARS_PER_TOKEN, PROMPT_TOKENS
+
+    # Ollama cannot count tokens, so the estimate decides the split.
+    limit = int(PROMPT_TOKENS * FALLBACK_CHARS_PER_TOKEN)
 
     section = "Mars travel news and offers for the whole family. " * 6
     parts = [
@@ -503,7 +506,12 @@ async def test_a_link_heavy_page_goes_in_requests_that_fit_the_window() -> None:
 
     prompts = [json.loads(call.request.content)["prompt"] for call in route.calls]
     assert len(prompts) > 1
-    assert all(len(prompt) <= PROMPT_CHARS for prompt in prompts)
+    assert all(len(prompt) <= limit for prompt in prompts)
+    # Each request names only its own links in the answer shape it asks for.
+    for call, prompt in zip(route.calls, prompts, strict=True):
+        schema = json.loads(call.request.content)["format"]
+        index = schema["properties"]["violations"]["items"]["properties"]["index"]
+        assert index["maximum"] == prompt.count("---- LINK ") - 1
     sent = sum(prompt.count("---- LINK ") for prompt in prompts)
     assert sent == MAX_LINKS_PER_CALL
     first_of_second = prompts[0].count("---- LINK ")

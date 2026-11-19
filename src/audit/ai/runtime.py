@@ -90,6 +90,16 @@ WORKING_BYTES_PER_MODEL = 1_500_000_000
 MEMORY_MARGIN_BYTES = 1_000_000_000
 # How long a start waits for memory to come back before it warns.
 MEMORY_SETTLE_S = 10.0
+# Nothing kept between requests. Every Axcess request is complete on its
+# own (one message, no history), but llama-server b12284 by default keeps
+# each finished prompt's state in RAM (--cache-ram, up to 8,192 MiB) and,
+# for hybrid models such as Bonsai 2, up to 32 snapshots per slot
+# (--ctx-checkpoints). During a scan the service grew by about 600 MB in
+# three wording-check requests and pushed the developer's 16 GB laptop
+# into swap (2026-11-19). Both off: memory stays at what the model and its
+# window need. The cost is reading the shared instructions again on each
+# request, which a scan's varied pages mostly did anyway.
+NO_REQUEST_CACHE = ("--cache-ram", "0", "--ctx-checkpoints", "0")
 # The service's process group, kept so a later start can end what an
 # earlier run left behind (a crash, a killed app).
 GROUP_FILE = "service.group"
@@ -242,6 +252,9 @@ def preset_text(
         *([f"n-gpu-layers = {layers}"] if layers is not None else []),
         "reasoning = off",
         "reasoning-format = none",
+        # NO_REQUEST_CACHE, as preset keys.
+        "cache-ram = 0",
+        "ctx-checkpoints = 0",
         "load-on-startup = true",
     ]
     for entry, model, mmproj in models:
@@ -668,6 +681,7 @@ class LlamaRuntime:
                 "off",
                 "--reasoning-format",
                 "none",
+                *NO_REQUEST_CACHE,
                 "--host",
                 str(sock),
                 "--no-webui",

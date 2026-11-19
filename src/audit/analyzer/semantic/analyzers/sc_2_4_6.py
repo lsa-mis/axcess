@@ -19,7 +19,7 @@ from typing import Any
 
 from audit.analyzer.ollama_base import OllamaError, prompt_content_version
 from audit.analyzer.semantic.base import AnalysisContext, SemanticFinding
-from audit.analyzer.semantic.budget import fit_batches
+from audit.analyzer.semantic.budget import plan_batches, violations_schema
 from audit.analyzer.semantic.extractor import HeadingRecord, extract_headings
 from audit.analyzer.semantic.ollama_text import OllamaTextProvider
 from audit.logging import get_logger
@@ -31,7 +31,7 @@ PROMPT_NAME = "sc_2_4_6_headings_descriptive.txt"
 
 # Cap headings per page so a heading-heavy page can't take forever. Each
 # request carries as many of them as fit the model's window
-# (budget.fit_batches, 2026-11-19).
+# (budget.plan_batches, 2026-11-19).
 MAX_HEADINGS_PER_CALL = 60
 
 _HELP_URL = "https://www.w3.org/WAI/WCAG22/Understanding/headings-and-labels.html"
@@ -75,11 +75,17 @@ class HeadingsAndLabelsAnalyzer:
         # One request per batch, each numbered from 0; a failed batch is
         # logged and skipped, the others still count.
         out: list[SemanticFinding] = []
-        batches = fit_batches(chunk, _format_headings, self._prompt_template)
+        batches = await plan_batches(
+            chunk,
+            self._render_prompt,
+            lambda text: self._provider.count_tokens(text, model=self._model),
+        )
         for batch in batches:
             prompt = self._render_prompt(batch)
             try:
-                raw = await self._provider.generate_json(prompt, model=self._model)
+                raw = await self._provider.generate_json(
+                    prompt, model=self._model, json_schema=violations_schema(len(batch))
+                )
             except OllamaError as exc:
                 log.warning(
                     "sc_2_4_6.llm_failed",

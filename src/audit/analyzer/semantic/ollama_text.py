@@ -20,6 +20,7 @@ two providers.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from typing import Any
 
 import httpx
@@ -84,6 +85,7 @@ class OllamaTextProvider(OllamaBase):
         model: str | None = None,
         force_json: bool = True,
         temperature: float = 0.0,
+        json_schema: Mapping[str, Any] | None = None,
     ) -> str:
         """Call ``/api/generate`` once. Returns the raw ``response`` field.
 
@@ -93,7 +95,8 @@ class OllamaTextProvider(OllamaBase):
 
         ``force_json=True`` (the default) tells Ollama to constrain
         decoding to valid JSON. Set ``False`` only if the prompt
-        intentionally elicits free-form text.
+        intentionally elicits free-form text. ``json_schema`` holds the
+        answer to that exact shape instead (budget.violations_schema).
 
         Errors:
         * :class:`OllamaError` on HTTP failures, exhausted retries, or
@@ -105,7 +108,8 @@ class OllamaTextProvider(OllamaBase):
             GenerateRequest(
                 model=model or self._model,
                 prompt=prompt,
-                json_mode=force_json,
+                json_mode=force_json and json_schema is None,
+                json_schema=json_schema,
                 temperature=temperature,
                 max_tokens=self._max_tokens,
                 # Ollama only; llama-server keeps its model loaded anyway.
@@ -119,6 +123,7 @@ class OllamaTextProvider(OllamaBase):
         *,
         model: str | None = None,
         temperature: float = 0.0,
+        json_schema: Mapping[str, Any] | None = None,
     ) -> dict[str, Any] | list[Any]:
         """Call :meth:`generate` and parse the response as JSON.
 
@@ -127,7 +132,9 @@ class OllamaTextProvider(OllamaBase):
         return an empty string on a model crash; we'd rather raise
         than return ``None``).
         """
-        raw = await self.generate(prompt, model=model, temperature=temperature)
+        raw = await self.generate(
+            prompt, model=model, temperature=temperature, json_schema=json_schema
+        )
         if not raw.strip():
             raise OllamaError("model returned an empty response body")
         try:
@@ -137,6 +144,14 @@ class OllamaTextProvider(OllamaBase):
         if not isinstance(parsed, (dict, list)):
             raise OllamaError(f"expected JSON object or array, got {type(parsed).__name__}")
         return parsed
+
+    async def count_tokens(self, text: str, *, model: str | None = None) -> int | None:
+        """Tokens the model reads ``text`` as, from the service; None when unknown.
+
+        Not under the request semaphore: it does no generation, and the
+        private service answers it at once.
+        """
+        return await self._model_client.count_tokens(text, model or self._model, timeout_s=10.0)
 
 
 __all__ = ["OllamaTextProvider"]

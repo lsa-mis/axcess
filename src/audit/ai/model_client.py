@@ -408,6 +408,17 @@ class ModelClient(ABC):
             # The response can quote the evidence; do not keep a copy.
             content.clear()
 
+    # -- token counts --------------------------------------------------------
+
+    async def count_tokens(
+        self, text: str, model: str, *, timeout_s: float | None = None
+    ) -> int | None:
+        """How many tokens ``model`` reads ``text`` as; None when unknown.
+
+        Only llama.cpp answers this; a caller without a count estimates.
+        """
+        return None
+
     # -- models and health ----------------------------------------------------
 
     async def _get_json(self, path: str, timeout_s: float | None) -> Any:
@@ -631,6 +642,28 @@ class LlamaCppClient(ModelClient):
 
     def generate_body(self, request: GenerateRequest) -> dict[str, Any]:
         return llama_cpp_generate_body(request)
+
+    async def count_tokens(
+        self, text: str, model: str, *, timeout_s: float | None = None
+    ) -> int | None:
+        """``POST /tokenize``: the loaded model's own tokenizer, no generation.
+
+        ``model`` names the model for the router (Linux, macOS) and for the
+        Windows routing transport; a single-model server ignores it. Any
+        failure is None, so a caller falls back to an estimate rather than
+        failing a check over a count.
+        """
+        extra: dict[str, Any] = {} if timeout_s is None else {"timeout": timeout_s}
+        try:
+            response = await self._http.post(
+                self._url("/tokenize"), json={"model": model, "content": text}, **extra
+            )
+            if response.status_code != 200:
+                return None
+            tokens = response.json().get("tokens")
+        except (httpx.HTTPError, ValueError, AttributeError):
+            return None
+        return len(tokens) if isinstance(tokens, list) else None
 
     def _response_text(self, envelope: Any) -> str:
         try:

@@ -12,7 +12,7 @@ empty findings list with a logged warning. The crawl moves on.
 Token budget: ``MAX_LINKS_PER_CALL`` caps how many links a page sends.
 A page with 200 links → first 50 go in; the rest are logged and dropped
 for this pass. Those 50 are split into as many requests as it takes to
-fit the model's window (``budget.fit_batches``; 2026-11-19, a 50-link
+fit the model's window (``budget.plan_batches``; 2026-11-19, a 50-link
 page was one 10,773-token request against an 8,192-token window).
 """
 
@@ -27,7 +27,7 @@ from audit.analyzer.semantic.base import (
     AnalysisContext,
     SemanticFinding,
 )
-from audit.analyzer.semantic.budget import fit_batches
+from audit.analyzer.semantic.budget import plan_batches, violations_schema
 from audit.analyzer.semantic.extractor import LinkRecord, extract_links
 from audit.analyzer.semantic.ollama_text import OllamaTextProvider
 from audit.logging import get_logger
@@ -40,7 +40,7 @@ PROMPT_NAME = "sc_2_4_4_link_purpose_in_context.txt"
 # Hard cap so a 1000-link page can't take forever. Picked at 50 because
 # that's where qwen2.5:7b's accuracy on similar bounded tasks plateaus in
 # informal testing, bigger batches dilute attention. Per page; each
-# request carries as many of them as fit (budget.fit_batches).
+# request carries as many of them as fit (budget.plan_batches).
 MAX_LINKS_PER_CALL = 50
 
 
@@ -95,11 +95,17 @@ class LinkPurposeInContextAnalyzer:
         # indexes point into that batch. A failed batch is logged and
         # skipped; the others still count.
         out: list[SemanticFinding] = []
-        batches = fit_batches(chunk, _format_links, self._prompt_template)
+        batches = await plan_batches(
+            chunk,
+            self._render_prompt,
+            lambda text: self._provider.count_tokens(text, model=self._model),
+        )
         for batch in batches:
             prompt = self._render_prompt(batch)
             try:
-                raw = await self._provider.generate_json(prompt, model=self._model)
+                raw = await self._provider.generate_json(
+                    prompt, model=self._model, json_schema=violations_schema(len(batch))
+                )
             except OllamaError as exc:
                 log.warning(
                     "sc_2_4_4.llm_failed",
