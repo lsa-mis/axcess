@@ -540,12 +540,18 @@ one of these (Axcess's own rules, modelled on Microsoft's Accessibility
 Checker):
 
 - images without alt text: a picture, chart, diagram or video with no alt
-  text that is not marked as decorative (WCAG 1.1.1);
-- tables without a header row: a table of at least 2 rows and 2 columns
-  whose first row is not marked as a header row (WCAG 1.3.1);
+  text that is not marked as decorative; alt text of only spaces or marks
+  counts as none (WCAG 1.1.1);
+- tables without a header row: a table that is a plain grid of at least 2
+  rows and 2 columns (no merged cells, no table inside it) whose first row
+  is not marked as a header row (WCAG 1.3.1). A table with merged cells is
+  often a form's layout, so a person must check it;
 - slides without a title (PowerPoint; WCAG 2.4.6);
-- no headings: a Word document of more than 400 words with no heading style
-  (WCAG 1.3.1);
+- no headings: a Word document with no heading style that shows at least 2
+  lines that look like headings: short lines in bold, underlined, in
+  capitals or larger text, each with body text under it (WCAG 1.3.1). A
+  document with no visible parts, such as a meeting transcript, does not
+  fail;
 - no language set (WCAG 3.1.1).
 
 It also lists **possible problems**, which a person must judge and which

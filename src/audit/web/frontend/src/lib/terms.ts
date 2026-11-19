@@ -332,12 +332,12 @@ export const LINKED_FILE_CHECK_WHY: Record<LinkedFileCheck, string> = {
   no_title: "A title tells people which file they have open.",
   no_language: "The language tells a screen reader which voice to read the file in.",
   no_alt_text:
-    "Alt text is the text a screen reader reads aloud for an image. Every picture, chart and diagram needs it, unless it is marked as decorative.",
+    "Alt text is the text a screen reader reads aloud for an image. Every picture, chart and diagram needs it, unless it is marked as decorative. Alt text of only spaces or marks, such as quote marks, counts as none.",
   table_no_header:
-    "A header row lets a screen reader say which column each cell is in. Axcess looks at tables with at least 2 rows and 2 columns.",
+    "A header row lets a screen reader say which column each cell is in. Axcess looks at tables that are a plain grid of at least 2 rows and 2 columns. A person must check tables with merged cells, which are often a form's layout.",
   slide_no_title: "Slide titles let a screen reader user find a slide and know where they are.",
   no_headings:
-    "Headings let a screen reader user jump between the parts of a long document. Axcess looks for heading styles in Word documents of more than 400 words.",
+    "Headings let a screen reader user jump between the parts of a document. Axcess looks for lines that look like headings, such as short bold or larger lines with text under them, in Word documents that use no heading style.",
   skipped_heading_level:
     "Headings that skip a level, such as Heading 1 then Heading 3, make the outline harder to follow.",
   unclear_link_text:
