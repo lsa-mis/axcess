@@ -157,6 +157,34 @@ async def test_generate_retries_on_5xx_then_succeeds() -> None:
 
 @pytest.mark.asyncio
 @respx.mock
+async def test_the_answer_length_is_capped() -> None:
+    """2026-11-19: without a cap the model wrote for over two minutes."""
+    from audit.analyzer.semantic.budget import ANSWER_TOKENS
+
+    route = respx.post(f"{BASE}/api/generate").mock(
+        return_value=httpx.Response(200, json=_reply({"ok": True}))
+    )
+    async with httpx.AsyncClient() as client:
+        provider = OllamaTextProvider(client, model=MODEL, base_url=BASE)
+        await provider.generate("p")
+    assert json.loads(route.calls[0].request.content)["options"]["num_predict"] == ANSWER_TOKENS
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_a_timeout_is_not_sent_again() -> None:
+    """At temperature 0 the same prompt times out the same way; a retry only
+    repeats the wait (three 2-minute timeouts on one page, 2026-11-19)."""
+    route = respx.post(f"{BASE}/api/generate").mock(side_effect=httpx.ReadTimeout("slow"))
+    async with httpx.AsyncClient() as client:
+        provider = OllamaTextProvider(client, model=MODEL, base_url=BASE, max_attempts=3)
+        with pytest.raises(OllamaError, match="did not answer within"):
+            await provider.generate("p")
+    assert route.call_count == 1
+
+
+@pytest.mark.asyncio
+@respx.mock
 async def test_healthy_probes_api_tags() -> None:
     """OllamaBase.healthy() works the same for text + image providers."""
     respx.get(f"{BASE}/api/tags").mock(

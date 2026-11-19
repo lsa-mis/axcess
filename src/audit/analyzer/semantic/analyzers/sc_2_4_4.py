@@ -9,10 +9,11 @@ The analyzer is built to be wrong gracefully: a malformed model
 response, an unreachable Ollama daemon, an empty page, all return an
 empty findings list with a logged warning. The crawl moves on.
 
-Token budget: ``MAX_LINKS_PER_CALL`` caps how many links we feed in
-one prompt. A page with 200 links → first 50 go in; the rest are
-logged and dropped for this pass. Most pages have ≤ 30 navigable
-links so this caps the worst case rather than the median.
+Token budget: ``MAX_LINKS_PER_CALL`` caps how many links a page sends.
+A page with 200 links → first 50 go in; the rest are logged and dropped
+for this pass. Those 50 are split into as many requests as it takes to
+fit the model's window (``budget.fit_batches``; 2026-11-19, a 50-link
+page was one 10,773-token request against an 8,192-token window).
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ from audit.analyzer.semantic.base import (
     AnalysisContext,
     SemanticFinding,
 )
+from audit.analyzer.semantic.budget import fit_batches
 from audit.analyzer.semantic.extractor import LinkRecord, extract_links
 from audit.analyzer.semantic.ollama_text import OllamaTextProvider
 from audit.logging import get_logger
@@ -35,9 +37,10 @@ log = get_logger(__name__)
 _PROMPT_PACKAGE = "audit.analyzer.semantic.prompts"
 PROMPT_NAME = "sc_2_4_4_link_purpose_in_context.txt"
 
-# Hard cap so a 1000-link page can't blow the prompt budget. Picked at
-# 50 because that's where qwen2.5:7b's accuracy on similar bounded
-# tasks plateaus in informal testing, bigger batches dilute attention.
+# Hard cap so a 1000-link page can't take forever. Picked at 50 because
+# that's where qwen2.5:7b's accuracy on similar bounded tasks plateaus in
+# informal testing, bigger batches dilute attention. Per page; each
+# request carries as many of them as fit (budget.fit_batches).
 MAX_LINKS_PER_CALL = 50
 
 
@@ -88,18 +91,26 @@ class LinkPurposeInContextAnalyzer:
                 kept=MAX_LINKS_PER_CALL,
             )
 
-        prompt = self._render_prompt(chunk)
-        try:
-            raw = await self._provider.generate_json(prompt, model=self._model)
-        except OllamaError as exc:
-            log.warning(
-                "sc_2_4_4.llm_failed",
-                page_url=ctx.page_url,
-                error=str(exc),
-            )
-            return []
-
-        return list(self._parse_response(raw, chunk))
+        # One request per batch, each numbered from 0, so the model's
+        # indexes point into that batch. A failed batch is logged and
+        # skipped; the others still count.
+        out: list[SemanticFinding] = []
+        batches = fit_batches(chunk, _format_links, self._prompt_template)
+        for batch in batches:
+            prompt = self._render_prompt(batch)
+            try:
+                raw = await self._provider.generate_json(prompt, model=self._model)
+            except OllamaError as exc:
+                log.warning(
+                    "sc_2_4_4.llm_failed",
+                    page_url=ctx.page_url,
+                    error=str(exc),
+                    batch_links=len(batch),
+                    batches=len(batches),
+                )
+                continue
+            out.extend(self._parse_response(raw, batch))
+        return out
 
     # ----------------------------------------------------------------
     # Prompt rendering.

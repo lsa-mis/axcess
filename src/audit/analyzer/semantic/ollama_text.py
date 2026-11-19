@@ -26,6 +26,7 @@ import httpx
 
 from audit.ai.model_client import DEFAULT_BACKEND, GenerateRequest
 from audit.analyzer.ollama_base import OllamaBase, OllamaError
+from audit.analyzer.semantic.budget import ANSWER_TOKENS
 
 
 class OllamaTextProvider(OllamaBase):
@@ -54,7 +55,9 @@ class OllamaTextProvider(OllamaBase):
         timeout_s: float = 120.0,
         keep_alive: str | int = -1,
         backend: str = DEFAULT_BACKEND,
+        max_tokens: int | None = ANSWER_TOKENS,
     ) -> None:
+        # Timeouts are not retried: see OllamaBase.retry_timeouts.
         super().__init__(
             client,
             model=model,
@@ -63,7 +66,10 @@ class OllamaTextProvider(OllamaBase):
             max_attempts=max_attempts,
             timeout_s=timeout_s,
             backend=backend,
+            retry_timeouts=False,
         )
+        # The longest answer a wording check asks for (budget.ANSWER_TOKENS).
+        self._max_tokens = max_tokens
         # keep_alive=-1 -> model stays resident in Ollama between calls.
         # At 10k pages x 10 criteria, we'd otherwise pay the ~5s model
         # warm-up tax repeatedly. -1 means "keep loaded until the
@@ -101,6 +107,7 @@ class OllamaTextProvider(OllamaBase):
                 prompt=prompt,
                 json_mode=force_json,
                 temperature=temperature,
+                max_tokens=self._max_tokens,
                 # Ollama only; llama-server keeps its model loaded anyway.
                 keep_alive=self._keep_alive,
             )

@@ -464,11 +464,51 @@ async def test_analyze_caps_links_at_max_per_call() -> None:
         analyzer = LinkPurposeInContextAnalyzer(provider)
         await analyzer.analyze(AnalysisContext(body=body, page_url="x"))
 
-    # The prompt sent to Ollama mentions LINK 0 through LINK 49 — not 50+.
+    # Short links fit one request: it mentions LINK 0 through LINK 49 — not 50+.
+    assert route.call_count == 1
     sent = json.loads(route.calls[0].request.content)
     prompt = sent["prompt"]
     assert f"LINK {MAX_LINKS_PER_CALL - 1}" in prompt
     assert f"LINK {MAX_LINKS_PER_CALL}" not in prompt
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_a_link_heavy_page_goes_in_requests_that_fit_the_window() -> None:
+    """2026-11-19: 50 links with their surrounding text were one 10,773-token
+    request against an 8,192-token window. Now each request fits, every one
+    of the 50 links is sent once, and a finding in a later request points at
+    that request's link."""
+    from audit.analyzer.semantic.budget import PROMPT_CHARS
+
+    section = "Mars travel news and offers for the whole family. " * 6
+    parts = [
+        f"<section><p>{section}</p><div><p>{section}</p>"
+        f'<a href="/p{i}">more {i}</a></div></section>'
+        for i in range(MAX_LINKS_PER_CALL + 5)
+    ]
+    body = ("<main>" + "".join(parts) + "</main>").encode()
+    answers = iter(
+        [{"violations": []}]
+        + [{"violations": [{"index": 0, "reason": "Vague 'more'.", "confidence": "high"}]}]
+        + [{"violations": []}] * 50
+    )
+    route = respx.post(f"{BASE}/api/generate").mock(
+        side_effect=lambda _request: httpx.Response(200, json=_ollama_response(next(answers)))
+    )
+    async with httpx.AsyncClient() as client:
+        provider = OllamaTextProvider(client, model=MODEL, base_url=BASE)
+        analyzer = LinkPurposeInContextAnalyzer(provider)
+        findings = await analyzer.analyze(AnalysisContext(body=body, page_url="x"))
+
+    prompts = [json.loads(call.request.content)["prompt"] for call in route.calls]
+    assert len(prompts) > 1
+    assert all(len(prompt) <= PROMPT_CHARS for prompt in prompts)
+    sent = sum(prompt.count("---- LINK ") for prompt in prompts)
+    assert sent == MAX_LINKS_PER_CALL
+    first_of_second = prompts[0].count("---- LINK ")
+    assert len(findings) == 1
+    assert f'href="/p{first_of_second}"' in findings[0].html_snippet
 
 
 @pytest.mark.asyncio

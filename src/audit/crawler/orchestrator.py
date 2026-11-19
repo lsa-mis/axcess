@@ -89,6 +89,9 @@ from audit.wcag_version import (
 log = get_logger(__name__)
 
 JOB_KIND = "fetch"
+# Longest a wording-check request to the private llama.cpp service may
+# take: the same 5 minutes as a fix suggestion (Settings.suggestion_timeout_s).
+PRIVATE_AI_TIMEOUT_S = 300.0
 
 
 class AlfaPageAnalyzer(Protocol):
@@ -1338,6 +1341,12 @@ async def _build_semantic_analyzers(
         base_url=config.vlm_base_url,
         concurrency=config.semantic_concurrency,
         backend=config.model_backend,
+        # The private llama.cpp service on a laptop answers slowly: give a
+        # wording check the 5 minutes a fix suggestion gets
+        # (Settings.suggestion_timeout_s default), not 2. A timeout is not
+        # retried (OllamaBase.retry_timeouts), so this is the longest one
+        # request can hold the page (developer, 2026-11-19).
+        timeout_s=PRIVATE_AI_TIMEOUT_S if config.model_backend == "llama_cpp" else 120.0,
     )
     if not await provider.healthy():
         log.warning(

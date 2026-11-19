@@ -40,6 +40,7 @@ from audit.ai.model_client import (
     ModelClient,
     ModelResponseError,
     ModelStatusError,
+    ModelTimeoutError,
     ModelTransportError,
     make_model_client,
 )
@@ -191,6 +192,7 @@ class OllamaBase:
         max_attempts: int = 3,
         timeout_s: float = 120.0,
         backend: str = DEFAULT_BACKEND,
+        retry_timeouts: bool = True,
     ) -> None:
         self._client = client
         self._model = model
@@ -201,6 +203,12 @@ class OllamaBase:
         self._sem = asyncio.Semaphore(max(1, concurrency))
         self._max_attempts = max_attempts
         self._timeout = timeout_s
+        # False: a request that ran out of time is not sent again. At
+        # temperature 0 the same prompt gives the same long answer, so a
+        # retry only repeats the wait (the wording checks, 2026-11-19:
+        # three 2-minute timeouts on one page). Connection errors and
+        # busy answers are still retried.
+        self._retry_timeouts = retry_timeouts
         # `model_version` is a plain attribute (not a property) because
         # the existing :class:`VlmProvider` protocol declares it as a
         # settable attribute. A read-only property here would break
@@ -254,6 +262,13 @@ class OllamaBase:
                     raise OllamaError(f"{reason} Choose a local model.")
                 try:
                     return await self._model_client.send(payload, timeout_s=self._timeout)
+                except ModelTimeoutError as exc:
+                    log.warning("ollama.timeout", attempt=attempt, timeout_s=self._timeout)
+                    if not self._retry_timeouts:
+                        raise OllamaError(
+                            f"{label} did not answer within {self._timeout:g} seconds"
+                        ) from exc
+                    last_error = exc
                 except ModelTransportError as exc:
                     last_error = exc
                     log.warning("ollama.http_error", attempt=attempt, error=str(exc))
