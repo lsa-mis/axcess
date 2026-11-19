@@ -123,7 +123,11 @@ async def test_first_launch_skip_choice_by_keyboard(new_page: Any, server: str, 
         await page.get_by_role("heading", name="Reports").first.wait_for()
         assert await heading.count() == 0
         preferences = await page.request.get(f"{server}/api/ai/preferences")
-        assert await preferences.json() == {"enabled": False, "choice_recorded": True}
+        assert await preferences.json() == {
+            "enabled": False,
+            "choice_recorded": True,
+            "gpu_only": False,
+        }
     finally:
         await page.context.close()
 

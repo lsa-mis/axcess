@@ -198,12 +198,19 @@ function AiSetupPage({
     ),
   });
   const [gpuMessage, setGpuMessage] = useState("");
+  // The box shows the choice at once and keeps it while AI restarts and
+  // the page reloads its data; it read the old value until then (UI test,
+  // 2026-11-19). A failed save puts the saved value back.
+  const [gpuOnly, setGpuOnly] = useState(plan.preferences.gpu_only);
+  useEffect(() => setGpuOnly(plan.preferences.gpu_only), [plan.preferences.gpu_only]);
   const changeGpuOnly = useMutation({
     mutationFn: api.setAiGpuOnly,
-    onMutate: () =>
+    onMutate: (value: boolean) => {
+      setGpuOnly(value);
       setGpuMessage(
         enabled ? "Saving. If AI is running, it restarts, which can take a minute…" : "Saving…",
-      ),
+      );
+    },
     onSuccess: (preferences) => {
       queryClient.setQueryData(["ai-preferences"], preferences);
       setGpuMessage(
@@ -213,8 +220,10 @@ function AiSetupPage({
       );
       refresh();
     },
-    onError: (error) =>
-      setGpuMessage(error instanceof Error ? error.message : "The setting could not be saved."),
+    onError: (error) => {
+      setGpuOnly(plan.preferences.gpu_only);
+      setGpuMessage(error instanceof Error ? error.message : "The setting could not be saved.");
+    },
   });
   const start = useMutation({
     mutationFn: (tier: AiTierId) => api.installAi(tier),
@@ -593,7 +602,7 @@ function AiSetupPage({
             {plan.program.gpu_build && current?.source === "private" && (
               <div className="mt-3 border-t border-border pt-3">
                 <Checkbox
-                  checked={plan.preferences.gpu_only}
+                  checked={gpuOnly}
                   onChange={(value) => {
                     if (!changeGpuOnly.isPending) changeGpuOnly.mutate(value);
                   }}
