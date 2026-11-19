@@ -9,7 +9,7 @@ import pytest
 
 from audit import evaluation
 from audit.db import repo
-from audit.web.pages_queries import MAX_LIMIT, list_scan_pages, load_result
+from audit.web.pages_queries import MAX_LIMIT, all_scan_pages, list_scan_pages, load_result
 
 
 def _scan(conn: sqlite3.Connection, seed: str) -> int:
@@ -245,3 +245,18 @@ def test_limit_is_bounded(
     assert list_scan_pages(tmp_db, scan_a, limit=10_000).limit == MAX_LIMIT
     assert list_scan_pages(tmp_db, scan_a, limit=0).limit == 1
     assert list_scan_pages(tmp_db, scan_a, offset=-5).offset == 0
+
+
+def test_all_pages_are_the_list_unpaged_and_bound_to_one_scan(
+    tmp_db: sqlite3.Connection, two_scans: tuple[int, int, dict[str, int]]
+) -> None:
+    """The CSV download's rows: every page of one scan, as the list shows them."""
+    scan_a, scan_b, ids = two_scans
+    for sort in ("load_desc", "url_asc", "occurrences_desc"):
+        everything = all_scan_pages(tmp_db, scan_a, sort=sort)
+        paged = list_scan_pages(tmp_db, scan_a, limit=MAX_LIMIT, sort=sort).pages
+        assert everything == paged
+    assert ids["other"] not in {row.page_id for row in all_scan_pages(tmp_db, scan_a)}
+    assert [row.page_id for row in all_scan_pages(tmp_db, scan_b)] == [ids["other"]]
+    with pytest.raises(ValueError, match="Unknown sort"):
+        all_scan_pages(tmp_db, scan_a, sort="id; DROP TABLE pages")  # type: ignore[arg-type]
