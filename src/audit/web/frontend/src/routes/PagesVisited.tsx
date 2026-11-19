@@ -4,6 +4,7 @@ import { AlertTriangle } from "lucide-react";
 import { useLocation, useParams, useSearchParams } from "react-router";
 import { ApiError, api } from "../api/client";
 import type { ScanPageRow, ScanPagesSort } from "../api/types";
+import FileDownload from "../components/FileDownload";
 import ReportHeader, { ReportMeta } from "../components/ReportHeader";
 import { PagedTable } from "../components/TablePagination";
 import {
@@ -252,6 +253,37 @@ export default function PagesVisitedRoute() {
         // Interface language rule 4): it is the first paragraph below, in
         // the same words, where the line length is held under 80 characters.
         meta={<ReportMeta counts={counts} note="" />}
+        // The whole list as a CSV file (src/audit/exports/pages_csv.py): every
+        // page, not only the rows on screen, in the order the table is sorted
+        // by, with the table's column names and words ("Not checked", not 0,
+        // for a page that did not load). The shared FileDownload button, in
+        // the header's action slot where Images keeps its ZIP and Issues
+        // keeps Export report, so a report's downloads are in one place (SC
+        // 3.2.3 Consistent Navigation, Level AA). Its words name the file
+        // and its type, a verb and an object (docs/plain-language.md rule 8).
+        // While it works it says it is getting every page in this order, so
+        // nobody expects only the ten rows they can see.
+        //
+        // Offered for any report with saved pages, stopped ones included
+        // (AGENTS.md: never refuse an action because a scan stopped); not
+        // while the scan is running and still adding pages, and not for a
+        // protected report, whose page addresses and titles stay in Axcess.
+        // The server refuses those too.
+        //
+        // Rejected: a row in Export report (ExportMenu). That panel's files
+        // all cover the whole report, and it lives on Issues, a screen away
+        // from this list.
+        actions={
+          scan.status !== "running" && !scan.protection && data.total > 0 ? (
+            <FileDownload
+              label="Download list of pages (CSV)"
+              busyLabel="Preparing list of pages (CSV)…"
+              preparing={`Preparing all ${plural(data.total, "page", "pages")}, sorted by ${describeSort(sort)}.`}
+              failure="The list of pages could not be downloaded."
+              download={() => api.downloadScanPagesCsv(scan.id, sortParam(sort) as ScanPagesSort)}
+            />
+          ) : undefined
+        }
       />
 
       {/* What the counts mean and what the list leaves out, before the
