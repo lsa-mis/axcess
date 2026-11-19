@@ -275,9 +275,9 @@ def test_files_come_in_the_recommended_order(client: TestClient, documents: int)
     assert guide["possible_problems"] == ["unclear_link_text", "no_title"]
     assert guide["checks_run"] == [
         "no_alt_text",
+        "table_no_header",
         "no_headings",
         "no_language",
-        "table_no_header",
         "skipped_heading_level",
         "unclear_link_text",
         "no_title",

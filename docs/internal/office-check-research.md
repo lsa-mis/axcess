@@ -90,7 +90,7 @@ reader user. The rest are "possible problems" a person must judge.
 | Check | Word | PowerPoint | Mostly sure? | Basis |
 |---|---|---|---|---|
 | Images without alt text | yes | yes | yes | Microsoft Error; WCAG 1.1.1 |
-| Tables without a header row (2+ rows, 2+ columns) | yes | yes | possible problem (since 2026-11-18) | Microsoft Error; WCAG 1.3.1. 4 of its 8 holdout flags were layout tables, which structure cannot tell from data tables |
+| Tables without a header row (2+ rows, 2+ columns) | yes | yes | yes | Microsoft Error; WCAG 1.3.1. Made a possible problem on 2026-11-18 and counted again on 2026-11-19 (migrations 0046, 0047): as a possible problem it missed every file whose only barrier was an unmarked data table (holdout recall 100% to 91.3%, tuning 100% to 66.7%) and removed no wrong verdict, since each layout-table file was already Mostly sure for another real barrier. The cost kept: a layout table can show "Problem found" on its row |
 | Slides without a title | – | yes | yes | Microsoft Error; WCAG 2.4.6 |
 | No headings (Word, over 400 words) | yes | – | yes | Microsoft Tip; WCAG 1.3.1 |
 | No language set | yes | yes | yes | WCAG 3.1.1 (as the PDF check) |

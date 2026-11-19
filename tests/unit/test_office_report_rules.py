@@ -76,25 +76,25 @@ def test_a_google_doc_does_not_list_a_title_its_author_cannot_set(
     assert drive.possible_problems == ["no_title"] and "no_title" in drive.checks_run
 
 
-def test_migration_0046_re_decides_files_whose_only_barrier_was_a_table(
+def test_migrations_0046_then_0047_leave_table_barriers_mostly_sure(
     tmp_db: sqlite3.Connection,
 ) -> None:
+    """0046 made a table without a header row a possible problem; 0047 counts
+    it again (2026-11-19). A database that ran both ends where it started."""
     scan_id = _scan(tmp_db)
     table_only = _file(
         tmp_db, scan_id, "https://site.test/a.docx", "docx", ["table_no_header", "no_title"]
     )
-    with_alt = _file(
-        tmp_db, scan_id, "https://site.test/b.docx", "docx", ["table_no_header", "no_alt_text"]
-    )
-    forward = (MIGRATIONS / "0046_office_table_header_possible.sql").read_text()
-    rollback = (MIGRATIONS / "0046_office_table_header_possible.rollback.sql").read_text()
+    title_only = _file(tmp_db, scan_id, "https://site.test/b.docx", "docx", ["no_title"])
 
     def status(file_id: int) -> str:
-        return str(
-            tmp_db.execute("SELECT status FROM linked_files WHERE id = ?", (file_id,)).fetchone()[0]
-        )
+        row = tmp_db.execute("SELECT status FROM linked_files WHERE id = ?", (file_id,)).fetchone()
+        return str(row[0])
 
-    tmp_db.executescript(forward)
-    assert (status(table_only), status(with_alt)) == ("not_sure", "mostly_sure")
-    tmp_db.executescript(rollback)
-    assert (status(table_only), status(with_alt)) == ("mostly_sure", "mostly_sure")
+    for name in ("0046_office_table_header_possible", "0047_office_table_header_counts_again"):
+        tmp_db.executescript((MIGRATIONS / f"{name}.sql").read_text())
+    assert (status(table_only), status(title_only)) == ("mostly_sure", "not_sure")
+    tmp_db.executescript(
+        (MIGRATIONS / "0047_office_table_header_counts_again.rollback.sql").read_text()
+    )
+    assert status(table_only) == "not_sure"

@@ -321,10 +321,10 @@ A document's own page works like an issue type's page. At the top right,
 (Accessibility problems?, Type, Hosted on, Pages it appears on). **What Axcess
 found** is a table of the checks that ran on that kind of file: five for a
 PDF (Tags, Text a screen reader can read, Security settings, Document title,
-Language), seven for a Word file (Alt text for images, Headings, Language,
-Table header rows, Heading levels, Link text, Document title) and six for a
-PowerPoint file (Alt text for images, Slide titles, Language, Table header
-rows, Link text, Document title). A Google Doc or Slides deck has no
+Language), seven for a Word file (Alt text for images, Table header rows,
+Headings, Language, Heading levels, Link text, Document title) and six for a
+PowerPoint file (Alt text for images, Slide titles, Table header rows,
+Language, Link text, Document title). A Google Doc or Slides deck has no
 Document title row: Google's exports never have a title, and its author
 cannot set one. Each has its result ("Problem found",
 "Possible problem" or "No problem found") and why it matters. "No problem found" is not a pass: a person must still check the file.

@@ -25,6 +25,17 @@ count).
     a machine cannot tell a border from an arrow that means something.
     Word: the document body only, not page headers and footers, which
     screen readers do not read as part of the text.
+``table_no_header`` (Word and PowerPoint)
+    A table of at least 2 rows and 2 columns has no header row. Microsoft:
+    Error, "Tables specify column header information". Word: the "Header
+    Row" table style option (``tblLook firstRow``), which Microsoft's own
+    instructions use ("Make your Word documents accessible"), or "Repeat as
+    header row" (``tblHeader``) on the first row; PowerPoint: "Header Row"
+    (``a:tblPr firstRow``). Counted, the developer's decision (2026-11-19,
+    after a day as a possible problem): a layout table can show "Problem
+    found" on its row, but on the labelled real files every such file was
+    "Mostly sure" for another real barrier, while as a possible problem the
+    rule missed every file whose only barrier was an unmarked data table.
 ``slide_no_title`` (PowerPoint)
     A slide has no title placeholder holding text. Microsoft: Error, "All
     slides have titles" (paraphrased: titles let people navigate a deck).
@@ -43,16 +54,6 @@ count).
 screen reader user needs a person, so they are listed and never make a
 file "Mostly sure".
 
-``table_no_header`` (Word and PowerPoint)
-    A table of at least 2 rows and 2 columns has no header row. Microsoft:
-    Error, "Tables specify column header information". Word: the "Header
-    Row" table style option (``tblLook firstRow``), which Microsoft's own
-    instructions use ("Make your Word documents accessible"), or "Repeat as
-    header row" (``tblHeader``) on the first row; PowerPoint: "Header Row"
-    (``a:tblPr firstRow``). A possible problem since 2026-11-18 (the
-    developer's decision): on the real holdout set 4 of its 8 flags were
-    layout tables (a course list laid out as a table), and a machine cannot
-    tell layout from data by structure alone, so a person decides.
 ``skipped_heading_level`` (Word)
     A heading more than one level deeper than the one before it (Heading 1
     then Heading 3). Microsoft's guidance: "do not skip heading levels".
@@ -175,9 +176,9 @@ class OfficeCheck:
 #: file "Mostly sure" first, then the possible problems.
 WORD_CHECKS: tuple[FailedCheck, ...] = (
     "no_alt_text",
+    "table_no_header",
     "no_headings",
     "no_language",
-    "table_no_header",
     "skipped_heading_level",
     "unclear_link_text",
     "no_title",
@@ -185,13 +186,15 @@ WORD_CHECKS: tuple[FailedCheck, ...] = (
 SLIDES_CHECKS: tuple[FailedCheck, ...] = (
     "no_alt_text",
     "slide_no_title",
-    "no_language",
     "table_no_header",
+    "no_language",
     "unclear_link_text",
     "no_title",
 )
 #: Checks whose failure makes a Word or PowerPoint file "Mostly sure".
-COUNTED: frozenset[str] = frozenset({"no_alt_text", "slide_no_title", "no_headings", "no_language"})
+COUNTED: frozenset[str] = frozenset(
+    {"no_alt_text", "table_no_header", "slide_no_title", "no_headings", "no_language"}
+)
 
 
 def checks_for(checked_as: CheckedAs | None) -> tuple[FailedCheck, ...]:

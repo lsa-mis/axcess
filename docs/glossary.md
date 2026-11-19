@@ -541,20 +541,19 @@ Checker):
 
 - images without alt text: a picture, chart, diagram or video with no alt
   text that is not marked as decorative (WCAG 1.1.1);
+- tables without a header row: a table of at least 2 rows and 2 columns
+  whose first row is not marked as a header row (WCAG 1.3.1);
 - slides without a title (PowerPoint; WCAG 2.4.6);
 - no headings: a Word document of more than 400 words with no heading style
   (WCAG 1.3.1);
 - no language set (WCAG 3.1.1).
 
 It also lists **possible problems**, which a person must judge and which
-never make a file Mostly sure: tables without a header row (a table of at
-least 2 rows and 2 columns whose first row is not marked as a header row;
-WCAG 1.3.1; a person decides, because a table used only for layout needs
-none), link text that is a web address or "click here" (WCAG 2.4.4),
-heading levels skipped (Heading 1, then Heading 3), and no document title.
-Word and PowerPoint show the file name, not the title. A Google Doc or
-Slides deck is not checked for a title at all: Google's exports never have
-one, and its author cannot set one.
+never make a file Mostly sure: link text that is a web address or "click
+here" (WCAG 2.4.4), heading levels skipped (Heading 1, then Heading 3), and
+no document title. Word and PowerPoint show the file name, not the title. A
+Google Doc or Slides deck is not checked for a title at all: Google's exports
+never have one, and its author cannot set one.
 
 A file that passes all its checks is [Not sure](#not-sure): a person must
 still check its reading order, how good its alt text is, and its table
