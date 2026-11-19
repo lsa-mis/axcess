@@ -1,5 +1,6 @@
 -- Rollback for 0047: a table without a header row alone leaves a Word or
--- PowerPoint file "Not sure", as 0046 had it.
+-- PowerPoint file "Not sure", as 0046 had it. (Fixed 2026-11-19: the list
+-- below wrongly included table_no_header, so the rollback changed nothing.)
 UPDATE linked_files
    SET status = 'not_sure'
  WHERE checked_as IN ('docx', 'pptx')
