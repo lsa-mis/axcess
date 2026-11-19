@@ -464,12 +464,12 @@ async def test_analyze_caps_links_at_max_per_call() -> None:
         analyzer = LinkPurposeInContextAnalyzer(provider)
         await analyzer.analyze(AnalysisContext(body=body, page_url="x"))
 
-    # Short links fit one request: it mentions LINK 0 through LINK 49 — not 50+.
-    assert route.call_count == 1
-    sent = json.loads(route.calls[0].request.content)
-    prompt = sent["prompt"]
-    assert f"LINK {MAX_LINKS_PER_CALL - 1}" in prompt
-    assert f"LINK {MAX_LINKS_PER_CALL}" not in prompt
+    # Exactly the first 50 links go out, over as many requests as the
+    # estimate needs (Ollama cannot count tokens), each numbered from 0.
+    prompts = [json.loads(call.request.content)["prompt"] for call in route.calls]
+    assert sum(prompt.count("---- LINK ") for prompt in prompts) == MAX_LINKS_PER_CALL
+    assert 'href="/p49"' in "".join(prompts) or "'/p49'" in "".join(prompts)
+    assert "/p50'" not in "".join(prompts) and '/p50"' not in "".join(prompts)
 
 
 @pytest.mark.asyncio
