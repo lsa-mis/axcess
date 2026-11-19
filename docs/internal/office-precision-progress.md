@@ -13,7 +13,7 @@ Anyone resuming: read this file, then `git log --oneline be31ee8..HEAD`.
 
 | Step | State | Where |
 |---|---|---|
-| 1. Mechanism of the false alarms (development set) | done in analysis; write-up in `docs/internal/office-check-research.md`, "Why precision was low" | see below for state of the write-up |
+| 1. Mechanism of the false alarms (development set) | done; written up in commit **65bb6a1** | `docs/internal/office-check-research.md`, "Why precision was low" and "Fresh validation set" |
 | 2. Rule changes | done, one commit: **946ad6f** (no headings needs 2+ visual headings; table rule only for plain grids; alt text with no letter or digit is none) | `src/audit/linked_files/office_check.py`, `tests/unit/test_office_check.py`, `tests/support/office_docs.py` |
 | 3. Development score | done: 145 of 150 scored, Mostly sure precision 100% (44/44), recall 100% (44/44). Old rules (be31ee8): 76.8% (43/56), 97.7% (43/44) | |
 | 4a. Fresh files collected | done: 57 Word files, 24 sites | `artifacts/office-fresh/files/<sha256>.docx`; worklist `artifacts/office-fresh/collect/manifest.json` (URL, page, link text per SHA-256); skipped sources `collect/skipped.md`; downloader `collect/fetch.py` (skips known SHA-256) |
@@ -21,8 +21,8 @@ Anyone resuming: read this file, then `git log --oneline be31ee8..HEAD`.
 | 4c. Labels frozen | done 2026-11-19 10:16:23 -0500 (read-only copies and SHA-256 in `artifacts/office-fresh/frozen.sha256`), BEFORE the rules commit (10:23:44) and the first fresh score (10:24:46) | `artifacts/office-fresh/frozen/labels_N.json`, `manifest.json` |
 | 4d. Fresh labels in the repo | done, commit **572a244** (`split: "fresh"` in `tests/real_pages/office_files.json`, built mechanically from the frozen files). Note: this commit is after the first score; the frozen copies' hashes and timestamps above are the proof that the labels predate it | |
 | 4e. Fresh score | done, rules frozen at 946ad6f, not changed after | `artifacts/office-fresh/reports/new_rules_report.json`, `old_rules_report.json` |
-| 5. Report wording (terms.ts, glossary, reading-your-report) | in progress | |
-| 6. Gates: make lint, make typecheck, make frontend-build, tests/unit/test_office_check.py, tests/ui/test_documents_route.py | not run yet | |
+| 5. Report wording | done, commit **c3072f3** (`terms.ts` LINKED_FILE_CHECK_WHY for no_alt_text, table_no_header, no_headings; `docs/glossary.md`); `docs/reading-your-report.md` needed no change; no UI test pins these sentences | |
+| 6. Gates | done 2026-11-19: make lint, make typecheck, make frontend-build pass; tests/unit/test_office_check.py 55 passed; test_office_downloads.py and test_linked_file_checks.py pass. Failing, and failing before this work (not caused by it): tests/unit/test_office_report_rules.py::test_migrations_0046_then_0047_leave_table_barriers_mostly_sure (also fails with be31ee8's office_check.py), and 3 tests in tests/ui/test_documents_route.py that still expect a "Document title" check on a Google Slides deck, which 0fd0b9a removed without updating them | |
 
 ## Fresh results (rules frozen at 946ad6f)
 
@@ -64,10 +64,10 @@ env -u VIRTUAL_ENV uv run python artifacts/office-fresh/reports/old_rules.py \
 
 ## Next step
 
-Write "Why precision was low" and the fresh results into
-`docs/internal/office-check-research.md`; update the report wording for
-`no_headings` and `table_no_header` (`src/audit/web/frontend/src/lib/terms.ts`
-LINKED_FILE_CHECK_WHY, `docs/glossary.md`, reading-your-report docs) and
-the UI tests that pin it; run the gates in step 6; commit; report. Do not
-change a rule now: any change after the fresh score needs a new fresh set
-(see "Open" in the research doc).
+The brief is done; the target is not met on the fresh set. Waiting for the
+developer's decision. If they want another round: make the fixes listed in
+the research doc ("Why the fresh errors happen"), report the fresh set as
+seen, and collect and label a second fresh set (other sites; same
+protocol, `artifacts/office-fresh/label/PROTOCOL.md`; freeze labels and
+commit them before scoring) to measure them. Separately, the two
+pre-existing test failures in step 6 need fixing.
