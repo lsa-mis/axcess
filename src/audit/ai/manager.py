@@ -67,7 +67,7 @@ class HardwareInfo(BaseModel):
     # Memory as computers are sold (hardware.memory_gb); 0 when unknown.
     memory_gb: int = 0
     # Memory on separate graphics cards, as sold; 0 for none or not known
-    # (Windows and macOS do not read it yet).
+    # (macOS: the Apple chip shares the computer's memory).
     gpu_memory_gb: int = 0
     # What the sizes are measured against: memory_gb plus gpu_memory_gb.
     ai_memory_gb: int = 0

@@ -143,8 +143,10 @@ choice moves into **Change the AI models**.
    Standard. The page names the card's memory and the total. Built-in
    graphics and Apple chips share the computer's memory, so they add
    nothing. Axcess reads the card's memory from the AI program itself
-   (`llama-server --list-devices`, in the same sandbox as the AI), on
-   Linux only for now; on Windows the card's memory is not counted yet.
+   (`llama-server --list-devices`, in the same sandbox as the AI: Bubblewrap
+   on Linux, the launcher's AppContainer on Windows). The Windows path is
+   checked by the Windows smoke test in CI, not yet on a computer with a
+   separate card.
 
    Without a graphics chip Axcess suggests Small, because larger models are
    slow on the processor alone, and the page says so. All models use the

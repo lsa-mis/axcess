@@ -14,7 +14,13 @@ import pytest
 from audit.ai.model_client import ModelEndpoint, ModelRoutingTransport, open_model_http_client
 from audit.ai.sandbox import IsolationError
 from audit.ai.state import AIConfig, effective_settings, save_config, trust_private_runtime
-from audit.ai.windows_launcher import LauncherService, ModelProcess, run_check, spec_text
+from audit.ai.windows_launcher import (
+    LauncherService,
+    ModelProcess,
+    run_check,
+    run_devices,
+    spec_text,
+)
 from audit.config import Settings
 
 pytestmark = pytest.mark.skipif(sys.platform.startswith("win"), reason="POSIX stand-in script")
@@ -121,6 +127,29 @@ def test_check_passes_only_on_every_line_and_exit_zero(
         with pytest.raises(IsolationError) as err:
             run_check(launcher, tmp_path, tmp_path, tmp_path, log, gpu=False)
         assert err.value.reason == "network_test_failed"
+
+
+@pytest.mark.parametrize(
+    ("done", "code"), [("AXCESS_DEVICES_DONE 0", 0), ("AXCESS_DEVICES_DONE 1", 1)]
+)
+def test_devices_reads_what_llama_server_wrote_only_when_it_finished(
+    tmp_path: Path, done: str, code: int
+) -> None:
+    """The launcher's ``devices`` command writes llama-server's output to
+    --log; Axcess reads it only after a clean finish (2026-11-19)."""
+    launcher = _script(
+        tmp_path,
+        "args = sys.argv[1:]\n"
+        "assert args[0] == 'devices' and '--gpu' in args and '--models' not in args\n"
+        "out = args[args.index('--log') + 1]\n"
+        "open(out, 'w').write('  Vulkan0: Card (8188 MiB, 7900 MiB free)\\n')\n"
+        f"print({done!r}); sys.exit({code})",
+    )
+    output = tmp_path / "scratch" / "devices.txt"
+    output.parent.mkdir()
+    output.write_text("left by an earlier run", encoding="utf-8")
+    text = run_devices(launcher, tmp_path, output.parent, output)
+    assert text == ("  Vulkan0: Card (8188 MiB, 7900 MiB free)\n" if code == 0 else "")
 
 
 def test_spec_lists_each_model_socket_and_argument(tmp_path: Path) -> None:

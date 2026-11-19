@@ -57,6 +57,7 @@ from audit.ai.windows_launcher import (
     private_copy,
     require_windows_sandbox,
     run_check,
+    run_devices,
     with_launcher,
 )
 
@@ -458,21 +459,25 @@ class LlamaRuntime:
         """The graphics devices the graphics build can use; [] when unknown.
 
         Runs ``llama-server -v --list-devices`` once per program, inside
-        the same sandbox as the service (Bubblewrap on Linux), with no
-        model and no network. Not yet on Windows, where the sandbox is the
-        launcher's AppContainer and the launcher has no command for it, nor
-        on macOS, where the Apple chip shares the computer's memory and
-        adds nothing.
+        the same sandbox as the service, with no model and no network:
+        Bubblewrap on Linux, the launcher's AppContainer on Windows (its
+        ``devices`` command). Not on macOS, where the Apple chip shares the
+        computer's memory and adds nothing.
         """
-        if not sys.platform.startswith("linux"):
+        windows = sys.platform.startswith("win")
+        if not (windows or sys.platform.startswith("linux")):
             return []
         gpu_builds = [(a, s) for a, s in self.builds() if a != "cpu"]
         if not gpu_builds:
             return []
-        server = gpu_builds[0][1].resolve()
+        accelerator, server = gpu_builds[0][0], gpu_builds[0][1].resolve()
         if self._devices is not None and self._devices[0] == server:
             return self._devices[1]
         found: list[hardware.GpuDevice] = []
+        if windows:
+            found = self._windows_devices(accelerator, server)
+            self._devices = (server, found)
+            return found
         try:
             self.models_dir.mkdir(parents=True, exist_ok=True)
             self.scratch.mkdir(parents=True, exist_ok=True)
@@ -499,6 +504,26 @@ class LlamaRuntime:
             logging.getLogger(__name__).warning("ai.list_devices_failed", exc_info=True)
         self._devices = (server, found)
         return found
+
+    def _windows_devices(self, accelerator: str, server: Path) -> list[hardware.GpuDevice]:
+        """``devices`` through the launcher, in the service's AppContainer."""
+        launcher = self._launcher()
+        try:
+            require_windows_sandbox(launcher)
+            if launcher is None:  # pragma: no cover - require_windows_sandbox raised
+                return []
+            self.scratch.mkdir(parents=True, exist_ok=True)
+            program = server.parent
+            # The launcher changes the folder's access list, which it cannot
+            # do under Program Files: the same private copy a start uses.
+            if not program.is_relative_to(self.ai_dir.resolve()):
+                program = private_copy(program, self.download_dir / accelerator).resolve()
+            scratch = self.scratch.resolve()
+            output = run_devices(launcher, program, scratch, scratch / "devices.txt")
+        except (OSError, subprocess.SubprocessError, IsolationError):
+            logging.getLogger(__name__).warning("ai.list_devices_failed", exc_info=True)
+            return []
+        return hardware.parse_devices(output)
 
     def separate_gpu_memory(self) -> int:
         """Memory on separate graphics cards, in bytes; 0 for none or unknown."""

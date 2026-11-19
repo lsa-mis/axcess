@@ -11,6 +11,10 @@ connection only from this Axcess process (it checks the connecting
 process ID). Closing the launcher's input stops everything; if the
 launcher dies, Windows ends the job and the servers with it.
 
+The launcher's ``devices`` command runs ``llama-server -v --list-devices``
+once in the same container, so Axcess can count a graphics card's own
+memory (``LlamaRuntime.devices``).
+
 The launcher's ``check`` command proves the boundary before every start:
 an outside connection fails with an operating-system denial, the program
 folder cannot be written, and a socket made inside can be reached from
@@ -89,6 +93,10 @@ def require_windows_sandbox(launcher: Path | None) -> None:
         )
 
 
+# A start and a read of the graphics devices may both copy the program.
+_COPY_LOCK = threading.Lock()
+
+
 def private_copy(source: Path, dest: Path) -> Path:
     """Copy a bundled build into the data folder, which the user owns.
 
@@ -96,12 +104,13 @@ def private_copy(source: Path, dest: Path) -> Path:
     folder; an install under Program Files cannot have its permissions
     changed without administrator rights.
     """
-    if not (dest / "llama-server.exe").is_file():
-        staging = dest.with_name(dest.name + ".copying")
-        shutil.rmtree(staging, ignore_errors=True)
-        shutil.copytree(source, staging)
-        shutil.rmtree(dest, ignore_errors=True)
-        staging.rename(dest)
+    with _COPY_LOCK:
+        if not (dest / "llama-server.exe").is_file():
+            staging = dest.with_name(dest.name + ".copying")
+            shutil.rmtree(staging, ignore_errors=True)
+            shutil.copytree(source, staging)
+            shutil.rmtree(dest, ignore_errors=True)
+            staging.rename(dest)
     return dest
 
 
@@ -169,6 +178,38 @@ def run_check(
             "The AI isolation check did not prove that outside connections are blocked. "
             "AI was not started.",
         )
+
+
+def run_devices(launcher: Path, runtime: Path, scratch: Path, output: Path) -> str:
+    """``llama-server -v --list-devices`` in the AppContainer; its output.
+
+    The launcher's ``devices`` command runs ``runtime``'s llama-server.exe
+    once, with the graphics capabilities and no models folder, and writes
+    what it prints to ``output`` (a fresh file in scratch). "" when it did
+    not finish cleanly, so the card's memory is simply not counted.
+    """
+    output.unlink(missing_ok=True)
+    result = subprocess.run(  # noqa: S603 - bundled launcher, fixed arguments
+        [
+            *_argv0(launcher),
+            "devices",
+            "--scratch",
+            str(scratch),
+            "--runtime",
+            str(runtime),
+            "--log",
+            str(output),
+            "--gpu",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        check=False,
+        creationflags=NO_WINDOW,
+    )
+    if result.returncode != 0 or "AXCESS_DEVICES_DONE 0" not in result.stdout.splitlines():
+        return ""
+    return output.read_text(encoding="utf-8", errors="replace")
 
 
 def note(log: Path, text: str) -> None:
