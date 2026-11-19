@@ -115,6 +115,11 @@ and continues without those checks.
   download and start that size, but it may answer very slowly or stop.
   The one exception: on a computer with 8 GB of memory or less, Axcess
   does not download or start Standard or Large. Choose Small there.
+- **"AI could not start on the graphics card alone"**: **Run AI on the
+  graphics card only** is on, and the models did not load on the graphics
+  card, most often because they do not fit in its memory. Turn that box off
+  on the AI features page, so Axcess puts what fits on the card and the rest
+  in the computer's memory.
 - **"Memory was low when AI started"**: AI started anyway, but the models
   need more free memory than there was, so answers may be slow. The
   operating system makes room by compressing or moving other programs'

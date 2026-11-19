@@ -388,6 +388,12 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ enabled }),
     }),
+  /** "Run AI on the graphics card only"; restarts AI when it runs. */
+  setAiGpuOnly: (gpuOnly: boolean) =>
+    request<AiPreferences>("/api/ai/preferences", {
+      method: "PUT",
+      body: JSON.stringify({ gpu_only: gpuOnly }),
+    }),
   getAiInstall: () => request<AiInstallStatus>("/api/ai/install", { cache: "no-store" }),
   /** Start or resume downloading the AI program and models for one size. */
   installAi: (tier: AiTierId) =>

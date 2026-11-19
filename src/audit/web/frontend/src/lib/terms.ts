@@ -700,7 +700,21 @@ export const AI_ISOLATION_REASON_LABEL: Record<string, string> = {
   // less memory than the size is for. Low free memory only warns.
   not_enough_memory: "This computer has 8 GB of memory or less, and this size is for 16 GB or more, so AI was not started. Choose Small in Change the AI models.",
   system_ollama_not_managed: "Your own Ollama is not isolated by Axcess. Axcess never starts or stops it.",
+  // "Run AI on the graphics card only" is on and a model did not load on
+  // the graphics card; there is no fallback to the processor (2026-11-19).
+  gpu_only_failed: "AI could not start on the graphics card alone. The models may not fit in its memory. Turn off “Run AI on the graphics card only” to use the computer’s memory too.",
 };
+
+/**
+ * The setting that keeps every model layer on the graphics card
+ * (AIPreferences.gpu_only). On a Mac the graphics are part of the Apple
+ * chip, so "graphics card" would name something the Mac does not have.
+ */
+export function aiGpuOnlyLabel(accelerator: string): string {
+  return accelerator === "apple"
+    ? "Run AI on the Apple chip’s graphics only"
+    : "Run AI on the graphics card only";
+}
 
 /**
  * What happens when someone opens a link to another website, for the

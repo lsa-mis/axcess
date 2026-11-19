@@ -18,6 +18,9 @@ IsolationReason = Literal[
     # Not isolation: the models would not fit in the memory free now, so
     # the service was not started (``runtime.memory_needed``).
     "not_enough_memory",
+    # Not isolation: "Run AI on the graphics card only" is on and the models
+    # did not load on the graphics card (most often too little memory on it).
+    "gpu_only_failed",
 ]
 
 

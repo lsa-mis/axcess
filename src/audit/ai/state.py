@@ -66,6 +66,10 @@ class AIPreferences(BaseModel):
 
     enabled: bool = False
     choice_recorded: bool = False
+    # "Run AI on the graphics card only": every model layer on the graphics
+    # card, with no processor fallback. Off: llama.cpp puts what fits on the
+    # card and the rest in the computer's memory (runtime.gpu_layers).
+    gpu_only: bool = False
 
 
 def load_preferences(settings: Settings) -> AIPreferences:

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import ctypes
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -32,10 +33,26 @@ class Hardware:
     gpu: str | None
     os: str
     arch: str
+    # Memory on separate graphics cards (not shared with the computer), as
+    # llama.cpp reports it (``parse_devices``). 0 when there is none or it
+    # is not known yet.
+    gpu_memory_bytes: int = 0
 
     @property
     def accelerated(self) -> bool:
-        return self.apple_silicon or self.gpu is not None
+        return self.apple_silicon or self.gpu is not None or self.gpu_memory_bytes > 0
+
+    @property
+    def ai_memory_gb(self) -> int:
+        """Memory the AI models can use: the computer's plus a separate card's.
+
+        llama.cpp puts as much of a model as fits on the graphics card and
+        the rest in the computer's memory, so both count (developer,
+        2026-11-19: an 8 GB laptop with an 8 GB card can run Standard).
+        0 when the computer's memory is unknown, which never refuses.
+        """
+        ram = memory_gb(self.memory_bytes)
+        return ram + memory_gb(self.gpu_memory_bytes) if ram else 0
 
 
 def _platform() -> str:
@@ -145,15 +162,59 @@ def size_refused(memory_gb: int, tier: Tier) -> bool:
 
     Only an 8 GB (or smaller) computer and a size for 16 GB or more. Any
     other size bigger than the computer's memory is allowed with a warning,
-    because the operating system makes room. ``memory_gb`` is as computers
-    are sold (``memory_gb()``); 0 means unknown and never refuses.
+    because the operating system makes room. ``memory_gb`` is
+    ``Hardware.ai_memory_gb``: as computers are sold, with a separate
+    graphics card's memory added, so 8 GB plus an 8 GB card is 16 and is
+    not refused. 0 means unknown and never refuses.
     """
     return 0 < memory_gb <= SMALL_COMPUTER_GB and tier.min_memory_gb >= REFUSED_ON_SMALL_COMPUTER_GB
 
 
-def dedicated_gpu() -> bool:
-    """A separate graphics card with its own memory (NVIDIA, AMD)."""
-    return _gpu() in ("NVIDIA", "AMD")
+@dataclass(frozen=True)
+class GpuDevice:
+    """One graphics device llama.cpp can use."""
+
+    name: str
+    total_bytes: int
+    free_bytes: int
+    # Shares the computer's memory (built-in graphics, Apple chips), so its
+    # memory is not extra room.
+    shared: bool
+
+
+# ``llama-server -v --list-devices`` (b12284). The Vulkan backend's debug
+# line says whether a device shares the computer's memory ("uma: 1"); the
+# list gives each device's memory. Checked 2026-11-19 on Intel Iris Xe:
+#   ggml_vulkan: 0 = Intel(R) Iris(R) Xe Graphics (TGL GT2) (...) | uma: 1 | ...
+#   Vulkan0: Intel(R) Iris(R) Xe Graphics (TGL GT2) (11771 MiB, 3664 MiB free)
+_VULKAN_INFO = re.compile(r"ggml_vulkan: (\d+) = .*?\| uma: (\d)")
+_DEVICE_LINE = re.compile(r"^\s*([A-Za-z]+)(\d+): (.+) \((\d+) MiB, (\d+) MiB free\)\s*$")
+
+
+def parse_devices(output: str) -> list[GpuDevice]:
+    """The devices in ``llama-server -v --list-devices`` output.
+
+    A device counts as separate only when it is a Vulkan device whose
+    debug line says "uma: 0". Anything else (Metal, a missing line) is
+    treated as shared, so its memory is never counted twice.
+    """
+    uma = {int(m.group(1)): m.group(2) == "1" for m in _VULKAN_INFO.finditer(output)}
+    devices = []
+    for line in output.splitlines():
+        match = _DEVICE_LINE.match(line)
+        if not match:
+            continue
+        backend, index, name, total, free = match.groups()
+        separate = backend == "Vulkan" and uma.get(int(index)) is False
+        devices.append(
+            GpuDevice(
+                name=name.strip(),
+                total_bytes=int(total) * 1024**2,
+                free_bytes=int(free) * 1024**2,
+                shared=not separate,
+            )
+        )
+    return devices
 
 
 def available_memory_bytes() -> int | None:
@@ -231,8 +292,9 @@ def fits(hardware: Hardware, tier: Tier, extra_bytes: int = 0) -> bool:
     Used to suggest a size and to warn; a size that does not fit can still
     be chosen unless ``size_refused`` says otherwise.
     """
-    # The same figure the page shows.
-    enough_memory = memory_gb(hardware.memory_bytes) >= tier.min_memory_gb
+    # The same figure the page shows: the computer's memory plus a separate
+    # graphics card's.
+    enough_memory = hardware.ai_memory_gb >= tier.min_memory_gb
     enough_disk = hardware.free_disk_bytes >= tier.size + extra_bytes + DISK_MARGIN
     return enough_memory and enough_disk
 
