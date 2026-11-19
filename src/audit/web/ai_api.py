@@ -11,7 +11,7 @@ import asyncio
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from audit.ai import custom
 from audit.ai.catalog import SamplingKey, TierId
@@ -70,8 +70,18 @@ class UseMyModelRequest(BaseModel):
 
 
 class PreferenceRequest(BaseModel):
+    """One change at a time: turn AI on or off, or "Run AI on the graphics
+    card only"."""
+
     model_config = ConfigDict(extra="forbid", strict=True)
-    enabled: bool
+    enabled: bool | None = None
+    gpu_only: bool | None = None
+
+    @model_validator(mode="after")
+    def exactly_one(self) -> PreferenceRequest:
+        if (self.enabled is None) == (self.gpu_only is None):
+            raise ValueError("Send either enabled or gpu_only.")
+        return self
 
 
 class RuntimeStartRequest(BaseModel):
@@ -118,7 +128,10 @@ def build_ai_router(manager: AIManager) -> APIRouter:
     @router.put("/ai/preferences")
     async def ai_set_preferences(body: PreferenceRequest) -> AIPreferences:
         try:
-            return await asyncio.to_thread(manager.set_enabled, body.enabled)
+            if body.gpu_only is not None:
+                return await asyncio.to_thread(manager.set_gpu_only, body.gpu_only)
+            # exactly_one: enabled is set here.
+            return await asyncio.to_thread(manager.set_enabled, body.enabled is True)
         except AIBusyError as exc:
             raise HTTPException(409, str(exc)) from exc
         except (RuntimeSetupError, IsolationError, AIStateError) as exc:

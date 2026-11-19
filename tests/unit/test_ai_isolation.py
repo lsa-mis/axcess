@@ -628,6 +628,40 @@ def test_runtime_falls_back_to_the_cpu_build_when_the_gpu_build_cannot_load(
     assert runtime.accelerator == "cpu" and runtime.isolated
 
 
+def test_graphics_only_never_falls_back_to_the_processor(tmp_path, monkeypatch) -> None:
+    """ "Run AI on the graphics card only" (2026-11-19): a model that does not
+    load on the graphics build leaves AI stopped with its own reason."""
+    runtime, servers = _installed_runtime(tmp_path, monkeypatch)
+    if len(servers) < 2:
+        pytest.skip("this platform has one build")
+    runtime.gpu_only = True
+    monkeypatch.setattr("audit.ai.runtime.build_sandbox", lambda *_a, **_k: Sandbox(["sandbox"]))
+    monkeypatch.setattr("audit.ai.runtime.test_network_boundary", Mock())
+    monkeypatch.setattr("audit.ai.runtime._end_group", lambda pgid, process=None: None)
+    sock = (tmp_path / "ai" / "scratch" / "llama.sock").resolve()
+    spawned: list[str] = []
+
+    def spawn(argv, **_kwargs):
+        spawned.append(argv[1])
+        sock.touch()
+        process = Mock()
+        process.poll.return_value = None
+        process.pid = 6000
+        return process
+
+    monkeypatch.setattr("audit.ai.runtime.subprocess.Popen", Mock(side_effect=spawn))
+    tags = (TWO_MODEL.text.served_name, TWO_MODEL.vision.served_name)
+    monkeypatch.setattr(
+        "audit.ai.runtime._model_states", lambda http: dict.fromkeys(tags, "failed")
+    )
+    with pytest.raises(RuntimeSetupError):
+        runtime.start((TWO_MODEL.text, TWO_MODEL.vision), wait_s=5)
+    # Only the graphics build ran; the preset kept every layer on the card.
+    assert spawned == [str(servers[0][1].resolve())]
+    assert "n-gpu-layers = all" in (tmp_path / "ai" / "scratch" / "models.ini").read_text()
+    assert runtime.isolation_reason == "gpu_only_failed"
+
+
 def _fake_service(tmp_path, monkeypatch, states):
     """Patch the sandbox and process so ``start`` runs without a real server."""
     monkeypatch.setattr("audit.ai.runtime.build_sandbox", lambda *a, **k: Sandbox(["sandbox"]))
@@ -765,14 +799,16 @@ def test_the_linux_sandbox_ends_every_process_in_it(
     assert "--unshare-pid" in sandbox.prefix and "--die-with-parent" in sandbox.prefix
 
 
-def test_memory_needed_counts_files_only_without_a_graphics_card() -> None:
+def test_memory_needed_counts_only_what_does_not_fit_on_a_graphics_card() -> None:
     from audit.ai.runtime import MEMORY_MARGIN_BYTES, WORKING_BYTES_PER_MODEL, memory_needed
 
     models = list(TWO_MODEL.models)
     files = sum(m.size for m in models)
     working = WORKING_BYTES_PER_MODEL * len(models) + MEMORY_MARGIN_BYTES
-    assert memory_needed(models, dedicated_gpu=False) == files + working
-    assert memory_needed(models, dedicated_gpu=True) == working
+    assert memory_needed(models) == files + working
+    assert memory_needed(models, gpu_memory=files * 2) == working
+    # A card smaller than the files: the rest is in the computer's memory.
+    assert memory_needed(models, gpu_memory=4_000_000_000) == files - 4_000_000_000 + working
 
 
 def test_low_free_memory_warns_but_never_stops_a_start(
@@ -786,7 +822,6 @@ def test_low_free_memory_warns_but_never_stops_a_start(
     runtime = LlamaRuntime(tmp_path / "ai", load_catalog())
     monkeypatch.setattr(runtime_module, "MEMORY_SETTLE_S", 0.0)
     monkeypatch.setattr(hardware, "available_memory_bytes", lambda: 2_000_000_000)
-    monkeypatch.setattr(hardware, "dedicated_gpu", lambda: False)
     runtime._note_memory(list(TWO_MODEL.models))
     assert runtime.memory_warning is not None
     assert runtime.memory_warning.startswith("Memory was low when AI started")
@@ -855,6 +890,74 @@ def test_only_8_gb_or_less_refuses_a_size_for_16_gb_or_more(
     assert size_refused(memory, load_catalog().tier(tier)) is refused
 
 
+def test_a_graphics_cards_own_memory_counts_toward_the_sizes(tmp_path: Path) -> None:
+    """Developer, 2026-11-19: an 8 GB laptop with an 8 GB card is not refused
+    Standard, because llama.cpp puts what fits on the card."""
+    from audit.ai.hardware import Hardware
+    from audit.ai.runtime import NotEnoughMemoryError
+
+    laptop = Hardware(8 * 1024**3, 100 * 10**9, False, "NVIDIA", "linux", "x86_64")
+    manager, runtime = manager_for(tmp_path)
+    manager.probe = lambda: laptop  # type: ignore[method-assign]
+    runtime.separate_gpu_memory.return_value = 8188 * 1024**2
+    machine = manager.hardware()
+    assert machine.ai_memory_gb == 16
+    manager._require_size_fits(load_catalog().tier("standard"))
+    # Without the card's memory the same laptop is refused.
+    runtime.separate_gpu_memory.return_value = 0
+    with pytest.raises(NotEnoughMemoryError, match="this computer has 8 GB"):
+        manager._require_size_fits(load_catalog().tier("standard"))
+
+
+def test_graphics_devices_are_read_from_llama_cpp() -> None:
+    from audit.ai.hardware import parse_devices
+
+    # Intel Iris Xe (b12284, 2026-11-19): built-in graphics share memory.
+    iris = (
+        "0.00.046.740 D ggml_vulkan: 0 = Intel(R) Iris(R) Xe Graphics (TGL GT2) "
+        "(Intel open-source Mesa driver) | uma: 1 | rebar: 1 | fp16: 1\n"
+        "Available devices:\n"
+        "  Vulkan0: Intel(R) Iris(R) Xe Graphics (TGL GT2) (11771 MiB, 3664 MiB free)\n"
+    )
+    (device,) = parse_devices(iris)
+    assert device.shared and device.total_bytes == 11771 * 1024**2
+    # A separate card next to built-in graphics (the same format, uma: 0).
+    both = (
+        "ggml_vulkan: 0 = NVIDIA GeForce RTX 4060 Laptop GPU (NVIDIA) | uma: 0 | fp16: 1\n"
+        "ggml_vulkan: 1 = AMD Radeon(TM) Graphics (RADV) | uma: 1 | fp16: 1\n"
+        "  Vulkan0: NVIDIA GeForce RTX 4060 Laptop GPU (8188 MiB, 7900 MiB free)\n"
+        "  Vulkan1: AMD Radeon(TM) Graphics (RADV REMBRANDT) (7000 MiB, 6000 MiB free)\n"
+    )
+    card, built_in = parse_devices(both)
+    assert not card.shared and card.name == "NVIDIA GeForce RTX 4060 Laptop GPU"
+    assert built_in.shared
+    # No debug line, or Metal: never counted as extra memory.
+    assert parse_devices("  Vulkan0: Some GPU (8000 MiB, 7000 MiB free)\n")[0].shared
+    assert parse_devices("  MTL0: Apple M2 (10922 MiB, 10922 MiB free)\n")[0].shared
+    assert parse_devices("") == []
+
+
+def test_graphics_only_is_kept_when_ai_is_turned_off_and_on(tmp_path: Path) -> None:
+    manager, runtime = manager_for(tmp_path, enabled=False)
+    runtime.running.return_value = False
+    assert manager.set_gpu_only(True).gpu_only
+    assert runtime.gpu_only is True
+    assert manager.set_enabled(False).gpu_only
+    runtime.start.assert_not_called()
+
+
+def test_changing_graphics_only_restarts_running_ai(tmp_path: Path) -> None:
+    manager, runtime = manager_for(tmp_path)
+    runtime.running.return_value = True
+    manager.start_runtime = Mock()  # type: ignore[method-assign]
+    manager.set_gpu_only(True)
+    runtime.stop.assert_called_once()
+    manager.start_runtime.assert_called_once()
+    # The same value again changes nothing.
+    manager.set_gpu_only(True)
+    runtime.stop.assert_called_once()
+
+
 @pytest.mark.parametrize(
     ("gib", "sold"),
     [(15.3, 16), (16.0, 16), (7.6, 8), (8.0, 8), (31.2, 32), (12.7, 13), (0, 0)],
@@ -896,7 +999,6 @@ def test_a_start_waits_briefly_for_memory_a_stop_gives_back(
 
     readings = iter([1_000_000_000, 2_000_000_000, 99_000_000_000])
     monkeypatch.setattr(hardware, "available_memory_bytes", lambda: next(readings))
-    monkeypatch.setattr(hardware, "dedicated_gpu", lambda: False)
     monkeypatch.setattr(runtime_module.time, "sleep", lambda _s: None)
     runtime = LlamaRuntime(tmp_path / "ai", load_catalog())
     runtime._note_memory(list(TWO_MODEL.models))

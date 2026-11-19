@@ -7,6 +7,7 @@ drive it with fakes.
 from __future__ import annotations
 
 import contextlib
+import dataclasses
 import logging
 import threading
 from collections.abc import Callable
@@ -65,8 +66,15 @@ class HardwareInfo(BaseModel):
     memory_bytes: int
     # Memory as computers are sold (hardware.memory_gb); 0 when unknown.
     memory_gb: int = 0
+    # Memory on separate graphics cards, as sold; 0 for none or not known
+    # (macOS: the Apple chip shares the computer's memory).
+    gpu_memory_gb: int = 0
+    # What the sizes are measured against: memory_gb plus gpu_memory_gb.
+    ai_memory_gb: int = 0
     free_disk_bytes: int
-    accelerator: Literal["apple", "nvidia", "amd", "none"]
+    # "other": a separate graphics card that llama.cpp reports but that
+    # was not recognised as NVIDIA or AMD (an Intel Arc card, say).
+    accelerator: Literal["apple", "nvidia", "amd", "other", "none"]
 
 
 class ProgramInfo(BaseModel):
@@ -77,6 +85,10 @@ class ProgramInfo(BaseModel):
     release_url: str
     download_bytes: int
     available_for_this_computer: bool
+    # A graphics build exists for this computer, so "Run AI on the graphics
+    # card only" means something (not on an Intel Mac, which has only the
+    # processor build).
+    gpu_build: bool = False
     # True when the desktop app includes the program, so setup downloads
     # only the models.
     included: bool
@@ -151,6 +163,8 @@ class AIManager:
         )
         self.probe = probe or (lambda: hw.probe(self.dir))
         self.busy_reason = busy_reason
+        with contextlib.suppress(AIStateError):
+            self.runtime.gpu_only = load_preferences(settings).gpu_only
         self.installer = installer or Installer(
             self.catalog,
             self.runtime,
@@ -170,7 +184,10 @@ class AIManager:
         previous_preferences = self.preferences()
         try:
             save_config(self.settings, config)
-            save_preferences(self.settings, AIPreferences(enabled=True, choice_recorded=True))
+            save_preferences(
+                self.settings,
+                previous_preferences.model_copy(update={"enabled": True, "choice_recorded": True}),
+            )
             self.on_change(config)
         except Exception:
             # Keep the last usable setup if applying the new one fails.
@@ -183,6 +200,39 @@ class AIManager:
 
     def preferences(self) -> AIPreferences:
         return load_preferences(self.settings)
+
+    def hardware(self) -> hw.Hardware:
+        """This computer, with a separate graphics card's memory added.
+
+        The card's memory comes from llama.cpp itself (runtime.devices), so
+        it counts only once the program is on this computer (the desktop
+        app includes it).
+        """
+        machine = self.probe()
+        if machine.gpu_memory_bytes:
+            return machine
+        # object: a test's stand-in runtime may return anything.
+        separate: object = self.runtime.separate_gpu_memory()
+        if not isinstance(separate, int) or separate <= 0:
+            return machine
+        return dataclasses.replace(machine, gpu_memory_bytes=separate)
+
+    def set_gpu_only(self, gpu_only: bool) -> AIPreferences:
+        """Save "Run AI on the graphics card only", and restart AI if it runs.
+
+        The restart is what makes the choice take effect; the person asked
+        for it by changing the setting. A restart that fails leaves AI
+        stopped with the reason (for example gpu_only_failed), as any start.
+        """
+        previous = self.preferences()
+        self._require_idle()
+        updated = previous.model_copy(update={"gpu_only": gpu_only})
+        save_preferences(self.settings, updated)
+        self.runtime.gpu_only = gpu_only
+        if previous.gpu_only != gpu_only and self.runtime.running():
+            self.runtime.stop()
+            self.start_runtime()
+        return updated
 
     def _require_idle(self) -> None:
         reason = (
@@ -211,7 +261,7 @@ class AIManager:
             save_config(self.settings, config)
         elif enabled and config is None:
             raise RuntimeSetupError("AI is not set up yet. Choose a size and download it.")
-        next_preferences = AIPreferences(enabled=enabled, choice_recorded=True)
+        next_preferences = previous.model_copy(update={"enabled": enabled, "choice_recorded": True})
         try:
             save_preferences(self.settings, next_preferences)
             self.on_change(config)
@@ -288,15 +338,17 @@ class AIManager:
         return tier.models
 
     def plan(self) -> AIPlan:
-        machine = self.probe()
+        machine = self.hardware()
         program_bytes = self.runtime.download_remaining()
-        accelerator: Literal["apple", "nvidia", "amd", "none"] = (
+        accelerator: Literal["apple", "nvidia", "amd", "other", "none"] = (
             "apple"
             if machine.apple_silicon
             else "nvidia"
             if machine.gpu == "NVIDIA"
             else "amd"
             if machine.gpu == "AMD"
+            else "other"
+            if machine.gpu_memory_bytes > 0
             else "none"
         )
         recommended = hw.recommend(machine, self.catalog, program_bytes)
@@ -307,6 +359,8 @@ class AIManager:
             hardware=HardwareInfo(
                 memory_bytes=machine.memory_bytes,
                 memory_gb=hw.memory_gb(machine.memory_bytes),
+                gpu_memory_gb=hw.memory_gb(machine.gpu_memory_bytes),
+                ai_memory_gb=machine.ai_memory_gb,
                 free_disk_bytes=machine.free_disk_bytes,
                 accelerator=accelerator,
             ),
@@ -317,6 +371,7 @@ class AIManager:
                 download_bytes=program_bytes,
                 available_for_this_computer=self.runtime.asset is not None,
                 included=self.runtime.bundled(),
+                gpu_build=any(a.accelerator != "cpu" for a in self.runtime.assets),
             ),
             tiers=[
                 TierPlan(
@@ -330,7 +385,7 @@ class AIManager:
                     models_bytes=t.size,
                     download_bytes=t.size + program_bytes,
                     fits=hw.fits(machine, t, program_bytes),
-                    refused=hw.size_refused(hw.memory_gb(machine.memory_bytes), t),
+                    refused=hw.size_refused(machine.ai_memory_gb, t),
                     installed=program_ready
                     and self.runtime.has_model(t.text)
                     and self.runtime.has_model(t.vision),
@@ -372,14 +427,17 @@ class AIManager:
         """
         if tier is None:
             return
-        have = hw.memory_gb(self.probe().memory_bytes)
+        machine = self.hardware()
+        have = machine.ai_memory_gb
         if not hw.size_refused(have, tier):
             return
         if starting:
             self.runtime.isolation_reason = "not_enough_memory"
+        card = hw.memory_gb(machine.gpu_memory_bytes)
+        counted = f", counting the {card} GB on its graphics card" if card else ""
         raise NotEnoughMemoryError(
             f"The {tier.label} size is for computers with {tier.min_memory_gb} GB of memory "
-            f"or more, and this computer has {have} GB. Choose a smaller size."
+            f"or more, and this computer has {have} GB{counted}. Choose a smaller size."
         )
 
     def _check_space(self, tier: Tier, status: InstallStatus) -> None:

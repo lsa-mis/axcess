@@ -11,6 +11,8 @@
 #      launcher's port answers 200 to this PowerShell process (--client-pid).
 #   c. The same port closes a connection from another process (curl.exe).
 #   d. Closing the launcher's stdin ends llama-server.exe within 10 seconds.
+#   e. "devices" runs llama-server -v --list-devices in the sandbox, exits 0,
+#      and writes its device list to --log.
 # Prints the launcher and llama-server log when anything fails.
 param(
     [Parameter(Mandatory = $true)][string]$Launcher,
@@ -94,6 +96,21 @@ try {
     Invoke-Check @()
     Write-Host "== a2. check with GPU capabilities (registryRead, lpacPnpNotifications)"
     Invoke-Check @("--gpu")
+
+    Write-Host "== e. devices lists the graphics devices from inside the sandbox"
+    $devicesOut = Join-Path $scratch "devices.txt"
+    $devices = @(& $Launcher devices --scratch $scratch --runtime (Split-Path -Parent $server) --log $devicesOut --gpu)
+    $devicesCode = $LASTEXITCODE
+    $devices | ForEach-Object { Write-Host "devices: $_" }
+    if ($devicesCode -ne 0) { throw "devices exited with $devicesCode." }
+    if (-not ($devices | Where-Object { $_ -eq "AXCESS_DEVICES_DONE 0" })) { throw "devices did not print AXCESS_DEVICES_DONE 0." }
+    $listed = Get-Content $devicesOut -Raw
+    Write-Host "----- devices output -----"
+    Write-Host $listed
+    if ($listed -notmatch "Available devices") { throw "devices output has no device list." }
+    $refused = @(& $Launcher devices --scratch $scratch --runtime (Split-Path -Parent $server) --models $models --log $devicesOut)
+    if ($LASTEXITCODE -eq 0) { throw "devices accepted --models, which it never needs." }
+    $refused | ForEach-Object { Write-Host "devices (with --models): $_" }
 
     Write-Host "== spec rejects a program outside --runtime"
     $badSpec = Join-Path $WorkDir "bad.spec"

@@ -18,6 +18,14 @@
  *          from the one process named by --client-pid (the Axcess backend).
  *          Prints PORT <name> <port> per model, then READY. Stops everything
  *          when its standard input closes.
+ *   devices
+ *          Runs "llama-server.exe -v --list-devices" once, in the same
+ *          sandbox, with its output written to --log (a fresh file the
+ *          backend reads). It loads no model and opens no socket. Axcess
+ *          reads each graphics card's memory from that output, so a
+ *          separate card's memory counts toward the model sizes. Prints
+ *          AXCESS_DEVICES_DONE <exit code> and exits 0 when llama-server
+ *          exited 0.
  *
  * WHY
  *   The model service reads files a person did not write (model files) and
@@ -54,6 +62,8 @@
  *                            [--gpu] --log FILE
  *   axcess-ai-launcher serve --scratch DIR --runtime DIR --models DIR
  *                            [--gpu] --log FILE --client-pid PID --spec FILE
+ *   axcess-ai-launcher devices --scratch DIR --runtime DIR [--gpu] --log FILE
+ *                            (runs DIR\llama-server.exe from --runtime)
  *   (internal) axcess-ai-launcher probe-inner SOCK --scratch DIR
  *                            --runtime DIR
  *
@@ -120,7 +130,7 @@
 #define EXIT_TOO_OLD 3
 #define EXIT_USAGE 64
 
-enum mode { MODE_CHECK, MODE_SERVE, MODE_INNER };
+enum mode { MODE_CHECK, MODE_SERVE, MODE_INNER, MODE_DEVICES };
 static enum mode g_mode = MODE_CHECK;
 static CRITICAL_SECTION g_out_lock;
 static volatile LONG g_stopping = 0;
@@ -148,7 +158,7 @@ static __declspec(noreturn) void fail(const char *api, DWORD err)
 {
     if (g_mode == MODE_SERVE)
         out_line("AXCESS_ERROR %s %lu", api, err);
-    else if (g_mode == MODE_CHECK)
+    else if (g_mode == MODE_CHECK || g_mode == MODE_DEVICES)
         out_line("AXCESS_CHECK_FAILED %s_%lu", api, err);
     else
         out_line("probe-inner: %s failed with %lu", api, err);
@@ -514,7 +524,10 @@ static void sandbox_init(struct sandbox *sb, const struct options *o, DWORD proc
     GetLocalTime(&now);
     _snprintf(header, sizeof(header),
               "\n--- axcess-ai-launcher %s, %04u-%02u-%02u %02u:%02u:%02u%s ---\n",
-              g_mode == MODE_SERVE ? "serve" : "check", now.wYear, now.wMonth, now.wDay,
+              g_mode == MODE_SERVE     ? "serve"
+              : g_mode == MODE_DEVICES ? "devices"
+                                       : "check",
+              now.wYear, now.wMonth, now.wDay,
               now.wHour, now.wMinute, now.wSecond, o->gpu ? ", GPU capabilities" : "");
     header[sizeof(header) - 1] = 0;
     WriteFile(sb->log, header, (DWORD)strlen(header), &written, NULL);
@@ -1075,6 +1088,61 @@ static int run_check(struct options *o)
 }
 
 /* ------------------------------------------------------------------ */
+/* devices                                                             */
+/* ------------------------------------------------------------------ */
+
+/* llama-server -v --list-devices, once, in the same sandbox as serve (the
+ * same container, capabilities and job; one process; no child processes).
+ * Its standard output and error go to --log, which the backend reads: the
+ * Vulkan debug lines say which devices share the computer's memory
+ * ("uma: 1"), and the list gives each device's memory. No models folder is
+ * granted, no socket is opened, and the container has no network
+ * capability, so it can reach nothing; it only asks the graphics driver
+ * what it has. */
+static int run_devices(struct options *o)
+{
+    struct sandbox sb;
+    wchar_t *exe, *cmdline;
+    wchar_t *args[3];
+    size_t n;
+    PROCESS_INFORMATION pi;
+    DWORD code = 0, wait;
+
+    require_dirs(o, 0);
+    if (!o->log)
+        fail_usage("log_missing", 0);
+    if (o->models || o->spec || o->client_pid)
+        fail_usage("usage", 0);
+    n = wcslen(o->runtime) + 32;
+    exe = (wchar_t *)xalloc(n * sizeof(wchar_t));
+    _snwprintf(exe, n - 1, L"%ls\\llama-server.exe", o->runtime);
+    if (!is_file(exe))
+        fail_usage("server_missing", 0);
+
+    sandbox_init(&sb, o, 1);
+    args[0] = exe;
+    args[1] = L"-v";
+    args[2] = L"--list-devices";
+    cmdline = build_cmdline(args, 3);
+    sandbox_start(&sb, exe, cmdline, &pi);
+    free(cmdline);
+
+    wait = WaitForSingleObject(pi.hProcess, 30000);
+    if (wait != WAIT_OBJECT_0) {
+        TerminateJobObject(sb.job, 1);
+        WaitForSingleObject(pi.hProcess, 5000);
+        out_line("AXCESS_CHECK_FAILED devices_timeout");
+        return EXIT_FAILED;
+    }
+    if (!GetExitCodeProcess(pi.hProcess, &code))
+        fail("GetExitCodeProcess", GetLastError());
+    CloseHandle(pi.hProcess);
+    free(exe);
+    out_line("AXCESS_DEVICES_DONE %lu", code);
+    return code == 0 ? 0 : EXIT_FAILED;
+}
+
+/* ------------------------------------------------------------------ */
 /* serve                                                               */
 /* ------------------------------------------------------------------ */
 
@@ -1564,6 +1632,12 @@ int wmain(int argc, wchar_t **argv)
         require_windows_version();
         parse_options(argc, argv, 2, &o);
         return run_serve(&o);
+    }
+    if (wcscmp(argv[1], L"devices") == 0) {
+        g_mode = MODE_DEVICES;
+        require_windows_version();
+        parse_options(argc, argv, 2, &o);
+        return run_devices(&o);
     }
     if (wcscmp(argv[1], L"probe-inner") == 0 && argc >= 3) {
         g_mode = MODE_INNER;

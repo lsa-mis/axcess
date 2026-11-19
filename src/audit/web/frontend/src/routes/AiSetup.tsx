@@ -9,7 +9,7 @@ import type {
   AiTierPlan,
   MyModelFile,
 } from "../api/types";
-import { Button, Card, LinkButton, PageHeader } from "../components/ui";
+import { Button, Card, Checkbox, LinkButton, PageHeader } from "../components/ui";
 import { AiStatus, aiIsSetUp } from "../components/AiStatus";
 import { cn } from "../lib/cn";
 import {
@@ -18,6 +18,7 @@ import {
   AI_TIER_LABEL,
   AI_MY_MODEL_LABEL,
   AI_TIER_DESCRIPTION,
+  aiGpuOnlyLabel,
 } from "../lib/terms";
 
 /**
@@ -196,6 +197,34 @@ function AiSetupPage({
       error instanceof Error ? error.message : "AI settings could not be changed.",
     ),
   });
+  const [gpuMessage, setGpuMessage] = useState("");
+  // The box shows the choice at once and keeps it while AI restarts and
+  // the page reloads its data; it read the old value until then (UI test,
+  // 2026-11-19). A failed save puts the saved value back.
+  const [gpuOnly, setGpuOnly] = useState(plan.preferences.gpu_only);
+  useEffect(() => setGpuOnly(plan.preferences.gpu_only), [plan.preferences.gpu_only]);
+  const changeGpuOnly = useMutation({
+    mutationFn: api.setAiGpuOnly,
+    onMutate: (value: boolean) => {
+      setGpuOnly(value);
+      setGpuMessage(
+        enabled ? "Saving. If AI is running, it restarts, which can take a minute…" : "Saving…",
+      );
+    },
+    onSuccess: (preferences) => {
+      queryClient.setQueryData(["ai-preferences"], preferences);
+      setGpuMessage(
+        enabled
+          ? "Saved. If AI was running, it restarted with this setting. The AI state above says whether it is on."
+          : "Saved. It applies the next time AI starts.",
+      );
+      refresh();
+    },
+    onError: (error) => {
+      setGpuOnly(plan.preferences.gpu_only);
+      setGpuMessage(error instanceof Error ? error.message : "The setting could not be saved.");
+    },
+  });
   const start = useMutation({
     mutationFn: (tier: AiTierId) => api.installAi(tier),
     onSuccess: (next) => {
@@ -296,7 +325,7 @@ function AiSetupPage({
               recommended={tier.id === plan.recommended}
               current={tier.id === current?.tier}
               checked={tier.id === chosen}
-              memoryGb={plan.hardware.memory_gb}
+              memoryGb={plan.hardware.ai_memory_gb}
               onChoose={() => setChosen(tier.id)}
             />
           ))}
@@ -410,7 +439,7 @@ function AiSetupPage({
               // button was (developer, 2026-11-18; see the rationale at the
               // top).
               <p className="min-h-target content-center text-sm font-semibold text-fg">
-                {`${AI_TIER_LABEL[chosenTier.id]} is for computers with ${chosenTier.min_memory_gb} GB of memory or more, and this computer has ${plan.hardware.memory_gb} GB. Choose a smaller size.`}
+                {`${AI_TIER_LABEL[chosenTier.id]} is for computers with ${chosenTier.min_memory_gb} GB of memory or more, and this computer has ${memoryHave(plan)}. Choose a smaller size.`}
               </p>
             ) : chosenIsSetUp ? (
               // The chosen size is set up and every file is checked: a line
@@ -444,7 +473,7 @@ function AiSetupPage({
               chosenTier && (
                 <>
                   <p id={`${headingId}-download`} className="mb-2 text-sm text-fg">
-                    {downloadNote(chosenTier, enabled, plan.hardware.memory_gb)}
+                    {downloadNote(chosenTier, enabled, plan)}
                   </p>
                   <Button
                     type="button"
@@ -554,6 +583,38 @@ function AiSetupPage({
             <p role="status" className={message ? "mt-2 font-semibold" : "sr-only"}>
               {message}
             </p>
+            {/* How the models use the graphics card (developer, 2026-11-19).
+                By default llama.cpp puts what fits on the card and the rest
+                in the computer's memory; this box keeps everything on the
+                card, which is faster when it fits and does not start when
+                it does not. It sits with Turn AI on/off because both change
+                how AI runs, not which models are downloaded; the models
+                card's Download button would wrongly suggest it needs a
+                download. A native checkbox (shared Checkbox: 44 px row,
+                SC 2.5.5 Target Size (Enhanced), Level AAA) that saves at
+                once: the hint says it restarts AI, so the change of
+                context is announced before it happens (SC 3.2.2 On Input,
+                Level A), and the result is a status message right under it
+                (SC 4.1.3 Status Messages, Level AA). Rejected: a separate
+                Save button, a second step for one choice. Shown only where
+                a graphics build exists (not on an Intel Mac) and only for
+                Axcess's own AI, not your own Ollama. */}
+            {plan.program.gpu_build && current?.source === "private" && (
+              <div className="mt-3 border-t border-border pt-3">
+                <Checkbox
+                  checked={gpuOnly}
+                  onChange={(value) => {
+                    if (!changeGpuOnly.isPending) changeGpuOnly.mutate(value);
+                  }}
+                  disabled={running || changeGpuOnly.isPending}
+                  label={aiGpuOnlyLabel(plan.hardware.accelerator)}
+                  hint={gpuOnlyHint(plan)}
+                />
+                <p role="status" className={gpuMessage ? "mt-1 font-semibold" : "sr-only"}>
+                  {gpuMessage}
+                </p>
+              </div>
+            )}
           </Card>
         )}
 
@@ -1126,11 +1187,36 @@ function ProgressBlock({ status }: { status: AiInstallStatus }) {
  * This computer has less memory than the size is for. Only a warning: the
  * one refusal is the server's tier.refused (8 GB or less, and a size for
  * 16 GB or more). Memory is as computers are sold (the server's
- * hardware.memory_gb), so a 16 GB computer reads 16, not 15. 0 means
- * unknown, which never warns.
+ * hardware.memory_gb), so a 16 GB computer reads 16, not 15, plus a
+ * separate graphics card's own memory (ai_memory_gb; developer,
+ * 2026-11-19), because the AI uses both. 0 means unknown, which never
+ * warns.
  */
 function belowMemory(plan: AiPlan, tier: AiTierPlan): boolean {
-  return plan.hardware.memory_gb > 0 && plan.hardware.memory_gb < tier.min_memory_gb;
+  return plan.hardware.ai_memory_gb > 0 && plan.hardware.ai_memory_gb < tier.min_memory_gb;
+}
+
+/** What the graphics-only box changes, and that changing it restarts AI. */
+function gpuOnlyHint(plan: AiPlan): string {
+  const card = plan.hardware.gpu_memory_gb;
+  const where = plan.hardware.accelerator === "apple" ? "the chip\u2019s graphics" : "the graphics card";
+  return (
+    `Faster when the models fit in the memory of ${where}. If they do not fit, AI does not start. ` +
+    `When this is off, Axcess puts what fits on ${where} and the rest in the computer\u2019s memory. ` +
+    (card > 0 ? `This graphics card has ${card} GB of its own memory. ` : "") +
+    "Changing this restarts AI if it is on."
+  );
+}
+
+/**
+ * "16 GB", or "16 GB, counting the 8 GB on its graphics card": the figure
+ * the sizes are measured against, saying where it comes from when a card
+ * adds to it, so it never looks like a wrong reading of the computer's
+ * memory. The server's refusal says it the same way.
+ */
+function memoryHave(plan: AiPlan): string {
+  const { ai_memory_gb: total, gpu_memory_gb: card } = plan.hardware;
+  return card > 0 ? `${total} GB, counting the ${card} GB on its graphics card` : `${total} GB`;
 }
 
 /**
@@ -1141,15 +1227,23 @@ function belowMemory(plan: AiPlan, tier: AiTierPlan): boolean {
  * does not fit" (developer, 2026-11-18).
  */
 function hardwareSentence(plan: AiPlan): string {
-  const memory = plan.hardware.memory_gb;
+  const memory = plan.hardware.ai_memory_gb;
+  const card = plan.hardware.gpu_memory_gb;
   const disk = formatBytes(plan.hardware.free_disk_bytes);
   const chip = {
     apple: "an Apple chip",
     nvidia: "an NVIDIA graphics card",
     amd: "an AMD graphics card",
+    other: "a graphics card",
     none: "no graphics card Axcess can use",
   }[plan.hardware.accelerator];
-  let sentence = `This computer has ${memory} GB of memory, ${disk} of free disk space, and ${chip}.`;
+  // A separate card's own memory is said, and the total the sizes use, so
+  // "Standard: for computers with 16 GB" on an 8 GB laptop with an 8 GB
+  // card is not a puzzle (developer, 2026-11-19).
+  let sentence =
+    card > 0
+      ? `This computer has ${plan.hardware.memory_gb} GB of memory, ${disk} of free disk space, and ${chip} with ${card} GB of its own memory. The AI uses both, so the sizes count ${memory} GB.`
+      : `This computer has ${plan.hardware.memory_gb} GB of memory, ${disk} of free disk space, and ${chip}.`;
   const suggested = plan.tiers.find((tier) => tier.id === plan.recommended);
   const bigger = plan.tiers.filter(
     (tier) => suggested && tier.min_memory_gb > suggested.min_memory_gb && tier.min_memory_gb <= memory,
@@ -1167,13 +1261,13 @@ function hardwareSentence(plan: AiPlan): string {
  * Said before the download button: the size, what happens after, and a
  * warning when this computer has less memory than the size is for.
  */
-function downloadNote(tier: AiTierPlan, enabled: boolean, memoryGb: number): string {
+function downloadNote(tier: AiTierPlan, enabled: boolean, plan: AiPlan): string {
   const size = `Download size: ${formatBytes(tier.download_bytes)}.`;
   const after = enabled
     ? `${size} Axcess checks each file, then switches AI to ${AI_TIER_LABEL[tier.id]}.`
     : `${size} Axcess checks each file, then turns AI on.`;
-  return memoryGb > 0 && memoryGb < tier.min_memory_gb
-    ? `${after} ${AI_TIER_LABEL[tier.id]} is for computers with ${tier.min_memory_gb} GB of memory or more, and this computer has ${memoryGb} GB, so it may answer very slowly or stop.`
+  return belowMemory(plan, tier)
+    ? `${after} ${AI_TIER_LABEL[tier.id]} is for computers with ${tier.min_memory_gb} GB of memory or more, and this computer has ${memoryHave(plan)}, so it may answer very slowly or stop.`
     : after;
 }
 

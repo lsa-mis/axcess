@@ -350,6 +350,35 @@ async def test_llama_cpp_generate_reads_message_content() -> None:
     assert str(seen[0].url) == f"{BASE}/v1/chat/completions"
 
 
+async def test_llama_cpp_counts_tokens_with_the_loaded_model() -> None:
+    """``/tokenize`` with the model's name, so the router and the Windows
+    routes reach the right model (wording-check batches, 2026-11-19)."""
+    handler, seen = _recording(httpx.Response(200, json={"tokens": [1, 2, 3, 4]}))
+    async with _http(handler) as http:
+        count = await LlamaCppClient(http, base_url=BASE).count_tokens("some text", "bonsai")
+    assert count == 4
+    assert str(seen[0].url) == f"{BASE}/tokenize"
+    assert json.loads(seen[0].content) == {"model": "bonsai", "content": "some text"}
+
+
+@pytest.mark.parametrize(
+    "response",
+    [httpx.Response(404, text="no such route"), httpx.Response(200, json={"error": "x"})],
+)
+async def test_a_token_count_that_fails_is_unknown(response: httpx.Response) -> None:
+    handler, _seen = _recording(response)
+    async with _http(handler) as http:
+        assert await LlamaCppClient(http, base_url=BASE).count_tokens("t", "m") is None
+
+
+async def test_ollama_cannot_count_tokens() -> None:
+    def refuse(_request: httpx.Request) -> httpx.Response:
+        raise AssertionError("nothing may be sent")
+
+    async with _http(refuse) as http:
+        assert await OllamaClient(http, base_url=BASE).count_tokens("t", "m") is None
+
+
 async def test_llama_cpp_null_content_is_empty_text() -> None:
     handler, _ = _recording(httpx.Response(200, json=_chat_reply(None)))
     async with _http(handler) as http:

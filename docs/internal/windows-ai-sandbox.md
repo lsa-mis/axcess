@@ -81,6 +81,15 @@ llama-server.exe (inside LPAC, inside job, cannot start children)
 Axcess backend
 ```
 
+The launcher has a third command, `devices` (2026-11-19). It runs
+`llama-server.exe -v --list-devices` once in the same container, job and
+capabilities (`--gpu`), with no models folder and no socket, and writes
+its output to `--log`, a fresh file in scratch that the backend reads
+(`windows_launcher.run_devices`). Axcess uses it to count a separate
+graphics card's own memory toward the model sizes. It refuses `--models`,
+`--spec` and `--client-pid`. The smoke test (`smoke.ps1`, step e) runs it
+on the CPU build.
+
 ### Why a native launcher, not only ctypes
 
 - Python's `subprocess` cannot pass `SECURITY_CAPABILITIES` [16].

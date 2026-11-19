@@ -195,8 +195,15 @@ async def test_semantic_plain_text_bytes_unchanged(
 ) -> None:
     capture = _Capture({"response": "free text"})
     async with httpx.AsyncClient(transport=httpx.MockTransport(capture)) as http:
+        # max_tokens=None: the wording checks' answer cap (2026-11-19) is a
+        # deliberate change, tested in test_semantic_ollama_text; this test
+        # pins only what the move to the client must not have changed.
         provider = OllamaTextProvider(
-            http, model="qwen2.5:7b-instruct", base_url=BASE, keep_alive=keep_alive
+            http,
+            model="qwen2.5:7b-instruct",
+            base_url=BASE,
+            keep_alive=keep_alive,
+            max_tokens=None,
         )
         await provider.generate(
             "PROMPT", model="qwen2.5:14b-instruct", force_json=False, temperature=temperature
@@ -220,7 +227,10 @@ async def test_suggest_text_only_bytes_unchanged() -> None:
 async def test_semantic_json_mode_same_content() -> None:
     capture = _Capture({"response": "{}"})
     async with httpx.AsyncClient(transport=httpx.MockTransport(capture)) as http:
-        provider = OllamaTextProvider(http, model="qwen2.5:7b-instruct", base_url=BASE)
+        # No answer cap here; see test_semantic_plain_text_bytes_unchanged.
+        provider = OllamaTextProvider(
+            http, model="qwen2.5:7b-instruct", base_url=BASE, max_tokens=None
+        )
         await provider.generate("PROMPT")
     old = _wire(_old_semantic("qwen2.5:7b-instruct", "PROMPT", -1, 0.0, True))
     assert _sorted(capture.body) == _sorted(old)

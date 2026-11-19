@@ -89,6 +89,9 @@ from audit.wcag_version import (
 log = get_logger(__name__)
 
 JOB_KIND = "fetch"
+# Longest a wording-check request to the private llama.cpp service may
+# take: the same 5 minutes as a fix suggestion (Settings.suggestion_timeout_s).
+PRIVATE_AI_TIMEOUT_S = 300.0
 
 
 class AlfaPageAnalyzer(Protocol):
@@ -1235,6 +1238,10 @@ class _WorkerContext:
     alfa: AlfaPageAnalyzer | None
     in_flight: int
     summary: CrawlSummary
+    # Jobs a worker has taken whose page is not counted yet: the page limit
+    # counts them as taken, so workers never start more pages than it
+    # allows (see _worker).
+    unfetched: set[int] = field(default_factory=set)
     # Phase 9+: list of per-criterion semantic analyzers to run per
     # page. Empty when ``config.semantic_enabled`` is False, the
     # provider can't reach Ollama, or no SC is registered.
@@ -1338,6 +1345,12 @@ async def _build_semantic_analyzers(
         base_url=config.vlm_base_url,
         concurrency=config.semantic_concurrency,
         backend=config.model_backend,
+        # The private llama.cpp service on a laptop answers slowly: give a
+        # wording check the 5 minutes a fix suggestion gets
+        # (Settings.suggestion_timeout_s default), not 2. A timeout is not
+        # retried (OllamaBase.retry_timeouts), so this is the longest one
+        # request can hold the page (developer, 2026-11-19).
+        timeout_s=PRIVATE_AI_TIMEOUT_S if config.model_backend == "llama_cpp" else 120.0,
     )
     if not await provider.healthy():
         log.warning(
@@ -1367,8 +1380,17 @@ async def _build_semantic_analyzers(
 async def _worker(ctx: _WorkerContext) -> None:
     """Lease and process jobs until both queue and peers are idle."""
     while True:
-        if _page_limit_reached(ctx):
-            return
+        # Pages being loaded count as taken. Counting only loaded pages let
+        # each idle worker start another page while the first ones were
+        # still loading or in their checks: a 2-page scan saved 7, and a
+        # 10-page one 17, each with its full AI checks (2026-11-19).
+        # A page being loaded may still fail and not count, so wait for it
+        # rather than stop one page short.
+        if _page_limit_reached(ctx, taken=len(ctx.unfetched)):
+            if _page_limit_reached(ctx) or not ctx.unfetched:
+                return
+            await asyncio.sleep(0.05)
+            continue
         job = queue.lease(ctx.conn, JOB_KIND, lease_secs=120, scan_id=ctx.scan_id)
         if job is None:
             if (
@@ -1379,6 +1401,7 @@ async def _worker(ctx: _WorkerContext) -> None:
             await asyncio.sleep(0.05)
             continue
         ctx.in_flight += 1
+        ctx.unfetched.add(job.id)
         try:
             with live_progress.page(ctx.scan_id, str(job.payload["url"]), _tracked_checks(ctx)):
                 await _process_job(ctx, job)
@@ -1389,6 +1412,7 @@ async def _worker(ctx: _WorkerContext) -> None:
             ctx.summary.errors += 1
         finally:
             ctx.in_flight -= 1
+            ctx.unfetched.discard(job.id)
 
 
 def _tracked_checks(ctx: _WorkerContext) -> list[str]:
@@ -1424,9 +1448,10 @@ def _tracked_checks(ctx: _WorkerContext) -> list[str]:
     return checks
 
 
-def _page_limit_reached(ctx: _WorkerContext) -> bool:
+def _page_limit_reached(ctx: _WorkerContext, *, taken: int = 0) -> bool:
+    """The page limit is used up: pages counted, plus ``taken`` not yet counted."""
     limit = ctx.config.max_pages
-    return limit is not None and ctx.summary.pages_fetched >= limit
+    return limit is not None and ctx.summary.pages_fetched + taken >= limit
 
 
 async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
@@ -1537,6 +1562,7 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
         ctx, url, status_code=result.status_code, result=result, render_mode=render_mode
     )
     ctx.summary.pages_fetched += 1
+    ctx.unfetched.discard(job.id)
     if result.search_result is not None and page_id is not None:
         repo.record_search_run(
             ctx.conn, scan_id=ctx.scan_id, page_id=page_id, outcome=result.search_result.outcome

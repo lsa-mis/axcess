@@ -26,6 +26,7 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import json
+import logging
 import os
 import shutil
 import signal
@@ -56,6 +57,7 @@ from audit.ai.windows_launcher import (
     private_copy,
     require_windows_sandbox,
     run_check,
+    run_devices,
     with_launcher,
 )
 
@@ -88,20 +90,31 @@ WORKING_BYTES_PER_MODEL = 1_500_000_000
 MEMORY_MARGIN_BYTES = 1_000_000_000
 # How long a start waits for memory to come back before it warns.
 MEMORY_SETTLE_S = 10.0
+# Nothing kept between requests. Every Axcess request is complete on its
+# own (one message, no history), but llama-server b12284 by default keeps
+# each finished prompt's state in RAM (--cache-ram, up to 8,192 MiB) and,
+# for hybrid models such as Bonsai 2, up to 32 snapshots per slot
+# (--ctx-checkpoints). During a scan the service grew by about 600 MB in
+# three wording-check requests and pushed the developer's 16 GB laptop
+# into swap (2026-11-19). Both off: memory stays at what the model and its
+# window need. The cost is reading the shared instructions again on each
+# request, which a scan's varied pages mostly did anyway.
+NO_REQUEST_CACHE = ("--cache-ram", "0", "--ctx-checkpoints", "0")
 # The service's process group, kept so a later start can end what an
 # earlier run left behind (a crash, a killed app).
 GROUP_FILE = "service.group"
 
 
-def memory_needed(models: Iterable[ModelEntry], *, dedicated_gpu: bool) -> int:
+def memory_needed(models: Iterable[ModelEntry], *, gpu_memory: int = 0) -> int:
     """Free memory the service needs to start ``models`` without swapping.
 
-    A separate graphics card (NVIDIA, AMD) holds the model files in its own
-    memory; Apple chips and integrated graphics use the computer's memory,
-    as does the processor-only build.
+    A separate graphics card holds as much of the model files as fits in
+    its own memory (``gpu_memory``, llama.cpp's ``--fit``); the rest is in
+    the computer's memory. Apple chips and built-in graphics share the
+    computer's memory, so for them ``gpu_memory`` is 0.
     """
     models = list(models)
-    files = 0 if dedicated_gpu else sum(m.size for m in models)
+    files = max(0, sum(m.size for m in models) - gpu_memory)
     return files + WORKING_BYTES_PER_MODEL * len(models) + MEMORY_MARGIN_BYTES
 
 
@@ -198,7 +211,25 @@ def find_server(folder: Path) -> Path | None:
     return None
 
 
-def preset_text(models: Iterable[tuple[ModelEntry, Path, Path | None]], *, gpu: bool) -> str:
+def gpu_layers(*, gpu: bool, gpu_only: bool) -> str | None:
+    """llama-server's ``--n-gpu-layers`` for this start, or None to leave it unset.
+
+    Unset on a graphics build, so llama.cpp's ``--fit`` (on by default in
+    b12284) puts as many layers on the graphics card as fit, keeping 1 GB
+    spare, and the rest in the computer's memory. It used to be 99 (every
+    layer): a model bigger than the card then failed to load on it and ran
+    on the processor alone (developer, 2026-11-19). "Run AI on the graphics
+    card only" sets ``all``: faster when it fits, and no start otherwise.
+    The processor build keeps 0.
+    """
+    if not gpu:
+        return "0"
+    return "all" if gpu_only else None
+
+
+def preset_text(
+    models: Iterable[tuple[ModelEntry, Path, Path | None]], *, gpu: bool, gpu_only: bool = False
+) -> str:
     """The router's model preset: one section per model, named ``served_name``.
 
     Keys are llama-server options without their dashes (server README,
@@ -212,14 +243,18 @@ def preset_text(models: Iterable[tuple[ModelEntry, Path, Path | None]], *, gpu: 
     loads both models when the service starts, so the first answer does
     not wait.
     """
+    layers = gpu_layers(gpu=gpu, gpu_only=gpu_only)
     lines = [
         "version = 1",
         "",
         "[*]",
         f"c = {CONTEXT_TOKENS}",
-        f"n-gpu-layers = {99 if gpu else 0}",
+        *([f"n-gpu-layers = {layers}"] if layers is not None else []),
         "reasoning = off",
         "reasoning-format = none",
+        # NO_REQUEST_CACHE, as preset keys.
+        "cache-ram = 0",
+        "ctx-checkpoints = 0",
         "load-on-startup = true",
     ]
     for entry, model, mmproj in models:
@@ -276,6 +311,11 @@ class LlamaRuntime:
         self.isolation_reason: str | None = None
         # Said while the service runs, when it started with little free memory.
         self.memory_warning: str | None = None
+        # "Run AI on the graphics card only" (AIPreferences.gpu_only), set by
+        # the manager before each start.
+        self.gpu_only = False
+        # Graphics devices, read once per program (``devices``).
+        self._devices: tuple[Path, list[hardware.GpuDevice]] | None = None
 
     # -- the program -------------------------------------------------------
 
@@ -428,6 +468,80 @@ class LlamaRuntime:
 
     # -- models ------------------------------------------------------------
 
+    def devices(self) -> list[hardware.GpuDevice]:
+        """The graphics devices the graphics build can use; [] when unknown.
+
+        Runs ``llama-server -v --list-devices`` once per program, inside
+        the same sandbox as the service, with no model and no network:
+        Bubblewrap on Linux, the launcher's AppContainer on Windows (its
+        ``devices`` command). Not on macOS, where the Apple chip shares the
+        computer's memory and adds nothing.
+        """
+        windows = sys.platform.startswith("win")
+        if not (windows or sys.platform.startswith("linux")):
+            return []
+        gpu_builds = [(a, s) for a, s in self.builds() if a != "cpu"]
+        if not gpu_builds:
+            return []
+        accelerator, server = gpu_builds[0][0], gpu_builds[0][1].resolve()
+        if self._devices is not None and self._devices[0] == server:
+            return self._devices[1]
+        found: list[hardware.GpuDevice] = []
+        if windows:
+            found = self._windows_devices(accelerator, server)
+            self._devices = (server, found)
+            return found
+        try:
+            self.models_dir.mkdir(parents=True, exist_ok=True)
+            self.scratch.mkdir(parents=True, exist_ok=True)
+            program_root = server.parent
+            sandbox = build_sandbox(program_root, self.models_dir, self.scratch, gpu=True)
+            scratch = str(self.scratch.resolve())
+            result = subprocess.run(  # noqa: S603 - pinned binary in OS sandbox
+                sandbox.command([str(server), "-v", "--list-devices"]),
+                cwd=scratch,
+                env={
+                    "PATH": str(program_root),
+                    "HOME": scratch,
+                    "TMPDIR": scratch,
+                    "LD_LIBRARY_PATH": str(program_root),
+                },
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+                stdin=subprocess.DEVNULL,
+            )
+            found = hardware.parse_devices(result.stdout + "\n" + result.stderr)
+        except (OSError, subprocess.SubprocessError, IsolationError):
+            logging.getLogger(__name__).warning("ai.list_devices_failed", exc_info=True)
+        self._devices = (server, found)
+        return found
+
+    def _windows_devices(self, accelerator: str, server: Path) -> list[hardware.GpuDevice]:
+        """``devices`` through the launcher, in the service's AppContainer."""
+        launcher = self._launcher()
+        try:
+            require_windows_sandbox(launcher)
+            if launcher is None:  # pragma: no cover - require_windows_sandbox raised
+                return []
+            self.scratch.mkdir(parents=True, exist_ok=True)
+            program = server.parent
+            # The launcher changes the folder's access list, which it cannot
+            # do under Program Files: the same private copy a start uses.
+            if not program.is_relative_to(self.ai_dir.resolve()):
+                program = private_copy(program, self.download_dir / accelerator).resolve()
+            scratch = self.scratch.resolve()
+            output = run_devices(launcher, program, scratch, scratch / "devices.txt")
+        except (OSError, subprocess.SubprocessError, IsolationError):
+            logging.getLogger(__name__).warning("ai.list_devices_failed", exc_info=True)
+            return []
+        return hardware.parse_devices(output)
+
+    def separate_gpu_memory(self) -> int:
+        """Memory on separate graphics cards, in bytes; 0 for none or unknown."""
+        return sum(d.total_bytes for d in self.devices() if not d.shared)
+
     def has_model(self, model: ModelEntry) -> bool:
         from audit.ai.downloader import model_present
 
@@ -500,7 +614,13 @@ class LlamaRuntime:
                 self.isolation_reason = exc.reason
                 raise
             builds = self.builds()
+            if self.gpu_only:
+                # No processor build to fall back to: "only" means only.
+                builds = [(a, s) for a, s in builds if a != "cpu"]
             if not builds:
+                if self.gpu_only and self.builds():
+                    self.isolation_reason = "gpu_only_failed"
+                    raise RuntimeSetupError("AI could not start on the graphics card alone.")
                 raise RuntimeSetupError("The AI program is not installed yet.")
             if not all(self.has_model(m) for m in models):
                 raise RuntimeSetupError("The AI models are not downloaded yet.")
@@ -516,7 +636,7 @@ class LlamaRuntime:
                 except _ModelLoadError as exc:
                     last = RuntimeSetupError(str(exc))
                     continue
-            self.isolation_reason = "runtime_failed"
+            self.isolation_reason = "gpu_only_failed" if self.gpu_only else "runtime_failed"
             raise last or RuntimeSetupError("The isolated AI service could not start.")
 
     def _start_windows_locked(
@@ -557,17 +677,19 @@ class LlamaRuntime:
                 entry.served_name,
                 "-c",
                 str(CONTEXT_TOKENS),
-                "-ngl",
-                "99" if gpu else "0",
                 "--reasoning",
                 "off",
                 "--reasoning-format",
                 "none",
+                *NO_REQUEST_CACHE,
                 "--host",
                 str(sock),
                 "--no-webui",
                 "--offline",
             ]
+            layers = gpu_layers(gpu=gpu, gpu_only=self.gpu_only)
+            if layers is not None:
+                argv += ["-ngl", layers]
             for key, value in sorted((entry.sampling or {}).items()):
                 argv += [f"--{key}", f"{value:g}"]
             processes.append(ModelProcess(entry.served_name, sock, argv))
@@ -616,7 +738,10 @@ class LlamaRuntime:
         sock.unlink(missing_ok=True)
         preset = (self.scratch / "models.ini").resolve()
         preset.write_text(
-            preset_text(self._model_paths(models), gpu=accelerator != "cpu"), encoding="utf-8"
+            preset_text(
+                self._model_paths(models), gpu=accelerator != "cpu", gpu_only=self.gpu_only
+            ),
+            encoding="utf-8",
         )
         scratch = str(self.scratch.resolve())
         env = {
@@ -771,7 +896,7 @@ class LlamaRuntime:
         for 16 GB or more on a computer with 8 GB or less
         (AIManager._require_size_fits, hardware.size_refused).
         """
-        need = memory_needed(models, dedicated_gpu=hardware.dedicated_gpu())
+        need = memory_needed(models, gpu_memory=self.separate_gpu_memory())
         # Memory a model just stopped holds comes back over a few seconds
         # (integrated graphics frees its part late), so a switch measured at
         # once would warn with room to spare (end-to-end test, 2026-11-17).

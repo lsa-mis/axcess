@@ -88,11 +88,21 @@ def test_skip_choice_persists_and_blocks_model_requests(
         assert client.get("/api/ai/preferences").json() == {
             "enabled": False,
             "choice_recorded": False,
+            "gpu_only": False,
         }
         assert client.put("/api/ai/preferences", json={"enabled": False}).json() == {
             "enabled": False,
             "choice_recorded": True,
+            "gpu_only": False,
         }
+        # "Run AI on the graphics card only" is saved on its own and kept
+        # when AI is turned on or off; one change per request.
+        assert client.put("/api/ai/preferences", json={"gpu_only": True}).json()["gpu_only"]
+        assert client.put("/api/ai/preferences", json={"enabled": False}).json()["gpu_only"]
+        assert client.put("/api/ai/preferences", json={}).status_code == 422
+        both = client.put("/api/ai/preferences", json={"enabled": False, "gpu_only": False})
+        assert both.status_code == 422
+        assert client.put("/api/ai/preferences", json={"gpu_only": False}).status_code == 200
         local = client.get("/api/capabilities/local-analysis").json()
         assert local["ai_enabled"] is False
         assert not local["vision"]["available"]

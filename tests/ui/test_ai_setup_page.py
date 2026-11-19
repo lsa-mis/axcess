@@ -123,7 +123,11 @@ async def test_first_launch_skip_choice_by_keyboard(new_page: Any, server: str, 
         await page.get_by_role("heading", name="Reports").first.wait_for()
         assert await heading.count() == 0
         preferences = await page.request.get(f"{server}/api/ai/preferences")
-        assert await preferences.json() == {"enabled": False, "choice_recorded": True}
+        assert await preferences.json() == {
+            "enabled": False,
+            "choice_recorded": True,
+            "gpu_only": False,
+        }
     finally:
         await page.context.close()
 
@@ -263,14 +267,19 @@ async def _tab_to(page: Any, name: str, limit: int = 60) -> None:
     raise AssertionError(f"Could not reach {name!r} with Tab")
 
 
-async def _private_standard(page: Any, runtime: dict[str, Any] | None = None) -> None:
+async def _private_standard(
+    page: Any, runtime: dict[str, Any] | None = None, hardware: dict[str, Any] | None = None
+) -> None:
     """The plan says the private Standard size is set up; the runtime answers
-    ``runtime`` (GET) unless the test routes it itself."""
+    ``runtime`` (GET) unless the test routes it itself. ``hardware`` replaces
+    parts of the plan's computer (a graphics card's memory, say)."""
 
     async def plan(route: Any) -> None:
         response = await route.fetch()
         body = await response.json()
         body["current"].update(source="private", backend="llama_cpp", tier="standard")
+        body["hardware"].update(hardware or {})
+        body["program"]["gpu_build"] = True
         for tier in body["tiers"]:
             tier["installed"] = tier["id"] == "standard"
         await route.fulfill(response=response, json=body)
@@ -397,6 +406,64 @@ async def test_private_runtime_start_by_keyboard_preserves_focus_and_announces(
         # A later status check keeps it that way.
         await page.wait_for_timeout(5500)
         assert await page.get_by_role("button", name="Start AI again").count() == 0
+        violations = await _run_axe(page)
+        assert not violations, _render_violations(violations)
+    finally:
+        await page.context.close()
+
+
+async def test_a_graphics_cards_memory_counts_and_graphics_only_can_be_set(
+    new_page: Any, server_set_up: str
+) -> None:
+    """Developer, 2026-11-19: a separate card's own memory counts toward the
+    sizes, the page says so, and "Run AI on the graphics card only" is one
+    checkbox by Turn AI on/off that saves at once."""
+    page = await new_page(viewport={"width": 320, "height": 900})
+    try:
+        running = {"running": True, "isolated": True, "reason": None, "starting": False}
+        card = {"gpu_memory_gb": 8, "ai_memory_gb": 24, "accelerator": "nvidia"}
+        await _private_standard(page, running, card)
+        await page.goto(f"{server_set_up}/app/settings/ai")
+        await page.get_by_role("heading", name=ON).wait_for()
+        box = page.get_by_role("checkbox", name="Run AI on the graphics card only")
+        assert not await box.is_checked()
+        description = await box.evaluate(
+            "el => el.getAttribute('aria-describedby').split(' ')"
+            ".map(id => document.getElementById(id).textContent).join(' ')"
+        )
+        assert "If they do not fit, AI does not start." in description
+        assert "This graphics card has 8 GB of its own memory." in description
+        assert "Changing this restarts AI if it is on." in description
+        await box.focus()
+        await page.keyboard.press("Space")
+        await page.get_by_text(
+            "Saved. If AI was running, it restarted with this setting. "
+            "The AI state above says whether it is on.",
+            exact=True,
+        ).wait_for()
+        assert await box.is_checked()
+        saved = await (await page.request.get(f"{server_set_up}/api/ai/preferences")).json()
+        assert saved["gpu_only"] is True
+
+        await _open_change(page)
+        await page.get_by_text("This computer has 16 GB of memory", exact=False).first.wait_for()
+        assert (
+            await page.get_by_text(
+                "and an NVIDIA graphics card with 8 GB of its own memory. "
+                "The AI uses both, so the sizes count 24 GB.",
+                exact=False,
+            ).count()
+            == 1
+        )
+        group = page.get_by_role("group", name="Choose the AI models")
+        await group.locator("input[value='large']").check()
+        large = page.get_by_role("button", name="Download Large and switch to it")
+        await large.wait_for()
+        note = await page.locator(f"#{await large.get_attribute('aria-describedby')}").inner_text()
+        assert note.endswith(
+            "this computer has 24 GB, counting the 8 GB on its graphics card, "
+            "so it may answer very slowly or stop."
+        )
         violations = await _run_axe(page)
         assert not violations, _render_violations(violations)
     finally:

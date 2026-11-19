@@ -2119,8 +2119,13 @@ export interface AiPlan {
     memory_bytes: number;
     /** Memory as computers are sold (16, not 15.3); 0 when unknown. */
     memory_gb: number;
+    /** Memory on separate graphics cards, as sold; 0 for none or not known. */
+    gpu_memory_gb: number;
+    /** What the sizes are measured against: memory_gb plus gpu_memory_gb. */
+    ai_memory_gb: number;
     free_disk_bytes: number;
-    accelerator: "apple" | "nvidia" | "amd" | "none";
+    /** "other": a separate graphics card not recognised as NVIDIA or AMD. */
+    accelerator: "apple" | "nvidia" | "amd" | "other" | "none";
   };
   program: {
     version: string;
@@ -2130,6 +2135,8 @@ export interface AiPlan {
     available_for_this_computer: boolean;
     /** True when the desktop app includes the program: setup downloads only models. */
     included: boolean;
+    /** A graphics build exists for this computer. */
+    gpu_build: boolean;
   };
   tiers: AiTierPlan[];
   recommended: AiTierId | null;
@@ -2154,6 +2161,8 @@ export interface MyModelFile {
 export interface AiPreferences {
   enabled: boolean;
   choice_recorded: boolean;
+  /** "Run AI on the graphics card only". */
+  gpu_only: boolean;
 }
 
 /** Private desktop AI service. No download happens when it is started. */

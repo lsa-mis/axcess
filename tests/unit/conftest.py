@@ -25,3 +25,12 @@ def _a_large_computer(monkeypatch: pytest.MonkeyPatch) -> None:
     from audit.ai import hardware
 
     monkeypatch.setattr(hardware, "_memory_bytes", lambda: 64 * 1024**3)
+
+
+@pytest.fixture(autouse=True)
+def _no_graphics_card_memory(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Reading the graphics cards runs llama-server; tests never do. Tests of
+    the card's memory set their own value."""
+    from audit.ai.runtime import LlamaRuntime
+
+    monkeypatch.setattr(LlamaRuntime, "devices", lambda self: [])

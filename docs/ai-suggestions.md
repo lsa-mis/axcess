@@ -137,6 +137,17 @@ choice moves into **Change the AI models**.
    one exception is a computer with 8 GB of memory or less, which cannot
    download or start Standard or Large.
 
+   A separate graphics card's own memory counts too, because the AI puts as
+   much of a model as fits on the card and the rest in the computer's
+   memory. An 8 GB laptop with an 8 GB card counts as 16 GB, so it can run
+   Standard. The page names the card's memory and the total. Built-in
+   graphics and Apple chips share the computer's memory, so they add
+   nothing. Axcess reads the card's memory from the AI program itself
+   (`llama-server --list-devices`, in the same sandbox as the AI: Bubblewrap
+   on Linux, the launcher's AppContainer on Windows). The Windows path is
+   checked by the Windows smoke test in CI, not yet on a computer with a
+   separate card.
+
    Without a graphics chip Axcess suggests Small, because larger models are
    slow on the processor alone, and the page says so. All models use the
    Apache 2.0 licence.
@@ -269,6 +280,13 @@ internet access.
 - Axcess tries the graphics chip build first: Metal on Apple Silicon Macs,
   Vulkan on Linux and Windows. If that build cannot load the models, it uses
   the processor-only (CPU) build. There are no NVIDIA CUDA or AMD ROCm builds.
+- On the graphics build, llama.cpp decides how much of each model goes on the
+  graphics card (its `--fit` setting): what fits, keeping 1 GB spare, and
+  the rest in the computer's memory. **Run AI on the graphics card only**,
+  by **Turn AI off** on the AI features page, keeps every part on the card
+  instead: faster when it fits, and AI does not start when it does not
+  (there is no fallback to the processor build then). Changing it restarts
+  AI if it is on.
 - The bundled AI program, its sandbox and graphics chip use still need
   testing in a packaged desktop release, and the macOS sandbox on a real Mac.
 
