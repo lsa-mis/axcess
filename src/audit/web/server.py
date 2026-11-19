@@ -2466,6 +2466,42 @@ def create_app(
                 conn, scan_id, limit=limit, offset=offset, sort=sort
             )
 
+    @app.get("/api/scans/{scan_id:int}/pages/export.csv")
+    def api_scan_pages_csv(
+        scan_id: int,
+        request: Request,
+        sort: pages_queries.PageSort = pages_queries.DEFAULT_SORT,
+    ) -> Response:
+        """Every page this report visited as one CSV file, in the list's order.
+
+        A download a person asks for from the Pages visited list. Refused
+        like the Images ZIP: for a protected report, whose page addresses and
+        titles stay in its store, and while the scan is still running and
+        adding pages. A stopped report with saved pages is a report and gets
+        its file (AGENTS.md: never refuse an action because a scan stopped).
+        """
+        from audit.exports.pages_csv import pages_csv_filename, render_pages_csv
+
+        with get_conn() as conn:
+            if _get_protected_scan_compat(conn, scan_id=scan_id) is not None:
+                raise HTTPException(
+                    status_code=403,
+                    detail="A protected report's list of pages cannot be downloaded.",
+                )
+            scan = _load_scan_or_404(conn, scan_id)
+            _require_ended_report(scan)
+            rows = pages_queries.all_scan_pages(conn, scan_id, sort=sort)
+        body = render_pages_csv(
+            rows, scan_id=scan_id, app_base_url=f"{str(request.base_url).rstrip('/')}/app"
+        )
+        return Response(
+            content=body,
+            media_type="text/csv; charset=utf-8",
+            headers={
+                "Content-Disposition": f'attachment; filename="{pages_csv_filename(scan_id)}"'
+            },
+        )
+
     @app.get("/api/scans/{scan_id:int}/documents", response_model=ScanDocumentsResponse)
     def api_scan_documents(
         scan_id: int,
@@ -5571,11 +5607,12 @@ def _saved_page_count(conn: sqlite3.Connection, scan_id: int) -> int:
 
 
 def _require_ended_report(scan: dict[str, Any]) -> None:
-    """Guard the Images tab's alt check and ZIP: a report, not a live crawl.
+    """Guard the Images tab's alt check and ZIP, and the Pages visited CSV:
+    a report, not a live crawl.
 
     A report is a completed scan or one that ended with saved pages, however
     it ended (the rule since 2026-11-14, ``sites.group_scans``). A running
-    scan is still adding images, so it is refused until it ends.
+    scan is still adding pages and images, so it is refused until it ends.
     """
     ended = scan["status"] != "running"
     if not (scan["status"] == "completed" or (ended and int(scan.get("page_count") or 0) > 0)):

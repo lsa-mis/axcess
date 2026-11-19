@@ -150,6 +150,39 @@ def list_scan_pages(
         (scan_id,),
     ).fetchone()
 
+    rows = _page_rows(conn, scan_id, order_by=order_by, limit=limit, offset=offset)
+
+    return ScanPagesResponse(
+        scan_id=scan_id,
+        total=int(totals["total"]),
+        not_loaded_count=int(totals["not_loaded"]),
+        error_status_count=int(totals["error_status"]),
+        limit=limit,
+        offset=offset,
+        sort=sort,
+        pages=rows,
+    )
+
+
+def all_scan_pages(
+    conn: sqlite3.Connection, scan_id: int, *, sort: PageSort = DEFAULT_SORT
+) -> list[ScanPageRow]:
+    """Every page ``scan_id`` visited, in ``sort`` order, for the CSV download.
+
+    Not paged: the download is the whole list, so a reader has every page in
+    one file. The rows are the same rows, with the same counts and the same
+    order, as ``list_scan_pages`` returns a page at a time.
+    """
+    order_by = _ORDER_BY.get(sort)
+    if order_by is None:
+        raise ValueError(f"Unknown sort: {sort!r}")
+    return _page_rows(conn, scan_id, order_by=order_by, limit=-1, offset=0)
+
+
+def _page_rows(
+    conn: sqlite3.Connection, scan_id: int, *, order_by: str, limit: int, offset: int
+) -> list[ScanPageRow]:
+    """The page rows of one scan. ``limit`` -1 is SQLite's "no limit"."""
     # Each count is a correlated subquery on an indexed page_id column
     # (idx_a11y_page, idx_page_images_page, the page_dom_states primary
     # key), and each repeats the scan_id bound: a child row is only counted
@@ -173,26 +206,16 @@ def list_scan_pages(
         """,  # noqa: S608 - order_by is one of the fixed _ORDER_BY strings
         (scan_id, limit, offset),
     ).fetchall()
-
-    return ScanPagesResponse(
-        scan_id=scan_id,
-        total=int(totals["total"]),
-        not_loaded_count=int(totals["not_loaded"]),
-        error_status_count=int(totals["error_status"]),
-        limit=limit,
-        offset=offset,
-        sort=sort,
-        pages=[
-            ScanPageRow(
-                page_id=int(row["page_id"]),
-                url=str(row["url"]),
-                title=row["title"],
-                status_code=row["status_code"],
-                load_result=load_result(row["status_code"]),
-                occurrence_count=int(row["occurrence_count"]),
-                image_count=int(row["image_count"]),
-                page_state_count=int(row["page_state_count"]),
-            )
-            for row in rows
-        ],
-    )
+    return [
+        ScanPageRow(
+            page_id=int(row["page_id"]),
+            url=str(row["url"]),
+            title=row["title"],
+            status_code=row["status_code"],
+            load_result=load_result(row["status_code"]),
+            occurrence_count=int(row["occurrence_count"]),
+            image_count=int(row["image_count"]),
+            page_state_count=int(row["page_state_count"]),
+        )
+        for row in rows
+    ]
