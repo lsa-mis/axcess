@@ -876,7 +876,10 @@ async def test_an_unfinished_report_offers_continue_scan_in_place_of_scan_again(
     ).to_have_count(0)
     # Its own status, in words: not finished, not stopped.
     await row.get_by_role("button", name=re.compile(r"^Show all 2 scans")).click()
-    await playwright_async.expect(table.get_by_text("Not finished", exact=True)).to_have_count(1)
+    # One visible badge; the hidden sizing rows (SizerRows) copy its words.
+    await playwright_async.expect(
+        table.get_by_text("Not finished", exact=True).locator("visible=true")
+    ).to_have_count(1)
     violations = await _run_axe(page)
     assert not violations, _render_violations(violations)
 
@@ -888,10 +891,15 @@ async def test_an_unfinished_report_offers_continue_scan_in_place_of_scan_again(
         assert "Continue report #71 (unfinished.example)?" in dialog.message
         await dialog.accept()
 
+    # By keyboard, as the Scan again test does: at 320px a pointer's
+    # scroll-into-view leaves the button under the sticky Site column.
     page.once("dialog", dismiss)
-    await button.click()
+    await button.focus()
+    await page.keyboard.press("Enter")
+    await page.wait_for_timeout(300)
     assert continued == []
     page.once("dialog", accept)
-    await button.click()
+    await button.focus()
+    await page.keyboard.press("Enter")
     await page.wait_for_url(re.compile(r"/app/scans/71$"))
     assert continued == ["POST"]
