@@ -190,6 +190,10 @@ from audit.web.protected_auth import (
 from audit.web.scan_settings import ScanFormSettings
 
 log = get_logger(__name__)
+#: How long quitting waits for a running scan to stop and close its browser
+#: (``_stop_running_crawl``). The desktop backend gives up on the whole
+#: shutdown a little after this (``audit.desktop_server``).
+CRAWL_STOP_TIMEOUT_S = 15.0
 
 _STATUS_OPTIONS = (
     "new",
@@ -1040,6 +1044,28 @@ def create_app(
         nonlocal retention_task
         if retention_task is None or retention_task.done():
             retention_task = asyncio.create_task(_protected_retention_worker())
+
+    @app.on_event("shutdown")
+    async def _stop_running_crawl() -> None:
+        """Quitting Axcess stops a running scan and closes its browsers.
+
+        It has to happen here, while the event loop still runs everything.
+        Left to ``asyncio.run``'s final sweep, the crawl was cancelled in the
+        same breath as Playwright's own connection task, so a worker waiting
+        on the browser waited forever: the process never exited, and its
+        Playwright driver and Chromium windows were left running for hours
+        after the desktop app closed (2026-11-20). Stopped here, the crawl's
+        own cleanup closes the browser, and the report is left "Not
+        finished", so Continue scan can carry it on.
+        """
+        task = crawl_state.get("task")
+        if not isinstance(task, asyncio.Task) or task.done():
+            return
+        log.info("web.shutdown_stopping_crawl", scan_id=crawl_state.get("scan_id"))
+        task.cancel()
+        done, _ = await asyncio.wait({task}, timeout=CRAWL_STOP_TIMEOUT_S)
+        if not done:
+            log.warning("web.shutdown_crawl_did_not_stop", timeout_s=CRAWL_STOP_TIMEOUT_S)
 
     @app.on_event("shutdown")
     async def _end_waiting_sign_ins() -> None:

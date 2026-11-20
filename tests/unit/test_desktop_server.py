@@ -225,3 +225,53 @@ def test_the_packaged_app_ships_every_data_file_the_code_reads() -> None:
     )
     assert "analyzer/semantic/prompts/sc_2_4_4_link_purpose_in_context.txt" in files
     assert not missing, f"backend.spec does not ship these data files: {missing}"
+
+
+# Quitting the desktop app leaves nothing running (2026-11-20: two closed
+# apps' backends and scan browsers were found running hours later).
+
+
+def _server(deadline_s: float = 25.0) -> object:
+    import uvicorn
+
+    from audit.desktop_server import DesktopServer
+
+    return DesktopServer(uvicorn.Config(lambda *a: None, port=0), deadline_s=deadline_s)
+
+
+def test_the_desktop_shell_can_ask_the_backend_to_exit_with_it() -> None:
+    args = build_parser().parse_args(["--port", "8765", "--exit-with-parent"])
+    assert args.exit_with_parent is True
+    assert build_parser().parse_args(["--port", "8765"]).exit_with_parent is False
+
+
+def test_the_end_of_input_starts_the_shutdown() -> None:
+    """The shell holds the other end of standard input: when it quits,
+    crashes or is killed, the pipe closes and the backend shuts down."""
+    import io
+
+    server = _server()
+    server.exit_when_input_closes(io.BytesIO(b"")).join(timeout=5)  # type: ignore[attr-defined]
+    assert server.should_exit is True  # type: ignore[attr-defined]
+
+
+def test_a_shutdown_that_hangs_ends_the_process(monkeypatch: pytest.MonkeyPatch) -> None:
+    import threading
+
+    from audit import desktop_server
+
+    ended = threading.Event()
+    codes: list[int] = []
+
+    def fake_exit(code: int) -> None:
+        codes.append(code)
+        ended.set()
+
+    monkeypatch.setattr(desktop_server.os, "_exit", fake_exit)
+    server = _server(deadline_s=0.05)
+    server.handle_exit(15, None)  # type: ignore[attr-defined]
+    assert server.should_exit is True  # type: ignore[attr-defined]
+    assert ended.wait(timeout=5)
+    # A second signal does not start a second deadline.
+    server.handle_exit(15, None)  # type: ignore[attr-defined]
+    assert codes == [1]
