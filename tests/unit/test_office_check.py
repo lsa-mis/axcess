@@ -89,16 +89,18 @@ def test_each_type_gets_its_own_checks() -> None:
     assert checks_for(None) == ()
     assert "slide_no_title" not in WORD_CHECKS
     assert "no_headings" not in SLIDES_CHECKS
+    # The checks that count come first in the report.
+    for order in (WORD_CHECKS, SLIDES_CHECKS):
+        tiers = [check in COUNTED for check in order]
+        assert tiers == sorted(tiers, reverse=True)
 
 
 def test_only_barriers_count_and_every_pdf_check_does() -> None:
-    assert {
-        "no_alt_text",
-        "table_no_header",
-        "slide_no_title",
-        "no_headings",
-        "no_language",
-    } == COUNTED
+    """The two tiers (the developer's decision, 2026-11-20): only the checks
+    with no false alarm on the fresh real files count."""
+    assert {"no_alt_text", "slide_no_title", "no_language"} == COUNTED
+    assert not counts("docx", "table_no_header")
+    assert not counts("docx", "no_headings")
     assert counts("pdf", "no_title")
     assert not counts("docx", "no_title")
     assert not counts("pptx", "unclear_link_text")
@@ -151,17 +153,13 @@ def test_word_tables_need_a_header_row(table: str, failed: tuple[str, ...]) -> N
     assert _failed(word(table=table), "docx") == failed  # type: ignore[arg-type]
 
 
-def test_no_headings_needs_lines_that_look_like_headings() -> None:
-    """WCAG 1.3.1: headings a reader can see must be marked as headings. A
-    long document with no heading style and no visible parts fails nothing."""
+def test_no_headings_lists_a_bold_line_when_no_heading_style_is_used() -> None:
+    """The developer's rule (2026-11-20): no heading style, and a bold line
+    that is its own paragraph of at most one sentence, is listed as a
+    possible problem. A long document with no bold line is not."""
     assert _failed(word(headings=(), words=600), "docx") == ()
-    looks_like = _word_lines(
-        [("Benefits", "bold"), BODY, ("Costs", "bold"), BODY, ("Contacts", "bold"), BODY]
-    )
-    assert _failed(looks_like, "docx") == ("no_headings",)
-    styled = _word_lines(
-        [("Benefits", "Heading 1"), BODY, ("Costs", "bold"), BODY, ("Contacts", "bold"), BODY]
-    )
+    assert _failed(_word_lines([("Benefits", "bold"), BODY]), "docx") == ("no_headings",)
+    styled = _word_lines([("Benefits", "Heading 1"), BODY, ("Costs", "bold"), BODY])
     assert _failed(styled, "docx") == ()
 
 
@@ -169,37 +167,45 @@ def test_no_headings_needs_lines_that_look_like_headings() -> None:
     ("look", "failed"),
     [
         ("bold", ("no_headings",)),
-        ("underline", ("no_headings",)),
-        ("large", ("no_headings",)),
+        ("underline", ()),
+        ("large", ()),
         ("capitals", ()),
         ("all caps text", ()),
     ],
 )
-def test_a_heading_stands_out_by_bold_underline_or_size_not_capitals(
-    look: str, failed: tuple[str, ...]
-) -> None:
-    """Capitals alone mark captions and column names on real forms and fee
-    schedules, not parts (since 2026-11-20)."""
-    names = ("Part one", "Part two", "Part three")
-    if look == "all caps text":
-        names = tuple(name.upper() for name in names)
-    lines = [line for name in names for line in ((name, look), BODY)]
+def test_only_bold_makes_a_line_look_like_a_heading(look: str, failed: tuple[str, ...]) -> None:
+    lines = [line for name in ("Part one", "Part two") for line in ((name, look), BODY)]
     assert _failed(_word_lines(lines), "docx") == failed
 
 
-def test_two_lines_that_look_like_headings_are_not_enough() -> None:
-    """A title and one bold line are not a document divided into parts: at
-    least three visual headings (since 2026-11-20; two made four false
-    alarms on the first fresh set)."""
-    lines = [("Benefits", "bold"), BODY, ("Costs", "bold"), BODY]
-    assert _failed(_word_lines(lines), "docx") == ()
+def test_no_headings_and_tables_are_possible_problems_only() -> None:
+    """Since 2026-11-20 neither makes a file "Mostly sure"."""
+    for data in (_word_lines([("Benefits", "bold"), BODY]), word(table="none")):
+        result = check_office(data, "docx")
+        assert result.failed in {("no_headings",), ("table_no_header",)}
+        assert result.status == "not_sure"
 
 
-def test_a_bold_line_with_no_text_under_it_is_not_a_heading() -> None:
-    """A form's bold labels ("Name:", "Date:") each followed by a short
-    field are labels, not the start of a part."""
-    lines = [(label, "bold") for label in ("Name:", "Date:", "Department:", "Signature:")]
-    assert _failed(_word_lines([*lines, BODY]), "docx") == ()
+def test_a_bold_title_style_line_is_not_listed() -> None:
+    """Word's Title and Subtitle styles name the document; they are not
+    headings a screen reader user would move between."""
+    assert _failed(_word_lines([("Annual report", "bold Title"), BODY]), "docx") == ()
+    assert _failed(_word_lines([("Fiscal year 2026", "bold Subtitle"), BODY]), "docx") == ()
+
+
+def test_a_bold_line_in_a_text_box_is_not_listed() -> None:
+    """A text box is a sidebar or callout, read apart from the body."""
+    box = (
+        b'<w:p><w:r><w:pict><v:shape xmlns:v="urn:schemas-microsoft-com:vml"><v:textbox>'
+        b"<w:txbxContent><w:p><w:r><w:rPr><w:b/></w:rPr><w:t>Did you know?</w:t></w:r></w:p>"
+        b"</w:txbxContent></v:textbox></v:shape></w:pict></w:r></w:p>"
+    )
+
+    def add(body: bytes) -> bytes:
+        return body.replace(b"<w:sectPr", box + b"<w:sectPr", 1)
+
+    data = _replace_part(_word_lines([BODY]), "word/document.xml", add)
+    assert _failed(data, "docx") == ()
 
 
 def test_word_tables_that_are_not_plain_grids_are_not_counted() -> None:
@@ -239,7 +245,7 @@ def test_word_language_and_title() -> None:
 # -- Word: cut-downs of real files ------------------------------------------
 
 
-#: Body text under a heading: more than the 40 words a heading needs under it.
+#: A paragraph of body text.
 BODY = (" ".join(["text"] * 45), "plain")
 
 
@@ -247,7 +253,11 @@ def _word_lines(lines: list[tuple[str, str]], *, title: str = "") -> bytes:
     """A Word file of paragraphs, each (text, look): "plain", "bold",
     "underline", "capitals" (the All caps font option), "large" (16 pt
     against 11 pt body text), "all caps text" (plain, typed in capitals),
-    "list" (a numbered list item), or a paragraph style's name."""
+    "list" (a numbered list item), "run-in" (the words before the first
+    "|" bold, the rest plain, in one paragraph), "bold cell" (a bold line
+    in the first cell of a one-row, two-column table), "bold " and a
+    paragraph style's name (bold text in that style), or a paragraph
+    style's name."""
     from docx import Document
     from docx.shared import Pt
 
@@ -256,10 +266,20 @@ def _word_lines(lines: list[tuple[str, str]], *, title: str = "") -> bytes:
     if title:
         document.add_paragraph(title, style="Title")
     for text, look in lines:
+        if look == "bold cell":
+            document.add_table(rows=1, cols=2).cell(0, 0).paragraphs[0].add_run(text).bold = True
+            continue
+        bold = look == "bold" or look.startswith("bold ")
+        look = look.removeprefix("bold ")
         style = {"list": "List Number"}.get(look, look if look[0].isupper() else None)
         paragraph = document.add_paragraph(style=style)
+        if look == "run-in":
+            lead, rest = text.split("|", 1)
+            paragraph.add_run(lead).bold = True
+            paragraph.add_run(rest)
+            continue
         run = paragraph.add_run(text)
-        run.bold = look == "bold" or None
+        run.bold = bold or None
         run.underline = look == "underline" or None
         run.font.all_caps = look == "capitals" or None
         run.font.size = Pt(16) if look == "large" else Pt(11)
@@ -268,11 +288,14 @@ def _word_lines(lines: list[tuple[str, str]], *, title: str = "") -> bytes:
     return out.getvalue()
 
 
+def _words(n: int, word: str = "text") -> str:
+    return " ".join([word] * n)
+
+
 def test_a_meeting_transcript_with_one_title_line_has_no_visible_parts() -> None:
     """section508.gov's IT Accessibility Community Meeting transcripts
     (2026-11-18): a Title line, a "--- BEGIN CAPTIONED TEXT ---" marker,
-    then hundreds of speaker turns. Nothing to move between, so no barrier,
-    whatever its length."""
+    then hundreds of speaker turns, none bold. Nothing to list."""
     turns = [(f">> SPEAKER {n}: " + " ".join(["said"] * 40), "plain") for n in range(40)]
     lines = [("--- BEGIN CAPTIONED TEXT ---", "plain"), *turns, ("[LAUGHTER]", "plain"), BODY]
     data = _word_lines(lines, title="June 2023 IT Accessibility Community Meeting Captioned Text")
@@ -290,147 +313,100 @@ def test_a_one_part_form_of_numbered_questions_has_no_visible_parts() -> None:
     assert _failed(data, "docx") == ()
 
 
-def test_a_policy_with_underlined_section_names_fails_no_headings() -> None:
-    """A finance.umich.edu tax policy (2026-11-17): its sections are
-    underlined lines such as "B. Bereavement", with no heading style."""
+def test_a_checklist_with_bold_part_names_lists_no_headings() -> None:
+    """deq.nc.gov's CDBG-I inspection checklist (fresh2, labelled a
+    barrier): no heading style; "Construction Site", "Construction Records",
+    "Schedule" and "Additional Observation Notes" are bold paragraphs of
+    their own over the checklist items. Its bold field labels ("Owner:",
+    "Grant No.:") are in a table and are not what lists it."""
     lines = [
-        ("Policy on Taxation of Gifts, Prizes and Awards to Employees", "bold"),
-        BODY,
-        ("B. Bereavement", "underline"),
-        BODY,
-        ("D. Length of Service Award", "underline"),
-        BODY,
+        ("Owner:", "bold cell"),
+        ("Grant No.:", "bold cell"),
+        ("Construction Site", "bold"),
+        *[(_words(9), "list")] * 4,
+        ("Construction Records", "bold"),
+        *[(_words(7), "list")] * 3,
+        ("Schedule", "bold"),
+        (_words(12), "list"),
+        ("Additional Observation Notes", "bold"),
     ]
     assert _failed(_word_lines(lines), "docx") == ("no_headings",)
+    in_cells_only = _word_lines([*lines[:2], (_words(30), "plain")])
+    assert _failed(in_cells_only, "docx") == ()
 
 
-def _words(n: int, word: str = "text") -> str:
-    return " ".join([word] * n)
-
-
-def test_minutes_whose_body_text_is_mostly_bold_are_not_failed() -> None:
-    """garfieldar.gov public forum minutes (first fresh set, 2026-11-19, a
-    false alarm): two thirds of the text is bold, so bold lines do not stand
-    out; besides the title, one short bold line, "Guests & Visitors", has
-    body text under it."""
+def test_bold_words_that_start_a_paragraph_are_not_a_line_of_their_own() -> None:
+    """hyannislonghorns.org's policy 5054 Student Bullying (first fresh
+    set, disputed): each section name is bold words at the start of a
+    paragraph of plain text ("Bullying Prohibited.  Students are
+    prohibited..."). Bold inside a paragraph is not a line of its own. (The
+    real file is listed for its bold "5054" and "Student Bullying" lines.)"""
     lines = [
-        ("August 10th, 2021 Sales Tax Special Called Public Forum", "bold"),
-        ("Mayor Blackburn called the meeting to order at 5:32 PM", "bold"),
-        (_words(26), "plain"),
-        (_words(36), "plain"),
-        ("Guests & Visitors", "bold"),
-        (_words(15), "plain"),
-        (_words(28), "bold"),
-        (_words(17), "bold"),
-        (_words(66), "bold"),
-        ("Mayor Blackburn announced the Public Forum ended at 5:53 PM.", "bold"),
-        ("Approved, Mayor Gary Blackburn", "bold"),
+        ("Bullying Prohibited.|  Students are prohibited from " + _words(30, "bullying"), "run-in"),
+        ("Disciplinary Consequences.|  The disciplinary " + _words(30, "consequence"), "run-in"),
+        ("Policy Review.|  The school district shall review this policy annually.", "run-in"),
     ]
     assert _failed(_word_lines(lines), "docx") == ()
 
 
-def test_bold_lines_that_introduce_lists_in_minutes_are_not_parts() -> None:
-    """utah.gov work meeting minutes (first fresh set, a false alarm): plain
-    paragraphs, and two bold lines ending in colons that introduce lists
-    ("The Final Proposed Package Details:", "Immediate Action Items:")."""
+def test_a_bold_instruction_of_two_sentences_is_not_listed() -> None:
+    """hr.umich.edu's professional development application (development
+    set): bold instructions such as "Please describe your proposed
+    professional development activity. The proposal should specify ..." are
+    two sentences, an instruction rather than a part's name. (The real file
+    is listed for its one-sentence bold line "Program/Department
+    Verification ...".)"""
     lines = [
-        (_words(105), "plain"),
-        (_words(67), "plain"),
-        ("The Final Proposed Package Details:", "bold"),
-        *[(_words(8), "list")] * 5,
-        (_words(80), "plain"),
-        ("Immediate Action Items:", "bold"),
-        *[(_words(18), "list")] * 3,
-        (_words(26), "plain"),
+        (
+            "Please describe your proposed professional development activity. "
+            "The proposal should specify the goals of the activity.",
+            "bold",
+        ),
+        (_words(40), "plain"),
+        (
+            "Please provide an itemized budget in the space below. "
+            "Please see https://www.gsa.gov/ for travel rates.",
+            "bold",
+        ),
+        (_words(10), "plain"),
     ]
+    assert _failed(_word_lines(lines), "docx") == ()
+    one_sentence = [("Program/Department Verification (to be completed by the Chair)", "bold")]
+    assert _failed(_word_lines([*one_sentence, *lines]), "docx") == ("no_headings",)
+
+
+def test_bold_course_names_in_table_cells_are_not_listed() -> None:
+    """A math course list, a Google Doc linked from a U-M site (development
+    set, labelled a barrier): each course is a table whose first cell holds its
+    bold name ("Math 500. Responsible Conduct of Research and Scholarship
+    in Math"). Lines in tables are not read, so this is a known miss: 4 of
+    the development set's barrier files and 3 fresh ones show their part
+    names only in table cells (docs/internal/office-check-research.md, "Two
+    tiers")."""
+    names = (
+        "Math 500. Responsible Conduct of Research and Scholarship in Math",
+        "Math 501. AIM Student Seminar",
+        "Math 506. Stochastic Analysis for Finance",
+    )
+    lines = [line for name in names for line in ((name, "bold cell"), (_words(30), "plain"))]
     assert _failed(_word_lines(lines), "docx") == ()
 
 
-def test_a_court_form_with_bold_and_capital_captions_is_not_failed() -> None:
-    """Wisconsin court form GF-223 (kewauneeco.org, first fresh set, a false
-    alarm): the court's name in bold capitals, a bold form name, a bold
-    statute line and a bold "See attached" among numbered statements."""
+def test_a_file_with_heading_styles_is_not_listed_for_its_bold_lines() -> None:
+    """section508.gov's Accessibility in Procurement Guide (development
+    set, no barrier): Heading 1 to 3 for its parts, and bold lines of
+    its own above them: a date line and a list of parts with page numbers
+    ("Purpose1", "Compliance2"). A document that
+    uses heading styles is not listed, whatever else is bold."""
     lines = [
-        ("This form is available in Spanish and Hmong.", "plain"),
-        ("STATE OF WISCONSIN, CIRCUIT COURT, COUNTY", "bold"),
-        ("IN THE INTEREST OF", "all caps text"),
-        ("Power of Attorney Delegating Parental Power", "bold"),
-        ("I STATE ON INFORMATION AND BELIEF:", "capitals"),
-        *[(_words(16, "power"), "plain")] * 8,
-        ("See attached", "bold"),
-        *[(_words(17, "power"), "plain")] * 12,
-    ]
-    assert _failed(_word_lines(lines), "docx") == ()
-
-
-def test_a_fee_schedule_whose_column_names_are_capitals_is_not_failed() -> None:
-    """dir.texas.gov fee schedule (first fresh set, a false alarm): a 24 pt
-    title, then tables whose marked header rows name the fees in capitals
-    ("PAYMENT CONVENIENCE FEES (BANKCARD)")."""
-    from docx import Document
-    from docx.oxml.ns import qn
-    from docx.shared import Pt
-
-    document = Document()
-    document.core_properties.title = "Real file cut-down"
-    document.add_paragraph().add_run("FY27 Texas.gov Fee Schedule").font.size = Pt(24)
-    document.add_paragraph(_words(12, "reference"))
-    for name in ("PAYMENT CONVENIENCE FEES (BANKCARD)", "PAYMENT CONVENIENCE FEES (ACH)"):
-        table = document.add_table(rows=6, cols=3)
-        table.cell(0, 0).text, table.cell(0, 1).text, table.cell(0, 2).text = (
-            name,
-            "Unit of Measure",
-            "Fee",
-        )
-        for row in range(1, 6):
-            for column in range(3):
-                table.cell(row, column).text = "TxPay Direct with Enhanced Help Desk"
-        look = table._tbl.tblPr.find(qn("w:tblLook"))
-        look.set(qn("w:firstRow"), "1")
-    out = io.BytesIO()
-    document.save(out)
-    assert _failed(out.getvalue(), "docx") == ()
-
-
-def test_a_short_checklist_with_bold_part_names_fails_no_headings() -> None:
-    """kewauneeco.org's Pension Document Checklist (71 words, first fresh
-    set, missed before): "Income", "Assets" and "Expenses" are bold and
-    underlined, each over a list of 12 to 17 words. A part of a short
-    document is short: 15% of its words is enough body text."""
-    lines = [
-        ("Pension Document Checklist", "bold"),
-        ("Income", "bold"),
-        *[(_words(4), "list")] * 4,
-        ("Assets", "bold"),
-        *[(_words(4), "list")] * 3,
-        ("Expenses", "bold"),
-        *[(_words(5), "list")] * 4,
-    ]
-    assert _failed(_word_lines(lines), "docx") == ("no_headings",)
-
-
-def test_a_form_whose_labels_are_all_bold_is_still_missed() -> None:
-    """kewauneeco.org's incident report form (66 words, first fresh set,
-    labelled a barrier as a close call): "WHEN:", "WHERE:", "WHAT:" are
-    bold capitals, but so are most field labels after them, so no bold line
-    has body text under it. A known miss: the rule cannot tell these part
-    names from the bold labels without reading the words."""
-    lines = [
-        ("INCIDENT REPORT", "bold"),
-        ("WHEN:", "bold"),
-        ("Date:", "plain"),
-        ("Time:", "plain"),
-        ("WHERE:", "bold"),
-        ("Department:", "plain"),
-        ("WHAT:", "bold"),
-        ("Description of activities when incident occurred:", "bold"),
-        ("Injuries:", "bold"),
-        ("Who was injured:", "plain"),
-        ("WHO:", "bold"),
-        ("Name(s) of individuals involved:", "bold"),
-        ("Party 1 Name:", "plain"),
-        ("Witnesses:", "bold"),
-        ("Comments:", "bold"),
+        ("iteration 2 (November 2, 2023)", "bold"),
+        ("Purpose 1", "bold"),
+        ("Compliance 2", "bold"),
+        ("Accessibility in Procurement Guide", "Heading 1"),
+        ("Purpose", "Heading 2"),
+        BODY,
+        ("Compliance", "Heading 2"),
+        BODY,
     ]
     assert _failed(_word_lines(lines), "docx") == ()
 

@@ -1,6 +1,9 @@
 """Evolutionary search for the Word "no headings" visual-heading probe (an experiment).
 
-Not product code: the probe it chose is frozen in office_check.py.
+Not product code: the probe it chose was frozen in office_check.py at
+1256e02 and replaced on 2026-11-20 by the developer's simpler bold-line rule
+(``office_check._word_bold_line``, a possible problem only), so the
+``product`` command no longer matches the app.
 
 The product rule (``office_check._word_visual_headings`` at 946ad6f) fails a
 Word file that uses no heading style and shows at least 2 "visual headings".

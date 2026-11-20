@@ -7,13 +7,22 @@ read 2026-11-17). Why our own and not an existing checker:
 docs/internal/office-check-research.md. Built and measured on labelled
 real files (tests/real_pages/office_files.json), as AGENTS.md asks.
 
-Each check reads a fact the file states about itself. Two kinds:
+Each check reads a fact the file states about itself. Two kinds, split by
+how accurate each check was on labelled real files no rule was made on
+(the developer's decision, 2026-11-20; the numbers are in
+docs/internal/office-check-research.md, "Two tiers"):
 
 **Checks that prove a barrier** (``COUNTED``): a failure is a problem a
-screen reader user meets, and a machine can see it without judging
-meaning. Any one makes the file "Mostly sure" (the developer's rule,
-2026-11-17: only machine-checkable rules that affect a screen reader user
-count).
+screen reader user meets, a machine can see it without judging meaning,
+and the check made no false alarm on the two fresh sets (130 Word files).
+Any one makes the file "Mostly sure" (the developer's rule, 2026-11-17:
+only machine-checkable rules that affect a screen reader user count).
+``no_alt_text``: precision 100%, recall 95.7% (22 right, 0 false alarms,
+1 missed); ``no_language``: 1 right, 0 false alarms; ``slide_no_title``:
+no PowerPoint file in the fresh sets, 2 right and 0 false alarms in
+development. The last two rest on few files; they stay counted because
+each reads one stated fact (a language value; a title placeholder with
+text) and judges nothing.
 
 ``no_alt_text`` (Word and PowerPoint)
     A picture, chart, diagram (SmartArt) or video has no alternative text
@@ -27,6 +36,18 @@ count).
     and a machine cannot tell a border from an arrow that means something.
     Word: the document body only, not page headers and footers, which
     screen readers do not read as part of the text.
+``slide_no_title`` (PowerPoint)
+    A slide has no title placeholder holding text. Microsoft: Error, "All
+    slides have titles" (paraphrased: titles let people navigate a deck).
+``no_language`` (Word and PowerPoint)
+    No language is set anywhere for the text, so a screen reader cannot
+    choose a voice (WCAG 3.1.1, Language of Page, Level A). The same check
+    as the PDF one, and the same words in the report.
+
+**Possible problems**: a machine can see them, but whether they hurt a
+screen reader user needs a person, so they are listed and never make a
+file "Mostly sure".
+
 ``table_no_header`` (Word and PowerPoint)
     A data table has no header row. Microsoft: Error, "Tables specify
     column header information"; WCAG 1.3.1 (Info and Relationships, Level
@@ -37,48 +58,39 @@ count).
     form or a page layout is built in Word, and a layout table must not
     have a header row (WCAG failure F46); Microsoft's checker also warns
     about merged cells and nested tables in any table (paraphrased:
-    "Tables have a simple structure"). So such a table is not counted, and
-    a person must check it: some are complex data tables. Measured
-    2026-11-19 on the labelled real files (docs/internal/office-check-
-    research.md, "Why precision was low"): every layout table the old rule
-    flagged had merged cells, and every unmarked data table was a plain
-    grid. Header row: Word's "Header Row" table style option (``tblLook
-    firstRow``), which Microsoft's own instructions use ("Make your Word
-    documents accessible"), or "Repeat as header row" (``tblHeader``) on
-    the first row; PowerPoint: "Header Row" (``a:tblPr firstRow``).
-``slide_no_title`` (PowerPoint)
-    A slide has no title placeholder holding text. Microsoft: Error, "All
-    slides have titles" (paraphrased: titles let people navigate a deck).
+    "Tables have a simple structure"). So such a table is not listed.
+    Measured 2026-11-19 on the labelled real files (docs/internal/office-
+    check-research.md, "Why precision was low"): every layout table the old
+    rule flagged had merged cells, and every unmarked data table was a
+    plain grid. Header row: Word's "Header Row" table style option
+    (``tblLook firstRow``), which Microsoft's own instructions use ("Make
+    your Word documents accessible"), or "Repeat as header row"
+    (``tblHeader``) on the first row; PowerPoint: "Header Row" (``a:tblPr
+    firstRow``). A possible problem since 2026-11-20 (the developer's
+    decision): on the second fresh set 4 of its 9 flags were layout grids
+    in court and label forms that are plain grids too (precision 55.6%),
+    and only a person can tell a layout grid from a data table.
 ``no_headings`` (Word)
-    The document shows headings but uses no heading style, so a screen
-    reader user cannot move between the parts a sighted reader sees. WCAG
-    1.3.1 (Info and Relationships, Level A): "Information, structure, and
-    relationships conveyed through presentation can be programmatically
-    determined or are available in text"; failure F2 (a change in how text
-    looks used to convey structure without the markup). "Shows headings":
-    at least ``VISUAL_HEADINGS_MIN`` visual headings
-    (``_word_visual_headings``: short lines in bold, underlined or larger
-    text, each followed by body text). A document with no visible parts,
-    such as a meeting transcript or a one-part form, does not fail, however
-    long: it has no structure to lose. Microsoft's guidance says the same
-    from the other side: use the built-in heading styles for headings, so
-    that screen readers can find them ("Make your Word documents accessible
-    to people with disabilities", https://support.microsoft.com/en-us/office/make-your-word-documents-accessible-to-people-with-disabilities-d9bf3683-87ac-47ea-b91a-78dcacb3c66d,
-    paraphrased). Until 2026-11-19 this failed any document of more than
-    400 words with no heading style, which flagged such transcripts and
-    forms (half of its failures on the labelled real files were false
-    alarms). The visual-heading rule was then chosen on 2026-11-20 by a
-    search over a family of such rules (``scripts/office_heading_search.py``;
-    docs/internal/office-check-research.md, "Second round: evolved heading
-    probe").
-``no_language`` (Word and PowerPoint)
-    No language is set anywhere for the text, so a screen reader cannot
-    choose a voice (WCAG 3.1.1, Language of Page, Level A). The same check
-    as the PDF one, and the same words in the report.
-
-**Possible problems**: a machine can see them, but whether they hurt a
-screen reader user needs a person, so they are listed and never make a
-file "Mostly sure".
+    The document uses no heading style but has a line that looks like a
+    heading (``_word_bold_line``): a paragraph of its own in bold, of at
+    most one sentence. If that line names a part of the document, a screen
+    reader user cannot move to it, so WCAG 1.3.1 (Info and Relationships,
+    Level A) fails: "Information, structure, and relationships conveyed
+    through presentation can be programmatically determined or are
+    available in text"; failure F2 (a change in how text looks used to
+    convey structure without the markup). Microsoft's guidance says the
+    same from the other side: use the built-in heading styles for
+    headings, so that screen readers can find them ("Make your Word
+    documents accessible to people with disabilities",
+    https://support.microsoft.com/en-us/office/make-your-word-documents-accessible-to-people-with-disabilities-d9bf3683-87ac-47ea-b91a-78dcacb3c66d,
+    paraphrased). Whether the line is a heading, a title or a bold
+    instruction needs a person, so this is a possible problem: the
+    developer's rule of 2026-11-20. It replaced rules that tried to decide
+    it by machine (counting lines that stand out with body text under each,
+    946ad6f, then 1256e02): on the second fresh set 1256e02's rule scored
+    80.0% precision and 59.3% recall for this check
+    (docs/internal/office-check-research.md, "Two tiers"). Details of the
+    rule are on ``_word_bold_line``.
 
 ``skipped_heading_level`` (Word)
     A heading more than one level deeper than the one before it (Heading 1
@@ -175,24 +187,15 @@ def sniff(data: bytes) -> Sniffed:
 
 Outcome = Literal["checked", "damaged"]
 
-#: A Word document with no heading style fails ``no_headings`` when it shows
-#: at least this many visual headings (``_word_visual_headings``). Three,
-#: not two: a bold or large line at the top is usually the document's
-#: title, and minutes and forms often show one more bold line (a closing
-#: "Approved" line, "Immediate Action Items:"); a title and one bold line
-#: are not a document divided into parts. Chosen 2026-11-20 (see the
-#: module docstring); 2 made four false alarms on the first fresh set.
-VISUAL_HEADINGS_MIN = 3
-#: A visual heading is a line of at most this many words (a heading names a
-#: part; a longer line in bold is emphasis or an instruction)...
-VISUAL_HEADING_MAX_WORDS = 12
-#: ...followed by at least this many words before the next one (a heading
-#: starts a part; a form's bold labels, "Name:" then "Date:", start none)...
-VISUAL_HEADING_MIN_BODY = 40
-#: ...or by this share of the document's words, when that is fewer: a
-#: one-page checklist's "Income", "Assets" and "Expenses" each head a list
-#: of about 15 words, which is a part of a 71-word document.
-VISUAL_HEADING_MIN_BODY_SHARE = 0.15
+#: Paragraph styles whose bold line is not a heading a person must check:
+#: Word's built-in Title and Subtitle name the whole document, and screen
+#: readers do not list them as headings, which is what Word means them for.
+#: Compared with the style's name, which Word stores in English whatever
+#: the language of its menus.
+_TITLE_STYLES = frozenset({"title", "subtitle"})
+#: The end of a sentence inside a line: ".", "!" or "?", any closing quote
+#: or bracket, then a space and more text.
+_SENTENCE_END = re.compile("[.!?][\"'\u201d\u2019)\\]]*\\s+(?=\\S)")
 
 
 @dataclass(frozen=True)
@@ -217,9 +220,9 @@ class OfficeCheck:
 #: file "Mostly sure" first, then the possible problems.
 WORD_CHECKS: tuple[FailedCheck, ...] = (
     "no_alt_text",
+    "no_language",
     "table_no_header",
     "no_headings",
-    "no_language",
     "skipped_heading_level",
     "unclear_link_text",
     "no_title",
@@ -227,15 +230,17 @@ WORD_CHECKS: tuple[FailedCheck, ...] = (
 SLIDES_CHECKS: tuple[FailedCheck, ...] = (
     "no_alt_text",
     "slide_no_title",
-    "table_no_header",
     "no_language",
+    "table_no_header",
     "unclear_link_text",
     "no_title",
 )
-#: Checks whose failure makes a Word or PowerPoint file "Mostly sure".
-COUNTED: frozenset[str] = frozenset(
-    {"no_alt_text", "table_no_header", "slide_no_title", "no_headings", "no_language"}
-)
+#: Checks whose failure makes a Word or PowerPoint file "Mostly sure": the
+#: ones that made no false alarm on files no rule was made on (the
+#: developer's decision, 2026-11-20; module docstring). Every other check
+#: is a possible problem. ``WORD_CHECKS`` and ``SLIDES_CHECKS`` list these
+#: first, so the report shows what counts before what a person must judge.
+COUNTED: frozenset[str] = frozenset({"no_alt_text", "slide_no_title", "no_language"})
 
 
 def checks_for(checked_as: CheckedAs | None) -> tuple[FailedCheck, ...]:
@@ -398,7 +403,7 @@ def _check_word(data: bytes) -> OfficeCheck:
         failed.add("table_no_header")
 
     levels = _word_heading_levels(part, body)
-    if not levels and _word_visual_headings(part, body) >= VISUAL_HEADINGS_MIN:
+    if not levels and _word_bold_line(part, body):
         failed.add("no_headings")
     if any(level > before + 1 for before, level in itertools.pairwise(levels)):
         failed.add("skipped_heading_level")
@@ -645,93 +650,82 @@ class _RunLook:
         return out
 
 
-def _word_visual_headings(part: Any, body: Any) -> int:
-    """How many headings a sighted reader sees in the body, styled or not.
+def _word_bold_line(part: Any, body: Any) -> bool:
+    """A bold line of at most one sentence that is its own paragraph.
 
-    A visual heading is a line of at most ``VISUAL_HEADING_MAX_WORDS`` words
-    that stands out from the body text (at least 80% of its letters bold or
-    underlined, or 2 points larger than the body text's usual size), starts
-    with a letter, digit or "(", and is followed by at least
-    ``VISUAL_HEADING_MIN_BODY`` words, or ``VISUAL_HEADING_MIN_BODY_SHARE``
-    of the document's words if that is fewer, before the next such line.
+    The developer's rule for the ``no_headings`` possible problem
+    (2026-11-20): a document with no heading style that has such a line may
+    be showing a heading by its look alone. A paragraph counts when:
 
-    Capitals alone do not make a line stand out (since 2026-11-20): forms
-    and fee schedules set captions, column names and court names in
-    capitals ("STATE OF WISCONSIN, CIRCUIT COURT", "PAYMENT CONVENIENCE
-    FEES (ACH)") that start no part. On the labelled development files,
-    counting capitals found no barrier that bold, underline and size did
-    not, and made one false alarm (the GF-223 court form). This choice, the 40 words and the share
-    for short documents, and three headings (``VISUAL_HEADINGS_MIN``)
-    are the rule a search chose by cross-validation on the 156 labelled
-    development and first fresh Word files, among rules that also
-    discounted bold when most body text is bold, skipped lines ending in a
-    colon or in table header rows, and counted list items as body text
-    (``scripts/office_heading_search.py``). It removed all 4 false alarms
-    on the first fresh set and one of its 2 misses. On a second fresh set,
-    labelled before it was frozen, it missed 6 barriers in short documents
-    that the 2026-11-19 rule found (2 visual headings, or under 40 words
-    per part), and made 1 false alarm: Word "Mostly sure" precision 88.2%,
-    recall 76.9% (research doc, "Second round: evolved heading probe").
+    * every letter and digit in it is bold, so bold words inside a
+      paragraph of plain text ("**Note:** forms are due on Friday") do not.
+      Bold as Word shows it: set on the text, its character style, the
+      paragraph's style or the document's defaults (``_RunLook``);
+    * it has at most one sentence (``_sentences``): two sentences in bold
+      are an instruction or a notice, not a name for a part;
+    * it has a letter or digit: an empty line, or a bold line of
+      underscores to write on, says nothing.
 
-    These are the ways a heading is made to look like one by hand (the
-    labelling protocol's "bold/large/numbered lines that start sections").
-    80%, not all: a section letter or a space is often left plain ("B.
-    Bereavement" with only "Bereavement" underlined). The first character:
-    a transcript's "--- BEGIN CAPTIONED TEXT ---" and "[LAUGHTER]" are
-    marks, not parts. Lines in tables count, as forms and course lists put
-    their part names in a table's cells. Not read: a table
-    style's own bold first row, colour, and centring. Each choice was made
-    on the labelled real files of 2026-11-19 and is measured on files it
-    was not made on (docs/internal/office-check-research.md).
+    Not read: paragraphs in tables (a form's bold field labels and a
+    table's column names sit in cells, and the table check covers tables),
+    in text boxes (a sidebar or callout, read apart from the body; Word
+    keeps them in ``w:txbxContent``), and in Word's built-in Title and
+    Subtitle styles (``_TITLE_STYLES``: the document's name, set the way
+    Word means). Page headers and footers are not in the body. Nothing else
+    is judged: a bold title typed by hand at the top, a bold "Name:" label
+    or a bold closing line is listed too, as the person reading the report
+    decides whether it is a heading.
     """
     look = _RunLook(part)
-    lines: list[tuple[int, list[tuple[str, dict[str, Any]]]]] = []
-    sizes: dict[int, int] = {}
+    titles = _title_style_ids(part)
     for paragraph in body.iter(_q(_W, "p")):
-        runs = look.runs(paragraph)
-        text = "".join(chunk for chunk, _ in runs).strip()
-        if not text:
+        if next(paragraph.iterancestors(_q(_W, "tc"), _q(_W, "txbxContent")), None) is not None:
             continue
-        lines.append((len(text.split()), runs))
-        for chunk, run_look in runs:
-            size = run_look.get("sz", 20)
-            sizes[size] = sizes.get(size, 0) + sum(c.isalnum() for c in chunk)
-    body_size = max(sizes, key=lambda size: sizes[size]) if sizes else 20
+        props = paragraph.find(_q(_W, "pPr"))
+        style = props.find(_q(_W, "pStyle")) if props is not None else None
+        style_id = style.get(_q(_W, "val")) if style is not None else look.default_paragraph
+        if style_id in titles:
+            continue
+        runs = [
+            (chunk, run_look)
+            for chunk, run_look in look.runs(paragraph)
+            if any(c.isalnum() for c in chunk)
+        ]
+        if not runs or not all(run_look.get("b") for _, run_look in runs):
+            continue
+        if _sentences("".join(chunk for chunk, _ in runs)) <= 1:
+            return True
+    return False
 
-    def stands_out(runs: list[tuple[str, dict[str, Any]]]) -> bool:
-        text = "".join(chunk for chunk, _ in runs).strip()
-        if not (text[0].isalnum() or text[0] == "("):
-            return False
-        letters = sum(c.isalnum() for c in text)
-        if not letters:
-            return False
 
-        def share(test: Any) -> float:
-            return sum(sum(c.isalnum() for c in w) for w, lk in runs if test(lk)) / letters
+def _sentences(text: str) -> int:
+    """How many sentences a line holds, at least 1.
 
-        return (
-            share(lambda lk: lk.get("b")) >= 0.8
-            or share(lambda lk: lk.get("u")) >= 0.8
-            or share(lambda lk: lk.get("sz", 20) >= body_size + 4) >= 0.8
-        )
-
-    need = min(
-        VISUAL_HEADING_MIN_BODY,
-        max(1, VISUAL_HEADING_MIN_BODY_SHARE * sum(length for length, _ in lines)),
-    )
-
-    count = 0
-    following: int | None = None  # words since the last line that stands out
-    for length, runs in lines:
-        if length <= VISUAL_HEADING_MAX_WORDS and stands_out(runs):
-            if following is not None and following >= need:
-                count += 1
-            following = 0
-        elif following is not None:
-            following += length
-    if following is not None and following >= need:
-        count += 1
+    A sentence ends at ".", "!" or "?" followed by more text
+    (``_SENTENCE_END``), and only when at least 3 words come before that
+    point since the last sentence ended: numbering and short abbreviations
+    are not sentences ("A. General", "Article 4. Fees", "U.S. Department of
+    Labor" are one each; "Read this first. Then sign below." is two).
+    """
+    count, start = 1, 0
+    for end in _SENTENCE_END.finditer(text):
+        if len(text[start : end.start() + 1].split()) >= 3:
+            count += 1
+            start = end.end()
     return count
+
+
+def _title_style_ids(part: Any) -> set[str]:
+    """The style IDs of the built-in Title and Subtitle paragraph styles."""
+    styles = _styles_part(part)
+    if styles is None:
+        return set()
+    found = set()
+    for style in styles.element.iter(_q(_W, "style")):
+        name = style.find(_q(_W, "name"))
+        if name is not None and (name.get(_q(_W, "val")) or "").lower() in _TITLE_STYLES:
+            found.add(style.get(_q(_W, "styleId")) or "")
+    return found
 
 
 def _outline(value: str | None) -> int | None:
