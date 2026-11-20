@@ -561,6 +561,12 @@ async def test_site_actions_line_up_with_their_heading_and_have_even_space(
     # scan" does (2026-11-20), whichever row sets the column's width.
     table = page.get_by_role("table", name="Public reports by site", exact=False)
     await table.get_by_role("button", name=re.compile(r"^Show all 3 scans for compared")).click()
+    await playwright_async.expect(
+        table.get_by_role("button", name=re.compile(r"^Hide all 3 scans for compared"))
+    ).to_have_attribute("aria-expanded", "true")
+    await playwright_async.expect(
+        table.get_by_role("button", name=re.compile(r"^Compare with")).first
+    ).to_be_visible()
     await _assert_compare_words_line_up(page)
     await _assert_lone_delete_centred(page)
     # A scan row much wider than the site's links, as a larger font can make
