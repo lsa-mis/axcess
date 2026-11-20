@@ -82,7 +82,25 @@ fresh set ("fresh2").
 | R7. score fresh2 once | done 2026-11-20 08:35 (after f55e523, a tooling-only commit): frozen probe P **88.2%** (30/34), R **76.9%** (30/39), 72 scored, 2 disputed. Target NOT met. For information: 946ad6f 80.0% / 92.3%; top 2 89.5% / 87.2%; top 3 85.4% / 89.7%; top 5 88.9% / 82.1%; top 1 87.1% / 69.2%; top 4 81.8% / 69.2%. Rule not changed after | `artifacts/office-fresh2/reports/frozen_probe_report.json`, `rules_946ad6f_report.json`; `artifacts/office-search/fresh2_probes.json`, `top5.txt` |
 | R8. research doc "Second round: evolved heading probe" | done (this commit); glossary updated (3 headings, capitals alone do not count); terms.ts sentence still true, unchanged | `docs/internal/office-check-research.md`, `docs/glossary.md` |
 
-## Next step
+## Round 3 (the developer, 2026-11-20): two tiers
+
+Decision: counted ("Mostly sure") = no_alt_text, no_language,
+slide_no_title. Possible problems = no_headings, table_no_header,
+unclear_link_text, no_title, skipped_heading_level. no_headings becomes
+the developer's simple rule: no heading style, and a bold line that is its
+own paragraph and at most one sentence (replaces 1256e02's probe). Keep
+946ad6f's plain-grid table rule and the "no letter or digit" alt rule.
+
+| Step | State | Where |
+|---|---|---|
+| T1. Per-check scores on fresh and fresh2 at 354d04b | done | `docs/internal/office-check-research.md`, "Two tiers" |
+| T2. Tiers in office_check.py (+ migration if stored statuses need it) | next | |
+| T3. Bold-line heading rule + unit tests | | |
+| T4. Score Mostly sure and every check, all sets | | |
+| T5. Wording: Documents tab, document page, terms.ts, glossary, reading-your-report, tests | | |
+| T6. Gates | | |
+
+## Next step (round 2, superseded by round 3)
 
 Round 2 is done; the target is not met on fresh2. Waiting for the
 developer: keep 1256e02's heading rule or go back to 946ad6f's (fresh2:

@@ -559,6 +559,53 @@ developer's decision: on fresh2 the new rule trades 15 points of recall
 for 8 of precision, and neither meets the goal. Any further change is
 designed on fresh2 too, so it needs a third set to measure.
 
+## Two tiers (2026-11-20)
+
+The developer's decision after the second round: split the Word and
+PowerPoint checks by how accurate each is on fresh files. Only checks
+that were right on fresh files make a file "Mostly sure"; the others are
+listed as possible problems for a person to judge.
+
+### Per-check scores, the basis for the tiers
+
+Each check's own precision and recall against its criterion's label
+(`fail` positive; `pass` and `n/a` negative), with the code at 354d04b
+(rules of 1256e02), on the two fresh sets (all Word files; no PowerPoint
+file is in either). Measured 2026-11-20 with the real-files scorer.
+"P" precision, "R" recall, then (right, false alarms, missed).
+
+| Check | Fresh (56 scored) | Fresh2 (74 scored) | Both |
+|---|---|---|---|
+| Images without alt text (`no_alt_text`) | P 100%, R 100% (10, 0, 0) | P 100%, R 92.3% (12, 0, 1) | P 100%, R 95.7% (22, 0, 1) |
+| No language (`no_language`) | no positives (0, 0, 0) | P 100%, R 100% (1, 0, 0) | P 100%, R 100% (1, 0, 0) |
+| Slides without a title (`slide_no_title`) | no PowerPoint files | no PowerPoint files | development only: P 100%, R 100% (2, 0, 0) |
+| Tables without a header row (`table_no_header`) | P 100%, R 83.3% (5, 0, 1) | **P 55.6%**, R 100% (5, 4, 0) | P 71.4%, R 90.9% (10, 4, 1) |
+| No headings (`no_headings`) | P 100%, R 81.8% (9, 0, 2) | **P 80.0%, R 59.3%** (16, 4, 11) | P 86.2%, R 65.8% (25, 4, 13) |
+| Skipped heading levels (`skipped_heading_level`) | P 100%, R 66.7% (4, 0, 2) | P 100%, R 100% (5, 0, 0) | P 100%, R 81.8% (9, 0, 2) |
+| Link text (`unclear_link_text`) | P 100%, R 100% (18, 0, 0) | P 100%, R 92.3% (12, 0, 1) | P 100%, R 96.8% (30, 0, 1) |
+| Document title (`no_title`) | P 100%, R 100% (35, 0, 0) | P 100%, R 100% (55, 0, 0) | P 100%, R 100% (90, 0, 0) |
+
+The first fresh set chose 1256e02's heading rule, so its "No headings"
+row is fit; fresh2 is the measure. File level at 354d04b: fresh "Mostly
+sure" P 100% (19/19), R 95.0% (19/20); fresh2 P 88.2% (30/34), R 76.9%
+(30/39); development 100% / 100% (fit).
+
+How the tiers follow from these numbers:
+
+- **Counted ("Mostly sure")**: images without alt text, no language and
+  slides without a title. No false alarm on any fresh file. "No language"
+  and "slides without a title" rest on very few positives (1 fresh, 2 in
+  development); they are kept counted because each reads one stated fact
+  (a `lang` value; a title placeholder holding text) with no judgement
+  of what the content means.
+- **Possible problems**: tables without a header row (4 false alarms of
+  9 on fresh2, all layout grids in court and label forms that a machine
+  cannot tell from data tables) and no headings (precision 80% and recall
+  59% on fresh2: whether bold lines are headings needs a person). Skipped
+  heading levels, link text and document title were already possible
+  problems: they are accurate, but whether each hurts a reader needs a
+  person (see `office_check.py`).
+
 ## Limits
 
 - 281 files: 73 from one university's sites, 77 from government and
