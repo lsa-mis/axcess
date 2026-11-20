@@ -349,6 +349,21 @@ class JsFetcher:
             await self._pw.stop()
             self._pw = None
 
+    @property
+    def browser_closed(self) -> bool:
+        """True once the browser this fetcher renders with has gone away.
+
+        Every page after that fails at once, through no fault of the page,
+        so the crawl stops rather than spend each waiting page's tries
+        (``orchestrator._worker``). False before the browser starts and
+        after this fetcher closes it itself.
+        """
+        if self._shared_context is not None:
+            browser = self._shared_context.browser
+        else:
+            browser = self._browser
+        return browser is not None and not browser.is_connected()
+
     async def fetch(self, url: str) -> FetchResult:
         """Render ``url`` with chromium and return the settled HTML.
 

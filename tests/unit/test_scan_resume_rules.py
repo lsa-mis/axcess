@@ -21,7 +21,12 @@ import sqlite3
 
 import pytest
 
-from audit.crawler.orchestrator import CrawlConfig, _ensure_scan, config_json_for_scan
+from audit.crawler.orchestrator import (
+    CrawlConfig,
+    _ensure_scan,
+    _retry_failed_pages,
+    config_json_for_scan,
+)
 from audit.db import queue
 
 SEED = "https://app.example.test/"
@@ -214,3 +219,51 @@ def test_an_unreadable_config_does_not_break_row_discovery(
     _queue_work(tmp_db, broken)
 
     assert _ensure_scan(tmp_db, SEED, _config()) == broken
+
+
+def _failed_work(conn: sqlite3.Connection, scan_id: int, url: str) -> None:
+    _queue_work(conn, scan_id, url=url)
+    conn.execute(
+        "UPDATE jobs SET state = 'failed', attempts = 3 WHERE dedupe_key = ?",
+        (f"{scan_id}:{url}",),
+    )
+
+
+def _state(conn: sqlite3.Connection, scan_id: int, url: str) -> str:
+    row = conn.execute(
+        "SELECT state FROM jobs WHERE dedupe_key = ?", (f"{scan_id}:{url}",)
+    ).fetchone()
+    return str(row["state"])
+
+
+def test_continuing_a_scan_retries_the_pages_that_failed(tmp_db: sqlite3.Connection) -> None:
+    """Scan 71 (2026-11-17): the browser closed as the app restarted, and 29
+    waiting pages used all their tries on it. Continuing the scan ran only the
+    one page still waiting, so the report lost those 29 pages and the 12 only
+    linked from them."""
+    scan_id = _scan(tmp_db, "interrupted")
+    _queue_work(tmp_db, scan_id, url=SEED + "waiting/")
+    _failed_work(tmp_db, scan_id, SEED + "failed/")
+
+    assert _retry_failed_pages(tmp_db, scan_id) == 1
+    assert _state(tmp_db, scan_id, SEED + "failed/") == "pending"
+
+
+def test_a_stopped_scan_does_not_retry_its_failed_pages(tmp_db: sqlite3.Connection) -> None:
+    """Stop empties the queue but keeps failed jobs. A stopped scan that a new
+    run takes over must not start crawling them again."""
+    scan_id = _scan(tmp_db, "interrupted")
+    _failed_work(tmp_db, scan_id, SEED + "failed/")
+
+    assert _retry_failed_pages(tmp_db, scan_id) == 0
+    assert _state(tmp_db, scan_id, SEED + "failed/") == "failed"
+
+
+def test_retrying_failed_pages_stays_inside_one_scan(tmp_db: sqlite3.Connection) -> None:
+    scan_id = _scan(tmp_db, "interrupted")
+    other = _scan(tmp_db, "interrupted")
+    _queue_work(tmp_db, scan_id, url=SEED + "waiting/")
+    _failed_work(tmp_db, other, SEED + "failed/")
+
+    assert _retry_failed_pages(tmp_db, scan_id) == 0
+    assert _state(tmp_db, other, SEED + "failed/") == "failed"

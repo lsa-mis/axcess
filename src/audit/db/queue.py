@@ -8,7 +8,8 @@ State machine::
 
     pending -> leased -> completed
                        `-> failed
-    leased  -> pending  (reclaim_expired)
+    leased  -> pending  (reclaim_expired; release, which gives the try back)
+    failed  -> pending  (retry_failed, when a scan is continued)
 """
 
 from __future__ import annotations
@@ -158,6 +159,53 @@ def fail(
         """,
         (max_attempts, error, ts, job_id),
     )
+
+
+def release(conn: sqlite3.Connection, job_id: int, *, now: datetime | None = None) -> None:
+    """Return a leased job to ``pending`` without counting the try it used.
+
+    For a job that could not run for a reason outside the page, such as the
+    crawl's browser having closed. Counting that try is how a scan lost 29
+    pages: the browser closed as the app restarted, and the workers spent
+    every waiting page's three tries in 40 seconds (scan 71, 2026-11-17).
+    """
+    conn.execute(
+        """
+        UPDATE jobs
+           SET state = 'pending',
+               attempts = MAX(attempts - 1, 0),
+               lease_until = NULL,
+               updated_at = ?
+         WHERE id = ? AND state = 'leased'
+        """,
+        (_iso(_now(now)), job_id),
+    )
+
+
+def retry_failed(
+    conn: sqlite3.Connection,
+    kind: str,
+    *,
+    scan_id: int,
+    now: datetime | None = None,
+) -> int:
+    """Put one scan's failed jobs of ``kind`` back to ``pending`` with no tries used.
+
+    Called when a crawl continues an interrupted scan. A failed job keeps its
+    dedupe key, so the address can never be queued again: without this, a
+    page that failed once (and every page only linked from it) stays out of
+    the report however often the scan is continued. Returns the count.
+    """
+    cur = conn.execute(
+        """
+        UPDATE jobs
+           SET state = 'pending', attempts = 0, lease_until = NULL, updated_at = ?
+         WHERE state = 'failed' AND kind = ?
+           AND json_extract(payload_json, '$.scan_id') = ?
+        """,
+        (_iso(_now(now)), kind, scan_id),
+    )
+    return int(cur.rowcount)
 
 
 def reclaim_expired(conn: sqlite3.Connection, *, now: datetime | None = None) -> int:

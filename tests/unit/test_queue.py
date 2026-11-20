@@ -130,3 +130,46 @@ def test_reclaim_allows_release(tmp_db: sqlite3.Connection) -> None:
     retry = queue.lease(tmp_db, "fetch", lease_secs=10, now=later)
     assert retry is not None and retry.id == first.id
     assert retry.attempts == 2
+
+
+def test_release_returns_a_leased_job_without_using_a_try(tmp_db: sqlite3.Connection) -> None:
+    """A job that could not run through no fault of its page keeps its tries."""
+    queue.enqueue(tmp_db, "fetch", {"u": "x"})
+    for _ in range(5):
+        job = queue.lease(tmp_db, "fetch", lease_secs=30)
+        assert job is not None
+        queue.release(tmp_db, job.id)
+    row = tmp_db.execute("SELECT state, attempts FROM jobs").fetchone()
+    assert row["state"] == "pending"
+    assert row["attempts"] == 0
+
+
+def test_release_leaves_a_job_that_is_not_leased_alone(tmp_db: sqlite3.Connection) -> None:
+    job_id = queue.enqueue(tmp_db, "fetch", {"u": "x"})
+    assert job_id is not None
+    tmp_db.execute("UPDATE jobs SET state = 'completed', attempts = 1")
+    queue.release(tmp_db, job_id)
+    row = tmp_db.execute("SELECT state, attempts FROM jobs").fetchone()
+    assert row["state"] == "completed"
+    assert row["attempts"] == 1
+
+
+def test_retry_failed_requeues_one_scans_failed_jobs_with_fresh_tries(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    for scan_id, url in ((1, "a"), (1, "b"), (2, "c")):
+        queue.enqueue(tmp_db, "fetch", {"scan_id": scan_id, "url": url}, dedupe_key=url)
+    queue.enqueue(tmp_db, "analyze", {"scan_id": 1, "url": "d"}, dedupe_key="d")
+    tmp_db.execute("UPDATE jobs SET state = 'failed', attempts = 3")
+    tmp_db.execute("UPDATE jobs SET state = 'completed' WHERE dedupe_key = 'b'")
+
+    assert queue.retry_failed(tmp_db, "fetch", scan_id=1) == 1
+
+    rows = {
+        r["dedupe_key"]: (r["state"], r["attempts"])
+        for r in tmp_db.execute("SELECT dedupe_key, state, attempts FROM jobs")
+    }
+    assert rows["a"] == ("pending", 0)
+    assert rows["b"] == ("completed", 3), "finished work stays finished"
+    assert rows["c"] == ("failed", 3), "another scan's jobs are untouched"
+    assert rows["d"] == ("failed", 3), "another kind of job is untouched"
