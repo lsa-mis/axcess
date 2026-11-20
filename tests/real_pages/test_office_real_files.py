@@ -14,8 +14,10 @@ each labelled file (``office_files.json``; how it was made is in
 Each score is given for each part (``split``): "holdout" and "tuning",
 together the "development" set (every rule of 2026-11-19 was chosen
 looking at all of them), and "fresh", 57 Word files labelled and frozen
-before the check was run on them, with the rules frozen at commit 946ad6f.
-The fresh part is the number that counts. A criterion or ``barrier``
+before the check was run on them, with the rules frozen at commit 946ad6f,
+and "fresh2", 74 Word files from other sites, labelled and frozen
+(2026-11-20) before the evolved "no headings" rule was chosen and frozen.
+"fresh" was used to choose that rule, so since then only "fresh2" counts. A criterion or ``barrier``
 labelled "disputed" is listed, not scored (AGENTS.md, step 6).
 
 It downloads the files from their sites, so it runs only on request:
@@ -254,6 +256,7 @@ SPLITS: dict[str, tuple[str, ...]] = {
     "tuning": ("tuning",),
     "development": ("holdout", "tuning"),
     "fresh": ("fresh",),
+    "fresh2": ("fresh2",),
 }
 
 

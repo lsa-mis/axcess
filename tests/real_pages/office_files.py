@@ -64,6 +64,19 @@ them under the same protocol, without access to the check's code and
 before the check was run on any of them; the labels were then frozen, and
 the rules were frozen at commit 946ad6f before the first score. One file
 is "disputed" (listed, not scored); one is damaged as served (``damaged``).
+
+Since 2026-11-20 the "no headings" rule was chosen by a search over all
+the files above (development and fresh), so "fresh" no longer tests it.
+Files with ``"split": "fresh2"`` (``"source": "fresh2-2026-11-20"``, 74
+Word files) are the second validation set: other .gov and .org sites, none
+used by the sets above (41 hosts, at most 4 files from one), weighted to
+the cases the first fresh set got wrong: meeting minutes and agendas,
+court and county forms, short checklists, fee schedules and reports with
+data tables (``document_type`` says which; ``publisher_kind`` as above). A
+collecting agent chose them by source and type only, without opening them;
+labelling agents labelled them under the same protocol without the check's
+code or the search, and the labels were frozen and committed before the
+rule was frozen and before the check ran on any of them.
 """
 
 from __future__ import annotations

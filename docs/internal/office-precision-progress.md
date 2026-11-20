@@ -62,9 +62,35 @@ env -u VIRTUAL_ENV uv run python artifacts/office-fresh/reports/old_rules.py \
   `tests/real_pages/office_files.json`, so the set can be downloaded again.
 - Scratch copy (may vanish): `/tmp/claude-1003/-var-home-me-Development-axcess--claude-worktrees-documents/07be128f-2331-40ee-b0f9-c857f7075117/scratchpad/prec/`.
 
+## Round 2 (the developer, 2026-11-19): evolved heading probe
+
+Goal: Word "Mostly sure" precision > 90% and recall > 90% on files never
+used for design or selection. Plan: a family of visual-heading probes,
+an evolutionary search with cross-validation on the development data
+(every Word file in office_files.json before fresh2: holdout, tuning,
+fresh), freeze the winner in office_check.py, then score once on a second
+fresh set ("fresh2").
+
+| Step | State | Where |
+|---|---|---|
+| R1. fresh2 files collected | done 2026-11-19 by a collecting agent (by source and type only, files not opened): 74 Word files, 41 hosts, max 4 per host; none in office_files.json or the earlier artifacts (SHA-256 checked) | `artifacts/office-fresh2/files/<sha256>.docx`; worklist `collect/manifest.json`; skips `collect/skipped.md`; fetcher `collect/fetch.py` (exclusion list of earlier sites, known SHA-256 in `collect/known_sha256.txt`) |
+| R2. fresh2 labelled | done: 5 labelling agents (batches `label/batch_N_files.json`, 15/15/15/15/14), cut off by a usage limit with 7 files unlabelled and one SHA-256 mistyped; a 6th agent (work_6) labelled the 7 and corrected the SHA (notes say so). 74 labelled: barrier 39 true, 33 false, 2 disputed | `artifacts/office-fresh2/label/batch_N.json`, protocol `label/PROTOCOL.md` |
+| R3. fresh2 labels frozen | done 2026-11-20T08:21:03-05:00: read-only copies `artifacts/office-fresh2/frozen/labels_N.json` + `manifest.json`, hashes in `artifacts/office-fresh2/frozen.sha256` (labels_1 74dc0dc1..., labels_2 e7065c78..., labels_3 1338a9d6..., labels_4 4e2b097e..., labels_5 a9db829e..., manifest 43b6e841...) | |
+| R4. fresh2 labels in the repo | this commit: `split: "fresh2"` in `office_files.json`, built mechanically by `artifacts/office-fresh2/collect/build_entries.py` from the frozen copies; scorer reports "fresh2" | |
+| R5. probe family + search | next | `scripts/office_heading_search.py` |
+| R6. freeze winner in office_check.py | not started (must be committed before R7) | |
+| R7. score fresh2 once | not started | |
+| R8. research doc "Second round: evolved heading probe" | not started | |
+
 ## Next step
 
-The brief is done; the target is not met on the fresh set. Waiting for the
+R5: write `scripts/office_heading_search.py` (features cached per file,
+probe family, k-fold CV fitness, checkpointed generations in
+`artifacts/office-search/`), run it on development data only. Do not
+open or run anything on `artifacts/office-fresh2/files` until R6 is
+committed.
+
+(Round 1 note, kept:) The brief is done; the target is not met on the fresh set. Waiting for the
 developer's decision. If they want another round: make the fixes listed in
 the research doc ("Why the fresh errors happen"), report the fresh set as
 seen, and collect and label a second fresh set (other sites; same
