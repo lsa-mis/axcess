@@ -54,6 +54,9 @@ class _Limiter:
 class _Js:
     """Stands in for the authenticated browser fetcher."""
 
+    # The browser is still running: the failure is the page's own.
+    browser_closed = False
+
     def __init__(self, error: Exception) -> None:
         self._error = error
 

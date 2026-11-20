@@ -487,6 +487,15 @@ async def run_crawl(
     # back so every engine below uses the version the report will claim.
     config = replace(config, wcag_version=_stored_scan_wcag_version(conn, scan_id))
     queue.reclaim_expired(conn)
+    # Continuing a scan that was cut off mid-run gives its failed pages
+    # another go. A failed job keeps its dedupe key, so nothing else ever
+    # queues that address again, and every page only linked from it is lost
+    # too: scan 71 failed 29 pages as the app restarted, and continuing it
+    # finished with 41 fewer pages than a fresh scan (2026-11-20).
+    # Only with work still waiting, the same rule ``_ensure_scan`` adopts an
+    # interrupted scan by: Stop empties the queue but keeps failed jobs, and
+    # a stopped scan taken over by a new run must not start crawling again.
+    _retry_failed_pages(conn, scan_id)
     # If we're reusing a scan whose queue was built under different scope
     # rules (e.g. path-scope was added after the scan started, or the user
     # re-submitted the seed with a tighter prefix), drop pending jobs that
@@ -744,8 +753,9 @@ async def run_crawl(
             # After the last page and before synthesis: the PDF checks the
             # pages queued and still running, then anything still waiting.
             # Inside this block so a stop during it is an interrupted scan
-            # like any other.
-            if ctx.linked_files is not None:
+            # like any other. Not after the browser closed: the crawl did
+            # not reach its last page, and continuing it gets here.
+            if ctx.linked_files is not None and not ctx.browser_closed:
                 await ctx.linked_files.check_pending(
                     client=client,
                     limiter=limiter,
@@ -767,6 +777,11 @@ async def run_crawl(
         if interrupted:
             summary.status = "interrupted"
             summary.notes.append("crawl interrupted")
+        elif ctx.browser_closed:
+            # Ended as a restart ends it, with the waiting pages still
+            # queued, so the scan can be continued (_ensure_scan).
+            summary.status = "interrupted"
+            summary.notes.append("browser closed")
         elif summary.status == "running":
             summary.status = "completed"
         # Every scan that saved pages gets its report finished, however it
@@ -1067,6 +1082,30 @@ def _linked_files_on(config: CrawlConfig) -> bool:
     return config.documents_signed_in or not config.browser_only
 
 
+def _retry_failed_pages(conn: sqlite3.Connection, scan_id: int) -> int:
+    """Queue a continued scan's failed pages again. Returns how many.
+
+    Nothing for a scan with no work waiting (new, finished, or stopped);
+    see the call in ``run_crawl``.
+    """
+    if not _has_outstanding_work(conn, scan_id):
+        return 0
+    retried = queue.retry_failed(conn, JOB_KIND, scan_id=scan_id)
+    if retried:
+        log.info("crawl.retrying_failed_pages", scan_id=scan_id, count=retried)
+    return retried
+
+
+def _has_outstanding_work(conn: sqlite3.Connection, scan_id: int) -> bool:
+    """True while ``scan_id`` has a page waiting or checked out by a worker."""
+    row = conn.execute(
+        "SELECT EXISTS (SELECT 1 FROM jobs WHERE state IN ('pending', 'leased') "
+        "AND json_extract(payload_json, '$.scan_id') = ?) AS n",
+        (scan_id,),
+    ).fetchone()
+    return bool(row["n"])
+
+
 def _purge_out_of_scope_jobs(
     conn: sqlite3.Connection,
     *,
@@ -1188,6 +1227,17 @@ class _LazyJs:
             self._fetcher = fetcher
         return self._fetcher
 
+    @property
+    def browser_closed(self) -> bool:
+        """True when the crawl's browser has started and then gone away.
+
+        Read with a default because a test may inject a stand-in fetcher
+        that has no browser to lose.
+        """
+        if self._fetcher is None:
+            return False
+        return bool(getattr(self._fetcher, "browser_closed", False))
+
     async def shutdown(self) -> None:
         if self._owned and self._fetcher is not None:
             await self._fetcher.__aexit__(None, None, None)
@@ -1256,6 +1306,10 @@ class _WorkerContext:
     semantic_analyzers: list[Any] = field(default_factory=list)
     # The report's Documents tab; None when the scan does not record them.
     linked_files: LinkedFileTracker | None = None
+    # Set when the crawl's browser has gone away (the app quitting, or the
+    # browser crashing). Workers stop and the scan ends interrupted, so it
+    # can be continued (see _worker).
+    browser_closed: bool = False
 
 
 async def _build_vlm(
@@ -1388,6 +1442,8 @@ async def _build_semantic_analyzers(
 async def _worker(ctx: _WorkerContext) -> None:
     """Lease and process jobs until both queue and peers are idle."""
     while True:
+        if ctx.browser_closed:
+            return
         # Pages being loaded count as taken. Counting only loaded pages let
         # each idle worker start another page while the first ones were
         # still loading or in their checks: a 2-page scan saved 7, and a
@@ -1415,9 +1471,23 @@ async def _worker(ctx: _WorkerContext) -> None:
                 await _process_job(ctx, job)
             queue.complete(ctx.conn, job.id)
         except Exception as exc:  # record and move on
-            log.warning("crawl.job_failed", id=job.id, error=str(exc))
-            queue.fail(ctx.conn, job.id, str(exc))
-            ctx.summary.errors += 1
+            if ctx.js is not None and ctx.js.browser_closed:
+                # Not the page's fault, so the page keeps its tries and the
+                # crawl stops. Counting them failed every waiting page of
+                # scan 71 in 40 seconds when the app restarted: 8 workers
+                # took page after page and each failed at once on the dead
+                # browser (2026-11-17). Relaunching the browser was the other
+                # option; when the app is quitting it would only race the
+                # shutdown, and a crash is rare enough that continuing the
+                # scan is a fair answer.
+                if not ctx.browser_closed:
+                    log.warning("crawl.browser_closed", id=job.id, error=str(exc))
+                ctx.browser_closed = True
+                queue.release(ctx.conn, job.id)
+            else:
+                log.warning("crawl.job_failed", id=job.id, error=str(exc))
+                queue.fail(ctx.conn, job.id, str(exc))
+                ctx.summary.errors += 1
         finally:
             ctx.in_flight -= 1
             ctx.unfetched.discard(job.id)
@@ -1506,6 +1576,10 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
             result = await (await ctx.js.get()).fetch(url)
             render_mode = "js"
         except FetchError as exc:
+            # A closed browser fails every page: stop the crawl (_worker)
+            # rather than save this one without its browser checks.
+            if ctx.js.browser_closed:
+                raise
             # Fall back to the plain fetch that was skipped. Escalation
             # always had a static result to keep when the browser failed,
             # and a degraded page beats no page at all.
@@ -1530,6 +1604,9 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
                     result = await (await ctx.js.get()).fetch(url)
                     render_mode = "js"
                 except FetchError as exc:
+                    # A closed browser is not this page failing (_worker).
+                    if ctx.js.browser_closed:
+                        raise
                     # The class only, never the message or the URL. A protected
                     # target's address and a failure string can both carry session
                     # detail, which is why this branch stays quiet where its public
@@ -1564,6 +1641,9 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
             result = await js_fetcher.fetch(url)
             render_mode = "js"
         except FetchError as exc:
+            # A closed browser is not this page failing (_worker).
+            if ctx.js.browser_closed:
+                raise
             log.warning("crawl.js_fetch_failed", url=url, error=str(exc))
 
     page_id = _record_page(
