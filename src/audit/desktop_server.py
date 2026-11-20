@@ -186,6 +186,8 @@ class DesktopServer(uvicorn.Server):
         super().__init__(config)
         self._deadline_s = deadline_s
         self._deadline_started = threading.Event()
+        #: The running deadline, once shutdown has started.
+        self.deadline_timer: threading.Timer | None = None
 
     def handle_exit(self, sig: int, frame: object) -> None:
         self.start_deadline()
@@ -207,6 +209,7 @@ class DesktopServer(uvicorn.Server):
 
         timer = threading.Timer(self._deadline_s, _expire)
         timer.daemon = True
+        self.deadline_timer = timer
         timer.start()
 
     def request_shutdown(self) -> None:

@@ -245,14 +245,23 @@ def test_the_desktop_shell_can_ask_the_backend_to_exit_with_it() -> None:
     assert build_parser().parse_args(["--port", "8765"]).exit_with_parent is False
 
 
-def test_the_end_of_input_starts_the_shutdown() -> None:
+def test_the_end_of_input_starts_the_shutdown(monkeypatch: pytest.MonkeyPatch) -> None:
     """The shell holds the other end of standard input: when it quits,
     crashes or is killed, the pipe closes and the backend shuts down."""
     import io
 
+    from audit import desktop_server
+
+    # The shutdown's deadline would end this test process; stop it here.
+    monkeypatch.setattr(desktop_server.os, "_exit", lambda code: None)
     server = _server()
     server.exit_when_input_closes(io.BytesIO(b"")).join(timeout=5)  # type: ignore[attr-defined]
-    assert server.should_exit is True  # type: ignore[attr-defined]
+    try:
+        assert server.should_exit is True  # type: ignore[attr-defined]
+        assert server.deadline_timer is not None  # type: ignore[attr-defined]
+    finally:
+        if server.deadline_timer is not None:  # type: ignore[attr-defined]
+            server.deadline_timer.cancel()  # type: ignore[attr-defined]
 
 
 def test_a_shutdown_that_hangs_ends_the_process(monkeypatch: pytest.MonkeyPatch) -> None:
