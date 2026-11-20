@@ -577,7 +577,15 @@ export default function ScansRoute() {
                         {SORT_LABELS[column]}
                       </SortHeader>
                     ))}
-                    <ColumnHeader className="w-[22rem] whitespace-nowrap px-3 py-1.5">
+                    {/* w-px: the column is only as wide as its widest row of
+                        links or buttons (whitespace-nowrap keeps each row on
+                        one line), so a site's links get the same space on
+                        both sides (SiteRows). It was 22rem, which left wide,
+                        uneven space around them (the developer's request,
+                        2026-11-20: smaller, equal space each side). Any
+                        extra width in a wide window goes to the other
+                        columns instead. */}
+                    <ColumnHeader className="w-px whitespace-nowrap px-3 py-1.5">
                       {/* The height of a sort button, words in its middle like theirs,
                           so its label lines up with them. */}
                       <span className="inline-flex min-h-target items-center px-1">Actions</span>
@@ -763,10 +771,23 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
               {completed.page_count.toLocaleString()}
             </Cell>
             <RuleChecksCell scan={completed} />
-            <Cell className="whitespace-nowrap">
+            {/* px-3, not the cell's 16px, and the links spread to the
+                cell's edges (justify-between), not centred: with each
+                link's own 4px (px-1), "Open latest scan" starts 16px in,
+                where the "Actions" heading's words do (its px-3 and px-1),
+                and "Scan again" ends 16px from the column's right edge, so
+                the space is the same on both sides (the developer's
+                request, 2026-11-20). The column fits its widest row (the
+                header's w-px), which is not always this one: an open
+                site's "Compare with" and Delete can be wider in some fonts
+                and text sizes. Left-aligning the pair was tried first and
+                left the extra width on the right only; spreading puts it
+                between the two links instead, so the edges stay even.
+                gap-2 is the least space between them. */}
+            <Cell className="whitespace-nowrap px-3">
               {/* Both actions shown side by side, as in the scan rows: see
                   "Actions" in the comment above. */}
-              <div className="flex items-center justify-center gap-2">
+              <div className="flex items-center justify-between gap-2">
                 <Link
                   to={`/scans/${completed.id}`}
                   className="report-link inline-flex min-h-target items-center px-1 font-semibold"
@@ -834,10 +855,28 @@ const OPEN_SITE_SHADE = "bg-surface-subtle";
  */
 /** A scan row's "Report #N" cell (ScanRow), shared with its sizing row. */
 const SCAN_ROW_HEADER = "whitespace-nowrap py-1 pl-[4.75rem] text-xs font-normal tabular-nums text-fg-muted";
-/** A scan row's actions ("Compare with", Delete), shared with its sizing row. */
-const SCAN_ACTIONS = "flex items-center justify-center";
-/** Delete's padding, 2px less each side than the shared button's 16px (2026-11-16). */
-const DELETE_PADDING = "px-3.5";
+/**
+ * A scan row's actions ("Compare with", Delete), shared with its sizing row.
+ *
+ * Left-aligned, in a cell with 7px on the left (SCAN_ACTIONS_CELL), so the
+ * words "Compare with" start 16px into the column (7px cell + the button's
+ * 1px border + 8px padding), where "Open latest scan" starts on the site
+ * row above (12px cell + 4px link padding) and the "Actions" heading's
+ * words do (the developer's request, 2026-11-20). Centred was rejected: the
+ * words moved with the column's width, so they lined up in no font. The
+ * developer chose lining up the words over lining up the buttons' hover
+ * fill, which now starts 7px from the column line.
+ */
+const SCAN_ACTIONS = "flex items-center";
+const SCAN_ACTIONS_CELL = "pl-[0.4375rem]";
+/**
+ * Delete's padding: 8px each side, half the shared button's 16px, so the
+ * row is narrower and "Compare with" can start where "Open latest scan"
+ * does (the developer's request, 2026-11-20; it was 14px from 2026-11-16).
+ * The button is still 44px tall and wider than 44px (SC 2.5.5 Target Size
+ * (Enhanced), Level AAA).
+ */
+const DELETE_PADDING = "px-2";
 
 function scanCardCell({ first, last, edge }: { first: boolean; last: boolean; edge?: "start" | "end" }): string {
   return cn(
@@ -937,14 +976,27 @@ function ScanRow({
           it: each cell here is its own layer (`isolate`, for the box drawn
           behind it), so a later row would otherwise paint over the list.
           Still under the top bar (z-20). */}
-      <Cell className={cn("whitespace-nowrap py-1 has-[[data-menu-open]]:z-10", piece("end"))}>
+      {/* Delete on its own (no other report to compare with) is centred,
+          not left-aligned (the developer's request, 2026-11-20): there are
+          no words in this row to line up with "Open latest scan", and a
+          lone button at the left edge looked out of place. Centred in the
+          white box's part of the column: no left padding, and the cell's
+          16px on the right is the box's inset from the column's right edge
+          (scanCardCell), so the space each side of Delete is the same. */}
+      <Cell
+        className={cn(
+          "whitespace-nowrap py-1 has-[[data-menu-open]]:z-10",
+          others.length > 0 ? SCAN_ACTIONS_CELL : "pl-0",
+          piece("end"),
+        )}
+      >
         {/* Default `md` size (44px tall): destructive controls in
             particular must be a real target (SC 2.5.5). In reading order:
             compare this report, then delete it. */}
         {/* No gap between "Compare with" and Delete: each button's own
             padding already separates them (the developer's request,
             2026-11-16). */}
-        <div className={SCAN_ACTIONS}>
+        <div className={cn(SCAN_ACTIONS, others.length === 0 && "justify-center")}>
           {others.length > 0 && (
             <LinkMenu
               label="Compare with"
@@ -1052,7 +1104,7 @@ function SizerRows({ sites }: { sites: readonly SiteGroup[] }) {
               <Cell className="whitespace-nowrap py-0">
                 {sized(scan.rule_checks ? ruleChecksText(scan.rule_checks) : "Not recorded")}
               </Cell>
-              <Cell className="whitespace-nowrap py-0">
+              <Cell className={cn("whitespace-nowrap py-0", SCAN_ACTIONS_CELL)}>
                 {/* pr-2: the Actions column is 8px wider than its buttons, so
                     Delete's hover fill clears the box's right edge (the
                     developer's request, 2026-11-16: make the column wider).
