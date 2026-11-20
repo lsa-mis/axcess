@@ -9,7 +9,14 @@ each labelled file (``office_files.json``; how it was made is in
 * per check: the check key a criterion names (``office_files.CRITERIA``)
   against the label, "fail" a positive, "pass" and "n/a" negatives;
 * per file: "Mostly sure" against ``barrier``, the labeller's verdict that
-  a screen reader user meets a barrier the counted checks can prove.
+  a screen reader user meets a barrier one of the first five criteria
+  names. Since 2026-11-20 only three of those checks count toward "Mostly
+  sure" (``office_check.COUNTED``; tables and headings are possible
+  problems), so "Mostly sure" recall here counts table and heading
+  barriers as misses by design. Two more file rows say what a reader
+  sees: ``any_problem`` (the report lists any problem, counted or
+  possible) and ``any_barrier_check`` (it lists one of the five barrier
+  checks).
 
 Each score is given for each part (``split``): "holdout" and "tuning",
 together the "development" set (every rule of 2026-11-19 was chosen
@@ -238,6 +245,32 @@ def run_set() -> dict[str, Any]:
                 ]
             ),
         }
+        # What a reader sees, not only "Mostly sure": a barrier file listed
+        # with any problem, counted or possible (since the two tiers of
+        # 2026-11-20, "Mostly sure" alone misses the table and heading
+        # barriers by design). "any_problem": any failed check the report
+        # shows (a Google file's "no_title" is left out, as the report does);
+        # "any_barrier_check": any check named by a criterion ``barrier``
+        # covers (``BARRIER_CHECKS``), so a missing document title alone
+        # does not count as finding a barrier.
+        part["any_problem"] = score(
+            [
+                (by_id[r["id"]]["barrier"] is True, bool(_shown(r)), r["id"])
+                for r in scored
+                if by_id[r["id"]]["barrier"] != "disputed"
+            ]
+        )
+        part["any_barrier_check"] = score(
+            [
+                (
+                    by_id[r["id"]]["barrier"] is True,
+                    bool(set(r["failed"]) & BARRIER_CHECKS),
+                    r["id"],
+                )
+                for r in scored
+                if by_id[r["id"]]["barrier"] != "disputed"
+            ]
+        )
         for criterion, key in CRITERIA.items():
             part[key] = score(
                 [
@@ -248,6 +281,20 @@ def run_set() -> dict[str, Any]:
             )
         report["scores"][split] = part
     return report
+
+
+#: The checks of the criteria ``barrier`` covers (the labelling protocol:
+#: "any of the first five fails").
+BARRIER_CHECKS = frozenset(
+    {"no_alt_text", "table_no_header", "slide_no_title", "no_language", "no_headings"}
+)
+
+
+def _shown(row: dict[str, Any]) -> list[str]:
+    """The failed checks the report lists for a scored row."""
+    if row["kind"].startswith("google"):
+        return [check for check in row["failed"] if check != "no_title"]
+    return list(row["failed"])
 
 
 #: Each reported part and the ``split`` values it holds.
