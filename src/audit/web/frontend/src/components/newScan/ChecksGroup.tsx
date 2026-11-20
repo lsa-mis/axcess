@@ -193,13 +193,23 @@ export default function ChecksGroup({ settings, update, policy, capabilities }: 
             the scanned site (AGENTS.md, Interface language rule 4: never
             drop a privacy fact). In a sign-in scan its own hint replaces
             that one: there the PDFs download with the person's sign-in,
-            and files on other sites are not downloaded (2026-11-16). */}
+            and files on other sites are not downloaded (2026-11-16). In a
+            public scan that follows robots.txt, a line says Google Drive
+            files will not be downloaded (Google's robots.txt asks scanners
+            not to), so the reader learns it before scanning, not from the
+            report (the developer's request, 2026-11-16). */}
         {!isFixed(policy, "skip_documents") && (
           <SwitchRow
             checked={switchOn(settings, "documents")}
             onChange={(on) => update(switchPatch(settings, "documents", on))}
             label={SWITCHES.documents.label}
-            hint={login ? SWITCHES.documents.hintSignedIn : SWITCHES.documents.hint}
+            hint={
+              login
+                ? SWITCHES.documents.hintSignedIn
+                : settings.ignore_robots
+                  ? SWITCHES.documents.hint
+                  : `${SWITCHES.documents.hint} ${SWITCHES.documents.driveRobotsNote}`
+            }
           />
         )}
       </SwitchList>

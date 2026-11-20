@@ -14,6 +14,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from audit.linked_files.formats import (
+    CheckedAs,
     FailedCheck,
     FileType,
     FoundBy,
@@ -40,6 +41,8 @@ class CheckResult:
     status: Status
     reason: Reason | None = None
     failed_checks: Sequence[FailedCheck] = ()
+    #: Checks the file was given (migration 0048); None for no check.
+    checks_run: Sequence[FailedCheck] | None = None
     http_status: int | None = None
     content_type: str | None = None
     byte_size: int | None = None
@@ -50,6 +53,9 @@ class CheckResult:
     thumbnail_hash: str | None = None
     # The same page, small, for the Documents table.
     thumbnail_small_hash: str | None = None
+    # Which check read the file: "pdf", "docx" or "pptx" (migration 0045).
+    # The bytes decide, not the link: a Google Doc is checked as "docx".
+    checked_as: CheckedAs | None = None
 
 
 def file_count(conn: sqlite3.Connection, scan_id: int) -> int:
@@ -135,15 +141,16 @@ def set_result(
     if result.status == "could_not_check" and result.reason is None:
         raise ValueError("A file that could not be checked needs a reason")
     cur = conn.execute(
-        "UPDATE linked_files SET status = ?, reason = ?, failed_checks = ?, "
+        "UPDATE linked_files SET status = ?, reason = ?, failed_checks = ?, checks_run = ?, "
         "http_status = ?, content_type = ?, byte_size = ?, sha256 = ?, is_form = ?, "
-        "page_count = ?, thumbnail_hash = ?, thumbnail_small_hash = ?, "
+        "page_count = ?, thumbnail_hash = ?, thumbnail_small_hash = ?, checked_as = ?, "
         "checked_at = CURRENT_TIMESTAMP "
         "WHERE id = ? AND scan_id = ?",
         (
             result.status,
             result.reason if result.status == "could_not_check" else None,
             json.dumps(list(result.failed_checks)),
+            None if result.checks_run is None else json.dumps(list(result.checks_run)),
             result.http_status,
             (result.content_type or "")[:200] or None,
             result.byte_size,
@@ -152,6 +159,7 @@ def set_result(
             result.page_count,
             result.thumbnail_hash,
             result.thumbnail_small_hash,
+            result.checked_as,
             file_id,
             scan_id,
         ),
@@ -171,7 +179,7 @@ def checked_copy(
     """
     row = conn.execute(
         "SELECT status, failed_checks, is_form, page_count, thumbnail_hash, "
-        "thumbnail_small_hash FROM linked_files "
+        "thumbnail_small_hash, checked_as, checks_run FROM linked_files "
         "WHERE scan_id = ? AND sha256 = ? AND id != ? "
         "AND status IN ('mostly_sure', 'not_sure') ORDER BY id LIMIT 1",
         (scan_id, sha256, file_id),
@@ -185,6 +193,8 @@ def checked_copy(
         page_count=row[3],
         thumbnail_hash=row[4],
         thumbnail_small_hash=row[5],
+        checked_as=row[6],
+        checks_run=None if row[7] is None else tuple(json.loads(row[7])),
     )
 
 
@@ -247,3 +257,43 @@ def mark_unchecked(conn: sqlite3.Connection, scan_id: int) -> int:
         (scan_id,),
     )
     return cur.rowcount
+
+
+#: Reasons a continued report checks again (``reopen_for_continuing``).
+_REOPENED_REASONS = ("not_checked", "type_not_checked_yet", "google_file")
+
+
+def reopen_for_continuing(conn: sqlite3.Connection, scan_id: int) -> int:
+    """Put back in the queue the files a continued report can still check.
+
+    For **Continue scan** (``audit.web.continuing``). Two kinds of row:
+
+    - ``not_checked``: the scan stopped before the file's check finished.
+    - A type the build that started the report could not check yet, which
+      this one can: ``type_not_checked_yet`` on a Word or PowerPoint file,
+      ``google_file`` on a Google Doc or Slides deck (both checked since
+      2026-11-18). A Doc published to the web still has no file to download
+      (``google.export_address``), so it keeps its reason.
+
+    Returns how many files were put back.
+    """
+    from audit.linked_files.google import export_address
+
+    reopened: list[int] = []
+    rows = conn.execute(
+        "SELECT id, url, file_type, reason FROM linked_files "
+        "WHERE scan_id = ? AND status = 'could_not_check' AND reason IN (?, ?, ?)",
+        (scan_id, *_REOPENED_REASONS),
+    ).fetchall()
+    for file_id, url, file_type, reason in rows:
+        if reason != "not_checked":
+            if initial_status(file_type)[0] != "pending":
+                continue
+            if file_type in {"google_doc", "google_slides"} and export_address(url) is None:
+                continue
+        reopened.append(int(file_id))
+    conn.executemany(
+        "UPDATE linked_files SET status = 'pending', reason = NULL WHERE id = ? AND scan_id = ?",
+        [(file_id, scan_id) for file_id in reopened],
+    )
+    return len(reopened)

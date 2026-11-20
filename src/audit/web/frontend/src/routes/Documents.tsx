@@ -208,7 +208,8 @@ const ORDER_WORDS = "Mostly sure first, then Not sure, then Could not check";
 /**
  * The files a report's pages link to (``/scans/:id/documents``), the report's
  * third tab: PDF, Word, Excel, PowerPoint, OpenDocument, RTF and Google files,
- * where each is linked from, and what the PDF checks found. A web editor
+ * where each is linked from, and what the checks found (PDF, Word and
+ * PowerPoint files, Google Docs and Slides since 2026-11-17). A web editor
  * opens it to decide which file to fix first.
  *
  * Laid out as Issues (routes/Issues.tsx), the tab beside it, so a reader who
@@ -663,25 +664,29 @@ function DocumentsToolbar({
  * Usable": one idea per chunk).
  *
  * In this order: the caveat, first, because a list with "Not sure" beside a
- * file could be read as a pass; which files are listed and that only PDFs
- * are checked; what Axcess downloaded and kept (a privacy fact); what the
- * list can miss; and why a report may not have looked for documents. Never
+ * file could be read as a pass; which files are listed and which types are
+ * checked; what the Word and PowerPoint checks look at, and that possible
+ * problems need a person; what Axcess downloaded and kept (a privacy fact);
+ * what the list can miss; and why a report may not have looked for
+ * documents. Never
  * drop the privacy or limitation facts to make the row shorter (AGENTS.md,
  * Interface language rule 4).
  *
  * The closed row shows one fact on its right, as Issues' shows "6 of 7
- * checks ran": "Only PDFs checked", the limit a reader most needs beside the
- * numbers; or, for a report that did not look, "Not looked for", under the
- * empty table that says so in full. No longer than Issues' 17 characters:
- * "Only PDF files are checked" squeezed the title to one word a line at
- * 320px.
+ * checks ran": "3 types checked" (PDF, Word and PowerPoint; "Only PDFs
+ * checked" until 2026-11-17), the limit a reader most needs beside the
+ * numbers, with the types named in the paragraph inside; or, for a report
+ * that did not look, "Not looked for", under the empty table that says so
+ * in full. No longer than Issues' 17 characters: "Only PDF files are
+ * checked" squeezed the title to one word a line at 320px, and a list of
+ * the three types would too.
  */
 function DocumentsCoverageNote({ recorded }: { recorded: boolean }) {
   return (
     <ReportNote
       id="report-coverage"
       title="What was checked"
-      meta={recorded ? "Only PDFs checked" : "Not looked for"}
+      meta={recorded ? "3 types checked" : "Not looked for"}
     >
       <div className="max-w-[52ch] space-y-2 text-sm leading-6 text-fg-muted">
         <p>
@@ -691,10 +696,30 @@ function DocumentsCoverageNote({ recorded }: { recorded: boolean }) {
         <p>
           This list shows the files that the scanned pages link to or show inside the page: PDF,
           Word, Excel, PowerPoint, OpenDocument, Rich Text Format (RTF) and Google files. Axcess
-          checks only the PDF files.
+          checks the PDF, Word (.docx) and PowerPoint (.pptx) files. It checks a Google Doc or
+          Google Slides file as the Word or PowerPoint file that Google exports. It does not check
+          Excel files, Google Sheets, old Office files (.doc, .ppt) or the other types.
+        </p>
+        {/* What the Word and PowerPoint checks look at, so a reader knows
+            what "No problem found" covers, and which checks can make a file
+            "Mostly sure" and which only list a possible problem for a
+            person to judge: the developer's two tiers of 2026-11-20
+            (office_check.COUNTED), chosen by how accurate each check was on
+            real files. Two paragraphs, one per tier, rather than one
+            sentence naming all eight checks: one idea per chunk (W3C COGA,
+            "Making Content Usable", https://www.w3.org/TR/coga-usable/,
+            paraphrased). True to office_check.py: change them together. */}
+        <p>
+          In a Word or PowerPoint file, three checks can make the file &ldquo;Mostly sure&rdquo;:
+          alt text for images, slide titles and the language.
         </p>
         <p>
-          To check a PDF, Axcess downloaded it to this computer once. It kept the results, not
+          Other checks list possible problems for a person to judge: table header rows, headings,
+          heading levels, link text and the document title. A possible problem never makes a file
+          &ldquo;Mostly sure&rdquo;.
+        </p>
+        <p>
+          To check a file, Axcess downloaded it to this computer once. It kept the results, not
           the file. For a file on another site, Axcess opened that one file and did not scan the
           site.
         </p>
@@ -714,7 +739,7 @@ function DocumentsCoverageNote({ recorded }: { recorded: boolean }) {
             "could not check" with the scan's-settings reason, which alone
             would not tell the reader why. */}
         <p>
-          A scan that signs in to a site downloads PDFs only from that site, with the sign-in. It
+          A scan that signs in to a site downloads files only from that site, with the sign-in. It
           lists files on other sites but does not download them.
         </p>
       </div>

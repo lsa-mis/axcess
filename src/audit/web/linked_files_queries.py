@@ -35,7 +35,15 @@ from urllib.parse import unquote, urlsplit
 
 from pydantic import BaseModel
 
-from audit.linked_files.formats import SEVERE_CHECKS, FailedCheck, FileType, Reason, RefKind
+from audit.linked_files.formats import (
+    SEVERE_CHECKS,
+    CheckedAs,
+    FailedCheck,
+    FileType,
+    Reason,
+    RefKind,
+)
+from audit.linked_files.office_check import checks_for, counts
 
 #: Largest page of rows one request may ask for. The Documents tab asks
 #: for every file at once (up to this many) and sorts, filters and pages
@@ -77,7 +85,23 @@ class LinkedFileRow(BaseModel):
     off_site: bool
     status: ShownStatus
     reason: Reason | None
+    #: The checks that failed and prove a problem: what makes the file
+    #: "Mostly sure". Every failed PDF check; for a Word or PowerPoint file,
+    #: the ones ``office_check.COUNTED`` names.
     failed_checks: list[FailedCheck]
+    #: Checks that failed but do not by themselves prove a barrier, for a
+    #: person to look at (Word and PowerPoint only, such as link text that
+    #: is a web address). They never make a file "Mostly sure".
+    possible_problems: list[FailedCheck] = []
+    #: Which check read the file: "pdf", "docx" or "pptx"; None when no
+    #: check read it. Decided by the bytes, so a Google Doc is "docx".
+    checked_as: CheckedAs | None = None
+    #: Every check that ran on the file, in report order, for the document
+    #: page's table of checks; empty when no check read it. A PDF stores its
+    #: own (the structure checks run only where they apply, migration 0048);
+    #: one checked before that, and every Word or PowerPoint file, ran all
+    #: the checks for its kind (``office_check.checks_for``).
+    checks_run: list[FailedCheck] = []
     http_status: int | None
     is_form: bool | None
     page_count: int | None
@@ -206,7 +230,12 @@ def _file_rows(
                f.failed_checks, f.http_status, f.is_form, f.page_count,
                (SELECT COUNT(DISTINCT r.page_id) FROM linked_file_refs r
                  WHERE r.file_id = f.id AND r.scan_id = f.scan_id) AS referring,
-               f.thumbnail_hash IS NOT NULL AS has_thumbnail
+               f.thumbnail_hash IS NOT NULL AS has_thumbnail,
+               -- Rows checked before migration 0045 were PDFs: nothing
+               -- else was checked then.
+               CASE WHEN f.status IN ('mostly_sure', 'not_sure')
+                    THEN COALESCE(f.checked_as, 'pdf') END AS checked_as,
+               f.checks_run
           FROM linked_files f
          WHERE f.scan_id = ? AND (? IS NULL OR f.id = ?)
          ORDER BY CASE {_SHOWN_STATUS_SQL}
@@ -228,6 +257,18 @@ def _file_rows(
     files = []
     for row in rows:
         first = copies.get(int(row[0]))
+        checked_as = row[12]
+        found = json.loads(row[6] or "[]")
+        # A PDF stores the checks it was given (migration 0048); every other
+        # file, and a PDF checked before then, ran all the checks for its kind.
+        run = json.loads(row[13]) if row[13] is not None else list(checks_for(checked_as))
+        if row[2] in GOOGLE_EXPORTS:
+            # Google's .docx and .pptx exports never carry a document title,
+            # and the author cannot set one, so the check is left out for
+            # them rather than listed on every Google row as a possible
+            # problem no one can fix (the developer's decision, 2026-11-18).
+            found = [check for check in found if check != "no_title"]
+            run = [check for check in run if check != "no_title"]
         files.append(
             LinkedFileRow(
                 file_id=int(row[0]),
@@ -242,7 +283,10 @@ def _file_rows(
                 off_site=bool(row[3]),
                 status=row[4],
                 reason=row[5],
-                failed_checks=json.loads(row[6] or "[]"),
+                failed_checks=[check for check in found if counts(checked_as, check)],
+                possible_problems=[check for check in found if not counts(checked_as, check)],
+                checked_as=checked_as,
+                checks_run=run,
                 http_status=row[7],
                 is_form=None if row[8] is None else bool(row[8]),
                 page_count=row[9],
@@ -267,6 +311,10 @@ def thumbnail_hash(
         (file_id, scan_id),
     ).fetchone()
     return None if row is None or row[0] is None else str(row[0])
+
+
+#: Google files Axcess checks as the Word or PowerPoint file Google exports.
+GOOGLE_EXPORTS = frozenset({"google_doc", "google_slides"})
 
 
 def _first_copies(conn: sqlite3.Connection, scan_id: int) -> dict[int, int]:

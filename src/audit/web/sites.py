@@ -39,6 +39,9 @@ class ScanSummaryModel(BaseModel):
     rule_checks: list[Literal["axe", "alfa"]] | None = None
     started_at: str | None
     finished_at: str | None
+    #: Not finished: Axcess closed mid-scan with addresses still waiting,
+    #: so Continue scan can carry it on (``audit.web.continuing``).
+    can_continue: bool = False
 
 
 class SiteGroup(BaseModel):

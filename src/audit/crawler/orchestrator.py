@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import functools
 import gzip
 import hashlib
 import json
@@ -75,6 +76,7 @@ from audit.extractor.downloader import ImageDownloader, ImageDownloaderProtocol
 from audit.extractor.pipeline import OcrConfig, VlmConfig, process_page
 from audit.linked_files import formats as linked_file_formats
 from audit.linked_files.fetch import FileFetcher
+from audit.linked_files.google import download_with_button
 from audit.linked_files.tracker import LinkedFileTracker
 from audit.logging import get_logger
 from audit.synthesizer.findings import synthesize_findings
@@ -738,6 +740,10 @@ async def run_crawl(
             # chose not to store rendered pages.
             thumbnails=blob_store if config.store_rendered_html else None,
             fetch=file_fetcher,
+            # A Drive file whose download address stops giving the file:
+            # press its download button in a browser of its own, with the
+            # scan's browser name.
+            drive_button=functools.partial(download_with_button, user_agent=config.user_agent),
         )
     try:
         try:
@@ -870,6 +876,15 @@ RESUMABLE_SCAN_SQL = (
     "THEN COALESCE(json_extract(config_json, '$.resumable'), 1) ELSE 1 END != 0"
 )
 
+#: True while a scan still has addresses waiting in the queue. Stopping a
+#: scan empties its queue; a crawl cut off when Axcess closed leaves its
+#: work there. So this is what tells "not finished" from "stopped", both
+#: stored as ``interrupted`` (``_ensure_scan``, ``audit.web.continuing``).
+WORK_WAITING_SQL = (
+    "EXISTS (SELECT 1 FROM jobs WHERE jobs.state IN ('pending', 'leased') "
+    "AND json_extract(jobs.payload_json, '$.scan_id') = scans.id)"
+)
+
 
 def _ensure_scan(conn: sqlite3.Connection, seed_url: str, config: CrawlConfig) -> int:
     """Create (or resume) a scan row for ``seed_url``. Returns its id."""
@@ -907,14 +922,7 @@ def _ensure_scan(conn: sqlite3.Connection, seed_url: str, config: CrawlConfig) -
            AND {RESUMABLE_SCAN_SQL}
            AND (
                status = 'running'
-               OR (
-                   status = 'interrupted'
-                   AND EXISTS (
-                       SELECT 1 FROM jobs
-                        WHERE jobs.state IN ('pending', 'leased')
-                          AND json_extract(jobs.payload_json, '$.scan_id') = scans.id
-                   )
-               )
+               OR (status = 'interrupted' AND {WORK_WAITING_SQL})
            )
          ORDER BY id DESC
          LIMIT 1

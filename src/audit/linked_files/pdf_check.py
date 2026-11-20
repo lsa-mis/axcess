@@ -30,6 +30,16 @@ The checks, and the WCAG technique each one follows:
 ``no_language``
     No ``/Lang`` in the catalog. WCAG technique PDF16.
 
+Four more read the file's tags and page contents
+(:mod:`audit.linked_files.pdf_structure`): ``field_no_name``,
+``link_no_description``, ``no_alt_text``,
+``formula_no_description``, ``table_cells_misplaced``, ``table_uneven_rows``
+and ``untagged_text``.
+Each runs only where it applies (a file with form fields, a tagged file
+with links, images, formulas or tables, a tagged file), so a file's ``checks_run`` says which
+checks it was given. A report made before 2026-11-17 ran the first five
+only (``BASE_CHECKS``).
+
 pypdf is pure Python, so a hostile file can make it slow; the caller runs
 :func:`check_pdf` in a thread under a time limit. Every exception from
 reading is "damaged": the file is untrusted input, and no fault in it may
@@ -45,6 +55,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from audit.linked_files.formats import FailedCheck
+from audit.linked_files.pdf_structure import read_structure
 
 #: Pages read for text. A file whose first 50 pages are all pictures is a
 #: scan in every sense that matters to a reader.
@@ -63,6 +74,8 @@ class PdfCheck:
     outcome: Outcome
     #: Failed checks, in the order of ``ALL_CHECKS``. Empty unless ``checked``.
     failed: tuple[FailedCheck, ...] = ()
+    #: Checks that ran on the file and applied to it, in ``ALL_CHECKS`` order.
+    checks_run: tuple[FailedCheck, ...] = ()
     #: True when the file has fillable form fields; None when not read.
     is_form: bool | None = None
     page_count: int | None = None
@@ -70,7 +83,24 @@ class PdfCheck:
     detail: str = field(default="", compare=False)
 
 
+#: Every check, most serious first: the order the report lists them in.
 ALL_CHECKS: tuple[FailedCheck, ...] = (
+    "not_tagged",
+    "no_text",
+    "blocks_assistive_tech",
+    "field_no_name",
+    "link_no_description",
+    "no_alt_text",
+    "formula_no_description",
+    "table_cells_misplaced",
+    "table_uneven_rows",
+    "untagged_text",
+    "no_title",
+    "no_language",
+)
+#: The checks every opened PDF gets, and all a report made before
+#: 2026-11-17 ran (its files have no ``checks_run``).
+BASE_CHECKS: tuple[FailedCheck, ...] = (
     "not_tagged",
     "no_text",
     "blocks_assistive_tech",
@@ -123,9 +153,41 @@ def _check(data: bytes) -> PdfCheck:
     if not _has_text(reader, page_count):
         failed.add("no_text")
 
+    ran: set[FailedCheck] = set(BASE_CHECKS)
+    structure = read_structure(reader, max_pages=MAX_TEXT_PAGES)
+    if structure is not None:
+        if structure.fields:
+            ran.add("field_no_name")
+            if structure.fields_without_name:
+                failed.add("field_no_name")
+        if structure.tagged:
+            ran.add("untagged_text")
+            if structure.untagged_text_runs:
+                failed.add("untagged_text")
+            if structure.links:
+                ran.add("link_no_description")
+                if structure.links_without_description:
+                    failed.add("link_no_description")
+            if structure.images:
+                ran.add("no_alt_text")
+                if structure.images_without_description:
+                    failed.add("no_alt_text")
+            if structure.formulas:
+                ran.add("formula_no_description")
+                if structure.formulas_without_description:
+                    failed.add("formula_no_description")
+            if structure.tables:
+                ran.add("table_cells_misplaced")
+                ran.add("table_uneven_rows")
+                if structure.misplaced_tables:
+                    failed.add("table_cells_misplaced")
+                if structure.uneven_tables:
+                    failed.add("table_uneven_rows")
+
     return PdfCheck(
         outcome="checked",
         failed=tuple(check for check in ALL_CHECKS if check in failed),
+        checks_run=tuple(check for check in ALL_CHECKS if check in ran),
         is_form=_has_form_fields(catalog),
         page_count=page_count,
     )

@@ -34,7 +34,7 @@ import {
   PageHeader,
 } from "../components/ui";
 import { withoutUserinfo } from "../components/ReportCrumb";
-import { SCAN_STATUS_LABEL, isReport } from "../lib/terms";
+import { scanStatusLabel, isReport } from "../lib/terms";
 import { useScanQuery } from "../hooks/useScanQuery";
 
 export default function ScanDetailRoute() {
@@ -139,7 +139,7 @@ export default function ScanDetailRoute() {
         <h2 className="font-semibold text-fg">No report was produced</h2>
         <p className="mt-1 text-sm text-fg-muted">
           This scan ended with the status{" "}
-          <strong>{SCAN_STATUS_LABEL[data.status]}</strong> before any page
+          <strong>{scanStatusLabel(data.status, data.can_continue)}</strong> before any page
           finished. Axcess did not create a report.
         </p>
         {data.failure_reason && (

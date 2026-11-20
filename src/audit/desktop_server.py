@@ -12,8 +12,10 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import signal
 import sys
+import threading
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -150,7 +152,86 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="verify bundled backend, browser, Alfa, and OCR dependencies, then exit",
     )
+    parser.add_argument(
+        "--exit-with-parent",
+        action="store_true",
+        help="shut down when standard input closes (the desktop shell has gone)",
+    )
     return parser
+
+
+#: How long a shutdown may take before the process ends itself. Longer than
+#: the web app's wait for a running scan to stop (``CRAWL_STOP_TIMEOUT_S``,
+#: 15 s), shorter than the desktop shell's wait before it kills the process.
+SHUTDOWN_DEADLINE_S = 25.0
+
+
+class DesktopServer(uvicorn.Server):
+    """uvicorn's server, made sure to end when asked to.
+
+    The desktop app must leave nothing running when it closes: no backend,
+    no scan browser. On 2026-11-20 two closed apps were found still running
+    hours later, their scan browsers using most of the computer's processor.
+    Shutting down now stops a running scan first (``_stop_running_crawl`` in
+    ``audit.web.server``), and this class adds two backstops:
+
+    - a deadline: once shutdown starts, the process ends itself after
+      ``SHUTDOWN_DEADLINE_S`` whatever is still running;
+    - with ``--exit-with-parent``, the end of standard input starts the
+      shutdown. The shell holds the other end of that pipe, so it closes when
+      the shell quits, crashes or is killed, even when no signal arrives.
+    """
+
+    def __init__(self, config: uvicorn.Config, *, deadline_s: float = SHUTDOWN_DEADLINE_S) -> None:
+        super().__init__(config)
+        self._deadline_s = deadline_s
+        self._deadline_started = threading.Event()
+        #: The running deadline, once shutdown has started.
+        self.deadline_timer: threading.Timer | None = None
+
+    def handle_exit(self, sig: int, frame: object) -> None:
+        self.start_deadline()
+        super().handle_exit(sig, frame)  # type: ignore[arg-type]
+
+    def start_deadline(self) -> None:
+        """End the process ``deadline_s`` from now if it has not ended by then."""
+        if self._deadline_started.is_set():
+            return
+        self._deadline_started.set()
+
+        def _expire() -> None:
+            print(
+                f"Axcess backend: shutdown took over {self._deadline_s:.0f} s; ending now.",
+                file=sys.stderr,
+                flush=True,
+            )
+            os._exit(1)
+
+        timer = threading.Timer(self._deadline_s, _expire)
+        timer.daemon = True
+        self.deadline_timer = timer
+        timer.start()
+
+    def request_shutdown(self) -> None:
+        """Shut down as a signal would, from any thread."""
+        self.start_deadline()
+        self.should_exit = True
+
+    def exit_when_input_closes(self, stream: IO[bytes] | None = None) -> threading.Thread:
+        """Start the shutdown when ``stream`` (standard input) reaches its end."""
+        source = stream if stream is not None else sys.stdin.buffer
+
+        def _watch() -> None:
+            try:
+                while source.read(4096):
+                    pass
+            except (OSError, ValueError):
+                pass
+            self.request_shutdown()
+
+        watcher = threading.Thread(target=_watch, name="parent-watch", daemon=True)
+        watcher.start()
+        return watcher
 
 
 async def verify_runtime() -> dict[str, str]:
@@ -290,13 +371,21 @@ def main(argv: list[str] | None = None) -> None:
     # its module-level FastAPI application using the current AUDIT_* settings.
     from audit.web.server import app
 
-    uvicorn.run(
-        app,
-        host=args.host,
-        port=args.port,
-        log_level="warning",
-        access_log=False,
+    server = DesktopServer(
+        uvicorn.Config(
+            app,
+            host=args.host,
+            port=args.port,
+            log_level="warning",
+            access_log=False,
+            # A connection still open at shutdown (a window that was not
+            # closed cleanly) is not waited for longer than this.
+            timeout_graceful_shutdown=5,
+        )
     )
+    if args.exit_with_parent:
+        server.exit_when_input_closes()
+    server.run()
 
 
 if __name__ == "__main__":

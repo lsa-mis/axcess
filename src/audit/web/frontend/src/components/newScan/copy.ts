@@ -111,12 +111,19 @@ export const SWITCHES = {
   },
   documents: {
     label: "Check the documents the pages link to",
-    hint: "Lists the PDF, Word, Excel and other files the pages link to, in the report’s list of documents, and checks each PDF during the scan. Axcess downloads each PDF once to this computer (up to 200, each up to 10 MB), also from other sites. It keeps the result and a picture of the first page, not the file.",
+    // Word and PowerPoint files, Google Docs and Slides are checked since
+    // 2026-11-17 (linked_files/office_check.py); the picture is a PDF's only.
+    hint: "Lists the PDF, Word, Excel and other files the pages link to, in the report’s list of documents. Checks each PDF, Word and PowerPoint file, Google Doc and Google Slides file during the scan. Axcess downloads each of them once to this computer (up to 200, each up to 10 MB), also from other sites. It keeps the result and a picture of a PDF’s first page, not the file.",
     // A sign-in scan's own hint, in place of the one above, not added to
     // it: the public hint says files on other sites are downloaded, which
     // is not true behind a sign-in (AGENTS.md, Interface language rule 5).
+    // Added to the public hint while robots.txt is followed (the
+    // developer's request, 2026-11-16): Google's robots.txt asks scanners
+    // not to download Drive files, so none is downloaded then.
+    driveRobotsNote:
+      "While Axcess follows robots.txt, it does not download files kept in Google Drive: Google asks scanners not to.",
     hintSignedIn:
-      "Lists the PDF, Word, Excel and other files the pages link to, in the report’s list of documents, and checks each PDF during the scan. Axcess downloads each PDF on this website with your sign-in, as you (up to 200, each up to 10 MB). It lists files on other sites but does not download them. It keeps the result and a picture of the first page, not the file.",
+      "Lists the PDF, Word, Excel and other files the pages link to, in the report’s list of documents. Checks each PDF, Word and PowerPoint file during the scan. Axcess downloads each of them on this website with your sign-in, as you (up to 200, each up to 10 MB). It lists files on other sites but does not download them. It keeps the result and a picture of a PDF’s first page, not the file.",
   },
   forms: {
     label: "Check that forms describe their errors",

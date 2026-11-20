@@ -1,0 +1,367 @@
+{
+ "about": "Real and test-suite PDFs collected 2026-11-18 for the table and formula checks, from 25 hosts (manifest of all 54 downloads: the verapdf-experiment worktree's artifacts/real-pdfs/manifest.jsonl, not in git). Each file is judged only on the checks in judged_checks (table_rows_fault: fails either table check, for test-suite files whose verdicts predate the split; true: should fail; false: should pass; null: disputed or unsure, not scored), with the basis. Test-suite files (kind) have an outside verdict; real-world files have none: they were judged by an agent from the rendered page and the tags, not by a person with a screen reader. Real-world tables flagged but not looked at (Wilkes, ETSI, Urban Institute, UK Treasury, Ealing, Wandsworth) are left out. Real-world tables the check passes are not labelled either, so this set says nothing about the check's recall on real files.",
+ "labelled": "2026-11-18",
+ "files": [
+  {
+   "url": "https://raw.githubusercontent.com/veraPDF/veraPDF-corpus/staging/PDF_UA-1/7.2%20Text/7.2-t41-fail-a.pdf",
+   "sha256": "f2080431e5e620790cf3a4c0fcbd3c578e2df515aa217c89b16d6eb5f91b4c54",
+   "kind": "test-suite",
+   "judged_checks": {
+    "table_rows_fault": true
+   },
+   "basis": "veraPDF corpus file outline: File outline: '7.2-41 Table; Attribute RowSpan with value 5 is present in Header 1; Expected result: fail'. Rule text in veraPDF profile (https://github.com/ver",
+   "notes": "Test-suite file, PDF/UA-1 7.2-41 to 43."
+  },
+  {
+   "url": "https://raw.githubusercontent.com/veraPDF/veraPDF-corpus/staging/PDF_UA-1/7.2%20Text/7.2-t42-fail-a.pdf",
+   "sha256": "4c7f1b6b7e1e4414f9e0146640c6cd87afe4a8283039d6b911d1e99dd057229f",
+   "kind": "test-suite",
+   "judged_checks": {
+    "table_rows_fault": true
+   },
+   "basis": "veraPDF corpus file outline: File outline: '7.2-42 Table; Attribute RowSpan with value 2 is present in empty cell; Attribute ColSpan with value 2 is present in TH1; Expected result: fail'. ",
+   "notes": "Test-suite file, PDF/UA-1 7.2-41 to 43."
+  },
+  {
+   "url": "https://raw.githubusercontent.com/veraPDF/veraPDF-corpus/staging/PDF_UA-1/7.2%20Text/7.2-t43-fail-a.pdf",
+   "sha256": "11062cc8144cc53cd83e8e9002e0081780023e43c336f92e244f8ae485807e26",
+   "kind": "test-suite",
+   "judged_checks": {
+    "table_rows_fault": true
+   },
+   "basis": "veraPDF corpus file outline: File outline: '7.2-43 Table; Attribute RowSpan with value 1 is present in empty cell; Attribute ColSpan with value 3 is present in TH1; Expected result: fail'. ",
+   "notes": "Test-suite file, PDF/UA-1 7.2-41 to 43."
+  },
+  {
+   "url": "https://raw.githubusercontent.com/veraPDF/veraPDF-corpus/staging/PDF_UA-1/7.2%20Text/7.2-t43-fail-b.pdf",
+   "sha256": "4ab4c57d229d14d43ccc9dddfb6c7cc5f243b93fdfea367daf3525f2540abc32",
+   "kind": "test-suite",
+   "judged_checks": {
+    "table_rows_fault": true
+   },
+   "basis": "veraPDF corpus file outline: File outline: '7.2-43 Table; THead contains all Table Header Cells; TBody contains all Table Data Cells; Expected result: fail'. Rule text in veraPDF profile (h",
+   "notes": "Test-suite file, PDF/UA-1 7.2-41 to 43."
+  },
+  {
+   "url": "https://raw.githubusercontent.com/veraPDF/veraPDF-corpus/staging/PDF_UA-1/7.2%20Text/7.2-t43-fail-c.pdf",
+   "sha256": "291f5067367b73157378c00489494a6b483e50ab2d89a406983e2574f2913839",
+   "kind": "test-suite",
+   "judged_checks": {
+    "table_rows_fault": true
+   },
+   "basis": "veraPDF corpus file outline: File outline: '7.2-43 Table; All Table Header Cells are present in TR; Expected result: fail'. Rule text in veraPDF profile (https://github.com/veraPDF/veraPDF-",
+   "notes": "Test-suite file, PDF/UA-1 7.2-41 to 43."
+  },
+  {
+   "url": "https://raw.githubusercontent.com/veraPDF/veraPDF-corpus/staging/PDF_UA-2/8.2%20Logical%20structure/8.2.5%20Additional%20requirements%20for%20specific%20structure%20types/8.2.5.26%20Table%20%28Table%2C%20TR%2C%20TH%2C%20TD%2C%20THead%2C%20TBody%2C%20TFoot%29/8.2.5.26-t01-pass-a.pdf",
+   "sha256": "085618a372d2b5ba5c9a61904d10a5c76a470d6f848c4c35ce58e8fedb3075c0",
+   "kind": "test-suite",
+   "judged_checks": {
+    "table_rows_fault": false
+   },
+   "basis": "veraPDF corpus file outline: File outline: '8.2.5.26 Table - Regular Table; Attribute RowSpan with value 2 is present in empty cell; Attribute ColSpan with value 3 is present in TH1; Expect",
+   "notes": "Test-suite file; PDF/UA-2's regular-table rule, a different standard from PDF/UA-1 7.2: supporting only."
+  },
+  {
+   "url": "https://raw.githubusercontent.com/veraPDF/veraPDF-corpus/staging/PDF_UA-2/8.2%20Logical%20structure/8.2.5%20Additional%20requirements%20for%20specific%20structure%20types/8.2.5.26%20Table%20%28Table%2C%20TR%2C%20TH%2C%20TD%2C%20THead%2C%20TBody%2C%20TFoot%29/8.2.5.26-t01-pass-b.pdf",
+   "sha256": "5f19af878750ddf6c41bbbe2def73c74783e1f7c30156ed85a52fe69e267f7f9",
+   "kind": "test-suite",
+   "judged_checks": {
+    "table_rows_fault": false
+   },
+   "basis": "veraPDF corpus file outline: File outline: '8.2.5.26 Table - Regular Table; Reading order of Table is good; Expected result: pass'. Rule text in veraPDF profile (https://github.com/veraPDF/",
+   "notes": "Test-suite file; PDF/UA-2's regular-table rule, a different standard from PDF/UA-1 7.2: supporting only."
+  },
+  {
+   "url": "https://raw.githubusercontent.com/veraPDF/veraPDF-corpus/staging/PDF_UA-2/8.2%20Logical%20structure/8.2.5%20Additional%20requirements%20for%20specific%20structure%20types/8.2.5.26%20Table%20%28Table%2C%20TR%2C%20TH%2C%20TD%2C%20THead%2C%20TBody%2C%20TFoot%29/8.2.5.26-t03-fail-a.pdf",
+   "sha256": "7fe078b93a3ce6293a90378c40f0bf66220549c73060228d8942914fcef8c0a4",
+   "kind": "test-suite",
+   "judged_checks": {
+    "table_rows_fault": true
+   },
+   "basis": "veraPDF corpus file outline: File outline: '8.2.5.26 Table - Regular Table; Attribute RowSpan with value 2 is present in empty cell; Attribute ColSpan with value 2 is present in TH1; Expect",
+   "notes": "Test-suite file; PDF/UA-2's regular-table rule: supporting only."
+  },
+  {
+   "url": "https://raw.githubusercontent.com/veraPDF/veraPDF-corpus/staging/PDF_UA-2/8.2%20Logical%20structure/8.2.5%20Additional%20requirements%20for%20specific%20structure%20types/8.2.5.26%20Table%20%28Table%2C%20TR%2C%20TH%2C%20TD%2C%20THead%2C%20TBody%2C%20TFoot%29/8.2.5.26-t03-fail-b.pdf",
+   "sha256": "7ef10f5140ba070f98d8815f89e8405a461deef0d0a1a4e67cfdef008de0aacc",
+   "kind": "test-suite",
+   "judged_checks": {
+    "table_rows_fault": true
+   },
+   "basis": "veraPDF corpus file outline: File outline: '8.2.5.26 Table - Regular Table; Attribute RowSpan with value 5 is present in Header 1; Expected result: fail'. Rule text in veraPDF profile (http",
+   "notes": "Test-suite file; PDF/UA-2's regular-table rule: supporting only."
+  },
+  {
+   "url": "https://raw.githubusercontent.com/veraPDF/veraPDF-corpus/staging/PDF_UA-2/8.2%20Logical%20structure/8.2.5%20Additional%20requirements%20for%20specific%20structure%20types/8.2.5.26%20Table%20%28Table%2C%20TR%2C%20TH%2C%20TD%2C%20THead%2C%20TBody%2C%20TFoot%29/8.2.5.26-t04-fail-a.pdf",
+   "sha256": "baff802a75a897b7c989c81abdf67c5e027354bc8ca83c4394ace7cb3f7a2a4b",
+   "kind": "test-suite",
+   "judged_checks": {
+    "table_rows_fault": true
+   },
+   "basis": "veraPDF corpus file outline: File outline: '8.2.5.26 Table - Regular Table; Attribute RowSpan with value 1 is present in empty cell; Attribute ColSpan with value 3 is present in TH1; Expect",
+   "notes": "Test-suite file; PDF/UA-2's regular-table rule: supporting only."
+  },
+  {
+   "url": "https://raw.githubusercontent.com/veraPDF/veraPDF-corpus/staging/PDF_UA-2/8.2%20Logical%20structure/8.2.5%20Additional%20requirements%20for%20specific%20structure%20types/8.2.5.26%20Table%20%28Table%2C%20TR%2C%20TH%2C%20TD%2C%20THead%2C%20TBody%2C%20TFoot%29/8.2.5.26-t04-fail-b.pdf",
+   "sha256": "810985ac6d5bcf92683cd94996772f7efccbed834ed01d9768018ea337c5db8e",
+   "kind": "test-suite",
+   "judged_checks": {
+    "table_rows_fault": true
+   },
+   "basis": "veraPDF corpus file outline: File outline: '8.2.5.26 Table - Regular Table; THead contains all Table Header Cells; TBody contains all Table Data Cells; Expected result: fail'. Rule text in ",
+   "notes": "Test-suite file; PDF/UA-2's regular-table rule: supporting only."
+  },
+  {
+   "url": "https://raw.githubusercontent.com/veraPDF/veraPDF-corpus/staging/PDF_UA-2/8.2%20Logical%20structure/8.2.5%20Additional%20requirements%20for%20specific%20structure%20types/8.2.5.26%20Table%20%28Table%2C%20TR%2C%20TH%2C%20TD%2C%20THead%2C%20TBody%2C%20TFoot%29/8.2.5.26-t04-fail-c.pdf",
+   "sha256": "914ae18a54fdd8032177d0b2174dcaad180bbe26b803e20999e1e39f2eae2aeb",
+   "kind": "test-suite",
+   "judged_checks": {
+    "table_rows_fault": true
+   },
+   "basis": "veraPDF corpus file outline: File outline: '8.2.5.26 Table - Regular Table; All Table Header Cells are present in TR; Expected result: fail'. Rule text in veraPDF profile (https://github.co",
+   "notes": "Test-suite file; PDF/UA-2's regular-table rule: supporting only."
+  },
+  {
+   "url": "https://www.newformat.se/documents/pdfa-org/pdfua-ref-docs/pdfua-ref-docs-iso-14289-1-v1-1/PDFUA-Ref-2-02_Invoice.pdf",
+   "sha256": "fbae08464f192f532205833215505b78266e86df6283d9b0c439cb06927ce0b9",
+   "kind": "test-suite",
+   "judged_checks": {
+    "table_rows_fault": false
+   },
+   "basis": "PDF Association PDF/UA Reference Suite V1.1 (via the NewFormat mirror; hash not compared with pdfa.org): sample documents 'showing correct tagging', conforming to PDF/UA-1.",
+   "notes": "Test-suite file."
+  },
+  {
+   "url": "https://www.newformat.se/documents/pdfa-org/pdfua-ref-docs/pdfua-ref-docs-iso-14289-1-v1-1/PDFUA-Ref-2-08_BookChapter.pdf",
+   "sha256": "2b958600daec79373736f413f2712fcd9c604de2c352cbc1ec9d67cc5d7932f1",
+   "kind": "test-suite",
+   "judged_checks": {
+    "table_rows_fault": false
+   },
+   "basis": "PDF Association PDF/UA Reference Suite V1.1 (via the NewFormat mirror; hash not compared with pdfa.org): sample documents 'showing correct tagging', conforming to PDF/UA-1.",
+   "notes": "Test-suite file."
+  },
+  {
+   "url": "https://www.w3.org/WAI/WCAG22/working-examples/pdf-table-headers/table-example-repaired.pdf",
+   "sha256": "45defa986c7f576d1243928126ad7dddc5deb915490a4b42d31c963076cffbe6",
+   "kind": "test-suite",
+   "judged_checks": {
+    "table_rows_fault": false
+   },
+   "basis": "W3C WCAG technique PDF6 links it as the working example of tagged table headings (paraphrase).",
+   "notes": "Test-suite file."
+  },
+  {
+   "url": "https://www.w3.org/WAI/WCAG22/working-examples/pdf-complex-table/complex-table.pdf",
+   "sha256": "c0bd0fc65103f2528e2fd6ece4c2529cce9dbbbdc0d333dc0d7e538550cd46c7",
+   "kind": "test-suite",
+   "judged_checks": {
+    "table_rows_fault": null
+   },
+   "basis": "W3C WCAG technique PDF20 describes header cells that needed 'Row Span from 1 to 2' (paraphrase); this file's header row has no span attributes and is one column short, but W3C does not say whether the file is the before or the after state.",
+   "notes": "Disputed: not scored."
+  },
+  {
+   "url": "https://www.w3.org/WAI/WCAG21/working-examples/pdf-table/table.pdf",
+   "sha256": "a693998ff2a475d128c11644fbf02374249f08ac134d526a4d9b913d8b5834a5",
+   "kind": "test-suite",
+   "judged_checks": {
+    "table_rows_fault": true
+   },
+   "basis": "Page rendered (PDFium) and its table tags read by an agent (Claude), 2026-11-18; not checked by a person with a screen reader.",
+   "notes": "'Ballots Incomplete/Terminated' spans two rows on the page but is tagged without RowSpan 2, so 'Accuracy' and 'Time to complete' are tagged one column left. No outside verdict."
+  },
+  {
+   "url": "https://budget.gov.au/content/bp1/download/bp1_bs-3.pdf",
+   "sha256": "2a01f435493443c7ec1a263262e352813a3c654290db4c7c96595e3a2cb3d123",
+   "kind": "real-world",
+   "judged_checks": {
+    "table_cells_misplaced": true
+   },
+   "basis": "Page rendered (PDFium) and its table tags read by an agent (Claude), 2026-11-18; not checked by a person with a screen reader.",
+   "notes": "Table 3.1 (page 85): the group header row (Actual, Estimates, Projections) is 8 cells with no ColSpan over 12 columns, so 'Projections' falls on 2029-30's column."
+  },
+  {
+   "url": "https://www2.census.gov/programs-surveys/cps/techdocs/cpsmar24.pdf",
+   "sha256": "85ef535e227177193f8f83dfb03d8d667974d3ebaf9544147ec72a86db564c00",
+   "kind": "real-world",
+   "judged_checks": {
+    "table_cells_misplaced": true
+   },
+   "basis": "Page rendered (PDFium) and its table tags read by an agent (Claude), 2026-11-18; not checked by a person with a screen reader.",
+   "notes": "Page 3-1 table: 'Identifiers' spans two columns on the page but is one cell with no ColSpan; the third column has no header. Mild."
+  },
+  {
+   "url": "https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-90B.pdf",
+   "sha256": "9b0dd77131ade3617a91cd8457fa09e0dc354c273bb2220a6afeaca16e5defe7",
+   "kind": "real-world",
+   "judged_checks": {
+    "table_cells_misplaced": true
+   },
+   "basis": "Page rendered (PDFium) and its table tags read by an agent (Claude), 2026-11-18; not checked by a person with a screen reader.",
+   "notes": "Table 2 (page 27): 'Binary data' and 'Non-binary data' each span two columns but are single cells, so 'Non-binary data' is the header of binary 'Cutoff Value C'."
+  },
+  {
+   "url": "https://www.pewresearch.org/wp-content/uploads/sites/20/2025/02/PR_2025.02.26_religious-landscape-study_topline.pdf",
+   "sha256": "01c6b1dc2161d6df048a946e02823f7f9821360d9e248952ab2058a6bb772c80",
+   "kind": "real-world",
+   "judged_checks": {
+    "table_cells_misplaced": true
+   },
+   "basis": "Page rendered (PDFium) and its table tags read by an agent (Claude), 2026-11-18; not checked by a person with a screen reader.",
+   "notes": "Page 30: the label row 'PHONE TREND PRESENTED FOR COMPARISON' is tagged as the second of 2 cells (the first empty) in a 7-column table, so it is read under 'At least once a week'. An earlier note called this mild; the tags say otherwise."
+  },
+  {
+   "url": "https://www.stalbans.gov.uk/sites/default/files/attachments/Statement%20of%20Accounts%202024-25%20-%20Unaudited.pdf",
+   "sha256": "85433aa8a3e1e33e9c290e4a02c37030b1626940b56d7dc2f9506bb21ccf78b6",
+   "kind": "real-world",
+   "judged_checks": {
+    "table_cells_misplaced": true,
+    "table_uneven_rows": true
+   },
+   "basis": "Page rendered (PDFium) and its table tags read by an agent (Claude), 2026-11-18; not checked by a person with a screen reader.",
+   "notes": "Page 20: the header row (2023/2024, blank, 2024/2025) is 3 cells with no ColSpan over 7 columns, so '2024/2025' is tagged on 2023/24's 'Net Expenditure' column (misplaced). Page 10: the label row 'This Capital Programme was financed as follows:' is 1 cell in a 4-column table, its missing cells at the end (uneven only)."
+  },
+  {
+   "url": "https://raw.githubusercontent.com/veraPDF/veraPDF-corpus/staging/PDF_UA-1/7.7%20Mathematical%20expressions/7.7-t01-fail-a.pdf",
+   "sha256": "5f062cf0040f9e5ee9fea1594535e8244ca17410edc18b2bde5d8056075e8ed0",
+   "kind": "test-suite",
+   "judged_checks": {
+    "formula_no_description": true
+   },
+   "basis": "veraPDF corpus file outline: File outline: '7.7-1 Mathematical expressions; Alt or Actual entries are not present in Formula; Expected result: fail'. Rule text in veraPDF profile (https://g",
+   "notes": "Test-suite file."
+  },
+  {
+   "url": "https://raw.githubusercontent.com/veraPDF/veraPDF-corpus/staging/PDF_UA-1/7.7%20Mathematical%20expressions/7.7-t01-fail-b.pdf",
+   "sha256": "4c3a68a89b455d25ddd3e791a8d4d1c25bb2e83a51199998f3a4101c723365e1",
+   "kind": "test-suite",
+   "judged_checks": {
+    "formula_no_description": true
+   },
+   "basis": "veraPDF corpus file outline: File outline: '7.7-1 Mathematical expressions; Alt entry is present in Formula; Value of Alt is empty; Expected result: fail'. Rule text in veraPDF profile (htt",
+   "notes": "Test-suite file. Alt present but empty."
+  },
+  {
+   "url": "https://raw.githubusercontent.com/veraPDF/veraPDF-corpus/staging/PDF_UA-1/7.7%20Mathematical%20expressions/7.7-t01-pass-a.pdf",
+   "sha256": "09e2bc2b88ba83c8deb55262af5720bec5f44c212f56cd62e45f5b3f41bf273b",
+   "kind": "test-suite",
+   "judged_checks": {
+    "formula_no_description": false
+   },
+   "basis": "veraPDF corpus file outline: File outline: '7.7-1 Mathematical expressions; Alt entry is present in Formula; Expected result: pass'. Rule text in veraPDF profile (https://github.com/veraPDF",
+   "notes": "Test-suite file."
+  },
+  {
+   "url": "https://raw.githubusercontent.com/veraPDF/veraPDF-corpus/staging/PDF_UA-1/7.7%20Mathematical%20expressions/7.7-t01-pass-b.pdf",
+   "sha256": "d6402526ecb2b716044a99ffa99c42137e24b350e72ddebdbb86d1e632677679",
+   "kind": "test-suite",
+   "judged_checks": {
+    "formula_no_description": false
+   },
+   "basis": "veraPDF corpus file outline: File outline: '7.7-1 Mathematical expressions; ActualText entry is present in Formula; Expected result: pass'. Rule text in veraPDF profile (https://github.com/",
+   "notes": "Test-suite file."
+  },
+  {
+   "url": "https://raw.githubusercontent.com/veraPDF/veraPDF-corpus/staging/PDF_UA-1/7.7%20Mathematical%20expressions/7.7-t01-pass-c.pdf",
+   "sha256": "8cfe653caa563812b686f5befb35a921329d02ce3996e3d7c437ba272aadce5d",
+   "kind": "test-suite",
+   "judged_checks": {
+    "formula_no_description": null
+   },
+   "basis": "veraPDF corpus file outline: File outline: '7.7-1 Mathematical expressions; ActualText entry is present in Formula; Value of ActualText is empty; Expected result: pass'. Rule text in veraPD",
+   "notes": "Test-suite file. Disputed: the corpus passes it (ActualText present), but ActualText is empty, so a screen reader reads nothing. Axcess fails it on purpose; not scored."
+  },
+  {
+   "url": "https://epubs.siam.org/pb-assets/author_guidelines_accessible_mathematics.pdf",
+   "sha256": "aba6887ca43fb86a287d5eef82582615347064102926e0831ddf7fd1b515837b",
+   "kind": "real-world",
+   "judged_checks": {
+    "formula_no_description": false
+   },
+   "basis": "Formula tags read by an agent (Claude), 2026-11-18: Alt, ActualText, associated files (/AF) and MathML children.",
+   "notes": "All 54 formulas have alt text (Word 365)."
+  },
+  {
+   "url": "https://richardwong.rice.edu/assets/materials/02_mad_minute.pdf",
+   "sha256": "3b88c78258127b0d97eb1d82c526057ac51e081aaeec015b4324aadc99698b64",
+   "kind": "real-world",
+   "judged_checks": {
+    "formula_no_description": false
+   },
+   "basis": "Formula tags read by an agent (Claude), 2026-11-18: Alt, ActualText, associated files (/AF) and MathML children.",
+   "notes": "All 15 formulas have alt text."
+  },
+  {
+   "url": "https://texdoc.org/serve/ltnews/0",
+   "sha256": "83e0748b7d7b546147f7fa52325c7f75923a7993db25c2684017c1012e17248c",
+   "kind": "real-world",
+   "judged_checks": {
+    "formula_no_description": false
+   },
+   "basis": "Formula tags read by an agent (Claude), 2026-11-18: Alt, ActualText, associated files (/AF) and MathML children. PDF 2.0 and PDF/UA-2 describe math with MathML.",
+   "notes": "355 formulas, each with MathML elements inside; no alt text. Whether a given screen reader uses the MathML is not judged."
+  },
+  {
+   "url": "https://tug.org/TUGboat/tb46-2/tb143fischer-tagging25.pdf",
+   "sha256": "95ba6950cd7bb3841c1ba0facf70befa9cb9ae4998f3e4a060e6102e439d7dbf",
+   "kind": "real-world",
+   "judged_checks": {
+    "formula_no_description": false
+   },
+   "basis": "Formula tags read by an agent (Claude), 2026-11-18: Alt, ActualText, associated files (/AF) and MathML children. PDF 2.0 and PDF/UA-2 describe math with MathML.",
+   "notes": "9 formulas, each with a MathML associated file."
+  },
+  {
+   "url": "https://raw.githubusercontent.com/latex3/tagging-project/main/documentation/wtpdf/stem-article-2col-af.pdf",
+   "sha256": "ef8b7fcbe59f17fd74e65b7611e56524ad294b7bea55d2c983c209df098e0ef7",
+   "kind": "test-suite",
+   "judged_checks": {
+    "formula_no_description": false
+   },
+   "basis": "Formula tags read by an agent (Claude), 2026-11-18: Alt, ActualText, associated files (/AF) and MathML children. PDF 2.0 and PDF/UA-2 describe math with MathML.",
+   "notes": "Test-suite file (LaTeX Project demo): 22 formulas with MathML associated files."
+  },
+  {
+   "url": "https://raw.githubusercontent.com/latex3/tagging-project/main/documentation/wtpdf/stem-article-2col-se.pdf",
+   "sha256": "20162a0e50d70f9ab21d9f52b5a9d698e7cc37d4e9749550af331fd196e28532",
+   "kind": "test-suite",
+   "judged_checks": {
+    "formula_no_description": false
+   },
+   "basis": "Formula tags read by an agent (Claude), 2026-11-18: Alt, ActualText, associated files (/AF) and MathML children. PDF 2.0 and PDF/UA-2 describe math with MathML.",
+   "notes": "Test-suite file (LaTeX Project demo): 22 formulas with MathML elements inside."
+  },
+  {
+   "url": "https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.203.pdf",
+   "sha256": "fe1f12f32a7e44ec9fdebbf400cda843a40b506dee676725234dc6f7923b6cac",
+   "kind": "real-world",
+   "judged_checks": {
+    "formula_no_description": true
+   },
+   "basis": "Formula tags read by an agent (Claude), 2026-11-18: Alt, ActualText, associated files (/AF) and MathML children. PDF/UA-1 7.7 requires alt or replacement text.",
+   "notes": "34 formulas with neither alt text nor MathML (PDF 1.7, LuaLaTeX). No outside verdict."
+  },
+  {
+   "url": "https://texdoc.org/serve/latex-lab-math/0",
+   "sha256": "1273818b992498ae86cb84030d14c43f6fbfd5a45f2e18b5308f5b71e305990a",
+   "kind": "real-world",
+   "judged_checks": {
+    "formula_no_description": null
+   },
+   "basis": "Formula tags read by an agent (Claude), 2026-11-18: Alt, ActualText, associated files (/AF) and MathML children.",
+   "notes": "Unsure: formulas carry only their TeX source as an associated file (application/x-tex), no alt text or MathML. Not scored."
+  },
+  {
+   "url": "https://texdoc.org/serve/latex-lab-table/0",
+   "sha256": "4b2e2472fb7c980d8b185d5530b1a7525ecf6ae4d521e9f5e11f1e232ac4e22d",
+   "kind": "real-world",
+   "judged_checks": {
+    "formula_no_description": null
+   },
+   "basis": "Formula tags read by an agent (Claude), 2026-11-18: Alt, ActualText, associated files (/AF) and MathML children.",
+   "notes": "Unsure, as latex-lab-math. Not scored."
+  }
+ ]
+}

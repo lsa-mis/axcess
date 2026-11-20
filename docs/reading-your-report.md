@@ -248,16 +248,19 @@ The name of each issue type opens [its page](#the-full-evidence-record).
 **Documents**, the third tab, lists the files the scanned pages link to or
 show inside the page: PDF, Word, Excel, PowerPoint, OpenDocument, Rich Text
 Format (RTF), and Google Docs, Sheets, Slides and Drive files. Use it to decide
-which file to fix first. Axcess checks only the PDF files; see
-[Document check](glossary.md#document-check) for what it checks.
+which file to fix first. Axcess checks the PDF, Word (.docx) and PowerPoint
+(.pptx) files, and Google Docs and Slides as the Word and PowerPoint files
+Google exports; see [Document check](glossary.md#document-check) for what it
+checks.
 
 The tab is laid out like the Issues tab. Four numbers above the table count
 the documents, then how many are Mostly sure (it has accessibility problems),
 Not sure (if it has accessibility problems) and Could not check (for
 accessibility problems).
 Under the table, two closed rows open more detail. **What was checked** shows
-"Only PDFs checked" and opens what the list covers, what Axcess downloaded and
-kept, and what the list can miss (the same facts as below). **What "Mostly
+"3 types checked" and opens what the list covers, what the Word and
+PowerPoint checks look at, what Axcess downloaded and kept, and what the list
+can miss (the same facts as below). **What "Mostly
 sure", "Not sure" and the other labels mean** explains a document, the
 values of the "Accessibility problems?" column, and the order. A report that did not look for documents shows no
 numbers, and its empty table says so.
@@ -267,7 +270,9 @@ Each row shows:
 - **Document**: the file's name, which opens the document's own page (see
   below).
 - **Type**: such as "PDF" or "Word, old format (.doc)", with "Has a form to
-  fill in" under it for a PDF with form fields.
+  fill in" under it for a PDF with form fields. A Google Doc or Slides file
+  says "Checked as the Word (.docx) file that Google exports" (or the
+  PowerPoint one) under it: the results are about Google's export.
 - **Hosted on**: the site the file itself is kept on, such as
   "docs.google.com", and whether that is "This site" or "Another site". Not
   the pages that link to it, which are in "Pages it appears on".
@@ -275,18 +280,24 @@ Each row shows:
   accessibility problems. The values are the same words as the Issues table's
   How sure column.
   - **Mostly sure**: a machine check found a problem, such as a PDF with no
-    tags or no text a screen reader can read.
-  - **Not sure**: the PDF passed the machine checks. A person must still check
-    the reading order, the image descriptions (alt text) and the table headers.
-    Not sure never means the file is accessible.
+    tags, or a Word file with an image that has no alt text.
+  - **Not sure**: the machine checks found no problem that makes the file
+    hard to use with a screen reader. A person must still check the reading
+    order, the image descriptions (alt text) and the table headers. Not sure
+    never means the file is accessible.
   - **Could not check**: the row says why. "Axcess does not check this file
-    type yet" (Word .docx, Excel .xlsx, PowerPoint .pptx, OpenDocument, RTF)
-    is different from "Axcess cannot check" (old .doc, .xls and .ppt files,
-    and Google files). A broken link, a password, a file over 10 MB, or a slow
+    type yet" (Excel .xlsx, OpenDocument, RTF) is different from "Axcess
+    cannot check" (old .doc, .xls and .ppt files). Google Sheets are not
+    checked because Google asks scanners not to download them. A broken link,
+    a file that needs a sign-in, a password, a file over 10 MB, or a slow
     download are reasons too.
 - **What Axcess found**: each problem the checks found, by a short name, most
-  serious first ("Not tagged", "No language set"); for a Not sure file, what a
-  person must still check; for a file Axcess could not check, why. Why each
+  serious first ("Not tagged", "Images without alt text"); for a Not sure
+  file, what a person must still check; then, for a Word or PowerPoint file,
+  any **Possible problems** (such as "Tables without a header row", "No
+  headings" or "Links that do not say where they go"), which a person must
+  judge and which never make a file Mostly sure; for a
+  file Axcess could not check, why. Why each
   problem matters is on the document's own page. A file with the same contents as
   one earlier in the list (the same PDF at another address) says "Same file
   as …" and shares that file's result.
@@ -309,10 +320,26 @@ the table always count the whole report.
 A document's own page works like an issue type's page. At the top right,
 **Open the file** opens it in a new tab. Under the heading are its facts
 (Accessibility problems?, Type, Hosted on, Pages it appears on). **What Axcess
-found** is a table of the five checks Axcess runs on every PDF it opens (Tags,
-Text a screen reader can read, Security settings, Document title, Language),
-each with its result ("Problem found" or "No problem found") and why it
-matters. "No problem found" is not a pass: a person must still check the file.
+found** is a table of the checks that ran on the file, each with its result
+("Problem found", "Possible problem" or "No problem found") and why it
+matters. A Word file gets seven (Alt text for images, Language, Table header
+rows, Headings, Heading levels, Link text, Document title) and a PowerPoint
+file six (Alt text for images, Slide titles, Language, Table header rows,
+Link text, Document title). The checks that can make a Word or PowerPoint
+file Mostly sure come first; the rest can only find a possible problem. A
+Google Doc or Slides deck has no
+Document title row: Google's exports never have a title, and its author
+cannot set one. Every PDF Axcess opens gets five (Tags, Text a screen reader
+can read, Security settings, Document title, Language), and up to seven more
+where they apply: Form field names (a file with form fields); Link text, Alt
+text for images, Alt text for formulas, Table headings and Table rows (a
+tagged file with links, images, formulas or tables); and Text outside the
+tags (a tagged file). Table headings finds a cell that sits under one column
+on the page but is tagged in another, so a screen reader reads it under the
+wrong heading. Table rows finds rows with more or fewer cells than the
+others where no cell was seen out of place. A check that did not apply is
+not listed, and a PDF checked before 2026-11-18 ran only the first five. "No
+problem found" is not a pass: a person must still check the file.
 For a file Axcess could not check, it says why instead. Then a table lists
 every page the file appears on, one row per page (up to 2,000), with a search
 box and sortable columns:
@@ -325,9 +352,9 @@ box and sortable columns:
   named button for a link that shows only after a click. A page that reaches
   the file in more than one way has one line for each.
 
-To check a PDF, Axcess downloads it once to your computer, checks it, and
-keeps only the result, not the file. A PDF on another site is downloaded once;
-that site is not scanned. Nothing is sent to any other service.
+To check a file, Axcess downloads it once to your computer, checks it, and
+keeps only the result, not the file. A file on another site is downloaded
+once; that site is not scanned. Nothing is sent to any other service.
 
 Limits: a link that appears only after pressing a button is found only if the
 scan pressed that button, and the scan never presses buttons that may

@@ -220,19 +220,21 @@ def test_a_typed_browser_name_is_never_sent_back(
 def test_without_a_choice_the_scan_sends_chromes_name(
     client: TestClient, seeded_db: tuple[Path, Path, int], no_crawl: None
 ) -> None:
-    """Chrome's name is the default since 6eff256 (2026-11-16): a request
-    with no choice, such as one from an older New scan, gets it."""
-    from audit.crawler.user_agent import chromium_user_agent
+    """A new scan sends Chrome's name unless the person chooses otherwise
+    (2026-11-16, audit.crawler.user_agent: bot filters block a scanner's own
+    name). It was Axcess's own name until then."""
+    from audit.crawler.user_agent import CHROME_CHOICE, chromium_user_agent
 
     scan_id = _create(client)
     config = _config(seeded_db[0], scan_id)
     assert config["user_agent"] == chromium_user_agent()
+    assert config["user_agent_choice"] == CHROME_CHOICE
     _stop(seeded_db[0], scan_id, "failed")
     settings = client.get(f"/api/scans/{scan_id}/settings").json()["settings"]
-    assert settings["user_agent_choice"] == "chrome"
+    assert settings["user_agent_choice"] == CHROME_CHOICE
 
 
-def test_axcess_choice_sends_its_own_name_and_ignores_a_string(
+def test_choosing_axcess_sends_its_own_name_and_ignores_a_typed_string(
     client: TestClient, seeded_db: tuple[Path, Path, int], no_crawl: None
 ) -> None:
     from audit.config import get_settings

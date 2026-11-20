@@ -261,7 +261,53 @@ function startupFailureDetails({ error, backendOutput, exitCode, logPath, packag
   };
 }
 
+/**
+ * How long quitting waits for the backend to stop before killing it. Longer
+ * than the backend's own deadline (SHUTDOWN_DEADLINE_S, 25 s, in
+ * audit/desktop_server.py), so a backend that is slow to stop ends itself
+ * first, after closing its scan browser.
+ */
+const BACKEND_STOP_TIMEOUT_MS = 30_000;
+
+/**
+ * Stop a child process and resolve once it has exited.
+ *
+ * The backend is asked to stop by closing its standard input: it was started
+ * with --exit-with-parent, so the end of input starts its shutdown, which
+ * stops a running scan and closes the scan browser first. Closing the pipe
+ * works the same on every platform and reaches the backend through `uv run`
+ * in development, where a signal would reach only `uv`. On Windows, kill()
+ * ends a process at once with no cleanup, so it is the last resort
+ * everywhere: used only when the child has not exited after `graceMs`.
+ *
+ * Resolves "exited" or "killed".
+ */
+function stopChildProcess(child, { graceMs = BACKEND_STOP_TIMEOUT_MS } = {}) {
+  return new Promise((resolve) => {
+    if (!child || child.exitCode !== null || child.signalCode !== null) {
+      resolve("exited");
+      return;
+    }
+    let killed = false;
+    const timer = setTimeout(() => {
+      killed = true;
+      child.kill("SIGKILL");
+    }, graceMs);
+    child.once("exit", () => {
+      clearTimeout(timer);
+      resolve(killed ? "killed" : "exited");
+    });
+    if (child.stdin && !child.stdin.destroyed) {
+      child.stdin.end();
+    } else {
+      // No pipe to close (started some other way): ask with a signal.
+      child.kill("SIGTERM");
+    }
+  });
+}
+
 module.exports = {
+  BACKEND_STOP_TIMEOUT_MS,
   MAX_ZOOM_LEVEL,
   PORTABLE_DATA_FOLDER,
   MIN_ZOOM_LEVEL,
@@ -277,4 +323,5 @@ module.exports = {
   windowsUpdateMethod,
   zoomActionFor,
   startupFailureDetails,
+  stopChildProcess,
 };

@@ -157,7 +157,7 @@ test-unit: ## Run unit tests only
 test-integration: ## Run integration tests only
 	$(PY) pytest tests/integration -m integration
 
-real-pages: ## Score the form error check on its labelled real pages (visits outside sites)
+real-pages: ## Score the form error and document checks on their labelled real pages and files (visits outside sites)
 	AXCESS_REAL_PAGES=1 $(PY) pytest tests/real_pages -s -p no:randomly
 
 test-ui: ## Run UI tests (Playwright + axe-core)

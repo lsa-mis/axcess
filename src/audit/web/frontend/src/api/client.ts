@@ -547,6 +547,12 @@ export const api = {
     request<ExportOptions>(`/api/scans/${scanId}/exports${redact ? "?redact=true" : ""}`),
   downloadExport,
   fetchExportText,
+  /**
+   * Continue a report that is not finished, with its own settings (409 when
+   * it has nothing left to scan, or another scan is running).
+   */
+  continueScan: (id: number) =>
+    request<{ scan_id: number }>(`/api/scans/${id}/continue`, { method: "POST" }),
   cancelScan: (id: number) =>
     request<{ ok: boolean }>(`/api/scans/${id}/cancel`, { method: "POST" }),
   /**

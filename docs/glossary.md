@@ -313,6 +313,22 @@ each scan. Neither part shows that a site meets WCAG. Not to be confused with
 How a scan moves through a site: Axcess starts at the address you give,
 follows links to find more pages, and tests each page in the [scope](#scope).
 
+### Stopped, Not finished and Continue scan
+
+How a scan that did not complete ended, as the Reports list shows it:
+
+| Status | What happened | What you can do |
+| --- | --- | --- |
+| Stopped | A person pressed Stop. The pages it had not reached yet are dropped. | **Scan again** makes a new report. |
+| Not finished | Axcess closed during the scan. The pages it had not reached yet are kept. | **Continue scan** carries on the same report, with the settings it started with. |
+
+Both are still reports when they saved a page. **Scan again** always makes
+a new report: it never continues an older one (since 2026-11-20). A
+sign-in scan cut off this way cannot be continued, because its signed-in
+browser closed with Axcess. When a report is continued, Axcess also checks
+the files it had not finished checking, and files the version that started
+the report could not open yet (such as Google Docs before 2026-11-18).
+
 ### Pages not reached
 
 Pages the scan tried but could not load, which the report summary counts
@@ -514,12 +530,15 @@ The check behind the report's **Documents** tab. While the scan runs, Axcess
 records every PDF, Word, Excel, PowerPoint, OpenDocument, RTF and Google file
 the scanned pages link to or show inside the page (in a frame, object or
 embed), including links that appear only after a click, and files on other
-sites. During the scan it downloads each PDF once (at most 10 MB, at most 200
-downloads a scan), checks it on your computer with no AI, and keeps only the
-result, in the background while the scan goes on to the next page. A link to
+sites. During the scan it downloads each PDF, Word (.docx) and PowerPoint
+(.pptx) file once (at most 10 MB, at most 200 downloads a scan), checks it on
+your computer with no AI, and keeps only the result, in the background while
+the scan goes on to the next page. A Google Doc or Google Slides file is
+downloaded as the Word or PowerPoint file Google exports, and checked as
+that; Google Sheets are not downloaded (Google asks scanners not to). A link to
 a document is never visited as a page, so documents take no part of the page
 limit and do not appear in Pages visited. A scan stopped part way keeps the
-results for the PDFs it reached. In code these are called *linked files*, because in the crawler a
+results for the files it reached. In code these are called *linked files*, because in the crawler a
 "document" means a web page.
 
 A PDF is marked [Mostly sure](#mostly-sure) when it fails one of these:
@@ -530,17 +549,77 @@ A PDF is marked [Mostly sure](#mostly-sure) when it fails one of these:
   scan saved as pictures (WCAG 1.1.1);
 - its security settings forbid copying text for accessibility;
 - no document title (WCAG 2.4.2, technique PDF18);
-- no language set (WCAG 3.1.1, technique PDF16).
+- no language set (WCAG 3.1.1, technique PDF16);
+- a form field without a name a screen reader can say: no tooltip, or a
+  tooltip a script left behind such as "undefined" (WCAG 4.1.2, technique
+  PDF12). Only files with form fields get this check;
+- a link with no text inside it, so a screen reader can only say "link"
+  (WCAG 2.4.4, technique PDF11). Only tagged files with links;
+- an image tagged as a figure with no alt text (WCAG 1.1.1, technique PDF1).
+  Only tagged files with images. Axcess does not judge whether alt text is
+  good, or whether an image is only decoration;
+- a formula tagged as one with no alt text, so a screen reader cannot read
+  the math (WCAG 1.1.1). Only tagged files with formulas;
+- a table cell under the wrong heading: a cell that sits under one column on
+  the page but is tagged in another, often a heading over several columns
+  tagged as one cell, so a screen reader reads it under the wrong heading
+  (WCAG 1.3.1). Axcess compares where each cell's text is on the page with
+  the column its tags give it;
+- a table whose rows have different numbers of cells, counting merged cells,
+  where Axcess did not see a cell out of place: for example a label across
+  the table tagged as one cell, or a table past the first 50 pages, whose
+  text Axcess does not place (WCAG 1.3.1). Both table checks run only on
+  tagged files with tables;
+- text a screen reader skips: visible text outside the tags, not counting the
+  top and bottom 5% of a page, where headers and footers go (WCAG 1.3.1).
+  Only tagged files.
 
-A PDF that passes all five is [Not sure](#not-sure): a person must still check
-its reading order, alt text and table headers. Every other file, and any PDF
-Axcess could not open, is "Could not check", with the reason. It is on by
+The first five run on every PDF Axcess opens; the other seven were added
+from 2026-11-17, so a report made before then did not run them.
+
+A Word or PowerPoint file is marked [Mostly sure](#mostly-sure) when it fails
+one of these (Axcess's own rules, modelled on Microsoft's Accessibility
+Checker). These checks made no false alarm on the real files we tested
+them on:
+
+- images without alt text: a picture, chart, diagram or video with no alt
+  text that is not marked as decorative; alt text of only spaces or marks
+  counts as none (WCAG 1.1.1). The same check, and the same words in the
+  report, as the PDF one, except that in a PDF only missing alt text counts;
+- slides without a title (PowerPoint; WCAG 2.4.6);
+- no language set (WCAG 3.1.1).
+
+It also lists **possible problems**, which a person must judge and which
+never make a file Mostly sure:
+
+- tables without a header row: a table that is a plain grid of at least 2
+  rows and 2 columns (no merged cells, no table inside it) whose first row
+  is not marked as a header row (WCAG 1.3.1). A person must check whether
+  the table holds data: a table that only lays out a form or a page needs
+  no header row. Tables with merged cells are not listed, but a person must
+  check them too;
+- no headings: a Word document that uses no heading style but has a line
+  in bold that is a paragraph of its own and one sentence or less, such as
+  "Construction Records" (WCAG 1.3.1). A person must check whether the line
+  is a heading. Lines in tables, in text boxes and in Word's Title and
+  Subtitle styles are not looked at;
+- link text that is a web address or "click here" (WCAG 2.4.4);
+- heading levels skipped (Heading 1, then Heading 3);
+- no document title. Word and PowerPoint show the file name, not the
+  title. A Google Doc or Slides deck is not checked for a title at all:
+  Google's exports never have one, and its author cannot set one.
+
+A file with no problem that makes it Mostly sure is [Not sure](#not-sure),
+even when it lists possible problems: a person must still check its
+reading order, how good its alt text is, and its table headers. Every other
+file, and any file Axcess could not open, is "Could not check", with the
+reason. It is on by
 default for every scan that does not sign in (**Check the documents the pages
 link to**, under Checks on the New scan page), and a sign-in scan never runs
 it. While a scan runs, the scanning page's **Document check** column shows it
-on each page: the page's document links are found and its PDFs are checked,
-each PDF once; a PDF on this site that a page links to is checked in its own
-row.
+on each page: the page's document links are found and its files are
+checked, each file once; a file on this site that a page links to is checked
+in its own row.
 
 ### Local AI model
 

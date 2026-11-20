@@ -955,10 +955,20 @@ async def test_the_document_check_is_on_by_default_and_says_what_it_keeps(
     # The privacy facts are read with it, as its description.
     await playwright_async.expect(switch).to_have_accessible_description(
         re.compile(
-            "downloads each PDF once to this computer.*also from other sites.*"
-            "keeps the result and a picture of the first page, not the file"
+            "Checks each PDF, Word and PowerPoint file, Google Doc and Google Slides file.*"
+            "downloads each of them once to this computer.*also from other sites.*"
+            "keeps the result and a picture of a PDF.s first page, not the file"
         )
     )
+    # Following robots.txt (the public default), it says Google Drive files
+    # will not be downloaded; set to ignore robots.txt, it does not
+    # (2026-11-16: Google's robots.txt asks scanners not to download them).
+    drive_note = re.compile("does not download files kept in Google Drive")
+    await playwright_async.expect(switch).to_have_accessible_description(drive_note)
+    robots = page.get_by_role("switch", name=re.compile("^Ignore the site\u2019s robots.txt rules"))
+    await robots.check()
+    await playwright_async.expect(switch).not_to_have_accessible_description(drive_note)
+    await robots.uncheck()
     summary = page.get_by_role("complementary", name="What this scan will do")
     assert "Document check" in await _rail_items(summary, "Checks that run")
     await page.get_by_role("textbox", name="Website address", exact=True).fill(
@@ -983,7 +993,8 @@ async def test_the_document_check_is_on_by_default_and_says_what_it_keeps(
     await playwright_async.expect(signed_in).to_be_checked()
     await playwright_async.expect(signed_in).to_have_accessible_description(
         re.compile(
-            "downloads each PDF on this website with your sign-in, as you.*"
+            "Checks each PDF, Word and PowerPoint file during the scan.*"
+            "downloads each of them on this website with your sign-in, as you.*"
             "lists files on other sites but does not download them"
         )
     )

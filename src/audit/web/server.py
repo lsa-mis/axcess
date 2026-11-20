@@ -90,6 +90,7 @@ from audit.crawler.search import SearchConfig, search_url_allowed
 from audit.crawler.tab_pool import TabPool
 from audit.crawler.user_agent import CHROME_CHOICE, chosen_user_agent
 from audit.db import repo
+from audit.db.linked_files import reopen_for_continuing
 from audit.db.reports import record_pages_found, scan_coverage
 from audit.db.schema import connect
 from audit.exports.audit_report import render_audit_report
@@ -189,6 +190,10 @@ from audit.web.protected_auth import (
 from audit.web.scan_settings import ScanFormSettings
 
 log = get_logger(__name__)
+#: How long quitting waits for a running scan to stop and close its browser
+#: (``_stop_running_crawl``). The desktop backend gives up on the whole
+#: shutdown a little after this (``audit.desktop_server``).
+CRAWL_STOP_TIMEOUT_S = 15.0
 
 _STATUS_OPTIONS = (
     "new",
@@ -1041,6 +1046,28 @@ def create_app(
             retention_task = asyncio.create_task(_protected_retention_worker())
 
     @app.on_event("shutdown")
+    async def _stop_running_crawl() -> None:
+        """Quitting Axcess stops a running scan and closes its browsers.
+
+        It has to happen here, while the event loop still runs everything.
+        Left to ``asyncio.run``'s final sweep, the crawl was cancelled in the
+        same breath as Playwright's own connection task, so a worker waiting
+        on the browser waited forever: the process never exited, and its
+        Playwright driver and Chromium windows were left running for hours
+        after the desktop app closed (2026-11-20). Stopped here, the crawl's
+        own cleanup closes the browser, and the report is left "Not
+        finished", so Continue scan can carry it on.
+        """
+        task = crawl_state.get("task")
+        if not isinstance(task, asyncio.Task) or task.done():
+            return
+        log.info("web.shutdown_stopping_crawl", scan_id=crawl_state.get("scan_id"))
+        task.cancel()
+        done, _ = await asyncio.wait({task}, timeout=CRAWL_STOP_TIMEOUT_S)
+        if not done:
+            log.warning("web.shutdown_crawl_did_not_stop", timeout_s=CRAWL_STOP_TIMEOUT_S)
+
+    @app.on_event("shutdown")
     async def _end_waiting_sign_ins() -> None:
         """Quitting Axcess ends a waiting sign-in at once. Memory only."""
         watcher = sign_in_watch.get("task")
@@ -1373,18 +1400,29 @@ def create_app(
 
     @app.get("/api/scans")
     def api_list_scans() -> JSONResponse:
+        from audit.web.continuing import continuable_ids
+
         with get_conn() as conn:
             rows = _public_scan_rows(conn)
-        return JSONResponse([_scan_row_to_summary(r) for r in rows])
+            unfinished = continuable_ids(conn)
+        return JSONResponse(
+            [_scan_row_to_summary(r, can_continue=int(r["id"]) in unfinished) for r in rows]
+        )
 
     @app.get("/api/sites")
     def api_list_sites() -> JSONResponse:
         """Public reports grouped by site, for the Reports list."""
         from audit.web import sites
+        from audit.web.continuing import continuable_ids
 
         with get_conn() as conn:
+            unfinished = continuable_ids(conn)
             groups = sites.group_scans(
-                conn, (_scan_row_to_summary(r) for r in _public_scan_rows(conn))
+                conn,
+                (
+                    _scan_row_to_summary(r, can_continue=int(r["id"]) in unfinished)
+                    for r in _public_scan_rows(conn)
+                ),
             )
         return JSONResponse([group.model_dump(mode="json") for group in groups])
 
@@ -1405,6 +1443,8 @@ def create_app(
 
     @app.get("/api/scans/{scan_id:int}")
     def api_scan_detail(scan_id: int) -> JSONResponse:
+        from audit.web.continuing import can_continue
+
         with get_conn() as conn:
             scan = _load_scan_or_404(conn, scan_id)
             if scan["status"] != "completed":
@@ -1421,8 +1461,9 @@ def create_app(
             progress = _scan_progress(conn, scan_id) if scan["status"] == "running" else None
             method_coverage = _scan_method_coverage(conn, scan_id)
             coverage = scan_coverage(conn, scan, page_count=int(scan.get("page_count") or 0))
+            unfinished = can_continue(conn, scan_id)
         payload: dict[str, Any] = {
-            **_scan_row_to_summary(scan),
+            **_scan_row_to_summary(scan, can_continue=unfinished),
             "error_count": int(scan.get("error_count") or 0),
             "by_severity": {level: int(breakdown.get(level, 0)) for level in _SEVERITY_OPTIONS},
             "previous_scan_id": prev,
@@ -1971,7 +2012,7 @@ def create_app(
         # A manual-login session is deliberately memory-only and cannot be
         # resumed after interruption. Always allocate a fresh report and job
         # frontier even when the auditor scans the same URL again.
-        scan_id = _prepare_scan_row(resolved_db, config, resume_interrupted=False)
+        scan_id = _prepare_scan_row(resolved_db, config)
         # Hand the crawler the row rather than letting it search: an
         # unresumable row is invisible to seed-based discovery, including its
         # own run's.
@@ -2228,7 +2269,10 @@ def create_app(
             "user_agent": body.get("user_agent"),
         }
         config = _build_crawl_config(form, settings)
+        # Always a new report (audit.web.continuing), handed to the crawler
+        # by ID so it never goes looking for an older one to continue.
         scan_id = _prepare_scan_row(resolved_db, config)
+        config = replace(config, scan_id=scan_id)
         crawl_state["scan_id"] = scan_id
 
         async def _runner() -> None:
@@ -2236,6 +2280,71 @@ def create_app(
 
         crawl_state["task"] = asyncio.create_task(_runner())
         return JSONResponse({"scan_id": scan_id}, status_code=201)
+
+    @app.post("/api/scans/{scan_id:int}/continue")
+    async def api_continue_scan(scan_id: int) -> JSONResponse:
+        """Continue a report that is not finished (``audit.web.continuing``).
+
+        The same report, with the settings it started with, picks up the
+        addresses still waiting. Files an older build closed only because it
+        could not check them yet are checked too. Refused for a report that
+        was stopped, finished or failed: those have nothing waiting, and
+        "Scan again" makes a new report.
+        """
+        from audit.web import continuing, scan_settings
+
+        task = crawl_state.get("task")
+        if isinstance(task, asyncio.Task) and not task.done():
+            scan_id_val = crawl_state.get("scan_id")
+            return JSONResponse(
+                {
+                    "error": "A crawl is already running.",
+                    "running_scan_id": int(scan_id_val) if isinstance(scan_id_val, int) else None,
+                },
+                status_code=409,
+            )
+        with get_conn() as conn:
+            scan = _load_scan_or_404(conn, scan_id)
+            if not continuing.can_continue(conn, scan_id):
+                return JSONResponse(
+                    {
+                        "error": "This report has nothing left to scan. "
+                        "Use Scan again to make a new report."
+                    },
+                    status_code=409,
+                )
+            snapshot = scan_settings.snapshot_from_config(
+                scan_id=scan_id,
+                seed_url=str(scan["seed_url"]),
+                config_json=scan.get("config_json"),
+            )
+            form: dict[str, Any] = snapshot.settings.model_dump()
+            form["search"] = snapshot.settings.search
+            if form.pop("all_pages"):
+                form["max_pages"] = None
+            # The stored seed, not the snapshot's copy with any user:password@
+            # removed: the report goes on under its own address.
+            form["url"] = str(scan["seed_url"])
+            config = continuing.with_stored_user_agent(
+                _build_crawl_config(form, settings),
+                scan.get("config_json"),
+                server_user_agent=settings.user_agent,
+            )
+            config = replace(config, scan_id=scan_id)
+            reopened = reopen_for_continuing(conn, scan_id)
+            conn.execute(
+                "UPDATE scans SET status = 'running', finished_at = NULL, "
+                "failure_reason = NULL WHERE id = ?",
+                (scan_id,),
+            )
+        log.info("web.scan_continued", scan_id=scan_id, files_reopened=reopened)
+        crawl_state["scan_id"] = scan_id
+
+        async def _runner() -> None:
+            await _run_background_crawl(resolved_db, config)
+
+        crawl_state["task"] = asyncio.create_task(_runner())
+        return JSONResponse({"scan_id": scan_id}, status_code=202)
 
     @app.post("/api/scans/{scan_id:int}/cancel")
     async def api_cancel_scan(scan_id: int) -> JSONResponse:
@@ -4300,8 +4409,12 @@ def _deny_legacy_protected_review(conn: sqlite3.Connection, scan_id: int) -> Non
         )
 
 
-def _scan_row_to_summary(scan: Any) -> dict[str, Any]:
-    """Coerce a sqlite3.Row or dict into the ScanSummary JSON shape."""
+def _scan_row_to_summary(scan: Any, *, can_continue: bool = False) -> dict[str, Any]:
+    """Coerce a sqlite3.Row or dict into the ScanSummary JSON shape.
+
+    ``can_continue``: the report is not finished and **Continue scan** may
+    carry it on (``audit.web.continuing``).
+    """
     row = dict(scan) if not isinstance(scan, dict) else scan
     return {
         "id": int(row["id"]),
@@ -4316,6 +4429,7 @@ def _scan_row_to_summary(scan: Any) -> dict[str, Any]:
         "rule_checks": _rule_checks_run(row),
         "started_at": _to_iso_string(row.get("started_at")),
         "finished_at": _to_iso_string(row.get("finished_at")),
+        "can_continue": can_continue,
     }
 
 
@@ -4436,62 +4550,26 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
     )
 
 
-def _prepare_scan_row(
-    db_path: Path,
-    config: CrawlConfig,
-    *,
-    resume_interrupted: bool = True,
-) -> int:
-    """Create the scan row up front so the UI can redirect immediately.
+def _prepare_scan_row(db_path: Path, config: CrawlConfig) -> int:
+    """Create a new scan row up front so the UI can redirect immediately.
+
+    Always a new report. Until 2026-11-20 this took over the last
+    unfinished report of the same address instead, so "Scan again" could
+    quietly continue a days-old report made by an older build. Continuing
+    is now its own action, **Continue scan** (``audit.web.continuing``).
+    The caller hands the row to the crawler (``CrawlConfig.scan_id``), so
+    the crawler's own row discovery never runs for a web scan.
 
     ``run_crawl`` canonicalizes directory-like seeds before discovering its
-    row (for example, ``/about`` becomes ``/about/``).  Store and match that
-    exact canonical value here as well.  Otherwise the browser can finish a
-    crawl under a second scan ID while the progress screen remains attached
-    to the original, permanently ``running`` row.
+    row (for example, ``/about`` becomes ``/about/``).  Store that exact
+    canonical value here as well, so the report lists under the same
+    address the crawler uses.
     """
-    from audit.crawler.orchestrator import RESUMABLE_SCAN_SQL, config_json_for_scan
+    from audit.crawler.orchestrator import config_json_for_scan
 
     seed_url = _canonical_scan_seed(config.seed_url)
     conn = connect(db_path)
     try:
-        # Same refusal the crawler's own row discovery honours. Both paths look
-        # for a row to continue, so a scan that may not be continued has to be
-        # invisible to both or the one that ignores it wins the race.
-        if not resume_interrupted:
-            existing = None
-        elif _protected_scan_table_exists(conn):
-            existing = conn.execute(
-                "SELECT id FROM scans "  # noqa: S608, module constant only
-                "WHERE seed_url = ? AND status IN ('running', 'interrupted') "
-                f"AND {RESUMABLE_SCAN_SQL} "
-                "AND NOT EXISTS ("
-                "SELECT 1 FROM protected_scans p WHERE p.scan_id = scans.id"
-                ") ORDER BY id DESC LIMIT 1",
-                (seed_url,),
-            ).fetchone()
-        else:
-            existing = conn.execute(
-                "SELECT id FROM scans "  # noqa: S608, module constant only
-                "WHERE seed_url = ? AND status IN ('running', 'interrupted') "
-                f"AND {RESUMABLE_SCAN_SQL} "
-                "ORDER BY id DESC LIMIT 1",
-                (seed_url,),
-            ).fetchone()
-        if existing is not None:
-            scan_id = int(existing["id"])
-            # The adopted row keeps the WCAG version it started with (an old
-            # row without one ran 2.2); the crawler reads it back from here.
-            stored = conn.execute(
-                "SELECT config_json FROM scans WHERE id = ?", (scan_id,)
-            ).fetchone()
-            adopted = replace(config, wcag_version=stored_wcag_version(stored["config_json"]))
-            conn.execute(
-                "UPDATE scans SET status = 'running', finished_at = NULL, "
-                "failure_reason = NULL, config_json = ? WHERE id = ?",
-                (config_json_for_scan(adopted), scan_id),
-            )
-            return scan_id
         cur = conn.execute(
             "INSERT INTO scans (seed_url, status, config_json) VALUES (?, 'running', ?)",
             (seed_url, config_json_for_scan(config)),
