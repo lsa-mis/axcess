@@ -997,6 +997,15 @@ async def test_running_scan_shows_factual_pipeline_progress(
             ["Waiting", "Waiting", "Waiting", "Waiting", "Waiting"]
         )
 
+        # On a phone the Page column keeps at least 160px (2026-11-20), as
+        # wide as Status and the check columns, instead of being squeezed to
+        # a letter or two a line while the table scrolls sideways.
+        await page.set_viewport_size({"width": 320, "height": 900})
+        page_header = table.get_by_role("columnheader", name="Page", exact=True)
+        page_box = await page_header.bounding_box()
+        assert page_box and page_box["width"] >= 159, page_box
+        await page.set_viewport_size({"width": 1280, "height": 900})
+
         # Each check's totals are details: closed at first, then one click away.
         show = page.get_by_role("button", name="Show details", exact=True)
         await playwright_async.expect(show).to_have_attribute("aria-expanded", "false")

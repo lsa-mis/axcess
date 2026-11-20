@@ -512,7 +512,19 @@ function PagesTable({
             <tbody>
               {rows.map((row, index) => (
                 <Row key={`${row.state}-${row.url}`} index={index}>
-                  <RowHeader className="max-w-[22rem] font-normal">
+                  {/* min-w-[10rem]: Page is at least 160px wide, close to
+                      Status and the check columns (the developer's request,
+                      2026-11-20). `break-all` lets an address break between
+                      any two letters, so without a minimum a narrow screen
+                      squeezed this column to one or two letters a line
+                      ("/pl", "atf", "orm") while the other columns, whose
+                      words do not break, kept their width. 160px leaves
+                      about 18 letters a line, so most addresses take one or
+                      two lines; the column still grows to 22rem on a wider
+                      screen. The table already
+                      scrolls sideways on a narrow screen, which SC 1.4.10
+                      Reflow (Level AA) allows for a data table. */}
+                  <RowHeader className="min-w-[10rem] max-w-[22rem] font-normal">
                     <span className="block break-all font-mono text-xs text-fg" title={withoutUserinfo(row.url)}>
                       {pagePath(row.url, seedUrl)}
                     </span>
