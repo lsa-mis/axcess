@@ -1515,3 +1515,54 @@ async def test_the_accessibility_problems_header_explains_its_values(
     await header.get_by_role("button", name=re.compile(r"^Accessibility problems\?")).click()
     sorted_by = page.get_by_text(re.compile(r"^Sorted by Accessibility problems\?"))
     await expect(sorted_by.first).to_be_attached()
+
+
+@on_module_loop
+async def test_a_google_doc_an_older_report_did_not_check_says_why(
+    documents: int,
+    seeded_db: tuple[Path, Path, int],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    """Before 2026-11-18 every Google Doc got ``google_file``. Today only a
+    copy published to the web does, so "published to the web" is said only
+    of an address with no export (report #71 said it of 53 ordinary Docs)."""
+    from playwright.async_api import expect
+
+    base, scan_id = live_server
+    with sqlite3.connect(seeded_db[0]) as conn:
+        about = _page_id(conn, scan_id, ABOUT)
+        older = _file(
+            conn,
+            scan_id,
+            "https://docs.google.com/document/d/1ZgSJQ3EuyzIiNEN2C2xdgm_eAQ2sVBkGIBLPiWEBMkE/edit",
+            "google_doc",
+            store.CheckResult("could_not_check", "google_file"),
+            [(about, "link", "Ordinary doc", None)],
+            off_site=True,
+        )
+        published = _file(
+            conn,
+            scan_id,
+            "https://docs.google.com/document/d/e/2PACX-1vQabcdefghij/pub",
+            "google_doc",
+            store.CheckResult("could_not_check", "google_file"),
+            [(about, "link", "Published doc", None)],
+            off_site=True,
+        )
+    page = await new_page(viewport={"width": 1280, "height": 800})
+    await page.goto(f"{base}/app/scans/{scan_id}/documents/{older}", wait_until="networkidle")
+    await expect(
+        page.get_by_text(
+            "Not checked: Axcess did not check Google Docs and Slides when this report "
+            "was made. Scan again to check this file."
+        )
+    ).to_be_visible()
+    await expect(page.get_by_text("published to the web")).to_have_count(0)
+    await page.goto(f"{base}/app/scans/{scan_id}/documents/{published}", wait_until="networkidle")
+    await expect(
+        page.get_by_text(
+            "Axcess cannot download this Google file. A copy published to the web has no file "
+            "to download."
+        )
+    ).to_be_visible()

@@ -240,18 +240,44 @@ export const LINKED_FILE_REASON_TEXT: Record<LinkedFileReason, string> = {
 };
 
 /**
+ * Whether Google exports the Doc or Slides deck at ``url`` as a file: the
+ * same address rule as the server's ``export_address``
+ * (linked_files/google.py). A copy published to the web
+ * (``/document/d/e/…/pub``) has no export.
+ */
+function googleExportable(url: string): boolean {
+  let path: string;
+  try {
+    path = new URL(url).pathname;
+  } catch {
+    return false;
+  }
+  return /\/(document|presentation)\/(?:u\/\d+\/)?d\/[A-Za-z0-9_-]{10,}(?:\/|$)/.test(path);
+}
+
+/**
  * The reason in words, with the server's status code where there is one.
- * ``fileType`` words the reasons that depend on what the link named.
+ * ``fileType`` words the reasons that depend on what the link named, and
+ * ``url`` the one that depends on the address.
  */
 export function linkedFileReasonText(
   reason: LinkedFileReason,
   httpStatus: number | null,
   fileType?: LinkedFileType,
+  url?: string,
 ): string {
   if (reason === "not_a_pdf" && fileType && fileType !== "pdf") {
     return "The link did not lead to a file Axcess can check. The site sent something else, such as a web page.";
   }
   if (reason === "google_file" && (fileType === "google_doc" || fileType === "google_slides")) {
+    // Today a Doc or deck gets this reason only when it has no export. A
+    // report started before 2026-11-18 gave it to every Doc and deck, so
+    // for an address that does export, the true reason is the report's age
+    // (report #71, 2026-11-20, said "published to the web" of 53 ordinary
+    // Docs).
+    if (url && googleExportable(url)) {
+      return "Not checked: Axcess did not check Google Docs and Slides when this report was made. Scan again to check this file.";
+    }
     return "Axcess cannot download this Google file. A copy published to the web has no file to download.";
   }
   // 401 and 403 are not broken links: the file is there, for people who

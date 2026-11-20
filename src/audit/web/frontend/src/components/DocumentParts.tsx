@@ -176,7 +176,7 @@ function FoundResult({ row }: { row: LinkedFileRow }) {
   if (row.status === "could_not_check") {
     return (
       <p>
-        {row.reason ? linkedFileReasonText(row.reason, row.http_status, row.file_type) : LINKED_FILE_STATUS_HELP.could_not_check}
+        {row.reason ? linkedFileReasonText(row.reason, row.http_status, row.file_type, row.url) : LINKED_FILE_STATUS_HELP.could_not_check}
       </p>
     );
   }
