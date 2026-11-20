@@ -976,8 +976,19 @@ function ScanRow({
           it: each cell here is its own layer (`isolate`, for the box drawn
           behind it), so a later row would otherwise paint over the list.
           Still under the top bar (z-20). */}
+      {/* Delete on its own (no other report to compare with) is centred,
+          not left-aligned (the developer's request, 2026-11-20): there are
+          no words in this row to line up with "Open latest scan", and a
+          lone button at the left edge looked out of place. Centred in the
+          white box's part of the column: no left padding, and the cell's
+          16px on the right is the box's inset from the column's right edge
+          (scanCardCell), so the space each side of Delete is the same. */}
       <Cell
-        className={cn("whitespace-nowrap py-1 has-[[data-menu-open]]:z-10", SCAN_ACTIONS_CELL, piece("end"))}
+        className={cn(
+          "whitespace-nowrap py-1 has-[[data-menu-open]]:z-10",
+          others.length > 0 ? SCAN_ACTIONS_CELL : "pl-0",
+          piece("end"),
+        )}
       >
         {/* Default `md` size (44px tall): destructive controls in
             particular must be a real target (SC 2.5.5). In reading order:
@@ -985,7 +996,7 @@ function ScanRow({
         {/* No gap between "Compare with" and Delete: each button's own
             padding already separates them (the developer's request,
             2026-11-16). */}
-        <div className={SCAN_ACTIONS}>
+        <div className={cn(SCAN_ACTIONS, others.length === 0 && "justify-center")}>
           {others.length > 0 && (
             <LinkMenu
               label="Compare with"

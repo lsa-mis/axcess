@@ -562,11 +562,36 @@ async def test_site_actions_line_up_with_their_heading_and_have_even_space(
     table = page.get_by_role("table", name="Public reports by site", exact=False)
     await table.get_by_role("button", name=re.compile(r"^Show all 3 scans for compared")).click()
     await _assert_compare_words_line_up(page)
+    await _assert_lone_delete_centred(page)
     # A scan row much wider than the site's links, as a larger font can make
     # it: the extra width goes between the links, not to one side.
     await page.add_style_tag(content="tfoot td:last-child > div { padding-right: 300px; }")
     await _assert_site_actions_even(page)
     await _assert_compare_words_line_up(page)
+    await _assert_lone_delete_centred(page)
+
+
+async def _assert_lone_delete_centred(page: Any) -> None:
+    """Delete alone (the stopped scan: nothing to compare) is centred (2026-11-20).
+
+    Between the column's left line and the right edge of the white box drawn
+    behind the scan rows (its ``::before``, inset from the column's edge).
+    """
+    left, right = await page.evaluate(
+        """() => {
+          const heading = document.querySelector('table thead th:last-child');
+          const column = heading.getBoundingClientRect();
+          const cell = [...document.querySelectorAll('table tbody > tr > td:last-child')]
+            .find((td) => td.textContent.startsWith('Delete'));
+          const button = [...cell.querySelectorAll('button')]
+            .find((b) => b.textContent.startsWith('Delete'))
+            .getBoundingClientRect();
+          const boxRight = column.right - parseFloat(getComputedStyle(cell, '::before').right);
+          return [button.left - column.left, boxRight - button.right];
+        }"""
+    )
+    assert abs(left - right) <= 1, (left, right)
+    assert left > 20, left
 
 
 async def _assert_compare_words_line_up(page: Any) -> None:
