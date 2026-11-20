@@ -538,6 +538,84 @@ async def test_compare_with_on_each_completed_scan_row(width: int, new_page: Any
     await page.wait_for_url("**/app/scans/21/compare?compare_to=20")
 
 
+async def test_site_actions_line_up_with_their_heading_and_have_even_space(
+    new_page: Any,
+) -> None:
+    """A site's links start where "Actions" does, with equal space each side.
+
+    The developer's request (2026-11-20): the Actions column was 22rem with
+    the links centred in it, so they sat well right of the heading's words
+    with wide space round them. The column now fits its widest row, which
+    is not always the site row ("Compare with" and Delete can be wider), so
+    the links spread to the cell's edges. A wider column is forced below to
+    show the edges stay even when another row sets the width.
+    """
+    if not (DIST / "index.html").exists():
+        pytest.skip("Build the frontend first")
+    page = await _open_reports(
+        new_page, [_comparable_site(), *(_site(index, 1) for index in range(1, 4))]
+    )
+    await page.set_viewport_size({"width": 1280, "height": 900})
+    await _assert_site_actions_even(page)
+    # An open site's "Compare with" starts its words where "Open latest
+    # scan" does (2026-11-20), whichever row sets the column's width.
+    table = page.get_by_role("table", name="Public reports by site", exact=False)
+    await table.get_by_role("button", name=re.compile(r"^Show all 3 scans for compared")).click()
+    await _assert_compare_words_line_up(page)
+    # A scan row much wider than the site's links, as a larger font can make
+    # it: the extra width goes between the links, not to one side.
+    await page.add_style_tag(content="tfoot td:last-child > div { padding-right: 300px; }")
+    await _assert_site_actions_even(page)
+    await _assert_compare_words_line_up(page)
+
+
+async def _assert_compare_words_line_up(page: Any) -> None:
+    """The words, not the boxes: "Compare with" has a border and padding."""
+    starts = await page.evaluate(
+        """() => {
+          const start = (el, text) => {
+            const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+            while (walk.nextNode()) {
+              const at = walk.currentNode.data.indexOf(text);
+              if (at < 0) continue;
+              const range = document.createRange();
+              range.setStart(walk.currentNode, at);
+              range.setEnd(walk.currentNode, at + text.length);
+              return range.getBoundingClientRect().left;
+            }
+            return null;
+          };
+          const rows = [...document.querySelectorAll('table tbody > tr')];
+          const site = rows.find((r) => r.querySelector('button[aria-expanded="true"]'));
+          const scan = rows.find((r) => start(r, 'Compare with') !== null);
+          return [start(site, 'Open latest scan'), start(scan, 'Compare with')];
+        }"""
+    )
+    assert None not in starts, starts
+    assert abs(starts[0] - starts[1]) <= 1, starts
+
+
+async def _assert_site_actions_even(page: Any) -> None:
+    table = page.get_by_role("table", name="Public reports by site", exact=False)
+    heading = table.locator("thead th").last.get_by_text("Actions", exact=True)
+    row = table.locator(":scope > tbody > tr").first
+    cell = row.locator(":scope > td").last
+    open_link = row.get_by_role("link", name=re.compile(r"^Open latest scan"))
+    again_link = row.get_by_role("link", name=re.compile(r"^Scan again"))
+    heading_box = await heading.bounding_box()
+    cell_box = await cell.bounding_box()
+    open_box = await open_link.bounding_box()
+    again_box = await again_link.bounding_box()
+    assert heading_box and cell_box and open_box and again_box
+    # Both boxes include their 4px of side padding (px-1), so their left
+    # edges line up exactly when their words do.
+    assert abs(open_box["x"] - heading_box["x"]) <= 1, (open_box, heading_box)
+    left = open_box["x"] - cell_box["x"]
+    right = cell_box["x"] + cell_box["width"] - (again_box["x"] + again_box["width"])
+    assert abs(left - right) <= 1, (left, right)
+    assert left <= 13, left
+
+
 async def test_a_new_sort_order_is_announced(new_page: Any) -> None:
     """The order is said in a live region (SC 4.1.3), not in a visible line."""
     if not (DIST / "index.html").exists():
