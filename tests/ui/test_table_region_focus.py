@@ -46,7 +46,11 @@ async def _open(new_page: Any, width: int, height: int, count: int) -> Any:
 async def test_a_table_that_fits_has_no_tab_stop(new_page: Any) -> None:
     if not (DIST / "index.html").exists():
         pytest.skip("Build the frontend first")
-    page = await _open(new_page, 1400, 900, 3)
+    # 1600px, well clear of the table's width: at 1400px it fit by about 20px
+    # on a developer's computer (it scrolls from 1380px, 2026-11-20) and not at
+    # all on CI, whose fonts draw a little wider. This test is about a table
+    # that fits; the next one covers a table that does not.
+    page = await _open(new_page, 1600, 900, 3)
     try:
         region = page.get_by_role("region", name="Public reports table")
         await playwright_async.expect(region).to_have_attribute("tabindex", "-1")
