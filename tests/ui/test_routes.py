@@ -888,7 +888,7 @@ def test_prepare_scan_row_leaves_a_signed_in_scan_alone(
     db_path, _, _ = seeded_db
     seed = "https://app.example.test/secure/"
     signed_in_config = server.CrawlConfig(seed_url=seed, resumable=False)
-    signed_in_id = server._prepare_scan_row(db_path, signed_in_config, resume_interrupted=False)
+    signed_in_id = server._prepare_scan_row(db_path, signed_in_config)
 
     anonymous_id = server._prepare_scan_row(db_path, server.CrawlConfig(seed_url=seed))
 

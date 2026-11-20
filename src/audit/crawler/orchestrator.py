@@ -861,6 +861,15 @@ RESUMABLE_SCAN_SQL = (
     "THEN COALESCE(json_extract(config_json, '$.resumable'), 1) ELSE 1 END != 0"
 )
 
+#: True while a scan still has addresses waiting in the queue. Stopping a
+#: scan empties its queue; a crawl cut off when Axcess closed leaves its
+#: work there. So this is what tells "not finished" from "stopped", both
+#: stored as ``interrupted`` (``_ensure_scan``, ``audit.web.continuing``).
+WORK_WAITING_SQL = (
+    "EXISTS (SELECT 1 FROM jobs WHERE jobs.state IN ('pending', 'leased') "
+    "AND json_extract(jobs.payload_json, '$.scan_id') = scans.id)"
+)
+
 
 def _ensure_scan(conn: sqlite3.Connection, seed_url: str, config: CrawlConfig) -> int:
     """Create (or resume) a scan row for ``seed_url``. Returns its id."""
@@ -898,14 +907,7 @@ def _ensure_scan(conn: sqlite3.Connection, seed_url: str, config: CrawlConfig) -
            AND {RESUMABLE_SCAN_SQL}
            AND (
                status = 'running'
-               OR (
-                   status = 'interrupted'
-                   AND EXISTS (
-                       SELECT 1 FROM jobs
-                        WHERE jobs.state IN ('pending', 'leased')
-                          AND json_extract(jobs.payload_json, '$.scan_id') = scans.id
-                   )
-               )
+               OR (status = 'interrupted' AND {WORK_WAITING_SQL})
            )
          ORDER BY id DESC
          LIMIT 1

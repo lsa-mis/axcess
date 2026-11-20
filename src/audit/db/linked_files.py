@@ -257,3 +257,43 @@ def mark_unchecked(conn: sqlite3.Connection, scan_id: int) -> int:
         (scan_id,),
     )
     return cur.rowcount
+
+
+#: Reasons a continued report checks again (``reopen_for_continuing``).
+_REOPENED_REASONS = ("not_checked", "type_not_checked_yet", "google_file")
+
+
+def reopen_for_continuing(conn: sqlite3.Connection, scan_id: int) -> int:
+    """Put back in the queue the files a continued report can still check.
+
+    For **Continue scan** (``audit.web.continuing``). Two kinds of row:
+
+    - ``not_checked``: the scan stopped before the file's check finished.
+    - A type the build that started the report could not check yet, which
+      this one can: ``type_not_checked_yet`` on a Word or PowerPoint file,
+      ``google_file`` on a Google Doc or Slides deck (both checked since
+      2026-11-18). A Doc published to the web still has no file to download
+      (``google.export_address``), so it keeps its reason.
+
+    Returns how many files were put back.
+    """
+    from audit.linked_files.google import export_address
+
+    reopened: list[int] = []
+    rows = conn.execute(
+        "SELECT id, url, file_type, reason FROM linked_files "
+        "WHERE scan_id = ? AND status = 'could_not_check' AND reason IN (?, ?, ?)",
+        (scan_id, *_REOPENED_REASONS),
+    ).fetchall()
+    for file_id, url, file_type, reason in rows:
+        if reason != "not_checked":
+            if initial_status(file_type)[0] != "pending":
+                continue
+            if file_type in {"google_doc", "google_slides"} and export_address(url) is None:
+                continue
+        reopened.append(int(file_id))
+    conn.executemany(
+        "UPDATE linked_files SET status = 'pending', reason = NULL WHERE id = ? AND scan_id = ?",
+        [(file_id, scan_id) for file_id in reopened],
+    )
+    return len(reopened)
