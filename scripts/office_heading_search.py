@@ -669,7 +669,10 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "command",
-        choices=["features", "search", "nested", "report", "show", "check", "simplify", "product"],
+        choices=[
+            *("features", "search", "nested", "report", "show"),
+            *("check", "simplify", "product", "fresh2"),
+        ],
     )
     parser.add_argument("genome", nargs="?")
     parser.add_argument("--generations", type=int, default=60)
@@ -677,6 +680,36 @@ def main() -> None:
     args = parser.parse_args()
     if args.command == "features":
         build_features()
+    elif args.command == "fresh2":
+        # Information only, after FROZEN was committed: every probe of the
+        # report's top 5, the base and FROZEN on the fresh2 files.
+        global FILES
+        FILES = ROOT / "artifacts" / "office-fresh2" / "files"
+        entries = json.loads(LABELS.read_text(encoding="utf-8"))["files"]
+        rows = []
+        for entry in entries:
+            if entry["split"] != "fresh2":
+                continue
+            data = (FILES / f"{entry['sha256']}.docx").read_bytes()
+            row = {"id": entry["id"], "barrier": entry["barrier"]}
+            try:
+                row.update(file_features(data))
+            except Exception as exc:  # damaged as served
+                row["outcome"] = f"damaged {type(exc).__name__}"
+            rows.append(row)
+        (OUT / "features_fresh2.json").write_text(json.dumps(rows), encoding="utf-8")
+        rows = [r for r in rows if r.get("outcome") == "checked" and r["barrier"] != "disputed"]
+        probes = {"946ad6f": base_genome(), "frozen": FROZEN}
+        for n, line in enumerate((OUT / "top5.txt").read_text().splitlines()[1:], start=1):
+            probes[f"top{n}"] = json.loads(line)["genome"]
+        out = {}
+        for name, genome in probes.items():
+            labels = [r["barrier"] is True for r in rows]
+            preds = [predict(r, genome) for r in rows]
+            p, rc, tp, fp, fn = pr(list(zip(labels, preds, strict=True)))
+            out[name] = {"precision": p, "recall": rc, "tp": tp, "fp": fp, "fn": fn, "n": len(rows)}
+            print(name, json.dumps(out[name]))
+        (OUT / "fresh2_probes.json").write_text(json.dumps(out, indent=1))
     elif args.command == "product":
         # The frozen probe (FROZEN) must give the product's verdict on every
         # development file: reads each file again with the current office_check.
