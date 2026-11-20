@@ -606,6 +606,87 @@ How the tiers follow from these numbers:
   problems: they are accurate, but whether each hurts a reader needs a
   person (see `office_check.py`).
 
+### The "no headings" possible problem: the developer's rule
+
+A Word file that uses no heading style and has a bold line that is its
+own paragraph, of at most one sentence, is listed as possibly missing
+heading styles (commit 68af8c2, replacing 1256e02's probe). Details chosen
+when building it, written beside `_word_bold_line`: every letter and digit
+of the paragraph bold (as Word shows it, styles included); a sentence
+ends at ".", "!" or "?" followed by more text, after at least 3 words (so
+"A. General" and "U.S. Department of Labor" are one sentence); empty
+lines, lines in tables, lines in text boxes and lines in Word's Title and
+Subtitle styles are not read. The rule is the developer's, so it was not
+tuned on any set; it was scored once, after it was written.
+
+### Scores with the two tiers (code at a7fa2a9)
+
+"Mostly sure" against `barrier` (the labellers' verdict: any of alt text,
+table header, slide title, language or headings fails). Since tables and
+headings no longer count, recall here counts every file whose only
+barriers are tables or headings as a miss, by design. P precision
+(false alarms at most, one-sided 95%), R recall (misses at most).
+
+| Set | Files scored | Barriers | Mostly sure P | Mostly sure R | Above 90% both? |
+|---|---|---|---|---|---|
+| Development (fit) | 145 | 44 | 100% (22/22; 12.7%) | 50.0% (22/44; 62.0%) | no (recall) |
+| Fresh | 55 | 20 | 100% (10/10; 25.9%) | 50.0% (10/20; 67.3%) | no (recall) |
+| Fresh2 | 72 | 39 | 100% (13/13; 20.6%) | 33.3% (13/39; 77.6%) | no (recall) |
+
+For information, recall against the barriers the counted checks are
+meant to find (alt text, language or slide title labelled "fail"):
+development 22 of 22, fresh 10 of 10, fresh2 13 of 14 (the miss is the
+letter whose seal has the alt text "sm_seal3", 3e32c57daf22).
+
+What a reader sees: a barrier file listed with at least one problem,
+counted or possible ("any problem"; a Google file's missing document
+title is left out, as the report leaves it out), and listed with one of
+the five barrier checks ("any barrier check"; so a missing document title
+alone does not count):
+
+| Set | Barrier files shown any problem | P | Barrier files shown a barrier check | P |
+|---|---|---|---|---|
+| Development | 40 of 44 (90.9%) | 43.0% | 40 of 44 (90.9%) | 93.0% |
+| Fresh | 20 of 20 (100%) | 40.8% | 19 of 20 (95.0%) | 70.4% |
+| Fresh2 | 39 of 39 (100%) | 57.4% | 38 of 39 (97.4%) | 71.7% |
+
+The 4 development files shown nothing are math course lists (Google
+Docs) whose part names are bold text in table cells; the fresh and
+fresh2 barrier files not shown a barrier check (d5bb033d2327, a Caltrans
+application form, and e504a836fcf8, a lighting review checklist) are
+forms whose section names are in table cells too; both are still shown
+another problem (link text or document title). "Any problem"
+precision is low because most files have no document title, which is
+listed on nearly every non-Google file.
+
+Each check (P, R, then right, false alarms, missed):
+
+| Check | Development | Fresh | Fresh2 |
+|---|---|---|---|
+| Images without alt text (counted) | 100%, 100% (19, 0, 0) | 100%, 100% (10, 0, 0) | 100%, 92.3% (12, 0, 1) |
+| No language (counted) | 100%, 100% (1, 0, 0) | no positives | 100%, 100% (1, 0, 0) |
+| Slides without a title (counted) | 100%, 100% (2, 0, 0) | no PowerPoint | no PowerPoint |
+| Tables without a header row (possible) | 100%, 100% (9, 0, 0) | 100%, 83.3% (5, 0, 1) | 55.6%, 100% (5, 4, 0) |
+| No headings, bold-line rule (possible) | 76.5%, 76.5% (13, 4, 4) | 50.0%, 90.9% (10, 10, 1) | 58.1%, 92.6% (25, 18, 2) |
+| Skipped heading levels (possible) | 100%, 100% (9, 0, 0) | 100%, 66.7% (4, 0, 2) | 100%, 100% (5, 0, 0) |
+| Link text (possible) | 100%, 96.5% (55, 0, 2) | 100%, 100% (18, 0, 0) | 100%, 92.3% (12, 0, 1) |
+| Document title (possible) | 100%, 100% (64, 0, 0) | 100%, 100% (35, 0, 0) | 100%, 100% (55, 0, 0) |
+
+The bold-line rule finds more heading barriers than 1256e02's probe on
+fresh2 (recall 92.6% against 59.3%) and lists more files that have none
+(precision 58.1% against 80.0%), which is the trade the developer chose
+for a possible problem. Its 18 fresh2 false alarms are bold lines that are
+not part names: a title typed by hand at the top ("Submission Checklist",
+"City of Hahira"), court-form captions in bold capitals ("VERIFIED ANSWER
+TO WRIT OF CONTINUING GARNISHMENT"), and lines that introduce a list
+("Agenda Items:"). All 7 of its misses across the sets are documents whose
+part names are only in table cells, which the rule does not read.
+
+**Result: "Mostly sure" precision is 100% on every set, above 90%;
+"Mostly sure" recall against all barriers is below 90% on every set
+(fresh 50.0%, fresh2 33.3%), as the tiers intend.** Every barrier file in
+fresh and fresh2 is still shown at least one problem.
+
 ## Limits
 
 - 281 files: 73 from one university's sites, 77 from government and

@@ -94,10 +94,10 @@ own paragraph and at most one sentence (replaces 1256e02's probe). Keep
 | Step | State | Where |
 |---|---|---|
 | T1. Per-check scores on fresh and fresh2 at 354d04b | done | `docs/internal/office-check-research.md`, "Two tiers" |
-| T2. Tiers in office_check.py (+ migration if stored statuses need it) | next | |
-| T3. Bold-line heading rule + unit tests | | |
-| T4. Score Mostly sure and every check, all sets | | |
-| T5. Wording: Documents tab, document page, terms.ts, glossary, reading-your-report, tests | | |
+| T2. Tiers in office_check.py (+ migration if stored statuses need it) | done: **68af8c2** (COUNTED, check order), **cd2f2a0** (migration **0049**, numbered past documents' 0048; renumber on merge if needed) | `src/audit/linked_files/office_check.py`, `src/audit/db/migrations/0049_office_two_tiers*.sql`, `tests/unit/test_office_report_rules.py` |
+| T3. Bold-line heading rule + unit tests | done in **68af8c2** (`_word_bold_line`, `_sentences`); real cut-downs from 06f21a62fbbb, 0cf575d1dc40, 0e1588d7eae2, 3828c86e0f47, 1d10e2d9fe14; tests not yet run | `tests/unit/test_office_check.py` |
+| T4. Score Mostly sure and every check, all sets | done: scorer rows `any_problem`, `any_barrier_check` (**a7fa2a9**); Mostly sure P 100% on all sets, R dev 50.0%, fresh 50.0%, fresh2 33.3% (by design); every fresh/fresh2 barrier file shown a problem | research doc, "Scores with the two tiers" |
+| T5. Wording: Documents tab, document page, terms.ts, glossary, reading-your-report, tests | next | |
 | T6. Gates | | |
 
 ## Next step (round 2, superseded by round 3)
