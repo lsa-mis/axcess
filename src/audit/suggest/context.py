@@ -288,6 +288,32 @@ def _issue_row_for(
     return None
 
 
+def suggestable(
+    conn: sqlite3.Connection,
+    scan_id: int,
+    *,
+    finding_ids: list[int],
+    image_issue_keys: list[str | None],
+) -> tuple[list[bool], list[bool]]:
+    """Which occurrences may get a fix suggestion, by the rule ``locate`` uses.
+
+    An occurrence of an issue marked "for information" has nothing to fix,
+    and ``create`` refuses it (409). Screens ask this first so they do not
+    offer a button that can only be refused (end-to-end test, 2026-11-17: an
+    image whose alt text already matches showed "Suggest a fix (AI)").
+    """
+    if not finding_ids and not any(image_issue_keys):
+        return [], [False] * len(image_issue_keys)
+    rows = issues.list_issues(conn, scan_id)
+
+    def ok(row: issues.IssueRow | None) -> bool:
+        return row is None or row.review_lane != "informational"
+
+    findings = [ok(_issue_row_for(rows, finding_id=f)) for f in finding_ids]
+    images = [key is not None and ok(_issue_row_for(rows, key=key)) for key in image_issue_keys]
+    return findings, images
+
+
 def _audience(row: issues.IssueRow | None) -> Audience:
     owner = (row.responsibility if row else "dev") or "dev"
     return "editor" if owner in _EDITOR_OWNERS else "developer"

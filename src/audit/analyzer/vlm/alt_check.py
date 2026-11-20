@@ -17,13 +17,14 @@ person's check.
 
 from __future__ import annotations
 
-import base64
 import json
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
 import httpx
 
+from audit.ai.model_client import DEFAULT_BACKEND, GenerateRequest
+from audit.ai.model_image import fit_for_model
 from audit.analyzer.ollama_base import OllamaBase, OllamaError, prompt_content_version
 from audit.analyzer.vlm.ollama import load_prompt
 
@@ -64,6 +65,20 @@ class AltChecker(Protocol):
     async def check(self, image_bytes: bytes, given: AltCheckInput) -> AltCheckResult: ...
 
 
+# The answer's exact shape. A non-empty suggestion is required: without the
+# schema, Bonsai 2 answered "good" with an empty one (2026-11-17).
+ALT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "verdict": {"enum": ["good", "needs_better", None]},
+        "reason": {"type": "string"},
+        "suggestion": {"type": "string", "minLength": 1, "maxLength": 150},
+    },
+    "required": ["verdict", "reason", "suggestion"],
+    "additionalProperties": False,
+}
+
+
 class OllamaAltChecker(OllamaBase):
     """Alt text check through the local Ollama daemon."""
 
@@ -74,11 +89,17 @@ class OllamaAltChecker(OllamaBase):
         model: str,
         base_url: str = "http://localhost:11434",
         timeout_s: float = 90.0,
+        backend: str = DEFAULT_BACKEND,
     ) -> None:
         # One attempt: a person is waiting on the button, and the endpoint
         # has its own deadline.
         super().__init__(
-            client, model=model, base_url=base_url, max_attempts=1, timeout_s=timeout_s
+            client,
+            model=model,
+            base_url=base_url,
+            max_attempts=1,
+            timeout_s=timeout_s,
+            backend=backend,
         )
         self._prompt_template = load_prompt(DEFAULT_PROMPT_NAME)
         self.prompt_version = prompt_content_version(self._prompt_template)
@@ -95,18 +116,29 @@ class OllamaAltChecker(OllamaBase):
             ocr=_field(given.image_text) or "(none)",
             snippet=_field(given.context_snippet) or "(none)",
         )
-        payload = {
-            "model": self._model,
-            "prompt": filled,
-            "images": [base64.b64encode(image_bytes).decode("ascii")],
-            "stream": False,
-            "format": "json",
-            "options": {"temperature": 0.0},
-        }
-        raw = await self._post_with_retries(payload)
+        # Built by the model client, which writes each service's own format.
+        # A hand-built Ollama body here went to the private llama.cpp service
+        # as is, and every check failed ("did not give a usable answer").
+        # The answer is held to ALT_SCHEMA, so a model cannot leave the
+        # suggestion out (Bonsai 2 answered "good" with an empty one).
+        image, mime = fit_for_model(image_bytes)
+        raw = await self._generate(
+            GenerateRequest(
+                model=self._model,
+                prompt=filled,
+                image=image,
+                image_mime=mime,
+                json_schema=ALT_SCHEMA,
+                temperature=0.0,
+            )
+        )
         has_alt = bool(given.alt_text and given.alt_text.strip())
         return parse_answer(
-            raw, has_alt=has_alt, model=self._model, prompt_version=self.prompt_version
+            raw,
+            has_alt=has_alt,
+            model=self._model,
+            prompt_version=self.prompt_version,
+            current_alt=given.alt_text,
         )
 
 
@@ -125,8 +157,19 @@ def _clean(value: object, limit: int) -> str:
     return " ".join(value.split())[:limit]
 
 
-def parse_answer(raw: str, *, has_alt: bool, model: str, prompt_version: str) -> AltCheckResult:
-    """Parse the model's JSON. Raises :class:`OllamaError` when it is unusable."""
+def parse_answer(
+    raw: str,
+    *,
+    has_alt: bool,
+    model: str,
+    prompt_version: str,
+    current_alt: str | None = None,
+) -> AltCheckResult:
+    """Parse the model's JSON. Raises :class:`OllamaError` when it is unusable.
+
+    "good" with no suggestion keeps the current alt text, which the prompt
+    allows ("If the current alt text is good, you may repeat it").
+    """
     try:
         parsed = json.loads(raw)
     except json.JSONDecodeError as exc:
@@ -134,6 +177,8 @@ def parse_answer(raw: str, *, has_alt: bool, model: str, prompt_version: str) ->
     if not isinstance(parsed, dict):
         raise OllamaError("the model did not return a JSON object")
     suggestion = _clean(parsed.get("suggestion"), SUGGESTION_LIMIT)
+    if not suggestion and parsed.get("verdict") == "good" and current_alt:
+        suggestion = _clean(current_alt, SUGGESTION_LIMIT)
     if not suggestion:
         raise OllamaError("the model returned no suggestion")
     verdict_raw = parsed.get("verdict")

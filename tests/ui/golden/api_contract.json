@@ -1102,6 +1102,7 @@
     "body": {
       "a11y_findings": [
         {
+          "can_suggest": "boolean",
           "criterion_sc": "null|string",
           "element_place": "null",
           "engine_evidence_json": "null|string",
@@ -1130,6 +1131,7 @@
         {
           "above_fold": "integer",
           "alt_text": "null|string",
+          "can_suggest": "boolean",
           "content_hash": "string",
           "context_snippet": "null|string",
           "hidden_in_copy": "boolean",
@@ -1491,7 +1493,7 @@
         "language": "string",
         "max_workers": "integer"
       },
-      "ollama": {"reachable": "boolean"},
+      "ollama": {"reachable": "boolean", "service": "string"},
       "semantic": {
         "available": "boolean",
         "checks_per_page": "integer",

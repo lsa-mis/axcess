@@ -26,6 +26,7 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from audit import evaluation
+from audit.ai.model_client import endpoint_from_settings
 from audit.ai.state import ai_enabled
 from audit.config import Settings
 from audit.crawler import url_policy
@@ -1036,6 +1037,7 @@ def _protected_crawl_config(
     request: ProtectedScanRequest, settings: Settings, seed_url: str
 ) -> CrawlConfig:
     """Build a safe persisted work specification, not a running crawl."""
+    model_endpoint = endpoint_from_settings(settings)
     return CrawlConfig(
         seed_url=seed_url,
         max_pages=request.max_pages,
@@ -1051,7 +1053,9 @@ def _protected_crawl_config(
         ocr_enabled=True,
         vlm_enabled=bool(request.allow_local_ai) and ai_enabled(settings),
         vlm_model=settings.vlm_model,
-        vlm_base_url=settings.ollama_base_url,
+        vlm_base_url=model_endpoint.base_url,
+        model_backend=model_endpoint.backend,
+        model_socket=model_endpoint.socket_path,
         js_enabled=True,
         js_eager=True,
         axe_enabled=request.scan_engine in {"axe", "both"},
@@ -1271,9 +1275,19 @@ def _protected_work_config(config: CrawlConfig, *, allow_local_ai: bool) -> dict
     if allow_local_ai:
         work_config["vlm_base_url"] = config.vlm_base_url
         work_config["vlm_model"] = config.vlm_model
+        # Which request format the service speaks ("ollama" or "llama_cpp").
+        work_config["model_backend"] = config.model_backend
+        # The desktop's private llama.cpp service listens on a UNIX socket
+        # on this computer; the companion checks it before using it.
+        if config.model_socket:
+            work_config["model_socket"] = config.model_socket
+        else:
+            work_config.pop("model_socket", None)
     else:
         work_config.pop("vlm_base_url", None)
         work_config.pop("vlm_model", None)
+        work_config.pop("model_backend", None)
+        work_config.pop("model_socket", None)
     return work_config
 
 

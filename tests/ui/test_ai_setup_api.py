@@ -24,15 +24,13 @@ from .test_fix_suggestions import FakeProvider, FakeVerifier, _add_finding
 def db(seeded_db: tuple[Path, Path, int], tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv("AUDIT_ACCESS_TOKEN", "")
     monkeypatch.setenv("AUDIT_DATA_DIR", str(tmp_path))
-    # No real Ollama is contacted: point the port-11434 check nowhere.
-    monkeypatch.setattr("audit.ai.manager.system_ollama", lambda: None)
     return seeded_db[0]
 
 
 def test_ai_routes_are_absent_outside_the_desktop_app(db: Path, tmp_path: Path) -> None:
     with TestClient(create_app(db_path=db, blob_dir=tmp_path / "blobs")) as client:
         assert client.get("/api/ai/plan").status_code == 404
-        assert client.post("/api/ai/install", json={"tier": "small"}).status_code in {404, 405}
+        assert client.post("/api/ai/install", json={"tier": "standard"}).status_code in {404, 405}
 
 
 def test_plan_describes_this_computer_and_every_size(
@@ -45,6 +43,9 @@ def test_plan_describes_this_computer_and_every_size(
         assert plan["current"] is None
         assert plan["install"]["state"] == "idle"
         assert plan["program"]["licence"] == "MIT"
+        # Run from source, the program is downloaded; no system Ollama is looked up.
+        assert plan["program"]["included"] is False
+        assert "system_version" not in plan["program"]
         for tier in plan["tiers"]:
             assert (
                 tier["download_bytes"] == tier["models_bytes"] + plan["program"]["download_bytes"]
@@ -62,7 +63,7 @@ def test_saved_setup_chooses_the_models_the_app_uses(
         AIConfig(
             source="system",
             base_url="http://127.0.0.1:1",
-            tier="small",
+            tier="standard",
             text_model="text:test",
             vision_model="vision:test",
         ),
@@ -87,11 +88,21 @@ def test_skip_choice_persists_and_blocks_model_requests(
         assert client.get("/api/ai/preferences").json() == {
             "enabled": False,
             "choice_recorded": False,
+            "gpu_only": False,
         }
         assert client.put("/api/ai/preferences", json={"enabled": False}).json() == {
             "enabled": False,
             "choice_recorded": True,
+            "gpu_only": False,
         }
+        # "Run AI on the graphics card only" is saved on its own and kept
+        # when AI is turned on or off; one change per request.
+        assert client.put("/api/ai/preferences", json={"gpu_only": True}).json()["gpu_only"]
+        assert client.put("/api/ai/preferences", json={"enabled": False}).json()["gpu_only"]
+        assert client.put("/api/ai/preferences", json={}).status_code == 422
+        both = client.put("/api/ai/preferences", json={"enabled": False, "gpu_only": False})
+        assert both.status_code == 422
+        assert client.put("/api/ai/preferences", json={"gpu_only": False}).status_code == 200
         local = client.get("/api/capabilities/local-analysis").json()
         assert local["ai_enabled"] is False
         assert not local["vision"]["available"]
@@ -274,7 +285,13 @@ def test_runtime_start_requires_explicit_boolean_confirmation(
             "download_bytes": None,
             "tier": None,
         }
-        assert set(client.get("/api/ai/runtime").json()) == {"running", "isolated", "reason"}
+        assert set(client.get("/api/ai/runtime").json()) == {
+            "running",
+            "isolated",
+            "reason",
+            "starting",
+            "memory_warning",
+        }
 
 
 def test_runtime_routes_stay_desktop_only(db: Path, tmp_path: Path) -> None:
@@ -303,29 +320,35 @@ def test_runtime_start_states(
     from unittest.mock import Mock
 
     from audit.ai.catalog import load_catalog
-    from audit.ai.runtime import OllamaRuntime
+    from audit.ai.runtime import LlamaRuntime
     from audit.ai.sandbox import IsolationError
 
     monkeypatch.setenv("AUDIT_DESKTOP", "1")
     settings = Settings(data_dir=tmp_path, desktop=True)
     save_preferences(settings, AIPreferences(enabled=True, choice_recorded=True))
+    small = load_catalog().tier("standard")
+    socket = str(tmp_path / "ai" / "scratch" / "llama.sock")
+    system = state == "system_ollama_not_managed"
     save_config(
         settings,
         AIConfig(
-            source="system" if state == "system_ollama_not_managed" else "private",
-            base_url="http://127.0.0.1:12345",
-            tier="small",
-            text_model="text:test",
-            vision_model="vision:test",
+            source="system" if system else "private",
+            base_url="http://127.0.0.1:12345" if system else "http://localhost",
+            backend="ollama" if system else "llama_cpp",
+            socket_path=None if system else socket,
+            tier="standard",
+            text_model=small.text.served_name,
+            vision_model=small.vision.served_name,
         ),
     )
-    runtime = Mock(spec=OllamaRuntime(tmp_path / "ai", load_catalog()))
+    runtime = Mock(spec=LlamaRuntime(tmp_path / "ai", load_catalog()))
     runtime.running.return_value = state == "already_running"
     runtime.installed.return_value = True
     runtime.has_model.return_value = state != "model_missing"
     runtime.download_remaining.return_value = 0
     runtime.isolation_reason = None
-    runtime.start.return_value = "http://127.0.0.1:12345"
+    runtime.start.return_value = socket
+    runtime.service_fields.return_value = {"socket_path": socket, "routes": None}
     if state == "not_isolated":
         runtime.start.side_effect = IsolationError("network_test_failed", "AI isolation failed")
     original = AIManager.__init__
@@ -347,8 +370,10 @@ def test_runtime_start_states(
         assert result["isolated"] is (state in {"started", "already_running"})
         assert result["reason"] == ("network_test_failed" if state == "not_isolated" else None)
         if state == "model_missing":
-            assert result["tier"] == "small"
-            assert result["download_bytes"] == load_catalog().tier("small").size
+            assert result["tier"] == "standard"
+            assert result["download_bytes"] == load_catalog().tier("standard").size
         if state not in {"started", "not_isolated"}:
             runtime.start.assert_not_called()
+        else:
+            runtime.start.assert_called_once_with(small.models)
         runtime.download.assert_not_called()

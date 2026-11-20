@@ -4,10 +4,11 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
+from support.two_model import TWO_MODEL, two_model_catalog
 
 from audit.ai.hardware import Hardware
 from audit.ai.manager import AIBusyError, AIManager
-from audit.ai.runtime import OllamaRuntime, RuntimeSetupError
+from audit.ai.runtime import LlamaRuntime, RuntimeSetupError
 from audit.ai.state import (
     AIConfig,
     AIPreferences,
@@ -24,13 +25,26 @@ from audit.config import Settings
 from audit.web.server import _build_crawl_config
 
 
+@pytest.fixture(autouse=True)
+def _two_model_size(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The manager's catalogue includes a two-model size (see support.two_model)."""
+    monkeypatch.setattr("audit.ai.manager.load_catalog", two_model_catalog)
+
+
+def socket_path(settings: Settings) -> str:
+    return str(settings.data_dir / "ai" / "scratch" / "llama.sock")
+
+
 def configured(settings: Settings, source: str = "private") -> AIConfig:
+    private = source == "private"
     config = AIConfig(
         source=source,
-        base_url="http://127.0.0.1:1234",
-        tier="small",
-        text_model="text:test",
-        vision_model="vision:test",
+        base_url="http://localhost" if private else "http://127.0.0.1:1234",
+        backend="llama_cpp" if private else "ollama",
+        socket_path=socket_path(settings) if private else None,
+        tier="extra_large",
+        text_model=TWO_MODEL.text.served_name,
+        vision_model=TWO_MODEL.vision.served_name,
     )
     save_config(settings, config)
     return config
@@ -77,11 +91,12 @@ def test_malformed_preference_fails_closed_and_reports_error(tmp_path: Path, cap
 def test_off_keeps_models_and_on_reuses_them(tmp_path: Path, source: str) -> None:
     settings = Settings(data_dir=tmp_path, desktop=True)
     config = configured(settings, source)
-    marker = tmp_path / "ai" / "models" / "kept"
+    marker = tmp_path / "ai" / "gguf" / "kept"
     marker.parent.mkdir()
     marker.write_text("model")
-    runtime = Mock(spec=OllamaRuntime)
-    runtime.start.return_value = config.base_url
+    runtime = Mock(spec=LlamaRuntime)
+    runtime.start.return_value = socket_path(settings)
+    runtime.service_fields.return_value = {"socket_path": socket_path(settings), "routes": None}
     applied = []
     manager = AIManager(settings, applied.append, runtime=runtime)
     assert manager.set_enabled(False).enabled is False
@@ -96,7 +111,8 @@ def test_off_keeps_models_and_on_reuses_them(tmp_path: Path, source: str) -> Non
     runtime.remove.assert_not_called()
     runtime.download.assert_not_called()
     if source == "private":
-        runtime.start.assert_called_once_with(preferred_url=config.base_url)
+        runtime.start.assert_called_once_with((TWO_MODEL.text, TWO_MODEL.vision))
+        assert load_config(settings) == config
     else:
         runtime.start.assert_not_called()
 
@@ -105,11 +121,34 @@ def test_start_failure_keeps_ai_off(tmp_path: Path) -> None:
     settings = Settings(data_dir=tmp_path, desktop=True)
     configured(settings)
     save_preferences(settings, AIPreferences(enabled=False, choice_recorded=True))
-    runtime = Mock(spec=OllamaRuntime)
-    runtime.start.side_effect = RuntimeSetupError("Ollama could not start.")
+    runtime = Mock(spec=LlamaRuntime)
+    runtime.start.side_effect = RuntimeSetupError("The isolated AI service could not start.")
     manager = AIManager(settings, Mock(), runtime=runtime)
     with pytest.raises(RuntimeSetupError, match="could not start"):
         manager.set_enabled(True)
+    assert not load_preferences(settings).enabled
+
+
+def test_turning_on_a_private_ollama_setup_asks_for_a_new_download(tmp_path: Path) -> None:
+    """A private setup from before llama.cpp has no models the service can run."""
+    settings = Settings(data_dir=tmp_path, desktop=True)
+    save_config(
+        settings,
+        AIConfig(
+            source="private",
+            base_url="http://127.0.0.1:1234",
+            tier="extra_large",
+            text_model=TWO_MODEL.text.served_name,
+            vision_model=TWO_MODEL.vision.served_name,
+            ollama_version="0.33.0",
+        ),
+    )
+    save_preferences(settings, AIPreferences(enabled=False, choice_recorded=True))
+    runtime = Mock(spec=LlamaRuntime)
+    manager = AIManager(settings, Mock(), runtime=runtime)
+    with pytest.raises(RuntimeSetupError, match="downloaded again"):
+        manager.set_enabled(True)
+    runtime.start.assert_not_called()
     assert not load_preferences(settings).enabled
 
 
@@ -117,7 +156,7 @@ def test_start_failure_keeps_ai_off(tmp_path: Path) -> None:
 def test_busy_work_keeps_setting_and_runtime(tmp_path: Path, operation: str) -> None:
     settings = Settings(data_dir=tmp_path, desktop=True)
     configured(settings)
-    runtime = Mock(spec=OllamaRuntime)
+    runtime = Mock(spec=LlamaRuntime)
     manager = AIManager(
         settings, Mock(), runtime=runtime, busy_reason=lambda: "Finish the current scan."
     )
@@ -143,8 +182,9 @@ def test_failed_application_rolls_back_preference(tmp_path: Path) -> None:
     settings = Settings(data_dir=tmp_path, desktop=True)
     configured(settings)
     save_preferences(settings, AIPreferences(enabled=False, choice_recorded=True))
-    runtime = Mock(spec=OllamaRuntime)
-    runtime.start.return_value = "http://127.0.0.1:1234"
+    runtime = Mock(spec=LlamaRuntime)
+    runtime.start.return_value = socket_path(settings)
+    runtime.service_fields.return_value = {"socket_path": socket_path(settings), "routes": None}
     manager = AIManager(settings, Mock(side_effect=RuntimeError("worker failed")), runtime=runtime)
     with pytest.raises(RuntimeError, match="worker failed"):
         manager.set_enabled(True)
@@ -154,17 +194,16 @@ def test_failed_application_rolls_back_preference(tmp_path: Path) -> None:
 
 def test_failed_setup_stops_private_runtime_while_ai_is_off(tmp_path: Path) -> None:
     settings = Settings(data_dir=tmp_path, desktop=True)
-    runtime = Mock(spec=OllamaRuntime)
+    runtime = Mock(spec=LlamaRuntime)
     manager = AIManager(
         settings,
         Mock(),
         runtime=runtime,
-        probe=lambda: Hardware(16 * 1024**3, 100 * 10**9, True, None, "darwin", "arm64"),
-        find_system=lambda: "0.33.0",
+        probe=lambda: Hardware(64 * 1024**3, 100 * 10**9, True, None, "darwin", "arm64"),
     )
     runtime.download_remaining.return_value = 0
     manager.installer.pull = Mock(side_effect=RuntimeSetupError("download stopped"))
-    manager.install("small")
+    manager.install("extra_large")
     assert manager.installer._thread is not None
     manager.installer._thread.join(3)
     assert not manager.installer.running

@@ -10,9 +10,11 @@ from __future__ import annotations
 import asyncio
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, ConfigDict, field_validator
+from fastapi import APIRouter, HTTPException, Query, Request
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from audit.ai import custom
+from audit.ai.catalog import SamplingKey, TierId
 from audit.ai.installer import InstallStatus
 from audit.ai.manager import (
     AIBusyError,
@@ -22,7 +24,7 @@ from audit.ai.manager import (
     AiRuntimeStatus,
     NotEnoughSpaceError,
 )
-from audit.ai.runtime import RuntimeSetupError
+from audit.ai.runtime import NotEnoughMemoryError, RuntimeSetupError
 from audit.ai.sandbox import IsolationError
 from audit.ai.state import AIPreferences, AIStateError
 
@@ -30,12 +32,56 @@ from audit.ai.state import AIPreferences, AIStateError
 class InstallRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    tier: Literal["small", "standard", "large"]
+    tier: TierId
+
+
+# The ranges the setup page offers (``SAMPLING_FIELDS`` in AiSetup.tsx).
+SAMPLING_RANGES: dict[str, tuple[float, float]] = {
+    "temp": (0, 2),
+    "top-p": (0, 1),
+    "top-k": (0, 1000),
+    "min-p": (0, 1),
+    "presence-penalty": (-2, 2),
+    "repeat-penalty": (0, 2),
+}
+
+
+class UseMyModelRequest(BaseModel):
+    """Switch the private service to files copied in before."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+    model: str = Field(pattern=r"^[a-f0-9]{64}$")
+    image_addon: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    # The model maker's recommended sampling; llama-server applies it and
+    # Axcess then sends no temperature of its own.
+    sampling: dict[SamplingKey, float] | None = None
+    confirm: Literal[True]
+
+    @field_validator("sampling")
+    @classmethod
+    def sampling_in_range(
+        cls, value: dict[SamplingKey, float] | None
+    ) -> dict[SamplingKey, float] | None:
+        for key, number in (value or {}).items():
+            low, high = SAMPLING_RANGES[key]
+            if not low <= number <= high or (key == "top-k" and number != int(number)):
+                raise ValueError(f"The answer setting {key} must be from {low:g} to {high:g}.")
+        return value
 
 
 class PreferenceRequest(BaseModel):
+    """One change at a time: turn AI on or off, or "Run AI on the graphics
+    card only"."""
+
     model_config = ConfigDict(extra="forbid", strict=True)
-    enabled: bool
+    enabled: bool | None = None
+    gpu_only: bool | None = None
+
+    @model_validator(mode="after")
+    def exactly_one(self) -> PreferenceRequest:
+        if (self.enabled is None) == (self.gpu_only is None):
+            raise ValueError("Send either enabled or gpu_only.")
+        return self
 
 
 class RuntimeStartRequest(BaseModel):
@@ -82,7 +128,10 @@ def build_ai_router(manager: AIManager) -> APIRouter:
     @router.put("/ai/preferences")
     async def ai_set_preferences(body: PreferenceRequest) -> AIPreferences:
         try:
-            return await asyncio.to_thread(manager.set_enabled, body.enabled)
+            if body.gpu_only is not None:
+                return await asyncio.to_thread(manager.set_gpu_only, body.gpu_only)
+            # exactly_one: enabled is set here.
+            return await asyncio.to_thread(manager.set_enabled, body.enabled is True)
         except AIBusyError as exc:
             raise HTTPException(409, str(exc)) from exc
         except (RuntimeSetupError, IsolationError, AIStateError) as exc:
@@ -95,6 +144,8 @@ def build_ai_router(manager: AIManager) -> APIRouter:
     @router.post("/ai/install", status_code=202)
     def ai_install(body: InstallRequest) -> InstallStatus:
         """Start or resume the download for one size."""
+        if body.tier not in {t.id for t in manager.catalog.tiers}:
+            raise HTTPException(404, "That AI size is not offered. Choose another size.")
         current = manager.installer.status
         if manager.installer.running and current.tier != body.tier:
             raise HTTPException(409, "Another AI download is running. Pause it first.")
@@ -106,6 +157,9 @@ def build_ai_router(manager: AIManager) -> APIRouter:
             raise HTTPException(503, str(exc)) from exc
         except NotEnoughSpaceError as exc:
             raise HTTPException(507, str(exc)) from exc
+        except NotEnoughMemoryError as exc:
+            # This computer has less memory than the size is for.
+            raise HTTPException(409, str(exc)) from exc
 
     @router.delete("/ai/install")
     async def ai_pause() -> InstallStatus:
@@ -119,5 +173,47 @@ def build_ai_router(manager: AIManager) -> APIRouter:
             await asyncio.to_thread(manager.remove)
         except AIBusyError as exc:
             raise HTTPException(409, str(exc)) from exc
+
+    @router.put("/ai/my-models")
+    async def ai_copy_my_model(
+        request: Request,
+        kind: custom.FileKind,
+        name: str = Query(min_length=1, max_length=255),
+        for_model: str | None = Query(default=None, pattern=r"^[a-f0-9]{64}$"),
+    ) -> custom.MyModelFile:
+        """Copy one GGUF file the person chose into the AI folder.
+
+        The body is the file itself, streamed to disk and checked as it
+        arrives; nothing runs it until ``POST /api/ai/my-models/use``. Not
+        held by the AI-settings lock (a copy can take minutes): it only adds
+        a checked file beside the others.
+        """
+        length = request.headers.get("content-length")
+        try:
+            return await custom.receive(
+                manager.runtime.models_dir,
+                request.stream(),
+                file_name=name,
+                kind=kind,
+                declared_size=int(length) if length and length.isdigit() else None,
+                for_model=for_model,
+            )
+        except custom.MyModelError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+    @router.post("/ai/my-models/use")
+    async def ai_use_my_model(body: UseMyModelRequest) -> AIPlan:
+        """Run your own model in the private AI service, then return the plan."""
+        try:
+            await asyncio.to_thread(
+                manager.use_my_model, body.model, body.image_addon, body.sampling
+            )
+        except AIBusyError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        except custom.MyModelError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        except (RuntimeSetupError, IsolationError, AIStateError) as exc:
+            raise HTTPException(503, str(exc)) from exc
+        return await asyncio.to_thread(manager.plan)
 
     return router

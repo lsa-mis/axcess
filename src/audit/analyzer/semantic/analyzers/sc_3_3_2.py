@@ -17,6 +17,7 @@ from typing import Any
 
 from audit.analyzer.ollama_base import OllamaError, prompt_content_version
 from audit.analyzer.semantic.base import AnalysisContext, SemanticFinding
+from audit.analyzer.semantic.budget import violations_schema
 from audit.analyzer.semantic.extractor import FormFieldRecord, extract_form_fields
 from audit.analyzer.semantic.ollama_text import OllamaTextProvider
 from audit.logging import get_logger
@@ -68,7 +69,10 @@ class LabelsOrInstructionsAnalyzer:
 
         prompt = self._render_prompt(chunk)
         try:
-            raw = await self._provider.generate_json(prompt, model=self._model)
+            # The fixed answer shape (budget.violations_schema, 2026-11-19).
+            raw = await self._provider.generate_json(
+                prompt, model=self._model, json_schema=violations_schema(len(chunk))
+            )
         except OllamaError as exc:
             log.warning("sc_3_3_2.llm_failed", page_url=ctx.page_url, error=str(exc))
             return []

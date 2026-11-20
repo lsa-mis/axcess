@@ -21,13 +21,15 @@ import { OPENS_NEW_WINDOW,
   AI_RUNTIME_START_LABEL,
 } from "../lib/terms";
 import { useAiSetup } from "../hooks/useAiSetup";
+import { parseServerTime } from "../lib/serverTime";
+import { AiStatus } from "./AiStatus";
 import Tabs from "./Tabs";
 import { Button, Card, ExternalLinkButton, LinkButton, relativeTime } from "./ui";
 
 /**
  * "Suggest a fix (AI)" for one occurrence, and the suggestion it produces.
  *
- * **What it does.** One button asks the local AI model (Ollama, on this
+ * **What it does.** One button asks the local AI model (on this
  * computer) to suggest a fix. The request waits in a queue and runs in the
  * background; this panel checks on it every few seconds and shows the answer
  * in two views, one for developers (code) and one for content editors (steps
@@ -46,6 +48,34 @@ import { Button, Card, ExternalLinkButton, LinkButton, relativeTime } from "./ui
  * important information where people will see it, not behind a control;
  * https://www.w3.org/TR/coga-usable/). Axcess never applies a suggestion; a
  * person copies it.
+ *
+ * **One card from the start (Page inspector).** Where the panel stands alone
+ * (``standalone``), before anything is asked it is already the AI suggestion card: its heading, one sentence on what will
+ * happen (it can take a few minutes, it can be wrong), then the button.
+ * Pressing it changes only what is inside the card. Before (developer,
+ * 2026-11-18), a bare button sat alone in a wide empty column and became a
+ * card when pressed, so the layout jumped, and the warning and the wait
+ * were said only after the press. Rejected: centring the bare button in
+ * the empty space, the developer's first idea. Every other part of the
+ * inspector starts at the left edge, and a control set apart in the middle
+ * is easy to miss for people using screen magnification, who follow that
+ * edge (W3C "Accessibility Requirements for People with Low Vision",
+ * https://www.w3.org/TR/low-vision-needs/, paraphrased: keep related
+ * information close together). The card fills the space instead. Saying
+ * the limits before the press follows W3C COGA "Making Content Usable"
+ * (https://www.w3.org/TR/coga-usable/, paraphrased: say what will happen
+ * before an action).
+ *
+ * **Time while waiting.** Answers took 26 to 163 seconds in our trials, so
+ * the waiting card says how long it has been ("Started 2 minutes ago"),
+ * and that it can take a few minutes. NN/g's response-time limits
+ * (https://www.nngroup.com/articles/response-times-3-important-limits/,
+ * paraphrased: past about 10 seconds, people need to see progress and how
+ * long it may take). Whole minutes, checked every 15 seconds, not a
+ * ticking clock: a line that changes every second distracts, and WCAG 2.2
+ * SC 2.2.2 Pause, Stop, Hide (Level A) asks for a way to stop auto-updating
+ * content; a change once a minute is not a distraction. The line is not a
+ * live region: only real changes of status are announced (SC 4.1.3).
  *
  * **Focus.** The trigger button is replaced by the queue status once
  * clicked, so its focus would fall to the page body. Focus moves to the
@@ -91,6 +121,28 @@ import { Button, Card, ExternalLinkButton, LinkButton, relativeTime } from "./ui
  * rule passing on the suggested code, because that is all it is: it does not
  * show the page meets WCAG.
  */
+/** The AI suggestion card: tinted, with a thick left border (see "Its own area"). */
+const PANEL = "rounded-xs border border-l-4 border-border border-l-umich-blue bg-umich-blue/5 p-3";
+
+/**
+ * How long a waiting suggestion has been going, in whole minutes, checked
+ * every 15 seconds (see "Time while waiting" above). Plain text, not a live
+ * region.
+ */
+function TimeSoFar({ since }: { since: string }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 15_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const started = parseServerTime(since);
+  if (Number.isNaN(started)) return null;
+  const minutes = Math.floor(Math.max(0, now - started) / 60_000);
+  const ago =
+    minutes < 1 ? "less than a minute ago" : `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  return <p className="mt-1 text-sm text-fg-muted">Started {ago}. It can take a few minutes.</p>;
+}
+
 const suggestionKey = (scanId: number, kind: SuggestionOccurrenceKind, occurrenceId: number) => [
   "suggestion",
   scanId,
@@ -128,6 +180,7 @@ export default function FixSuggestion({
   occurrenceId,
   availability,
   headingLevel = 4,
+  standalone = false,
 }: {
   scanId: number;
   kind: SuggestionOccurrenceKind;
@@ -139,6 +192,16 @@ export default function FixSuggestion({
    * outline never skips a level (SC 1.3.1 Info and Relationships, Level A).
    */
   headingLevel?: 2 | 3 | 4;
+  /**
+   * The panel stands alone beside another one (the Page inspector, next to
+   * the review column): no space above it, so both start on one line, and
+   * before anything is asked it is already the card with its heading and
+   * what will happen. In a list of occurrences (Page details) it stays a
+   * plain button: the same sentence under every occurrence would repeat
+   * itself down the page (W3C COGA, paraphrased: avoid repetition that adds
+   * nothing).
+   */
+  standalone?: boolean;
 }) {
   const Heading = `h${headingLevel}` as "h2" | "h3" | "h4";
   const queryClient = useQueryClient();
@@ -171,7 +234,7 @@ export default function FixSuggestion({
   const [startMessage, setStartMessage] = useState("");
   const startService = useMutation({
     mutationFn: api.startAiRuntime,
-    onMutate: () => setStartMessage("Starting the AI service. You can keep browsing other issues."),
+    onMutate: () => setStartMessage("Starting AI. You can keep browsing other issues."),
     onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: ["ai-runtime"] });
       if (result.state === "started" || result.state === "already_running") {
@@ -228,18 +291,47 @@ export default function FixSuggestion({
 
   if (!record || record.status === "cancelled") {
     if (!availability.enabled) return null;
+    if (!standalone) {
+      return (
+        <div className="mt-3 flex flex-col items-start gap-1.5">
+          <Button type="button" onClick={() => ask.mutate()} disabled={ask.isPending}>
+            <Sparkles className="h-4 w-4" aria-hidden />
+            Suggest a fix (AI)
+          </Button>
+          {errorText && (
+            <p role="alert" className="text-sm text-sev-critical">
+              {errorText}
+            </p>
+          )}
+        </div>
+      );
+    }
+    // The same card the suggestion will fill (see "One card from the start").
     return (
-      <div className="mt-3 flex flex-col items-start gap-1.5">
-        <Button type="button" onClick={() => ask.mutate()} disabled={ask.isPending}>
+      <section aria-labelledby={headingId} className={`${standalone ? "" : "mt-4 "}${PANEL}`}>
+        <Heading
+          id={headingId}
+          ref={headingRef}
+          tabIndex={-1}
+          className="flex items-center gap-1.5 text-sm font-semibold text-fg"
+        >
+          <Sparkles className="h-4 w-4" aria-hidden />
+          {AI_SUGGESTION}
+        </Heading>
+        <p className="mt-1 text-sm text-fg">
+          The AI on this computer can write a fix for this occurrence. It can take a few
+          minutes, and it can be wrong, so check it before you use it.
+        </p>
+        <Button className="mt-3" type="button" onClick={() => ask.mutate()} disabled={ask.isPending}>
           <Sparkles className="h-4 w-4" aria-hidden />
           Suggest a fix (AI)
         </Button>
         {errorText && (
-          <p role="alert" className="text-sm text-sev-critical">
+          <p role="alert" className="mt-2 text-sm text-sev-critical">
             {errorText}
           </p>
         )}
-      </div>
+      </section>
     );
   }
 
@@ -249,7 +341,7 @@ export default function FixSuggestion({
     <section
       ref={sectionRef}
       aria-labelledby={headingId}
-      className="mt-4 rounded-xs border border-l-4 border-border border-l-umich-blue bg-umich-blue/5 p-3"
+      className={`${standalone ? "" : "mt-4 "}${PANEL}`}
     >
       <Heading
         id={headingId}
@@ -276,16 +368,21 @@ export default function FixSuggestion({
         {statusSentence(record, availability)}
       </p>
 
+      {waiting && <TimeSoFar since={record.created_at} />}
+      {/* "Stop this suggestion", not a bare "Stop": a button says what it
+          does, verb and object (repo interface-language rule 8; WCAG 2.2
+          SC 2.4.6 Headings and Labels, Level AA). One label while waiting
+          and while writing: both end the same request. */}
       {waiting && (
         <div className="mt-2">
           <Button type="button" onClick={() => stop.mutate(record.id)} disabled={stop.isPending}>
-            Stop
+            Stop this suggestion
           </Button>
         </div>
       )}
 
       {/* When the service is simply not running, the fix sits next to the
-          error: one "Start AI service" button that starts Axcess's own
+          error: one "Start AI again" button that starts Axcess's own
           isolated service and then writes this suggestion, so people do not
           have to leave the issue (W3C COGA Making Content Usable,
           https://www.w3.org/TR/coga-usable/, paraphrased: make it easy to
@@ -296,7 +393,9 @@ export default function FixSuggestion({
           the size is shown before you confirm. aria-disabled plus a click
           guard keep focus on the button while it works (SC 2.4.3 Focus
           Order, Level A), and the polite status region announces progress
-          (SC 4.1.3 Status Messages, Level AA). */}
+          (SC 4.1.3 Status Messages, Level AA). Its words match the shared
+          AI state's button (components/AiStatus.tsx), since both start the
+          same service (SC 3.2.4 Consistent Identification, Level AA). */}
       {record.status === "failed" && availability.enabled && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           {record.error_code === "model_unavailable" && aiSetup && (
@@ -308,7 +407,7 @@ export default function FixSuggestion({
                 if (!startService.isPending && !ask.isPending) startService.mutate();
               }}
             >
-              Start AI service
+              Start AI again
             </Button>
           )}
           <Button type="button" onClick={() => ask.mutate()} disabled={ask.isPending}>
@@ -716,9 +815,14 @@ export function SuggestionsBlockedNote({
   // a fix is known, tell the person) and W3C COGA "Making Content Usable",
   // objective 5 (help users avoid mistakes or know how to correct them),
   // https://www.w3.org/TR/coga-usable/.
-  // In the desktop app the first fix offered is Settings > AI features,
-  // which downloads Ollama and the models with a button; the terminal
-  // command stays for people who run their own Ollama.
+  // The words follow the AI service in use (`status.service`). The desktop
+  // app runs its own private service, set up and started from Settings > AI
+  // features, so it names no other program and offers no terminal command:
+  // the earlier text told desktop users to install Ollama, which the
+  // desktop app no longer uses. People who run their own Ollama keep its
+  // name and the `ollama pull` command; a llama.cpp server set up by an
+  // administrator gets "ask the person who set it up", since Axcess cannot
+  // know how it was installed. Repo rule: text must match what the code does.
   const aiSetup = useAiSetup();
   const setupLink = aiSetup ? (
     <p className="mt-3">
@@ -734,6 +838,28 @@ export function SuggestionsBlockedNote({
   // The note links to the one settings page (WCAG 2.2 SC 3.2.4 Consistent
   // Identification, Level AA), not a second local toggle.
   if (status.reason === "model_missing") {
+    if (status.service === "private") {
+      return (
+        <Card className={`${className} p-4 text-sm text-fg-muted`}>
+          <p className="max-w-measure">
+            AI fix suggestions are turned on, but the AI models they use are not downloaded.
+            Download them in Settings → AI features. It downloads several gigabytes.
+          </p>
+          {setupLink}
+        </Card>
+      );
+    }
+    if (status.service === "llama_cpp") {
+      return (
+        <Card className={`${className} p-4 text-sm text-fg-muted`}>
+          <p className="max-w-measure">
+            AI fix suggestions are turned on, but the AI service does not have the model they
+            use ({status.text_model}). Ask the person who set up Axcess to add it.
+          </p>
+          {setupLink}
+        </Card>
+      );
+    }
     return (
       <Card className={`${className} p-4 text-sm text-fg-muted`}>
         <p className="max-w-measure">AI fix suggestions are turned on, but the AI model they use is not installed.</p>
@@ -751,6 +877,37 @@ export function SuggestionsBlockedNote({
       <Card className={`${className} p-4 text-sm text-fg-muted`}>
         AI fix suggestions are turned on, but cannot run because the Axcess database needs an
         update first (run make migrate).
+      </Card>
+    );
+  }
+  if (status.service === "private") {
+    // The service stopped (a crash, a refused start): the same Start control
+    // as Settings, here, so the person does not leave the report or reload
+    // it. When it runs, the suggestion status is fetched again and this note
+    // gives way to the Suggest buttons (end-to-end test, 2026-11-17: the
+    // note said "start it in Settings, then reload this page"). The shared
+    // control, not a second one (WCAG 2.2 SC 3.2.4 Consistent
+    // Identification, Level AA); its own link to AI features is left out
+    // because the note already has one (repo rule "One control, one job").
+    return (
+      <Card className={`${className} p-4 text-sm text-fg-muted`}>
+        <p className="max-w-measure">
+          AI fix suggestions are turned on, but the private AI service on this computer is not
+          ready yet. Starting it never downloads anything.
+        </p>
+        {aiSetup ? <AiStatus /> : null}
+        {setupLink}
+      </Card>
+    );
+  }
+  if (status.service === "llama_cpp") {
+    return (
+      <Card className={`${className} p-4 text-sm text-fg-muted`}>
+        <p className="max-w-measure">
+          AI fix suggestions are turned on, but Axcess cannot reach its AI service. Ask the
+          person who set up Axcess to start it, then reload this page.
+        </p>
+        {setupLink}
       </Card>
     );
   }

@@ -191,7 +191,6 @@ def protected_client(
     )
     if getattr(request, "param", False):
         settings = settings.model_copy(update={"desktop": True, "data_dir": tmp_path})
-        monkeypatch.setattr("audit.ai.manager.system_ollama", lambda: None)
 
     class TestProtectedEgressPolicy(RealPolicy):
         def __init__(self, allowed_origins: Iterable[str]) -> None:

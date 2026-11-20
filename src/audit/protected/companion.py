@@ -23,6 +23,8 @@ import hashlib
 import hmac
 import io
 import ipaddress
+import os
+import stat
 import warnings
 from collections import deque
 from collections.abc import Awaitable, Callable, Iterable
@@ -736,18 +738,44 @@ class _ProtectedBrowserCrawler:
             self._config, "vlm_enabled", False
         ):
             return None
-        base_url = _config_text(self._config, "vlm_base_url", "")
-        if not is_loopback_ollama_url(base_url):
-            await self._client.event(
-                "companion.local_ai_disabled",
-                details={"reason": "loopback_required"},
-                run_lease_id=self._work.run_lease_id,
+        socket_path = _config_text(self._config, "model_socket", "")
+        transport: httpx.AsyncBaseTransport | None = None
+        if socket_path:
+            # The desktop's private llama.cpp service: a UNIX socket is a
+            # file on this computer, so it is local by construction. Use it
+            # only if it is a socket owned by this user.
+            if not is_own_unix_socket(socket_path):
+                await self._client.event(
+                    "companion.local_ai_disabled",
+                    details={"reason": "socket_unavailable"},
+                    run_lease_id=self._work.run_lease_id,
+                )
+                return None
+            base_url = "http://localhost"
+            backend = "llama_cpp"
+            transport = httpx.AsyncHTTPTransport(uds=socket_path)
+        else:
+            base_url = _config_text(self._config, "vlm_base_url", "")
+            # A literal loopback address of either service; work specs from
+            # before llama.cpp carry no backend and mean Ollama.
+            backend = (
+                "llama_cpp"
+                if _config_text(self._config, "model_backend", "ollama") == "llama_cpp"
+                else "ollama"
             )
-            return None
+            if not is_loopback_ollama_url(base_url):
+                await self._client.event(
+                    "companion.local_ai_disabled",
+                    details={"reason": "loopback_required"},
+                    run_lease_id=self._work.run_lease_id,
+                )
+                return None
         client = ProtectedLocalOllama(
             base_url=base_url,
             model=_config_text(self._config, "vlm_model", "qwen3-vl:2b-instruct"),
             timeout_s=_config_float(self._config, "protected_local_ai_timeout_s", 60.0),
+            backend=backend,
+            transport=transport,
         )
         await client.__aenter__()
         return client
@@ -1254,6 +1282,17 @@ def _normalize_companion_server(value: str) -> str:
     ):
         raise CompanionError("The companion service URL must be an exact HTTPS origin.")
     return f"https://{parsed.netloc}".rstrip("/")
+
+
+def is_own_unix_socket(value: str) -> bool:
+    """True for an absolute path to a UNIX socket this user owns."""
+    if os.name != "posix" or not os.path.isabs(value):
+        return False
+    try:
+        info = os.stat(value, follow_symlinks=False)
+    except OSError:
+        return False
+    return stat.S_ISSOCK(info.st_mode) and info.st_uid == os.getuid()
 
 
 def is_loopback_ollama_url(value: str) -> bool:

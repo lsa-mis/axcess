@@ -403,6 +403,45 @@ def test_public_config_keeps_only_alias_and_local_ai_endpoint_stays_encrypted() 
     assert "vlm_model" not in no_ai_work
 
 
+def test_private_llama_cpp_socket_reaches_only_the_local_ai_work_spec() -> None:
+    """The desktop's private service socket is sent only when local AI is allowed."""
+    socket = "/home/person/.axcess/ai/scratch/llama.sock"
+    config = CrawlConfig(
+        seed_url="https://app.example.edu/secure/",
+        vlm_base_url="http://localhost",
+        vlm_model="qwen3-vl-2b-instruct",
+        model_backend="llama_cpp",
+        model_socket=socket,
+    )
+    alias = "protected://report/" + "c" * 32
+
+    public = json.loads(_protected_public_config_json(config, alias))
+    local_ai_work = _protected_work_config(config, allow_local_ai=True)
+    no_ai_work = _protected_work_config(config, allow_local_ai=False)
+
+    assert socket not in json.dumps(public)
+    assert local_ai_work["model_backend"] == "llama_cpp"
+    assert local_ai_work["model_socket"] == socket
+    assert local_ai_work["vlm_base_url"] == "http://localhost"
+    for key in ("model_socket", "model_backend", "vlm_base_url", "vlm_model"):
+        assert key not in no_ai_work
+    assert socket not in json.dumps(no_ai_work)
+
+
+def test_tcp_llama_cpp_backend_reaches_the_local_ai_work_spec() -> None:
+    """A server's llama.cpp over loopback TCP keeps its request format."""
+    config = CrawlConfig(
+        seed_url="https://app.example.edu/secure/",
+        vlm_base_url="http://127.0.0.1:8080",
+        vlm_model="qwen3-vl-2b-instruct",
+        model_backend="llama_cpp",
+    )
+    local_ai_work = _protected_work_config(config, allow_local_ai=True)
+    assert local_ai_work["model_backend"] == "llama_cpp"
+    assert local_ai_work["vlm_base_url"] == "http://127.0.0.1:8080"
+    assert "model_socket" not in local_ai_work
+
+
 def test_work_spec_migration_scrubs_legacy_plaintext_seed_and_audit_detail(
     tmp_path: Path,
 ) -> None:

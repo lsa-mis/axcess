@@ -280,3 +280,24 @@ async def test_a_model_from_a_registry_with_a_port_matches_its_listed_name(
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
         assert await why_not_local(client, "http://127.0.0.1:11434/api/tags", model) is None
+
+
+async def test_the_check_runs_for_ollama_and_not_for_llama_cpp() -> None:
+    """Only Ollama has cloud models. A llama.cpp server runs the files it was
+    started with, so asking it for Ollama's model list would only fail."""
+    from audit.ai.model_client import make_model_client
+    from audit.analyzer.ollama_base import why_not_local_service
+
+    asked: list[str] = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        asked.append(request.url.path)
+        return httpx.Response(200, json={"models": [{"name": "text:local"}]})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as http:
+        ollama = make_model_client("ollama", http, base_url="http://127.0.0.1:11434")
+        llama = make_model_client("llama_cpp", http, base_url="http://localhost")
+        assert await why_not_local_service(ollama, http, "text:local") is None
+        assert await why_not_local_service(ollama, http, "gpt-oss:120b-cloud") is not None
+        assert await why_not_local_service(llama, http, "text-local") is None
+    assert asked == ["/api/tags"]

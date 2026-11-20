@@ -1,7 +1,8 @@
 """The one background job that sets up the AI pack, with pause and resume.
 
-Steps: download the private program and checksum-verified models on the host,
-then start the offline sandboxed service. No system Ollama is managed.
+Steps: download the llama.cpp program (unless the desktop app includes it)
+and the checksum-verified model files on the host, then start the offline
+sandboxed service. No system Ollama is managed.
 """
 
 from __future__ import annotations
@@ -12,14 +13,15 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from audit.ai.catalog import Catalog, Tier
+from audit.ai.catalog import Catalog, ModelEntry, Tier
 from audit.ai.downloader import download_model
-from audit.ai.runtime import OllamaRuntime, PausedError, RuntimeSetupError, system_ollama
+from audit.ai.runtime import LlamaRuntime, PausedError, RuntimeSetupError
 from audit.ai.sandbox import IsolationError
-from audit.ai.state import AIConfig
+from audit.ai.state import SOCKET_BASE_URL, AIConfig
 
 InstallState = Literal["idle", "running", "paused", "failed", "done"]
-InstallStep = Literal["program", "starting", "text_model", "vision_model", "finishing"]
+# "model": one model that does both jobs (Small); otherwise text, then vision.
+InstallStep = Literal["program", "starting", "model", "text_model", "vision_model", "finishing"]
 
 
 class InstallStatus(BaseModel):
@@ -37,17 +39,15 @@ class Installer:
     def __init__(
         self,
         catalog: Catalog,
-        runtime: OllamaRuntime,
+        runtime: LlamaRuntime,
         on_ready: Callable[[AIConfig], None],
         *,
-        find_system: Callable[[], str | None] = system_ollama,
         pull: Callable[..., None] = download_model,
         on_stopped: Callable[[], None] = lambda: None,
     ) -> None:
         self.catalog = catalog
         self.runtime = runtime
         self.on_ready = on_ready
-        self.find_system = find_system
         self.pull = pull
         self.on_stopped = on_stopped
         self.status = InstallStatus()
@@ -69,7 +69,7 @@ class Installer:
             self.status = InstallStatus(
                 state="running",
                 tier=tier.id,
-                total_bytes=program + tier.text.size + tier.vision.size,
+                total_bytes=program + tier.size,
             )
             self._thread = threading.Thread(
                 target=self._run,
@@ -113,25 +113,34 @@ class Installer:
             base += before
             if cancel.is_set():
                 raise PausedError
-            for name, model in (("text_model", tier.text), ("vision_model", tier.vision)):
-                report = step(name)  # type: ignore[arg-type]
-                self.pull(
-                    self.runtime.models_dir, model.tag, report, cancel, manifest=model.manifest
-                )
+            steps: tuple[tuple[InstallStep, ModelEntry], ...] = (
+                (("model", tier.text),)
+                if len(tier.models) == 1
+                else (("text_model", tier.text), ("vision_model", tier.vision))
+            )
+            for name, model in steps:
+                report = step(name)
+                self.pull(self.runtime.models_dir, model, report, cancel)
                 base += model.size
                 self.status.done_bytes = min(base, self.status.total_bytes)
             step("starting")
-            base_url = self.runtime.start()
+            self.runtime.stop()  # A service started for another size.
+            self.runtime.start(tier.models)
             step("finishing")
             config = AIConfig(
                 source="private",
-                base_url=base_url,
+                base_url=SOCKET_BASE_URL,
+                backend="llama_cpp",
+                **self.runtime.service_fields(),
                 tier=tier.id,
-                text_model=tier.text.tag,
-                vision_model=tier.vision.tag,
-                ollama_version=self.catalog.ollama.version,
+                text_model=tier.text.served_name,
+                vision_model=tier.vision.served_name,
+                llama_cpp_version=self.catalog.llama_cpp.version,
             )
             self.on_ready(config)
+            # The private Ollama files of versions before llama.cpp are no
+            # longer used; the new setup works, so free their disk space.
+            self.runtime.remove_legacy_ollama()
             self.status.done_bytes = self.status.total_bytes
             self.status.state = "done"
             self.status.step = None

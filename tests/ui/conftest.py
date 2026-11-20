@@ -156,6 +156,14 @@ def _pixel_png(color: tuple[int, int, int] = (200, 200, 200)) -> bytes:
     return buf.getvalue()
 
 
+@pytest.fixture(autouse=True)
+def _no_graphics_card_memory(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Reading the graphics cards runs llama-server; UI tests never do."""
+    from audit.ai.runtime import LlamaRuntime
+
+    monkeypatch.setattr(LlamaRuntime, "devices", lambda self: [])
+
+
 @pytest.fixture
 def seeded_db(
     tmp_path: Path, migrate_db: Callable[[sqlite3.Connection], None]

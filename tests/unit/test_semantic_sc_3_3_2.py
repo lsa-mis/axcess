@@ -26,9 +26,19 @@ class _FakeProvider:
         self._payload = payload
         self.calls = 0
 
-    async def generate_json(self, prompt: str, *, model: str | None = None) -> dict[str, Any]:
+    async def generate_json(
+        self,
+        prompt: str,
+        *,
+        model: str | None = None,
+        json_schema: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         self.calls += 1
+        self.schema = json_schema
         return self._payload
+
+    async def count_tokens(self, text: str, *, model: str | None = None) -> int | None:
+        return None  # Like Ollama: no count, so the estimate decides.
 
 
 # ---- extractor -----------------------------------------------------------

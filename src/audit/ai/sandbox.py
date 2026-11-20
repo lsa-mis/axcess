@@ -11,7 +11,16 @@ from pathlib import Path
 from typing import Literal
 
 IsolationReason = Literal[
-    "sandbox_unavailable", "network_test_failed", "namespace_unreachable", "runtime_failed"
+    "sandbox_unavailable",
+    "network_test_failed",
+    "namespace_unreachable",
+    "runtime_failed",
+    # Not isolation: the models would not fit in the memory free now, so
+    # the service was not started (``runtime.memory_needed``).
+    "not_enough_memory",
+    # Not isolation: "Run AI on the graphics card only" is on and the models
+    # did not load on the graphics card (most often too little memory on it).
+    "gpu_only_failed",
 ]
 
 
@@ -53,10 +62,22 @@ def macos_profile(runtime: Path, models: Path, scratch: Path) -> str:
             "(version 1)",
             "(deny default)",
             "(allow process-fork)",
+            # The service's own folder, and Python for the isolation check.
+            # A framework Python (python.org, GitHub's macOS runners) starts
+            # by running Python.app inside its install folder; without that
+            # folder the check failed with "posix_spawn ... Python"
+            # (2026-11-12). The packaged app's backend is the literal path.
             f"(allow process-exec (subpath {path(runtime.resolve())}) "
+            f"(subpath {path(Path(sys.base_prefix).resolve())}) "
             f"(literal {path(Path(sys.executable).resolve())}))",
             "(allow sysctl-read)",
             '(allow file-read* (literal "/"))',
+            # File details only (what ``stat`` returns), never contents: a
+            # program resolving its own path looks up every parent folder
+            # (/Library, /Applications, ...). Without this, Python stopped
+            # at start with "realpath: Operation not permitted" (GitHub
+            # macOS 15 runner, 2026-11-12), so the isolation check failed.
+            "(allow file-read-metadata)",
             "(allow file-read* " + " ".join(f"(subpath {path(p)})" for p in reads) + ")",
             f"(allow file-write* (subpath {path(models.resolve())}) "
             f'(subpath {path(scratch.resolve())}) (literal "/dev/null"))',
@@ -67,6 +88,12 @@ def macos_profile(runtime: Path, models: Path, scratch: Path) -> str:
             '"AGXDeviceUserClient" "AGXSharedUserClient" "IOSurfaceRootUserClient" '
             '"IOAccelerator"))',
             '(allow mach-lookup (global-name "com.apple.MTLCompilerService"))',
+            # The service's own UNIX socket, in the scratch folder only.
+            f"(allow network-bind network-inbound (local unix-socket (subpath "
+            f"{path(scratch.resolve())})))",
+            # The llama.cpp router reaches its per-model children on
+            # loopback. macOS has no private network namespace, so loopback
+            # is the narrowest network the router can use.
             '(allow network-inbound (local ip "localhost:*"))',
             '(allow network-outbound (remote ip "localhost:*"))',
             '(allow network-bind (local ip "localhost:*"))',
@@ -74,8 +101,20 @@ def macos_profile(runtime: Path, models: Path, scratch: Path) -> str:
     )
 
 
+# Read-only system folders a GPU build needs to find the graphics card inside
+# Bubblewrap (checked 2026-11-12 with llama.cpp's Vulkan build on Intel Iris
+# Xe and Mesa): without them Vulkan reports no device and the model runs on
+# the CPU. Device information only; nothing here opens a network path.
+_LINUX_GPU_READS = ("/sys/dev/char", "/sys/devices", "/sys/bus/pci")
+
+
 def build_sandbox(
-    runtime: Path, models: Path, scratch: Path, *, platform: str | None = None
+    runtime: Path,
+    models: Path,
+    scratch: Path,
+    *,
+    platform: str | None = None,
+    gpu: bool = False,
 ) -> Sandbox:
     platform = platform or sys.platform
     if platform == "darwin":
@@ -88,6 +127,11 @@ def build_sandbox(
             args = [
                 tool,
                 "--unshare-net",
+                # Its own process space: when the sandbox ends, the kernel
+                # ends every process in it, the per-model servers llama.cpp's
+                # router starts included. Without it a stopped or crashed
+                # service left those running, each holding a model in memory.
+                "--unshare-pid",
                 "--die-with-parent",
                 "--new-session",
                 "--proc",
@@ -108,6 +152,14 @@ def build_sandbox(
             ):
                 if Path(p).exists():
                     args += ["--ro-bind", p, p]
+            if gpu:
+                # The graphics devices: /dev/dri (Mesa: Intel, AMD) and the
+                # NVIDIA driver's device files when they exist.
+                args += ["--dev-bind-try", "/dev/dri", "/dev/dri"]
+                for name in ("nvidiactl", "nvidia-uvm", "nvidia0", "nvidia1"):
+                    args += ["--dev-bind-try", f"/dev/{name}", f"/dev/{name}"]
+                for p in _LINUX_GPU_READS:
+                    args += ["--ro-bind-try", p, p]
             args += [
                 "--bind",
                 str(models.resolve()),
