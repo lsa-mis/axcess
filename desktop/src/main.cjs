@@ -17,6 +17,7 @@ const {
   windowsUpdateMethod,
   zoomActionFor,
   startupFailureDetails,
+  stopChildProcess,
   PORTABLE_DATA_FOLDER,
 } = require("./runtime.cjs");
 const {
@@ -124,7 +125,11 @@ function backendLaunch(port) {
       "axcess-server",
       executable,
     );
-    return { command, args: ["--host", "127.0.0.1", "--port", String(port)], cwd: path.dirname(command) };
+    return {
+      command,
+      args: ["--host", "127.0.0.1", "--port", String(port), "--exit-with-parent"],
+      cwd: path.dirname(command),
+    };
   }
 
   const command = process.env.AXCESS_UV_EXECUTABLE || "uv";
@@ -139,6 +144,9 @@ function backendLaunch(port) {
       "127.0.0.1",
       "--port",
       String(port),
+      // Shut down when this shell's pipe to it closes: on quit, and also
+      // when the shell crashes or is killed (stopBackend).
+      "--exit-with-parent",
     ],
     cwd: repoRoot,
   };
@@ -177,7 +185,9 @@ function startBackend(port) {
     env,
     shell: false,
     windowsHide: true,
-    stdio: ["ignore", "pipe", "pipe"],
+    // Standard input is a pipe this shell holds open for the backend's whole
+    // life: closing it is how the backend is asked to stop (stopBackend).
+    stdio: ["pipe", "pipe", "pipe"],
   });
   const relay = (chunk) => {
     backendOutput.push(chunk);
@@ -349,10 +359,20 @@ function showStartupFailure(error) {
   }
 }
 
-function stopBackend() {
-  if (!backendProcess) return;
-  backendProcess.kill("SIGTERM");
-  backendProcess = null;
+/**
+ * Stop the backend and wait until it has exited, so nothing it started is
+ * left running. Closing the app used to send one SIGTERM and exit at once;
+ * a backend busy with a scan did not stop, and it and its scan browsers ran
+ * on for hours after the window closed (2026-11-20). The backend now stops
+ * its scan and closes the browser itself (audit/desktop_server.py); if it
+ * has not exited after BACKEND_STOP_TIMEOUT_MS, it is killed.
+ */
+async function stopBackend() {
+  const child = backendProcess;
+  if (!child) return;
+  const outcome = await stopChildProcess(child);
+  logLauncher(`backend stopped: ${outcome}`);
+  if (backendProcess === child) backendProcess = null;
 }
 
 function ownerWindow() {
@@ -597,9 +617,19 @@ if (portableDataUnwritable) {
   app.on("activate", () => {
     if (!mainWindow) void launch().catch((error) => showStartupFailure(error));
   });
-  app.on("before-quit", () => {
+  // Quitting waits for the backend to stop (stopBackend), then quits again.
+  // A second quit while it waits (a second Cmd+Q) does not start another.
+  let backendStopped = false;
+  let stopping = null;
+  app.on("before-quit", (event) => {
     quitting = true;
-    stopBackend();
+    if (backendStopped || !backendProcess) return;
+    event.preventDefault();
+    if (stopping) return;
+    stopping = stopBackend().finally(() => {
+      backendStopped = true;
+      app.quit();
+    });
   });
   app.on("window-all-closed", () => {
     if (process.platform !== "darwin") app.quit();
