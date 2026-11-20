@@ -6,6 +6,8 @@ drive it with fakes.
 
 from __future__ import annotations
 
+import contextlib
+import dataclasses
 import logging
 import threading
 from collections.abc import Callable
@@ -13,12 +15,14 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from audit.ai import custom
 from audit.ai import hardware as hw
-from audit.ai.catalog import Catalog, Tier, load_catalog
+from audit.ai.catalog import Catalog, ModelEntry, SamplingKey, Tier, TierId, load_catalog
 from audit.ai.installer import Installer, InstallStatus
-from audit.ai.runtime import OllamaRuntime, RuntimeSetupError, system_ollama
+from audit.ai.runtime import LlamaRuntime, NotEnoughMemoryError, RuntimeSetupError
 from audit.ai.sandbox import IsolationError
 from audit.ai.state import (
+    SOCKET_BASE_URL,
     AIConfig,
     AIPreferences,
     AIStateError,
@@ -29,6 +33,7 @@ from audit.ai.state import (
     load_preferences,
     save_config,
     save_preferences,
+    service_address,
     trust_private_runtime,
 )
 from audit.config import Settings
@@ -41,7 +46,7 @@ class ModelInfo(BaseModel):
 
 
 class TierPlan(BaseModel):
-    id: Literal["small", "standard", "large"]
+    id: TierId
     label: str
     min_memory_gb: int
     text: ModelInfo
@@ -49,21 +54,44 @@ class TierPlan(BaseModel):
     models_bytes: int
     download_bytes: int
     fits: bool
+    # This computer has 8 GB of memory or less and the size is for 16 GB or
+    # more: it cannot be downloaded or started (hardware.size_refused).
+    refused: bool = False
+    # Every file this size needs is on this computer and checked: the AI
+    # program and both models. The setup page then has nothing to download.
+    installed: bool = False
 
 
 class HardwareInfo(BaseModel):
     memory_bytes: int
+    # Memory as computers are sold (hardware.memory_gb); 0 when unknown.
+    memory_gb: int = 0
+    # Memory on separate graphics cards, as sold; 0 for none or not known
+    # (macOS: the Apple chip shares the computer's memory).
+    gpu_memory_gb: int = 0
+    # What the sizes are measured against: memory_gb plus gpu_memory_gb.
+    ai_memory_gb: int = 0
     free_disk_bytes: int
-    accelerator: Literal["apple", "nvidia", "amd", "none"]
+    # "other": a separate graphics card that llama.cpp reports but that
+    # was not recognised as NVIDIA or AMD (an Intel Arc card, say).
+    accelerator: Literal["apple", "nvidia", "amd", "other", "none"]
 
 
 class ProgramInfo(BaseModel):
+    """The llama.cpp program that runs the models."""
+
     version: str
     licence: str
     release_url: str
     download_bytes: int
     available_for_this_computer: bool
-    system_version: str | None
+    # A graphics build exists for this computer, so "Run AI on the graphics
+    # card only" means something (not on an Intel Mac, which has only the
+    # processor build).
+    gpu_build: bool = False
+    # True when the desktop app includes the program, so setup downloads
+    # only the models.
+    included: bool
 
 
 class AIPlan(BaseModel):
@@ -71,15 +99,21 @@ class AIPlan(BaseModel):
     hardware: HardwareInfo
     program: ProgramInfo
     tiers: list[TierPlan]
-    recommended: Literal["small", "standard", "large"] | None
+    recommended: TierId | None
     current: AIConfig | None
     install: InstallStatus
+    # Files copied in for "Use your own model", newest first.
+    my_models: list[custom.MyModelFile] = []
 
 
 class AiRuntimeStatus(BaseModel):
     running: bool = False
     isolated: bool = False
     reason: str | None = None
+    # A start is loading the models (at launch it runs in the background).
+    starting: bool = False
+    # While running: the service started with little free memory.
+    memory_warning: str | None = None
 
 
 class AiRuntimeStartResponse(BaseModel):
@@ -96,7 +130,7 @@ class AiRuntimeStartResponse(BaseModel):
     isolated: bool = False
     reason: str | None = None
     download_bytes: int | None = None
-    tier: Literal["small", "standard", "large"] | None = None
+    tier: TierId | None = None
 
 
 class NotEnoughSpaceError(Exception):
@@ -114,9 +148,8 @@ class AIManager:
         on_change: Callable[[AIConfig | None], None],
         *,
         catalog: Catalog | None = None,
-        runtime: OllamaRuntime | None = None,
+        runtime: LlamaRuntime | None = None,
         probe: Callable[[], hw.Hardware] | None = None,
-        find_system: Callable[[], str | None] | None = None,
         installer: Installer | None = None,
         busy_reason: Callable[[], str | None] = lambda: None,
     ) -> None:
@@ -125,15 +158,17 @@ class AIManager:
         self.on_change = on_change
         self.catalog = catalog or load_catalog()
         self.dir = ai_dir(settings)
-        self.runtime = runtime or OllamaRuntime(self.dir, self.catalog)
+        self.runtime = runtime or LlamaRuntime(
+            self.dir, self.catalog, bundled_dir=settings.llama_server_dir
+        )
         self.probe = probe or (lambda: hw.probe(self.dir))
-        self.find_system = find_system or system_ollama
         self.busy_reason = busy_reason
+        with contextlib.suppress(AIStateError):
+            self.runtime.gpu_only = load_preferences(settings).gpu_only
         self.installer = installer or Installer(
             self.catalog,
             self.runtime,
             self._installed,
-            find_system=self.find_system,
             on_stopped=self._download_stopped,
         )
 
@@ -142,13 +177,17 @@ class AIManager:
             self.runtime.stop()
 
     def _installed(self, config: AIConfig) -> None:
-        if config.source == "private":
-            trust_private_runtime(self.settings, config.base_url, self.runtime.running)
+        address = service_address(config)
+        if config.source == "private" and address:
+            trust_private_runtime(self.settings, address, self.runtime.running)
         previous_config = self.config()
         previous_preferences = self.preferences()
         try:
             save_config(self.settings, config)
-            save_preferences(self.settings, AIPreferences(enabled=True, choice_recorded=True))
+            save_preferences(
+                self.settings,
+                previous_preferences.model_copy(update={"enabled": True, "choice_recorded": True}),
+            )
             self.on_change(config)
         except Exception:
             # Keep the last usable setup if applying the new one fails.
@@ -161,6 +200,39 @@ class AIManager:
 
     def preferences(self) -> AIPreferences:
         return load_preferences(self.settings)
+
+    def hardware(self) -> hw.Hardware:
+        """This computer, with a separate graphics card's memory added.
+
+        The card's memory comes from llama.cpp itself (runtime.devices), so
+        it counts only once the program is on this computer (the desktop
+        app includes it).
+        """
+        machine = self.probe()
+        if machine.gpu_memory_bytes:
+            return machine
+        # object: a test's stand-in runtime may return anything.
+        separate: object = self.runtime.separate_gpu_memory()
+        if not isinstance(separate, int) or separate <= 0:
+            return machine
+        return dataclasses.replace(machine, gpu_memory_bytes=separate)
+
+    def set_gpu_only(self, gpu_only: bool) -> AIPreferences:
+        """Save "Run AI on the graphics card only", and restart AI if it runs.
+
+        The restart is what makes the choice take effect; the person asked
+        for it by changing the setting. A restart that fails leaves AI
+        stopped with the reason (for example gpu_only_failed), as any start.
+        """
+        previous = self.preferences()
+        self._require_idle()
+        updated = previous.model_copy(update={"gpu_only": gpu_only})
+        save_preferences(self.settings, updated)
+        self.runtime.gpu_only = gpu_only
+        if previous.gpu_only != gpu_only and self.runtime.running():
+            self.runtime.stop()
+            self.start_runtime()
+        return updated
 
     def _require_idle(self) -> None:
         reason = (
@@ -176,15 +248,20 @@ class AIManager:
         self._require_idle()
         config = self.config()
         if enabled and config is not None and config.source == "private":
-            url = self.runtime.start(preferred_url=config.base_url)
-            trust_private_runtime(self.settings, url, self.runtime.running)
-            config = config.model_copy(update={"base_url": url})
+            models = self._models(config)
+            if models is None:
+                raise RuntimeSetupError(
+                    "The AI models need to be downloaded again for this version of Axcess. "
+                    "Choose a size and download it."
+                )
+            self._require_size_fits(self._tier_of(config), starting=True)
+            self.runtime.start(models)
+            config = config.model_copy(update=self.runtime.service_fields())
+            self._trust(config)
             save_config(self.settings, config)
         elif enabled and config is None:
-            raise RuntimeSetupError(
-                "AI is not set up yet. Choose a size and select Download and set up."
-            )
-        next_preferences = AIPreferences(enabled=enabled, choice_recorded=True)
+            raise RuntimeSetupError("AI is not set up yet. Choose a size and download it.")
+        next_preferences = previous.model_copy(update={"enabled": enabled, "choice_recorded": True})
         try:
             save_preferences(self.settings, next_preferences)
             self.on_change(config)
@@ -199,28 +276,91 @@ class AIManager:
         return next_preferences
 
     def config(self) -> AIConfig | None:
-        return load_config(self.settings)
+        config = load_config(self.settings)
+        if config is None:
+            return None
+        # The sizes were renamed on 2026-11-17 (Small became Standard,
+        # Standard became Large, Large became Extra large) and a new Small
+        # added. A setup saved before keeps its models; its size is the one
+        # whose models it runs, saved again under the new name. Extra large
+        # was removed on 2026-11-18: a setup naming its models matches no
+        # size, keeps what it saved, and asks for a new download.
+        tier = self._tier_running(config)
+        if tier is not None and tier.id != config.tier:
+            config = config.model_copy(update={"tier": tier.id})
+            with contextlib.suppress(OSError):
+                save_config(self.settings, config)
+        return config
+
+    def _tier_running(self, config: AIConfig) -> Tier | None:
+        """The catalog size whose two models this setup names, if any.
+
+        Private setups name llama.cpp's served names; a setup with your own
+        Ollama names the Ollama tags.
+        """
+        if config.tier == "custom":
+            return None
+        pair = (config.text_model, config.vision_model)
+        for tier in self.catalog.tiers:
+            if pair in {
+                (tier.text.served_name, tier.vision.served_name),
+                (tier.text.tag, tier.vision.tag),
+            }:
+                return tier
+        return None
+
+    def _trust(self, config: AIConfig) -> None:
+        """Trust the service this process just started, at its address."""
+        address = service_address(config)
+        if address:
+            trust_private_runtime(self.settings, address, self.runtime.running)
+
+    def _models(self, config: AIConfig) -> tuple[ModelEntry, ...] | None:
+        """The catalog models a private llama.cpp setup runs, if still current.
+
+        None for a private Ollama setup from before llama.cpp, or when the
+        catalog no longer has these models: both need a new download.
+        """
+        if config.backend != "llama_cpp":
+            return None
+        if config.tier == "custom":
+            own = config.custom_model
+            if own is None or own.served_name != config.text_model:
+                return None
+            return (own,)
+        try:
+            tier = self.catalog.tier(config.tier)
+        except KeyError:
+            return None
+        names = (tier.text.served_name, tier.vision.served_name)
+        if names != (config.text_model, config.vision_model):
+            return None
+        return tier.models
 
     def plan(self) -> AIPlan:
-        machine = self.probe()
-        # Setup discovery reads only the program version, never a model.
-        system = self.find_system()
+        machine = self.hardware()
         program_bytes = self.runtime.download_remaining()
-        accelerator: Literal["apple", "nvidia", "amd", "none"] = (
+        accelerator: Literal["apple", "nvidia", "amd", "other", "none"] = (
             "apple"
             if machine.apple_silicon
             else "nvidia"
             if machine.gpu == "NVIDIA"
             else "amd"
             if machine.gpu == "AMD"
+            else "other"
+            if machine.gpu_memory_bytes > 0
             else "none"
         )
         recommended = hw.recommend(machine, self.catalog, program_bytes)
-        release = self.catalog.ollama
+        release = self.catalog.llama_cpp
+        program_ready = self.runtime.installed()
         return AIPlan(
             preferences=self.preferences(),
             hardware=HardwareInfo(
                 memory_bytes=machine.memory_bytes,
+                memory_gb=hw.memory_gb(machine.memory_bytes),
+                gpu_memory_gb=hw.memory_gb(machine.gpu_memory_bytes),
+                ai_memory_gb=machine.ai_memory_gb,
                 free_disk_bytes=machine.free_disk_bytes,
                 accelerator=accelerator,
             ),
@@ -230,7 +370,8 @@ class AIManager:
                 release_url=release.release_url,
                 download_bytes=program_bytes,
                 available_for_this_computer=self.runtime.asset is not None,
-                system_version=system,
+                included=self.runtime.bundled(),
+                gpu_build=any(a.accelerator != "cpu" for a in self.runtime.assets),
             ),
             tiers=[
                 TierPlan(
@@ -244,12 +385,17 @@ class AIManager:
                     models_bytes=t.size,
                     download_bytes=t.size + program_bytes,
                     fits=hw.fits(machine, t, program_bytes),
+                    refused=hw.size_refused(machine.ai_memory_gb, t),
+                    installed=program_ready
+                    and self.runtime.has_model(t.text)
+                    and self.runtime.has_model(t.vision),
                 )
                 for t in self.catalog.tiers
             ],
             recommended=recommended.id if recommended else None,
             current=self.config(),
             install=self.installer.status,
+            my_models=custom.list_files(self.runtime.models_dir),
         )
 
     def install(self, tier_id: str) -> InstallStatus:
@@ -258,9 +404,41 @@ class AIManager:
         status = self.installer.status
         if not (self.installer.running and status.tier == tier_id):
             self._require_idle()
+            self._require_size_fits(tier)
             self._check_space(tier, status)
         save_preferences(self.settings, preferences.model_copy(update={"choice_recorded": True}))
         return self.installer.start(tier)
+
+    def _tier_of(self, config: AIConfig) -> Tier | None:
+        """The catalogue size a setup uses; None for your own model."""
+        return next((t for t in self.catalog.tiers if t.id == config.tier), None)
+
+    def _require_size_fits(self, tier: Tier | None, *, starting: bool = False) -> None:
+        """Refuse a size for 16 GB or more on a computer with 8 GB or less.
+
+        The one memory refusal left (developer, 2026-11-18: "only refuse to
+        start 16 gb and above on a 8gb laptop"). Free memory only warns,
+        because the operating system makes room, and so does any other size
+        bigger than the computer's memory (Large on a 16 GB computer): the
+        setup page says so before the download (hardware.size_refused).
+        Unknown memory never refuses, and your own model has no such limit.
+        ``starting`` marks the service as stopped for this reason, so the AI
+        state says why.
+        """
+        if tier is None:
+            return
+        machine = self.hardware()
+        have = machine.ai_memory_gb
+        if not hw.size_refused(have, tier):
+            return
+        if starting:
+            self.runtime.isolation_reason = "not_enough_memory"
+        card = hw.memory_gb(machine.gpu_memory_bytes)
+        counted = f", counting the {card} GB on its graphics card" if card else ""
+        raise NotEnoughMemoryError(
+            f"The {tier.label} size is for computers with {tier.min_memory_gb} GB of memory "
+            f"or more, and this computer has {have} GB{counted}. Choose a smaller size."
+        )
 
     def _check_space(self, tier: Tier, status: InstallStatus) -> None:
         # What a paused run of the same size already wrote is on disk, so
@@ -281,6 +459,68 @@ class AIManager:
         if not self.preferences().enabled:
             self.runtime.stop()
         return status
+
+    def use_my_model(
+        self,
+        model_sha256: str,
+        addon_sha256: str | None,
+        sampling: dict[SamplingKey, float] | None = None,
+    ) -> AIConfig:
+        """Run your own model (files copied in before) instead of a size.
+
+        Stops the service, starts it with that model in the same sandbox,
+        and saves the setup only once the model answered. Raises
+        :class:`AIBusyError`, :class:`IsolationError`,
+        :class:`custom.MyModelError` or :class:`RuntimeSetupError`.
+        """
+        if not self._start_lock.acquire(blocking=False):
+            raise AIBusyError("The AI service is starting. Try again in a moment.")
+        try:
+            self._require_idle()
+            self.runtime.require_isolation()
+            if not self.runtime.installed():
+                raise RuntimeSetupError(
+                    "The AI program is not installed yet. Download a size first; your "
+                    "own model then runs with the same program."
+                )
+            models = self.runtime.models_dir
+            model = custom.find(models, model_sha256, "model")
+            addon = custom.find(models, addon_sha256, "image_addon") if addon_sha256 else None
+            entry = custom.model_entry(model, addon, sampling)
+            previous = self.config()
+            before = self._models(previous) if previous and self.runtime.running() else None
+            self.runtime.stop()
+            try:
+                self.runtime.start((entry,))
+            except RuntimeSetupError as exc:
+                # Do not leave AI off because the new model could not start:
+                # start the one that ran before, and say which happened.
+                raise type(exc)(f"{exc} {self._restart_previous(before)}") from exc
+            config = AIConfig(
+                source="private",
+                base_url=SOCKET_BASE_URL,
+                backend="llama_cpp",
+                **self.runtime.service_fields(),
+                tier="custom",
+                text_model=entry.served_name,
+                vision_model=entry.served_name if addon else "",
+                custom_model=entry,
+                llama_cpp_version=self.catalog.llama_cpp.version,
+            )
+            self._installed(config)
+            return config
+        finally:
+            self._start_lock.release()
+
+    def _restart_previous(self, models: tuple[ModelEntry, ...] | None) -> str:
+        """Start the models that ran before a failed switch; say the outcome."""
+        if not models:
+            return "Choose a model and try again."
+        try:
+            self.runtime.start(models)
+        except (RuntimeSetupError, IsolationError):
+            return "The model used before is not running either; select Start AI again."
+        return "The model used before is running again."
 
     def remove(self) -> None:
         """Forget the setup; delete the private program and models if Axcess owns them.
@@ -305,10 +545,15 @@ class AIManager:
                 self.runtime.require_isolation()
             except IsolationError as exc:
                 reason = exc.reason
+        running = self.runtime.running()
+        # Only a message the runtime wrote, and only while it runs.
+        warning = self.runtime.memory_warning
         return AiRuntimeStatus(
-            running=self.runtime.running(),
-            isolated=self.runtime.running(),
-            reason=reason,
+            running=running,
+            isolated=running,
+            reason=None if self.runtime.starting else reason,
+            starting=self.runtime.starting and not running,
+            memory_warning=warning if running and isinstance(warning, str) else None,
         )
 
     def start_runtime(self) -> AiRuntimeStartResponse:
@@ -332,13 +577,16 @@ class AIManager:
                 self.runtime.require_isolation()
             except IsolationError as exc:
                 return AiRuntimeStartResponse(state="not_isolated", reason=exc.reason)
-            tier = self.catalog.tier(config.tier) if config else None
+            # None for your own model ("custom") or a size no longer offered:
+            # neither is in the catalogue (end-to-end test, 2026-11-17: Start
+            # AI service crashed with your own model in use).
+            tier = next((t for t in self.catalog.tiers if config and t.id == config.tier), None)
+            models = self._models(config) if config else None
             if (
                 not self.runtime.installed()
                 or config is None
-                or not all(
-                    self.runtime.has_model(tag) for tag in (config.text_model, config.vision_model)
-                )
+                or models is None
+                or not all(self.runtime.has_model(m) for m in models)
             ):
                 return AiRuntimeStartResponse(
                     state="model_missing",
@@ -348,14 +596,17 @@ class AIManager:
                     else None,
                 )
             try:
-                url = self.runtime.start(preferred_url=config.base_url)
+                self._require_size_fits(tier, starting=True)
+                self.runtime.start(models)
             except IsolationError as exc:
                 return AiRuntimeStartResponse(state="not_isolated", reason=exc.reason)
+            except NotEnoughMemoryError:
+                return AiRuntimeStartResponse(state="not_isolated", reason="not_enough_memory")
             except RuntimeSetupError:
                 return AiRuntimeStartResponse(state="not_isolated", reason="runtime_failed")
-            trust_private_runtime(self.settings, url, self.runtime.running)
             previous = config
-            config = config.model_copy(update={"base_url": url})
+            config = config.model_copy(update=self.runtime.service_fields())
+            self._trust(config)
             try:
                 save_config(self.settings, config)
                 self.on_change(config)
@@ -368,7 +619,7 @@ class AIManager:
             self._start_lock.release()
 
     def startup(self) -> None:
-        """Start the private Ollama if the saved setup uses it."""
+        """Start the private service if the saved setup uses it."""
         config = self.config()
         try:
             enabled = self.preferences().enabled
@@ -377,14 +628,19 @@ class AIManager:
             return
         if not enabled or config is None or config.source != "private":
             return
+        models = self._models(config)
+        if models is None or not all(self.runtime.has_model(m) for m in models):
+            return
         try:
-            url = self.runtime.start(preferred_url=config.base_url)
+            self._require_size_fits(self._tier_of(config), starting=True)
+            self.runtime.start(models)
         except (RuntimeSetupError, IsolationError):
             logging.getLogger(__name__).exception("ai.runtime_start_failed")
             return
-        trust_private_runtime(self.settings, url, self.runtime.running)
-        if url != config.base_url:
-            config = config.model_copy(update={"base_url": url})
+        started = config.model_copy(update=self.runtime.service_fields())
+        self._trust(started)
+        if started != config:
+            config = started
             save_config(self.settings, config)
         self.on_change(config)
 

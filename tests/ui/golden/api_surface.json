@@ -462,6 +462,16 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/pages/export.csv",
+        "methods": ["GET"],
+        "name": "api_scan_pages_csv",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["sort"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/scans/{scan_id:int}/documents",
         "methods": ["GET"],
         "name": "api_scan_documents",
@@ -1408,6 +1418,16 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/pages/export.csv",
+        "methods": ["GET"],
+        "name": "api_scan_pages_csv",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["sort"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/scans/{scan_id:int}/documents",
         "methods": ["GET"],
         "name": "api_scan_documents",
@@ -2336,6 +2356,16 @@
         "async": false,
         "params": {"path": ["scan_id"], "query": ["limit", "offset", "sort"]},
         "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/pages/export.csv",
+        "methods": ["GET"],
+        "name": "api_scan_pages_csv",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["sort"]},
+        "request_param": "request",
         "background_tasks_param": null
       },
       {
@@ -3281,6 +3311,16 @@
         "async": false,
         "params": {"path": ["scan_id"], "query": ["limit", "offset", "sort"]},
         "request_param": null,
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/scans/{scan_id:int}/pages/export.csv",
+        "methods": ["GET"],
+        "name": "api_scan_pages_csv",
+        "async": false,
+        "params": {"path": ["scan_id"], "query": ["sort"]},
+        "request_param": "request",
         "background_tasks_param": null
       },
       {

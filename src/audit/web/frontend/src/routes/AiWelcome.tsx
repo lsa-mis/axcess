@@ -38,7 +38,8 @@ export default function AiWelcome() {
         check each result, and a scan never proves a site meets WCAG.
       </p>
       <p>
-        Setting up AI downloads several gigabytes from GitHub and the Ollama model library.
+        Setting up AI downloads several gigabytes: AI models from Hugging Face, a website
+        that shares AI models, and the AI program from GitHub if Axcess does not include it.
         You choose the size and confirm the download on the next page. You can turn AI on
         or off later in Settings → AI features.
       </p>

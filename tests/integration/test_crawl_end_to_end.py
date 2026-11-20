@@ -192,6 +192,27 @@ def test_crawl_respects_max_pages(tmp_db: sqlite3.Connection) -> None:
     assert summary.pages_fetched >= config.max_pages
 
 
+def test_several_workers_never_start_more_pages_than_the_limit(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    """Pages being loaded count toward the limit (2026-11-19): with only
+    loaded pages counted, idle workers each started another page, and a
+    2-page scan with every AI check on saved 7."""
+    with _serve() as base:
+        config = CrawlConfig(
+            js_eager=False,
+            seed_url=base,
+            max_pages=2,
+            rps=100.0,
+            workers=4,
+            vlm_enabled=False,
+            semantic_enabled=False,
+        )
+        summary = asyncio.run(run_crawl(tmp_db, config))
+
+    assert summary.pages_fetched == config.max_pages
+
+
 def test_crawl_with_no_page_limit_visits_every_page_in_scope(tmp_db: sqlite3.Connection) -> None:
     """``max_pages=None`` ends the crawl only when the frontier runs dry.
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -46,6 +47,25 @@ class Settings(BaseSettings):
     vlm_concurrency: int = 1
     vlm_prompt_name: str = "classify_v1.txt"
 
+    # Which local model service the scan-analysis checks and AI fix
+    # suggestions talk to (``audit.ai.model_client``). "ollama" (the
+    # default) uses ``ollama_base_url``; "llama_cpp" uses a ``llama-server``
+    # at ``llama_cpp_url``, or through the UNIX socket ``llama_cpp_socket``
+    # when one is set. A future report chat must get its own provider
+    # setting, never this one, so changing a chat model cannot change how a
+    # finished report was produced (AGENTS.md).
+    model_backend: Literal["ollama", "llama_cpp"] = "ollama"
+    llama_cpp_url: str = "http://127.0.0.1:8080"
+    llama_cpp_socket: Path | None = None
+    # Windows only: model name -> URL of the llama-server that runs just
+    # that model (``ModelRoutingTransport``); set by the desktop app.
+    llama_cpp_routes: dict[str, str] | None = None
+    # The desktop app's own llama.cpp builds (``resources/llama-runtime``,
+    # one folder per accelerator), set by the desktop shell. Unset when
+    # running from source: the AI setup then downloads the same pinned
+    # build into the data folder.
+    llama_server_dir: Path | None = None
+
     # Alt text checks on the report's Images tab: a person asks the local
     # model about one image's alt text after the scan. Empty means off, and
     # no image is sent anywhere. Kept apart from ``vlm_model`` on purpose:
@@ -60,13 +80,22 @@ class Settings(BaseSettings):
     # administrator turns them on. The models are deliberately separate from
     # the scan-analysis models above and in ``analyzer_models.yaml``, so
     # changing them can never change how a finished report was produced.
-    # They talk only to the Ollama daemon at ``ollama_base_url``. Axcess never
+    # They talk only to the model service chosen by ``model_backend`` above
+    # (the desktop app's private llama.cpp service, or Ollama). Axcess never
     # downloads a model by itself: only the desktop app's Settings > AI
     # features page does, after the person chooses a size (``audit.ai``).
     suggestions_enabled: bool = False
     suggestion_text_model: str = "qwen2.5-coder:7b-instruct"
     suggestion_vision_model: str = "qwen2.5vl:7b"
-    suggestion_timeout_s: float = Field(default=120.0, ge=10.0, le=600.0)
+    # The whole suggestion, its second try included. 300 s: on a laptop
+    # without a separate graphics card a local model writes 10-16 tokens a
+    # second, and an answer that needs its second try took over 150 s; at
+    # 120 s it failed as "Could not write a suggestion" (2026-11-18). Stop
+    # ends a wait sooner.
+    suggestion_timeout_s: float = Field(default=300.0, ge=10.0, le=600.0)
+    # Sent with each fix-suggestion request. None: not sent, so the model's
+    # own sampling applies (your own model with recommended settings).
+    suggestion_temperature: float | None = 0.0
     suggestion_queue_max: int = Field(default=20, ge=1, le=200)
 
     # Set by the desktop app (``AUDIT_DESKTOP=1``). Turns on the optional AI

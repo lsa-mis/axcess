@@ -106,7 +106,7 @@ export default function PageEvidenceRoute() {
     <>
       <ReportHeader
         scanId={scan}
-        previousScanId={scanData.previous_scan_id}
+        canCompare={scanData.has_other_reports}
         title={data.page.title || "Page details"}
         meta={
           <ReportMeta
@@ -256,8 +256,12 @@ export default function PageEvidenceRoute() {
                     {image.vlm_rationale}
                   </p>
                 )}
-                {/* Only an image the scan flagged has an issue to fix. */}
-                {suggestions && image.issue_key && (
+                {/* Only an image with something to fix: the scan flagged it
+                    and its issue is not "for information" (an alt text that
+                    already matches). The server decides (can_suggest), by the
+                    rule the suggestion service applies, so the button is never
+                    one that can only be refused. */}
+                {suggestions && image.can_suggest && (
                   <FixSuggestion
                     scanId={scan}
                     kind="image"
@@ -395,7 +399,7 @@ function FindingCard({
 
       {/* Last in the card: the suggestion is built from the evidence above,
           so it reads after it (SC 1.3.2 Meaningful Sequence, Level A). */}
-      {suggestions && (
+      {suggestions && finding.can_suggest && (
         <FixSuggestion
           scanId={scanId}
           kind="a11y"

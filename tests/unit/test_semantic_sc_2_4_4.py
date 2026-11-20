@@ -464,11 +464,59 @@ async def test_analyze_caps_links_at_max_per_call() -> None:
         analyzer = LinkPurposeInContextAnalyzer(provider)
         await analyzer.analyze(AnalysisContext(body=body, page_url="x"))
 
-    # The prompt sent to Ollama mentions LINK 0 through LINK 49 — not 50+.
-    sent = json.loads(route.calls[0].request.content)
-    prompt = sent["prompt"]
-    assert f"LINK {MAX_LINKS_PER_CALL - 1}" in prompt
-    assert f"LINK {MAX_LINKS_PER_CALL}" not in prompt
+    # Exactly the first 50 links go out, over as many requests as the
+    # estimate needs (Ollama cannot count tokens), each numbered from 0.
+    prompts = [json.loads(call.request.content)["prompt"] for call in route.calls]
+    assert sum(prompt.count("---- LINK ") for prompt in prompts) == MAX_LINKS_PER_CALL
+    assert 'href="/p49"' in "".join(prompts) or "'/p49'" in "".join(prompts)
+    assert "/p50'" not in "".join(prompts) and '/p50"' not in "".join(prompts)
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_a_link_heavy_page_goes_in_requests_that_fit_the_window() -> None:
+    """2026-11-19: 50 links with their surrounding text were one 10,773-token
+    request against an 8,192-token window. Now each request fits, every one
+    of the 50 links is sent once, and a finding in a later request points at
+    that request's link."""
+    from audit.analyzer.semantic.budget import FALLBACK_CHARS_PER_TOKEN, PROMPT_TOKENS
+
+    # Ollama cannot count tokens, so the estimate decides the split.
+    limit = int(PROMPT_TOKENS * FALLBACK_CHARS_PER_TOKEN)
+
+    section = "Mars travel news and offers for the whole family. " * 6
+    parts = [
+        f"<section><p>{section}</p><div><p>{section}</p>"
+        f'<a href="/p{i}">more {i}</a></div></section>'
+        for i in range(MAX_LINKS_PER_CALL + 5)
+    ]
+    body = ("<main>" + "".join(parts) + "</main>").encode()
+    answers = iter(
+        [{"violations": []}]
+        + [{"violations": [{"index": 0, "reason": "Vague 'more'.", "confidence": "high"}]}]
+        + [{"violations": []}] * 50
+    )
+    route = respx.post(f"{BASE}/api/generate").mock(
+        side_effect=lambda _request: httpx.Response(200, json=_ollama_response(next(answers)))
+    )
+    async with httpx.AsyncClient() as client:
+        provider = OllamaTextProvider(client, model=MODEL, base_url=BASE)
+        analyzer = LinkPurposeInContextAnalyzer(provider)
+        findings = await analyzer.analyze(AnalysisContext(body=body, page_url="x"))
+
+    prompts = [json.loads(call.request.content)["prompt"] for call in route.calls]
+    assert len(prompts) > 1
+    assert all(len(prompt) <= limit for prompt in prompts)
+    # Each request names only its own links in the answer shape it asks for.
+    for call, prompt in zip(route.calls, prompts, strict=True):
+        schema = json.loads(call.request.content)["format"]
+        index = schema["properties"]["violations"]["items"]["properties"]["index"]
+        assert index["maximum"] == prompt.count("---- LINK ") - 1
+    sent = sum(prompt.count("---- LINK ") for prompt in prompts)
+    assert sent == MAX_LINKS_PER_CALL
+    first_of_second = prompts[0].count("---- LINK ")
+    assert len(findings) == 1
+    assert f'href="/p{first_of_second}"' in findings[0].html_snippet
 
 
 @pytest.mark.asyncio

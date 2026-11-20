@@ -1,7 +1,7 @@
 import { Link, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, PlusCircle, Trash2 } from "lucide-react";
-import { memo, useCallback, useMemo, useState } from "react";
+import { ChevronDown, ChevronRight, PlusCircle, Trash2 } from "lucide-react";
+import { memo, useCallback, useMemo, useState, type ReactNode } from "react";
 import { api } from "../api/client";
 import {
   protectedQueryKey,
@@ -15,6 +15,7 @@ import {
   PageHeader,
   ScanStatusBadge,
   ScanTag,
+  buttonClasses,
   relativeTime,
 } from "../components/ui";
 import { withoutUserinfo } from "../components/ReportCrumb";
@@ -29,7 +30,7 @@ import { confirmDestructive } from "../hooks/usePreferences";
 import BreakableUrl from "../components/BreakableUrl";
 import RunningScanNotice from "../components/RunningScanNotice";
 import ScanAgainLink from "../components/ScanAgainLink";
-import LinkMenu from "../components/LinkMenu";
+import LinkMenu, { LINK_MENU_TRIGGER_CLASS } from "../components/LinkMenu";
 import {
   Cell,
   ColumnHeader,
@@ -262,6 +263,32 @@ const SORT_KINDS: Record<SortKey, SortKind> = {
   kinds: "number",
   checks: "text",
   completed: "date",
+};
+
+/**
+ * Each column's width, the wider of its width with every site closed and with
+ * one open (measured on the developer's data, 2026-11-16). Without it every
+ * column took its share of the table's spare width by what its cells held
+ * (the table's columns size automatically), so opening a site moved every
+ * column line by up to 15px. With a width on each column but Site, the spare
+ * width goes to Site and the others stay put. A width is a preference, not a
+ * minimum: on a narrow window the columns still shrink toward their longest
+ * word, as they did, so nothing scrolls sideways sooner than before (SC 1.4.10
+ * Reflow, Level AA). Two columns also have a minimum, the width each had
+ * with a site open: Site 241px (15.0625rem, from 768px wide; see
+ * SizerRows for why not on a phone; a closed row's long address
+ * wraps, an open site's "Report #N" and badge do not) and Issue types 109px
+ * (6.8125rem; "Not counted" does not wrap), so they do not jump when a site
+ * opens in a window too narrow for the widths above (the developer's
+ * request, 2026-11-16). Rejected: a fixed table layout, which cuts words off
+ * where a narrow window gives a column less than its longest word.
+ */
+const COLUMN_WIDTHS: Partial<Record<SortKey, string>> = {
+  completed: "w-[10.5rem]",
+  kinds: "w-[9.25rem] min-w-[6.8125rem]",
+  issues: "w-[12rem]",
+  pages: "w-[7.5rem]",
+  checks: "w-[8.5rem]",
 };
 
 const SORT_LABELS: Record<SortKey, string> = {
@@ -530,7 +557,7 @@ export default function ScansRoute() {
                       column="site"
                       kind="text"
                       wrap="words"
-                      className="sticky left-0 z-[2] bg-surface-muted pl-[calc(1rem+var(--target,44px)+0.25rem)]"
+                      className="sticky left-0 z-[2] bg-surface-muted md:min-w-[15.0625rem] pl-[calc(1rem+var(--target,44px)+0.25rem)]"
                       {...sortProps}
                     >
                       {SORT_LABELS.site}
@@ -543,13 +570,14 @@ export default function ScansRoute() {
                         column={column}
                         kind={SORT_KINDS[column]}
                         wrap="words"
+                        className={COLUMN_WIDTHS[column]}
                         hint={column === "checks" ? RULE_CHECK_HELP : undefined}
                         {...sortProps}
                       >
                         {SORT_LABELS[column]}
                       </SortHeader>
                     ))}
-                    <ColumnHeader className="whitespace-nowrap px-3 py-1.5">
+                    <ColumnHeader className="w-[22rem] whitespace-nowrap px-3 py-1.5">
                       {/* The height of a sort button, words in its middle like theirs,
                           so its label lines up with them. */}
                       <span className="inline-flex min-h-target items-center px-1">Actions</span>
@@ -578,6 +606,7 @@ export default function ScansRoute() {
                     );
                   })}
                 </tbody>
+                <SizerRows sites={sitePages.pageRows} />
               </Table>
             </TableRegion>
           </PagedTable>
@@ -803,6 +832,13 @@ const OPEN_SITE_SHADE = "bg-surface-subtle";
  * `z-index`) so the layer's `-z-10` puts it over the cell's background and
  * under its content.
  */
+/** A scan row's "Report #N" cell (ScanRow), shared with its sizing row. */
+const SCAN_ROW_HEADER = "whitespace-nowrap py-1 pl-[4.75rem] text-xs font-normal tabular-nums text-fg-muted";
+/** A scan row's actions ("Compare with", Delete), shared with its sizing row. */
+const SCAN_ACTIONS = "flex items-center justify-center";
+/** Delete's padding, 2px less each side than the shared button's 16px (2026-11-16). */
+const DELETE_PADDING = "px-3.5";
+
 function scanCardCell({ first, last, edge }: { first: boolean; last: boolean; edge?: "start" | "end" }): string {
   return cn(
     "before:absolute before:-z-10 before:border-border before:bg-surface before:content-['']",
@@ -847,11 +883,13 @@ function ScanRow({
     // The open site's shade, and no rule above: it reads as part of the site row.
     <tr id={id} className={OPEN_SITE_SHADE}>
       {/* Indented into the box, which starts under the site's name (see
-          scanCardCell). "Report #" keeps the 44px it had inside the box's
-          left edge before the box moved in, so the whole block shifts
-          right rather than the padding shrinking (the developer's
-          correction, 2026-10-29). The rows read as the site's own (W3C
-          COGA, "Making Content Usable": group related content).
+          scanCardCell). "Report #" had 44px inside the box's left edge
+          (6.25rem in all, 2026-10-29); it is now 16px (4.75rem in all,
+          the developer's request, 2026-11-16). The 100px made this column
+          about 20px wider when a site was open, which moved every column
+          line (the table's columns size to their widest row). The rows
+          read as the site's own (W3C COGA, "Making Content Usable": group
+          related content).
 
           "Report #N" is the one way into a scan's report. A scan that saved
           pages goes straight to its Issues page, however it ended; any other
@@ -867,7 +905,7 @@ function ScanRow({
           row's header. */}
       <RowHeader
         sticky
-        className={cn("whitespace-nowrap py-1 pl-[6.25rem] text-xs font-normal tabular-nums text-fg-muted", piece("start"))}
+        className={cn(SCAN_ROW_HEADER, piece("start"))}
       >
         <Link
           to={isReport(scan) ? `/scans/${scan.id}/issues` : `/scans/${scan.id}`}
@@ -903,7 +941,10 @@ function ScanRow({
         {/* Default `md` size (44px tall): destructive controls in
             particular must be a real target (SC 2.5.5). In reading order:
             compare this report, then delete it. */}
-        <div className="flex items-center justify-center gap-2">
+        {/* No gap between "Compare with" and Delete: each button's own
+            padding already separates them (the developer's request,
+            2026-11-16). */}
+        <div className={SCAN_ACTIONS}>
           {others.length > 0 && (
             <LinkMenu
               label="Compare with"
@@ -941,6 +982,104 @@ function RuleChecksCell({ scan, className }: { scan: ScanSummary; className?: st
     <Cell className={cn("whitespace-nowrap", checks?.length ? "text-fg" : "text-fg-muted", className)}>
       {checks ? ruleChecksText(checks) : "Not recorded"}
     </Cell>
+  );
+}
+
+/**
+ * Hidden rows that size the columns as if every site on this page were open,
+ * so opening one does not move the column lines (the developer's request,
+ * 2026-11-16: the grid an open site needs is the grid from the start).
+ *
+ * A table's columns take their width from their widest cell, and a closed
+ * site's scan rows are not drawn, so the columns grew the moment a site
+ * opened: Site for "Report #N" and its status badge, which do not wrap,
+ * Issue types and Issue occurrences for "Not counted", Actions for "Compare
+ * with" and Delete. One row here per scan, with the same words and the same
+ * classes as its ScanRow (SCAN_ROW_HEADER, SCAN_ACTIONS, DELETE_PADDING,
+ * LINK_MENU_TRIGGER_CLASS), sets those widths before the rows are shown,
+ * whatever the font. The counts are left out: they are fetched only when a
+ * site opens, and a number is narrower than its column's heading.
+ *
+ * In a ``tfoot``, not the body, so a row count of the body is the rows a
+ * reader sees. Zero height (``py-0`` and an empty-height box around each
+ * cell's words), hidden (``invisible``, which also keeps it out of the tab
+ * order) and ``aria-hidden``, so it is never seen, heard or reached. Its
+ * stand-ins for links and buttons are plain text with their classes, not
+ * controls.
+ *
+ * From 768px wide (md) only, as is Site's minimum width. Site is the column
+ * that stays put while the table scrolls, and on a phone a Site column wide
+ * enough for "Report #N" and its badge covered most of the table, with the
+ * sort buttons under it (CI, 2026-11-17: a click on "Pages" at 320px landed
+ * on Site). A phone's table scrolls sideways anyway, so there the columns
+ * still grow when a site opens, as they did before.
+ *
+ * The minimum widths on Site and Issue types (COLUMN_WIDTHS) came
+ * first and stay; alone they held only for the fonts and report numbers they
+ * were measured with.
+ */
+function SizerRows({ sites }: { sites: readonly SiteGroup[] }) {
+  const sized = (children: ReactNode) => <div className="h-0 overflow-hidden">{children}</div>;
+  return (
+    <tfoot aria-hidden="true" className="invisible hidden md:table-footer-group">
+      {sites.flatMap((site) => {
+        const reports = site.scans.filter(isReport);
+        return site.scans.map((scan) => {
+          const compare = isReport(scan) && reports.length > 1;
+          const counted = isReport(scan) ? null : "Not counted";
+          return (
+            <tr key={`${site.site_url}-${scan.id}`}>
+              <td className={cn("px-4", SCAN_ROW_HEADER, "py-0")}>
+                {sized(
+                  <>
+                    <span className="inline-flex items-center px-1 font-semibold">Report #{scan.id}</span>
+                    {scan.status !== "completed" && (
+                      <span className="ml-2 font-sans">
+                        <ScanStatusBadge value={scan.status} />
+                      </span>
+                    )}
+                  </>,
+                )}
+              </td>
+              <Cell className="whitespace-nowrap py-0 text-xs">
+                {sized(relativeTime(scan.finished_at ?? scan.started_at))}
+              </Cell>
+              <Cell className="whitespace-nowrap py-0 text-right">{sized(counted)}</Cell>
+              <Cell className="whitespace-nowrap py-0 text-right">{sized(counted)}</Cell>
+              <Cell numeric className="py-0">
+                {sized(scan.page_count.toLocaleString())}
+              </Cell>
+              <Cell className="whitespace-nowrap py-0">
+                {sized(scan.rule_checks ? ruleChecksText(scan.rule_checks) : "Not recorded")}
+              </Cell>
+              <Cell className="whitespace-nowrap py-0">
+                {/* pr-2: the Actions column is 8px wider than its buttons, so
+                    Delete's hover fill clears the box's right edge (the
+                    developer's request, 2026-11-16: make the column wider).
+                    Here, not on the real cells: the extra width follows the
+                    buttons in any font, and these rows hold no real buttons
+                    whose spacing a touch-target check would measure. It
+                    replaces a 17rem minimum, which overshot in some fonts. */}
+                {sized(
+                  <div className={cn(SCAN_ACTIONS, "pr-2")}>
+                    {compare && (
+                      <span className={cn(buttonClasses("ghost"), LINK_MENU_TRIGGER_CLASS)}>
+                        Compare with
+                        <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
+                      </span>
+                    )}
+                    <span className={cn(buttonClasses("ghost"), DELETE_PADDING)}>
+                      <Trash2 className="h-4 w-4" aria-hidden />
+                      Delete
+                    </span>
+                  </div>,
+                )}
+              </Cell>
+            </tr>
+          );
+        });
+      })}
+    </tfoot>
   );
 }
 
@@ -1067,7 +1206,7 @@ function DeleteScanButton({ scan }: { scan: ScanSummary }) {
         variant="ghost"
         disabled
         title="Stop the scan before you delete this report."
-        className="text-fg-subtle"
+        className={cn(DELETE_PADDING, "text-fg-subtle")}
         aria-label={`Delete report ${scan.id} (not available while the scan is running)`}
       >
         <Trash2 className="h-4 w-4" aria-hidden />
@@ -1081,7 +1220,9 @@ function DeleteScanButton({ scan }: { scan: ScanSummary }) {
       <Button
         variant="ghost"
         disabled={mutation.isPending}
-        className="text-sev-critical hover:bg-sev-critical-bg"
+        // px-3.5: 2px less each side than the shared button's 16px (the
+        // developer's request, 2026-11-16).
+        className={cn(DELETE_PADDING, "text-sev-critical hover:bg-sev-critical-bg")}
         aria-label={`Delete report ${scan.id}`}
         onClick={() => {
           // confirm() blocks; it's the right primitive for "are you sure".

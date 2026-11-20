@@ -24,7 +24,7 @@ import ReportWorkspaceNav from "./ReportWorkspaceNav";
  */
 export default function ReportHeader({
   scanId,
-  previousScanId,
+  canCompare,
   title,
   help,
   meta,
@@ -32,7 +32,9 @@ export default function ReportHeader({
   tabs = false,
 }: {
   scanId: number;
-  previousScanId: number | null;
+  /** Another report of the same site exists, earlier or later, so the tabs
+   *  include Compare reports (ScanDetail.has_other_reports). */
+  canCompare: boolean;
   title: ReactNode;
   /**
    * A ``HelpTip`` ("?") that explains the view, right after the heading
@@ -57,7 +59,7 @@ export default function ReportHeader({
           that ends at the report; the title then reads as the heading of
           the view you chose, not as something the tabs sit beneath. */}
       {tabs && (
-        <ReportWorkspaceNav scanId={scanId} previousScanId={previousScanId} />
+        <ReportWorkspaceNav scanId={scanId} canCompare={canCompare} />
       )}
       <div className="mt-5 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">

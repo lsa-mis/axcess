@@ -711,8 +711,9 @@ export const SUGGESTION_OPTION_LABEL = {
 
 /** Desktop AI setup: what the download is doing now. */
 export const AI_INSTALL_STEP_LABEL: Record<AiInstallStep, string> = {
-  program: "Downloading the Ollama program",
-  starting: "Starting Ollama",
+  program: "Downloading the AI program",
+  starting: "Starting the private AI service",
+  model: "Downloading the AI model",
   text_model: "Downloading the text model",
   vision_model: "Downloading the image model",
   finishing: "Finishing setup",
@@ -727,10 +728,19 @@ export const AI_INSTALL_STATE_LABEL: Record<AiInstallState, string> = {
   done: "Ready",
 };
 
-/** Saved desktop AI choice, separate from whether models are ready. */
-export const AI_FEATURE_STATE_LABEL = {
-  on: "AI features are on",
-  off: "AI features are off",
+/**
+ * Desktop AI: the one state a person sees. It combines three facts that
+ * used to be shown one by one (the on/off choice, whether the models are
+ * downloaded, whether the AI service runs), which made people work out for
+ * themselves which button could do anything (developer, 2026-11-18).
+ */
+export type AiStateKind = "not_set_up" | "off" | "starting" | "on" | "stopped";
+export const AI_STATE_LABEL: Record<AiStateKind, string> = {
+  not_set_up: "AI is not set up",
+  off: "AI is off",
+  starting: "AI is starting",
+  on: "AI is on",
+  stopped: "AI has stopped",
 };
 
 /** Desktop AI setup: the size of the AI models. */
@@ -738,12 +748,31 @@ export const AI_TIER_LABEL: Record<AiTierId, string> = {
   small: "Small",
   standard: "Standard",
   large: "Large",
+  // No longer offered (2026-11-18); kept so a setup saved under it is named.
+  extra_large: "Extra large",
 };
+/**
+ * What each size is like, said the same way for each: speed first, then
+ * answers. From the real-page trials in docs/internal/model-trials-2026-11.md
+ * on this project's 16 GB test computer, without a graphics card: Small
+ * (Bonsai 2 4B) took 26 to 95 s an answer, Standard (Bonsai 2 9B) 40 to 163 s,
+ * and Standard wrote more usable fixes (5 of 10 against 3). Large (27B) was
+ * not timed, so its line says only what is certain: it is the biggest model
+ * (three times Standard) and the slowest. Update these with the trials.
+ */
+export const AI_TIER_DESCRIPTION: Record<AiTierId, string> = {
+  small: "Fastest, but fewer usable answers than Standard.",
+  standard: "Better answers than Small in our tests. Takes about 1.5 times as long to answer.",
+  large: "The biggest model, three times the size of Standard, and the slowest.",
+  extra_large: "",
+};
+/** Desktop AI setup: a GGUF file the person chose instead of a size. */
+export const AI_MY_MODEL_LABEL = "Your own model";
 
 /** Why a suggestion failed, in words that say what to do next. */
 export const SUGGESTION_ERROR_LABEL: Record<SuggestionErrorCode, string> = {
-  model_unavailable: "The local AI service (Ollama) is not running. Start it, then try again.",
-  model_missing: "The AI model is not installed in Ollama. Install it with ollama pull, then try again.",
+  model_unavailable: "The AI service on this computer was not running. Start it, then try again.",
+  model_missing: "The AI model was not installed. Install it, then try again.",
   // A cloud model, or one Ollama's model list cannot confirm is on this
   // computer. Says nothing was sent, because that is the privacy fact.
   model_not_local:
@@ -758,7 +787,7 @@ export const SUGGESTION_ERROR_LABEL: Record<SuggestionErrorCode, string> = {
 
 export const AI_RUNTIME_START_LABEL: Record<import("../api/types").AiRuntimeStartState, string> = {
   started: "AI service started. It is isolated and stays on this computer.",
-  already_running: "AI service: isolated, local only.",
+  already_running: "AI service is running. It is isolated and stays on this computer.",
   model_missing: "The private AI program or models are missing. Choose a size and confirm its download below.",
   not_isolated: "AI was not started because Axcess could not keep it isolated.",
   system_ollama_not_managed: "This is your own Ollama. Axcess does not start, stop or isolate it. Choose a private download for isolated AI.",
@@ -771,8 +800,25 @@ export const AI_ISOLATION_REASON_LABEL: Record<string, string> = {
   network_test_failed: "The isolation check could not prove that outside connections are blocked. AI was not started.",
   namespace_unreachable: "Axcess cannot reach the AI service inside its private network on this computer. AI was not started.",
   runtime_failed: "The isolated AI service could not start. Check the application log.",
+  // The one memory refusal left (2026-11-18): a size on a computer with
+  // less memory than the size is for. Low free memory only warns.
+  not_enough_memory: "This computer has 8 GB of memory or less, and this size is for 16 GB or more, so AI was not started. Choose Small in Change the AI models.",
   system_ollama_not_managed: "Your own Ollama is not isolated by Axcess. Axcess never starts or stops it.",
+  // "Run AI on the graphics card only" is on and a model did not load on
+  // the graphics card; there is no fallback to the processor (2026-11-19).
+  gpu_only_failed: "AI could not start on the graphics card alone. The models may not fit in its memory. Turn off “Run AI on the graphics card only” to use the computer’s memory too.",
 };
+
+/**
+ * The setting that keeps every model layer on the graphics card
+ * (AIPreferences.gpu_only). On a Mac the graphics are part of the Apple
+ * chip, so "graphics card" would name something the Mac does not have.
+ */
+export function aiGpuOnlyLabel(accelerator: string): string {
+  return accelerator === "apple"
+    ? "Run AI on the Apple chip’s graphics only"
+    : "Run AI on the graphics card only";
+}
 
 /**
  * What happens when someone opens a link to another website, for the

@@ -32,6 +32,7 @@ test-results/
 desktop/backend-dist/
 desktop/playwright-browsers/
 desktop/ocr-runtime/
+desktop/llama-runtime/
 desktop/out/
 
 # IDE / OS

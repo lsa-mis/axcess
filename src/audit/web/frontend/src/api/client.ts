@@ -60,6 +60,7 @@ import type {
   ScopePreview,
   AiInstallStatus,
   AiPlan,
+  MyModelFile,
   AiPreferences,
   AiTierId,
   SuggestionAvailability,
@@ -139,6 +140,40 @@ async function request<T>(input: string, init?: RequestInit): Promise<T> {
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
+}
+
+/**
+ * Copy one GGUF file the person chose into Axcess's AI folder.
+ *
+ * XMLHttpRequest, not fetch: fetch reports no upload progress, and a model
+ * file is gigabytes. The browser streams the file from disk.
+ */
+function copyMyModel(
+  file: File,
+  kind: MyModelFile["kind"],
+  onProgress: (fraction: number) => void,
+  forModel: string | null = null,
+): Promise<MyModelFile> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const query = new URLSearchParams({ kind, name: file.name });
+    if (forModel) query.set("for_model", forModel);
+    xhr.open("PUT", `/api/ai/my-models?${query.toString()}`);
+    xhr.setRequestHeader("Accept", "application/json");
+    xhr.setRequestHeader("Content-Type", "application/octet-stream");
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) onProgress(event.loaded / event.total);
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(JSON.parse(xhr.responseText) as MyModelFile);
+      } else {
+        reject(new ApiError(xhr.status, apiErrorMessage(xhr.status, xhr.responseText)));
+      }
+    };
+    xhr.onerror = () => reject(new ApiError(0, "Axcess could not copy the file. Try again."));
+    xhr.send(file);
+  });
 }
 
 /**
@@ -353,6 +388,12 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ enabled }),
     }),
+  /** "Run AI on the graphics card only"; restarts AI when it runs. */
+  setAiGpuOnly: (gpuOnly: boolean) =>
+    request<AiPreferences>("/api/ai/preferences", {
+      method: "PUT",
+      body: JSON.stringify({ gpu_only: gpuOnly }),
+    }),
   getAiInstall: () => request<AiInstallStatus>("/api/ai/install", { cache: "no-store" }),
   /** Start or resume downloading the AI program and models for one size. */
   installAi: (tier: AiTierId) =>
@@ -363,6 +404,13 @@ export const api = {
   pauseAiInstall: () => request<AiInstallStatus>("/api/ai/install", { method: "DELETE" }),
   /** Turn AI features off and delete what Axcess downloaded. */
   removeAi: () => request<void>("/api/ai", { method: "DELETE" }),
+  copyMyModel,
+  /** Run your own model (files copied in before) in the private AI service. */
+  useMyModel: (model: string, imageAddon: string | null, sampling: Record<string, number> | null) =>
+    request<AiPlan>("/api/ai/my-models/use", {
+      method: "POST",
+      body: JSON.stringify({ model, image_addon: imageAddon, sampling, confirm: true }),
+    }),
   /** Whether AI fix suggestions are turned on and their local model is ready. */
   getSuggestionStatus: () =>
     request<SuggestionAvailability>("/api/suggestions/status", { cache: "no-store" }),
@@ -555,6 +603,7 @@ export const api = {
       method: "POST",
     }),
   downloadImagesZip,
+  downloadScanPagesCsv,
   getFinding: (id: number) => request<FindingDetail>(`/api/findings/${id}`),
   setStatus: (id: number, status: FindingStatus, rationale?: string) =>
     request<{ status: FindingStatus }>(`/api/findings/${id}/status`, {
@@ -749,18 +798,43 @@ export const blobUrl = (contentHash: string): string =>
  * some windows (the developer's report, 2026-11-13), and fetching lets the
  * page say it is working and show an error in words.
  */
-async function downloadImagesZip(scanId: number): Promise<{ filename: string; sizeBytes: number }> {
-  const res = await fetch(imagesZipUrl(scanId), { credentials: "same-origin", cache: "no-store" });
+/**
+ * Fetch one file and save it, then say what arrived: its name and size.
+ *
+ * ``fetch`` rather than a plain link, so a refusal or a server error reaches
+ * the page as text (ApiError) instead of being saved as the file. Used by
+ * every per-view download button (components/FileDownload.tsx).
+ */
+async function downloadFile(url: string, fallbackName: string): Promise<DownloadedFile> {
+  const res = await fetch(url, { credentials: "same-origin", cache: "no-store" });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new ApiError(res.status, apiErrorMessage(res.status, body));
   }
   const blob = await res.blob();
-  const filename =
-    dispositionFilename(res.headers.get("Content-Disposition")) ?? `report-${scanId}-images.zip`;
+  const filename = dispositionFilename(res.headers.get("Content-Disposition")) ?? fallbackName;
   saveBlob(blob, filename);
   return { filename, sizeBytes: blob.size };
 }
+
+/** What a download saved: the file name and its size in bytes. */
+export interface DownloadedFile {
+  filename: string;
+  sizeBytes: number;
+}
+
+function downloadImagesZip(scanId: number): Promise<DownloadedFile> {
+  return downloadFile(imagesZipUrl(scanId), `report-${scanId}-images.zip`);
+}
+
+/** Every page a report visited, as CSV, in the order the list is sorted by. */
+function downloadScanPagesCsv(scanId: number, sort: ScanPagesSort): Promise<DownloadedFile> {
+  return downloadFile(scanPagesCsvUrl(scanId, sort), `report-${scanId}-pages-visited.csv`);
+}
+
+/** Download URL for the Pages visited list as CSV (``pages_csv.py``). */
+export const scanPagesCsvUrl = (scanId: number, sort: ScanPagesSort): string =>
+  `/api/scans/${scanId}/pages/export.csv?${new URLSearchParams({ sort })}`;
 
 /** Download URL for the Images tab's ZIP: pictures in folders by group and verdict, and a sheet. */
 export const imagesZipUrl = (scanId: number): string => `/api/scans/${scanId}/images/export.zip`;

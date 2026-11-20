@@ -4,9 +4,11 @@ Axcess can ask a local AI model to suggest a fix for one
 [occurrence](./glossary.md#occurrence). This page explains how to turn it on,
 what it does with your data, and what it cannot do.
 
-**In short:** it is off unless you turn it on. It runs only on this computer,
-through Ollama. It can be wrong, so a person checks every suggestion before
-using it. It never changes your site or your report.
+**In short:** it is off unless you turn it on. It runs only on this computer:
+in the desktop app, through its own private AI service; in the web version,
+through an Ollama or llama.cpp server that you run. It can be wrong, so a
+person checks every suggestion before using it. It never changes your site or
+your report.
 
 ## What you see
 
@@ -68,7 +70,7 @@ flowchart LR
   B --> C[(fix_suggestions<br/>queued)]
   C --> D[Background worker<br/>one at a time]
   D --> E[Build evidence from<br/>this report only,<br/>remove secrets]
-  E --> F[Ollama on this computer]
+  E --> F[Local AI service<br/>on this computer]
   F --> G{Answer safe and<br/>in the right shape?}
   G -- no --> H[Saved as failed,<br/>never shown]
   G -- yes --> I[Run one axe rule on<br/>suggested code, offline]
@@ -90,11 +92,25 @@ flowchart LR
 
 ## Set up AI features in the desktop app
 
-**Settings > AI features** installs everything the AI features need, after
-you ask it to. Nothing is downloaded before that. On a fresh installation,
+**Settings > AI features** downloads what the AI features need, after you
+ask it to. Nothing is downloaded before that. On a fresh installation,
 Axcess offers **Set up AI features** or **Continue without AI** when it first
 opens. Choosing setup opens the size page; it does not start a download.
 Choosing to continue keeps AI off. You can change your choice in Settings.
+
+Settings and **AI features** show one state for AI, with the one action it
+needs:
+
+| State | What it means | Action |
+| --- | --- | --- |
+| AI is not set up | No size is downloaded yet. | **Set up AI features** (Settings), then choose a size. |
+| AI is off | A size is kept on this computer; nothing runs. | **Turn AI on** (downloads nothing). |
+| AI is starting | The models are loading, for example just after the app opens. | Wait; this can take a minute. |
+| AI is on | The private AI service runs the size in use. | **Turn AI off** when you want. |
+| AI has stopped | AI is on, but its service stopped or could not start. The reason is shown. | **Start AI again**. |
+
+Once a size is set up, **AI features** shows this state first, and the size
+choice moves into **Change the AI models**.
 
 1. Axcess checks this computer: memory (RAM), free disk space, and whether
    there is a graphics chip that speeds AI up (an Apple chip, or an NVIDIA or
@@ -103,17 +119,50 @@ Choosing to continue keeps AI off. You can change your choice in Settings.
 
    | Size | Needs at least | Text model | Image model | Download |
    | --- | --- | --- | --- | --- |
-   | Small | 8 GB memory | `qwen3:4b-instruct-2507-q4_K_M` | `qwen3-vl:2b-instruct` | about 4.4 GB |
-   | Standard | 16 GB memory | `qwen2.5-coder:7b-instruct` | `qwen3-vl:4b-instruct` | about 8 GB |
-   | Large | 32 GB memory | `qwen2.5-coder:14b-instruct` | `qwen3-vl:8b-instruct` | about 15 GB |
+   | Small | 8 GB memory | `bonsai2:4b-ternary-q2_0` (one model reads text and images) | the same model | about 1.6 GB |
+   | Standard | 16 GB memory | `bonsai2:9b-ternary-q2_0` (one model reads text and images) | the same model | about 3.2 GB |
+   | Large | 32 GB memory | `bonsai2:27b-ternary-q2_0` (one model reads text and images) | the same model | about 8.3 GB |
+
+   A model needs working memory beyond its download size, so a size needs
+   much more memory than it downloads. Each size says how fast it is and
+   how good its answers were in our real-page trials
+   (`docs/internal/model-trials-2026-11.md`): Standard took about 1.5 times
+   as long as Small to answer, and wrote more usable fixes. Extra large, two
+   models at once, was removed on 2026-11-18: it was not tested against the
+   Bonsai 2 sizes and does not fit a 16 GB computer. A setup saved under it
+   asks for a new download.
+
+   A size bigger than this computer's memory can still be chosen: the page
+   warns before the download that it may answer very slowly or stop. The
+   one exception is a computer with 8 GB of memory or less, which cannot
+   download or start Standard or Large.
+
+   A separate graphics card's own memory counts too, because the AI puts as
+   much of a model as fits on the card and the rest in the computer's
+   memory. An 8 GB laptop with an 8 GB card counts as 16 GB, so it can run
+   Standard. The page names the card's memory and the total. Built-in
+   graphics and Apple chips share the computer's memory, so they add
+   nothing. Axcess reads the card's memory from the AI program itself
+   (`llama-server --list-devices`, in the same sandbox as the AI: Bubblewrap
+   on Linux, the launcher's AppContainer on Windows). The Windows path is
+   checked by the Windows smoke test in CI, not yet on a computer with a
+   separate card.
 
    Without a graphics chip Axcess suggests Small, because larger models are
-   very slow on the processor alone. All models use the Apache 2.0 licence.
-3. Select **Download and set up** after checking the size shown on the button.
-   Axcess downloads its own Ollama 0.33.0 (MIT licence), checks its fixed SHA-256
-   checksum, and separately downloads the models over HTTPS. It checks the
-   registry manifest checksum and every model file before installing them.
-   It never asks Ollama to download anything. Your own Ollama is left alone.
+   slow on the processor alone, and the page says so. All models use the
+   Apache 2.0 licence.
+3. Check the download size, shown just above the button, then select
+   **Download Small and turn AI on** (the button names the size you chose;
+   if AI is already on, it says **Download Standard and switch to it**, for
+   example).
+   Axcess downloads only the AI models for that size, as GGUF files, from
+   Hugging Face, a website that shares AI models. Each file is pinned to an
+   exact version. Axcess checks each file against its SHA-256 checksum
+   before it uses it.
+   The desktop app already includes the AI program (llama.cpp, MIT licence),
+   so it is not downloaded. When you run Axcess from source code, setup also
+   downloads the same pinned AI program from GitHub and checks it the same
+   way. The setup page shows the program's build number and licence.
 4. You can select **Pause download** and **Resume download** later. A
    download that stops part way picks up where it stopped. Axcess does not
    start the download if the disk does not have room for what is left, plus 3 GB.
@@ -122,18 +171,37 @@ When it finishes, AI fix suggestions use the new models. The AI checks during
 a scan are still off for each new scan; turn them on in the scan form if you
 want them.
 
-Files are kept in the Axcess data folder, under `ai/`: the Ollama program in
-`ai/runtime`, models in `ai/models`, and the setup in `ai/config.json`.
-The on/off and first-launch choices are saved in `ai/preferences.json`.
-**Remove AI features** deletes Axcess's program and models and forgets the
-setup. It keeps the saved off choice so the welcome does not repeat.
-If Axcess used an Ollama you already had,
-removing only forgets the setup; the models stay in your Ollama.
+Files are kept in the Axcess data folder, under `ai/`:
+
+| File or folder | What it holds |
+| --- | --- |
+| `ai/gguf` | The AI models, and any model download that stopped part way. |
+| `ai/runtime` | The AI program (llama.cpp), only when you run Axcess from source code. The desktop app keeps its own copy inside the app. |
+| `ai/downloads` | An AI program download that stopped part way (only when you run Axcess from source code). |
+| `ai/scratch` | The private connection to the AI service (a UNIX socket file), and the service's working files. |
+| `ai/llama-server.log` | What the private AI service wrote while it started and ran. |
+| `ai/config.json` | The setup: the size and the models. |
+| `ai/preferences.json` | The on/off and first-launch choices. |
+
+**Remove AI features** stops the private AI service, deletes the AI files
+Axcess downloaded, and forgets the setup. It keeps the saved off choice so
+the welcome does not repeat.
+An older version of Axcess could also use an Ollama you already had. For a
+setup saved that way, removing only forgets the setup; the models stay in
+your Ollama.
+
+### A setup from an older version
+
+Older versions of the desktop app ran the models in a private copy of
+Ollama. That setup no longer runs. Choose a size and select **Download and
+set up** to download the models again. When that download finishes, Axcess
+deletes the old private Ollama files from its data folder. It never touches
+an Ollama you installed yourself.
 
 ### Turn AI off without removing it
 
-Select **Turn AI off** in **Settings > AI features**. This stops Axcess's
-private Ollama and blocks new AI suggestions and model-based scan checks.
+Select **Turn AI off** in **Settings > AI features**. This stops the private
+AI service and blocks new AI suggestions and model-based scan checks.
 It does not stop an Ollama you started yourself. Models are kept, and the
 choice stays saved when you close and reopen Axcess.
 
@@ -147,62 +215,108 @@ request finishing in the background; wait for that request to finish too.
 Axcess explains why it cannot change the setting and leaves the choice as it
 was. It does not switch off later without another click.
 
-Select **Turn AI on** to reuse the kept models. If there is no setup yet,
-choose a size and select **Download and set up** instead. AI becomes available
+Select **Turn AI on** to reuse the kept models. This starts the private AI
+service again. If there is no setup yet,
+choose a size and download it instead. AI becomes available
 only when the required local models are ready. Scan-time AI checks are still
 off for each new scan until you choose them. Existing installations keep
 their setup and do not repeat the first-launch choice.
 
-### Start the isolated AI service
+### Start the private AI service
 
-Select **Start AI service** in Settings or AI features. This starts only the
-private copy Axcess owns. It does not start, stop or download into your own
-Ollama. An existing setup that explicitly uses your own Ollama is not isolated
-by Axcess; choose a private download to use isolated AI.
+When AI is on, Axcess starts the private AI service by itself: when you turn
+AI on, and in the background when the app opens. Until the service is ready,
+AI requests say that it is not running, and the state is "AI is
+starting". If AI is on but its service stopped, the state is "AI has
+stopped" with the reason; select **Start AI again** in Settings, AI features
+or on the suggestion. This starts only Axcess's own service and never
+downloads anything. It does not start, stop or download into your own
+Ollama. The button shows only in that state. Once a size is downloaded and
+in use, **Change the AI models** says it is set up and offers no download
+for it; choose another size to download that one.
 
-On macOS, a deny-by-default `sandbox-exec` profile allows the bundled program,
-private models and scratch folder, the system libraries and the local Python
-interpreter needed for the isolation check. Networking is restricted to
-loopback. Before startup, a socket probe in the same sandbox must receive an
-OS denial for a non-loopback connection. A timeout is not enough. Failure
-keeps AI stopped; report browsing and saved suggestions still work. Ollama
-uses `OLLAMA_HOST=127.0.0.1:<private port>` and `OLLAMA_NO_CLOUD=1`. The OS
-boundary, not an environment variable, prevents internet access.
+### Use your own model
 
-Windows and computers without an OS sandbox cannot start private AI. Linux
-Bubblewrap command construction restricts networking and files, but startup
-is blocked: the host cannot reach a loopback-only network namespace until a
-private connection bridge is implemented. `unshare` alone is not sufficient
-because it does not restrict file access. No fallback shares the host network.
-The real bundled Ollama and GPU operation still need desktop release testing.
-A saved private port is not trusted after a restart. Axcess sends no model
-requests to it until the running private process has passed isolation checks.
+To try a model that is not one of the sizes, use **Use your own model** on
+**Settings > AI features**:
 
-The catalogue pins the program checksum and model **tags**, not independent
-model manifest checksums. First acquisition verifies the checksum supplied
-by the HTTPS registry. That verified manifest is then pinned locally for
-retries, and blobs are checked by SHA-256. This detects transfer corruption;
-it does not provide an independently pinned model release. Release tooling
-must add independently reviewed manifest digests before claiming that guarantee.
-Downloads happen on the host only after the size-labelled confirmation button,
-not inside the model service. No report evidence is sent to the registry.
+1. Choose a model file (GGUF) on this computer. To let it look at images,
+   also choose its image add-on file (mmproj GGUF); without one, the model
+   answers from text only, and image questions are answered from the
+   image's stored facts.
+2. Select **Copy and use this model**. Axcess copies the files into its AI
+   folder, checks that they are GGUF files, records their SHA-256, and runs
+   the model in the same private AI service, with no internet and with
+   thinking (reasoning) off.
+
+Axcess cannot check where such a file came from, what licence it has, or
+how good its answers are, and it does not check that it fits in memory.
+Models copied before are listed with a **Use** button each, to switch back
+and forth. **Remove AI features** deletes them with everything else.
+
+### How the private AI service is kept away from the internet
+
+The private AI service runs inside an operating-system sandbox that has no
+internet access.
+
+| System | What happens |
+| --- | --- |
+| Linux | Bubblewrap (`bwrap`) runs the service with no network. Bubblewrap must be installed. Without it, AI does not start. |
+| macOS | A deny-by-default `sandbox-exec` profile allows only the AI program, the models, a scratch folder, the system libraries, the Mac graphics driver (Metal), and the Python needed for the isolation check. Networking is limited to this computer (loopback). |
+| Windows | A Windows AppContainer (the stricter "less privileged" kind) with no network permission, started by Axcess's small sandbox program (`axcess-ai-launcher.exe`). The service can read only the AI program and the models, and write only its scratch folder. Needs Windows 10 version 1809 or later; otherwise AI does not start. Saved results still work. Axcess reaches each model through a local port that accepts only the Axcess program itself. |
+
+- Axcess talks to the service through a private connection: a UNIX socket
+  file in `ai/scratch`, in its data folder.
+- Before startup, an isolation check runs in the same sandbox. The operating
+  system must refuse a test connection to the internet. A timeout does not
+  count. If the check fails, AI stays stopped; report browsing and saved
+  suggestions still work.
+- Axcess never falls back to running the service without the sandbox.
+- A connection file left from an earlier run is not trusted. Axcess sends no
+  model requests to it until the service it started has passed the isolation
+  check.
+- The AI program also runs with its offline setting, but the operating
+  system's sandbox, not that setting, is what blocks the internet.
+- Axcess tries the graphics chip build first: Metal on Apple Silicon Macs,
+  Vulkan on Linux and Windows. If that build cannot load the models, it uses
+  the processor-only (CPU) build. There are no NVIDIA CUDA or AMD ROCm builds.
+- On the graphics build, llama.cpp decides how much of each model goes on the
+  graphics card (its `--fit` setting): what fits, keeping 1 GB spare, and
+  the rest in the computer's memory. **Run AI on the graphics card only**,
+  by **Turn AI off** on the AI features page, keeps every part on the card
+  instead: faster when it fits, and AI does not start when it does not
+  (there is no fallback to the processor build then). Changing it restarts
+  AI if it is on.
+- The bundled AI program, its sandbox and graphics chip use still need
+  testing in a packaged desktop release, and the macOS sandbox on a real Mac.
+
+Each file is pinned in `src/audit/ai/catalog.json`: the AI program by its
+build and SHA-256, and each model file by its Hugging Face repository,
+commit, size and SHA-256. A file that does not match is deleted and never
+used. Downloads happen on this computer only after the size-labelled
+confirmation button, never inside the private AI service. No report evidence
+is sent to Hugging Face or GitHub.
 
 ## Turn it on
 
 **In the desktop app**, choose AI during first launch or open
 **Settings > AI features** (see
 [Set up AI features in the desktop app](#set-up-ai-features-in-the-desktop-app)).
-The desktop download uses a private isolated service, not a newly detected
-system Ollama. Until the private models are there, the
+The desktop app uses its own private AI service, never an Ollama it finds on
+this computer. Until the private models are there, the
 button's place shows what is missing and links to the setup page. Axcess
 never downloads anything until you choose a size and select **Download and
 set up**.
 To turn AI off, use **Turn AI off** in Settings. The saved desktop choice
 takes precedence over `AUDIT_SUGGESTIONS_ENABLED`.
 
-**In the web version** follow all four steps.
+**In the web version** (run from source code, or hosted), you run the AI
+service yourself. Follow all four steps.
 
-1. Install [Ollama](https://ollama.com) and start it.
+1. Install [Ollama](https://ollama.com) and start it. To use a llama.cpp
+   server instead, set `AUDIT_MODEL_BACKEND=llama_cpp` and its address in
+   `AUDIT_LLAMA_CPP_URL`, or its UNIX socket file in `AUDIT_LLAMA_CPP_SOCKET`.
+   Then load the models there instead of step 2.
 2. Install the models. The vision model is optional; without it, image
    suggestions use the text model and do not look at the picture.
 
@@ -219,11 +333,11 @@ takes precedence over `AUDIT_SUGGESTIONS_ENABLED`.
 | `AUDIT_SUGGESTIONS_ENABLED` | `false` (`true` in the desktop app) | Turns the feature on. |
 | `AUDIT_SUGGESTION_TEXT_MODEL` | `qwen2.5-coder:7b-instruct` | Model for all suggestions. |
 | `AUDIT_SUGGESTION_VISION_MODEL` | `qwen2.5vl:7b` | Model used when a picture helps (images, contrast, focus). |
-| `AUDIT_SUGGESTION_TIMEOUT_S` | `120` | Longest wait for one answer, 10 to 600 seconds. |
+| `AUDIT_SUGGESTION_TIMEOUT_S` | `300` | Longest wait for one answer, its second try included, 10 to 600 seconds. A laptop without a separate graphics card can need over 2 minutes. |
 | `AUDIT_SUGGESTION_QUEUE_MAX` | `20` | Most suggestions waiting at once, 1 to 200. |
 | `AUDIT_OLLAMA_BASE_URL` | `http://localhost:11434` | Where Ollama is. Keep it on this computer. |
 
-Axcess asks Ollama for the exact answer shape it checks (structured
+With Ollama, Axcess asks for the exact answer shape it checks (structured
 output), caps the answer's length, and keeps the model loaded for 10
 minutes after the last suggestion so the next one starts faster. Then
 Ollama frees the memory.
@@ -250,7 +364,7 @@ in exports.
 
 | What you see | What to do |
 | --- | --- |
-| A note that suggestions cannot run | Start Ollama, install the model, or run `make migrate`, as the note says. |
+| A note that suggestions cannot run | Do what the note says: in the desktop app, start the private AI service or download the models in **Settings > AI features**; in the web version, start Ollama, install the model, or run `make migrate`. |
 | "The AI model took too long to answer" | Try again when no scan is running, or raise `AUDIT_SUGGESTION_TIMEOUT_S`. |
 | "An answer Axcess could not show safely" or "did not suggest a real change" | Axcess already asked the model a second time, explaining what was wrong. Pressing **Try again** usually gives the same answer, so choose a bigger model in Settings, or fix it by hand with the rule guidance. |
 | "Axcess restarted before the suggestion was finished" | Press **Try again**. |
@@ -271,7 +385,7 @@ The code is in `src/audit/suggest/`:
 | --- | --- |
 | `service.py` | Request rules and refusals; called by thin routes in `web/server.py`. |
 | `context.py` | Builds the evidence from one report and removes secrets. |
-| `provider.py` | Prompt, Ollama calls, and the answer's safety check. |
+| `provider.py` | Prompt, model calls, and the answer's safety check. |
 | `verify.py` | Runs one axe rule on the suggested code, offline. |
 | `queue.py` | The background worker. |
 | `repo.py` | SQL for `fix_suggestions` (migration `0030`). |

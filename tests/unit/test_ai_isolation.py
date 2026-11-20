@@ -1,22 +1,25 @@
-"""Offline AI runtime guards and registry imports; all network clients are fake."""
+"""Offline AI runtime guards and pinned model downloads; all network clients are fake."""
 
 from __future__ import annotations
 
 import hashlib
-import json
-import re
 import subprocess
+import sys
 import threading
 from pathlib import Path
 from unittest.mock import Mock
 
 import httpx
 import pytest
+from pydantic import ValidationError
+from support.two_model import TWO_MODEL, two_model_catalog
 
-from audit.ai.catalog import load_catalog
-from audit.ai.downloader import download_model, model_path, model_present
+from audit.ai import downloader
+from audit.ai import sandbox as sandbox_module
+from audit.ai.catalog import GgufFile, ModelEntry, load_catalog, platform_key
+from audit.ai.downloader import download_model, file_path, model_present, model_remaining
 from audit.ai.manager import AIManager
-from audit.ai.runtime import OllamaRuntime
+from audit.ai.runtime import LlamaRuntime, PausedError, RuntimeSetupError
 from audit.ai.sandbox import (
     NETWORK_PROBE_FLAG,
     IsolationError,
@@ -40,8 +43,18 @@ def test_macos_profile_denies_default_and_allows_only_loopback_network(tmp_path:
     profile = macos_profile(tmp_path / "runtime", tmp_path / "models", tmp_path / "scratch")
     assert "(deny default)" in profile
     network = [line for line in profile.splitlines() if "allow network" in line]
-    assert len(network) == 3
-    assert all('ip "localhost:*"' in line for line in network)
+    # IP networking: loopback only (the router reaches its per-model children).
+    ip_rules = [line for line in network if " ip " in line]
+    assert len(ip_rules) == 3
+    assert all('ip "localhost:*"' in line for line in ip_rules)
+    # The one other network rule is the service's own UNIX socket, and only
+    # inside the scratch folder.
+    other = [line for line in network if line not in ip_rules]
+    scratch = str((tmp_path / "scratch").resolve())
+    assert other == [
+        f'(allow network-bind network-inbound (local unix-socket (subpath "{scratch}")))'
+    ]
+    assert "network-outbound" not in other[0]
     assert "(allow network*)" not in profile
     assert str((tmp_path / "models").resolve()) in profile
     assert "(allow file-read*)" not in profile
@@ -64,7 +77,31 @@ def test_linux_builder_uses_private_network_and_readonly_program(tmp_path, monke
     assert "--unshare-net" in sandbox.prefix
     assert "--ro-bind" in sandbox.prefix
     assert "--share-net" not in sandbox.prefix
-    assert sandbox.command(["ollama", "serve"])[-2:] == ["ollama", "serve"]
+    # No graphics devices unless a GPU build asks for them.
+    assert "/dev/dri" not in sandbox.prefix
+    assert sandbox.command(["llama-server", "--offline"])[-2:] == ["llama-server", "--offline"]
+
+
+def test_linux_gpu_builder_adds_devices_but_keeps_the_private_network(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setattr("audit.ai.sandbox.shutil.which", lambda tool: "/usr/bin/bwrap")
+    sandbox = build_sandbox(
+        tmp_path, tmp_path / "models", tmp_path / "scratch", platform="linux", gpu=True
+    )
+    assert "--unshare-net" in sandbox.prefix
+    assert "--share-net" not in sandbox.prefix
+    devices = [sandbox.prefix[i + 1] for i, a in enumerate(sandbox.prefix) if a == "--dev-bind-try"]
+    assert "/dev/dri" in devices
+    assert all(d.startswith("/dev/") for d in devices)
+    # GPU discovery reads are read-only.
+    reads = [sandbox.prefix[i + 1] for i, a in enumerate(sandbox.prefix) if a == "--ro-bind-try"]
+    assert reads and all(r.startswith("/sys/") for r in reads)
+    writable = [sandbox.prefix[i + 1] for i, a in enumerate(sandbox.prefix) if a == "--bind"]
+    assert writable == [
+        str((tmp_path / "models").resolve()),
+        str((tmp_path / "scratch").resolve()),
+    ]
 
 
 @pytest.mark.parametrize("platform", ["win32", "linux", "darwin"])
@@ -138,154 +175,246 @@ def test_linux_builder_binds_the_executables_folder(tmp_path, monkeypatch) -> No
     assert str(app.resolve()) in binds
 
 
-def _manifest_body(payload: bytes) -> bytes:
-    digest = "sha256:" + hashlib.sha256(payload).hexdigest()
-    return json.dumps(
-        {
-            "schemaVersion": 2,
-            "config": {"digest": digest, "size": len(payload)},
-            "layers": [{"digest": digest, "size": len(payload)}],
-        }
-    ).encode()
+# -- pinned Hugging Face GGUF downloads ---------------------------------------
+
+REVISION = "0123456789abcdef0123456789abcdef01234567"
 
 
-def manifest_pin(payload: bytes = b"a model!") -> str:
-    """The catalogue's pin for the pretend registry's manifest of ``payload``."""
-    return "sha256:" + hashlib.sha256(_manifest_body(payload)).hexdigest()
+def gguf(payload: bytes, name: str = "model-Q4_K_M.gguf", **extra) -> GgufFile:
+    fields = {
+        "repo": "example-org/Example-GGUF",
+        "revision": REVISION,
+        "file": name,
+        "size": len(payload),
+        "sha256": hashlib.sha256(payload).hexdigest(),
+    }
+    fields.update(extra)
+    return GgufFile(**fields)
 
 
-def registry_client(payload: bytes, *, wrong_blob: bool = False):
-    """A pretend registry.ollama.ai that answers as the real one does: the
-    manifest with no ``Docker-Content-Digest`` header (checked against the
-    real registry on 2026-11-16), so a check that needs one fails here too."""
-    body = _manifest_body(payload)
-    seen = []
+def model_entry(*files: GgufFile, tag: str = "text:test") -> ModelEntry:
+    return ModelEntry(
+        tag=tag,
+        size=sum(f.size for f in files),
+        licence="Apache-2.0",
+        gguf=files[0],
+        mmproj=files[1] if len(files) > 1 else None,
+    )
 
-    def respond(request):
-        seen.append((request.method, str(request.url)))
-        assert request.url.scheme == "https" and request.url.host == "registry.ollama.ai"
-        if "/manifests/" in request.url.path:
-            return httpx.Response(
-                200,
-                content=body,
-                headers={"Content-Type": "application/vnd.docker.distribution.manifest.v2+json"},
-            )
-        return httpx.Response(200, content=b"bad-data" if wrong_blob else payload)
+
+def hf_client(files: dict[str, bytes], *, status: int | None = None, extra: bytes = b""):
+    """A fake Hugging Face host serving ``files`` by URL path; honours Range."""
+    seen: list[tuple[str, str, str | None]] = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        seen.append((request.method, str(request.url), request.headers.get("range")))
+        assert request.url.scheme == "https" and request.url.host == "huggingface.co"
+        if status is not None:
+            return httpx.Response(status)
+        body = files[request.url.path] + extra
+        ranged = request.headers.get("range")
+        if ranged:
+            start = int(ranged.removeprefix("bytes=").removesuffix("-"))
+            return httpx.Response(206, content=body[start:])
+        return httpx.Response(200, content=body)
 
     return httpx.Client(transport=httpx.MockTransport(respond)), seen
 
 
-def test_downloader_imports_checksum_verified_offline_model_without_pull(tmp_path) -> None:
-    client, seen = registry_client(b"a model!")
-    progress = []
-    download_model(
-        tmp_path,
-        "text:test",
-        lambda d, t: progress.append((d, t)),
-        threading.Event(),
-        client,
-        manifest=manifest_pin(),
-    )
-    assert model_present(tmp_path, "text:test")
-    assert progress[-1] == (8, 8)
-    assert all(method == "GET" and "/api/pull" not in url for method, url in seen)
-    assert (tmp_path / "manifests/registry.ollama.ai/library/text/test").exists()
-    # The verified local manifest and blob are reused without asking the registry again.
+def _path(entry: GgufFile) -> str:
+    return f"/{entry.repo}/resolve/{entry.revision}/{entry.file}"
+
+
+def test_downloader_fetches_pinned_files_and_verifies_them(tmp_path) -> None:
+    weights, projector = b"model weights!", b"image add-on"
+    text, mmproj = gguf(weights), gguf(projector, name="mmproj-F16.gguf")
+    model = model_entry(text, mmproj, tag="vision:test")
+    client, seen = hf_client({_path(text): weights, _path(mmproj): projector})
+    progress: list[tuple[int, int]] = []
+    assert model_remaining(tmp_path, model) == model.size
+    download_model(tmp_path, model, lambda d, t: progress.append((d, t)), threading.Event(), client)
+    assert model_present(tmp_path, model)
+    assert model_remaining(tmp_path, model) == 0
+    assert progress[-1] == (model.size, model.size)
+    # Only GETs of the exact pinned commit; no branch names, no other host.
+    assert [(m, url) for m, url, _ in seen] == [
+        ("GET", f"https://huggingface.co/example-org/Example-GGUF/resolve/{REVISION}/{f.file}")
+        for f in (text, mmproj)
+    ]
+    for entry, data in ((text, weights), (mmproj, projector)):
+        target = file_path(tmp_path, entry)
+        assert target.is_relative_to(tmp_path)
+        assert target.read_bytes() == data
+    assert not list(tmp_path.rglob("*.part"))
+    # Verified files are reused without asking the server again.
     seen.clear()
-    download_model(
-        tmp_path, "text:test", lambda d, t: None, threading.Event(), client, manifest=manifest_pin()
-    )
+    download_model(tmp_path, model, lambda d, t: None, threading.Event(), client)
     assert seen == []
 
 
-@pytest.mark.parametrize(
-    "tag",
-    [model.tag for tier in load_catalog().tiers for model in (tier.text, tier.vision)],
-)
-def test_downloader_supports_every_catalog_model(tmp_path, tag) -> None:
-    client, seen = registry_client(b"a model!")
-    download_model(
-        tmp_path, tag, lambda d, t: None, threading.Event(), client, manifest=manifest_pin()
-    )
-    assert model_present(tmp_path, tag)
-    name, version = tag.split(":")
-    path, parsed_name, parsed_version = model_path(tmp_path, tag)
-    assert (parsed_name, parsed_version) == (name, version)
-    assert path == tmp_path / "manifests/registry.ollama.ai/library" / name / version
-    assert seen[0][1] == f"https://registry.ollama.ai/v2/library/{name}/manifests/{version}"
+def test_downloader_resumes_a_partial_file_with_a_range_request(tmp_path) -> None:
+    payload = b"0123456789abcdefghij"
+    entry = gguf(payload)
+    model = model_entry(entry)
+    partial = file_path(tmp_path, entry).with_name(entry.file + ".part")
+    partial.parent.mkdir(parents=True)
+    partial.write_bytes(payload[:8])
+    assert model_remaining(tmp_path, model) == len(payload) - 8
+    client, seen = hf_client({_path(entry): payload})
+    download_model(tmp_path, model, lambda d, t: None, threading.Event(), client)
+    assert [r for _, _, r in seen] == ["bytes=8-"]
+    assert model_present(tmp_path, model)
+    assert file_path(tmp_path, entry).read_bytes() == payload
 
 
-@pytest.mark.parametrize("wrong_manifest,wrong_blob", [(True, False), (False, True)])
-def test_downloader_rejects_wrong_checksums(tmp_path, wrong_manifest, wrong_blob) -> None:
-    client, _ = registry_client(b"a model!", wrong_blob=wrong_blob)
-    # A manifest that is not the one the catalogue pins (a tag that moved).
-    pin = "sha256:" + "0" * 64 if wrong_manifest else manifest_pin()
-    with pytest.raises(Exception, match="checksum"):
-        download_model(
-            tmp_path, "text:test", lambda d, t: None, threading.Event(), client, manifest=pin
-        )
-    assert not model_present(tmp_path, "text:test")
+def test_downloader_starts_again_when_the_server_ignores_the_range(tmp_path) -> None:
+    payload = b"0123456789abcdefghij"
+    entry = gguf(payload)
+    partial = file_path(tmp_path, entry).with_name(entry.file + ".part")
+    partial.parent.mkdir(parents=True)
+    partial.write_bytes(b"stale-junk")
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, content=payload)  # ignores Range
+
+    client = httpx.Client(transport=httpx.MockTransport(respond))
+    download_model(tmp_path, model_entry(entry), lambda d, t: None, threading.Event(), client)
+    assert file_path(tmp_path, entry).read_bytes() == payload
+
+
+def test_downloader_deletes_a_file_with_the_wrong_checksum(tmp_path) -> None:
+    payload = b"a model!"
+    entry = gguf(payload, sha256="0" * 64)
+    model = model_entry(entry)
+    client, _ = hf_client({_path(entry): payload})
+    with pytest.raises(RuntimeSetupError, match="checksum"):
+        download_model(tmp_path, model, lambda d, t: None, threading.Event(), client)
+    assert not model_present(tmp_path, model)
+    assert not file_path(tmp_path, entry).exists()
     assert not list(tmp_path.rglob("*.part"))
 
 
-def test_a_kept_manifest_that_is_not_the_pinned_one_is_fetched_again(tmp_path) -> None:
-    """A manifest kept from an earlier catalogue is checked against the pin,
-    not trusted because it is on disk."""
-    client, seen = registry_client(b"a model!")
-    path, _, _ = model_path(tmp_path, "text:test")
-    path.parent.mkdir(parents=True)
-    path.with_name(path.name + ".verified").write_bytes(b'{"stale": true}')
-    download_model(
-        tmp_path, "text:test", lambda d, t: None, threading.Event(), client, manifest=manifest_pin()
-    )
-    assert model_present(tmp_path, "text:test")
-    assert any("/manifests/" in url for _, url in seen)
+def test_downloader_rejects_a_file_larger_than_pinned(tmp_path) -> None:
+    payload = b"a model!"
+    entry = gguf(payload)
+    model = model_entry(entry)
+    client, _ = hf_client({_path(entry): payload}, extra=b"and more")
+    with pytest.raises(RuntimeSetupError, match="larger than expected"):
+        download_model(tmp_path, model, lambda d, t: None, threading.Event(), client)
+    assert not model_present(tmp_path, model)
+    assert not list(tmp_path.rglob("*.part"))
 
 
-def test_every_catalog_model_pins_its_manifest() -> None:
-    """Each model the setup offers names the exact manifest it accepts."""
-    for tier in load_catalog().tiers:
-        for model in (tier.text, tier.vision):
-            assert re.fullmatch(r"sha256:[a-f0-9]{64}", model.manifest), model.tag
+def test_downloader_reports_http_errors_in_plain_words(tmp_path) -> None:
+    payload = b"a model!"
+    entry = gguf(payload)
+    client, _ = hf_client({_path(entry): payload}, status=404)
+    with pytest.raises(RuntimeSetupError, match=r"HTTP 404"):
+        download_model(tmp_path, model_entry(entry), lambda d, t: None, threading.Event(), client)
+    assert not model_present(tmp_path, model_entry(entry))
+
+
+def test_downloader_pause_keeps_the_partial_file(tmp_path) -> None:
+    payload = b"a model!"
+    entry = gguf(payload)
+    client, seen = hf_client({_path(entry): payload})
+    cancel = threading.Event()
+    cancel.set()
+    with pytest.raises(PausedError):
+        download_model(tmp_path, model_entry(entry), lambda d, t: None, cancel, client)
+    assert seen == []
+
+
+def test_downloader_refuses_to_follow_a_redirect_off_https(tmp_path, monkeypatch) -> None:
+    """The default client checks every request, redirects included."""
+    payload = b"a model!"
+    entry = gguf(payload)
+    requested: list[str] = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        requested.append(str(request.url))
+        if request.url.scheme != "https":
+            return httpx.Response(200, content=payload)
+        return httpx.Response(302, headers={"Location": "http://cdn.example/model.gguf"})
+
+    real_client = httpx.Client
+
+    def client_with_fake_transport(**kwargs):
+        return real_client(transport=httpx.MockTransport(respond), **kwargs)
+
+    monkeypatch.setattr(downloader.httpx, "Client", client_with_fake_transport)
+    with pytest.raises(RuntimeSetupError, match="secure connection"):
+        download_model(tmp_path, model_entry(entry), lambda d, t: None, threading.Event())
+    assert requested == [entry.url]
+    assert not model_present(tmp_path, model_entry(entry))
 
 
 @pytest.mark.parametrize(
-    "tag",
+    "field,value",
     [
-        "../escape:test",
-        "https://outside/model:test",
-        "text:../../escape",
-        "..:test",
-        "text:..",
-        ".:test",
-        "text:.",
+        ("repo", "../escape"),
+        ("repo", "https://outside/model"),
+        ("repo", "owner/../../escape"),
+        ("file", "../escape.gguf"),
+        ("file", "sub/dir.gguf"),
+        ("file", ".hidden.gguf"),
+        ("file", "model.bin"),
+        ("revision", "main"),
+        ("sha256", "not-a-checksum"),
     ],
 )
-def test_downloader_rejects_paths_and_external_registry_names(tmp_path, tag) -> None:
-    with pytest.raises(Exception, match="model name"):
-        download_model(tmp_path, tag, lambda d, t: None, threading.Event(), manifest=manifest_pin())
+def test_catalog_file_entries_reject_paths_branches_and_other_hosts(field, value) -> None:
+    with pytest.raises(ValidationError):
+        gguf(b"x", **{field: value})
 
 
-def manager_for(tmp_path, *, enabled=True, desktop=True, source="private"):
+@pytest.mark.parametrize(
+    "model",
+    [model for tier in load_catalog().tiers for model in (tier.text, tier.vision)],
+    ids=lambda m: m.tag,
+)
+def test_every_catalog_model_is_pinned_to_a_commit_over_https(tmp_path, model) -> None:
+    for entry in model.files:
+        assert entry.url == (
+            f"https://huggingface.co/{entry.repo}/resolve/{entry.revision}/{entry.file}"
+        )
+        assert file_path(tmp_path, entry).resolve().is_relative_to(tmp_path.resolve())
+    assert not model_present(tmp_path, model)
+
+
+# -- the manager and the service ---------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _two_model_size(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The manager's catalogue includes a two-model size (see support.two_model)."""
+    monkeypatch.setattr("audit.ai.manager.load_catalog", two_model_catalog)
+
+
+def manager_for(tmp_path, *, enabled=True, desktop=True, source="private", backend="llama_cpp"):
     settings = Settings(data_dir=tmp_path, desktop=desktop)
+    socket = str(tmp_path / "ai" / "scratch" / "llama.sock")
     save_config(
         settings,
         AIConfig(
             source=source,
-            base_url="http://127.0.0.1:12345",
-            tier="small",
-            text_model="text:test",
-            vision_model="vision:test",
+            base_url="http://localhost" if source == "private" else "http://127.0.0.1:12345",
+            backend=backend,
+            socket_path=socket if backend == "llama_cpp" else None,
+            tier="extra_large",
+            text_model=TWO_MODEL.text.served_name,
+            vision_model=TWO_MODEL.vision.served_name,
         ),
     )
     save_preferences(settings, AIPreferences(enabled=enabled, choice_recorded=True))
-    runtime = Mock(spec=OllamaRuntime(tmp_path / "ai", load_catalog()))
+    runtime = Mock(spec=LlamaRuntime(tmp_path / "ai", load_catalog()))
     runtime.running.return_value = False
     runtime.installed.return_value = True
     runtime.has_model.return_value = True
     runtime.download_remaining.return_value = 0
     runtime.isolation_reason = None
-    runtime.start.return_value = "http://127.0.0.1:12345"
+    runtime.start.return_value = socket
+    runtime.service_fields.return_value = {"socket_path": socket, "routes": None}
     return AIManager(settings, Mock(), runtime=runtime), runtime
 
 
@@ -311,10 +440,7 @@ def test_start_states_and_download_size(tmp_path) -> None:
     manager, runtime = manager_for(tmp_path)
     runtime.has_model.return_value = False
     missing = manager.start_runtime()
-    assert (
-        missing.state == "model_missing"
-        and missing.download_bytes == load_catalog().tier("small").size
-    )
+    assert missing.state == "model_missing" and missing.download_bytes == TWO_MODEL.size
     runtime.start.assert_not_called()
     runtime.has_model.return_value = True
     runtime.start.side_effect = IsolationError("network_test_failed", "blocked")
@@ -327,6 +453,7 @@ def test_start_states_and_download_size(tmp_path) -> None:
         "download_bytes": None,
         "tier": None,
     }
+    runtime.start.assert_called_with((TWO_MODEL.text, TWO_MODEL.vision))
     runtime.running.return_value = True
     assert manager.start_runtime().state == "already_running"
     assert manager.runtime_status().isolated
@@ -334,60 +461,298 @@ def test_start_states_and_download_size(tmp_path) -> None:
     assert manager.start_runtime().state == "busy"
 
 
+def test_private_ollama_setup_from_before_llama_cpp_needs_a_new_download(tmp_path) -> None:
+    """Its models are Ollama files nothing runs now; never start or trust it."""
+    manager, runtime = manager_for(tmp_path, backend="ollama")
+    result = manager.start_runtime()
+    assert result.state == "model_missing"
+    runtime.start.assert_not_called()
+    manager.startup()
+    runtime.start.assert_not_called()
+    assert effective_settings(manager.settings).ollama_base_url == "http://127.0.0.1:0"
+
+
+def test_setup_whose_models_left_the_catalog_needs_a_new_download(tmp_path) -> None:
+    manager, runtime = manager_for(tmp_path)
+    config = manager.config()
+    assert config is not None
+    save_config(manager.settings, config.model_copy(update={"text_model": "retired:model"}))
+    assert manager.start_runtime().state == "model_missing"
+    runtime.start.assert_not_called()
+
+
 def test_runtime_refuses_unisolated_start_before_spawning(tmp_path, monkeypatch) -> None:
-    runtime = OllamaRuntime(tmp_path, load_catalog())
+    runtime = LlamaRuntime(tmp_path, load_catalog())
     monkeypatch.setattr("audit.ai.sandbox.shutil.which", lambda tool: None)
     popen = Mock()
     monkeypatch.setattr("audit.ai.runtime.subprocess.Popen", popen)
     with pytest.raises(IsolationError):
-        runtime.start()
+        runtime.start((TWO_MODEL.text, TWO_MODEL.vision))
     popen.assert_not_called()
+    assert not runtime.running()
 
 
+def _installed_runtime(tmp_path, monkeypatch) -> tuple[LlamaRuntime, list[tuple[str, Path]]]:
+    """A runtime with a fake program for every build and models marked present."""
+    bundled = tmp_path / "llama-runtime"
+    servers = []
+    for asset in load_catalog().llama_cpp.assets[platform_key()]:
+        server = bundled / asset.accelerator / "llama-b1" / "llama-server"
+        server.parent.mkdir(parents=True)
+        server.write_text("a checksum-verified test program")
+        servers.append((asset.accelerator, server))
+    runtime = LlamaRuntime(tmp_path / "ai", load_catalog(), bundled_dir=bundled)
+    monkeypatch.setattr(runtime, "has_model", lambda model: True)
+    return runtime, servers
+
+
+@pytest.mark.skipif(sys.platform.startswith("win"), reason="no UNIX socket service on Windows")
 def test_runtime_uses_same_sandbox_for_probe_and_serve_with_clean_environment(
     tmp_path, monkeypatch
 ) -> None:
-    runtime = OllamaRuntime(tmp_path, load_catalog())
-    monkeypatch.setattr("audit.ai.runtime.sys.platform", "darwin")
-    binary = runtime.binary
-    assert binary is not None
-    binary.parent.mkdir(parents=True)
-    binary.write_text("a checksum-verified test program")
-    sandbox = Sandbox(["sandbox-exec", "-p", "deny-outside"])
-    monkeypatch.setattr("audit.ai.runtime.build_sandbox", lambda *args: sandbox)
+    runtime, servers = _installed_runtime(tmp_path, monkeypatch)
+    sandbox = Sandbox(["sandbox", "--deny-outside"])
+    built: list[dict] = []
+
+    def fake_build(*args, **kwargs):
+        built.append(kwargs)
+        return sandbox
+
+    monkeypatch.setattr("audit.ai.runtime.build_sandbox", fake_build)
     probe = Mock()
     monkeypatch.setattr("audit.ai.runtime.test_network_boundary", probe)
     process = Mock()
     process.poll.return_value = None
-    spawn = Mock(return_value=process)
-    monkeypatch.setattr("audit.ai.runtime.subprocess.Popen", spawn)
-    monkeypatch.setattr("audit.ai.runtime.ollama_version", lambda *args, **kwargs: "test")
+    process.pid = 4321
+    ended: list[int] = []
+    monkeypatch.setattr(
+        "audit.ai.runtime._end_group", lambda pgid, process=None: ended.append(pgid)
+    )
+    sock = (tmp_path / "ai" / "scratch" / "llama.sock").resolve()
+
+    def spawn(*_args, **_kwargs):
+        sock.touch()  # the service creates its socket
+        return process
+
+    popen = Mock(side_effect=spawn)
+    monkeypatch.setattr("audit.ai.runtime.subprocess.Popen", popen)
+    monkeypatch.setattr(
+        "audit.ai.runtime._model_states",
+        lambda http: {TWO_MODEL.text.served_name: "loaded", TWO_MODEL.vision.served_name: "loaded"},
+    )
     monkeypatch.setenv("UNTRUSTED_MODEL_KEY", "not-inherited")
-    url = runtime.start()
-    assert url.startswith("http://127.0.0.1:")
+
+    path = runtime.start((TWO_MODEL.text, TWO_MODEL.vision), wait_s=5)
+
+    assert path == str(sock)
     probe.assert_called_once_with(sandbox)
-    argv = spawn.call_args.args[0]
-    assert argv == sandbox.command([str(binary.resolve()), "serve"])
-    assert "pull" not in argv
-    env = spawn.call_args.kwargs["env"]
-    assert env["OLLAMA_HOST"] == url.removeprefix("http://")
-    assert env["OLLAMA_NO_CLOUD"] == "1"
+    accelerator, server = servers[0]
+    # The GPU build (first in the catalog) gets the GPU devices; CPU does not.
+    assert built[-1].get("gpu") is (accelerator != "cpu")
+    argv = popen.call_args.args[0]
+    preset = (tmp_path / "ai" / "scratch" / "models.ini").resolve()
+    assert argv == sandbox.command(
+        [
+            str(server.resolve()),
+            "--models-preset",
+            str(preset),
+            "--models-max",
+            "2",
+            "--host",
+            str(sock),
+            "--no-webui",
+            "--offline",
+        ]
+    )
+    # A socket in the sandbox's scratch folder, never a TCP port.
+    assert "--port" not in argv
+    text = preset.read_text()
+    assert f"[{TWO_MODEL.text.served_name}]" in text and f"[{TWO_MODEL.vision.served_name}]" in text
+    env = popen.call_args.kwargs["env"]
     assert "UNTRUSTED_MODEL_KEY" not in env
-    assert runtime.isolated
+    assert set(env) == {"PATH", "HOME", "TMPDIR", "LLAMA_CACHE", "LD_LIBRARY_PATH"}
+    assert env["HOME"] == str((tmp_path / "ai" / "scratch").resolve())
+    assert runtime.isolated and runtime.running()
     runtime.stop()
-    process.terminate.assert_called_once()
-    assert not runtime.isolated
+    # The stop ends the service's whole process group (its model servers too).
+    assert ended == [4321]
+    assert not runtime.isolated and not runtime.running()
+    assert runtime.socket_path is None
+    assert not sock.exists()
 
 
-def test_saved_private_port_is_never_trusted_without_live_isolation(tmp_path):
+@pytest.mark.skipif(sys.platform.startswith("win"), reason="no UNIX socket service on Windows")
+def test_runtime_falls_back_to_the_cpu_build_when_the_gpu_build_cannot_load(
+    tmp_path, monkeypatch
+) -> None:
+    runtime, servers = _installed_runtime(tmp_path, monkeypatch)
+    if len(servers) < 2:
+        pytest.skip("this platform has one build")
+    built: list[bool] = []
+
+    def fake_build(*_args, gpu=False, **_kwargs):
+        built.append(gpu)
+        return Sandbox(["sandbox"])
+
+    monkeypatch.setattr("audit.ai.runtime.build_sandbox", fake_build)
+    monkeypatch.setattr("audit.ai.runtime.test_network_boundary", Mock())
+    sock = (tmp_path / "ai" / "scratch" / "llama.sock").resolve()
+    spawned: list[str] = []
+    processes: list[Mock] = []
+    ended: list[int] = []
+    monkeypatch.setattr(
+        "audit.ai.runtime._end_group", lambda pgid, process=None: ended.append(pgid)
+    )
+
+    def spawn(argv, **_kwargs):
+        spawned.append(argv[1])
+        sock.touch()
+        process = Mock()
+        process.poll.return_value = None
+        process.pid = 5000 + len(processes)
+        processes.append(process)
+        return process
+
+    monkeypatch.setattr("audit.ai.runtime.subprocess.Popen", Mock(side_effect=spawn))
+    tags = (TWO_MODEL.text.served_name, TWO_MODEL.vision.served_name)
+    monkeypatch.setattr(
+        "audit.ai.runtime._model_states",
+        lambda http: {t: ("failed" if len(spawned) == 1 else "loaded") for t in tags},
+    )
+    path = runtime.start((TWO_MODEL.text, TWO_MODEL.vision), wait_s=5)
+    assert path == str(sock)
+    assert spawned == [str(s.resolve()) for _, s in servers]
+    # Only the GPU build is given the graphics devices.
+    assert built[-2:] == [True, False]
+    assert ended == [5000]  # the GPU build's whole group, before the CPU build
+    assert runtime.accelerator == "cpu" and runtime.isolated
+
+
+def test_graphics_only_never_falls_back_to_the_processor(tmp_path, monkeypatch) -> None:
+    """ "Run AI on the graphics card only" (2026-11-19): a model that does not
+    load on the graphics build leaves AI stopped with its own reason."""
+    runtime, servers = _installed_runtime(tmp_path, monkeypatch)
+    if len(servers) < 2:
+        pytest.skip("this platform has one build")
+    runtime.gpu_only = True
+    monkeypatch.setattr("audit.ai.runtime.build_sandbox", lambda *_a, **_k: Sandbox(["sandbox"]))
+    monkeypatch.setattr("audit.ai.runtime.test_network_boundary", Mock())
+    monkeypatch.setattr("audit.ai.runtime._end_group", lambda pgid, process=None: None)
+    sock = (tmp_path / "ai" / "scratch" / "llama.sock").resolve()
+    spawned: list[str] = []
+
+    def spawn(argv, **_kwargs):
+        spawned.append(argv[1])
+        sock.touch()
+        process = Mock()
+        process.poll.return_value = None
+        process.pid = 6000
+        return process
+
+    monkeypatch.setattr("audit.ai.runtime.subprocess.Popen", Mock(side_effect=spawn))
+    tags = (TWO_MODEL.text.served_name, TWO_MODEL.vision.served_name)
+    monkeypatch.setattr(
+        "audit.ai.runtime._model_states", lambda http: dict.fromkeys(tags, "failed")
+    )
+    with pytest.raises(RuntimeSetupError):
+        runtime.start((TWO_MODEL.text, TWO_MODEL.vision), wait_s=5)
+    # Only the graphics build ran; the preset kept every layer on the card.
+    assert spawned == [str(servers[0][1].resolve())]
+    assert "n-gpu-layers = all" in (tmp_path / "ai" / "scratch" / "models.ini").read_text()
+    assert runtime.isolation_reason == "gpu_only_failed"
+
+
+def _fake_service(tmp_path, monkeypatch, states):
+    """Patch the sandbox and process so ``start`` runs without a real server."""
+    monkeypatch.setattr("audit.ai.runtime.build_sandbox", lambda *a, **k: Sandbox(["sandbox"]))
+    monkeypatch.setattr("audit.ai.runtime.test_network_boundary", Mock())
+    sock = (tmp_path / "ai" / "scratch" / "llama.sock").resolve()
+    process = Mock()
+    process.poll.return_value = None
+    process.pid = 6000
+    # The groups a stop ends, kept on the stand-in for the test to read.
+    process.ended = []
+    monkeypatch.setattr(
+        "audit.ai.runtime._end_group", lambda pgid, _p=None: process.ended.append(pgid)
+    )
+
+    def spawn(*_args, **_kwargs):
+        sock.touch()
+        return process
+
+    monkeypatch.setattr("audit.ai.runtime.subprocess.Popen", Mock(side_effect=spawn))
+    monkeypatch.setattr("audit.ai.runtime._model_states", states)
+    return sock, process
+
+
+@pytest.mark.skipif(sys.platform.startswith("win"), reason="no UNIX socket service on Windows")
+def test_stop_makes_a_start_still_loading_models_give_up(tmp_path, monkeypatch) -> None:
+    runtime, _ = _installed_runtime(tmp_path, monkeypatch)
+    loading = threading.Event()
+
+    def states(_http):
+        loading.set()
+        return {TWO_MODEL.text.served_name: "loading", TWO_MODEL.vision.served_name: "loading"}
+
+    sock, process = _fake_service(tmp_path, monkeypatch, states)
+    errors: list[BaseException] = []
+
+    def start() -> None:
+        try:
+            runtime.start((TWO_MODEL.text, TWO_MODEL.vision), wait_s=10)
+        except BaseException as exc:
+            errors.append(exc)
+
+    thread = threading.Thread(target=start)
+    thread.start()
+    assert loading.wait(5)
+    runtime.stop()
+    thread.join(5)
+    assert not thread.is_alive()
+    assert len(errors) == 1 and isinstance(errors[0], RuntimeSetupError)
+    assert "stopped while it was starting" in str(errors[0])
+    assert process.ended == [6000]
+    assert not runtime.running() and runtime.socket_path is None
+    assert not sock.exists()
+    # The stop request does not linger: the next start works.
+    monkeypatch.setattr(
+        "audit.ai.runtime._model_states",
+        lambda http: {TWO_MODEL.text.served_name: "loaded", TWO_MODEL.vision.served_name: "loaded"},
+    )
+    assert runtime.start((TWO_MODEL.text, TWO_MODEL.vision), wait_s=5) == str(sock)
+
+
+@pytest.mark.skipif(sys.platform.startswith("win"), reason="no UNIX socket service on Windows")
+def test_start_without_models_waits_for_router_health(tmp_path, monkeypatch) -> None:
+    runtime, _ = _installed_runtime(tmp_path, monkeypatch)
+    sock, _process = _fake_service(tmp_path, monkeypatch, lambda http: {})
+    checks: list[int] = []
+
+    def healthy(_http) -> bool:
+        checks.append(1)
+        return len(checks) > 1  # not ready on the first look
+
+    monkeypatch.setattr("audit.ai.runtime._healthy", healthy)
+    monkeypatch.setattr("audit.ai.runtime.time.sleep", lambda _s: None)
+    assert runtime.start((), wait_s=5) == str(sock)
+    assert len(checks) == 2 and runtime.isolated
+
+
+def test_saved_private_socket_is_never_trusted_without_live_isolation(tmp_path):
     manager, runtime = manager_for(tmp_path)
-    assert effective_settings(manager.settings).ollama_base_url == "http://127.0.0.1:0"
-    trust_private_runtime(manager.settings, "http://127.0.0.1:12345", runtime.running)
-    assert effective_settings(manager.settings).ollama_base_url == "http://127.0.0.1:0"
+    socket = str(tmp_path / "ai" / "scratch" / "llama.sock")
+    not_started = tmp_path / "ai" / "scratch" / "not-started.sock"
+    assert effective_settings(manager.settings).model_backend == "llama_cpp"
+    assert effective_settings(manager.settings).llama_cpp_socket == not_started
+    trust_private_runtime(manager.settings, socket, runtime.running)
+    assert effective_settings(manager.settings).llama_cpp_socket == not_started
     runtime.running.return_value = True
-    assert effective_settings(manager.settings).ollama_base_url == "http://127.0.0.1:12345"
+    assert str(effective_settings(manager.settings).llama_cpp_socket) == socket
     runtime.running.return_value = False
-    assert effective_settings(manager.settings).ollama_base_url == "http://127.0.0.1:0"
+    assert effective_settings(manager.settings).llama_cpp_socket == not_started
+    # A running service at another path does not vouch for the saved one.
+    trust_private_runtime(manager.settings, socket + ".other", lambda: True)
+    assert effective_settings(manager.settings).llama_cpp_socket == not_started
 
 
 @pytest.mark.parametrize(
@@ -404,17 +769,237 @@ def test_desktop_model_addresses_cannot_send_evidence_off_host(url):
         AIConfig(
             source="private",
             base_url=url,
-            tier="small",
+            tier="extra_large",
             text_model="text:test",
             vision_model="vision:test",
         )
 
 
 def test_enabling_without_setup_never_silently_selects_system_ollama(tmp_path):
-    from audit.ai.runtime import RuntimeSetupError
-
     settings = Settings(data_dir=tmp_path, desktop=True)
-    manager = AIManager(settings, Mock(), find_system=lambda: "installed-system-version")
+    manager = AIManager(settings, Mock())
     with pytest.raises(RuntimeSetupError, match="not set up"):
         manager.set_enabled(True)
     assert not manager.preferences().enabled
+    assert manager.config() is None
+    assert effective_settings(settings).ollama_base_url == settings.ollama_base_url
+    assert effective_settings(settings).model_backend == settings.model_backend
+
+
+# -- never two services, never more than fits in memory (2026-11-17) ----------
+
+
+def test_the_linux_sandbox_ends_every_process_in_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """--unshare-pid: when the sandbox ends, so do llama.cpp's per-model
+    servers. Before, a stop or crash left them holding models in memory."""
+    monkeypatch.setattr(sandbox_module.shutil, "which", lambda name: f"/usr/bin/{name}")
+    sandbox = build_sandbox(tmp_path, tmp_path, tmp_path, platform="linux")
+    assert "--unshare-pid" in sandbox.prefix and "--die-with-parent" in sandbox.prefix
+
+
+def test_memory_needed_counts_only_what_does_not_fit_on_a_graphics_card() -> None:
+    from audit.ai.runtime import MEMORY_MARGIN_BYTES, WORKING_BYTES_PER_MODEL, memory_needed
+
+    models = list(TWO_MODEL.models)
+    files = sum(m.size for m in models)
+    working = WORKING_BYTES_PER_MODEL * len(models) + MEMORY_MARGIN_BYTES
+    assert memory_needed(models) == files + working
+    assert memory_needed(models, gpu_memory=files * 2) == working
+    # A card smaller than the files: the rest is in the computer's memory.
+    assert memory_needed(models, gpu_memory=4_000_000_000) == files - 4_000_000_000 + working
+
+
+def test_low_free_memory_warns_but_never_stops_a_start(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """2026-11-18: free memory warns instead of refusing; the operating
+    system makes room (it refused even Small on an 8 GB MacBook Air)."""
+    from audit.ai import hardware
+    from audit.ai import runtime as runtime_module
+
+    runtime = LlamaRuntime(tmp_path / "ai", load_catalog())
+    monkeypatch.setattr(runtime_module, "MEMORY_SETTLE_S", 0.0)
+    monkeypatch.setattr(hardware, "available_memory_bytes", lambda: 2_000_000_000)
+    runtime._note_memory(list(TWO_MODEL.models))
+    assert runtime.memory_warning is not None
+    assert runtime.memory_warning.startswith("Memory was low when AI started")
+    assert "2.0 GB was free" in runtime.memory_warning
+    assert runtime.isolation_reason is None
+    # Enough memory, or unknown: no warning.
+    monkeypatch.setattr(hardware, "available_memory_bytes", lambda: None)
+    runtime._note_memory(list(TWO_MODEL.models))
+    assert runtime.memory_warning is None
+
+
+def test_a_size_is_refused_only_on_an_8_gb_computer(
+    tmp_path: Path,
+) -> None:
+    """The one memory refusal left (developer, 2026-11-18: "only refuse to
+    start 16 gb and above on a 8gb laptop"): an 8 GB laptop cannot download
+    or start Standard or Large. A bigger computer starts a size it has less
+    memory than, with a warning on the setup page."""
+    from audit.ai.hardware import Hardware
+    from audit.ai.runtime import NotEnoughMemoryError
+
+    def laptop(gb: int) -> Hardware:
+        return Hardware(gb * 1024**3, 100 * 10**9, True, None, "darwin", "arm64")
+
+    manager, runtime = manager_for(tmp_path)
+    manager.probe = lambda: laptop(8)  # type: ignore[method-assign]
+    with pytest.raises(NotEnoughMemoryError, match="for computers with 16 GB"):
+        manager.install("standard")
+    with pytest.raises(NotEnoughMemoryError, match="this computer has 8 GB"):
+        manager.install("large")
+    # The saved setup is the two-model size (32 GB): Start AI again refuses
+    # and the AI state says why.
+    refused = manager.start_runtime()
+    assert (refused.state, refused.reason) == ("not_isolated", "not_enough_memory")
+    assert runtime.isolation_reason == "not_enough_memory"
+    runtime.start.assert_not_called()
+    # Unknown memory never refuses.
+    manager.probe = lambda: laptop(0)  # type: ignore[method-assign]
+    assert manager.start_runtime().state == "started"
+    # 16 GB and 12 GB start the 32 GB size: memory only warns there.
+    for gb in (16, 12):
+        runtime.reset_mock()
+        manager.probe = lambda gb=gb: laptop(gb)  # type: ignore[method-assign]
+        assert manager.start_runtime().state == "started"
+
+
+@pytest.mark.parametrize(
+    ("memory", "tier", "refused"),
+    [
+        (8, "standard", True),
+        (8, "large", True),
+        (6, "standard", True),
+        (8, "small", False),
+        (4, "small", False),
+        (12, "standard", False),
+        (12, "large", False),
+        (16, "large", False),
+        (0, "large", False),
+    ],
+)
+def test_only_8_gb_or_less_refuses_a_size_for_16_gb_or_more(
+    memory: int, tier: str, refused: bool
+) -> None:
+    from audit.ai.hardware import size_refused
+
+    assert size_refused(memory, load_catalog().tier(tier)) is refused
+
+
+def test_a_graphics_cards_own_memory_counts_toward_the_sizes(tmp_path: Path) -> None:
+    """Developer, 2026-11-19: an 8 GB laptop with an 8 GB card is not refused
+    Standard, because llama.cpp puts what fits on the card."""
+    from audit.ai.hardware import Hardware
+    from audit.ai.runtime import NotEnoughMemoryError
+
+    laptop = Hardware(8 * 1024**3, 100 * 10**9, False, "NVIDIA", "linux", "x86_64")
+    manager, runtime = manager_for(tmp_path)
+    manager.probe = lambda: laptop  # type: ignore[method-assign]
+    runtime.separate_gpu_memory.return_value = 8188 * 1024**2
+    machine = manager.hardware()
+    assert machine.ai_memory_gb == 16
+    manager._require_size_fits(load_catalog().tier("standard"))
+    # Without the card's memory the same laptop is refused.
+    runtime.separate_gpu_memory.return_value = 0
+    with pytest.raises(NotEnoughMemoryError, match="this computer has 8 GB"):
+        manager._require_size_fits(load_catalog().tier("standard"))
+
+
+def test_graphics_devices_are_read_from_llama_cpp() -> None:
+    from audit.ai.hardware import parse_devices
+
+    # Intel Iris Xe (b12284, 2026-11-19): built-in graphics share memory.
+    iris = (
+        "0.00.046.740 D ggml_vulkan: 0 = Intel(R) Iris(R) Xe Graphics (TGL GT2) "
+        "(Intel open-source Mesa driver) | uma: 1 | rebar: 1 | fp16: 1\n"
+        "Available devices:\n"
+        "  Vulkan0: Intel(R) Iris(R) Xe Graphics (TGL GT2) (11771 MiB, 3664 MiB free)\n"
+    )
+    (device,) = parse_devices(iris)
+    assert device.shared and device.total_bytes == 11771 * 1024**2
+    # A separate card next to built-in graphics (the same format, uma: 0).
+    both = (
+        "ggml_vulkan: 0 = NVIDIA GeForce RTX 4060 Laptop GPU (NVIDIA) | uma: 0 | fp16: 1\n"
+        "ggml_vulkan: 1 = AMD Radeon(TM) Graphics (RADV) | uma: 1 | fp16: 1\n"
+        "  Vulkan0: NVIDIA GeForce RTX 4060 Laptop GPU (8188 MiB, 7900 MiB free)\n"
+        "  Vulkan1: AMD Radeon(TM) Graphics (RADV REMBRANDT) (7000 MiB, 6000 MiB free)\n"
+    )
+    card, built_in = parse_devices(both)
+    assert not card.shared and card.name == "NVIDIA GeForce RTX 4060 Laptop GPU"
+    assert built_in.shared
+    # No debug line, or Metal: never counted as extra memory.
+    assert parse_devices("  Vulkan0: Some GPU (8000 MiB, 7000 MiB free)\n")[0].shared
+    assert parse_devices("  MTL0: Apple M2 (10922 MiB, 10922 MiB free)\n")[0].shared
+    assert parse_devices("") == []
+
+
+def test_graphics_only_is_kept_when_ai_is_turned_off_and_on(tmp_path: Path) -> None:
+    manager, runtime = manager_for(tmp_path, enabled=False)
+    runtime.running.return_value = False
+    assert manager.set_gpu_only(True).gpu_only
+    assert runtime.gpu_only is True
+    assert manager.set_enabled(False).gpu_only
+    runtime.start.assert_not_called()
+
+
+def test_changing_graphics_only_restarts_running_ai(tmp_path: Path) -> None:
+    manager, runtime = manager_for(tmp_path)
+    runtime.running.return_value = True
+    manager.start_runtime = Mock()  # type: ignore[method-assign]
+    manager.set_gpu_only(True)
+    runtime.stop.assert_called_once()
+    manager.start_runtime.assert_called_once()
+    # The same value again changes nothing.
+    manager.set_gpu_only(True)
+    runtime.stop.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    ("gib", "sold"),
+    [(15.3, 16), (16.0, 16), (7.6, 8), (8.0, 8), (31.2, 32), (12.7, 13), (0, 0)],
+)
+def test_memory_reads_as_computers_are_sold(gib: float, sold: int) -> None:
+    from audit.ai.hardware import memory_gb
+
+    assert memory_gb(int(gib * 1024**3)) == sold
+
+
+def test_a_service_left_running_is_ended_before_a_new_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from audit.ai import runtime as runtime_module
+
+    runtime = LlamaRuntime(tmp_path / "ai", load_catalog())
+    runtime.scratch.mkdir(parents=True)
+    (runtime.scratch / runtime_module.GROUP_FILE).write_text("4242", encoding="ascii")
+    ended: list[int] = []
+    monkeypatch.setattr(runtime_module, "_group_alive", lambda pgid: True)
+    monkeypatch.setattr(runtime_module, "_group_runs_llama", lambda pgid: pgid == 4242)
+    monkeypatch.setattr(runtime_module, "_end_group", lambda pgid, process=None: ended.append(pgid))
+    runtime._end_leftovers()
+    assert ended == [4242]
+    assert not (runtime.scratch / runtime_module.GROUP_FILE).exists()
+    # A group that no longer runs llama-server (its number reused) is left alone.
+    (runtime.scratch / runtime_module.GROUP_FILE).write_text("777", encoding="ascii")
+    runtime._end_leftovers()
+    assert ended == [4242]
+
+
+def test_a_start_waits_briefly_for_memory_a_stop_gives_back(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Memory comes back a moment after a model stops; the check waits for it
+    before it warns."""
+    from audit.ai import hardware
+    from audit.ai import runtime as runtime_module
+
+    readings = iter([1_000_000_000, 2_000_000_000, 99_000_000_000])
+    monkeypatch.setattr(hardware, "available_memory_bytes", lambda: next(readings))
+    monkeypatch.setattr(runtime_module.time, "sleep", lambda _s: None)
+    runtime = LlamaRuntime(tmp_path / "ai", load_catalog())
+    runtime._note_memory(list(TWO_MODEL.models))
+    assert runtime.memory_warning is None

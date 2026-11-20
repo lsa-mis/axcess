@@ -507,6 +507,21 @@ def get_page_evidence(
     )
     for image in images:
         image["issue_key"] = issue_keys.get(int(image.pop("image_id")))
+    # Whether a fix suggestion can be asked for each occurrence, by the rule
+    # the suggestion service applies, so a screen never offers a button that
+    # is refused.
+    from audit.suggest.context import suggestable
+
+    finding_ok, image_ok = suggestable(
+        conn,
+        scan_id,
+        finding_ids=[int(f["id"]) for f in findings],
+        image_issue_keys=[image["issue_key"] for image in images],
+    )
+    for finding, can in zip(findings, finding_ok, strict=True):
+        finding["can_suggest"] = can
+    for image, can in zip(images, image_ok, strict=True):
+        image["can_suggest"] = can
     # The saved copy is the exact document the image check and the AI review
     # read, so their own walks over it give back the element each occurrence
     # came from. Read only when something needs it.

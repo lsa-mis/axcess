@@ -262,7 +262,7 @@ export default function IssuesRoute() {
       <ReportHeader
         tabs
         scanId={scan.id}
-        previousScanId={scan.previous_scan_id}
+        canCompare={scan.has_other_reports}
         title="Issues"
         // The heading and Export report only (2026-10-30, the developer's
         // request). "Based on the report generated…" under the heading and
@@ -852,6 +852,19 @@ function IssueTable({
                   // same line as the issue types (the developer's report,
                   // 2026-11-16).
                   column === "Issue" && "sticky left-0 z-[1] bg-surface-muted px-4",
+                  // A number column gets 12px at each side, not 6 and 12: the
+                  // heading's words sat 6px from the left line and its arrow
+                  // 12px from the right (measured, 2026-11-16), which read
+                  // as uneven. The body cells below get the same, so the
+                  // numbers end under the heading's arrow.
+                  SORT_KINDS[column] === "number" && column !== "Priority" && "px-3",
+                  // The two count columns are set narrow (6rem): their words
+                  // wrap ("Issue / occurrences") and the numbers are short,
+                  // so the width they took was blank space that pushed the
+                  // table past 1280px (the developer's request, 2026-11-16).
+                  // A width is only a preference in an auto-layout table: it
+                  // can never go below the longest word.
+                  (column === "Occurrences" || column === "Pages") && "w-24",
                   // "How sure ⇅ ?" on one line. Wrapped, the label's box kept
                   // the column's full width, so "sure ⇅" sat centred in it
                   // with a wide gap before the "?" (the developer's
@@ -863,7 +876,7 @@ function IssueTable({
                   // region at 1280px (test_issue_table_fits_the_default_desktop_width).
                   // Their headings sit 2px left of the tags under them; at 6px
                   // the table is still 1px too wide (2026-11-16).
-                  (column === "Type" || column === "Finding type" || column === "Priority") && "px-1",
+                  (column === "Type" || column === "Finding type" || column === "Priority") && "px-1.5",
                 )}
                 hint={columnHint(column)}
                 help={columnHelp(column)}
@@ -925,7 +938,11 @@ const IssueTableRow = memo(function IssueTableRow({
 
   return (
     <Row index={index}>
-      <RowHeader sticky className="min-w-[11rem] max-w-[18rem]">
+      {/* At least 9.5rem: the narrowest the issue titles go before the table
+          is too wide at 1280px. It was 11rem, then 10.5rem; 9.5rem leaves
+          about 20px to spare with a column sorted, so a computer that draws
+          text a little wider (CI, 2026-11-16) still fits. */}
+      <RowHeader sticky className="min-w-[9.5rem] max-w-[18rem]">
         {/* The title is the row's main link and opens the issue's full
             evidence record: what it is, why it matters, the fix, and its
             pages. The page count beside it is the shortcut straight to
@@ -956,10 +973,10 @@ const IssueTableRow = memo(function IssueTableRow({
           <span title={PRIORITY_HELP[priorityTier(row.priority)]}>{priorityTier(row.priority)}</span>
         )}
       </Cell>
-      <Cell numeric className={cell}>
+      <Cell numeric className={cn(cell, "px-3")}>
         {row.occurrence_count}
       </Cell>
-      <Cell numeric className={cell}>
+      <Cell numeric className={cn(cell, "px-3")}>
         {row.page_count}
       </Cell>
       <Cell className={cell}>

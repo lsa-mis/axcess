@@ -1,15 +1,81 @@
 {
-  "ollama": {
-    "version": "0.33.0",
-    "release_url": "https://github.com/ollama/ollama/releases/tag/v0.33.0",
+  "llama_cpp": {
+    "version": "b12284",
+    "release_url": "https://github.com/ggml-org/llama.cpp/releases/tag/b12284",
     "licence": "MIT",
     "assets": {
-      "darwin-arm64": {"name": "ollama-darwin.tgz", "size": 154169325, "sha256": "63e05ad537bc02a9ee790345341ca1aff7803d289fdd4f5fda065190a2087124", "binary": "ollama"},
-      "darwin-x64": {"name": "ollama-darwin.tgz", "size": 154169325, "sha256": "63e05ad537bc02a9ee790345341ca1aff7803d289fdd4f5fda065190a2087124", "binary": "ollama"},
-      "linux-x64": {"name": "ollama-linux-amd64.tar.zst", "size": 1422232853, "sha256": "72c4b9d91c317742ffd11b92e0a7fbe6353072c6354d910f1a03fd3ce40403d4", "binary": "bin/ollama"},
-      "linux-arm64": {"name": "ollama-linux-arm64.tar.zst", "size": 1543385573, "sha256": "c09f5ae1fc90f70ac6e19e325bd958d9c8c02c29ec0908785c21672fab5f4ee4", "binary": "bin/ollama"},
-      "win32-x64": {"name": "ollama-windows-amd64.zip", "size": 1460309471, "sha256": "cb8f0eb7b84efd19222bf5dfa96dac2fe97f963e778c0d92082d4227cce338ee", "binary": "ollama.exe"},
-      "win32-arm64": {"name": "ollama-windows-arm64.zip", "size": 209964143, "sha256": "96bd9dd8dbf82f1076922f7b54f715fbae6bd3526e6609277cf8059500796f5c", "binary": "ollama.exe"}
+      "darwin-arm64": [
+        {
+          "name": "llama-b12284-bin-macos-arm64.tar.gz",
+          "size": 16870569,
+          "sha256": "7965e7701df311c49cfc629cfe14cc5092fcc590ef8c85f4c436a2973031e9d0",
+          "accelerator": "metal"
+        }
+      ],
+      "darwin-x64": [
+        {
+          "name": "llama-b12284-bin-macos-x64.tar.gz",
+          "size": 12613082,
+          "sha256": "4513149cdc86dff07dcfafcaca1b3522b81a2ccd6476e32b9ef185b3fcdbbe49",
+          "accelerator": "cpu"
+        }
+      ],
+      "linux-x64": [
+        {
+          "name": "llama-b12284-bin-ubuntu-vulkan-x64.tar.gz",
+          "size": 36106190,
+          "sha256": "94bfdf9ad9ab4e5544acc71d8699942fe8013b6c3b39f24570262782619de707",
+          "accelerator": "vulkan"
+        },
+        {
+          "name": "llama-b12284-bin-ubuntu-x64.tar.gz",
+          "size": 23284029,
+          "sha256": "50b5f85d45f8ddc7179d1b9b65de6534fbb18dc075942413238cb3471570123f",
+          "accelerator": "cpu"
+        }
+      ],
+      "linux-arm64": [
+        {
+          "name": "llama-b12284-bin-ubuntu-vulkan-arm64.tar.gz",
+          "size": 29382068,
+          "sha256": "1d7574f7143f15c8f600906b8f5f0a7bd0977e284d9729363e0178d5212b9f89",
+          "accelerator": "vulkan"
+        },
+        {
+          "name": "llama-b12284-bin-ubuntu-arm64.tar.gz",
+          "size": 18926615,
+          "sha256": "88cd4ac318056bcbcc05d92613481c303eecb03b6ded77367cbd5711aaba4435",
+          "accelerator": "cpu"
+        }
+      ],
+      "win32-x64": [
+        {
+          "name": "llama-b12284-bin-win-vulkan-x64.zip",
+          "size": 38022154,
+          "sha256": "c1d73d3bfdb3e65556f73a7fe79da2cca64aaa8f27e7ee73cf423890e83d4b76",
+          "accelerator": "vulkan"
+        },
+        {
+          "name": "llama-b12284-bin-win-cpu-x64.zip",
+          "size": 25058030,
+          "sha256": "6b3d2c7034b0c0bac65aa0524ddf01ba9c2b622ce7e32675976df642627defa9",
+          "accelerator": "cpu"
+        }
+      ],
+      "win32-arm64": [
+        {
+          "name": "llama-b12284-bin-win-vulkan-arm64.zip",
+          "size": 25954539,
+          "sha256": "f22800751fd1d2510962dad24f2721a162be54046cdf97e08bcfb4f75dd4b6e4",
+          "accelerator": "vulkan"
+        },
+        {
+          "name": "llama-b12284-bin-win-cpu-arm64.zip",
+          "size": 13408918,
+          "sha256": "be2eb55c767c1066824e2738715d820059bff9cd6f99560daa2f498e5df7f745",
+          "accelerator": "cpu"
+        }
+      ]
     }
   },
   "tiers": [
@@ -17,22 +83,172 @@
       "id": "small",
       "label": "Small",
       "min_memory_gb": 8,
-      "text": {"tag": "qwen3:4b-instruct-2507-q4_K_M", "manifest": "sha256:0edcdef34593eac1aa2be9c7d06c432dcf81945adca5eca2f27662c18f168ba0", "size": 2500000000, "licence": "Apache-2.0"},
-      "vision": {"tag": "qwen3-vl:2b-instruct", "manifest": "sha256:afc393e3572c07db0bc84aa460d928a16c75f3fbb9ca9e0dccc4fbd2dafb573e", "size": 1890000000, "licence": "Apache-2.0"}
+      "text": {
+        "tag": "bonsai2:4b-ternary-q2_0",
+        "size": 1578998144,
+        "licence": "Apache-2.0",
+        "gguf": {
+          "repo": "prism-ml/Ternary-Bonsai-2-4B-gguf",
+          "revision": "50ebba61be85e5be07e8083db468ace0fc1bac43",
+          "file": "Ternary-Bonsai-2-4B-Q2_0.gguf",
+          "size": 1212103520,
+          "sha256": "64a5183b44921bdb5ac4a6f5f92007821d6ebe5c66997d3c147fd214ab9433d4"
+        },
+        "mmproj": {
+          "repo": "prism-ml/Ternary-Bonsai-2-4B-gguf",
+          "revision": "50ebba61be85e5be07e8083db468ace0fc1bac43",
+          "file": "Ternary-Bonsai-2-4B-mmproj-Q8_0.gguf",
+          "size": 366894624,
+          "sha256": "db939d5f9b7014137810205e91d05e5f54afd72b0b3af9d33bd7d82f7906a55d"
+        },
+        "sampling": {
+          "temp": 0.7,
+          "top-p": 0.8,
+          "top-k": 20,
+          "min-p": 0.0,
+          "presence-penalty": 1.5
+        }
+      },
+      "vision": {
+        "tag": "bonsai2:4b-ternary-q2_0",
+        "size": 1578998144,
+        "licence": "Apache-2.0",
+        "gguf": {
+          "repo": "prism-ml/Ternary-Bonsai-2-4B-gguf",
+          "revision": "50ebba61be85e5be07e8083db468ace0fc1bac43",
+          "file": "Ternary-Bonsai-2-4B-Q2_0.gguf",
+          "size": 1212103520,
+          "sha256": "64a5183b44921bdb5ac4a6f5f92007821d6ebe5c66997d3c147fd214ab9433d4"
+        },
+        "mmproj": {
+          "repo": "prism-ml/Ternary-Bonsai-2-4B-gguf",
+          "revision": "50ebba61be85e5be07e8083db468ace0fc1bac43",
+          "file": "Ternary-Bonsai-2-4B-mmproj-Q8_0.gguf",
+          "size": 366894624,
+          "sha256": "db939d5f9b7014137810205e91d05e5f54afd72b0b3af9d33bd7d82f7906a55d"
+        },
+        "sampling": {
+          "temp": 0.7,
+          "top-p": 0.8,
+          "top-k": 20,
+          "min-p": 0.0,
+          "presence-penalty": 1.5
+        }
+      }
     },
     {
       "id": "standard",
       "label": "Standard",
       "min_memory_gb": 16,
-      "text": {"tag": "qwen2.5-coder:7b-instruct", "manifest": "sha256:dae161e27b0e90dd1856c8bb3209201fd6736d8eb66298e75ed87571486f4364", "size": 4680000000, "licence": "Apache-2.0"},
-      "vision": {"tag": "qwen3-vl:4b-instruct", "manifest": "sha256:84f7ed8042fa7cdbd902f7dcb7d0370e032095047cc3244179f263b77b5bc318", "size": 3300000000, "licence": "Apache-2.0"}
+      "text": {
+        "tag": "bonsai2:9b-ternary-q2_0",
+        "size": 3180869792,
+        "licence": "Apache-2.0",
+        "gguf": {
+          "repo": "prism-ml/Ternary-Bonsai-2-9B-gguf",
+          "revision": "82265ccc78ddaac4700286a35e9badcc32376dd9",
+          "file": "Ternary-Bonsai-2-9B-Q2_0.gguf",
+          "size": 2556640128,
+          "sha256": "1f884aa56aacd2bbbb2e4b7abaead2b1102b74a9c75a23fc33dab916813a384d"
+        },
+        "mmproj": {
+          "repo": "prism-ml/Ternary-Bonsai-2-9B-gguf",
+          "revision": "82265ccc78ddaac4700286a35e9badcc32376dd9",
+          "file": "Ternary-Bonsai-2-9B-mmproj-Q8_0.gguf",
+          "size": 624229664,
+          "sha256": "e0cb6f6988cea323ef798cd77d019bbb819af75582f034eaab0e7232314953db"
+        },
+        "sampling": {
+          "temp": 0.7,
+          "top-p": 0.8,
+          "top-k": 20,
+          "min-p": 0.0,
+          "presence-penalty": 1.5
+        }
+      },
+      "vision": {
+        "tag": "bonsai2:9b-ternary-q2_0",
+        "size": 3180869792,
+        "licence": "Apache-2.0",
+        "gguf": {
+          "repo": "prism-ml/Ternary-Bonsai-2-9B-gguf",
+          "revision": "82265ccc78ddaac4700286a35e9badcc32376dd9",
+          "file": "Ternary-Bonsai-2-9B-Q2_0.gguf",
+          "size": 2556640128,
+          "sha256": "1f884aa56aacd2bbbb2e4b7abaead2b1102b74a9c75a23fc33dab916813a384d"
+        },
+        "mmproj": {
+          "repo": "prism-ml/Ternary-Bonsai-2-9B-gguf",
+          "revision": "82265ccc78ddaac4700286a35e9badcc32376dd9",
+          "file": "Ternary-Bonsai-2-9B-mmproj-Q8_0.gguf",
+          "size": 624229664,
+          "sha256": "e0cb6f6988cea323ef798cd77d019bbb819af75582f034eaab0e7232314953db"
+        },
+        "sampling": {
+          "temp": 0.7,
+          "top-p": 0.8,
+          "top-k": 20,
+          "min-p": 0.0,
+          "presence-penalty": 1.5
+        }
+      }
     },
     {
       "id": "large",
       "label": "Large",
       "min_memory_gb": 32,
-      "text": {"tag": "qwen2.5-coder:14b-instruct", "manifest": "sha256:9ec8897f747e246e970bc5cfdda85d22f1123dc2e3d34978a010a75968716849", "size": 8990000000, "licence": "Apache-2.0"},
-      "vision": {"tag": "qwen3-vl:8b-instruct", "manifest": "sha256:70e58e37beb15464e19aa903dedb2cba828b89c0fb186f75ff2738c7347b96eb", "size": 6140000000, "licence": "Apache-2.0"}
+      "text": {
+        "tag": "bonsai2:27b-ternary-q2_0",
+        "size": 8255255904,
+        "licence": "Apache-2.0",
+        "gguf": {
+          "repo": "prism-ml/Ternary-Bonsai-2-27B-gguf",
+          "revision": "839bd57023c1558945afea70a74fa83c054f35f9",
+          "file": "Ternary-Bonsai-2-27B-Q2_0.gguf",
+          "size": 7626008928,
+          "sha256": "4f99aed01b8a877e153f9aa6569a4440fe17c59701cc0953e36d7f460549e70e"
+        },
+        "mmproj": {
+          "repo": "prism-ml/Ternary-Bonsai-2-27B-gguf",
+          "revision": "839bd57023c1558945afea70a74fa83c054f35f9",
+          "file": "Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf",
+          "size": 629246976,
+          "sha256": "6807ede61d570bb86ba34b756a0fa109edc33668604de867c6ea6d8f1d631903"
+        },
+        "sampling": {
+          "temp": 0.7,
+          "top-p": 0.8,
+          "top-k": 20,
+          "min-p": 0.05,
+          "presence-penalty": 1.5
+        }
+      },
+      "vision": {
+        "tag": "bonsai2:27b-ternary-q2_0",
+        "size": 8255255904,
+        "licence": "Apache-2.0",
+        "gguf": {
+          "repo": "prism-ml/Ternary-Bonsai-2-27B-gguf",
+          "revision": "839bd57023c1558945afea70a74fa83c054f35f9",
+          "file": "Ternary-Bonsai-2-27B-Q2_0.gguf",
+          "size": 7626008928,
+          "sha256": "4f99aed01b8a877e153f9aa6569a4440fe17c59701cc0953e36d7f460549e70e"
+        },
+        "mmproj": {
+          "repo": "prism-ml/Ternary-Bonsai-2-27B-gguf",
+          "revision": "839bd57023c1558945afea70a74fa83c054f35f9",
+          "file": "Ternary-Bonsai-2-27B-mmproj-Q8_0.gguf",
+          "size": 629246976,
+          "sha256": "6807ede61d570bb86ba34b756a0fa109edc33668604de867c6ea6d8f1d631903"
+        },
+        "sampling": {
+          "temp": 0.7,
+          "top-p": 0.8,
+          "top-k": 20,
+          "min-p": 0.05,
+          "presence-penalty": 1.5
+        }
+      }
     }
   ]
 }

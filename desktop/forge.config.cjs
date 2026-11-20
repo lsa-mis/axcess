@@ -2,7 +2,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { FuseV1Options, FuseVersion } = require("@electron/fuses");
 
-const resources = ["backend-dist", "playwright-browsers", "ocr-runtime"]
+const resources = ["backend-dist", "playwright-browsers", "ocr-runtime", "llama-runtime"]
   .map((name) => path.join(__dirname, name))
   .filter((candidate) => fs.existsSync(candidate));
 // electron-updater reads resources/app-update.yml before it downloads an

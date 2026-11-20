@@ -1079,6 +1079,50 @@
         }
       }
     },
+    "/api/scans/{scan_id}/pages/export.csv": {
+      "get": {
+        "summary": "Api Scan Pages Csv",
+        "description": "Every page this report visited as one CSV file, in the list's order.\n\nA download a person asks for from the Pages visited list. Refused\nlike the Images ZIP: for a protected report, whose page addresses and\ntitles stay in its store, and while the scan is still running and\nadding pages. A stopped report with saved pages is a report and gets\nits file (AGENTS.md: never refuse an action because a scan stopped).",
+        "operationId": "api_scan_pages_csv_api_scans__scan_id__pages_export_csv_get",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "load_desc",
+                "load_asc",
+                "url_asc",
+                "url_desc",
+                "occurrences_desc",
+                "occurrences_asc",
+                "images_desc",
+                "images_asc",
+                "states_desc",
+                "states_asc"
+              ],
+              "type": "string",
+              "default": "load_desc",
+              "title": "Sort"
+            }
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
     "/api/scans/{scan_id}/documents": {
       "get": {
         "summary": "Api Scan Documents",
@@ -3987,6 +4031,12 @@
             "type": "string",
             "enum": ["ready", "turned_off", "database_update_needed", "model_unavailable", "model_missing"],
             "title": "Reason"
+          },
+          "service": {
+            "type": "string",
+            "enum": ["private", "ollama", "llama_cpp"],
+            "title": "Service",
+            "default": "ollama"
           },
           "text_model": {"type": "string", "title": "Text Model"},
           "vision_model": {"type": "string", "title": "Vision Model"},

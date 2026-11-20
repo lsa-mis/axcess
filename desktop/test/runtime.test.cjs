@@ -107,6 +107,10 @@ test("desktop evidence uses the operating system application-data directory", ()
       path.join("Applications", "Axcess Resources", "ocr-runtime", "bin") + path.delimiter,
     ),
   );
+  assert.equal(
+    env.AUDIT_LLAMA_SERVER_DIR,
+    path.join("Applications", "Axcess Resources", "llama-runtime"),
+  );
 });
 
 test("Ctrl+= zooms in, which the View menu's accelerator never matched", () => {

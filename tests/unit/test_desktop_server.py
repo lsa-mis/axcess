@@ -194,3 +194,34 @@ def test_the_packaged_app_ships_the_check_script_the_fix_brief_reads() -> None:
     on_disk = Path(axcess_check.__file__).read_text(encoding="utf-8")
     assert on_disk == fix_brief.CHECK_SCRIPT
     assert _shipped_package_files().get(script.as_posix()) == f"audit/{script.parent.as_posix()}"
+
+
+def test_the_packaged_app_ships_every_data_file_the_code_reads() -> None:
+    """Every file under src/audit other than Python code (prompts, rules,
+    templates) is copied by the spec: the file itself or a folder above it.
+
+    PyInstaller packs modules but not the files beside them. The semantic
+    checks' prompts were left out, so every packaged scan with those AI
+    checks on failed with "No module named audit.analyzer.semantic.prompts"
+    (developer, 2026-11-19), while every test from source passed.
+    """
+    import audit
+
+    package_dir = Path(audit.__file__).resolve().parent
+    skipped = {"__pycache__", "frontend", "node_modules"}
+    files = {
+        path.relative_to(package_dir).as_posix()
+        for path in package_dir.rglob("*")
+        if path.is_file()
+        and path.suffix not in {".py", ".pyc", ".bak"}
+        and path.name != "README.md"
+        and not skipped.intersection(path.relative_to(package_dir).parts)
+    }
+    shipped = _shipped_package_files()
+    missing = sorted(
+        name
+        for name in files
+        if not any(name == source or name.startswith(source + "/") for source in shipped)
+    )
+    assert "analyzer/semantic/prompts/sc_2_4_4_link_purpose_in_context.txt" in files
+    assert not missing, f"backend.spec does not ship these data files: {missing}"

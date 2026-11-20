@@ -17,25 +17,44 @@ from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
 
+from audit.ai.catalog import ModelEntry, TierId
 from audit.config import Settings
 
 SYSTEM_OLLAMA_URL = "http://127.0.0.1:11434"
+# The HTTP Host header sent through the private service's socket.
+SOCKET_BASE_URL = "http://localhost"
 log = logging.getLogger(__name__)
 _PRIVATE_RUNTIMES: dict[Path, tuple[str, Callable[[], bool]]] = {}
 
 
-def trust_private_runtime(settings: Settings, url: str, running: Callable[[], bool]) -> None:
-    """Process-local proof, never a saved flag that could survive an unsafe restart."""
-    _PRIVATE_RUNTIMES[ai_dir(settings).resolve()] = (url, running)
+def trust_private_runtime(settings: Settings, address: str, running: Callable[[], bool]) -> None:
+    """Process-local proof, never a saved flag that could survive an unsafe restart.
+
+    ``address`` is the private service's UNIX socket path.
+    """
+    _PRIVATE_RUNTIMES[ai_dir(settings).resolve()] = (address, running)
 
 
-def private_runtime_url(settings: Settings, config: AIConfig) -> str:
+def service_address(config: AIConfig) -> str | None:
+    """What identifies a running private service: its socket, or its routes."""
+    if config.routes:
+        return json.dumps(config.routes, sort_keys=True)
+    return config.socket_path
+
+
+def private_runtime_trusted(settings: Settings, config: AIConfig) -> bool:
     trusted = _PRIVATE_RUNTIMES.get(ai_dir(settings).resolve())
-    if trusted is not None and trusted[0] == config.base_url and trusted[1]():
-        return trusted[0]
-    # A previous private port could now belong to an unisolated service. Never
-    # send evidence there merely because its address is in the saved setup.
-    return "http://127.0.0.1:0"
+    address = service_address(config)
+    return trusted is not None and address is not None and trusted[0] == address and trusted[1]()
+
+
+def private_runtime_socket(settings: Settings, config: AIConfig) -> str:
+    if private_runtime_trusted(settings, config) and config.socket_path:
+        return config.socket_path
+    # A socket file left from an earlier run proves nothing about what now
+    # listens there. Point at a path that never exists, so every request
+    # fails closed until this process has started and checked the service.
+    return str(ai_dir(settings) / "scratch" / "not-started.sock")
 
 
 class AIStateError(Exception):
@@ -47,6 +66,10 @@ class AIPreferences(BaseModel):
 
     enabled: bool = False
     choice_recorded: bool = False
+    # "Run AI on the graphics card only": every model layer on the graphics
+    # card, with no processor fallback. Off: llama.cpp puts what fits on the
+    # card and the rest in the computer's memory (runtime.gpu_layers).
+    gpu_only: bool = False
 
 
 def load_preferences(settings: Settings) -> AIPreferences:
@@ -98,10 +121,17 @@ def ai_enabled(settings: Settings) -> bool:
 class AIConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    # "system": an Ollama the person already runs on port 11434.
-    # "private": the pinned Ollama Axcess downloaded into ``data_dir/ai``.
+    # "system": an Ollama the person already runs on port 11434 (saved by
+    # versions before llama.cpp; no longer offered by the setup page).
+    # "private": the sandboxed service Axcess runs from ``data_dir/ai``.
     source: Literal["system", "private"]
     base_url: str
+    # "llama_cpp" for the private service since llama.cpp. A private setup
+    # saved before it says "ollama" and needs its models downloaded again.
+    backend: Literal["ollama", "llama_cpp"] = "ollama"
+    socket_path: str | None = None
+    # Windows: model name -> the launcher's 127.0.0.1 port for that model.
+    routes: dict[str, str] | None = None
 
     @field_validator("base_url")
     @classmethod
@@ -119,10 +149,14 @@ class AIConfig(BaseModel):
             raise ValueError("The desktop AI service must use a local address on this computer.")
         return value.rstrip("/")
 
-    tier: Literal["small", "standard", "large"]
+    # "custom": your own model (``custom_model``), not a catalogue size.
+    tier: TierId | Literal["custom"]
     text_model: str
+    # Empty for your own model without an image add-on: it answers text only.
     vision_model: str
+    custom_model: ModelEntry | None = None
     ollama_version: str | None = None
+    llama_cpp_version: str | None = None
 
 
 def ai_dir(settings: Settings) -> Path:
@@ -153,6 +187,31 @@ def clear_config(settings: Settings) -> None:
     config_path(settings).unlink(missing_ok=True)
 
 
+def _models_bring_sampling(config: AIConfig) -> bool:
+    """True when every model the setup runs has its own sampling settings.
+
+    llama-server then applies them (your own model, or a catalogue model
+    with its maker's recommended values such as Standard's text model), and
+    fix-suggestion requests send no temperature of their own.
+    """
+    if config.custom_model is not None:
+        return bool(config.custom_model.sampling)
+    if config.backend != "llama_cpp" or config.source != "private":
+        return False
+    from audit.ai.catalog import load_catalog
+
+    try:
+        tier = load_catalog().tier(config.tier)
+    except KeyError:
+        return False
+    if (tier.text.served_name, tier.vision.served_name) != (
+        config.text_model,
+        config.vision_model,
+    ):
+        return False
+    return all(m.sampling for m in tier.models)
+
+
 def effective_settings(settings: Settings) -> Settings:
     """Settings with the desktop AI setup applied, or unchanged if none."""
     if not settings.desktop:
@@ -163,19 +222,59 @@ def effective_settings(settings: Settings) -> Settings:
         if settings.suggestions_enabled == enabled:
             return settings
         return settings.model_copy(update={"suggestions_enabled": enabled})
+    if config.source == "private" and config.backend == "llama_cpp" and config.routes:
+        # Windows: one server per model behind the launcher's ports. Not
+        # started and checked by this process: port 0, which never answers.
+        trusted = private_runtime_trusted(settings, config)
+        service: dict[str, object] = {
+            "model_backend": "llama_cpp",
+            "llama_cpp_url": SOCKET_BASE_URL,
+            "llama_cpp_socket": None,
+            "llama_cpp_routes": dict(config.routes)
+            if trusted
+            else dict.fromkeys(config.routes, "http://127.0.0.1:0"),
+        }
+    elif config.source == "private" and config.backend == "llama_cpp":
+        service = {
+            "model_backend": "llama_cpp",
+            "llama_cpp_url": SOCKET_BASE_URL,
+            "llama_cpp_socket": Path(private_runtime_socket(settings, config)),
+            "llama_cpp_routes": None,
+        }
+    elif config.source == "private":
+        # A private Ollama setup from before llama.cpp: nothing runs it any
+        # more. Fail closed (port 0) until the person downloads again.
+        service = {"model_backend": "ollama", "ollama_base_url": "http://127.0.0.1:0"}
+    else:
+        service = {"model_backend": "ollama", "ollama_base_url": config.base_url}
     return settings.model_copy(
         update={
-            "ollama_base_url": (
-                private_runtime_url(settings, config)
-                if config.source == "private"
-                else config.base_url
-            ),
+            **service,
             "vlm_model": config.vision_model,
             "suggestion_text_model": config.text_model,
             "suggestion_vision_model": config.vision_model,
             "suggestions_enabled": enabled,
+            "suggestion_temperature": None
+            if _models_bring_sampling(config)
+            else settings.suggestion_temperature,
         }
     )
+
+
+ModelService = Literal["private", "ollama", "llama_cpp"]
+
+
+def model_service(settings: Settings) -> ModelService:
+    """Which AI service the interface should name in its help text.
+
+    "private": the desktop app's own sandboxed service, set up in Settings >
+    AI features. "ollama": an Ollama the person or an administrator runs.
+    "llama_cpp": a llama.cpp server an administrator configured.
+    """
+    if settings.desktop:
+        config = load_config(settings)
+        return "ollama" if config is not None and config.source == "system" else "private"
+    return "llama_cpp" if settings.model_backend == "llama_cpp" else "ollama"
 
 
 def semantic_model(settings: Settings) -> str | None:

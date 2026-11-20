@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -11,7 +12,7 @@ import {
   type TdHTMLAttributes,
   type ThHTMLAttributes,
 } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, Search } from "lucide-react";
+import { ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, Search } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { ariaSort, nextSort, sortChip, type Sort, type SortKind } from "./sort";
 
@@ -255,7 +256,10 @@ export function TableRegion({
   // Whether the table is wider than the region, so the region scrolls
   // sideways. Measured whenever either changes size.
   const [scrolls, setScrolls] = useState(false);
+  // The table's full width, for the top bar's track (see below).
+  const [scrollWidth, setScrollWidth] = useState(0);
   const [node, setNode] = useState<HTMLDivElement | null>(null);
+  const [top, setTop] = useState<HTMLDivElement | null>(null);
   const setRef = useCallback(
     (element: HTMLDivElement | null) => {
       setNode(element);
@@ -266,7 +270,10 @@ export function TableRegion({
   );
   useEffect(() => {
     if (!node) return;
-    const measure = () => setScrolls(node.scrollWidth > node.clientWidth + 1);
+    const measure = () => {
+      setScrolls(node.scrollWidth > node.clientWidth + 1);
+      setScrollWidth(node.scrollWidth);
+    };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(node);
@@ -283,7 +290,68 @@ export function TableRegion({
       node.removeEventListener("focus", onFocus);
     };
   }, [node]);
+  // The top bar and the region scroll together: moving either moves the
+  // other to the same place. Equal positions end the back-and-forth.
+  useEffect(() => {
+    if (!node || !top) return;
+    top.scrollLeft = node.scrollLeft;
+    const follow = (from: HTMLElement, to: HTMLElement) => () => {
+      if (Math.abs(to.scrollLeft - from.scrollLeft) >= 1) to.scrollLeft = from.scrollLeft;
+    };
+    const fromRegion = follow(node, top);
+    const fromTop = follow(top, node);
+    // A click on the bar would focus it (a scrolling box takes focus), and
+    // focus must never rest on something hidden from screen readers (axe
+    // aria-hidden-focus). It goes to the region instead, the one keyboard
+    // control for this scrolling, so the arrow keys carry on from the click.
+    const toRegion = () => node.focus({ preventScroll: true });
+    node.addEventListener("scroll", fromRegion, { passive: true });
+    top.addEventListener("scroll", fromTop, { passive: true });
+    top.addEventListener("focus", toRegion);
+    return () => {
+      node.removeEventListener("scroll", fromRegion);
+      top.removeEventListener("scroll", fromTop);
+      top.removeEventListener("focus", toRegion);
+    };
+  }, [node, top]);
   return (
+    <>
+      {/* A scroll bar over a table that is wider than its region, at the
+          top, so it shows as soon as the table does that the table scrolls
+          sideways, and it can be dragged without first scrolling down to
+          the region's own bar under the last row (the developer's request,
+          2026-11-16). Shown only while the table scrolls. It is the
+          browser's own scroll bar, on a strip as wide as the region with a
+          track as wide as the table, kept in step with the region (the
+          effect above), and styled thin and always visible
+          (.ax-scrollbar in styles.css), so it does not fade away as
+          overlay scroll bars do on a Mac. Its target size, contrast and
+          forced-colours behaviour are set out there.
+          It is for the pointer only, as a browser's own scroll bar is: a
+          scroll bar is never a Tab stop. The keyboard way to scroll is to
+          focus the scrolling box and use the arrow keys, and the region
+          below is that box (SC 2.1.1 Keyboard, Level A; axe
+          scrollable-region-focusable). So the bar is out of the Tab order
+          (tabIndex -1; without it, recent Chromium makes any scrolling box
+          a Tab stop), hidden from screen readers (aria-hidden: a second
+          thing to scroll, read out, would be two controls for one job, W3C
+          COGA, "Making Content Usable"), and a click on it sends focus to
+          the region (the effect above), so focus never rests on hidden
+          content. It has no scrollbar role, as before: a role="scrollbar"
+          widget (WAI-ARIA APG) would need its own focus, value and arrow
+          keys, all of which the region already gives. Rejected: a drawn bar with a draggable thumb, which
+          would be a custom widget, and a "Scroll for more columns" note,
+          which tells but does not let the reader scroll. */}
+      {scrolls && (
+        <div
+          ref={setTop}
+          aria-hidden="true"
+          tabIndex={-1}
+          className={cn("ax-scrollbar overflow-x-auto overflow-y-hidden border-b border-border", CARD_EDGE)}
+        >
+          <div style={{ width: scrollWidth, height: 1 }} />
+        </div>
+      )}
     <div
       ref={setRef}
       role="region"
@@ -320,6 +388,7 @@ export function TableRegion({
     >
       {children}
     </div>
+    </>
   );
 }
 
@@ -476,13 +545,13 @@ export function SortHeader<K extends string>({
         )}
       >
         <Arrow className="h-3 w-3 shrink-0" aria-hidden />
-        {chip ? chip(sort) : sortChip(kind, sort.direction)}
+        {withDrawnArrows(chip ? chip(sort) : sortChip(kind, sort.direction))}
       </span>
     ) : (
       <Arrow
         className={cn(
           "h-3.5 w-3.5 shrink-0 opacity-40 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100",
-          words && "ml-1 inline-block align-[-2px]",
+          words && (right ? "inline-block" : "ml-1 inline-block align-[-2px]"),
         )}
         aria-hidden
       />
@@ -552,6 +621,22 @@ export function SortHeader<K extends string>({
               {label}
               <span className={cn("mt-0.5 flex", right ? "justify-end" : "justify-start")}>{indicator}</span>
             </span>
+          ) : right ? (
+            // A right-aligned label that wraps ("Issue / occurrences"): the
+            // lines are right-aligned to each other and the arrow stands in
+            // its own column after them, centred on the label. With the
+            // arrow after the last word, the last line was pushed left of the
+            // others and "Issue" no longer ended where "occurrences" did
+            // (the developer's screenshots, 2026-11-16). Rejected: the arrow
+            // inline after the last word, the left-aligned columns' way,
+            // which is right where the lines start on the left. Proximity
+            // and alignment: W3C COGA, "Making Content Usable"
+            // (https://www.w3.org/TR/coga-usable/); the sort mark is still
+            // inside the one button (SC 2.5.3 Label in Name, Level A).
+            <span className="inline-flex items-center gap-1">
+              <span className="text-right">{label}</span>
+              {indicator}
+            </span>
           ) : (
             <span>{withLastWord(label, indicator)}</span>
           )
@@ -615,6 +700,32 @@ function useFitToLines(button: RefObject<HTMLButtonElement | null>, enabled: boo
       el.style.maxWidth = "";
     };
   }, [button, enabled, key]);
+}
+
+/**
+ * A sort chip's words with each "→" drawn as an icon ("high → low").
+ *
+ * The app's font has no arrows, so a typed "→" came from whatever font the
+ * computer had, and took a different width on each one: the Issues table
+ * fitted 1280px here and was 13px too wide in CI with a column sorted
+ * (test_issue_table_fits_the_default_desktop_width, 2026-11-16). The icon is
+ * one width everywhere, like the chip's own direction arrow. The "→" stays
+ * in the text, visually hidden, so the button's name and text are unchanged.
+ */
+function withDrawnArrows(words: string): ReactNode {
+  const parts = words.split("→");
+  if (parts.length === 1) return words;
+  return parts.map((part, index) => (
+    <Fragment key={index}>
+      {index > 0 && (
+        <>
+          <ArrowRight className="h-2.5 w-2.5 shrink-0" aria-hidden />
+          <span className="sr-only">→</span>
+        </>
+      )}
+      {part}
+    </Fragment>
+  ));
 }
 
 /**

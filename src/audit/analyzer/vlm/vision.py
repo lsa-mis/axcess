@@ -13,17 +13,17 @@ timeouts) from :class:`~audit.analyzer.ollama_base.OllamaBase`.
 
 from __future__ import annotations
 
-import base64
 import json
 from typing import Any
 
+from audit.ai.model_client import GenerateRequest
 from audit.analyzer.ollama_base import OllamaBase, OllamaError
 
 __all__ = ["OllamaVisionProvider"]
 
 
 class OllamaVisionProvider(OllamaBase):
-    """Send a screenshot + prompt to a local Ollama vision model → JSON dict."""
+    """Send a screenshot + prompt to a local vision model → JSON dict."""
 
     async def describe_json(
         self,
@@ -36,16 +36,18 @@ class OllamaVisionProvider(OllamaBase):
         emitted. Raises :class:`OllamaError` on transport failure or if the
         model returns non-JSON / a non-object.
         """
-        _ = mime  # Ollama infers the format from the base64 payload.
-        payload = {
-            "model": self._model,
-            "prompt": prompt,
-            "images": [base64.b64encode(image_bytes).decode("ascii")],
-            "stream": False,
-            "format": "json",
-            "options": {"temperature": 0.0},
-        }
-        raw = await self._post_with_retries(payload)
+        raw = await self._generate(
+            GenerateRequest(
+                model=self._model,
+                prompt=prompt,
+                image=image_bytes,
+                # Ollama infers the format from the bytes; llama.cpp gets a
+                # data: URL.
+                image_mime=mime,
+                json_mode=True,
+                temperature=0.0,
+            )
+        )
         try:
             parsed = json.loads(raw)
         except json.JSONDecodeError as exc:

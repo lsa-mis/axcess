@@ -155,7 +155,12 @@ export interface ScanDetail extends ScanSummary {
    *  say. */
   scan_note: string | null;
   by_severity: Record<Severity, number>;
+  /** The latest earlier report of the same site: What changed's default
+   *  baseline. Null on a site's first report. */
   previous_scan_id: number | null;
+  /** Another report of the same site exists, earlier or later, so this
+   *  report offers Compare reports. */
+  has_other_reports: boolean;
   /** How much of the site this scan covered, as facts rather than a
    *  "partial" or "full" label (src/audit/db/reports.py, ScanCoverage). */
   coverage: ScanCoverage;
@@ -319,7 +324,8 @@ export interface LocalAnalysisCapability {
     max_workers: number;
     bundled_in_desktop: boolean;
   };
-  ollama: { reachable: boolean };
+  /** The model service; named for Ollama, it means whichever runs. */
+  ollama: { reachable: boolean; service?: AiService };
   vision: {
     available: boolean;
     model: string;
@@ -1597,6 +1603,9 @@ export interface PageEvidence {
   };
   a11y_findings: Array<{
     id: number;
+    /** A fix suggestion can be asked for: false for an issue marked "for
+     *  information", which the suggestion service refuses. */
+    can_suggest: boolean;
     pipeline: string;
     rule_id: string;
     criterion_sc: string | null;
@@ -1643,6 +1652,9 @@ export interface PageEvidence {
     /** The Images with text issue this image is in; null when the scan made
      *  no finding for it. */
     issue_key: string | null;
+    /** A fix suggestion can be asked for: an image in an issue that is not
+     *  marked "for information" (an alt text that already matches is not). */
+    can_suggest: boolean;
     /** Which element of the saved copy the image came from; null when the
      *  page kept no copy or the copy disagrees with the stored occurrence. */
     locator: ImageLocator | null;
@@ -2000,6 +2012,13 @@ export type SuggestionErrorCode =
   | "restarted"
   | "occurrence_gone"
   | "internal";
+/**
+ * Which AI service help text should name: "private" is the desktop app's
+ * own sandboxed service (Settings > AI features); "ollama" an Ollama the
+ * person runs; "llama_cpp" a llama.cpp server an administrator set up.
+ */
+export type AiService = "private" | "ollama" | "llama_cpp";
+
 export type SuggestionAvailabilityReason =
   | "ready"
   | "turned_off"
@@ -2060,6 +2079,7 @@ export interface SuggestionRecord {
 export interface SuggestionAvailability {
   enabled: boolean;
   reason: SuggestionAvailabilityReason;
+  service: AiService;
   text_model: string;
   vision_model: string;
   missing_models: string[];
@@ -2068,9 +2088,9 @@ export interface SuggestionAvailability {
 }
 
 /** Desktop AI setup (`/api/ai/*`). Only the desktop app serves these. */
-export type AiTierId = "small" | "standard" | "large";
+export type AiTierId = "small" | "standard" | "large" | "extra_large";
 export type AiInstallState = "idle" | "running" | "paused" | "failed" | "done";
-export type AiInstallStep = "program" | "starting" | "text_model" | "vision_model" | "finishing";
+export type AiInstallStep = "program" | "starting" | "model" | "text_model" | "vision_model" | "finishing";
 
 export interface AiModelInfo {
   tag: string;
@@ -2087,6 +2107,10 @@ export interface AiTierPlan {
   models_bytes: number;
   download_bytes: number;
   fits: boolean;
+  /** 8 GB of memory or less and a size for 16 GB or more: cannot be downloaded or started. */
+  refused: boolean;
+  /** The AI program and both models are on this computer and checked. */
+  installed: boolean;
 }
 
 export interface AiInstallStatus {
@@ -2103,18 +2127,37 @@ export interface AiInstallStatus {
 export interface AiSetup {
   source: "system" | "private";
   base_url: string;
-  tier: AiTierId;
+  /** "llama_cpp" for the private service; "ollama" for a setup saved before it. */
+  backend: "ollama" | "llama_cpp";
+  socket_path: string | null;
+  /** "custom": your own model, not one of the sizes. */
+  tier: AiTierId | "custom";
   text_model: string;
+  /** Empty for your own model without an image add-on (text only). */
   vision_model: string;
+  custom_model: {
+    tag: string;
+    size: number;
+    gguf: { sha256: string };
+    mmproj: { sha256: string } | null;
+  } | null;
   ollama_version: string | null;
+  llama_cpp_version: string | null;
 }
 
 export interface AiPlan {
   preferences: AiPreferences;
   hardware: {
     memory_bytes: number;
+    /** Memory as computers are sold (16, not 15.3); 0 when unknown. */
+    memory_gb: number;
+    /** Memory on separate graphics cards, as sold; 0 for none or not known. */
+    gpu_memory_gb: number;
+    /** What the sizes are measured against: memory_gb plus gpu_memory_gb. */
+    ai_memory_gb: number;
     free_disk_bytes: number;
-    accelerator: "apple" | "nvidia" | "amd" | "none";
+    /** "other": a separate graphics card not recognised as NVIDIA or AMD. */
+    accelerator: "apple" | "nvidia" | "amd" | "other" | "none";
   };
   program: {
     version: string;
@@ -2122,17 +2165,36 @@ export interface AiPlan {
     release_url: string;
     download_bytes: number;
     available_for_this_computer: boolean;
-    system_version: string | null;
+    /** True when the desktop app includes the program: setup downloads only models. */
+    included: boolean;
+    /** A graphics build exists for this computer. */
+    gpu_build: boolean;
   };
   tiers: AiTierPlan[];
   recommended: AiTierId | null;
   current: AiSetup | null;
   install: AiInstallStatus;
+  /** Files copied in for "Use your own model", newest first. */
+  my_models: MyModelFile[];
+}
+
+/** One GGUF file copied into the AI folder (``audit.ai.custom.MyModelFile``). */
+export interface MyModelFile {
+  sha256: string;
+  file: string;
+  size: number;
+  kind: "model" | "image_addon";
+  /** The model's own name from the file, or the file name. */
+  name: string;
+  /** An image add-on: the model it was copied with. */
+  for_model: string | null;
 }
 
 export interface AiPreferences {
   enabled: boolean;
   choice_recorded: boolean;
+  /** "Run AI on the graphics card only". */
+  gpu_only: boolean;
 }
 
 /** Private desktop AI service. No download happens when it is started. */
@@ -2148,4 +2210,8 @@ export interface AiRuntimeStatus {
   running: boolean;
   isolated: boolean;
   reason: string | null;
+  /** A start is loading the models (at launch it runs in the background). */
+  starting: boolean;
+  /** While running: the service started with little free memory. */
+  memory_warning?: string | null;
 }

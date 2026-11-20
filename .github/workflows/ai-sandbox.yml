@@ -1,0 +1,116 @@
+name: Private AI sandbox
+
+# Starts the desktop app's private llama.cpp service for real inside the
+# operating system's sandbox (Bubblewrap on Linux, sandbox-exec on macOS) and
+# checks that Axcess reaches it through its UNIX socket while the network
+# check proves outside connections are blocked
+# (tests/integration/test_llama_runtime_live.py). No AI model is downloaded:
+# the service starts with an empty model list. It downloads only the pinned
+# llama.cpp builds, checked against catalog.json.
+#
+# Runs on demand, and on branch pushes and pull requests that change the AI
+# service or this file.
+
+on:
+  workflow_dispatch:
+  # Branch pushes too: a workflow that is not on main yet cannot be started
+  # by hand, and the llama.cpp work lives on its own branch.
+  push:
+    branches-ignore: [main]
+    paths:
+      - "src/audit/ai/**"
+      - "desktop/scripts/bundle-llama-server.py"
+      - "tests/integration/test_llama_runtime_live.py"
+      - "tests/integration/test_ai_sandbox_live.py"
+      - "tests/integration/test_windows_launcher_live.py"
+      - "desktop/ai-launcher/**"
+      - ".github/workflows/ai-sandbox.yml"
+  pull_request:
+    paths:
+      - "src/audit/ai/**"
+      - "desktop/scripts/bundle-llama-server.py"
+      - "tests/integration/test_llama_runtime_live.py"
+      - "tests/integration/test_ai_sandbox_live.py"
+      - "tests/integration/test_windows_launcher_live.py"
+      - "desktop/ai-launcher/**"
+      - ".github/workflows/ai-sandbox.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-sandbox-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sandbox:
+    name: Sandbox on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          python-version: "3.13"
+      - name: Install Bubblewrap
+        if: runner.os == 'Linux'
+        # Ubuntu 24.04 blocks unprivileged user namespaces through AppArmor
+        # by default; desktop distributions Axcess supports allow them.
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends bubblewrap
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Install locked dependencies
+        # Tests import from src; installing the Axcess wheel would need the
+        # packaged React dist, which this job does not build.
+        run: uv sync --frozen --no-install-project
+      - name: Bundle the pinned llama.cpp builds
+        run: uv run --no-sync python desktop/scripts/bundle-llama-server.py
+      - name: Start the private service in the sandbox
+        env:
+          AXCESS_LLAMA_SERVER_DIR: ${{ github.workspace }}/desktop/llama-runtime
+          PYTHONPATH: src
+        run: >-
+          uv run --no-sync pytest -v -p no:cacheprovider
+          tests/integration/test_llama_runtime_live.py
+          tests/integration/test_ai_sandbox_live.py
+      - name: Show what the network check sees
+        if: failure()
+        env:
+          PYTHONPATH: src
+        run: uv run --no-sync python scripts/ai_sandbox_diagnose.py
+      - name: Show the service log
+        if: failure()
+        run: find /tmp -maxdepth 3 -name llama-server.log -exec tail -n 80 {} \; || true
+
+  windows:
+    name: Sandbox on windows-2022
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          python-version: "3.13"
+      - name: Install locked dependencies
+        run: uv sync --frozen --no-install-project
+      - name: Bundle the pinned llama.cpp builds
+        run: uv run --no-sync python desktop/scripts/bundle-llama-server.py
+      - name: Build the sandbox launcher
+        shell: pwsh
+        run: desktop/ai-launcher/build.ps1 -Output desktop/llama-runtime/axcess-ai-launcher.exe
+      - name: Launcher smoke test (check, serve, other process refused, stop)
+        shell: pwsh
+        run: >-
+          desktop/ai-launcher/smoke.ps1 -Launcher desktop/llama-runtime/axcess-ai-launcher.exe
+          -Runtime desktop/llama-runtime -WorkDir "$env:RUNNER_TEMP\axl"
+      - name: Python reaches the sandboxed service through the launcher
+        env:
+          AXCESS_LLAMA_SERVER_DIR: ${{ github.workspace }}\desktop\llama-runtime
+          PYTHONPATH: src
+        run: uv run --no-sync pytest -v -p no:cacheprovider tests/integration/test_windows_launcher_live.py

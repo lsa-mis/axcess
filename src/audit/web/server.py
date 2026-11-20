@@ -52,7 +52,14 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from audit import __version__, coverage_matrix, evaluation, occurrence_reviews
 from audit.ai.manager import AIManager
-from audit.ai.state import AIConfig, ai_enabled, initialize_preferences
+from audit.ai.model_client import (
+    ModelEndpoint,
+    ModelServiceError,
+    endpoint_from_settings,
+    make_model_client,
+    open_model_http_client,
+)
+from audit.ai.state import AIConfig, ai_enabled, initialize_preferences, model_service
 from audit.ai.state import effective_settings as effective_ai_settings
 from audit.ai.state import load_config as load_ai_config
 from audit.ai.state import semantic_model as ai_semantic_model
@@ -76,6 +83,7 @@ from audit.crawler.orchestrator import (
     CrawlSummary,
     build_search_explorer,
     build_vision_provider,
+    model_http_client,
     run_crawl,
 )
 from audit.crawler.search import SearchConfig, search_url_allowed
@@ -144,6 +152,7 @@ from audit.web.comparison import (
     Pipeline,
     SiteHistory,
     compare_reports,
+    has_other_report,
     previous_scan_id,
     site_history,
 )
@@ -1059,12 +1068,15 @@ def create_app(
             return
         provider = suggestion_state["provider"]
         if provider is None:
-            client = httpx.AsyncClient()
+            endpoint = endpoint_from_settings(settings)
+            client = open_model_http_client(endpoint)
             suggestion_state["client"] = client
             provider = OllamaSuggestionProvider(
                 client,
-                base_url=settings.ollama_base_url,
+                base_url=endpoint.base_url,
                 timeout_s=settings.suggestion_timeout_s,
+                backend=endpoint.backend,
+                temperature=settings.suggestion_temperature,
             )
             suggestion_state["provider"] = provider
         worker = SuggestionWorker(
@@ -1168,6 +1180,11 @@ def create_app(
         releases_work = request.url.path.startswith("/api/agents/") and request.url.path.endswith(
             "/work"
         )
+        # Copying your own model file can take minutes and only adds a
+        # checked file to the AI folder; switching to it (".../use") is
+        # serialized like every other AI change.
+        if request.method == "PUT" and request.url.path == "/api/ai/my-models":
+            related = False
         if (
             base_settings.desktop
             and related
@@ -1181,12 +1198,22 @@ def create_app(
         ai_state["loop"] = asyncio.get_running_loop()
         manager = ai_state["manager"]
         if manager is not None:
-            await asyncio.to_thread(manager.startup)
+            # In the background: the private service loads both models
+            # before it counts as started, which can take a while, and the
+            # app should open at once. Until it is ready, AI requests fail
+            # closed (``private_runtime_socket``) and say the service is
+            # not running.
+            ai_state["startup"] = asyncio.create_task(asyncio.to_thread(manager.startup))
 
     async def _stop_ai_runtime() -> None:
         manager = ai_state["manager"]
         if manager is not None:
+            # Stopping also ends a start that is still loading models.
             await asyncio.to_thread(manager.shutdown)
+            startup = ai_state.get("startup")
+            if startup is not None:
+                with contextlib.suppress(Exception):
+                    await startup
 
     if ai_state["manager"] is not None:
         app.middleware("http")(_serialize_desktop_ai_changes)
@@ -1389,6 +1416,7 @@ def create_app(
             protection = _get_protected_scan_compat(conn, scan_id=scan_id)
             breakdown = _severity_breakdown(conn, scan_id)
             prev = previous_scan_id(conn, scan)
+            other_reports = prev is not None or has_other_report(conn, scan)
             blocked = _detect_blocked_scan(conn, scan_id, scan)
             progress = _scan_progress(conn, scan_id) if scan["status"] == "running" else None
             method_coverage = _scan_method_coverage(conn, scan_id)
@@ -1398,6 +1426,10 @@ def create_app(
             "error_count": int(scan.get("error_count") or 0),
             "by_severity": {level: int(breakdown.get(level, 0)) for level in _SEVERITY_OPTIONS},
             "previous_scan_id": prev,
+            # Another report of the same site, earlier or later: the report
+            # then offers Compare reports. ``previous_scan_id`` is only the
+            # earlier one, which a site's first report never has.
+            "has_other_reports": other_reports,
             # How much of the site this scan covered, as facts: pages found,
             # pages visited, the limits chosen and how it ended. This replaces
             # the old "partial report" label for a stopped scan.
@@ -1488,7 +1520,7 @@ def create_app(
                         "max_workers": settings.ocr_max_workers,
                         "bundled_in_desktop": bool(shutil.which("tesseract")),
                     },
-                    "ollama": {"reachable": False},
+                    "ollama": {"reachable": False, "service": model_service(settings)},
                     "vision": {
                         "available": False,
                         "model": settings.vlm_model,
@@ -1507,21 +1539,18 @@ def create_app(
             )
 
         installed: dict[str, int] = {}
+        # Named for Ollama in the response; it means "the model service".
         ollama_reachable = False
+        endpoint = endpoint_from_settings(settings)
         try:
-            async with httpx.AsyncClient(timeout=2.0) as client:
-                response = await client.get(f"{settings.ollama_base_url.rstrip('/')}/api/tags")
-                response.raise_for_status()
-                payload = response.json()
-            models = payload.get("models", []) if isinstance(payload, dict) else []
-            for model in models if isinstance(models, list) else []:
-                if not isinstance(model, dict):
-                    continue
-                name = str(model.get("name") or "").strip()
-                if name:
-                    installed[name] = max(0, int(model.get("size") or 0))
+            async with open_model_http_client(endpoint, timeout=2.0) as client:
+                served = await make_model_client(
+                    endpoint.backend, client, base_url=endpoint.base_url
+                ).ready_models()
+            for model in served:
+                installed[model.name] = model.size_bytes or 0
             ollama_reachable = True
-        except (httpx.HTTPError, ValueError, TypeError, json.JSONDecodeError):
+        except ModelServiceError:
             pass
 
         def installed_size(model: str) -> int | None:
@@ -1551,7 +1580,7 @@ def create_app(
                     "max_workers": settings.ocr_max_workers,
                     "bundled_in_desktop": bool(shutil.which("tesseract")),
                 },
-                "ollama": {"reachable": ollama_reachable},
+                "ollama": {"reachable": ollama_reachable, "service": model_service(settings)},
                 "vision": {
                     "available": vision_size is not None,
                     "model": vision_model,
@@ -1560,9 +1589,9 @@ def create_app(
                         None
                         if vision_size is not None
                         else (
-                            f"Install the local model with: ollama pull {vision_model}"
+                            _model_missing_reason(settings, [vision_model])
                             if ollama_reachable
-                            else "Ollama is not running on this computer."
+                            else _service_down_reason(settings)
                         )
                     ),
                 },
@@ -1576,9 +1605,9 @@ def create_app(
                         None
                         if ollama_reachable and not semantic_missing
                         else (
-                            "Missing local model(s): " + ", ".join(semantic_missing)
+                            _model_missing_reason(settings, semantic_missing)
                             if ollama_reachable
-                            else "Ollama is not running on this computer."
+                            else _service_down_reason(settings)
                         )
                     ),
                 },
@@ -1740,12 +1769,13 @@ def create_app(
             _sync_sign_in_window(existing)
             return _sign_in_json(_sign_in_state(existing, already_waiting=True))
 
-        local_vlm_url = _local_login_ollama_url(settings.ollama_base_url)
-        if not body.skip_vlm and local_vlm_url is None:
+        local_model = _local_login_model_endpoint(settings)
+        if not body.skip_vlm and local_model is None:
             return JSONResponse(
                 {
                     "error": (
-                        "Protected VLM analysis requires Ollama on a literal loopback "
+                        "AI image checks on a signed-in site need the AI service on this "
+                        "computer: a private connection (UNIX socket) or a literal loopback "
                         "address such as http://127.0.0.1:11434."
                     )
                 },
@@ -1797,7 +1827,10 @@ def create_app(
             ocr_min_word_count=settings.ocr_min_word_count,
             vlm_enabled=not body.skip_vlm,
             vlm_model=settings.vlm_model,
-            vlm_base_url=local_vlm_url or "http://127.0.0.1:11434",
+            vlm_base_url=local_model.base_url if local_model else "http://127.0.0.1:11434",
+            model_backend=local_model.backend if local_model else "ollama",
+            model_socket=local_model.socket_path if local_model else None,
+            model_routes=dict(local_model.routes) or None if local_model else None,
             vlm_prompt_name=settings.vlm_prompt_name,
             vlm_concurrency=1,
             semantic_enabled=not body.skip_semantic and ai_enabled(settings),
@@ -2460,6 +2493,42 @@ def create_app(
                 conn, scan_id, limit=limit, offset=offset, sort=sort
             )
 
+    @app.get("/api/scans/{scan_id:int}/pages/export.csv")
+    def api_scan_pages_csv(
+        scan_id: int,
+        request: Request,
+        sort: pages_queries.PageSort = pages_queries.DEFAULT_SORT,
+    ) -> Response:
+        """Every page this report visited as one CSV file, in the list's order.
+
+        A download a person asks for from the Pages visited list. Refused
+        like the Images ZIP: for a protected report, whose page addresses and
+        titles stay in its store, and while the scan is still running and
+        adding pages. A stopped report with saved pages is a report and gets
+        its file (AGENTS.md: never refuse an action because a scan stopped).
+        """
+        from audit.exports.pages_csv import pages_csv_filename, render_pages_csv
+
+        with get_conn() as conn:
+            if _get_protected_scan_compat(conn, scan_id=scan_id) is not None:
+                raise HTTPException(
+                    status_code=403,
+                    detail="A protected report's list of pages cannot be downloaded.",
+                )
+            scan = _load_scan_or_404(conn, scan_id)
+            _require_ended_report(scan)
+            rows = pages_queries.all_scan_pages(conn, scan_id, sort=sort)
+        body = render_pages_csv(
+            rows, scan_id=scan_id, app_base_url=f"{str(request.base_url).rstrip('/')}/app"
+        )
+        return Response(
+            content=body,
+            media_type="text/csv; charset=utf-8",
+            headers={
+                "Content-Disposition": f'attachment; filename="{pages_csv_filename(scan_id)}"'
+            },
+        )
+
     @app.get("/api/scans/{scan_id:int}/documents", response_model=ScanDocumentsResponse)
     def api_scan_documents(
         scan_id: int,
@@ -3110,6 +3179,22 @@ def create_app(
                     "Ask the person who runs Axcess to set one."
                 ),
             )
+        manager = ai_state.get("manager")
+        if (
+            manager is not None
+            and (ai_config := load_ai_config(settings)) is not None
+            and ai_config.source == "private"
+            and not manager.runtime.running()
+        ):
+            # Said plainly, not as "did not give a usable answer": nothing
+            # was asked, because the service is not running.
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "The private AI service is not running. Start it in Settings → "
+                    "AI features, then try again."
+                ),
+            )
         if not target.can_check:
             raise HTTPException(
                 status_code=422,
@@ -3134,8 +3219,10 @@ def create_app(
         try:
             # trust_env=False: proxy settings in the environment
             # (HTTP_PROXY, ALL_PROXY) must not route the image and page text
-            # through another computer; the address is loopback only.
-            async with httpx.AsyncClient(trust_env=False) as client:
+            # through another computer; the service is on this computer.
+            open_client = getattr(factory, "open_client", None)
+            client_cm = open_client() if open_client else httpx.AsyncClient(trust_env=False)
+            async with client_cm as client:
                 checker = factory(client)
                 answer = await asyncio.wait_for(
                     checker.check(image_bytes, given),
@@ -4275,6 +4362,7 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
     if scan_engine not in {"axe", "alfa", "both"}:
         # Legacy non-browser callers retain the original axe-default behavior.
         scan_engine = "axe"
+    model_endpoint = endpoint_from_settings(settings)
     # A browser name chosen on New scan (already checked by
     # ``user_agent_refusal``); otherwise the server's own name. robots.txt
     # is matched against the server's own name either way.
@@ -4306,7 +4394,10 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
         ocr_min_word_count=settings.ocr_min_word_count,
         vlm_enabled=not bool(form["skip_vlm"]) and ai_enabled(settings),
         vlm_model=settings.vlm_model,
-        vlm_base_url=settings.ollama_base_url,
+        vlm_base_url=model_endpoint.base_url,
+        model_backend=model_endpoint.backend,
+        model_socket=model_endpoint.socket_path,
+        model_routes=dict(model_endpoint.routes) or None,
         vlm_prompt_name=settings.vlm_prompt_name,
         vlm_concurrency=settings.vlm_concurrency,
         semantic_model=ai_semantic_model(settings),
@@ -4453,9 +4544,10 @@ def _alt_checker_factory_for(settings: Settings) -> Any:
 
     The check sends the saved image, its text and nearby page text to the
     model, and the Images tab says that stays on this computer. So it runs
-    only against a literal loopback Ollama address and never with an Ollama
-    cloud model (tag "cloud" or "...-cloud"), which runs on Ollama's servers
-    even through the local daemon.
+    only on a model service on this computer (``_local_login_model_endpoint``:
+    the desktop app's private service, or a literal loopback address) and
+    never with an Ollama cloud model (tag "cloud" or "...-cloud"), which runs
+    on Ollama's servers even through the local daemon.
     """
     from audit.analyzer.ollama_base import is_cloud_model
 
@@ -4470,17 +4562,36 @@ def _alt_checker_factory_for(settings: Settings) -> Any:
         )
     if not model or is_cloud_model(model):
         return None
-    url = _local_login_ollama_url(settings.ollama_base_url)
-    if url is None:
+    endpoint = _local_login_model_endpoint(settings)
+    if endpoint is None:
         return None
-    timeout_s = settings.alt_check_timeout_s
+    return _AltCheckerFactory(endpoint, model, settings.alt_check_timeout_s)
 
-    def factory(client: httpx.AsyncClient) -> Any:
+
+@dataclass(frozen=True)
+class _AltCheckerFactory:
+    """Builds the alt text checker for one model service on this computer."""
+
+    endpoint: ModelEndpoint
+    model: str
+    timeout_s: float
+
+    def open_client(self) -> httpx.AsyncClient:
+        """A client that reaches the service: its socket or routes, or the
+        loopback address. Never a proxy (trust_env=False): the image and page
+        text must not go through another computer."""
+        return open_model_http_client(self.endpoint, trust_env=False)
+
+    def __call__(self, client: httpx.AsyncClient) -> Any:
         from audit.analyzer.vlm.alt_check import OllamaAltChecker
 
-        return OllamaAltChecker(client, model=model, base_url=str(url), timeout_s=timeout_s)
-
-    return factory
+        return OllamaAltChecker(
+            client,
+            model=self.model,
+            base_url=self.endpoint.base_url,
+            timeout_s=self.timeout_s,
+            backend=self.endpoint.backend,
+        )
 
 
 async def _run_local_login_background(
@@ -4507,6 +4618,10 @@ async def _run_local_login_background(
     # the visual check's vision model); browser_only or the authenticated
     # static fetcher keeps it from fetching protected documents.
     local_client = httpx.AsyncClient(trust_env=False)
+    # The visual check's model client: ``local_client`` for an Ollama
+    # address, or one for the private AI service's socket or routes, the
+    # same one a public scan's checks use (``model_http_client``).
+    vision_client: httpx.AsyncClient | None = None
     try:
         run.status = "verifying_authentication"
         if not config.browser_headless and not run.session.window_open:
@@ -4601,7 +4716,10 @@ async def _run_local_login_background(
             visual_probe=(
                 VisualProbe(
                     provider=(
-                        await build_vision_provider(config, local_client)
+                        await build_vision_provider(
+                            config,
+                            vision_client := model_http_client(config, local_client),
+                        )
                         if config.vlm_enabled
                         else None
                     )
@@ -4684,6 +4802,8 @@ async def _run_local_login_background(
         _finish_local_login_scan(db_path, run.scan_id, "failed")
         log.warning("web.local_login_scan_failed", scan_id=run.scan_id)
     finally:
+        if vision_client is not None and vision_client is not local_client:
+            await vision_client.aclose()
         await local_client.aclose()
         if conn is not None:
             conn.close()
@@ -4767,6 +4887,49 @@ def _local_login_completion(summary: CrawlSummary) -> tuple[str, str | None]:
     if summary.status in {"completed", "failed", "interrupted"}:
         return summary.status, None
     return "failed", "The login scan ended before Axcess could finish the report."
+
+
+def _service_down_reason(settings: Settings) -> str:
+    """Why AI checks cannot run: the service in use is not reachable."""
+    service = model_service(settings)
+    if service == "private":
+        return "The private AI service is not running. Start it in Settings → AI features."
+    if service == "llama_cpp":
+        return "Axcess cannot reach its AI service. Ask the person who set up Axcess."
+    return "Ollama is not running on this computer."
+
+
+def _model_missing_reason(settings: Settings, models: list[str]) -> str:
+    """Why AI checks cannot run: the service lacks a model."""
+    service = model_service(settings)
+    if service == "private":
+        return "The AI models are not downloaded. Download them in Settings → AI features."
+    if service == "llama_cpp":
+        return "The AI service does not have this model: " + ", ".join(models)
+    if len(models) == 1:
+        return f"Install the local model with: ollama pull {models[0]}"
+    return "Missing local model(s): " + ", ".join(models)
+
+
+def _local_login_model_endpoint(settings: Settings) -> ModelEndpoint | None:
+    """The model service for signed-in content, only if it is on this computer.
+
+    A UNIX socket is a file on this computer, so it is local by
+    construction; a TCP address must be a literal loopback address.
+    """
+    endpoint = endpoint_from_settings(settings)
+    if endpoint.routes:
+        # Windows private service: every route is a launcher port on
+        # 127.0.0.1 that accepts only this Axcess process.
+        if all(_local_login_ollama_url(url) for _, url in endpoint.routes):
+            return endpoint
+        return None
+    if endpoint.socket_path:
+        return endpoint
+    url = _local_login_ollama_url(endpoint.base_url)
+    if url is None:
+        return None
+    return ModelEndpoint(endpoint.backend, url)
 
 
 def _local_login_ollama_url(value: str) -> str | None:
@@ -5565,11 +5728,12 @@ def _saved_page_count(conn: sqlite3.Connection, scan_id: int) -> int:
 
 
 def _require_ended_report(scan: dict[str, Any]) -> None:
-    """Guard the Images tab's alt check and ZIP: a report, not a live crawl.
+    """Guard the Images tab's alt check and ZIP, and the Pages visited CSV:
+    a report, not a live crawl.
 
     A report is a completed scan or one that ended with saved pages, however
     it ended (the rule since 2026-11-14, ``sites.group_scans``). A running
-    scan is still adding images, so it is refused until it ends.
+    scan is still adding pages and images, so it is refused until it ends.
     """
     ended = scan["status"] != "running"
     if not (scan["status"] == "completed" or (ended and int(scan.get("page_count") or 0) > 0)):
