@@ -262,7 +262,7 @@ export default function IssuesRoute() {
       <ReportHeader
         tabs
         scanId={scan.id}
-        previousScanId={scan.previous_scan_id}
+        canCompare={scan.has_other_reports}
         title="Issues"
         // The heading and Export report only (2026-10-30, the developer's
         // request). "Based on the report generated…" under the heading and

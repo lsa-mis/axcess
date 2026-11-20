@@ -1225,7 +1225,7 @@ export default function InspectorRoute() {
     <>
       <ReportHeader
         scanId={scan}
-        previousScanId={scanData?.previous_scan_id ?? null}
+        canCompare={scanData?.has_other_reports ?? false}
         title={displayTitle}
         meta={
           // The URL is the part worth a line: an issue's pages often share a

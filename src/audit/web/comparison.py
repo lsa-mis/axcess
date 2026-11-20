@@ -226,6 +226,29 @@ def previous_scan_id(conn: sqlite3.Connection, scan: dict[str, Any]) -> int | No
     return None
 
 
+def has_other_report(conn: sqlite3.Connection, scan: dict[str, Any]) -> bool:
+    """Whether another public report of the same normalized seed scope exists,
+    earlier or later.
+
+    Decides whether a report offers Compare reports, which can pair it with
+    any other report of its site. ``previous_scan_id`` is only the earlier
+    one, so a site's first report had no Compare reports tab even once a
+    later report existed. The reports counted are the ones ``previous_scan_id``
+    and ``site_history`` count.
+    """
+    if _protected(conn, int(scan["id"])):
+        return False
+    scope = site_scope(str(scan["seed_url"]))
+    rows = conn.execute(
+        "SELECT id, seed_url FROM scans WHERE (status = 'completed' OR page_count > 0) AND id != ?",
+        (int(scan["id"]),),
+    )
+    return any(
+        site_scope(str(row["seed_url"])) == scope and not _protected(conn, int(row["id"]))
+        for row in rows
+    )
+
+
 def _identity(scan: dict[str, Any]) -> ReportIdentity:
     return ReportIdentity(
         id=int(scan["id"]), seed_url=str(scan["seed_url"]), started_at=str(scan["started_at"])

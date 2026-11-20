@@ -106,7 +106,7 @@ export default function PageEvidenceRoute() {
     <>
       <ReportHeader
         scanId={scan}
-        previousScanId={scanData.previous_scan_id}
+        canCompare={scanData.has_other_reports}
         title={data.page.title || "Page details"}
         meta={
           <ReportMeta

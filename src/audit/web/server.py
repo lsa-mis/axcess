@@ -152,6 +152,7 @@ from audit.web.comparison import (
     Pipeline,
     SiteHistory,
     compare_reports,
+    has_other_report,
     previous_scan_id,
     site_history,
 )
@@ -1415,6 +1416,7 @@ def create_app(
             protection = _get_protected_scan_compat(conn, scan_id=scan_id)
             breakdown = _severity_breakdown(conn, scan_id)
             prev = previous_scan_id(conn, scan)
+            other_reports = prev is not None or has_other_report(conn, scan)
             blocked = _detect_blocked_scan(conn, scan_id, scan)
             progress = _scan_progress(conn, scan_id) if scan["status"] == "running" else None
             method_coverage = _scan_method_coverage(conn, scan_id)
@@ -1424,6 +1426,10 @@ def create_app(
             "error_count": int(scan.get("error_count") or 0),
             "by_severity": {level: int(breakdown.get(level, 0)) for level in _SEVERITY_OPTIONS},
             "previous_scan_id": prev,
+            # Another report of the same site, earlier or later: the report
+            # then offers Compare reports. ``previous_scan_id`` is only the
+            # earlier one, which a site's first report never has.
+            "has_other_reports": other_reports,
             # How much of the site this scan covered, as facts: pages found,
             # pages visited, the limits chosen and how it ended. This replaces
             # the old "partial report" label for a stopped scan.
@@ -2486,6 +2492,42 @@ def create_app(
             return pages_queries.list_scan_pages(
                 conn, scan_id, limit=limit, offset=offset, sort=sort
             )
+
+    @app.get("/api/scans/{scan_id:int}/pages/export.csv")
+    def api_scan_pages_csv(
+        scan_id: int,
+        request: Request,
+        sort: pages_queries.PageSort = pages_queries.DEFAULT_SORT,
+    ) -> Response:
+        """Every page this report visited as one CSV file, in the list's order.
+
+        A download a person asks for from the Pages visited list. Refused
+        like the Images ZIP: for a protected report, whose page addresses and
+        titles stay in its store, and while the scan is still running and
+        adding pages. A stopped report with saved pages is a report and gets
+        its file (AGENTS.md: never refuse an action because a scan stopped).
+        """
+        from audit.exports.pages_csv import pages_csv_filename, render_pages_csv
+
+        with get_conn() as conn:
+            if _get_protected_scan_compat(conn, scan_id=scan_id) is not None:
+                raise HTTPException(
+                    status_code=403,
+                    detail="A protected report's list of pages cannot be downloaded.",
+                )
+            scan = _load_scan_or_404(conn, scan_id)
+            _require_ended_report(scan)
+            rows = pages_queries.all_scan_pages(conn, scan_id, sort=sort)
+        body = render_pages_csv(
+            rows, scan_id=scan_id, app_base_url=f"{str(request.base_url).rstrip('/')}/app"
+        )
+        return Response(
+            content=body,
+            media_type="text/csv; charset=utf-8",
+            headers={
+                "Content-Disposition": f'attachment; filename="{pages_csv_filename(scan_id)}"'
+            },
+        )
 
     @app.get("/api/scans/{scan_id:int}/documents", response_model=ScanDocumentsResponse)
     def api_scan_documents(
@@ -5686,11 +5728,12 @@ def _saved_page_count(conn: sqlite3.Connection, scan_id: int) -> int:
 
 
 def _require_ended_report(scan: dict[str, Any]) -> None:
-    """Guard the Images tab's alt check and ZIP: a report, not a live crawl.
+    """Guard the Images tab's alt check and ZIP, and the Pages visited CSV:
+    a report, not a live crawl.
 
     A report is a completed scan or one that ended with saved pages, however
     it ended (the rule since 2026-11-14, ``sites.group_scans``). A running
-    scan is still adding images, so it is refused until it ends.
+    scan is still adding pages and images, so it is refused until it ends.
     """
     ended = scan["status"] != "running"
     if not (scan["status"] == "completed" or (ended and int(scan.get("page_count") or 0) > 0)):

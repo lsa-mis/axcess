@@ -165,6 +165,7 @@ def test_api_scan_detail(client: TestClient, seeded_db: tuple[object, object, in
         "info",
     }
     assert body["previous_scan_id"] is None  # only one scan seeded
+    assert body["has_other_reports"] is False  # so no Compare reports tab
     assert body["blocked"] is None
     assert body["progress"] is None  # not running
     methods = {method["key"]: method for method in body["methods_used"]}

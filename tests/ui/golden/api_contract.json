@@ -94,6 +94,7 @@
       "failure_reason": "null",
       "finding_count": "integer",
       "finished_at": "string",
+      "has_other_reports": "boolean",
       "id": "integer",
       "methods_used": [
         {
@@ -145,6 +146,7 @@
       "failure_reason": "null",
       "finding_count": "integer",
       "finished_at": "null",
+      "has_other_reports": "boolean",
       "id": "integer",
       "methods_used": [
         {
@@ -228,6 +230,7 @@
       "failure_reason": "null",
       "finding_count": "integer",
       "finished_at": "string",
+      "has_other_reports": "boolean",
       "id": "integer",
       "methods_used": [
         {
@@ -279,6 +282,7 @@
       "failure_reason": "string",
       "finding_count": "integer",
       "finished_at": "string",
+      "has_other_reports": "boolean",
       "id": "integer",
       "methods_used": [
         {

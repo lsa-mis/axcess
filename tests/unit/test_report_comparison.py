@@ -13,6 +13,7 @@ from audit.web.comparison import (
     HISTORY_LIMIT,
     ComparisonError,
     compare_reports,
+    has_other_report,
     previous_scan_id,
     site_history,
 )
@@ -240,6 +241,30 @@ def test_predecessor_normalizes_seed_and_uses_time_not_id(tmp_db: sqlite3.Connec
     assert compare_reports(tmp_db, closer).baseline.id == old  # type: ignore[union-attr]
     row = dict(tmp_db.execute("SELECT * FROM scans WHERE id=?", (old,)).fetchone())
     assert previous_scan_id(tmp_db, row) is None
+
+
+def test_other_report_counts_later_reports_too(tmp_db: sqlite3.Connection) -> None:
+    """A site's first report offers Compare reports once a later one exists."""
+
+    def row(scan_id: int) -> dict[str, Any]:
+        return dict(tmp_db.execute("SELECT * FROM scans WHERE id=?", (scan_id,)).fetchone())
+
+    first = scan(tmp_db, seed="HTTPS://EXAMPLE.COM:443")
+    other_site = scan(tmp_db, seed="https://other.example/")
+    # A scan still running has saved nothing yet: not a report to compare with.
+    scan(tmp_db, date="2026-09-02 12:00:00", status="running")
+    assert has_other_report(tmp_db, row(first)) is False
+    later = scan(tmp_db, date="2026-09-03 12:00:00")
+    assert previous_scan_id(tmp_db, row(first)) is None
+    assert has_other_report(tmp_db, row(first)) is True
+    assert has_other_report(tmp_db, row(later)) is True
+    assert has_other_report(tmp_db, row(other_site)) is False
+    # A protected report is never offered, from either side.
+    tmp_db.execute("ALTER TABLE protected_scans RENAME TO saved_protected_scans")
+    tmp_db.execute("CREATE TABLE protected_scans(scan_id INTEGER)")
+    tmp_db.execute("INSERT INTO protected_scans VALUES(?)", (later,))
+    assert has_other_report(tmp_db, row(first)) is False
+    assert has_other_report(tmp_db, row(later)) is False
 
 
 def test_timestamp_ties_use_lower_id(tmp_db: sqlite3.Connection) -> None:

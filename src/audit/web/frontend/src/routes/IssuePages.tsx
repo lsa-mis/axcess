@@ -73,7 +73,7 @@ export default function IssuePagesRoute() {
     <>
       <ReportHeader
         scanId={scan.id}
-        previousScanId={scan.previous_scan_id}
+        canCompare={scan.has_other_reports}
         title={
           <span className="flex flex-wrap items-center gap-2">
             {!isInformational && <ConformanceBadge level={row.conformance} />}
