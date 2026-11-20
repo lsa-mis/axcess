@@ -313,7 +313,7 @@ each scan. Neither part shows that a site meets WCAG. Not to be confused with
 How a scan moves through a site: Axcess starts at the address you give,
 follows links to find more pages, and tests each page in the [scope](#scope).
 
-### Stopped, Not finished and Continue scan
+### When a scan does not complete
 
 How a scan that did not complete ended, as the Reports list shows it:
 

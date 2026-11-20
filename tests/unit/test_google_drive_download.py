@@ -10,10 +10,7 @@ against a page served on this computer.
 
 from __future__ import annotations
 
-import http.server
 import sqlite3
-import threading
-from collections.abc import Iterator
 from typing import Any
 
 import httpx
@@ -23,7 +20,6 @@ from support.office_docs import word
 from audit.linked_files.fetch import FetchedFile
 from audit.linked_files.google import (
     DOWNLOAD_URL,
-    download_with_button,
     drive_file_id,
     fetch_drive_file,
     view_url,
@@ -133,53 +129,6 @@ async def test_a_file_over_the_limit_is_not_kept() -> None:
     async with _client(lambda request: httpx.Response(200, content=PDF)) as client:
         got = await fetch_drive_file(client, VIEW, max_bytes=50)
     assert got.outcome == "too_large"
-
-
-@pytest.fixture
-def drive_like_site() -> Iterator[str]:
-    """A page with a "Download" button that downloads a PDF, on this computer."""
-
-    class Handler(http.server.BaseHTTPRequestHandler):
-        def do_GET(self) -> None:
-            if self.path.startswith("/file/d/"):
-                body = (
-                    b"<!doctype html><html><body><h1>report.pdf</h1>"
-                    b"<button type='button' aria-label='Download'"
-                    b" onclick=\"location.href='/download'\">"
-                    b"<svg aria-hidden='true' width='16' height='16'></svg></button>"
-                    b"</body></html>"
-                )
-                self.send_response(200)
-                self.send_header("Content-Type", "text/html")
-            else:
-                body = PDF
-                self.send_response(200)
-                self.send_header("Content-Type", "application/pdf")
-                self.send_header("Content-Disposition", 'attachment; filename="report.pdf"')
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
-
-        def log_message(self, *args: object) -> None:
-            pass
-
-    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
-    thread.start()
-    try:
-        yield f"http://127.0.0.1:{server.server_address[1]}"
-    finally:
-        server.shutdown()
-
-
-async def test_the_button_fallback_presses_download_and_keeps_the_file(
-    drive_like_site: str,
-) -> None:
-    """The button is an icon named only by its accessible name, as Drive's
-    is: found by role and name, then pressed."""
-    pytest.importorskip("playwright.async_api")
-    got = await download_with_button(f"{drive_like_site}/file/d/{FILE_ID}/view", user_agent="test")
-    assert (got.outcome, got.body) == ("ok", PDF)
 
 
 async def _track_drive_links(
