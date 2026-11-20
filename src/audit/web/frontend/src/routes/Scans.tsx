@@ -783,7 +783,8 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
                 cell's edges (justify-between), not centred: with each
                 link's own 4px (px-1), "Open latest scan" starts 16px in,
                 where the "Actions" heading's words do (its px-3 and px-1),
-                and "Scan again" ends 16px from the column's right edge, so
+                and "Scan again" (or "Continue scan", also px-1) ends 16px
+                from the column's right edge, so
                 the space is the same on both sides (the developer's
                 request, 2026-11-20). The column fits its widest row (the
                 header's w-px), which is not always this one: an open
