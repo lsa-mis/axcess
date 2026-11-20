@@ -43,6 +43,40 @@ obeyed. Labelling agents labelled them under the same protocol, without
 access to the check's code and before the check was run on them. All are
 in the holdout part whatever their SHA-256, and no rule was changed after
 scoring them.
+
+Since 2026-11-19 every rule was redesigned looking at all 150 files above,
+so holdout and tuning together are the "development" set: they no longer
+measure anything the rules were not chosen on.
+
+Files with ``"split": "fresh"`` (``"source": "fresh-2026-11-19"``, 57
+Word files) are the validation set for those rules. Sources (the
+developer's general approval of .gov and .org sites), none used before: 24
+sites, at most 6 files from one, e.g. www.epa.gov, www.samhsa.gov,
+www.energy.gov, www.dol.gov, www.fema.gov, dot.ca.gov, www.cde.ca.gov,
+www.codot.gov, p12.nysed.gov, www.utah.gov, dir.texas.gov, county, city
+and school district sites (kewauneeco.org, belleplaineiowa.gov,
+garfieldar.gov, hyannislonghorns.org) and non-profits (thefdp.org,
+results4america.org); ``publisher_kind`` says which kind each is (18
+federal, 14 state, 16 local, 9 non-profit). A collecting agent chose them
+by source and type only, without opening them or seeing the check;
+robots.txt obeyed, one request at a time. Four labelling agents labelled
+them under the same protocol, without access to the check's code and
+before the check was run on any of them; the labels were then frozen, and
+the rules were frozen at commit 946ad6f before the first score. One file
+is "disputed" (listed, not scored); one is damaged as served (``damaged``).
+
+Since 2026-11-20 the "no headings" rule was chosen by a search over all
+the files above (development and fresh), so "fresh" no longer tests it.
+Files with ``"split": "fresh2"`` (``"source": "fresh2-2026-11-20"``, 74
+Word files) are the second validation set: other .gov and .org sites, none
+used by the sets above (41 hosts, at most 4 files from one), weighted to
+the cases the first fresh set got wrong: meeting minutes and agendas,
+court and county forms, short checklists, fee schedules and reports with
+data tables (``document_type`` says which; ``publisher_kind`` as above). A
+collecting agent chose them by source and type only, without opening them;
+labelling agents labelled them under the same protocol without the check's
+code or the search, and the labels were frozen and committed before the
+rule was frozen and before the check ran on any of them.
 """
 
 from __future__ import annotations

@@ -90,9 +90,9 @@ reader user. The rest are "possible problems" a person must judge.
 | Check | Word | PowerPoint | Mostly sure? | Basis |
 |---|---|---|---|---|
 | Images without alt text | yes | yes | yes | Microsoft Error; WCAG 1.1.1 |
-| Tables without a header row (2+ rows, 2+ columns) | yes | yes | yes | Microsoft Error; WCAG 1.3.1. Made a possible problem on 2026-11-18 and counted again on 2026-11-19 (migrations 0046, 0047): as a possible problem it missed every file whose only barrier was an unmarked data table (holdout recall 100% to 91.3%, tuning 100% to 66.7%) and removed no wrong verdict, since each layout-table file was already Mostly sure for another real barrier. The cost kept: a layout table can show "Problem found" on its row |
+| Tables without a header row (plain grids of 2+ rows, 2+ columns, since 2026-11-19; see "Why precision was low") | yes | yes | yes | Microsoft Error; WCAG 1.3.1, F91. Made a possible problem on 2026-11-18 and counted again on 2026-11-19 (migrations 0046, 0047): as a possible problem it missed every file whose only barrier was an unmarked data table (holdout recall 100% to 91.3%, tuning 100% to 66.7%) and removed no wrong verdict, since each layout-table file was already Mostly sure for another real barrier. The cost kept: a layout table can show "Problem found" on its row |
 | Slides without a title | – | yes | yes | Microsoft Error; WCAG 2.4.6 |
-| No headings (Word, over 400 words) | yes | – | yes | Microsoft Tip; WCAG 1.3.1 |
+| No headings (Word: until 2026-11-19 over 400 words; since then 2+ visual headings) | yes | – | yes | Microsoft Tip; WCAG 1.3.1, F2 |
 | No language set | yes | yes | yes | WCAG 3.1.1 (as the PDF check) |
 | Heading levels skipped | yes | – | possible problem | Microsoft guidance |
 | Links that do not say where they go | yes | yes | possible problem | Microsoft guidance; WCAG 2.4.4 lets context give the purpose |
@@ -289,10 +289,410 @@ Fresh databases, New scan's public defaults:
   sure" for no headings and HHS 568 for a table without a header row,
   both false alarms by the labels (see the errors above).
 
+## Why precision was low (2026-11-19)
+
+All 13 holdout false alarms at be31ee8 were Word files: 11 from "No
+headings" and 6 from "Tables without a header row" (some files had both).
+Each rule fired on a fact that does not decide whether a reader meets the
+barrier. WCAG 1.3.1 (Info and Relationships, Level A) fails when structure
+a reader can see is not in the markup; neither rule looked at what a
+reader sees.
+
+**No headings.** The rule failed any Word document over 400 words with no
+heading style. Length says nothing: the 11 false alarms ran from 442 to
+16,573 words, the 17 real failures from 421 to 7,255. What separates them
+is whether the document shows headings at all. Counting "visual headings"
+(a line of at most 12 words, at least 80% bold, underlined, in capitals or
+2 points larger than the body text, starting with a letter, digit or "(",
+followed by at least 20 words before the next such line) on every
+development Word file with no heading style:
+
+| Label | Visual headings found |
+|---|---|
+| Fail (17 files) | 3 to 39 (3: two short forms of 421 and 462 words) |
+| Pass, false alarm before (11 files) | 1 each: the transcripts' and forms' Title line |
+| Pass, other (15 files) | 0 or 1 |
+
+The six section508.gov transcripts are a Title line, a "--- BEGIN
+CAPTIONED TEXT ---" marker and plain speaker turns; the four NIH forms are
+a Title line and numbered questions in body text. The transcripts'
+marker and one transcript's "[LAUGHTER]" lines are in capitals, which is
+why a line must start with a letter, digit or "(". A policy whose
+sections are only underlined (2fb0c01f2fb2) shows 4, and the 421-word
+form the old rule missed by its word count (0e1588d7eae2) shows 3.
+
+**Tables.** The rule failed any table of 2+ rows and 2+ columns without a
+header row. Every table false alarm was a layout or form table with merged
+cells: the four Math course lists (a second row merged across all three
+columns, one course per table), a gift form's 12-by-2 grid (11 merged
+cells), and NIH's HHS 568 and PHS 416-7, each one table holding the whole
+form (64 and 95 merged cells). Every file with an unmarked data table had
+at least one plain grid: every row the same number of cells, none merged
+(budgets, contact lists, plan comparisons, Canvas feature tables). Merged
+cells are how Word builds a form or a layout; Microsoft's checker warns
+about them in any table ("Tables have a simple structure", paraphrased),
+and a layout table must not get a header row (WCAG failure F46).
+
+**Alt text.** The one missed barrier: section508.gov's PowerPoint guide
+gives 12 screenshots the alt text `"  "`. Alt text with no letter or digit
+gives a screen reader nothing to say (WCAG 1.1.1).
+
+## The rules since 2026-11-19 (commit 946ad6f)
+
+| Rule | Before | Now | Basis |
+|---|---|---|---|
+| No headings (Word) | no heading style and more than 400 words | no heading style and at least 2 visual headings (defined above), any length | WCAG 1.3.1, failure F2: a change in how text looks used to show structure without the markup |
+| Tables without a header row | any table of 2+ rows and 2+ columns | only a plain grid: same number of cells in every row, no cell merged across rows or columns, no table inside it; others are left to a person | WCAG 1.3.1, F91 (data table headers not marked), F46 (layout tables get no headers); Microsoft "Tables have a simple structure" (paraphrased) |
+| Images without alt text | alt text empty, a file name or a default name | also: alt text with no letter or digit (spaces, quote marks, dashes) | WCAG 1.1.1 |
+
+PowerPoint tables follow the same plain-grid rule (`gridSpan`, `rowSpan`,
+`hMerge`, `vMerge`). No PowerPoint score changed on the development set,
+and the fresh set has no PowerPoint files, so that part is not validated.
+
+The "No headings" rule changed again on 2026-11-20 (commit 1256e02: 3
+visual headings, no capitals, 40 words or 15%): see "Second round:
+evolved heading probe".
+
+These rules were chosen looking at all 150 labelled files, so those files
+are now the **development set**, not a test: every number on them below is
+how well the rules fit what they were made from.
+
+## Fresh validation set (2026-11-19)
+
+57 Word files no rule had seen (24 .gov and .org sites, none used before:
+federal agencies, state departments, counties, a school district and
+non-profits; `split: "fresh"` in `office_files.json`, sources in
+`office_files.py`). Order of work: files collected by source and type
+only; four labelling agents labelled them without the check's code; the
+labels were frozen (10:16) before the rules were committed (946ad6f,
+10:23) and before the check first ran on them (10:24). No rule was changed
+after. One file is disputed (a school policy whose section names are bold
+words starting their paragraphs) and not scored; one (a dol.gov guide) is
+a damaged ZIP as served (bad CRC on a picture), which the check, like the
+app, reads as "damaged"; it is a barrier by its label, so counted as a
+miss, recall would be 18 of 21 (85.7%).
+
+### Scores
+
+File level, "Mostly sure" against `barrier`, with the one-sided 95% upper
+bounds on false alarms among "Mostly sure" files and on missed barriers:
+
+| Set | Rules | Files scored | Barriers | Right | False alarms | Missed | Precision (false alarms at most) | Recall (misses at most) |
+|---|---|---|---|---|---|---|---|---|
+| Development | be31ee8 | 145 | 44 | 43 | 13 | 1 | 76.8% (33.6%) | 97.7% (9.6%) |
+| Development | 946ad6f | 145 | 44 | 44 | 0 | 0 | 100% (6.6%) | 100% (6.6%) |
+| Fresh | be31ee8 | 55 | 20 | 18 | 6 | 2 | 75.0% (41.5%) | 90.0% (26.2%) |
+| Fresh | 946ad6f | 55 | 20 | 18 | 4 | 2 | **81.8%** (34.9%) | **90.0%** (26.2%) |
+
+**The goal, precision and recall both above 90% on files the rules were
+not made on, is not met**: fresh precision 81.8%, recall exactly 90.0%.
+The new rules remove two of the six fresh false alarms and miss nothing
+the old rules found. The development score (100%) is fit, not evidence.
+
+Per check on the fresh set (right, false alarms, missed), old then new:
+no headings 9, 5, 2 then 9, 4, 2; tables without a header row 6, 5, 0
+then 5, 0, 1; images without alt text 10, 0, 0 both. The table rule now
+makes no false alarm on fresh files either (it had 5); all remaining
+errors are "No headings".
+
+### Why the fresh errors happen
+
+| File | Error | Mechanism | Labeller |
+|---|---|---|---|
+| 6f0eb2e36703, garfieldar.gov forum minutes | false alarm | two thirds of the body text is bold, so bold lines do not stand out; the rule compares size with the body text but not bold | close call |
+| d28372f96e20, dir.texas.gov fee schedule | false alarm | the column names of its data tables are in capitals ("PAYMENT CONVENIENCE FEES (Bankcard)") and its title is 24 pt: read as visual headings, though they sit in header rows that are marked | clear |
+| edd7d5cddc9c, Wisconsin court form GF-223 | false alarm | a form laid out in tables: bold caption lines and a bold "See attached" read as headings | clear |
+| ab47342fce67, utah.gov meeting minutes | false alarm | two bold lines ending in colons that introduce lists ("Immediate Action Items:") | close call |
+| 5b3220a52069, county pension checklist (71 words) | missed | "Income", "Assets", "Expenses" are bold, underlined and larger, but each is followed by a list of 12 to 17 words, under the 20-word minimum | clear |
+| a26b53665ba1, county incident report form (66 words) | missed | "WHEN:", "WHAT:" are bold capitals, but so are most field labels after them, so no line is followed by body text | close call |
+| 1dad5be3d018, energy.gov template | table missed (file still found, for alt text) | an 8-by-10 data table without a header row has one merged cell | clear |
+
+Three of the six file-level errors are close calls the labellers flagged
+themselves. Fixes these suggest, not made (each was found on the fresh
+files, so the fresh set can no longer test it): count bold, underline and
+capitals as standing out only when most body text lacks them; do not read
+lines in a table whose header row is marked as visual headings; a smaller
+body-text minimum for very short documents (the risk is a form's bold
+labels). Testing them needs another fresh set, collected and labelled the
+same way before the rules change.
+
+## Second round: evolved heading probe (2026-11-20)
+
+The developer asked (2026-11-19) for another round on the six fresh
+errors: build several probes, choose one with an evolutionary search, and
+reach Word "Mostly sure" precision and recall above 90% on files never used
+to design or choose it. **Not reached**: on the second fresh set the chosen
+rule scores precision 88.2% and recall 76.9%.
+
+### Order of work (commit order proves it)
+
+1. 74 new Word files collected (by source and type only) and labelled
+   under the same protocol by agents without the check's code or the
+   search; labels frozen 2026-11-20 08:21 and committed in **2f90223**
+   (`split: "fresh2"`).
+2. Search run on the development data only (every labelled Word file
+   before fresh2: holdout, tuning and the first fresh set, 155 scored).
+3. Winner frozen in `office_check.py`, commit **1256e02**.
+4. Scored once on fresh2 (08:35). The rule was not changed after.
+
+### The probe family
+
+`scripts/office_heading_search.py`. A probe is 20 genes, each one plain
+sentence; the base genome is the 946ad6f rule (the script's `check`
+confirms it gives 946ad6f's verdict on every file).
+
+| Gene | Values | What it says |
+|---|---|---|
+| max_words | 6-20 (12) | A heading is a line of at most this many words. |
+| share | 0.6-1.0 (0.8) | This share of a line's letters must carry the emphasis. |
+| use_bold, use_underline, use_caps, use_size | on/off (on) | Which kinds of emphasis make a line stand out. |
+| size_delta | 1-4 pt (2 pt) | Larger text: this much over the body text's usual size. |
+| relative | off, 20-67% | Emphasis does not count when this share of the body text has it too (bold minutes). |
+| colon | count, skip, skip before a list | Lines ending in ":" introduce lists or label fields. |
+| tables | all, not header rows, not data-table cells, none | Lines in tables: column names in marked header rows are not headings. |
+| boxes | on/off | Lines in text boxes count. |
+| min_body | 5-40 (20) | Words of body text a heading needs under it... |
+| body_frac | off, 5-15% | ...or this share of the document's words, if fewer (short documents). |
+| min_paras | off, 2-4 | ...or this many body paragraphs (a list of short items). |
+| keep_next, numbered, space_before | off/on | Other signals: "keep with next", a typed section number before a longer paragraph, space before the line. |
+| min_count | 1-4 (2) | How many visual headings the document must show. |
+| skip_title | off/on | The first line that stands out, near the top, is the title. |
+| label_cap | off, 50%, 70% | When most short lines stand out, they are a form's labels. |
+
+### The search
+
+Fitness: the file-level "Mostly sure" verdict (other counted checks as at
+946ad6f) against `barrier`, mean of min(precision, recall) over 10 repeats
+of stratified 5-fold cross-validation (50 held-out folds), minus 0.004 per
+active switch. The probes have no fitted parameters, so a fold's score is
+the probe's score on the files in it: the mean over many folds rewards a
+probe that is right on every part of the data, not one that is right
+overall by a few files. It is not an estimate on unseen files; the nested
+run below is.
+
+Genetic algorithm: 150 probes, 60 generations, tournament of 3, 4 kept
+unchanged each generation, uniform crossover (70%), each gene mutated with
+15% chance; seeds 1, 2 and 3 (`artifacts/office-search/main/seed_N/`, a
+checkpoint per generation). All three seeds reached the same best probe.
+
+Nested cross-validation (the whole search, 40 generations, run on 4/5 of
+the development files and its winner scored on the fifth, 5 times):
+pooled precision 94.7% (54 of 57), recall 94.7% (54 of 57). Every
+fold's winner needed 3 visual headings; their other switches differed.
+
+Top 5 distinct probes (different verdicts on the development files),
+development data:
+
+| # | Switches and thresholds changed from 946ad6f | CV mean min(P,R) | Precision | Recall |
+|---|---|---|---|---|
+| base | 946ad6f | 0.919 | 93.2% (55/59) | 96.5% (55/57) |
+| 1 | no capitals; body 40 words or 15% of the document's; 3 headings (also: at most 6 words, 90%, 4 pt) | 0.983 | 100% (56/56) | 98.2% (56/57) |
+| 2 | no capitals, no size; 40 words or 2 paragraphs; 3 headings; at most 8 words, 90% | 0.984 | 98.3% (57/58) | 100% (57/57) |
+| 3 | 40 words or 2 paragraphs; 3 headings; at most 8 words, 90%, 1.5 pt | 0.968 | 96.6% (57/59) | 100% |
+| 4 | 40 words or 15%; 3 headings; at most 6 words, 3 pt | 0.968 | 98.2% (56/57) | 98.2% |
+| 5 | no capitals; 20 words or 15%; 3 headings | 0.972 | 98.2% (56/57) | 98.2% |
+
+Frozen: probe 1 with each gene moved back to 946ad6f's value where the
+development verdicts stay the same (the script's `simplify`): **a line
+stands out when 80% of it is bold, underlined or 2 pt larger than the body
+text (capitals alone no longer count); it needs 40 words under it, or 15%
+of the document's words if that is fewer; and the document must show at
+least 3 such lines.** On the six first-fresh errors: 3 headings removes the
+garfieldar and utah minutes false alarms, no capitals removes the GF-223
+court form, 40 words removes the fee schedule, 15% catches the pension
+checklist; the incident form is still missed. The share is a knife edge on
+the development files: 10% brings back the fee schedule false alarm, 20%
+loses the pension checklist.
+
+### Scores
+
+File level, "Mostly sure" against `barrier`, with the scorer's one-sided
+95% upper bounds on false alarms and misses. Fresh2: 74 files, 2
+disputed (minutes whose part titles have no visual cue), 72 scored, 39
+barriers.
+
+| Set | Rule | Precision (false alarms at most) | Recall (misses at most) |
+|---|---|---|---|
+| Development: holdout and tuning (145 scored, Word and PowerPoint) | frozen | 100% (6.6%) | 100% (6.6%) |
+| Development: first fresh set (55 scored, now seen) | frozen | 100% (14.6%) | 95.0% (19.6%) |
+| Development, nested CV (the search's own estimate) | search winners | 94.7% | 94.7% |
+| **Fresh2** | **frozen (1256e02)** | **88.2%** (30/34; 23.8%) | **76.9%** (30/39; 35.7%) |
+| Fresh2, for information | 946ad6f | 80.0% (36/45; 31.4%) | 92.3% (36/39; 17.8%) |
+| Fresh2, for information | top 2 | 89.5% (34/38; 21.5%) | 87.2% (34/39; 24.1%) |
+| Fresh2, for information | top 3 | 85.4% (35/41; 25.9%) | 89.7% (35/39; 21.0%) |
+| Fresh2, for information | top 5 | 88.9% (32/36; 22.6%) | 82.1% (32/39; 30.0%) |
+| Fresh2, for information | top 1 unsimplified | 87.1% (27/31; 25.8%) | 69.2% (27/39; 43.8%) |
+| Fresh2, for information | top 4 | 81.8% (27/33; 31.5%) | 69.2% (27/39; 43.8%) |
+
+No probe reaches both 90% on fresh2. The first fresh set is now seen (its
+errors chose the rule), so its 100% / 95% is fit, not evidence.
+
+### Why fresh2 fails
+
+- **The search fit the first fresh set's six files.** Every change was
+  bought with those six; fresh2 was weighted to the same kinds of file
+  and the changes did not carry over. The new rule lost six barriers
+  946ad6f found, all short or form-like (120 to 1,309 words of text):
+  two checklists that show exactly 2 visual headings (06f21a62fbbb,
+  f62b8ce4febf: lost by needing 3); a customer letter and an agenda whose
+  parts have fewer than 40 words under them (21f787cb75fe, a8e75d26b857:
+  lost by the 40 words); a library group's list whose banner headings
+  have short lists under them (b0ce2f4443d4: the 40 words and 3); and a
+  court order whose numbered parts start with bold capitals
+  (24b3b97d86e0: 3 headings and capitals). The nested CV estimate (94.7%)
+  was too high: the development files hold too few short documents with
+  few parts to show the cost.
+- **False alarms are mostly not headings.** 3 of the 4 fresh2 false
+  alarms are "Tables without a header row" on court and label-sheet
+  layout grids that are plain grids (b20fe674ded9, e8aa013b6558,
+  66fba0d163e2), unchanged by this round; 946ad6f makes the same three.
+  The fourth is a dog licence form printed three times on a page, its
+  bold title shown three times (9bc0aa43bb68), exactly 3 visual headings.
+- **Misses by every rule:** a quick guide with a title and one bold line
+  (20f67c8ca820), a fee schedule whose two group names end in colons
+  (9a8674718bfa), and a letter whose seal and signature have alt text
+  "sm_seal3" and "John (2) (002)", which the labeller read as file names
+  and the check reads as alt text (3e32c57daf22).
+
+Whether to keep 1256e02 or go back to 946ad6f's heading rule is the
+developer's decision: on fresh2 the new rule trades 15 points of recall
+for 8 of precision, and neither meets the goal. Any further change is
+designed on fresh2 too, so it needs a third set to measure.
+
+## Two tiers (2026-11-20)
+
+The developer's decision after the second round: split the Word and
+PowerPoint checks by how accurate each is on fresh files. Only checks
+that were right on fresh files make a file "Mostly sure"; the others are
+listed as possible problems for a person to judge.
+
+### Per-check scores, the basis for the tiers
+
+Each check's own precision and recall against its criterion's label
+(`fail` positive; `pass` and `n/a` negative), with the code at 354d04b
+(rules of 1256e02), on the two fresh sets (all Word files; no PowerPoint
+file is in either). Measured 2026-11-20 with the real-files scorer.
+"P" precision, "R" recall, then (right, false alarms, missed).
+
+| Check | Fresh (56 scored) | Fresh2 (74 scored) | Both |
+|---|---|---|---|
+| Images without alt text (`no_alt_text`) | P 100%, R 100% (10, 0, 0) | P 100%, R 92.3% (12, 0, 1) | P 100%, R 95.7% (22, 0, 1) |
+| No language (`no_language`) | no positives (0, 0, 0) | P 100%, R 100% (1, 0, 0) | P 100%, R 100% (1, 0, 0) |
+| Slides without a title (`slide_no_title`) | no PowerPoint files | no PowerPoint files | development only: P 100%, R 100% (2, 0, 0) |
+| Tables without a header row (`table_no_header`) | P 100%, R 83.3% (5, 0, 1) | **P 55.6%**, R 100% (5, 4, 0) | P 71.4%, R 90.9% (10, 4, 1) |
+| No headings (`no_headings`) | P 100%, R 81.8% (9, 0, 2) | **P 80.0%, R 59.3%** (16, 4, 11) | P 86.2%, R 65.8% (25, 4, 13) |
+| Skipped heading levels (`skipped_heading_level`) | P 100%, R 66.7% (4, 0, 2) | P 100%, R 100% (5, 0, 0) | P 100%, R 81.8% (9, 0, 2) |
+| Link text (`unclear_link_text`) | P 100%, R 100% (18, 0, 0) | P 100%, R 92.3% (12, 0, 1) | P 100%, R 96.8% (30, 0, 1) |
+| Document title (`no_title`) | P 100%, R 100% (35, 0, 0) | P 100%, R 100% (55, 0, 0) | P 100%, R 100% (90, 0, 0) |
+
+The first fresh set chose 1256e02's heading rule, so its "No headings"
+row is fit; fresh2 is the measure. File level at 354d04b: fresh "Mostly
+sure" P 100% (19/19), R 95.0% (19/20); fresh2 P 88.2% (30/34), R 76.9%
+(30/39); development 100% / 100% (fit).
+
+How the tiers follow from these numbers:
+
+- **Counted ("Mostly sure")**: images without alt text, no language and
+  slides without a title. No false alarm on any fresh file. "No language"
+  and "slides without a title" rest on very few positives (1 fresh, 2 in
+  development); they are kept counted because each reads one stated fact
+  (a `lang` value; a title placeholder holding text) with no judgement
+  of what the content means.
+- **Possible problems**: tables without a header row (4 false alarms of
+  9 on fresh2, all layout grids in court and label forms that a machine
+  cannot tell from data tables) and no headings (precision 80% and recall
+  59% on fresh2: whether bold lines are headings needs a person). Skipped
+  heading levels, link text and document title were already possible
+  problems: they are accurate, but whether each hurts a reader needs a
+  person (see `office_check.py`).
+
+### The "no headings" possible problem: the developer's rule
+
+A Word file that uses no heading style and has a bold line that is its
+own paragraph, of at most one sentence, is listed as possibly missing
+heading styles (commit 68af8c2, replacing 1256e02's probe). Details chosen
+when building it, written beside `_word_bold_line`: every letter and digit
+of the paragraph bold (as Word shows it, styles included); a sentence
+ends at ".", "!" or "?" followed by more text, after at least 3 words (so
+"A. General" and "U.S. Department of Labor" are one sentence); empty
+lines, lines in tables, lines in text boxes and lines in Word's Title and
+Subtitle styles are not read. The rule is the developer's, so it was not
+tuned on any set; it was scored once, after it was written.
+
+### Scores with the two tiers (code at a7fa2a9)
+
+"Mostly sure" against `barrier` (the labellers' verdict: any of alt text,
+table header, slide title, language or headings fails). Since tables and
+headings no longer count, recall here counts every file whose only
+barriers are tables or headings as a miss, by design. P precision
+(false alarms at most, one-sided 95%), R recall (misses at most).
+
+| Set | Files scored | Barriers | Mostly sure P | Mostly sure R | Above 90% both? |
+|---|---|---|---|---|---|
+| Development (fit) | 145 | 44 | 100% (22/22; 12.7%) | 50.0% (22/44; 62.0%) | no (recall) |
+| Fresh | 55 | 20 | 100% (10/10; 25.9%) | 50.0% (10/20; 67.3%) | no (recall) |
+| Fresh2 | 72 | 39 | 100% (13/13; 20.6%) | 33.3% (13/39; 77.6%) | no (recall) |
+
+For information, recall against the barriers the counted checks are
+meant to find (alt text, language or slide title labelled "fail"):
+development 22 of 22, fresh 10 of 10, fresh2 13 of 14 (the miss is the
+letter whose seal has the alt text "sm_seal3", 3e32c57daf22).
+
+What a reader sees: a barrier file listed with at least one problem,
+counted or possible ("any problem"; a Google file's missing document
+title is left out, as the report leaves it out), and listed with one of
+the five barrier checks ("any barrier check"; so a missing document title
+alone does not count):
+
+| Set | Barrier files shown any problem | P | Barrier files shown a barrier check | P |
+|---|---|---|---|---|
+| Development | 40 of 44 (90.9%) | 43.0% | 40 of 44 (90.9%) | 93.0% |
+| Fresh | 20 of 20 (100%) | 40.8% | 19 of 20 (95.0%) | 70.4% |
+| Fresh2 | 39 of 39 (100%) | 57.4% | 38 of 39 (97.4%) | 71.7% |
+
+The 4 development files shown nothing are math course lists (Google
+Docs) whose part names are bold text in table cells; the fresh and
+fresh2 barrier files not shown a barrier check (d5bb033d2327, a Caltrans
+application form, and e504a836fcf8, a lighting review checklist) are
+forms whose section names are in table cells too; both are still shown
+another problem (link text or document title). "Any problem"
+precision is low because most files have no document title, which is
+listed on nearly every non-Google file.
+
+Each check (P, R, then right, false alarms, missed):
+
+| Check | Development | Fresh | Fresh2 |
+|---|---|---|---|
+| Images without alt text (counted) | 100%, 100% (19, 0, 0) | 100%, 100% (10, 0, 0) | 100%, 92.3% (12, 0, 1) |
+| No language (counted) | 100%, 100% (1, 0, 0) | no positives | 100%, 100% (1, 0, 0) |
+| Slides without a title (counted) | 100%, 100% (2, 0, 0) | no PowerPoint | no PowerPoint |
+| Tables without a header row (possible) | 100%, 100% (9, 0, 0) | 100%, 83.3% (5, 0, 1) | 55.6%, 100% (5, 4, 0) |
+| No headings, bold-line rule (possible) | 76.5%, 76.5% (13, 4, 4) | 50.0%, 90.9% (10, 10, 1) | 58.1%, 92.6% (25, 18, 2) |
+| Skipped heading levels (possible) | 100%, 100% (9, 0, 0) | 100%, 66.7% (4, 0, 2) | 100%, 100% (5, 0, 0) |
+| Link text (possible) | 100%, 96.5% (55, 0, 2) | 100%, 100% (18, 0, 0) | 100%, 92.3% (12, 0, 1) |
+| Document title (possible) | 100%, 100% (64, 0, 0) | 100%, 100% (35, 0, 0) | 100%, 100% (55, 0, 0) |
+
+The bold-line rule finds more heading barriers than 1256e02's probe on
+fresh2 (recall 92.6% against 59.3%) and lists more files that have none
+(precision 58.1% against 80.0%), which is the trade the developer chose
+for a possible problem. Its 18 fresh2 false alarms are bold lines that are
+not part names: a title typed by hand at the top ("Submission Checklist",
+"City of Hahira"), court-form captions in bold capitals ("VERIFIED ANSWER
+TO WRIT OF CONTINUING GARNISHMENT"), and lines that introduce a list
+("Agenda Items:"). All 7 of its misses across the sets are documents whose
+part names are only in table cells, which the rule does not read.
+
+**Result: "Mostly sure" precision is 100% on every set, above 90%;
+"Mostly sure" recall against all barriers is below 90% on every set
+(fresh 50.0%, fresh2 33.3%), as the tiers intend.** Every barrier file in
+fresh and fresh2 is still shown at least one problem.
+
 ## Limits
 
-- 150 files: 73 from one university's sites and 77 from government and
-  non-profit sites, 50 of them PowerPoint. The new files are mostly from
+- 281 files: 73 from one university's sites, 77 from government and
+  non-profit sites, 57 fresh Word files and 74 fresh2 Word files from
+  other .gov and .org sites;
+  50 PowerPoint, all in the development set. The new files are mostly from
   accessibility teams (section508.gov) and have few barriers (9 of 77), so
   recall rests mostly on the U-M files. Small numbers: a 95% bound is
   given beside each rate.

@@ -7,44 +7,38 @@ read 2026-11-17). Why our own and not an existing checker:
 docs/internal/office-check-research.md. Built and measured on labelled
 real files (tests/real_pages/office_files.json), as AGENTS.md asks.
 
-Each check reads a fact the file states about itself. Two kinds:
+Each check reads a fact the file states about itself. Two kinds, split by
+how accurate each check was on labelled real files no rule was made on
+(the developer's decision, 2026-11-20; the numbers are in
+docs/internal/office-check-research.md, "Two tiers"):
 
 **Checks that prove a barrier** (``COUNTED``): a failure is a problem a
-screen reader user meets, and a machine can see it without judging
-meaning. Any one makes the file "Mostly sure" (the developer's rule,
-2026-11-17: only machine-checkable rules that affect a screen reader user
-count).
+screen reader user meets, a machine can see it without judging meaning,
+and the check made no false alarm on the two fresh sets (130 Word files).
+Any one makes the file "Mostly sure" (the developer's rule, 2026-11-17:
+only machine-checkable rules that affect a screen reader user count).
+``no_alt_text``: precision 100%, recall 95.7% (22 right, 0 false alarms,
+1 missed); ``no_language``: 1 right, 0 false alarms; ``slide_no_title``:
+no PowerPoint file in the fresh sets, 2 right and 0 false alarms in
+development. The last two rest on few files; they stay counted because
+each reads one stated fact (a language value; a title placeholder with
+text) and judges nothing.
 
 ``no_alt_text`` (Word and PowerPoint)
     A picture, chart, diagram (SmartArt) or video has no alternative text
     and is not marked decorative. Microsoft: Error, "All non-text content
     has alternative text" (paraphrased: screen readers speak the alt text to
-    describe images). Text boxes and shapes holding text are text, not
-    images; plain shapes with no text and no picture (lines, boxes) are not
-    counted, as Microsoft's own fix for them is to mark them decorative and
-    a machine cannot tell a border from an arrow that means something.
+    describe images). Alt text with no letter or digit in it (spaces, quote
+    marks, a dash) is none: a screen reader has no words to say (WCAG 1.1.1,
+    Non-text Content, Level A). Text boxes and shapes holding text are text,
+    not images; plain shapes with no text and no picture (lines, boxes) are
+    not counted, as Microsoft's own fix for them is to mark them decorative
+    and a machine cannot tell a border from an arrow that means something.
     Word: the document body only, not page headers and footers, which
     screen readers do not read as part of the text.
-``table_no_header`` (Word and PowerPoint)
-    A table of at least 2 rows and 2 columns has no header row. Microsoft:
-    Error, "Tables specify column header information". Word: the "Header
-    Row" table style option (``tblLook firstRow``), which Microsoft's own
-    instructions use ("Make your Word documents accessible"), or "Repeat as
-    header row" (``tblHeader``) on the first row; PowerPoint: "Header Row"
-    (``a:tblPr firstRow``). Counted, the developer's decision (2026-11-19,
-    after a day as a possible problem): a layout table can show "Problem
-    found" on its row, but on the labelled real files every such file was
-    "Mostly sure" for another real barrier, while as a possible problem the
-    rule missed every file whose only barrier was an unmarked data table.
 ``slide_no_title`` (PowerPoint)
     A slide has no title placeholder holding text. Microsoft: Error, "All
     slides have titles" (paraphrased: titles let people navigate a deck).
-``no_headings`` (Word)
-    A document of more than ``HEADINGS_MIN_WORDS`` words uses no heading
-    style at all, so a screen reader user cannot move between its parts.
-    Microsoft: Tip, "Documents use heading styles"; counted here because
-    in a long document it is a barrier (WCAG 1.3.1, 2.4.6 and technique
-    G130/G141), and the threshold was tuned on real files.
 ``no_language`` (Word and PowerPoint)
     No language is set anywhere for the text, so a screen reader cannot
     choose a voice (WCAG 3.1.1, Language of Page, Level A). The same check
@@ -53,6 +47,50 @@ count).
 **Possible problems**: a machine can see them, but whether they hurt a
 screen reader user needs a person, so they are listed and never make a
 file "Mostly sure".
+
+``table_no_header`` (Word and PowerPoint)
+    A data table has no header row. Microsoft: Error, "Tables specify
+    column header information"; WCAG 1.3.1 (Info and Relationships, Level
+    A), failure F91 (table headers not marked). A data table here is a
+    plain grid of at least 2 rows and 2 columns: every row has the same
+    number of cells, no cell is merged across rows or columns, and no table
+    is inside it. A table with merged cells or a table inside it is how a
+    form or a page layout is built in Word, and a layout table must not
+    have a header row (WCAG failure F46); Microsoft's checker also warns
+    about merged cells and nested tables in any table (paraphrased:
+    "Tables have a simple structure"). So such a table is not listed.
+    Measured 2026-11-19 on the labelled real files (docs/internal/office-
+    check-research.md, "Why precision was low"): every layout table the old
+    rule flagged had merged cells, and every unmarked data table was a
+    plain grid. Header row: Word's "Header Row" table style option
+    (``tblLook firstRow``), which Microsoft's own instructions use ("Make
+    your Word documents accessible"), or "Repeat as header row"
+    (``tblHeader``) on the first row; PowerPoint: "Header Row" (``a:tblPr
+    firstRow``). A possible problem since 2026-11-20 (the developer's
+    decision): on the second fresh set 4 of its 9 flags were layout grids
+    in court and label forms that are plain grids too (precision 55.6%),
+    and only a person can tell a layout grid from a data table.
+``no_headings`` (Word)
+    The document uses no heading style but has a line that looks like a
+    heading (``_word_bold_line``): a paragraph of its own in bold, of at
+    most one sentence. If that line names a part of the document, a screen
+    reader user cannot move to it, so WCAG 1.3.1 (Info and Relationships,
+    Level A) fails: "Information, structure, and relationships conveyed
+    through presentation can be programmatically determined or are
+    available in text"; failure F2 (a change in how text looks used to
+    convey structure without the markup). Microsoft's guidance says the
+    same from the other side: use the built-in heading styles for
+    headings, so that screen readers can find them ("Make your Word
+    documents accessible to people with disabilities",
+    https://support.microsoft.com/en-us/office/make-your-word-documents-accessible-to-people-with-disabilities-d9bf3683-87ac-47ea-b91a-78dcacb3c66d,
+    paraphrased). Whether the line is a heading, a title or a bold
+    instruction needs a person, so this is a possible problem: the
+    developer's rule of 2026-11-20. It replaced rules that tried to decide
+    it by machine (counting lines that stand out with body text under each,
+    946ad6f, then 1256e02): on the second fresh set 1256e02's rule scored
+    80.0% precision and 59.3% recall for this check
+    (docs/internal/office-check-research.md, "Two tiers"). Details of the
+    rule are on ``_word_bold_line``.
 
 ``skipped_heading_level`` (Word)
     A heading more than one level deeper than the one before it (Heading 1
@@ -69,9 +107,9 @@ file "Mostly sure".
 
 Not checked: reading order (Microsoft lists it as a Warning for a person to
 check; the order shapes are stored in says nothing about whether it makes
-sense), contrast (needs the theme and layout resolved), merged cells and
-alt text quality. A file with no problem found is "Not sure", never
-"accessible".
+sense), contrast (needs the theme and layout resolved), tables with merged
+cells (see ``table_no_header``) and alt text quality. A file with no
+problem found is "Not sure", never "accessible".
 
 The bytes are untrusted: everything is read in a thread under a time limit
 by the caller, a ZIP that would unpack past ``MAX_UNPACKED_BYTES`` is not
@@ -149,9 +187,15 @@ def sniff(data: bytes) -> Sniffed:
 
 Outcome = Literal["checked", "damaged"]
 
-#: A Word document longer than this with no heading style fails
-#: ``no_headings``; shorter ones (a note, a one-part form) do not need any.
-HEADINGS_MIN_WORDS = 400
+#: Paragraph styles whose bold line is not a heading a person must check:
+#: Word's built-in Title and Subtitle name the whole document, and screen
+#: readers do not list them as headings, which is what Word means them for.
+#: Compared with the style's name, which Word stores in English whatever
+#: the language of its menus.
+_TITLE_STYLES = frozenset({"title", "subtitle"})
+#: The end of a sentence inside a line: ".", "!" or "?", any closing quote
+#: or bracket, then a space and more text.
+_SENTENCE_END = re.compile("[.!?][\"'\u201d\u2019)\\]]*\\s+(?=\\S)")
 
 
 @dataclass(frozen=True)
@@ -176,9 +220,9 @@ class OfficeCheck:
 #: file "Mostly sure" first, then the possible problems.
 WORD_CHECKS: tuple[FailedCheck, ...] = (
     "no_alt_text",
+    "no_language",
     "table_no_header",
     "no_headings",
-    "no_language",
     "skipped_heading_level",
     "unclear_link_text",
     "no_title",
@@ -186,15 +230,17 @@ WORD_CHECKS: tuple[FailedCheck, ...] = (
 SLIDES_CHECKS: tuple[FailedCheck, ...] = (
     "no_alt_text",
     "slide_no_title",
-    "table_no_header",
     "no_language",
+    "table_no_header",
     "unclear_link_text",
     "no_title",
 )
-#: Checks whose failure makes a Word or PowerPoint file "Mostly sure".
-COUNTED: frozenset[str] = frozenset(
-    {"no_alt_text", "table_no_header", "slide_no_title", "no_headings", "no_language"}
-)
+#: Checks whose failure makes a Word or PowerPoint file "Mostly sure": the
+#: ones that made no false alarm on files no rule was made on (the
+#: developer's decision, 2026-11-20; module docstring). Every other check
+#: is a possible problem. ``WORD_CHECKS`` and ``SLIDES_CHECKS`` list these
+#: first, so the report shows what counts before what a person must judge.
+COUNTED: frozenset[str] = frozenset({"no_alt_text", "slide_no_title", "no_language"})
 
 
 def checks_for(checked_as: CheckedAs | None) -> tuple[FailedCheck, ...]:
@@ -299,9 +345,15 @@ def _has_alt(props: Any) -> bool:
             return True
     for attribute in ("descr", "title"):
         value = (props.get(attribute) or "").strip()
-        if value and not _FILE_NAME.match(value) and not _DEFAULT_NAME.match(value):
+        if _says_something(value) and not _DEFAULT_NAME.match(value):
             return True
     return False
+
+
+def _says_something(alt: str) -> bool:
+    """Alt text a screen reader can read as words: a letter or digit in it,
+    and not only a file name. Spaces, quote marks or dashes alone are none."""
+    return any(c.isalnum() for c in alt) and not _FILE_NAME.match(alt)
 
 
 def _unclear_link(text: str) -> bool:
@@ -357,8 +409,7 @@ def _check_word(data: bytes) -> OfficeCheck:
         failed.add("table_no_header")
 
     levels = _word_heading_levels(part, body)
-    words = len(_text(body).split())
-    if not levels and words > HEADINGS_MIN_WORDS:
+    if not levels and _word_bold_line(part, body):
         failed.add("no_headings")
     if any(level > before + 1 for before, level in itertools.pairwise(levels)):
         failed.add("skipped_heading_level")
@@ -433,7 +484,7 @@ def _word_images_without_alt(body: Any) -> bool:
         if shape is None or shape.find(_q(_V, "textbox")) is not None:
             continue
         alt = (shape.get("alt") or image.get(_q(_O, "title")) or "").strip()
-        if not alt or _FILE_NAME.match(alt):
+        if not _says_something(alt):
             return True
     return False
 
@@ -441,11 +492,32 @@ def _word_images_without_alt(body: Any) -> bool:
 def _word_tables_without_header(body: Any) -> bool:
     for table in body.iter(_q(_W, "tbl")):
         rows = table.findall(_q(_W, "tr"))
-        if len(rows) < 2 or max(len(row.findall(_q(_W, "tc"))) for row in rows) < 2:
+        cells = [row.findall(_q(_W, "tc")) for row in rows]
+        if len(rows) < 2 or max(len(row) for row in cells) < 2:
+            continue
+        if not _word_plain_grid(table, cells):
             continue
         if not (_word_look_first_row(table) or _word_repeats_first_row(rows[0])):
             return True
     return False
+
+
+def _word_plain_grid(table: Any, cells: list[list[Any]]) -> bool:
+    """Every row has the same number of cells, no cell is merged across
+    columns or rows, and no table is inside it."""
+    if len({len(row) for row in cells}) != 1:
+        return False
+    for row in cells:
+        for cell in row:
+            props = cell.find(_q(_W, "tcPr"))
+            if props is None:
+                continue
+            span = props.find(_q(_W, "gridSpan"))
+            if span is not None and (span.get(_q(_W, "val")) or "1") != "1":
+                return False
+            if props.find(_q(_W, "vMerge")) is not None:
+                return False
+    return not any(inner is not table for inner in table.iter(_q(_W, "tbl")))
 
 
 def _on(value: str | None) -> bool:
@@ -497,6 +569,169 @@ def _word_heading_levels(part: Any, body: Any) -> list[int]:
         if level is not None and _text(paragraph).strip():
             levels.append(level)
     return levels
+
+
+class _RunLook:
+    """How a run of text looks: bold, underlined, in capitals, its size.
+
+    Resolved as Word does, last wins: the document defaults, then the
+    paragraph's style (and the styles it is based on), then the run's
+    character style, then the run's own properties.
+    """
+
+    def __init__(self, part: Any) -> None:
+        self.styles: dict[str, tuple[str | None, dict[str, Any]]] = {}
+        self.defaults: dict[str, Any] = {}
+        self.default_paragraph: str | None = None
+        styles = _styles_part(part)
+        if styles is None:
+            return
+        root = styles.element
+        defaults = root.find(f"{_q(_W, 'docDefaults')}/{_q(_W, 'rPrDefault')}/{_q(_W, 'rPr')}")
+        self.defaults = self.read(defaults)
+        for style in root.iter(_q(_W, "style")):
+            style_id = style.get(_q(_W, "styleId")) or ""
+            parent = style.find(_q(_W, "basedOn"))
+            self.styles[style_id] = (
+                parent.get(_q(_W, "val")) if parent is not None else None,
+                self.read(style.find(_q(_W, "rPr"))),
+            )
+            if style.get(_q(_W, "type")) == "paragraph" and _on(style.get(_q(_W, "default"))):
+                self.default_paragraph = style_id
+
+    @staticmethod
+    def read(props: Any) -> dict[str, Any]:
+        look: dict[str, Any] = {}
+        if props is None:
+            return look
+        for name in ("b", "caps", "smallCaps"):
+            node = props.find(_q(_W, name))
+            if node is not None:
+                value = node.get(_q(_W, "val"))
+                look[name] = value is None or _on(value)
+        underline = props.find(_q(_W, "u"))
+        if underline is not None:
+            look["u"] = (underline.get(_q(_W, "val")) or "single") != "none"
+        size = props.find(_q(_W, "sz"))
+        if size is not None and (size.get(_q(_W, "val")) or "").isdigit():
+            look["sz"] = int(size.get(_q(_W, "val")) or "0")
+        return look
+
+    def style(self, style_id: str | None) -> dict[str, Any]:
+        chain: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        while style_id and style_id not in seen and style_id in self.styles:
+            seen.add(style_id)
+            parent, look = self.styles[style_id]
+            chain.append(look)
+            style_id = parent
+        merged: dict[str, Any] = {}
+        for look in reversed(chain):
+            merged.update(look)
+        return merged
+
+    def runs(self, paragraph: Any) -> list[tuple[str, dict[str, Any]]]:
+        """Each run of the paragraph's own text (not a text box inside it) and its look."""
+        props = paragraph.find(_q(_W, "pPr"))
+        style = props.find(_q(_W, "pStyle")) if props is not None else None
+        base = dict(self.defaults)
+        base.update(
+            self.style(style.get(_q(_W, "val")) if style is not None else self.default_paragraph)
+        )
+        out = []
+        for run in paragraph.iter(_q(_W, "r")):
+            if next(run.iterancestors(_q(_W, "p")), None) is not paragraph:
+                continue
+            words = "".join(node.text or "" for node in run.findall(_q(_W, "t")))
+            if not words.strip():
+                continue
+            look = dict(base)
+            own = run.find(_q(_W, "rPr"))
+            if own is not None:
+                character = own.find(_q(_W, "rStyle"))
+                if character is not None:
+                    look.update(self.style(character.get(_q(_W, "val"))))
+                look.update(self.read(own))
+            out.append((words, look))
+        return out
+
+
+def _word_bold_line(part: Any, body: Any) -> bool:
+    """A bold line of at most one sentence that is its own paragraph.
+
+    The developer's rule for the ``no_headings`` possible problem
+    (2026-11-20): a document with no heading style that has such a line may
+    be showing a heading by its look alone. A paragraph counts when:
+
+    * every letter and digit in it is bold, so bold words inside a
+      paragraph of plain text ("**Note:** forms are due on Friday") do not.
+      Bold as Word shows it: set on the text, its character style, the
+      paragraph's style or the document's defaults (``_RunLook``);
+    * it has at most one sentence (``_sentences``): two sentences in bold
+      are an instruction or a notice, not a name for a part;
+    * it has a letter or digit: an empty line, or a bold line of
+      underscores to write on, says nothing.
+
+    Not read: paragraphs in tables (a form's bold field labels and a
+    table's column names sit in cells, and the table check covers tables),
+    in text boxes (a sidebar or callout, read apart from the body; Word
+    keeps them in ``w:txbxContent``), and in Word's built-in Title and
+    Subtitle styles (``_TITLE_STYLES``: the document's name, set the way
+    Word means). Page headers and footers are not in the body. Nothing else
+    is judged: a bold title typed by hand at the top, a bold "Name:" label
+    or a bold closing line is listed too, as the person reading the report
+    decides whether it is a heading.
+    """
+    look = _RunLook(part)
+    titles = _title_style_ids(part)
+    for paragraph in body.iter(_q(_W, "p")):
+        if next(paragraph.iterancestors(_q(_W, "tc"), _q(_W, "txbxContent")), None) is not None:
+            continue
+        props = paragraph.find(_q(_W, "pPr"))
+        style = props.find(_q(_W, "pStyle")) if props is not None else None
+        style_id = style.get(_q(_W, "val")) if style is not None else look.default_paragraph
+        if style_id in titles:
+            continue
+        runs = [
+            (chunk, run_look)
+            for chunk, run_look in look.runs(paragraph)
+            if any(c.isalnum() for c in chunk)
+        ]
+        if not runs or not all(run_look.get("b") for _, run_look in runs):
+            continue
+        if _sentences("".join(chunk for chunk, _ in runs)) <= 1:
+            return True
+    return False
+
+
+def _sentences(text: str) -> int:
+    """How many sentences a line holds, at least 1.
+
+    A sentence ends at ".", "!" or "?" followed by more text
+    (``_SENTENCE_END``), and only when at least 3 words come before that
+    point since the last sentence ended: numbering and short abbreviations
+    are not sentences ("A. General", "Article 4. Fees", "U.S. Department of
+    Labor" are one each; "Read this first. Then sign below." is two).
+    """
+    count, start = 1, 0
+    for end in _SENTENCE_END.finditer(text):
+        if len(text[start : end.start() + 1].split()) >= 3:
+            count += 1
+            start = end.end()
+    return count
+
+
+def _title_style_ids(part: Any) -> set[str]:
+    """The style IDs of the built-in Title and Subtitle paragraph styles."""
+    styles = _styles_part(part)
+    if styles is None:
+        return set()
+    found = set()
+    for style in styles.element.iter(_q(_W, "style")):
+        name = style.find(_q(_W, "name"))
+        if name is not None and (name.get(_q(_W, "val")) or "").lower() in _TITLE_STYLES:
+            found.add(style.get(_q(_W, "styleId")) or "")
+    return found
 
 
 def _outline(value: str | None) -> int | None:
@@ -631,10 +866,25 @@ def _slide_tables_without_header(tree: Any) -> bool:
         rows = table.findall(_q(_A, "tr"))
         if len(rows) < 2 or max(len(row.findall(_q(_A, "tc"))) for row in rows) < 2:
             continue
+        if not _slide_plain_grid(table):
+            continue
         props = table.find(_q(_A, "tblPr"))
         if props is None or not _on(props.get("firstRow")):
             return True
     return False
+
+
+def _slide_plain_grid(table: Any) -> bool:
+    """No cell merged across columns (``gridSpan``, ``hMerge``) or rows
+    (``rowSpan``, ``vMerge``)."""
+    for cell in table.iter(_q(_A, "tc")):
+        for name in ("gridSpan", "rowSpan"):
+            value = cell.get(name) or "1"
+            if value.isdigit() and int(value) > 1:
+                return False
+        if _on(cell.get("hMerge")) or _on(cell.get("vMerge")):
+            return False
+    return True
 
 
 def _slide_has_unclear_link(tree: Any) -> bool:

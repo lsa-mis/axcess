@@ -335,7 +335,10 @@ export const LINKED_FILE_CHECK_NAME: Record<LinkedFileCheck, string> = {
  * document's page. A Word or PowerPoint check says what it looks at where
  * the name alone could mislead (which images, which headings, how long a
  * document), so a reader knows what "No problem found" covers. Each is
- * true to office_check.py; change them together.
+ * true to office_check.py; change them together. Since 2026-11-20 (the
+ * developer's two tiers) "Table header rows" and "Headings" find only
+ * possible problems, so their sentences end by saying what a person must
+ * check, as the result beside them says "Possible problem".
  */
 export const LINKED_FILE_CHECK_WHY: Record<LinkedFileCheck, string> = {
   not_tagged: "Tags mark the headings, lists and tables, so a screen reader can tell them apart.",
@@ -357,12 +360,12 @@ export const LINKED_FILE_CHECK_WHY: Record<LinkedFileCheck, string> = {
   no_title: "A title tells people which file they have open.",
   no_language: "The language tells a screen reader which voice to read the file in.",
   no_alt_text:
-    'Alt text is the text a screen reader reads aloud for an image. Every picture, chart and diagram needs it, unless it is marked as decorative; without it, people hear only "graphic". Axcess does not judge whether alt text is good, or whether an image not marked as decorative is only decoration.',
+    'Alt text is the text a screen reader reads aloud for an image. Every picture, chart and diagram needs it, unless it is marked as decorative; without it, people hear only "graphic". Axcess does not judge whether alt text is good, or whether an image not marked as decorative is only decoration. In a Word or PowerPoint file, alt text of only spaces or marks, such as quote marks, counts as none.',
   table_no_header:
-    "A header row lets a screen reader say which column each cell is in. Axcess looks at tables with at least 2 rows and 2 columns.",
+    "A header row lets a screen reader say which column each cell is in. Axcess lists tables that are a plain grid of at least 2 rows and 2 columns. A person must check whether the table holds data: a table that only lays out a form or a page needs no header row. A person must also check tables with merged cells.",
   slide_no_title: "Slide titles let a screen reader user find a slide and know where they are.",
   no_headings:
-    "Headings let a screen reader user jump between the parts of a long document. Axcess looks for heading styles in Word documents of more than 400 words.",
+    "Headings let a screen reader user jump between the parts of a document. In a Word document that uses no heading style, Axcess lists a bold line that is a paragraph of its own and one sentence or less. A person must check whether it is a heading.",
   skipped_heading_level:
     "Headings that skip a level, such as Heading 1 then Heading 3, make the outline harder to follow.",
   unclear_link_text:

@@ -9,10 +9,23 @@ each labelled file (``office_files.json``; how it was made is in
 * per check: the check key a criterion names (``office_files.CRITERIA``)
   against the label, "fail" a positive, "pass" and "n/a" negatives;
 * per file: "Mostly sure" against ``barrier``, the labeller's verdict that
-  a screen reader user meets a barrier the counted checks can prove.
+  a screen reader user meets a barrier one of the first five criteria
+  names. Since 2026-11-20 only three of those checks count toward "Mostly
+  sure" (``office_check.COUNTED``; tables and headings are possible
+  problems), so "Mostly sure" recall here counts table and heading
+  barriers as misses by design. Two more file rows say what a reader
+  sees: ``any_problem`` (the report lists any problem, counted or
+  possible) and ``any_barrier_check`` (it lists one of the five barrier
+  checks).
 
-Each score is given for the holdout part and the tuning part separately
-(``split``); the holdout part is the number that counts.
+Each score is given for each part (``split``): "holdout" and "tuning",
+together the "development" set (every rule of 2026-11-19 was chosen
+looking at all of them), and "fresh", 57 Word files labelled and frozen
+before the check was run on them, with the rules frozen at commit 946ad6f,
+and "fresh2", 74 Word files from other sites, labelled and frozen
+(2026-11-20) before the evolved "no headings" rule was chosen and frozen.
+"fresh" was used to choose that rule, so since then only "fresh2" counts. A criterion or ``barrier``
+labelled "disputed" is listed, not scored (AGENTS.md, step 6).
 
 It downloads the files from their sites, so it runs only on request:
 
@@ -216,29 +229,86 @@ def run_set() -> dict[str, Any]:
 
     by_id = {entry["id"]: entry for entry in load()}
     report: dict[str, Any] = {"files": rows, "scores": {}}
-    for split in ("holdout", "tuning"):
-        scored = [r for r in rows if r["split"] == split and r.get("outcome") == "checked"]
+    for split, members in SPLITS.items():
+        rows_in = [r for r in rows if r["split"] in members]
+        scored = [r for r in rows_in if r.get("outcome") == "checked"]
         part: dict[str, Any] = {
-            "files": len([r for r in rows if r["split"] == split]),
+            "files": len(rows_in),
             "scored": len(scored),
-            "not_scored": dict(
-                Counter(
-                    r["outcome"] for r in rows if r["split"] == split and r["outcome"] != "checked"
-                )
-            ),
+            "not_scored": dict(Counter(r["outcome"] for r in rows_in if r["outcome"] != "checked")),
+            "disputed": [r["id"] for r in scored if by_id[r["id"]]["barrier"] == "disputed"],
             "mostly_sure": score(
-                [(by_id[r["id"]]["barrier"], r["status"] == "mostly_sure", r["id"]) for r in scored]
+                [
+                    (by_id[r["id"]]["barrier"] is True, r["status"] == "mostly_sure", r["id"])
+                    for r in scored
+                    if by_id[r["id"]]["barrier"] != "disputed"
+                ]
             ),
         }
+        # What a reader sees, not only "Mostly sure": a barrier file listed
+        # with any problem, counted or possible (since the two tiers of
+        # 2026-11-20, "Mostly sure" alone misses the table and heading
+        # barriers by design). "any_problem": any failed check the report
+        # shows (a Google file's "no_title" is left out, as the report does);
+        # "any_barrier_check": any check named by a criterion ``barrier``
+        # covers (``BARRIER_CHECKS``), so a missing document title alone
+        # does not count as finding a barrier.
+        part["any_problem"] = score(
+            [
+                (by_id[r["id"]]["barrier"] is True, bool(_shown(r)), r["id"])
+                for r in scored
+                if by_id[r["id"]]["barrier"] != "disputed"
+            ]
+        )
+        part["any_barrier_check"] = score(
+            [
+                (
+                    by_id[r["id"]]["barrier"] is True,
+                    bool(set(r["failed"]) & BARRIER_CHECKS),
+                    r["id"],
+                )
+                for r in scored
+                if by_id[r["id"]]["barrier"] != "disputed"
+            ]
+        )
         for criterion, key in CRITERIA.items():
             part[key] = score(
                 [
                     (by_id[r["id"]]["expected"][criterion] == "fail", key in r["failed"], r["id"])
                     for r in scored
+                    if by_id[r["id"]]["expected"][criterion] != "disputed"
                 ]
             )
         report["scores"][split] = part
     return report
+
+
+#: The checks of the criteria ``barrier`` covers (the labelling protocol:
+#: "any of the first five fails").
+BARRIER_CHECKS = frozenset(
+    {"no_alt_text", "table_no_header", "slide_no_title", "no_language", "no_headings"}
+)
+
+
+def _shown(row: dict[str, Any]) -> list[str]:
+    """The failed checks the report lists for a scored row."""
+    if row["kind"].startswith("google"):
+        return [check for check in row["failed"] if check != "no_title"]
+    return list(row["failed"])
+
+
+#: Each reported part and the ``split`` values it holds.
+SPLITS: dict[str, tuple[str, ...]] = {
+    "holdout": ("holdout",),
+    "tuning": ("tuning",),
+    "development": ("holdout", "tuning"),
+    "fresh": ("fresh",),
+    "fresh2": ("fresh2",),
+}
+
+
+def _rate(value: float | None) -> str:
+    return "-" if value is None else f"{value:.1%}"
 
 
 def test_office_check_on_real_files() -> None:
@@ -248,13 +318,20 @@ def test_office_check_on_real_files() -> None:
     for split, part in report["scores"].items():
         print(
             f"\n== {split}: {part['scored']} of {part['files']} files scored {part['not_scored']}"
+            f" disputed={part['disputed']}"
         )
         for name, s in part.items():
             if isinstance(s, dict) and "tp" in s:
                 print(
                     f"  {name:24} n={s['n']:3} pos={s['positives']:3} tp={s['tp']:3} "
-                    f"fp={s['fp']:3} "
-                    f"fn={s['fn']:3} precision={s['precision']} recall={s['recall']}"
+                    f"fp={s['fp']:3} fn={s['fn']:3} precision={_rate(s['precision'])} "
+                    f"(false alarms <= {_rate(s['false_discovery_upper_95'])}) "
+                    f"recall={_rate(s['recall'])} (misses <= {_rate(s['miss_rate_upper_95'])})"
                 )
-    damaged = [r["id"] for r in report["files"] if r.get("outcome") == "damaged"]
+    # A file whose label records it as damaged as served (a bad ZIP) is
+    # expected to read "damaged"; any other is a fault in the check.
+    known = {entry["id"] for entry in load() if entry.get("damaged")}
+    damaged = [
+        r["id"] for r in report["files"] if r.get("outcome") == "damaged" and r["id"] not in known
+    ]
     assert not damaged, f"real files the check could not read: {damaged}"

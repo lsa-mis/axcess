@@ -248,8 +248,9 @@ export default function DocumentDetailRoute() {
  * check it belongs to. The result is in words, never colour alone (SC 1.4.1
  * Use of Color, Level A): "Problem found" in bold for a check that proves a
  * barrier; "Possible problem" for a Word or PowerPoint check that does not
- * prove one on its own and never makes the file Mostly sure (the document
- * title, link text, heading levels; office_check.COUNTED), so the two are
+ * prove one on its own and never makes the file Mostly sure (table header
+ * rows, headings, heading levels, link text, the document title;
+ * office_check.COUNTED, the developer's two tiers of 2026-11-20), so the two are
  * told apart by their words, not their weight; "No problem found" muted.
  * Never "Passed": a machine check cannot prove a file is accessible
  * (AGENTS.md, Interface language rule 4). A file Axcess could not check has

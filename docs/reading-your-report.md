@@ -294,8 +294,9 @@ Each row shows:
 - **What Axcess found**: each problem the checks found, by a short name, most
   serious first ("Not tagged", "Images without alt text"); for a Not sure
   file, what a person must still check; then, for a Word or PowerPoint file,
-  any **Possible problems** (such as "Links that do not say where they go"),
-  which a person must judge and which never make a file Mostly sure; for a
+  any **Possible problems** (such as "Tables without a header row", "No
+  headings" or "Links that do not say where they go"), which a person must
+  judge and which never make a file Mostly sure; for a
   file Axcess could not check, why. Why each
   problem matters is on the document's own page. A file with the same contents as
   one earlier in the list (the same PDF at another address) says "Same file
@@ -321,10 +322,12 @@ A document's own page works like an issue type's page. At the top right,
 (Accessibility problems?, Type, Hosted on, Pages it appears on). **What Axcess
 found** is a table of the checks that ran on the file, each with its result
 ("Problem found", "Possible problem" or "No problem found") and why it
-matters. A Word file gets seven (Alt text for images, Table header rows,
-Headings, Language, Heading levels, Link text, Document title) and a
-PowerPoint file six (Alt text for images, Slide titles, Table header rows,
-Language, Link text, Document title). A Google Doc or Slides deck has no
+matters. A Word file gets seven (Alt text for images, Language, Table header
+rows, Headings, Heading levels, Link text, Document title) and a PowerPoint
+file six (Alt text for images, Slide titles, Language, Table header rows,
+Link text, Document title). The checks that can make a Word or PowerPoint
+file Mostly sure come first; the rest can only find a possible problem. A
+Google Doc or Slides deck has no
 Document title row: Google's exports never have a title, and its author
 cannot set one. Every PDF Axcess opens gets five (Tags, Text a screen reader
 can read, Security settings, Document title, Language), and up to seven more
