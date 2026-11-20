@@ -98,7 +98,13 @@ own paragraph and at most one sentence (replaces 1256e02's probe). Keep
 | T3. Bold-line heading rule + unit tests | done in **68af8c2** (`_word_bold_line`, `_sentences`); real cut-downs from 06f21a62fbbb, 0cf575d1dc40, 0e1588d7eae2, 3828c86e0f47, 1d10e2d9fe14; tests not yet run | `tests/unit/test_office_check.py` |
 | T4. Score Mostly sure and every check, all sets | done: scorer rows `any_problem`, `any_barrier_check` (**a7fa2a9**); Mostly sure P 100% on all sets, R dev 50.0%, fresh 50.0%, fresh2 33.3% (by design); every fresh/fresh2 barrier file shown a problem | research doc, "Scores with the two tiers" |
 | T5. Wording: Documents tab, document page, terms.ts, glossary, reading-your-report, tests | done (this commit): Documents "What was checked" says the two tiers in two paragraphs; terms.ts why-sentences for tables and headings; rationale comments in DocumentDetail.tsx, DocumentParts.tsx; glossary and reading-your-report; test_documents_route.py pins the new order, a table as a possible problem, and (taken from documents' 8db578c) no title row for a Google deck | |
-| T6. Gates | | |
+| T6. Gates | done 2026-11-20: make lint, make typecheck, make frontend-build pass; tests/unit/test_office_check.py all pass; tests/unit/test_office_report_rules.py 1 failure, the pre-existing test_migrations_0046_then_0047 (0047's rollback bug, fixed on documents in 8db578c by editing 0047's rollback, not taken here: an existing migration); tests/ui/test_documents_route.py 40 passed; unit tests matching linked_file/office/document 167 passed + that 1 | |
+
+Round 3 is done. Open items: renumber 0049 if documents' numbering differs at
+merge; the heading rule misses part names in table cells (7 barrier files
+across the sets); "Mostly sure" recall against all barriers is low by design
+(fresh 50.0%, fresh2 33.3%), every fresh/fresh2 barrier file is still shown
+a problem.
 
 ## Next step (round 2, superseded by round 3)
 
