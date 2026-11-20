@@ -30,6 +30,7 @@ import { confirmDestructive } from "../hooks/usePreferences";
 import BreakableUrl from "../components/BreakableUrl";
 import RunningScanNotice from "../components/RunningScanNotice";
 import ScanAgainLink from "../components/ScanAgainLink";
+import ContinueScanButton from "../components/ContinueScanButton";
 import LinkMenu, { LINK_MENU_TRIGGER_CLASS } from "../components/LinkMenu";
 import {
   Cell,
@@ -250,6 +251,13 @@ const PROTECTED_STATUS_LABEL: Record<ProtectedScanStatus, string> = {
  * - A site with no report (no scan that completed or saved a page) has
  *   nothing to open, so it shows only
  *   "Scan again", from its latest scan.
+ * - "Continue scan" takes the place of "Scan again" when that scan is not
+ *   finished: Axcess closed mid-scan and the pages it had still to visit
+ *   are waiting (the developer's decision, 2026-11-20). Its status reads
+ *   "Not finished", not "Stopped": a scan a person stopped is over, and
+ *   keeps "Scan again". Before, "Scan again" quietly continued such a
+ *   report; see ContinueScanButton for why that became its own action. A
+ *   new report of the site is still on New scan.
  */
 type SortKey = "site" | "completed" | "pages" | "issues" | "kinds" | "checks";
 
@@ -774,7 +782,11 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
                   Open latest scan
                   <span className="sr-only"> of {label}, the most recent report</span>
                 </Link>
-                <ScanAgainLink scanId={completed.id} site={label} look="link" />
+                {completed.can_continue ? (
+                  <ContinueScanButton scanId={completed.id} site={label} />
+                ) : (
+                  <ScanAgainLink scanId={completed.id} site={label} look="link" />
+                )}
               </div>
             </Cell>
           </>
@@ -784,7 +796,11 @@ const SiteRows = memo(function SiteRows({ site, index, rowId, expanded, onToggle
               No report yet. Expand the site to open its other scans.
             </Cell>
             <Cell className="whitespace-nowrap">
-              <ScanAgainLink scanId={site.most_recent.id} site={label} look="link" />
+              {site.most_recent.can_continue ? (
+                <ContinueScanButton scanId={site.most_recent.id} site={label} />
+              ) : (
+                <ScanAgainLink scanId={site.most_recent.id} site={label} look="link" />
+              )}
             </Cell>
           </>
         )}
@@ -918,7 +934,7 @@ function ScanRow({
             in the comment on this route. A word, not a colour (SC 1.4.1). */}
         {scan.status !== "completed" && (
           <span className="ml-2 font-sans">
-            <ScanStatusBadge value={scan.status} />
+            <ScanStatusBadge value={scan.status} canContinue={scan.can_continue} />
           </span>
         )}
       </RowHeader>
@@ -1035,7 +1051,7 @@ function SizerRows({ sites }: { sites: readonly SiteGroup[] }) {
                     <span className="inline-flex items-center px-1 font-semibold">Report #{scan.id}</span>
                     {scan.status !== "completed" && (
                       <span className="ml-2 font-sans">
-                        <ScanStatusBadge value={scan.status} />
+                        <ScanStatusBadge value={scan.status} canContinue={scan.can_continue} />
                       </span>
                     )}
                   </>,

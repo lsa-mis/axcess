@@ -216,7 +216,7 @@ export default function DashboardRoute() {
                         image{s.finding_count === 1 ? "" : "s"} with text
                       </span>
                     </span>
-                    <ScanStatusBadge value={s.status} />
+                    <ScanStatusBadge value={s.status} canContinue={s.can_continue} />
                     <span className="shrink-0 text-xs tabular-nums text-fg-subtle">
                       {relativeTime(s.started_at)}
                     </span>

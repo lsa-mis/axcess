@@ -550,6 +550,22 @@ export const SCAN_STATUS_LABEL: Record<ScanStatus, string> = {
 };
 
 /**
+ * An interrupted scan that can be continued: Axcess closed mid-scan and
+ * the addresses still to visit are waiting (audit/web/continuing.py). A
+ * scan a person stopped has none waiting and stays "Stopped". Two labels
+ * because the two mean different things to the reader: one can be carried
+ * on with Continue scan, the other is over (the developer's decision,
+ * 2026-11-20).
+ */
+export const SCAN_NOT_FINISHED_LABEL = "Not finished";
+
+/** A scan's status in words, telling "Not finished" from "Stopped". */
+export function scanStatusLabel(status: ScanStatus, canContinue?: boolean): string {
+  if (status === "interrupted" && canContinue) return SCAN_NOT_FINISHED_LABEL;
+  return SCAN_STATUS_LABEL[status] ?? status;
+}
+
+/**
  * The Images tab's groups (routes/Images.tsx). Each is a question asked of
  * the report's images, so an image can be in two: "Images with text" and
  * one of the other two.

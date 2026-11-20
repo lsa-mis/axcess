@@ -724,3 +724,65 @@ async def test_sites_stay_open_when_coming_back_by_the_navigation(new_page: Any)
         table.get_by_role("button", name="Show all 2 scans for site3.example")
     ).to_be_visible()
     await page.context.close()
+
+
+async def test_an_unfinished_report_offers_continue_scan_in_place_of_scan_again(
+    new_page: Any,
+) -> None:
+    """A report cut off when Axcess closed, with pages still waiting, is
+    "Not finished" and offers Continue scan, not Scan again (the developer's
+    decision, 2026-11-20). Continue asks first, then carries on the same
+    report and opens its progress page."""
+    if not (DIST / "index.html").exists():
+        pytest.skip("Build the frontend first")
+    url = "https://unfinished.example/"
+    unfinished = {**_scan(71, "interrupted", site=url), "page_count": 142, "can_continue": True}
+    older = _scan(70, "completed", site=url)
+    site = {
+        "site_url": url,
+        "scan_count": 2,
+        "report_count": 2,
+        "most_recent": unfinished,
+        "most_recent_report": unfinished,
+        "most_recent_report_issue_count": 4,
+        "most_recent_report_occurrence_count": 9,
+        "scans": [unfinished, older],
+    }
+    page = await _open_reports(new_page, [site])
+    continued: list[str] = []
+
+    async def continue_scan(route: Any) -> None:
+        continued.append(route.request.method)
+        await route.fulfill(status=202, json={"scan_id": 71})
+
+    await page.route("**/api/scans/71/continue", continue_scan)
+    table = page.get_by_role("table", name="Public reports by site", exact=False)
+    row = table.locator(":scope > tbody > tr").first
+    button = row.get_by_role(
+        "button", name=re.compile(r"^Continue scan\W+report #71, unfinished\.example$")
+    )
+    await playwright_async.expect(button).to_be_visible()
+    await playwright_async.expect(
+        row.get_by_role("link", name=re.compile(r"^Scan again"))
+    ).to_have_count(0)
+    # Its own status, in words: not finished, not stopped.
+    await row.get_by_role("button", name=re.compile(r"^Show all 2 scans")).click()
+    await playwright_async.expect(table.get_by_text("Not finished", exact=True)).to_have_count(1)
+    violations = await _run_axe(page)
+    assert not violations, _render_violations(violations)
+
+    # It asks first: dismissing starts nothing.
+    async def dismiss(dialog: Any) -> None:
+        await dialog.dismiss()
+
+    async def accept(dialog: Any) -> None:
+        assert "Continue report #71 (unfinished.example)?" in dialog.message
+        await dialog.accept()
+
+    page.once("dialog", dismiss)
+    await button.click()
+    assert continued == []
+    page.once("dialog", accept)
+    await button.click()
+    await page.wait_for_url(re.compile(r"/app/scans/71$"))
+    assert continued == ["POST"]

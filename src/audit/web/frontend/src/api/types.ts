@@ -34,6 +34,10 @@ export interface ScanSummary {
   rule_checks?: RuleCheck[] | null;
   started_at: string | null;
   finished_at: string | null;
+  /** Not finished: Axcess closed mid-scan with addresses still waiting, so
+   *  Continue scan can carry the same report on (audit/web/continuing.py).
+   *  Absent from an older server: read as false. */
+  can_continue?: boolean;
 }
 
 /** A rule check by its pipeline key (labels: RULE_CHECK_TOOL in lib/terms.ts). */

@@ -9,7 +9,7 @@ import {
   OPENS_NEW_WINDOW,
   REVIEW_DECISION_HELP,
   REVIEW_DECISION_LABEL,
-  SCAN_STATUS_LABEL,
+  scanStatusLabel,
   STATUS_HELP,
   STATUS_LABEL,
 } from "../lib/terms";
@@ -834,16 +834,19 @@ const SCAN_STATUS_CLASS: Record<ScanStatus, string> = {
   failed: "border-sev-critical/40 bg-sev-critical-bg text-sev-critical",
   interrupted: "border-sev-major/40 bg-sev-major-bg text-sev-major",
 };
-export function ScanStatusBadge({ value }: { value: ScanStatus }) {
+export function ScanStatusBadge({ value, canContinue }: { value: ScanStatus; canContinue?: boolean }) {
+  // "Not finished" keeps the interrupted amber: it is the same state seen
+  // from the reader's side, one that Continue scan can carry on.
+  const label = scanStatusLabel(value, canContinue);
   return (
     <span
-      aria-label={`Scan status: ${SCAN_STATUS_LABEL[value] ?? value}`}
+      aria-label={`Scan status: ${label}`}
       className={cn(
         "inline-flex items-center rounded-xs border px-2 py-0.5 text-2xs font-semibold",
         SCAN_STATUS_CLASS[value],
       )}
     >
-      {SCAN_STATUS_LABEL[value] ?? value}
+      {label}
     </span>
   );
 }

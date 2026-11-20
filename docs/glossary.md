@@ -313,6 +313,22 @@ each scan. Neither part shows that a site meets WCAG. Not to be confused with
 How a scan moves through a site: Axcess starts at the address you give,
 follows links to find more pages, and tests each page in the [scope](#scope).
 
+### Stopped, Not finished and Continue scan
+
+How a scan that did not complete ended, as the Reports list shows it:
+
+| Status | What happened | What you can do |
+| --- | --- | --- |
+| Stopped | A person pressed Stop. The pages it had not reached yet are dropped. | **Scan again** makes a new report. |
+| Not finished | Axcess closed during the scan. The pages it had not reached yet are kept. | **Continue scan** carries on the same report, with the settings it started with. |
+
+Both are still reports when they saved a page. **Scan again** always makes
+a new report: it never continues an older one (since 2026-11-20). A
+sign-in scan cut off this way cannot be continued, because its signed-in
+browser closed with Axcess. When a report is continued, Axcess also checks
+the files it had not finished checking, and files the version that started
+the report could not open yet (such as Google Docs before 2026-11-18).
+
 ### Pages not reached
 
 Pages the scan tried but could not load, which the report summary counts

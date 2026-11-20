@@ -5,7 +5,7 @@ import { Check, CornerDownLeft, Search } from "lucide-react";
 import { api } from "../api/client";
 import { siteLabel } from "./ReportCrumb";
 import { cn } from "../lib/cn";
-import { CHECK_LABEL, CHECK_METHOD_LABEL, SCAN_STATUS_LABEL } from "../lib/terms";
+import { CHECK_LABEL, CHECK_METHOD_LABEL, scanStatusLabel } from "../lib/terms";
 import { ALL_SETTINGS } from "../lib/settingsCatalog";
 import type { Preferences } from "../lib/preferences";
 import { setPreference, usePreferences } from "../hooks/usePreferences";
@@ -180,7 +180,7 @@ export default function CommandPalette({
           id: `scan-${s.id}`,
           group: "Reports",
           label,
-          sublabel: `Report #${s.id} · ${SCAN_STATUS_LABEL[s.status] ?? s.status}`,
+          sublabel: `Report #${s.id} · ${scanStatusLabel(s.status, s.can_continue)}`,
           to: `/scans/${s.id}`,
         });
       }
