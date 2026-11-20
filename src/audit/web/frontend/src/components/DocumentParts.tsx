@@ -156,12 +156,14 @@ export function Found({ row }: { row: LinkedFileRow }) {
 }
 
 /*
- * Possible problems (Word and PowerPoint only: a document title, link text,
- * heading levels) come after the problems, under their own words,
- * "Possible problems:", so a reader never takes one for a proven problem:
- * they do not make a file Mostly sure (office_check.COUNTED, the
- * developer's rule of 2026-11-17: only a machine-checkable barrier to a
- * screen reader user counts). A list of its own, so a screen reader says
+ * Possible problems (Word and PowerPoint only: table header rows,
+ * headings, heading levels, link text, a document title) come after the
+ * problems, under their own words, "Possible problems:", so a reader never
+ * takes one for a proven problem: they do not make a file Mostly sure
+ * (office_check.COUNTED; the developer's rule of 2026-11-17, only a
+ * machine-checkable barrier to a screen reader user counts, and the two
+ * tiers of 2026-11-20, only the checks with no false alarm on real files
+ * count). A list of its own, so a screen reader says
  * how many. Rejected: one list with both kinds, which would let a link's
  * words look as serious as an image with no alt text; and leaving them to
  * the document's page, which hides them from the table a reader works

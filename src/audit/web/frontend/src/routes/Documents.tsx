@@ -701,13 +701,22 @@ function DocumentsCoverageNote({ recorded }: { recorded: boolean }) {
           Excel files, Google Sheets, old Office files (.doc, .ppt) or the other types.
         </p>
         {/* What the Word and PowerPoint checks look at, so a reader knows
-            what "No problem found" covers, and that a possible problem is
-            for a person to judge. True to office_check.py: change them
-            together. */}
+            what "No problem found" covers, and which checks can make a file
+            "Mostly sure" and which only list a possible problem for a
+            person to judge: the developer's two tiers of 2026-11-20
+            (office_check.COUNTED), chosen by how accurate each check was on
+            real files. Two paragraphs, one per tier, rather than one
+            sentence naming all eight checks: one idea per chunk (W3C COGA,
+            "Making Content Usable", https://www.w3.org/TR/coga-usable/,
+            paraphrased). True to office_check.py: change them together. */}
         <p>
-          In a Word or PowerPoint file, Axcess checks the alt text for images, table header rows,
-          headings, slide titles and the language. It also lists possible problems, such as link
-          text, for a person to judge. They do not make a file &ldquo;Mostly sure&rdquo;.
+          In a Word or PowerPoint file, three checks can make the file &ldquo;Mostly sure&rdquo;:
+          alt text for images, slide titles and the language.
+        </p>
+        <p>
+          Other checks list possible problems for a person to judge: table header rows, headings,
+          heading levels, link text and the document title. A possible problem never makes a file
+          &ldquo;Mostly sure&rdquo;.
         </p>
         <p>
           To check a file, Axcess downloaded it to this computer once. It kept the results, not

@@ -537,33 +537,38 @@ A PDF is marked [Mostly sure](#mostly-sure) when it fails one of these:
 
 A Word or PowerPoint file is marked [Mostly sure](#mostly-sure) when it fails
 one of these (Axcess's own rules, modelled on Microsoft's Accessibility
-Checker):
+Checker). These checks made no false alarm on the real files we tested
+them on:
 
 - images without alt text: a picture, chart, diagram or video with no alt
   text that is not marked as decorative; alt text of only spaces or marks
   counts as none (WCAG 1.1.1);
-- tables without a header row: a table that is a plain grid of at least 2
-  rows and 2 columns (no merged cells, no table inside it) whose first row
-  is not marked as a header row (WCAG 1.3.1). A table with merged cells is
-  often a form's layout, so a person must check it;
 - slides without a title (PowerPoint; WCAG 2.4.6);
-- no headings: a Word document with no heading style that shows at least 3
-  lines that look like headings: short lines in bold, underlined or larger
-  text, each with body text under it (WCAG 1.3.1). Capitals alone do not
-  count, as forms put captions and column names in capitals. A document
-  with no visible parts, such as a meeting transcript, does not fail;
 - no language set (WCAG 3.1.1).
 
 It also lists **possible problems**, which a person must judge and which
-never make a file Mostly sure: link text that is a web address or "click
-here" (WCAG 2.4.4), heading levels skipped (Heading 1, then Heading 3), and
-no document title. Word and PowerPoint show the file name, not the title. A
-Google Doc or Slides deck is not checked for a title at all: Google's exports
-never have one, and its author cannot set one.
+never make a file Mostly sure:
 
-A file that passes all its checks is [Not sure](#not-sure): a person must
-still check its reading order, how good its alt text is, and its table
-headers. Every other file, and any file Axcess could not open, is "Could not
+- tables without a header row: a table that is a plain grid of at least 2
+  rows and 2 columns (no merged cells, no table inside it) whose first row
+  is not marked as a header row (WCAG 1.3.1). A person must check whether
+  the table holds data: a table that only lays out a form or a page needs
+  no header row. Tables with merged cells are not listed, but a person must
+  check them too;
+- no headings: a Word document that uses no heading style but has a line
+  in bold that is a paragraph of its own and one sentence or less, such as
+  "Construction Records" (WCAG 1.3.1). A person must check whether the line
+  is a heading. Lines in tables, in text boxes and in Word's Title and
+  Subtitle styles are not looked at;
+- link text that is a web address or "click here" (WCAG 2.4.4);
+- heading levels skipped (Heading 1, then Heading 3);
+- no document title. Word and PowerPoint show the file name, not the
+  title. A Google Doc or Slides deck is not checked for a title at all:
+  Google's exports never have one, and its author cannot set one.
+
+A file with no problem that makes it Mostly sure is [Not sure](#not-sure),
+even when it lists possible problems: a person must still check its
+reading order, how good its alt text is, and its table headers. Every other file, and any file Axcess could not open, is "Could not
 check", with the reason. It is on by
 default for every scan that does not sign in (**Check the documents the pages
 link to**, under Checks on the New scan page), and a sign-in scan never runs

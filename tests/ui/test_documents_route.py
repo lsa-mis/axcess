@@ -167,7 +167,8 @@ def _seed_documents(db_path: Path, scan_id: int, blob_dir: Path | None = None) -
             [(home, "iframe", "Course map", None)],
         )
         # A Word file the check read (since 2026-11-17): one problem that
-        # makes it Mostly sure, and two possible problems that do not.
+        # makes it Mostly sure, and three possible problems that do not
+        # (a table without a header row is one since 2026-11-20).
         _file(
             conn,
             scan_id,
@@ -175,7 +176,7 @@ def _seed_documents(db_path: Path, scan_id: int, blob_dir: Path | None = None) -
             "docx",
             store.CheckResult(
                 "mostly_sure",
-                failed_checks=["no_alt_text", "unclear_link_text", "no_title"],
+                failed_checks=["no_alt_text", "table_no_header", "unclear_link_text", "no_title"],
                 http_status=200,
                 checked_as="docx",
             ),
@@ -272,23 +273,27 @@ def test_files_come_in_the_recommended_order(client: TestClient, documents: int)
     guide = next(f for f in body["files"] if f["name"] == "welcome-guide.docx")
     assert guide["checked_as"] == "docx"
     assert guide["failed_checks"] == ["no_alt_text"]
-    assert guide["possible_problems"] == ["unclear_link_text", "no_title"]
+    assert guide["possible_problems"] == ["table_no_header", "unclear_link_text", "no_title"]
+    # The checks that can make a file Mostly sure come first (2026-11-20).
     assert guide["checks_run"] == [
         "no_alt_text",
+        "no_language",
         "table_no_header",
         "no_headings",
-        "no_language",
         "skipped_heading_level",
         "unclear_link_text",
         "no_title",
     ]
     deck = next(f for f in body["files"] if f["name"] == "Orientation slides")
+    # A Google Slides deck: no title check, since Google's export never has
+    # one and its author cannot set it (2026-11-18).
     assert (deck["checked_as"], deck["failed_checks"], deck["possible_problems"]) == (
         "pptx",
         [],
-        ["no_title"],
+        [],
     )
     assert "slide_no_title" in deck["checks_run"]
+    assert "no_title" not in deck["checks_run"]
     # A file no check read has none.
     sheet = next(f for f in body["files"] if f["name"] == "Meeting notes")
     assert (sheet["checked_as"], sheet["checks_run"]) == (None, [])
@@ -570,7 +575,9 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
     for text in (
         CAVEAT,
         "Axcess checks the PDF, Word (.docx) and PowerPoint (.pptx) files.",
-        "It also lists possible problems, such as link text, for a person to judge.",
+        "three checks can make the file “Mostly sure”: alt text for images, slide titles and "
+        "the language.",
+        "Other checks list possible problems for a person to judge: table header rows, headings,",
         "To check a file, Axcess downloaded it to this computer once. It kept the results, "
         "not the file.",
         "The list can miss files.",
@@ -643,7 +650,7 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
     )
     await expect(guide.get_by_text("Possible problems:", exact=True)).to_be_visible()
     await expect(guide.get_by_role("list").nth(1).get_by_role("listitem")).to_have_text(
-        ["Links that do not say where they go", "No document title"]
+        ["Tables without a header row", "Links that do not say where they go", "No document title"]
     )
     # Not sure says what a person must still check: never read as a pass.
     await expect(rows.nth(3)).to_contain_text("Not sure")
@@ -972,19 +979,21 @@ async def test_a_word_and_a_powerpoint_page_list_their_own_checks(
     await expect(checks.get_by_role("rowheader")).to_have_text(
         [
             "Alt text for images",
+            "Language",
             "Table header rows",
             "Headings",
-            "Language",
             "Heading levels",
             "Link text",
             "Document title",
         ]
     )
+    # The checks that can make the file Mostly sure come first; a table
+    # without a header row is a possible problem (2026-11-20).
     await expect(checks.locator("tbody tr td:nth-of-type(1)")).to_have_text(
         [
             "Problem found",
             "No problem found",
-            "No problem found",
+            "Possible problem",
             "No problem found",
             "No problem found",
             "Possible problem",
@@ -1012,14 +1021,14 @@ async def test_a_word_and_a_powerpoint_page_list_their_own_checks(
         [
             "Alt text for images",
             "Slide titles",
-            "Table header rows",
             "Language",
+            "Table header rows",
             "Link text",
-            "Document title",
         ]
     )
+    # A Google Slides deck has no "Document title" row (2026-11-18).
     await expect(checks.locator("tbody tr td:nth-of-type(1)")).to_have_text(
-        ["No problem found"] * 5 + ["Possible problem"]
+        ["No problem found"] * 5
     )
     for tags in (_AXE_TAGS_AA, None):
         violations = await _run_axe(page, tags)
