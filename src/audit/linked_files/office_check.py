@@ -57,13 +57,20 @@ count).
     determined or are available in text"; failure F2 (a change in how text
     looks used to convey structure without the markup). "Shows headings":
     at least ``VISUAL_HEADINGS_MIN`` visual headings
-    (``_word_visual_headings``: short lines in bold, underlined, in
-    capitals or larger text, each followed by body text). A document with
-    no visible parts, such as a meeting transcript or a one-part form,
-    does not fail, however long: it has no structure to lose. Until
-    2026-11-19 this failed any document of more than 400 words with no
-    heading style, which flagged such transcripts and forms (half of its
-    failures on the labelled real files were false alarms).
+    (``_word_visual_headings``: short lines in bold, underlined or larger
+    text, each followed by body text). A document with no visible parts,
+    such as a meeting transcript or a one-part form, does not fail, however
+    long: it has no structure to lose. Microsoft's guidance says the same
+    from the other side: use the built-in heading styles for headings, so
+    that screen readers can find them ("Make your Word documents accessible
+    to people with disabilities", https://support.microsoft.com/en-us/office/make-your-word-documents-accessible-to-people-with-disabilities-d9bf3683-87ac-47ea-b91a-78dcacb3c66d,
+    paraphrased). Until 2026-11-19 this failed any document of more than
+    400 words with no heading style, which flagged such transcripts and
+    forms (half of its failures on the labelled real files were false
+    alarms). The visual-heading rule was then chosen on 2026-11-20 by a
+    search over a family of such rules (``scripts/office_heading_search.py``;
+    docs/internal/office-check-research.md, "Second round: evolved heading
+    probe").
 ``no_language`` (Word and PowerPoint)
     No language is set anywhere for the text, so a screen reader cannot
     choose a voice (WCAG 3.1.1, Language of Page, Level A). The same check
@@ -169,16 +176,23 @@ def sniff(data: bytes) -> Sniffed:
 Outcome = Literal["checked", "damaged"]
 
 #: A Word document with no heading style fails ``no_headings`` when it shows
-#: at least this many visual headings (``_word_visual_headings``). Two, not
-#: one: a single bold or large line at the top is the document's title, and
-#: a document with only a title has no parts to move between.
-VISUAL_HEADINGS_MIN = 2
+#: at least this many visual headings (``_word_visual_headings``). Three,
+#: not two: a bold or large line at the top is usually the document's
+#: title, and minutes and forms often show one more bold line (a closing
+#: "Approved" line, "Immediate Action Items:"); a title and one bold line
+#: are not a document divided into parts. Chosen 2026-11-20 (see the
+#: module docstring); 2 made four false alarms on the first fresh set.
+VISUAL_HEADINGS_MIN = 3
 #: A visual heading is a line of at most this many words (a heading names a
 #: part; a longer line in bold is emphasis or an instruction)...
 VISUAL_HEADING_MAX_WORDS = 12
 #: ...followed by at least this many words before the next one (a heading
-#: starts a part; a form's bold labels, "Name:" then "Date:", start none).
-VISUAL_HEADING_MIN_BODY = 20
+#: starts a part; a form's bold labels, "Name:" then "Date:", start none)...
+VISUAL_HEADING_MIN_BODY = 40
+#: ...or by this share of the document's words, when that is fewer: a
+#: one-page checklist's "Income", "Assets" and "Expenses" each head a list
+#: of about 15 words, which is a part of a 71-word document.
+VISUAL_HEADING_MIN_BODY_SHARE = 0.15
 
 
 @dataclass(frozen=True)
@@ -635,18 +649,34 @@ def _word_visual_headings(part: Any, body: Any) -> int:
     """How many headings a sighted reader sees in the body, styled or not.
 
     A visual heading is a line of at most ``VISUAL_HEADING_MAX_WORDS`` words
-    that stands out from the body text (at least 80% of its letters bold,
-    underlined or in capitals, or 2 points larger than the body text's usual
-    size), starts with a letter, digit or "(", and is followed by at least
-    ``VISUAL_HEADING_MIN_BODY`` words before the next such line.
+    that stands out from the body text (at least 80% of its letters bold or
+    underlined, or 2 points larger than the body text's usual size), starts
+    with a letter, digit or "(", and is followed by at least
+    ``VISUAL_HEADING_MIN_BODY`` words, or ``VISUAL_HEADING_MIN_BODY_SHARE``
+    of the document's words if that is fewer, before the next such line.
+
+    Capitals alone do not make a line stand out (since 2026-11-20): forms
+    and fee schedules set captions, column names and court names in
+    capitals ("STATE OF WISCONSIN, CIRCUIT COURT", "PAYMENT CONVENIENCE
+    FEES (ACH)") that start no part. On the labelled development files,
+    counting capitals found no barrier that bold, underline and size did
+    not, and made one false alarm (the GF-223 court form). This choice, the 40 words and the share
+    for short documents, and three headings (``VISUAL_HEADINGS_MIN``)
+    are the rule a search chose by cross-validation on the 156 labelled
+    development and first fresh Word files, among rules that also
+    discounted bold when most body text is bold, skipped lines ending in a
+    colon or in table header rows, and counted list items as body text
+    (``scripts/office_heading_search.py``). It removed all 4 false alarms
+    on the first fresh set and one of its 2 misses; it is measured on a
+    second fresh set it was frozen before (research doc).
 
     These are the ways a heading is made to look like one by hand (the
     labelling protocol's "bold/large/numbered lines that start sections").
     80%, not all: a section letter or a space is often left plain ("B.
     Bereavement" with only "Bereavement" underlined). The first character:
-    a transcript's "--- BEGIN CAPTIONED TEXT ---" and "[LAUGHTER]" are in
-    capitals but mark no part. Lines in tables count, as forms and course
-    lists put their part names in a table's cells. Not read: a table
+    a transcript's "--- BEGIN CAPTIONED TEXT ---" and "[LAUGHTER]" are
+    marks, not parts. Lines in tables count, as forms and course lists put
+    their part names in a table's cells. Not read: a table
     style's own bold first row, colour, and centring. Each choice was made
     on the labelled real files of 2026-11-19 and is measured on files it
     was not made on (docs/internal/office-check-research.md).
@@ -676,25 +706,27 @@ def _word_visual_headings(part: Any, body: Any) -> int:
         def share(test: Any) -> float:
             return sum(sum(c.isalnum() for c in w) for w, lk in runs if test(lk)) / letters
 
-        alphabetic = [c for c in text if c.isalpha()]
         return (
             share(lambda lk: lk.get("b")) >= 0.8
             or share(lambda lk: lk.get("u")) >= 0.8
-            or share(lambda lk: lk.get("caps") or lk.get("smallCaps")) >= 0.8
             or share(lambda lk: lk.get("sz", 20) >= body_size + 4) >= 0.8
-            or (len(alphabetic) >= 2 and all(c.isupper() for c in alphabetic))
         )
+
+    need = min(
+        VISUAL_HEADING_MIN_BODY,
+        max(1, VISUAL_HEADING_MIN_BODY_SHARE * sum(length for length, _ in lines)),
+    )
 
     count = 0
     following: int | None = None  # words since the last line that stands out
     for length, runs in lines:
         if length <= VISUAL_HEADING_MAX_WORDS and stands_out(runs):
-            if following is not None and following >= VISUAL_HEADING_MIN_BODY:
+            if following is not None and following >= need:
                 count += 1
             following = 0
         elif following is not None:
             following += length
-    if following is not None and following >= VISUAL_HEADING_MIN_BODY:
+    if following is not None and following >= need:
         count += 1
     return count
 

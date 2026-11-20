@@ -165,11 +165,34 @@ def test_no_headings_needs_lines_that_look_like_headings() -> None:
     assert _failed(styled, "docx") == ()
 
 
-@pytest.mark.parametrize("look", ["bold", "underline", "capitals", "large", "all caps text"])
-def test_a_heading_can_stand_out_in_several_ways(look: str) -> None:
-    text = "PART ONE" if look == "all caps text" else "Part one"
-    lines = [(text, look), BODY, (text.replace("ONE", "TWO").replace("one", "two"), look), BODY]
-    assert _failed(_word_lines(lines), "docx") == ("no_headings",)
+@pytest.mark.parametrize(
+    ("look", "failed"),
+    [
+        ("bold", ("no_headings",)),
+        ("underline", ("no_headings",)),
+        ("large", ("no_headings",)),
+        ("capitals", ()),
+        ("all caps text", ()),
+    ],
+)
+def test_a_heading_stands_out_by_bold_underline_or_size_not_capitals(
+    look: str, failed: tuple[str, ...]
+) -> None:
+    """Capitals alone mark captions and column names on real forms and fee
+    schedules, not parts (since 2026-11-20)."""
+    names = ("Part one", "Part two", "Part three")
+    if look == "all caps text":
+        names = tuple(name.upper() for name in names)
+    lines = [line for name in names for line in ((name, look), BODY)]
+    assert _failed(_word_lines(lines), "docx") == failed
+
+
+def test_two_lines_that_look_like_headings_are_not_enough() -> None:
+    """A title and one bold line are not a document divided into parts: at
+    least three visual headings (since 2026-11-20; two made four false
+    alarms on the first fresh set)."""
+    lines = [("Benefits", "bold"), BODY, ("Costs", "bold"), BODY]
+    assert _failed(_word_lines(lines), "docx") == ()
 
 
 def test_a_bold_line_with_no_text_under_it_is_not_a_heading() -> None:
@@ -216,8 +239,8 @@ def test_word_language_and_title() -> None:
 # -- Word: cut-downs of real files ------------------------------------------
 
 
-#: Body text under a heading: more than the 20 words a heading needs under it.
-BODY = (" ".join(["text"] * 30), "plain")
+#: Body text under a heading: more than the 40 words a heading needs under it.
+BODY = (" ".join(["text"] * 45), "plain")
 
 
 def _word_lines(lines: list[tuple[str, str]], *, title: str = "") -> bytes:
@@ -279,6 +302,137 @@ def test_a_policy_with_underlined_section_names_fails_no_headings() -> None:
         BODY,
     ]
     assert _failed(_word_lines(lines), "docx") == ("no_headings",)
+
+
+def _words(n: int, word: str = "text") -> str:
+    return " ".join([word] * n)
+
+
+def test_minutes_whose_body_text_is_mostly_bold_are_not_failed() -> None:
+    """garfieldar.gov public forum minutes (first fresh set, 2026-11-19, a
+    false alarm): two thirds of the text is bold, so bold lines do not stand
+    out; besides the title, one short bold line, "Guests & Visitors", has
+    body text under it."""
+    lines = [
+        ("August 10th, 2021 Sales Tax Special Called Public Forum", "bold"),
+        ("Mayor Blackburn called the meeting to order at 5:32 PM", "bold"),
+        (_words(26), "plain"),
+        (_words(36), "plain"),
+        ("Guests & Visitors", "bold"),
+        (_words(15), "plain"),
+        (_words(28), "bold"),
+        (_words(17), "bold"),
+        (_words(66), "bold"),
+        ("Mayor Blackburn announced the Public Forum ended at 5:53 PM.", "bold"),
+        ("Approved, Mayor Gary Blackburn", "bold"),
+    ]
+    assert _failed(_word_lines(lines), "docx") == ()
+
+
+def test_bold_lines_that_introduce_lists_in_minutes_are_not_parts() -> None:
+    """utah.gov work meeting minutes (first fresh set, a false alarm): plain
+    paragraphs, and two bold lines ending in colons that introduce lists
+    ("The Final Proposed Package Details:", "Immediate Action Items:")."""
+    lines = [
+        (_words(105), "plain"),
+        (_words(67), "plain"),
+        ("The Final Proposed Package Details:", "bold"),
+        *[(_words(8), "list")] * 5,
+        (_words(80), "plain"),
+        ("Immediate Action Items:", "bold"),
+        *[(_words(18), "list")] * 3,
+        (_words(26), "plain"),
+    ]
+    assert _failed(_word_lines(lines), "docx") == ()
+
+
+def test_a_court_form_with_bold_and_capital_captions_is_not_failed() -> None:
+    """Wisconsin court form GF-223 (kewauneeco.org, first fresh set, a false
+    alarm): the court's name in bold capitals, a bold form name, a bold
+    statute line and a bold "See attached" among numbered statements."""
+    lines = [
+        ("This form is available in Spanish and Hmong.", "plain"),
+        ("STATE OF WISCONSIN, CIRCUIT COURT, COUNTY", "bold"),
+        ("IN THE INTEREST OF", "all caps text"),
+        ("Power of Attorney Delegating Parental Power", "bold"),
+        ("I STATE ON INFORMATION AND BELIEF:", "capitals"),
+        *[(_words(16, "power"), "plain")] * 8,
+        ("See attached", "bold"),
+        *[(_words(17, "power"), "plain")] * 12,
+    ]
+    assert _failed(_word_lines(lines), "docx") == ()
+
+
+def test_a_fee_schedule_whose_column_names_are_capitals_is_not_failed() -> None:
+    """dir.texas.gov fee schedule (first fresh set, a false alarm): a 24 pt
+    title, then tables whose marked header rows name the fees in capitals
+    ("PAYMENT CONVENIENCE FEES (BANKCARD)")."""
+    from docx import Document
+    from docx.oxml.ns import qn
+    from docx.shared import Pt
+
+    document = Document()
+    document.core_properties.title = "Real file cut-down"
+    document.add_paragraph().add_run("FY27 Texas.gov Fee Schedule").font.size = Pt(24)
+    document.add_paragraph(_words(12, "reference"))
+    for name in ("PAYMENT CONVENIENCE FEES (BANKCARD)", "PAYMENT CONVENIENCE FEES (ACH)"):
+        table = document.add_table(rows=6, cols=3)
+        table.cell(0, 0).text, table.cell(0, 1).text, table.cell(0, 2).text = (
+            name,
+            "Unit of Measure",
+            "Fee",
+        )
+        for row in range(1, 6):
+            for column in range(3):
+                table.cell(row, column).text = "TxPay Direct with Enhanced Help Desk"
+        look = table._tbl.tblPr.find(qn("w:tblLook"))
+        look.set(qn("w:firstRow"), "1")
+    out = io.BytesIO()
+    document.save(out)
+    assert _failed(out.getvalue(), "docx") == ()
+
+
+def test_a_short_checklist_with_bold_part_names_fails_no_headings() -> None:
+    """kewauneeco.org's Pension Document Checklist (71 words, first fresh
+    set, missed before): "Income", "Assets" and "Expenses" are bold and
+    underlined, each over a list of 12 to 17 words. A part of a short
+    document is short: 15% of its words is enough body text."""
+    lines = [
+        ("Pension Document Checklist", "bold"),
+        ("Income", "bold"),
+        *[(_words(4), "list")] * 4,
+        ("Assets", "bold"),
+        *[(_words(4), "list")] * 3,
+        ("Expenses", "bold"),
+        *[(_words(5), "list")] * 4,
+    ]
+    assert _failed(_word_lines(lines), "docx") == ("no_headings",)
+
+
+def test_a_form_whose_labels_are_all_bold_is_still_missed() -> None:
+    """kewauneeco.org's incident report form (66 words, first fresh set,
+    labelled a barrier as a close call): "WHEN:", "WHERE:", "WHAT:" are
+    bold capitals, but so are most field labels after them, so no bold line
+    has body text under it. A known miss: the rule cannot tell these part
+    names from the bold labels without reading the words."""
+    lines = [
+        ("INCIDENT REPORT", "bold"),
+        ("WHEN:", "bold"),
+        ("Date:", "plain"),
+        ("Time:", "plain"),
+        ("WHERE:", "bold"),
+        ("Department:", "plain"),
+        ("WHAT:", "bold"),
+        ("Description of activities when incident occurred:", "bold"),
+        ("Injuries:", "bold"),
+        ("Who was injured:", "plain"),
+        ("WHO:", "bold"),
+        ("Name(s) of individuals involved:", "bold"),
+        ("Party 1 Name:", "plain"),
+        ("Witnesses:", "bold"),
+        ("Comments:", "bold"),
+    ]
+    assert _failed(_word_lines(lines), "docx") == ()
 
 
 def _replace_part(data: bytes, name: str, change: object) -> bytes:
