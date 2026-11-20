@@ -349,6 +349,10 @@ PowerPoint tables follow the same plain-grid rule (`gridSpan`, `rowSpan`,
 `hMerge`, `vMerge`). No PowerPoint score changed on the development set,
 and the fresh set has no PowerPoint files, so that part is not validated.
 
+The "No headings" rule changed again on 2026-11-20 (commit 1256e02: 3
+visual headings, no capitals, 40 words or 15%): see "Second round:
+evolved heading probe".
+
 These rules were chosen looking at all 150 labelled files, so those files
 are now the **development set**, not a test: every number on them below is
 how well the rules fit what they were made from.
@@ -412,10 +416,154 @@ body-text minimum for very short documents (the risk is a form's bold
 labels). Testing them needs another fresh set, collected and labelled the
 same way before the rules change.
 
+## Second round: evolved heading probe (2026-11-20)
+
+The developer asked (2026-11-19) for another round on the six fresh
+errors: build several probes, choose one with an evolutionary search, and
+reach Word "Mostly sure" precision and recall above 90% on files never used
+to design or choose it. **Not reached**: on the second fresh set the chosen
+rule scores precision 88.2% and recall 76.9%.
+
+### Order of work (commit order proves it)
+
+1. 74 new Word files collected (by source and type only) and labelled
+   under the same protocol by agents without the check's code or the
+   search; labels frozen 2026-11-20 08:21 and committed in **2f90223**
+   (`split: "fresh2"`).
+2. Search run on the development data only (every labelled Word file
+   before fresh2: holdout, tuning and the first fresh set, 155 scored).
+3. Winner frozen in `office_check.py`, commit **1256e02**.
+4. Scored once on fresh2 (08:35). The rule was not changed after.
+
+### The probe family
+
+`scripts/office_heading_search.py`. A probe is 20 genes, each one plain
+sentence; the base genome is the 946ad6f rule (the script's `check`
+confirms it gives 946ad6f's verdict on every file).
+
+| Gene | Values | What it says |
+|---|---|---|
+| max_words | 6-20 (12) | A heading is a line of at most this many words. |
+| share | 0.6-1.0 (0.8) | This share of a line's letters must carry the emphasis. |
+| use_bold, use_underline, use_caps, use_size | on/off (on) | Which kinds of emphasis make a line stand out. |
+| size_delta | 1-4 pt (2 pt) | Larger text: this much over the body text's usual size. |
+| relative | off, 20-67% | Emphasis does not count when this share of the body text has it too (bold minutes). |
+| colon | count, skip, skip before a list | Lines ending in ":" introduce lists or label fields. |
+| tables | all, not header rows, not data-table cells, none | Lines in tables: column names in marked header rows are not headings. |
+| boxes | on/off | Lines in text boxes count. |
+| min_body | 5-40 (20) | Words of body text a heading needs under it... |
+| body_frac | off, 5-15% | ...or this share of the document's words, if fewer (short documents). |
+| min_paras | off, 2-4 | ...or this many body paragraphs (a list of short items). |
+| keep_next, numbered, space_before | off/on | Other signals: "keep with next", a typed section number before a longer paragraph, space before the line. |
+| min_count | 1-4 (2) | How many visual headings the document must show. |
+| skip_title | off/on | The first line that stands out, near the top, is the title. |
+| label_cap | off, 50%, 70% | When most short lines stand out, they are a form's labels. |
+
+### The search
+
+Fitness: the file-level "Mostly sure" verdict (other counted checks as at
+946ad6f) against `barrier`, mean of min(precision, recall) over 10 repeats
+of stratified 5-fold cross-validation (50 held-out folds), minus 0.004 per
+active switch. The probes have no fitted parameters, so a fold's score is
+the probe's score on the files in it: the mean over many folds rewards a
+probe that is right on every part of the data, not one that is right
+overall by a few files. It is not an estimate on unseen files; the nested
+run below is.
+
+Genetic algorithm: 150 probes, 60 generations, tournament of 3, 4 kept
+unchanged each generation, uniform crossover (70%), each gene mutated with
+15% chance; seeds 1, 2 and 3 (`artifacts/office-search/main/seed_N/`, a
+checkpoint per generation). All three seeds reached the same best probe.
+
+Nested cross-validation (the whole search, 40 generations, run on 4/5 of
+the development files and its winner scored on the fifth, 5 times):
+pooled precision 94.7% (54 of 57), recall 94.7% (54 of 57). Every
+fold's winner needed 3 visual headings; their other switches differed.
+
+Top 5 distinct probes (different verdicts on the development files),
+development data:
+
+| # | Switches and thresholds changed from 946ad6f | CV mean min(P,R) | Precision | Recall |
+|---|---|---|---|---|
+| base | 946ad6f | 0.919 | 93.2% (55/59) | 96.5% (55/57) |
+| 1 | no capitals; body 40 words or 15% of the document's; 3 headings (also: at most 6 words, 90%, 4 pt) | 0.983 | 100% (56/56) | 98.2% (56/57) |
+| 2 | no capitals, no size; 40 words or 2 paragraphs; 3 headings; at most 8 words, 90% | 0.984 | 98.3% (57/58) | 100% (57/57) |
+| 3 | 40 words or 2 paragraphs; 3 headings; at most 8 words, 90%, 1.5 pt | 0.968 | 96.6% (57/59) | 100% |
+| 4 | 40 words or 15%; 3 headings; at most 6 words, 3 pt | 0.968 | 98.2% (56/57) | 98.2% |
+| 5 | no capitals; 20 words or 15%; 3 headings | 0.972 | 98.2% (56/57) | 98.2% |
+
+Frozen: probe 1 with each gene moved back to 946ad6f's value where the
+development verdicts stay the same (the script's `simplify`): **a line
+stands out when 80% of it is bold, underlined or 2 pt larger than the body
+text (capitals alone no longer count); it needs 40 words under it, or 15%
+of the document's words if that is fewer; and the document must show at
+least 3 such lines.** On the six first-fresh errors: 3 headings removes the
+garfieldar and utah minutes false alarms, no capitals removes the GF-223
+court form, 40 words removes the fee schedule, 15% catches the pension
+checklist; the incident form is still missed. The share is a knife edge on
+the development files: 10% brings back the fee schedule false alarm, 20%
+loses the pension checklist.
+
+### Scores
+
+File level, "Mostly sure" against `barrier`, with the scorer's one-sided
+95% upper bounds on false alarms and misses. Fresh2: 74 files, 2
+disputed (minutes whose part titles have no visual cue), 72 scored, 39
+barriers.
+
+| Set | Rule | Precision (false alarms at most) | Recall (misses at most) |
+|---|---|---|---|
+| Development: holdout and tuning (145 scored, Word and PowerPoint) | frozen | 100% (6.6%) | 100% (6.6%) |
+| Development: first fresh set (55 scored, now seen) | frozen | 100% (14.6%) | 95.0% (19.6%) |
+| Development, nested CV (the search's own estimate) | search winners | 94.7% | 94.7% |
+| **Fresh2** | **frozen (1256e02)** | **88.2%** (30/34; 23.8%) | **76.9%** (30/39; 35.7%) |
+| Fresh2, for information | 946ad6f | 80.0% (36/45; 31.4%) | 92.3% (36/39; 17.8%) |
+| Fresh2, for information | top 2 | 89.5% (34/38; 21.5%) | 87.2% (34/39; 24.1%) |
+| Fresh2, for information | top 3 | 85.4% (35/41; 25.9%) | 89.7% (35/39; 21.0%) |
+| Fresh2, for information | top 5 | 88.9% (32/36; 22.6%) | 82.1% (32/39; 30.0%) |
+| Fresh2, for information | top 1 unsimplified | 87.1% (27/31; 25.8%) | 69.2% (27/39; 43.8%) |
+| Fresh2, for information | top 4 | 81.8% (27/33; 31.5%) | 69.2% (27/39; 43.8%) |
+
+No probe reaches both 90% on fresh2. The first fresh set is now seen (its
+errors chose the rule), so its 100% / 95% is fit, not evidence.
+
+### Why fresh2 fails
+
+- **The search fit the first fresh set's six files.** Every change was
+  bought with those six; fresh2 was weighted to the same kinds of file
+  and the changes did not carry over. The new rule lost six barriers
+  946ad6f found, all short or form-like (120 to 1,309 words of text):
+  two checklists that show exactly 2 visual headings (06f21a62fbbb,
+  f62b8ce4febf: lost by needing 3); a customer letter and an agenda whose
+  parts have fewer than 40 words under them (21f787cb75fe, a8e75d26b857:
+  lost by the 40 words); a library group's list whose banner headings
+  have short lists under them (b0ce2f4443d4: the 40 words and 3); and a
+  court order whose numbered parts start with bold capitals
+  (24b3b97d86e0: 3 headings and capitals). The nested CV estimate (94.7%)
+  was too high: the development files hold too few short documents with
+  few parts to show the cost.
+- **False alarms are mostly not headings.** 3 of the 4 fresh2 false
+  alarms are "Tables without a header row" on court and label-sheet
+  layout grids that are plain grids (b20fe674ded9, e8aa013b6558,
+  66fba0d163e2), unchanged by this round; 946ad6f makes the same three.
+  The fourth is a dog licence form printed three times on a page, its
+  bold title shown three times (9bc0aa43bb68), exactly 3 visual headings.
+- **Misses by every rule:** a quick guide with a title and one bold line
+  (20f67c8ca820), a fee schedule whose two group names end in colons
+  (9a8674718bfa), and a letter whose seal and signature have alt text
+  "sm_seal3" and "John (2) (002)", which the labeller read as file names
+  and the check reads as alt text (3e32c57daf22).
+
+Whether to keep 1256e02 or go back to 946ad6f's heading rule is the
+developer's decision: on fresh2 the new rule trades 15 points of recall
+for 8 of precision, and neither meets the goal. Any further change is
+designed on fresh2 too, so it needs a third set to measure.
+
 ## Limits
 
-- 207 files: 73 from one university's sites, 77 from government and
-  non-profit sites, 57 fresh Word files from other .gov and .org sites;
+- 281 files: 73 from one university's sites, 77 from government and
+  non-profit sites, 57 fresh Word files and 74 fresh2 Word files from
+  other .gov and .org sites;
   50 PowerPoint, all in the development set. The new files are mostly from
   accessibility teams (section508.gov) and have few barriers (9 of 77), so
   recall rests mostly on the U-M files. Small numbers: a 95% bound is

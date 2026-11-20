@@ -547,11 +547,11 @@ Checker):
   is not marked as a header row (WCAG 1.3.1). A table with merged cells is
   often a form's layout, so a person must check it;
 - slides without a title (PowerPoint; WCAG 2.4.6);
-- no headings: a Word document with no heading style that shows at least 2
-  lines that look like headings: short lines in bold, underlined, in
-  capitals or larger text, each with body text under it (WCAG 1.3.1). A
-  document with no visible parts, such as a meeting transcript, does not
-  fail;
+- no headings: a Word document with no heading style that shows at least 3
+  lines that look like headings: short lines in bold, underlined or larger
+  text, each with body text under it (WCAG 1.3.1). Capitals alone do not
+  count, as forms put captions and column names in capitals. A document
+  with no visible parts, such as a meeting transcript, does not fail;
 - no language set (WCAG 3.1.1).
 
 It also lists **possible problems**, which a person must judge and which

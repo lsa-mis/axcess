@@ -667,8 +667,11 @@ def _word_visual_headings(part: Any, body: Any) -> int:
     discounted bold when most body text is bold, skipped lines ending in a
     colon or in table header rows, and counted list items as body text
     (``scripts/office_heading_search.py``). It removed all 4 false alarms
-    on the first fresh set and one of its 2 misses; it is measured on a
-    second fresh set it was frozen before (research doc).
+    on the first fresh set and one of its 2 misses. On a second fresh set,
+    labelled before it was frozen, it missed 6 barriers in short documents
+    that the 2026-11-19 rule found (2 visual headings, or under 40 words
+    per part), and made 1 false alarm: Word "Mostly sure" precision 88.2%,
+    recall 76.9% (research doc, "Second round: evolved heading probe").
 
     These are the ways a heading is made to look like one by hand (the
     labelling protocol's "bold/large/numbered lines that start sections").

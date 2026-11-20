@@ -78,18 +78,18 @@ fresh set ("fresh2").
 | R3. fresh2 labels frozen | done 2026-11-20T08:21:03-05:00: read-only copies `artifacts/office-fresh2/frozen/labels_N.json` + `manifest.json`, hashes in `artifacts/office-fresh2/frozen.sha256` (labels_1 74dc0dc1..., labels_2 e7065c78..., labels_3 1338a9d6..., labels_4 4e2b097e..., labels_5 a9db829e..., manifest 43b6e841...) | |
 | R4. fresh2 labels in the repo | done, commit **2f90223**: `split: "fresh2"` in `office_files.json`, built mechanically by `artifacts/office-fresh2/collect/build_entries.py` from the frozen copies; scorer reports "fresh2" | |
 | R5. probe family + search | done 2026-11-20: 3 seeds x 60 generations x 150 probes, all three reach the same best (fitness 0.9746, CV mean min(P,R) 0.9826); nested CV (5 outer folds, 40 generations each) pooled P 94.7% (54/57), R 94.7% (54/57) vs 946ad6f on the same files 93.2%, 96.5% | `scripts/office_heading_search.py`; features of the 157 development Word files cached in `artifacts/office-search/features.json` (`... features`; `... check` confirms the base genome reproduces 946ad6f's no_headings on every file); checkpoints per generation in `artifacts/office-search/main/seed_N/gen_XXX.json` (resume: rerun the same command), logs `artifacts/office-search/search_seed_N.out`, nested CV in `artifacts/office-search/nested/fold_K/` and `nested/summary.json` |
-| R6. freeze winner in office_check.py | this commit (before R7): capitals no longer make a line stand out; 40 words under a heading, or 15% of the document's words if fewer; at least 3 visual headings. `... product` confirms office_check.py gives the frozen probe's verdict on all 155 scored development files. Unit tests: 6 cut-downs of the fresh-1 errors (5 fail on 946ad6f, pass now; the incident form is pinned as a known miss) | `src/audit/linked_files/office_check.py`, `tests/unit/test_office_check.py` (62 passed), `FROZEN` in the script |
-| R7. score fresh2 once | not started | |
-| R8. research doc "Second round: evolved heading probe" | not started | |
+| R6. freeze winner in office_check.py | done, commit **1256e02** (before R7): capitals no longer make a line stand out; 40 words under a heading, or 15% of the document's words if fewer; at least 3 visual headings. `... product` confirms office_check.py gives the frozen probe's verdict on all 155 scored development files. Unit tests: 6 cut-downs of the fresh-1 errors (5 fail on 946ad6f, pass now; the incident form is pinned as a known miss) | `src/audit/linked_files/office_check.py`, `tests/unit/test_office_check.py` (62 passed), `FROZEN` in the script |
+| R7. score fresh2 once | done 2026-11-20 08:35 (after f55e523, a tooling-only commit): frozen probe P **88.2%** (30/34), R **76.9%** (30/39), 72 scored, 2 disputed. Target NOT met. For information: 946ad6f 80.0% / 92.3%; top 2 89.5% / 87.2%; top 3 85.4% / 89.7%; top 5 88.9% / 82.1%; top 1 87.1% / 69.2%; top 4 81.8% / 69.2%. Rule not changed after | `artifacts/office-fresh2/reports/frozen_probe_report.json`, `rules_946ad6f_report.json`; `artifacts/office-search/fresh2_probes.json`, `top5.txt` |
+| R8. research doc "Second round: evolved heading probe" | done (this commit); glossary updated (3 headings, capitals alone do not count); terms.ts sentence still true, unchanged | `docs/internal/office-check-research.md`, `docs/glossary.md` |
 
 ## Next step
 
-R7: copy `artifacts/office-fresh2/files/*.docx` into
-`artifacts/office-real-files/` and run the scorer ONCE (fresh2 reported
-as its own split); score 946ad6f and the other top-5 probes on fresh2 for
-information only (`old_rules.py` with `git show 946ad6f:...`; probes via
-the script's features on fresh2, a separate command). Do not change the
-rule after.
+Round 2 is done; the target is not met on fresh2. Waiting for the
+developer: keep 1256e02's heading rule or go back to 946ad6f's (fresh2:
+88.2%/76.9% vs 80.0%/92.3%). Open items: layout grids in court forms read
+as data tables (3 of 4 fresh2 false alarms); alt text such as "sm_seal3"
+(a file name without an extension); any further change needs a third
+fresh set. The two older test failures (round 1, step 6) still stand.
 
 (Round 1 note, kept:) The brief is done; the target is not met on the fresh set. Waiting for the
 developer's decision. If they want another round: make the fixes listed in
