@@ -869,6 +869,28 @@
         }
       }
     },
+    "/api/scans/{scan_id}/continue": {
+      "post": {
+        "summary": "Api Continue Scan",
+        "description": "Continue a report that is not finished (``audit.web.continuing``).\n\nThe same report, with the settings it started with, picks up the\naddresses still waiting. Files an older build closed only because it\ncould not check them yet are checked too. Refused for a report that\nwas stopped, finished or failed: those have nothing waiting, and\n\"Scan again\" makes a new report.",
+        "operationId": "api_continue_scan_api_scans__scan_id__continue_post",
+        "parameters": [
+          {
+            "name": "scan_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "integer", "title": "Scan Id"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
     "/api/scans/{scan_id}/cancel": {
       "post": {
         "summary": "Api Cancel Scan",
