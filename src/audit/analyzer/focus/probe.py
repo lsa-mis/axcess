@@ -63,6 +63,7 @@ from typing import Any
 
 from playwright.async_api import Page
 
+from audit import check_log
 from audit.analyzer.focus.base import (
     RULE_FOCUS_OBSCURED,
     RULE_POSITIVE_TABINDEX,
@@ -475,18 +476,24 @@ class FocusProbe:
         try:
             findings.extend(await self._check_obscured(page))
         except Exception as exc:  # pragma: no cover - defensive
-            self._log_failure("obscured", exc)
+            self._log_failure("obscured", exc, page=page)
         try:
             findings.extend(await self._check_positive_tabindex(page))
         except Exception as exc:  # pragma: no cover - defensive
-            self._log_failure("tabindex", exc)
+            self._log_failure("tabindex", exc, page=page)
         return findings
 
-    def _log_failure(self, check: str, exc: Exception) -> None:
-        if self.suppress_diagnostics:
-            log.warning("focus.probe_failed_in_protected_context", check=check)
-        else:
-            log.warning(f"focus.{check}_failed", error=str(exc))
+    def _log_failure(self, check: str, exc: Exception, *, page: Any = None) -> None:
+        """Log, as ``check.not_run``, which part of the check failed and why."""
+        protected = self.suppress_diagnostics
+        check_log.not_run(
+            "focus",
+            scope="page",
+            part=check,
+            url=None if protected else check_log.url_of(page),
+            protected=protected,
+            reason=check_log.failure(f"The focus check's {check} part", exc, protected=protected),
+        )
 
     async def _check_obscured(self, page: Page) -> list[FocusFinding]:
         """SC 2.4.11: elements entirely hidden behind fixed/sticky content

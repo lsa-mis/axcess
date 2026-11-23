@@ -16,6 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from audit import check_log
 from audit.analyzer.ollama_base import OllamaError
 from audit.analyzer.visual.base import (
     RULE_AUTOPLAY_AUDIO_NO_CONTROL,
@@ -169,11 +170,23 @@ class VisualProbe:
         try:
             findings.extend(await self._check_motion(page))
         except Exception as exc:  # pragma: no cover - defensive
-            log.warning("visual.motion_failed", error=str(exc))
+            check_log.not_run(
+                "visual",
+                scope="page",
+                part="motion",
+                url=check_log.url_of(page),
+                reason=check_log.failure("The motion check", exc),
+            )
         try:
             findings.extend(await self._check_meaningful_sequence(page))
         except Exception as exc:  # pragma: no cover - defensive
-            log.warning("visual.sequence_failed", error=str(exc))
+            check_log.not_run(
+                "visual",
+                scope="page",
+                part="reading_order",
+                url=check_log.url_of(page),
+                reason=check_log.failure("The visual reading order check", exc),
+            )
         return findings
 
     async def _check_motion(self, page: Page) -> list[VisualFinding]:

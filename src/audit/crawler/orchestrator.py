@@ -27,6 +27,7 @@ import httpx
 import structlog
 from selectolax.parser import HTMLParser
 
+from audit import check_log
 from audit.ai.model_client import Backend, ModelEndpoint, open_model_http_client
 from audit.analyzer.alfa import (
     AlfaAnalyzer,
@@ -59,7 +60,7 @@ from audit.analyzer.vlm.ollama import OllamaProvider
 from audit.analyzer.vlm.vision import OllamaVisionProvider
 from audit.blob_store import BlobStore
 from audit.config import get_settings
-from audit.crawler import check_log, live_progress, url_policy
+from audit.crawler import live_progress, url_policy
 from audit.crawler.fetcher import FetchError, FetchResult, PageFetcher, StaticFetcher
 from audit.crawler.js_fetcher import JsFetcher
 from audit.crawler.rate_limit import HostLimiter
@@ -747,6 +748,17 @@ async def run_crawl(
             if _linked_files_on(config)
             else None
         ),
+    )
+    _log_check_plan(
+        config,
+        axe=axe_analyzer is not None,
+        alfa_in_tab=alfa_worker is not None,
+        interaction=interaction_probe is not None,
+        ocr=ocr_config is not None,
+        vlm=vlm_config is not None,
+        reading_order=visual_probe is not None and visual_probe.provider is not None,
+        semantic=bool(semantic_analyzers),
+        documents=ctx.linked_files is not None,
     )
 
     interrupted = False
@@ -1572,6 +1584,253 @@ def _tracked_checks(ctx: _WorkerContext) -> list[str]:
     return checks
 
 
+def _log_check_plan(
+    config: CrawlConfig,
+    *,
+    axe: bool,
+    alfa_in_tab: bool,
+    interaction: bool,
+    ocr: bool,
+    vlm: bool,
+    reading_order: bool,
+    semantic: bool,
+    documents: bool,
+) -> None:
+    """At scan start, log each check that will not run in this scan, and why.
+
+    One ``check.not_run`` line with ``scope=scan`` per check: ``info`` when
+    the person turned it off, ``warning`` when it was chosen but cannot run
+    (a missing model, a missing file). Then one ``check.plan`` line naming
+    what will run. Page-level reasons are logged as each page is saved.
+    """
+    protected = config.browser_only
+    browser = config.js_enabled
+
+    def off(check: str, reason: str = "Turned off in this scan's settings.") -> None:
+        check_log.not_run(check, scope="scan", reason=reason, protected=protected, chosen=True)
+
+    def broken(check: str, reason: str, **extra: Any) -> None:
+        check_log.not_run(check, scope="scan", reason=reason, protected=protected, **extra)
+
+    no_browser = "Needs the browser, and this scan does not open pages in one."
+    runs: list[str] = []
+    if not config.axe_enabled:
+        off("axe", "Not chosen as the rule check tool.")
+    elif not browser:
+        broken("axe", no_browser)
+    elif not axe:
+        broken("axe", "The bundled axe-core script is missing, so axe cannot run.")
+    else:
+        runs.append("axe")
+    if not config.alfa_enabled:
+        off("alfa", "Not chosen as the rule check tool.")
+    else:
+        runs.append("alfa")
+        log.info(
+            "check.plan_alfa",
+            capture="crawler_tab" if alfa_in_tab else "separate_browser",
+            reason=(
+                "Alfa checks the crawler's own tab, at load and in each page state "
+                "Click-Through or site search opens."
+                if alfa_in_tab
+                else "Alfa opens its own browser and checks each page as it loads only, "
+                "so it checks no page state a click opens."
+            ),
+        )
+    for check, enabled in (
+        ("markup", config.markup_checks_enabled),
+        ("keyboard", config.keyboard_probe_enabled),
+        ("focus", config.focus_checks_enabled),
+        ("responsive", config.responsive_checks_enabled),
+        ("forms", config.form_error_checks_enabled),
+    ):
+        if not enabled:
+            off(check)
+        elif not browser:
+            broken(check, no_browser)
+        else:
+            runs.append(check)
+    if not config.interaction_checks_enabled:
+        if protected and config.alfa_enabled and not config.axe_enabled:
+            off(
+                "interaction",
+                "A sign-in scan runs Click-Through with Rule check (axe) only, and this "
+                "scan uses Alfa alone.",
+            )
+        else:
+            off("interaction")
+    elif not browser:
+        broken("interaction", no_browser)
+    elif not interaction:
+        broken(
+            "interaction",
+            "Click-Through needs a rule check tool that checks the crawler's own tab "
+            "(axe, or Alfa in a public scan), and this scan has none.",
+        )
+    else:
+        runs.append("interaction")
+    if not config.visual_checks_enabled:
+        off("visual")
+    elif not browser:
+        broken("visual", no_browser)
+    else:
+        runs.append("visual")
+        if not reading_order:
+            broken(
+                "visual",
+                "The visual reading order part needs the vision model, which is turned off "
+                "or not reachable; the motion part still runs.",
+                part="reading_order",
+            )
+    if not config.image_extraction_enabled:
+        off("image")
+    else:
+        runs.append("image")
+        if not config.ocr_enabled:
+            off("ocr")
+        elif not ocr:
+            broken("ocr", "The text-in-images reader (OCR) could not be set up.")
+        if not config.vlm_enabled:
+            off("vision", "The vision model check is turned off.")
+        elif not vlm:
+            broken(
+                "vision",
+                "The vision model is not reachable, or its model is not installed, so images "
+                "are not compared with their alt text by the model.",
+            )
+    if not config.semantic_enabled:
+        off("semantic")
+    elif not semantic:
+        broken(
+            "semantic",
+            "The AI wording review's model service is not reachable or its model is not installed.",
+        )
+    else:
+        runs.append("semantic")
+    if not config.linked_files_enabled:
+        off("documents")
+    elif not documents:
+        broken("documents", "The document check is not available for this kind of scan.")
+    else:
+        runs.append("documents")
+    log.info("check.plan", runs=runs, protected_context=protected or None)
+
+
+# Checks that need the page open in the crawler's browser, by report key.
+_BROWSER_CHECKS = (
+    "axe",
+    "markup",
+    "keyboard",
+    "focus",
+    "responsive",
+    "visual",
+    "forms",
+    "interaction",
+)
+
+
+def _browser_checks_on(ctx: _WorkerContext) -> list[str]:
+    """The browser checks this scan runs, by report key."""
+    config = ctx.config
+    on = {
+        "axe": config.axe_enabled,
+        "markup": config.markup_checks_enabled,
+        "keyboard": config.keyboard_probe_enabled,
+        "focus": config.focus_checks_enabled,
+        "responsive": config.responsive_checks_enabled,
+        "visual": config.visual_checks_enabled,
+        "forms": config.form_error_checks_enabled,
+        "interaction": config.interaction_checks_enabled
+        and (config.axe_enabled or config.alfa_enabled),
+    }
+    return [check for check in _BROWSER_CHECKS if on[check]]
+
+
+def _log_page_checks_not_run(
+    ctx: _WorkerContext,
+    url: str,
+    result: FetchResult,
+    *,
+    render_mode: str,
+    browser_failure: str | None,
+) -> None:
+    """Log each check that will not run on this saved page, and why.
+
+    Three page-level causes, each one line per check so the log can be
+    searched by check: the page did not answer with a success; it is HTML
+    but was read without the browser, so no browser check ran; or Click-
+    Through started but could not finish. A non-HTML answer (a PDF, an
+    image) is a linked file, not a page, and is left to the document check.
+    """
+    if not result.is_html:
+        return
+    if not result.is_ok:
+        log_check_not_run(
+            ctx,
+            "page_checks",
+            url=url,
+            scope="page",
+            reason=(
+                f"The page answered with HTTP status {result.status_code}, not a "
+                "success, so no check ran on it."
+            ),
+        )
+        return
+    if ctx.js is None:
+        return
+    if render_mode != "js":
+        checks = _browser_checks_on(ctx)
+        if not checks:
+            return
+        if browser_failure:
+            reason = (
+                "The page could not be opened in the browser, so it was read as plain HTML "
+                f"and no browser check ran on it. Browser error: {browser_failure}"
+            )
+        else:
+            reason = (
+                "Fast scan read this page as plain HTML without the browser (it did not need "
+                "scripts), so no browser check ran on it."
+                if not ctx.config.js_eager
+                else "The page was read as plain HTML without the browser, so no browser "
+                "check ran on it."
+            )
+        # One line for the page, naming every browser check it did not get.
+        log_check_not_run(
+            ctx,
+            "browser_checks",
+            url=url,
+            scope="page",
+            reason=reason,
+            checks=checks,
+            chosen=not browser_failure and not ctx.config.js_eager,
+        )
+        return
+    if "interaction" in _browser_checks_on(ctx):
+        if not result.interaction_evaluated:
+            log_check_not_run(
+                ctx,
+                "interaction",
+                url=url,
+                scope="page",
+                reason=(
+                    "Click-Through could not start its safety guard (the part that stops "
+                    "it sending forms or leaving the site), so it pressed nothing on this page."
+                ),
+            )
+        elif result.interaction_stopped_by:
+            log_check_not_run(
+                ctx,
+                "interaction",
+                url=url,
+                scope="page",
+                reason=(
+                    "Click-Through stopped early on this page because of an error "
+                    f"({result.interaction_stopped_by}). What it opened before then is kept."
+                ),
+            )
+
+
 def _page_limit_reached(ctx: _WorkerContext, *, taken: int = 0) -> bool:
     """The page limit is used up: pages counted, plus ``taken`` not yet counted."""
     limit = ctx.config.max_pages
@@ -1608,6 +1867,9 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
     # Logged before the fetch, not after, so the order pages are *visited* is
     # recoverable even when a later one fails or the process dies.
     log.info("crawl.navigating", url=url, depth=depth)
+    # Why the browser could not open this page, for the log line that says
+    # which browser checks did not run on it.
+    browser_failure: str | None = None
 
     if ctx.js is not None and _renders_without_static_fetch(ctx, url):
         # One fetch, in the browser. The escalation below would otherwise
@@ -1630,6 +1892,7 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
             # always had a static result to keep when the browser failed,
             # and a degraded page beats no page at all.
             log.warning("crawl.js_fetch_failed", url=url, error=str(exc))
+            browser_failure = str(exc)
             async with ctx.limiter.throttle(url):
                 try:
                     result = await ctx.static.fetch(url)
@@ -1691,12 +1954,16 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
             if ctx.js.browser_closed:
                 raise
             log.warning("crawl.js_fetch_failed", url=url, error=str(exc))
+            browser_failure = str(exc)
 
     page_id = _record_page(
         ctx, url, status_code=result.status_code, result=result, render_mode=render_mode
     )
     ctx.summary.pages_fetched += 1
     ctx.unfetched.discard(job.id)
+    _log_page_checks_not_run(
+        ctx, url, result, render_mode=render_mode, browser_failure=browser_failure
+    )
     if result.search_result is not None and page_id is not None:
         repo.record_search_run(
             ctx.conn, scan_id=ctx.scan_id, page_id=page_id, outcome=result.search_result.outcome

@@ -743,6 +743,7 @@ class JsFetcher:
                 interaction_dialogs_opened=interaction.dialogs_opened,
                 interaction_dialogs_stuck=interaction.dialogs_stuck,
                 interaction_detail=interaction.detail,
+                interaction_stopped_by=interaction.stopped_by,
                 discovered_urls=tuple(
                     sorted(set(interaction.urls) | set(search_result.urls if search_result else ()))
                 ),

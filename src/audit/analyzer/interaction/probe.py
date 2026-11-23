@@ -626,6 +626,7 @@ class InteractionProbe:
         )
         found: list[RevealedViolation] = []
         evaluated = False
+        stopped_by = ""
         started = time.perf_counter()
         try:
             async with exploration_guard(page, budget.urls, self.blocked_labels):
@@ -648,7 +649,10 @@ class InteractionProbe:
         except Exception as exc:
             # A probe is evidence-gathering, not a gate. Whatever we managed
             # to reach before something went wrong is still valid evidence.
-            log.warning("interaction.aborted", error_type=type(exc).__name__)
+            # The orchestrator logs why the page's sweep stopped early
+            # (``stopped_by``), with the page address the probe does not
+            # have and the scan's privacy setting.
+            stopped_by = type(exc).__name__
         if budget.remaining <= 0:
             budget.limits.add("clicks")
         log.info(
@@ -687,6 +691,7 @@ class InteractionProbe:
             dialogs_opened=budget.dialogs_opened,
             dialogs_stuck=budget.dialogs_stuck,
             detail=budget.detail,
+            stopped_by=stopped_by,
         )
 
     async def _explore_frames(

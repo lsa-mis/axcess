@@ -67,6 +67,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from audit import check_log
 from audit.analyzer.responsive.base import (
     RULE_REFLOW,
     RULE_SPACING_CLIPPED,
@@ -378,15 +379,15 @@ class ResponsiveProbe:
         try:
             findings.extend(await self._photograph(page, await self._check_reflow(page), shot))
         except Exception as exc:
-            self._log_failure("reflow", exc)
+            self._log_failure("reflow", exc, page=page)
         try:
             findings.extend(await self._check_zoom_clipping(page, shot))
         except Exception as exc:
-            self._log_failure("zoom_clipping", exc)
+            self._log_failure("zoom_clipping", exc, page=page)
         try:
             findings.extend(await self._check_text_spacing(page, shot))
         except Exception as exc:
-            self._log_failure("text_spacing", exc)
+            self._log_failure("text_spacing", exc, page=page)
         # Always restore the crawl's standard viewport.
         with contextlib.suppress(Exception):
             await page.set_viewport_size(
@@ -411,11 +412,21 @@ class ResponsiveProbe:
             out.append(dataclasses.replace(finding, screenshot=png) if png else finding)
         return out
 
-    def _log_failure(self, check: str, exc: Exception) -> None:
-        if self.suppress_diagnostics:
-            log.warning("responsive.%s_failed_in_protected_context", check)
-        else:
-            log.warning("responsive.%s_failed: %s", check, exc)
+    def _log_failure(self, check: str, exc: Exception, *, page: Any = None) -> None:
+        """Log, as ``check.not_run``, which part of the check failed and why."""
+        protected = self.suppress_diagnostics
+        check_log.not_run(
+            "responsive",
+            scope="page",
+            part=check,
+            url=None if protected else check_log.url_of(page),
+            protected=protected,
+            reason=check_log.failure(
+                f"The zoom and layout check's {check.replace('_', ' ')} part",
+                exc,
+                protected=protected,
+            ),
+        )
 
     # -----------------------------------------------------------------
     # Check 1, reflow at 320 px (SC 1.4.10).

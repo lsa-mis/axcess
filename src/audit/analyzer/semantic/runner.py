@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import asyncio
 
+from audit import check_log
 from audit.analyzer.semantic.base import (
     AnalysisContext,
     SemanticAnalyzer,
@@ -63,10 +64,14 @@ async def analyze_page(
             # non-Exception (Cancel, KeyboardInterrupt) flowing here
             # is also a per-analyzer event we want to log + skip
             # rather than tear down the page.
-            log.warning(
-                "semantic.analyzer_failed",
-                criterion=analyzer.criterion_sc,
-                error=str(result),
+            check_log.not_run(
+                "semantic",
+                scope="page",
+                url=ctx.page_url,
+                part=analyzer.criterion_sc,
+                reason=check_log.failure(
+                    f"The AI wording review of WCAG {analyzer.criterion_sc}", result
+                ),
             )
             continue
         findings.extend(result)

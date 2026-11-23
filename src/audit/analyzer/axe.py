@@ -48,6 +48,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
+from audit import check_log
 from audit.wcag_version import LEGACY_WCAG_VERSION, WcagVersion
 
 if TYPE_CHECKING:
@@ -350,10 +351,15 @@ class AxeAnalyzer:
             if not await page.evaluate(already_loaded):
                 await page.evaluate(self.axe_source)
         except Exception as exc:
-            if self.suppress_diagnostics:
-                log.warning("axe-core installation failed in protected context")
-            else:
-                log.warning("axe-core installation failed on page: %s", exc)
+            check_log.not_run(
+                "axe",
+                scope="page",
+                url=None if self.suppress_diagnostics else check_log.url_of(page),
+                protected=self.suppress_diagnostics,
+                reason=check_log.failure(
+                    "Adding axe-core to the page", exc, protected=self.suppress_diagnostics
+                ),
+            )
             return []
         tags = tags_for_level(level, version)
         # axe.run returns the full result object; we keep `violations`, and
@@ -375,10 +381,15 @@ class AxeAnalyzer:
             )
         except Exception as exc:
             # Don't kill the crawl on an axe failure, log and return empty.
-            if self.suppress_diagnostics:
-                log.warning("axe.run failed in protected context")
-            else:
-                log.warning("axe.run failed on page: %s", exc)
+            check_log.not_run(
+                "axe",
+                scope="page",
+                url=None if self.suppress_diagnostics else check_log.url_of(page),
+                protected=self.suppress_diagnostics,
+                reason=check_log.failure(
+                    "Axe's check of the page", exc, protected=self.suppress_diagnostics
+                ),
+            )
             return []
         found = list(_flatten(raw.get("violations") or []))
         found.extend(_flatten(raw.get("incomplete") or [], outcome="cant_tell"))

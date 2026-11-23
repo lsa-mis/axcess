@@ -109,6 +109,8 @@ class FetchResult:
     interaction_dialogs_opened: int = 0
     interaction_dialogs_stuck: int = 0
     interaction_detail: str = ""
+    # The error type that stopped Click-Through early on this page, or "".
+    interaction_stopped_by: str = ""
     discovered_urls: tuple[str, ...] = ()
     # Links that appeared after a click, with the control that revealed each,
     # for the Documents tab (``audit.linked_files``). JsFetcher only, when

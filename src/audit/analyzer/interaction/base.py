@@ -176,6 +176,9 @@ class InteractionResult:
     #: clicking on regardless would record coverage that never happened.
     dialogs_opened: int = 0
     dialogs_stuck: int = 0
+    #: The error type that stopped the sweep early, or "" when nothing did.
+    #: What it reached before the error is still kept.
+    stopped_by: str = ""
     #: Bounded, reproducible note about the first stuck dialog: which dialog,
     #: which control opened it, and what dismissal was tried.
     detail: str = ""
