@@ -170,28 +170,7 @@ class AlfaAnalyzer:
         node_executable = _node_executable()
         if node_executable is None:
             raise AlfaError("Node.js 22 or later is not available.")
-        runtime_temp = tempfile.gettempdir()
-        env = {
-            "PATH": os.environ.get("PATH", ""),
-            # Node's os.tmpdir() requires TEMP or TMP on Windows. Supplying the
-            # resolved system temp directory keeps Playwright functional while
-            # the companion process remains isolated from application secrets.
-            "TEMP": runtime_temp,
-            "TMP": runtime_temp,
-            "TMPDIR": runtime_temp,
-        }
-        if os.environ.get("AUDIT_NODE_RUN_AS_NODE") == "1":
-            # A packaged Electron executable can provide its embedded Node
-            # runtime to the bundled Alfa runner without requiring a separate
-            # system installation. No application secrets are forwarded.
-            env["ELECTRON_RUN_AS_NODE"] = "1"
-        if os.environ.get("AUDIT_RUNTIME_VERIFICATION_DIAGNOSTICS") == "1":
-            # Only the fixed, local desktop build fixture enables this. Normal
-            # scans keep browser diagnostics generic because exception text can
-            # contain target-controlled URLs or page content.
-            env["ALFA_RUNTIME_VERIFICATION_DIAGNOSTICS"] = "1"
-        if self._chromium_path:
-            env["ALFA_CHROMIUM_PATH"] = self._chromium_path
+        env = runner_environment(chromium_path=self._chromium_path)
         # The page URL can itself contain a protected path/record identifier.
         # Send all runner input through the one-use stdin pipe, not argv,
         # environment, a file, or process-list-visible command arguments.
@@ -278,6 +257,78 @@ class AlfaAnalyzer:
             message = stderr.decode("utf-8", errors="replace").strip()
             raise AlfaError(message or f"Alfa runner exited with code {process.returncode}.")
         return _parse_result(stdout)
+
+
+# Windows variables a child process needs to start at all. Without
+# SystemRoot, Winsock cannot load its providers, so every socket call fails
+# (WSAEPROVIDERFAILEDINIT, 10106): Chromium in the runner then loads no page
+# and every page's Alfa check fails, which the report showed as "Not run".
+# The desktop build check never noticed because its fixture page is served
+# from inside the runner, with no network. None of these hold a secret: they
+# are system folder locations.
+_WINDOWS_SYSTEM_ENV = (
+    "SYSTEMROOT",
+    "WINDIR",
+    "SYSTEMDRIVE",
+    "COMSPEC",
+    "PATHEXT",
+    "PROGRAMDATA",
+    "PROGRAMFILES",
+    "PROGRAMFILES(X86)",
+    "LOCALAPPDATA",
+    "APPDATA",
+    "USERPROFILE",
+    "NUMBER_OF_PROCESSORS",
+    "PROCESSOR_ARCHITECTURE",
+)
+
+
+def runner_environment(
+    *,
+    chromium_path: str | None = None,
+    source: Mapping[str, str] | None = None,
+    windows: bool | None = None,
+) -> dict[str, str]:
+    """The environment the Node runner starts with.
+
+    Deliberately not the whole parent environment: the companion-side Node
+    process must not inherit application secrets (``AUDIT_ACCESS_TOKEN``, AI
+    service keys). It gets ``PATH``, a temp directory, and on Windows the
+    system locations listed in ``_WINDOWS_SYSTEM_ENV``.
+    """
+    environ = os.environ if source is None else source
+    on_windows = os.name == "nt" if windows is None else windows
+    runtime_temp = tempfile.gettempdir()
+    env = {
+        "PATH": environ.get("PATH", ""),
+        # Node's os.tmpdir() requires TEMP or TMP on Windows. Supplying the
+        # resolved system temp directory keeps Playwright functional while
+        # the companion process remains isolated from application secrets.
+        "TEMP": runtime_temp,
+        "TMP": runtime_temp,
+        "TMPDIR": runtime_temp,
+    }
+    if on_windows:
+        # Windows environment names are case-insensitive, but a Mapping
+        # given here may not be, so match them without case.
+        upper = {key.upper(): value for key, value in environ.items()}
+        for name in _WINDOWS_SYSTEM_ENV:
+            value = upper.get(name)
+            if value:
+                env[name] = value
+    if environ.get("AUDIT_NODE_RUN_AS_NODE") == "1":
+        # A packaged Electron executable can provide its embedded Node
+        # runtime to the bundled Alfa runner without requiring a separate
+        # system installation. No application secrets are forwarded.
+        env["ELECTRON_RUN_AS_NODE"] = "1"
+    if environ.get("AUDIT_RUNTIME_VERIFICATION_DIAGNOSTICS") == "1":
+        # Only the fixed, local desktop build fixture enables this. Normal
+        # scans keep browser diagnostics generic because exception text can
+        # contain target-controlled URLs or page content.
+        env["ALFA_RUNTIME_VERIFICATION_DIAGNOSTICS"] = "1"
+    if chromium_path:
+        env["ALFA_CHROMIUM_PATH"] = chromium_path
+    return env
 
 
 def _node_executable() -> str | None:
