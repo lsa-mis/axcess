@@ -18,6 +18,7 @@ import httpx
 if TYPE_CHECKING:
     from playwright.async_api import APIRequestContext
 
+    from audit.analyzer.alfa_states import AlfaPageChecks
     from audit.analyzer.axe import AxeViolation
     from audit.analyzer.focus import FocusFinding
     from audit.analyzer.forms import FormFinding
@@ -135,6 +136,11 @@ class FetchResult:
     # report's "What was checked" counts.
     form_check_ran: bool = False
     form_outcomes: dict[str, int] = field(default_factory=dict)
+    # Alfa's checks of this page, at load and in each state Click-Through
+    # opened. They finish in the background (the tab only took snapshots),
+    # so the orchestrator awaits them with ``alfa_states.settle``. ``None``
+    # when Alfa did not check this page in the crawler's tab.
+    alfa_checks: AlfaPageChecks | None = None
 
     @property
     def is_html(self) -> bool:

@@ -1337,6 +1337,8 @@ def upsert_alfa_finding(
     target_hash: str,
     engine_outcome: str,
     engine_evidence_json: str,
+    revealed_by: str | None = None,
+    revealed_state_key: str | None = None,
 ) -> int:
     """Idempotently persist a Siteimprove Alfa actionable ACT outcome.
 
@@ -1344,6 +1346,11 @@ def upsert_alfa_finding(
     its outcome is retained verbatim enough to separate ``failed`` from
     ``cant_tell``. ``impact`` stays NULL: Alfa does not supply axe-compatible
     impact labels, and assigning one here would manufacture severity.
+
+    ``revealed_by`` and ``revealed_state_key`` name the control whose click
+    opened the page state Alfa first saw this occurrence in, as for axe
+    (``upsert_axe_violation``), and like there they are never updated on
+    conflict: an occurrence seen at load keeps its NULL.
     """
     conn.execute(
         """
@@ -1351,9 +1358,9 @@ def upsert_alfa_finding(
             page_id, scan_id, rule_id, wcag_sc, wcag_scs, wcag_level,
             impact, help, help_url, target_selector, failure_summary,
             html_snippet, target_hash, pipeline, criterion_sc,
-            engine_outcome, engine_evidence_json
+            engine_outcome, engine_evidence_json, revealed_by, revealed_state_key
         )
-        VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, 'alfa', ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, 'alfa', ?, ?, ?, ?, ?)
         ON CONFLICT(page_id, rule_id, target_hash) DO UPDATE SET
             scan_id = excluded.scan_id,
             wcag_sc = excluded.wcag_sc,
@@ -1385,6 +1392,8 @@ def upsert_alfa_finding(
             wcag_sc,
             engine_outcome,
             engine_evidence_json,
+            revealed_by,
+            revealed_state_key,
         ),
     )
     row = conn.execute(
