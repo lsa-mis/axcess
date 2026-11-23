@@ -103,8 +103,13 @@ it accepts requests.
    gzipped, up to 2,000,000 uncompressed bytes, unless rendered storage is off.
 4. **Images.** `process_page` extracts images, stores them, and runs OCR and
    the vision model.
-5. **Rule engines.** axe-core results are persisted, then Alfa runs its own
-   browser capture of the same URL.
+5. **Rule engines.** axe-core results are persisted, then Alfa's. On a page
+   opened in the crawler's browser, Alfa took its snapshot in that tab right
+   after axe, and Click-Through and site search added one per page state
+   (`AlfaWorker.submit`); the checks run in one Node process for the whole
+   scan (`alfa_runner/worker.mjs`) and finish here (`alfa_states.settle`).
+   A page read without the browser, and every page of a sign-in scan, gets
+   Alfa's own browser capture of the URL instead (`AlfaAnalyzer.run`).
 6. **Browser checks.** Keyboard, responsive, focus, visual, and click-through
    results are persisted. These exist only for rendered pages.
 7. **AI language checks** run on the page's HTML, which is the rendered DOM
@@ -557,7 +562,7 @@ for updates when the app window opens. This is what
 
 | Destination | When | Code |
 | --- | --- | --- |
-| The website you scan | Every scan: the plain HTTP fetch, the Chromium render, and Alfa's separate capture. A render also loads the page's own subresources from whatever hosts it names, such as CDNs. Only the click-through check's guard blocks cross-origin requests, and only while it operates controls. | `crawler/fetcher.py`, `crawler/js_fetcher.py`, `analyzer/alfa.py`, `analyzer/interaction/safety.py` |
+| The website you scan | Every scan: the plain HTTP fetch, the Chromium render, and, for a page read without the browser or a sign-in scan's page, Alfa's separate capture. A render also loads the page's own subresources from whatever hosts it names, such as CDNs. Only the click-through check's guard blocks cross-origin requests, and only while it operates controls. | `crawler/fetcher.py`, `crawler/js_fetcher.py`, `analyzer/alfa.py`, `analyzer/interaction/safety.py` |
 | The website you scan, from the page inspector | Opening a stored page: the capture gets the page's URL as `<base href>`, so the reviewer's browser loads that site's fonts and images live. Its stylesheets load live too, unless the scan saved the copy's CSS (`saved_copy_styles`, served by `/api/scans/{id}/pages/{page}/saved-styles.css`), which newer scans do. Its scripts never run. With no stored capture, the server renders the page again in a throwaway browser. | `frontend/src/routes/Inspector.tsx`, `web/page_inspector.py` |
 | Sign-in and two-factor services | Login scans only, while you sign in | `protected/session.py`, `protected/egress.py` |
 | Ollama, if you use it | The vision model, the visual reading-order check, the AI language checks, and one model-list request when the New scan form opens. The default address is `http://localhost:11434` (`AUDIT_OLLAMA_BASE_URL`). Axcess never pulls a model. | `config.py`, `web/server.py` |
