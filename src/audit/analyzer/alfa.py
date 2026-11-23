@@ -415,7 +415,12 @@ def _parse_result(raw: bytes) -> AlfaResult:
         payload = json.loads(raw.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise AlfaError("Alfa returned malformed JSON evidence.") from exc
-    if not isinstance(payload, dict) or payload.get("protocol_version") != 1:
+    return _parse_payload(payload)
+
+
+def _parse_payload(payload: Any) -> AlfaResult:
+    """Validate one decoded runner or worker result."""
+    if not isinstance(payload, Mapping) or payload.get("protocol_version") != 1:
         raise AlfaError("Alfa returned an unsupported evidence protocol.")
     if payload.get("engine") != "alfa":
         raise AlfaError("Alfa runner identified an unexpected engine.")
