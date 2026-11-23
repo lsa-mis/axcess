@@ -176,14 +176,23 @@ def test_refusal_names_the_setting_without_echoing_the_request(
     assert "do-not-echo" not in response.text
 
 
-def test_engine_and_render_refusals_are_distinguishable(
+def test_search_with_alfa_alone_runs_and_fast_scan_is_refused(
     seeded_db: tuple[Path, Path, int],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Since 2026-11-23 a public scan's Alfa checks the crawler's own tab,
+    so it checks search results by itself: only Fast scan is refused, and
+    Click-Through stays on with Alfa alone."""
     # Without the pinned Alfa install the Alfa request would be refused for
     # that reason first, and this would test the machine rather than the
     # search refusal.
     monkeypatch.setattr(server, "alfa_availability", lambda: AlfaAvailability(True))
+    captured: dict[str, object] = {}
+
+    async def _capture(db_path, config):  # type: ignore[no-untyped-def]
+        captured["config"] = config
+
+    monkeypatch.setattr(server, "_run_background_crawl", _capture)
     db_path, blob_dir, _ = seeded_db
     app = server.create_app(db_path=db_path, blob_dir=blob_dir)
     with TestClient(app, base_url="http://127.0.0.1:8765", client=("127.0.0.1", 45000)) as client:
@@ -197,10 +206,15 @@ def test_engine_and_render_refusals_are_distinguishable(
             json={"url": "https://example.test/", "scan_engine": "alfa", "search": SEARCH},
             headers={"origin": "http://127.0.0.1:8765"},
         )
-    assert static.status_code == alfa.status_code == 422
+    assert static.status_code == 422
     assert "static-only" in static.json()["error"]
-    assert "axe-core" in alfa.json()["error"]
-    assert static.json()["error"] != alfa.json()["error"]
+    assert alfa.status_code == 201, alfa.text
+    config = captured["config"]
+    assert isinstance(config, server.CrawlConfig)
+    assert config.axe_enabled is False
+    assert config.alfa_enabled is True
+    assert config.search is not None
+    assert config.interaction_checks_enabled is True
 
 
 def test_an_unknown_setting_names_itself_and_points_at_the_server(

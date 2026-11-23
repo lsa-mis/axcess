@@ -596,6 +596,7 @@ class JsFetcher:
                             self._capture_element if self._capture_screenshots else None
                         ),
                         capture_styles=self._snapshot_styles,
+                        alfa_checks=alfa_checks,
                     )
                 interaction_evaluated = interaction.evaluated
 
@@ -676,6 +677,7 @@ class JsFetcher:
                 search_result = await self._search_explorer.run(
                     page,
                     baseline=(*axe_violations, *(item.violation for item in interaction.findings)),
+                    alfa_checks=alfa_checks,
                 )
 
             form_findings: tuple[FormFinding, ...] = ()

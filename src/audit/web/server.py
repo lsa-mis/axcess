@@ -749,8 +749,13 @@ def _search_setup_refusal(
     whole_host: bool,
     engine: str,
     static_only: bool = False,
+    alfa_in_tab: bool = False,
 ) -> str:
     """Return the one setting that makes a configured search unusable.
+
+    ``alfa_in_tab``: Alfa checks the crawler's own tab in this kind of scan
+    (a public scan), so it can check search results alone. A sign-in scan's
+    Alfa still opens its own browser at page load, so it needs axe here.
 
     Each cause has its own fix, and they are not interchangeable: an
     out-of-scope page URL is corrected in a different box from an engine
@@ -762,7 +767,7 @@ def _search_setup_refusal(
             "Search-driven pages: unavailable in static-only mode, "
             "because searching needs Axcess' browser."
         )
-    if engine == "alfa":
+    if engine == "alfa" and not alfa_in_tab:
         return (
             "Search-driven pages: needs axe-core. "
             "Choose axe-core or both engines, or turn the search off."
@@ -2187,6 +2192,7 @@ def create_app(
                 whole_host=bool(body.get("whole_host")),
                 engine=requested_engine,
                 static_only=static_only,
+                alfa_in_tab=True,
             )
             if refusal:
                 return JSONResponse({"error": refusal, "fields": ["search"]}, status_code=422)
@@ -4525,12 +4531,11 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
         wcag_version=form.get("wcag_version", DEFAULT_WCAG_VERSION),
         alfa_enabled=scan_engine in {"alfa", "both"},
         # DOM-state discovery operates controls in Axcess' browser and
-        # re-runs axe-core after a control reveals new content. Keep the
-        # stored config honest when either prerequisite is unavailable.
+        # re-runs the rule check tools (axe, Alfa, or both, each in the
+        # crawler's own tab) after a control reveals new content. Keep the
+        # stored config honest when the browser is unavailable.
         interaction_checks_enabled=(
-            not bool(form.get("skip_interaction"))
-            and not bool(form.get("static_only"))
-            and scan_engine in {"axe", "both"}
+            not bool(form.get("skip_interaction")) and not bool(form.get("static_only"))
         ),
         # Per-criterion semantic analyzers (Phase 9+). Opt-out like axe;
         # the wiring to the runner lands in Phase 9.1, for now this
@@ -5384,6 +5389,21 @@ def _detect_blocked_scan(
     }
 
 
+def _state_rule_checks(cfg: Mapping[str, Any]) -> str:
+    """Which rule check tools Click-Through ran on each page state, in words.
+
+    Alfa checks page states only when it took its snapshots in the
+    crawler's own tab (``alfa_capture``); before 2026-11-23 it never did.
+    """
+    axe = cfg.get("axe_enabled", True) is not False
+    alfa = bool(cfg.get("alfa_enabled")) and cfg.get("alfa_capture") == "crawler_tab"
+    if axe and alfa:
+        return "the rule checks (axe and Alfa)"
+    if alfa:
+        return "the rule check (Alfa)"
+    return "the rule check (axe)"
+
+
 def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[str, Any]]:
     """Describe configured methods and the evidence that they actually ran.
 
@@ -5556,8 +5576,8 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
             "coverage_known": interaction_pages > 0
             or int(cfg.get("interaction_coverage_version") or 0) >= 1,
             "description": (
-                "Opens menus, tabs and dialogs, then runs the rule check (axe) "
-                f"on each {CLICK_THROUGH_STATE}."
+                "Opens menus, tabs and dialogs, then runs "
+                f"{_state_rule_checks(cfg)} on each {CLICK_THROUGH_STATE}."
             ),
             # One sentence, as every limit in the report's "What was checked"
             # table; the website's card for this check has the rest (safety

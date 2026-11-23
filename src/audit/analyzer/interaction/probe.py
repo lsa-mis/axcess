@@ -33,6 +33,8 @@ from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from audit.analyzer.alfa import AlfaError
+from audit.analyzer.alfa_states import AlfaPageChecks, AlfaStateCheck
 from audit.analyzer.axe import AxeAnalyzer, AxeViolation, Level
 from audit.analyzer.interaction.base import (
     InteractionResult,
@@ -49,6 +51,7 @@ if TYPE_CHECKING:
 
     from playwright.async_api import Frame, Locator, Page
 
+    from audit.analyzer.alfa_worker import AlfaWorker
     from audit.crawler.style_snapshot import StyleSnapshot
 
     #: Takes an element screenshot for a CSS selector, or returns None. Supplied
@@ -491,6 +494,9 @@ class _Budget:
     #: save styles. Held here rather than on the probe: the probe is shared
     #: by every worker, and this belongs to one page's fetch.
     capture_styles: StylesFn | None = None
+    #: This page's pending Alfa checks; each new state adds one. ``None``
+    #: when the scan does not run Alfa in the crawler's tab.
+    alfa_checks: AlfaPageChecks | None = None
     #: Consecutive clicks per shape that changed nothing. A date grid answers
     #: every cell the same way, so once a few have done nothing the rest will
     #: too, and the page's remaining budget is better spent elsewhere. Reset
@@ -530,14 +536,20 @@ def _timing_ms(budget: _Budget, total_s: float) -> dict[str, int]:
 
 @dataclass
 class InteractionProbe:
-    """Re-runs ``axe`` against DOM states reached by operating controls.
+    """Re-runs the rule checks against DOM states reached by operating controls.
 
     Construct one per crawl and reuse it across pages: it holds no per-page
     state, and the :class:`AxeAnalyzer` it wraps is the same instance the
     load-state pass uses, so axe is injected once per page either way.
+
+    ``axe`` and ``alfa`` are the two rule check tools; either may be absent
+    (the scan's choice), not both. Axe runs inline in each state. Alfa only
+    takes a snapshot of the state, and checks it in the background
+    (:meth:`AlfaWorker.submit`), so a state costs the tab about 0.1-0.6 s
+    more, not the 1.5 s Alfa's rules take.
     """
 
-    axe: AxeAnalyzer
+    axe: AxeAnalyzer | None
     level: Level = "AA"
     # The WCAG version ``level`` is read against; the scan's own choice.
     version: WcagVersion = LEGACY_WCAG_VERSION
@@ -582,6 +594,8 @@ class InteractionProbe:
     max_inert_repeats: int = DEFAULT_MAX_INERT_REPEATS
     min_inert_population: int = DEFAULT_MIN_INERT_POPULATION
     max_state_shots: int = DEFAULT_MAX_STATE_SHOTS
+    # The scan-long Alfa worker, when the scan runs Alfa in the crawler's tab.
+    alfa: AlfaWorker | None = None
 
     async def run(
         self,
@@ -590,6 +604,7 @@ class InteractionProbe:
         baseline: Sequence[AxeViolation] = (),
         capture_screenshot: ShotFn | None = None,
         capture_styles: StylesFn | None = None,
+        alfa_checks: AlfaPageChecks | None = None,
     ) -> InteractionResult:
         """Return violations reachable only by operating the page.
 
@@ -598,11 +613,16 @@ class InteractionProbe:
         seen set and never reported again no matter how many states it
         survives into. Passing nothing is allowed but means the first
         revealed state re-reports the whole page.
+
+        ``alfa_checks`` is this page's pending Alfa checks, holding the load
+        check that is Alfa's baseline. Each new state adds an Alfa check to
+        it; ``alfa_states.settle`` later keeps what each state revealed.
         """
         budget = _Budget(
             remaining=self.max_clicks,
             seen_hashes={v.target_hash for v in baseline},
             capture_styles=capture_styles,
+            alfa_checks=alfa_checks if self.alfa is not None else None,
         )
         found: list[RevealedViolation] = []
         evaluated = False
@@ -703,12 +723,13 @@ class InteractionProbe:
                 # With "needs review" results, as every re-run below asks for
                 # them: a frame's load-time cant_tell rows would otherwise all
                 # look revealed by the first click inside it.
-                budget.seen_hashes.update(
-                    v.target_hash
-                    for v in await self.axe.run(
-                        frame, self.level, self.version, include_incomplete=True
+                if self.axe is not None:
+                    budget.seen_hashes.update(
+                        v.target_hash
+                        for v in await self.axe.run(
+                            frame, self.level, self.version, include_incomplete=True
+                        )
                     )
-                )
             except Exception as exc:
                 log.debug("interaction.frame_skipped", error_type=type(exc).__name__)
                 continue
@@ -1187,11 +1208,20 @@ class InteractionProbe:
         label: str,
         state_key: str = "",
     ) -> None:
-        """Run axe on the current state and keep only unseen violations."""
+        """Check the current state: axe keeps only unseen violations, Alfa
+        takes a snapshot to check in the background."""
+        await self._submit_alfa(page, budget, label, state_key)
+        if self.axe is None:
+            return
         try:
             violations = await self.axe.run(page, self.level, self.version, include_incomplete=True)
         except Exception as exc:
-            log.debug("interaction.axe_failed", error_type=type(exc).__name__)
+            log.warning(
+                "check.not_run",
+                check="interaction",
+                scope="page_state",
+                reason=f"Axe failed in a page state a click opened ({type(exc).__name__}).",
+            )
             return
         for violation in violations:
             digest = violation.target_hash
@@ -1201,6 +1231,23 @@ class InteractionProbe:
             found.append(
                 RevealedViolation(violation=violation, revealed_by=label, state_key=state_key)
             )
+
+    async def _submit_alfa(self, page: Frame, budget: _Budget, label: str, state_key: str) -> None:
+        """Snapshot the whole page in this state for Alfa, like the load check.
+
+        Always the top document, even for a state inside a frame: the load
+        check that serves as Alfa's baseline is of the top document too, so
+        the two compare like for like.
+        """
+        checks = budget.alfa_checks
+        if checks is None or self.alfa is None:
+            return
+        try:
+            task = await self.alfa.submit(page.page, level=self.level, version=self.version)
+        except AlfaError as exc:
+            checks.state_errors.append(str(exc))
+            return
+        checks.states.append(AlfaStateCheck(task=task, revealed_by=label, state_key=state_key))
 
     async def _capture_shots(
         self,

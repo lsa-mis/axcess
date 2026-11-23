@@ -668,9 +668,12 @@ async def run_crawl(
     # Interaction probe, opt-in. Shares the crawl's single AxeAnalyzer so
     # axe is injected once per page whether or not this probe runs.
     interaction_probe: InteractionProbe | None = None
-    if config.interaction_checks_enabled and axe_analyzer is not None:
+    # Runs with axe, with Alfa in the crawler's tab, or both: each state a
+    # click opens is checked by whichever rule check tools the scan runs.
+    if config.interaction_checks_enabled and (axe_analyzer is not None or alfa_worker is not None):
         interaction_probe = InteractionProbe(
             axe=axe_analyzer,
+            alfa=alfa_worker,
             level=axe_level,
             version=wcag_version,
             max_clicks=config.interaction_max_clicks,
@@ -706,7 +709,7 @@ async def run_crawl(
             form_error_probe=form_error_probe,
             capture_screenshots=config.capture_screenshots,
             headless=config.browser_headless,
-            search_explorer=build_search_explorer(config, axe_analyzer),
+            search_explorer=build_search_explorer(config, axe_analyzer, alfa_worker),
             idle_timeout_ms=config.js_idle_timeout_ms,
             alfa_worker=alfa_worker,
         )
@@ -1281,11 +1284,16 @@ class _LazyJs:
             self._fetcher = None
 
 
-def build_search_explorer(config: CrawlConfig, axe: AxeAnalyzer | None) -> SearchExplorer | None:
+def build_search_explorer(
+    config: CrawlConfig, axe: AxeAnalyzer | None, alfa: AlfaWorker | None = None
+) -> SearchExplorer | None:
     if config.search is None:
         return None
-    if axe is None or not config.js_enabled or not config.js_eager:
-        raise ValueError("Configured searches require browser rendering and axe-core.")
+    if (axe is None and alfa is None) or not config.js_enabled or not config.js_eager:
+        raise ValueError(
+            "Configured searches require browser rendering and a rule check tool "
+            "(axe or Alfa) that checks the crawler's own tab."
+        )
     if not search_url_allowed(config.search, config.seed_url, whole_host=config.whole_host):
         raise ValueError("Search page must be inside the scan scope.")
     scope = url_policy.build_scope(config.seed_url, whole_host=config.whole_host)
@@ -1311,6 +1319,7 @@ def build_search_explorer(config: CrawlConfig, axe: AxeAnalyzer | None) -> Searc
         axe=axe,
         level=config.axe_level,  # type: ignore[arg-type]
         version=config.wcag_version,
+        alfa=alfa,
     )
 
 
@@ -1548,7 +1557,7 @@ def _tracked_checks(ctx: _WorkerContext) -> list[str]:
             checks.append("keyboard")
         if config.responsive_checks_enabled:
             checks.append("responsive")
-        if config.interaction_checks_enabled and config.axe_enabled:
+        if config.interaction_checks_enabled and (config.axe_enabled or config.alfa_enabled):
             checks.append("interaction")
     if ctx.alfa is not None:
         checks.append("alfa")
