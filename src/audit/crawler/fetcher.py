@@ -56,6 +56,10 @@ class FetchResult:
     body: bytes
     retry_after: float | None
     axe_violations: tuple[AxeViolation, ...] = field(default=())
+    # Whether axe checked this page: True, False when it was asked and failed
+    # (the log says why), None when the fetcher does not say (older fakes and
+    # fetchers without axe), which the orchestrator reads as before.
+    axe_checked: bool | None = None
     # SC 2.1.2 keyboard-trap probe results. Populated only by JsFetcher
     # when a KeyboardProbe is attached (default on; ``--skip-keyboard``
     # disables). Static fetches always leave it empty (probing requires

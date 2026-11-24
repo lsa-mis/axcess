@@ -2051,7 +2051,10 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
         # never scanned this page." JsFetcher always returns a tuple after
         # a successful axe run, so the proxy here is `render_mode == "js"`
         # AND axe was on.
-        if render_mode == "js" and ctx.config.axe_enabled:
+        # A page axe failed on (result.axe_checked is False) is not counted
+        # as checked: an empty result there is not "nothing found". The
+        # fetcher logged the reason.
+        if render_mode == "js" and ctx.config.axe_enabled and result.axe_checked is not False:
             _persist_axe(
                 ctx,
                 page_id=page_id,

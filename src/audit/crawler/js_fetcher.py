@@ -23,10 +23,11 @@ from typing import TYPE_CHECKING, Any, Self
 
 from PIL import Image, ImageDraw
 
+from audit import check_log
 from audit.analyzer.alfa import AlfaError
 from audit.analyzer.alfa_states import AlfaPageChecks
 from audit.analyzer.alfa_worker import AlfaWorker
-from audit.analyzer.axe import AxeAnalyzer, AxeViolation, Level
+from audit.analyzer.axe import AxeAnalyzer, AxeError, AxeViolation, Level
 from audit.analyzer.focus import FocusFinding, FocusProbe
 from audit.analyzer.forms import ErrorIdentificationProbe, FormFinding
 from audit.analyzer.interaction import (
@@ -492,6 +493,10 @@ class JsFetcher:
             # On any axe failure the analyzer logs + returns []; one bad
             # page must never tank a 1000-page crawl.
             axe_violations: list[AxeViolation] = []
+            # None: this fetch had no axe to run. False: axe was asked and
+            # failed (logged with the reason), so the page is not counted as
+            # checked and nothing compares page states with an empty result.
+            axe_checked: bool | None = None
             if (
                 self._axe_analyzer is not None
                 and 200 <= status < 300
@@ -501,12 +506,23 @@ class JsFetcher:
                     # "Needs review" results too (axe's incomplete), stored
                     # as cant_tell and shown as Not sure: dropping them hid
                     # every element axe could not decide on.
-                    axe_violations = await self._axe_analyzer.run(
-                        page,
-                        level=self._axe_level,
-                        version=self._wcag_version,
-                        include_incomplete=True,
-                    )
+                    try:
+                        axe_violations = await self._axe_analyzer.run(
+                            page,
+                            level=self._axe_level,
+                            version=self._wcag_version,
+                            include_incomplete=True,
+                        )
+                        axe_checked = True
+                    except AxeError as exc:
+                        axe_checked = False
+                        check_log.not_run(
+                            "axe",
+                            scope="page",
+                            url=None if self._private_context else final_url,
+                            protected=self._private_context,
+                            reason=str(exc),
+                        )
             # Alfa's snapshot of the loaded page, right after axe and on the
             # same quiet page, so both engines judge one page state. Only the
             # snapshot holds the tab; the rules run in the background.
@@ -597,6 +613,7 @@ class JsFetcher:
                         ),
                         capture_styles=self._snapshot_styles,
                         alfa_checks=alfa_checks,
+                        use_axe=axe_checked is not False,
                     )
                 interaction_evaluated = interaction.evaluated
 
@@ -678,6 +695,7 @@ class JsFetcher:
                     page,
                     baseline=(*axe_violations, *(item.violation for item in interaction.findings)),
                     alfa_checks=alfa_checks,
+                    use_axe=axe_checked is not False,
                 )
 
             form_findings: tuple[FormFinding, ...] = ()
@@ -724,6 +742,7 @@ class JsFetcher:
                 body=html.encode("utf-8", errors="replace"),
                 retry_after=None,
                 axe_violations=tuple(axe_violations),
+                axe_checked=axe_checked,
                 keyboard_traps=tuple(keyboard_traps),
                 responsive_findings=tuple(responsive_findings),
                 focus_findings=tuple(focus_findings),

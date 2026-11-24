@@ -12,9 +12,10 @@ from urllib.parse import urljoin, urlsplit
 from playwright.async_api import TimeoutError as BrowserTimeout
 from pydantic import BaseModel, ConfigDict, Field
 
+from audit import check_log
 from audit.analyzer.alfa import AlfaError
 from audit.analyzer.alfa_states import AlfaPageChecks, AlfaStateCheck
-from audit.analyzer.axe import AxeAnalyzer, AxeViolation, Level
+from audit.analyzer.axe import AxeAnalyzer, AxeError, AxeViolation, Level
 from audit.analyzer.interaction import DEFAULT_BLOCKED_LABELS, RevealedViolation
 from audit.crawler import url_policy
 from audit.wcag_version import LEGACY_WCAG_VERSION, WcagVersion
@@ -132,6 +133,7 @@ class SearchExplorer:
         *,
         baseline: Sequence[AxeViolation],
         alfa_checks: AlfaPageChecks | None = None,
+        use_axe: bool = True,
     ) -> SearchResult:
         urls: set[str] = set()
         findings: list[RevealedViolation] = []
@@ -174,9 +176,16 @@ class SearchExplorer:
                     alfa_checks.state_errors.append(str(exc))
                 else:
                     alfa_checks.states.append(AlfaStateCheck(task, "Configured search"))
-            if self.axe is None:
+            # Without the page's load result (axe failed there) every search
+            # state would look new, so axe skips the search states too.
+            if self.axe is None or not use_axe:
                 return
-            for finding in await self.axe.run(page, self.level, self.version):
+            try:
+                found = await self.axe.run(page, self.level, self.version)
+            except AxeError as exc:
+                check_log.not_run("axe", scope="page_state", part="search", reason=str(exc))
+                return
+            for finding in found:
                 if finding.target_hash not in hashes:
                     hashes.add(finding.target_hash)
                     findings.append(RevealedViolation(finding, "Configured search"))

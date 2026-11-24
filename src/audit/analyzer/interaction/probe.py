@@ -33,9 +33,10 @@ from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from audit import check_log
 from audit.analyzer.alfa import AlfaError
 from audit.analyzer.alfa_states import AlfaPageChecks, AlfaStateCheck
-from audit.analyzer.axe import AxeAnalyzer, AxeViolation, Level
+from audit.analyzer.axe import AxeAnalyzer, AxeError, AxeViolation, Level
 from audit.analyzer.interaction.base import (
     InteractionResult,
     RevealedLink,
@@ -497,6 +498,9 @@ class _Budget:
     #: This page's pending Alfa checks; each new state adds one. ``None``
     #: when the scan does not run Alfa in the crawler's tab.
     alfa_checks: AlfaPageChecks | None = None
+    #: Run axe in each state. False when there is no axe, or when axe failed
+    #: on the loaded page and there is no baseline to compare states with.
+    use_axe: bool = True
     #: Consecutive clicks per shape that changed nothing. A date grid answers
     #: every cell the same way, so once a few have done nothing the rest will
     #: too, and the page's remaining budget is better spent elsewhere. Reset
@@ -605,6 +609,7 @@ class InteractionProbe:
         capture_screenshot: ShotFn | None = None,
         capture_styles: StylesFn | None = None,
         alfa_checks: AlfaPageChecks | None = None,
+        use_axe: bool = True,
     ) -> InteractionResult:
         """Return violations reachable only by operating the page.
 
@@ -617,12 +622,16 @@ class InteractionProbe:
         ``alfa_checks`` is this page's pending Alfa checks, holding the load
         check that is Alfa's baseline. Each new state adds an Alfa check to
         it; ``alfa_states.settle`` later keeps what each state revealed.
+
+        ``use_axe`` is False when axe failed on the loaded page: without its
+        baseline every state would look new, so states get no axe check.
         """
         budget = _Budget(
             remaining=self.max_clicks,
             seen_hashes={v.target_hash for v in baseline},
             capture_styles=capture_styles,
             alfa_checks=alfa_checks if self.alfa is not None else None,
+            use_axe=use_axe and self.axe is not None,
         )
         found: list[RevealedViolation] = []
         evaluated = False
@@ -728,7 +737,7 @@ class InteractionProbe:
                 # With "needs review" results, as every re-run below asks for
                 # them: a frame's load-time cant_tell rows would otherwise all
                 # look revealed by the first click inside it.
-                if self.axe is not None:
+                if self.axe is not None and budget.use_axe:
                     budget.seen_hashes.update(
                         v.target_hash
                         for v in await self.axe.run(
@@ -1216,14 +1225,18 @@ class InteractionProbe:
         """Check the current state: axe keeps only unseen violations, Alfa
         takes a snapshot to check in the background."""
         await self._submit_alfa(page, budget, label, state_key)
-        if self.axe is None:
+        if self.axe is None or not budget.use_axe:
             return
         try:
             violations = await self.axe.run(page, self.level, self.version, include_incomplete=True)
+        except AxeError as exc:
+            # No address: the probe does not know whether this is a sign-in
+            # scan. The reason itself follows the analyzer's privacy setting.
+            check_log.not_run("axe", scope="page_state", part=label[:80], reason=str(exc))
+            return
         except Exception as exc:
-            log.warning(
-                "check.not_run",
-                check="interaction",
+            check_log.not_run(
+                "axe",
                 scope="page_state",
                 reason=f"Axe failed in a page state a click opened ({type(exc).__name__}).",
             )
