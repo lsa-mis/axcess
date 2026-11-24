@@ -98,3 +98,26 @@ def _marker_xs(png: bytes) -> list[int]:
         for index, (red, green, blue) in enumerate(image.get_flattened_data())
         if red >= 170 and green <= 50 and blue <= 70
     ]
+
+
+# A dropdown closed by clipping, as the main menu on rossweb.bus.umich.edu
+# is after Click-Through closes it: the link keeps a box, but nothing of it
+# is shown. Its screenshot showed the page with no outline (2026-11-24).
+_CLOSED_MENU = (
+    "<html><body style='margin:0'>"
+    "<nav style='background:#2d3748;height:80px'><ul style='margin:0'>"
+    "<li><a href='#'>Students</a>"
+    "<ul id='menu' style='max-height:0;overflow:hidden;margin:0'>"
+    "<li><a id='hidden' href='#'>Michigan Ross</a></li></ul></li></ul></nav>"
+    "<p><a id='shown' href='#'>Privacy Notice</a></p>"
+    "</body></html>"
+)
+
+
+async def test_an_element_that_must_be_seen_in_a_closed_menu_gets_no_screenshot(page) -> None:  # type: ignore[no-untyped-def]
+    await page.set_content(_CLOSED_MENU)
+    fetcher = _fetcher()
+
+    assert await fetcher._capture_element(page, "#hidden", must_be_seen=True) is None
+    shown = await fetcher._capture_element(page, "#shown", must_be_seen=True)
+    assert shown is not None and len(_marker_xs(shown)) > 20

@@ -122,10 +122,17 @@ async def settle_dom(
 # retaining a hard safety bound for generated or broken DOMs.
 MAX_SHOTS_PER_PAGE = 100
 # How long the screenshot pass waits for Alfa's background checks of this
-# page to finish before photographing their occurrences. The tab is held
-# meanwhile; a check not done by then leaves its occurrences without a
-# screenshot (logged), never without a result.
-ALFA_SHOT_WAIT_S = 30.0
+# page to finish before photographing their occurrences. The page is saved
+# only once every one of its Alfa checks is done (``alfa_states.settle``),
+# so waiting here costs the scan no time: it only keeps the tab open until
+# the results it needs arrive. With eight pages sharing one Alfa worker a
+# page's checks can queue for minutes; the old 30-second wait left every
+# Alfa occurrence of such a page without a screenshot (a 10-page scan of
+# rossweb.bus.umich.edu/ross-it/, 2026-11-24: 50 on one page). This limit
+# only guards a stuck queue; each check has its own time limits. A check
+# not done by then leaves its occurrences without a screenshot (logged),
+# never without a result.
+ALFA_SHOT_WAIT_S = 600.0
 
 
 # Location marker geometry, in image pixels. The outline sits _MARKER_GAP_PX
@@ -143,6 +150,16 @@ _MARKER_WHITE = (255, 255, 255, 255)
 # so outlining the block would frame mostly blank space. The range around its
 # contents, clipped to the element, is what a reviewer needs to find. Controls
 # and replaced elements keep their own box: the control is what is reported.
+# True when the element is the topmost thing at the centre of its box: not
+# clipped away by a closed menu, nor covered by another element.
+_ON_TOP_JS = """
+el => {
+  const r = el.getBoundingClientRect();
+  const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+  return top !== null && (top === el || el.contains(top));
+}
+"""
+
 _CONTENT_BOX_JS = """
 (el) => {
   const ownBox = 'img, svg, video, canvas, iframe, object, embed, '
@@ -688,6 +705,18 @@ class JsFetcher:
                             screenshots[th] = png
                     if alfa_checks is not None:
                         await self._capture_alfa(page, alfa_checks, screenshots)
+                    if len(screenshots) >= MAX_SHOTS_PER_PAGE:
+                        # Says why later occurrences on this page have no
+                        # picture: the cap, not a failure.
+                        log.info(
+                            "screenshots.limit_reached",
+                            limit=MAX_SHOTS_PER_PAGE,
+                            **(
+                                {"protected_context": True}
+                                if self._private_context
+                                else {"url": final_url}
+                            ),
+                        )
                 except Exception as exc:
                     if self._private_context:
                         log.warning("screenshot.capture_failed", protected_context=True)
@@ -812,7 +841,9 @@ class JsFetcher:
         """Photograph Alfa's occurrences, as the pass above does axe's.
 
         Alfa checks in the background, so this waits (up to
-        ``ALFA_SHOT_WAIT_S``) for this page's checks, then outlines each
+        ``ALFA_SHOT_WAIT_S``, which costs the scan nothing: the page is
+        saved only after these checks finish) for this page's checks, then
+        outlines each
         occurrence's element, found by the XPath Alfa reports. Like axe's,
         an element no longer shown (inside a menu the sweep closed again)
         gets no picture.
@@ -828,6 +859,15 @@ class JsFetcher:
                 checks_not_finished=len(pending),
                 **({"protected_context": True} if self._private_context else {"url": page.url}),
             )
+        # What the loaded page itself showed. An occurrence found only in a
+        # page state a click opened is photographed here, on the loaded
+        # page, only if its element is really in view: most sit in a menu
+        # the sweep closed again (a 10-page scan, 2026-11-24: 5 of 6 such
+        # screenshots showed a closed menu with no outline).
+        at_load: set[str] = set()
+        load = checks.load
+        if load is not None and load in done and not load.cancelled() and not load.exception():
+            at_load = {finding.target_hash for finding in load.result().findings}
         for task in tasks:
             if task not in done or task.cancelled() or task.exception() is not None:
                 continue
@@ -839,7 +879,12 @@ class JsFetcher:
                 path = alfa_xpath(finding.target_hint)
                 if path is None:
                     continue
-                png = await self._capture_element(page, f"xpath={path}", center=True)
+                png = await self._capture_element(
+                    page,
+                    f"xpath={path}",
+                    center=True,
+                    must_be_seen=task is not load and finding.target_hash not in at_load,
+                )
                 if png:
                     screenshots[finding.target_hash] = png
 
@@ -851,7 +896,7 @@ class JsFetcher:
         return snapshot
 
     async def _capture_element(
-        self, page: Page, selector: str, *, center: bool = False
+        self, page: Page, selector: str, *, center: bool = False, must_be_seen: bool = False
     ) -> bytes | None:
         """Screenshot the element at ``selector`` with its location outlined.
 
@@ -867,6 +912,12 @@ class JsFetcher:
         at a viewport edge. Only the final capture pass asks for it: the
         interaction probe photographs revealed states, and a scroll there
         could close a menu that dismisses itself on scroll.
+
+        ``must_be_seen`` photographs the element only when it is the topmost
+        thing at its own centre (``_ON_TOP_JS``). An element inside a menu
+        that is closed again keeps a box but is clipped or covered; its
+        screenshot would show the page with no outline, which misleads more
+        than no screenshot does.
         """
         try:
             loc = page.locator(selector).first
@@ -891,6 +942,8 @@ class JsFetcher:
                     await loc.scroll_into_view_if_needed(timeout=1500)
             box = await loc.bounding_box()
             if box is None:
+                return None
+            if must_be_seen and not await loc.evaluate(_ON_TOP_JS):
                 return None
             mark: Any = None
             with contextlib.suppress(Exception):
