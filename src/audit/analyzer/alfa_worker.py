@@ -90,7 +90,11 @@ class AlfaWorker:
         evaluate_timeout_s: float = DEFAULT_EVALUATE_TIMEOUT_S,
         max_pending: int = DEFAULT_MAX_PENDING,
         chromium_path: str | None = None,
+        private: bool = False,
     ) -> None:
+        # A sign-in scan: the worker's own error text and error output can
+        # quote the signed-in page, so reasons leave them out.
+        self._private = private
         self._evaluate_timeout_s = evaluate_timeout_s
         self._pending = asyncio.Semaphore(max(1, max_pending))
         self._turn = asyncio.Lock()
@@ -302,7 +306,7 @@ class AlfaWorker:
                     "The Alfa worker stopped while checking a page state. "
                     f"Error output: {self._stderr_text() or 'none'}"
                 ) from exc
-        return _parse_response(line, request_id)
+        return _parse_response(line, request_id, private=self._private)
 
     async def close(self) -> None:
         """End the worker; safe to call more than once."""
@@ -348,6 +352,8 @@ class AlfaWorker:
             del self._stderr_tail[: max(0, len(self._stderr_tail) - 4096)]
 
     def _stderr_text(self) -> str:
+        if self._private:
+            return "withheld in a sign-in scan"
         return " ".join(self._stderr_tail.decode("utf-8", errors="replace").split())[-1000:]
 
     async def _kill(self) -> None:
@@ -360,7 +366,7 @@ class AlfaWorker:
             await asyncio.wait_for(process.wait(), 5.0)
 
 
-def _parse_response(line: bytes, request_id: int) -> AlfaResult:
+def _parse_response(line: bytes, request_id: int, *, private: bool = False) -> AlfaResult:
     if len(line) > _MAX_RESPONSE_BYTES:
         raise AlfaError("Alfa returned more output for one page state than Axcess can keep.")
     try:
@@ -370,5 +376,9 @@ def _parse_response(line: bytes, request_id: int) -> AlfaResult:
     if not isinstance(payload, Mapping) or payload.get("id") != request_id:
         raise AlfaError("The Alfa worker answered a different request.")
     if "error" in payload:
+        if private:
+            raise AlfaError(
+                "Alfa could not check this page state (details withheld in a sign-in scan)."
+            )
         raise AlfaError(f"Alfa could not check this page state: {payload.get('error')}")
     return _parse_payload(payload)

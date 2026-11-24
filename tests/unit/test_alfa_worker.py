@@ -124,3 +124,21 @@ def test_parse_response_passes_the_worker_error_on() -> None:
 
     with pytest.raises(AlfaError, match="TypeError: x is undefined"):
         _parse_response(line, 7)
+
+
+def test_a_sign_in_scan_withholds_the_worker_error_text() -> None:
+    """The worker's error text can quote the signed-in page."""
+    line = json.dumps({"id": 7, "error": "TypeError: cannot read 'Jane Doe grade 42'"}).encode()
+
+    with pytest.raises(AlfaError) as raised:
+        _parse_response(line, 7, private=True)
+
+    assert "Jane Doe" not in str(raised.value)
+    assert "withheld in a sign-in scan" in str(raised.value)
+
+
+def test_a_sign_in_scan_withholds_the_worker_error_output() -> None:
+    worker = AlfaWorker(private=True)
+    worker._stderr_tail.extend(b"at https://app.example.edu/records/123")
+
+    assert worker._stderr_text() == "withheld in a sign-in scan"

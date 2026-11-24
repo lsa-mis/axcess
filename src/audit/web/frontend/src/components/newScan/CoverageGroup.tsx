@@ -21,7 +21,6 @@ import SwitchRow from "./SwitchRow";
  */
 export default function CoverageGroup({ settings, update, policy, errors, fieldIds }: GroupProps) {
   const login = policy.mode === "login";
-  const searchNeedsAxe = login && settings.scan_engine === "alfa";
   const errorFor = (field: "max_pages" | "max_depth") => errors.find((error) => error.field === field)?.message;
   const offersAllPages = !isFixed(policy, "all_pages");
   const allPages = offersAllPages && settings.all_pages;
@@ -69,24 +68,17 @@ export default function CoverageGroup({ settings, update, policy, errors, fieldI
           hint={settings.static_only ? "A fast scan has no saved copies to keep." : SWITCHES.skip_rendered_storage.hint}
         />
         {/* Search discovery reaches pages only a search box links to, so it
-            decides how much of the site is visited. It needs a browser, and
-            in a sign-in scan Rule check (axe), whose Alfa sees each page only
-            as it loads; in a public scan Alfa checks the search results too
-            (2026-11-23). The hint says what it needs and the alert names
-            the setting to change (SC 3.3.2 Labels or Instructions, Level A). */}
+            decides how much of the site is visited. It needs a browser; any
+            rule check tool checks the results (axe, or Alfa since
+            2026-11-23). The hint says what it needs and the alert names the
+            setting to change (SC 3.3.2 Labels or Instructions, Level A). */}
         <div className="px-2 py-2">
           <SearchSettings
             value={settings.search}
             onChange={(search) => update({ search })}
-            disabled={settings.static_only || searchNeedsAxe}
-            needs={login ? SEARCH_COPY.needsSignedIn : SEARCH_COPY.needs}
-            disabledReason={
-              settings.static_only && searchNeedsAxe
-                ? SEARCH_COPY.unavailableBoth
-                : settings.static_only
-                  ? SEARCH_COPY.unavailableStatic
-                  : SEARCH_COPY.unavailableAlfa
-            }
+            disabled={settings.static_only}
+            needs={SEARCH_COPY.needs}
+            disabledReason={SEARCH_COPY.unavailableStatic}
           />
         </div>
         {offersAllPages && (

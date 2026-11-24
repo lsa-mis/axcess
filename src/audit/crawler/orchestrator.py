@@ -610,9 +610,9 @@ async def run_crawl(
         chromium_path = await chromium_executable_path()
         # Pages opened in the crawler's browser: Alfa checks the crawler's
         # own tab, at load and in each state Click-Through opens, like axe
-        # (alfa_worker). A test or the sign-in companion can inject its own
-        # JsFetcher; that one has no worker, so its pages keep the separate
-        # capture below.
+        # (alfa_worker). A caller that injects its own JsFetcher brings its
+        # own worker (the sign-in scan does, in server.py) or none (a test);
+        # without one its pages keep the separate capture below.
         if config.js_enabled and js_fetcher is None:
             alfa_worker = AlfaWorker(
                 evaluate_timeout_s=config.alfa_timeout_s,
@@ -1061,13 +1061,11 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             "alfa_concurrency": config.alfa_concurrency,
             # Where Alfa took its snapshots. "crawler_tab": in the crawler's
             # own tab, right after axe, and in the page states Click-Through
-            # opened. "separate_browser": its own browser, at page load only
-            # (every scan before 2026-11-23, Fast scans, and sign-in scans,
-            # whose companion supplies its own browser fetcher).
+            # opened (public scans and sign-in scans alike since 2026-11-23).
+            # "separate_browser": its own browser, at page load only (every
+            # scan before then, and any page read without the browser).
             "alfa_capture": (
-                "crawler_tab"
-                if config.alfa_enabled and config.js_enabled and not config.browser_only
-                else "separate_browser"
+                "crawler_tab" if config.alfa_enabled and config.js_enabled else "separate_browser"
             ),
             "semantic_enabled": config.semantic_enabled,
             "keyboard_probe_enabled": config.keyboard_probe_enabled,
@@ -1651,21 +1649,13 @@ def _log_check_plan(
         else:
             runs.append(check)
     if not config.interaction_checks_enabled:
-        if protected and config.alfa_enabled and not config.axe_enabled:
-            off(
-                "interaction",
-                "A sign-in scan runs Click-Through with Rule check (axe) only, and this "
-                "scan uses Alfa alone.",
-            )
-        else:
-            off("interaction")
+        off("interaction")
     elif not browser:
         broken("interaction", no_browser)
     elif not interaction:
         broken(
             "interaction",
-            "Click-Through needs a rule check tool that checks the crawler's own tab "
-            "(axe, or Alfa in a public scan), and this scan has none.",
+            "Click-Through needs a rule check tool (axe or Alfa), and this scan has none.",
         )
     else:
         runs.append("interaction")
