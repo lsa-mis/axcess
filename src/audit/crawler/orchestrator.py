@@ -743,7 +743,11 @@ async def run_crawl(
         semantic_analyzers=semantic_analyzers,
         linked_files=(
             LinkedFileTracker(
-                conn, scan_id=scan_id, scope=scope, allow_subdomains=config.allow_subdomains
+                conn,
+                scan_id=scan_id,
+                scope=scope,
+                allow_subdomains=config.allow_subdomains,
+                protected=config.browser_only,
             )
             if _linked_files_on(config)
             else None

@@ -33,7 +33,7 @@ from audit.logging import get_logger
 
 log = get_logger("audit.checks")
 
-Scope = Literal["scan", "page", "page_state", "image"]
+Scope = Literal["scan", "page", "page_state", "image", "file"]
 
 #: Marks where a reason starts quoting another program's error output.
 _RAW_OUTPUT_MARKERS = (" Error output:", " Last error output:")

@@ -61,6 +61,7 @@ from typing import TYPE_CHECKING
 
 import httpx
 
+from audit import check_log
 from audit.crawler import url_policy
 from audit.db import linked_files as store
 from audit.db.schema import write_batch
@@ -135,8 +136,14 @@ class LinkedFileTracker:
         scan_id: int,
         scope: HostScope,
         allow_subdomains: bool,
+        protected: bool = False,
     ) -> None:
         self._conn = conn
+        #: A sign-in scan: the log leaves out file addresses (check_log).
+        self._protected = protected
+        #: Files whose "could not check" reason is already in the log, so a
+        #: file linked from many pages is logged once.
+        self._logged: set[int] = set()
         self._scan_id = scan_id
         self._scope = scope
         self._site = replace(scope, path_prefix="/")
@@ -259,6 +266,10 @@ class LinkedFileTracker:
         if file_id is None and not self.full:
             self.full = True
             log.warning("linked_files.limit_reached", limit=store.MAX_FILES_PER_SCAN)
+        if file_id is not None and file_id not in self._logged:
+            status, reason = formats.initial_status(file_type)
+            if status == "could_not_check" and reason is not None:
+                self._log_not_checked(file_id, url, store.CheckResult(status, reason))
         return file_id
 
     def _add_ref(self, file_id: int, page_id: int, link: FoundLink) -> None:
@@ -412,7 +423,14 @@ class LinkedFileTracker:
         finally:
             # A stop or a fault leaves nothing silently pending: the report
             # says the scan stopped before the file was checked.
-            store.mark_unchecked(self._conn, self._scan_id)
+            unchecked = store.mark_unchecked(self._conn, self._scan_id)
+            if unchecked:
+                check_log.not_run(
+                    "documents",
+                    scope="scan",
+                    reason=_REASON_LOG_TEXT["not_checked"],
+                    files=unchecked,
+                )
 
     async def _check_all(self, pending: Sequence[tuple[int, str]], downloads: _Downloads) -> None:
         tasks: list[asyncio.Task[None]] = []
@@ -655,6 +673,33 @@ class LinkedFileTracker:
 
     def _store(self, file_id: int, result: store.CheckResult) -> None:
         store.set_result(self._conn, scan_id=self._scan_id, file_id=file_id, result=result)
+        if result.status == "could_not_check" and file_id not in self._logged:
+            self._log_not_checked(file_id, None, result)
+
+    def _log_not_checked(self, file_id: int, url: str | None, result: store.CheckResult) -> None:
+        """Log why one file could not be checked, once per file.
+
+        The report's Documents tab shows the same reason in its own words
+        (``linkedFileReasonText``). What the site or the file caused is a
+        warning; what Axcess does by design (a type it does not check, the
+        download cap, robots.txt) is ``info``.
+        """
+        self._logged.add(file_id)
+        reason = result.reason or "not_checked"
+        if url is None:
+            row = self._conn.execute(
+                "SELECT url FROM linked_files WHERE id = ?", (file_id,)
+            ).fetchone()
+            url = str(row[0]) if row else None
+        check_log.not_run(
+            "documents",
+            scope="file",
+            url=url,
+            protected=self._protected,
+            chosen=reason in _BY_DESIGN,
+            reason=_reason_log_text(reason, result.http_status),
+            reason_code=reason,
+        )
 
 
 #: Bytes no check reads, and the reason each gets. ``not_a_pdf`` is any
@@ -668,6 +713,45 @@ _NOT_READ: dict[str, formats.Reason] = {
     "old_office": "old_format",
     "unknown": "not_a_pdf",
 }
+
+
+#: Why a file could not be checked, for the log (``check.not_run``). The
+#: report words each one for its readers (``linkedFileReasonText``).
+_REASON_LOG_TEXT: dict[str, str] = {
+    "type_not_checked_yet": "Axcess does not check this file type yet.",
+    "old_format": "An old Office format, which Axcess does not check.",
+    "google_file": (
+        "Axcess cannot download this Google file (a Google Sheet, or a copy published to the web)."
+    ),
+    "broken_link": "The address could not be reached.",
+    "http_error": "The site answered with an error.",
+    "password": "The file needs a password to open.",
+    "too_large": (
+        f"The file is larger than {MAX_FILE_BYTES // (1024 * 1024)} MB, the most Axcess downloads."
+    ),
+    "timed_out": "The download took too long.",
+    "not_a_pdf": (
+        "The link did not lead to a file Axcess checks (the site sent a web page or other content)."
+    ),
+    "damaged": "The file is damaged and could not be read.",
+    "robots": "The site's robots.txt does not allow downloading it.",
+    "blocked": (
+        "The address is excluded from this scan, or a sign-in scan's download rules refused it."
+    ),
+    "limit": f"The scan already downloaded {MAX_DOWNLOADS} documents, the most it downloads.",
+    "not_checked": "The scan stopped before these documents were checked.",
+}
+
+#: Reasons Axcess chose by design, logged as ``info`` rather than a warning.
+_BY_DESIGN = frozenset({"type_not_checked_yet", "old_format", "google_file", "robots", "limit"})
+
+
+def _reason_log_text(reason: str, http_status: int | None) -> str:
+    if reason == "http_error" and http_status in {401, 403}:
+        return f"The file needs a sign-in (HTTP {http_status})."
+    if reason == "http_error" and http_status is not None:
+        return f"The site answered with an error (HTTP {http_status})."
+    return _REASON_LOG_TEXT.get(reason, f"Could not check it ({reason}).")
 
 
 _FETCH_REASON: dict[str, formats.Reason] = {

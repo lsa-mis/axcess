@@ -419,7 +419,9 @@ The review app is the React app; there are no server-rendered pages.
   `scope` says how much was missed: `scan` (logged at scan start, `info`
   when the person turned the check off, `warning` when it was chosen but
   cannot run), `page`, `page_state` (one state a click or a site search
-  opened) or `image`. `check.plan` at scan start lists what runs. Sign-in
+  opened), `image`, or `file` (one linked document, logged once with its
+  `reason_code`; `info` for what Axcess skips by design, such as a type it
+  does not check). `check.plan` at scan start lists what runs. Sign-in
   scans leave out the page address and keep only the error's type.
 - **"The crawler followed too many links."** Check `allow_subdomains` in the
   scan's settings:
