@@ -11,9 +11,6 @@
 
 import { Audit } from "@siteimprove/alfa-act";
 import { Playwright as AlfaPlaywright } from "@siteimprove/alfa-playwright";
-import rules from "@siteimprove/alfa-rules";
-import { Criterion, Conformance } from "@siteimprove/alfa-wcag";
-import { Refinement } from "@siteimprove/alfa-refinement";
 import { chromium } from "playwright";
 import { lookup } from "node:dns/promises";
 import { chmod, mkdir, mkdtemp, readdir, rm, stat } from "node:fs/promises";
@@ -22,6 +19,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { collectOutcomes } from "./evidence.mjs";
+import { selectRules } from "./rules.mjs";
 const PROFILE_ROOT = join(tmpdir(), "axcess-protected-alfa");
 const PROFILE_PREFIX = "run-";
 const STALE_PROFILE_MAX_AGE_MS = 6 * 60 * 60 * 1_000;
@@ -165,18 +163,7 @@ try {
     await document.dispose();
     verificationProgress("DOM captured");
 
-    // Alfa's conformance predicates default to the current Recommendation
-    // (2.2); pass the scan's chosen version so a WCAG 2.1 scan selects only
-    // the rules whose criteria 2.1 requires at this level.
-    const conformance =
-      level === "A"
-        ? Conformance.isA(version)
-        : level === "AAA"
-          ? Conformance.isAAA(version)
-          : Conformance.isAA(version);
-    const selectedRules = rules.filter((rule) =>
-      rule.hasRequirement(Refinement.and(Criterion.isCriterion, conformance)),
-    );
+    const selectedRules = selectRules(level, version);
     const auditRules = process.env.ALFA_RUNTIME_VERIFICATION_DIAGNOSTICS === "1"
       ? selectedRules.slice(0, 1)
       : selectedRules;

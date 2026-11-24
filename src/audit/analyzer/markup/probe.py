@@ -19,6 +19,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+from audit import check_log
 from audit.analyzer.markup.base import (
     MAX_SNIPPET_CHARS,
     RULE_LABEL_FOR_MISSING,
@@ -403,10 +404,17 @@ class MarkupProbe:
             try:
                 findings.extend(await self._run_rule(page, rule_id, body))
             except Exception as exc:
-                if self.suppress_diagnostics:
-                    log.warning("markup.rule_failed_in_protected_context", rule_id=rule_id)
-                else:
-                    log.warning("markup.rule_failed", rule_id=rule_id, error=str(exc))
+                protected = self.suppress_diagnostics
+                check_log.not_run(
+                    "markup",
+                    scope="page",
+                    part=rule_id,
+                    url=None if protected else check_log.url_of(page),
+                    protected=protected,
+                    reason=check_log.failure(
+                        f"The page code check's rule {rule_id}", exc, protected=protected
+                    ),
+                )
         return findings
 
     async def _run_rule(self, page: Page, rule_id: str, body: str) -> list[MarkupFinding]:

@@ -24,8 +24,15 @@ import SwitchRow from "./SwitchRow";
  * rule check tool" (see ScanForm): which tool checks the pages is part of
  * what Axcess tests on each page, this group's own description. It sits
  * under the standard it checks against, before the switches that add
- * checks of their own, and it decides whether Click-Through can run (Alfa
- * alone cannot), so the switch it disables is right below it.
+ * checks of their own.
+ *
+ * Since 2026-11-23 (the developer's request, "make Alfa the same logic as
+ * axe"), Alfa checks the crawler's own browser tab, in public and sign-in
+ * scans alike, so it checks the page states Click-Through opens just as axe
+ * does: choosing Alfa no longer turns Click-Through off. Until then Alfa
+ * alone disabled the switch, because Alfa opened its own browser and saw
+ * each page only as it loaded. Only Fast scan disables it now, and its hint
+ * says why (SC 3.3.2 Labels or Instructions, Level A).
  */
 export default function ChecksGroup({ settings, update, policy, capabilities }: GroupProps) {
   const login = policy.mode === "login";
@@ -34,11 +41,7 @@ export default function ChecksGroup({ settings, update, policy, capabilities }: 
   const alfaReason = alfaOff
     ? `${CHECK_LABEL.alfa} is not available: ${capabilities.alfa?.reason ?? "not installed"}.`
     : undefined;
-  const clickThroughBlocked = settings.static_only
-    ? CLICK_THROUGH_COPY.unavailableStatic
-    : settings.scan_engine === "alfa"
-      ? CLICK_THROUGH_COPY.unavailableAlfa
-      : null;
+  const clickThroughBlocked = settings.static_only ? CLICK_THROUGH_COPY.unavailableStatic : null;
 
   return (
     <SettingsGroup variant="plain" id="checks" legend={GROUPS.checks.legend} description={GROUPS.checks.description}>
@@ -75,10 +78,8 @@ export default function ChecksGroup({ settings, update, policy, capabilities }: 
         value={settings.scan_engine}
         onChange={(scan_engine) => {
           const patch: Partial<ScanSettings> = { scan_engine };
-          // Alfa alone cannot re-check revealed content; axe or Both
-          // cannot run without a rendered page.
-          if (scan_engine === "alfa") patch.skip_interaction = true;
-          else if (settings.static_only) patch.static_only = false;
+          // Axe or Both cannot run without a rendered page.
+          if (scan_engine !== "alfa" && settings.static_only) patch.static_only = false;
           update(patch);
         }}
         options={[

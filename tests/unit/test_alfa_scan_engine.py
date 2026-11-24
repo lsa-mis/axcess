@@ -221,6 +221,34 @@ async def test_alfa_runner_receives_only_bounded_runtime_environment(
     assert "APPLICATION_SECRET" not in captured_env
 
 
+def test_alfa_runner_environment_keeps_windows_system_locations() -> None:
+    """Without SystemRoot a Windows child cannot open a socket, so Alfa's
+    Chromium loaded no page and every page's Alfa check failed."""
+    source = {
+        "PATH": r"C:\Windows\system32",
+        "SystemRoot": r"C:\Windows",
+        "windir": r"C:\Windows",
+        "LOCALAPPDATA": r"C:\Users\a\AppData\Local",
+        "AUDIT_ACCESS_TOKEN": "must-not-leak",
+        "APPLICATION_SECRET": "must-not-leak",
+    }
+
+    env = alfa.runner_environment(source=source, windows=True)
+
+    assert env["SYSTEMROOT"] == r"C:\Windows"
+    assert env["WINDIR"] == r"C:\Windows"
+    assert env["LOCALAPPDATA"] == r"C:\Users\a\AppData\Local"
+    assert "AUDIT_ACCESS_TOKEN" not in env
+    assert "APPLICATION_SECRET" not in env
+
+
+def test_alfa_runner_environment_adds_no_windows_names_elsewhere() -> None:
+    env = alfa.runner_environment(source={"PATH": "/usr/bin", "SystemRoot": "x"}, windows=False)
+
+    assert "SYSTEMROOT" not in env
+    assert env["PATH"] == "/usr/bin"
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("stdout", "stderr"),

@@ -32,8 +32,12 @@ function Target({ label, value, onChange }: { label: string; value: SearchTarget
   </div>;
 }
 
-export default function SearchSettings({ value, onChange, disabled = false }: {
+export default function SearchSettings({ value, onChange, disabled = false, needs, disabledReason }: {
   value?: SearchConfig | null; onChange: (value: SearchConfig | null) => void; disabled?: boolean;
+  /** What search needs, ending its hint; the scan type decides (see SEARCH_COPY). */
+  needs: string;
+  /** Which setting to change, shown while search is unavailable. */
+  disabledReason: string;
 }) {
   const update = (patch: Partial<SearchConfig>) => value && onChange({ ...value, ...patch });
   const field = (index: number, patch: Partial<SearchField>) => value && update({ fields: value.fields.map((item, i) => i === index ? { ...item, ...patch } : item) });
@@ -42,10 +46,10 @@ export default function SearchSettings({ value, onChange, disabled = false }: {
   // its neighbours instead of a titled container of its own.
   return <>
     <Checkbox checked={!!value} disabled={disabled && !value} onChange={enabled => onChange(enabled ? structuredClone(defaults) : null)}
-      label="Use a search box to find more pages" hint="For sites where some pages appear only after a search. Needs a browser and Rule check (axe)." />
+      label="Use a search box to find more pages" hint={`For sites where some pages appear only after a search. ${needs}`} />
     {value && <fieldset className="ml-6 space-y-3 rounded-xs border border-border p-4">
       <legend className="px-1 text-sm font-semibold">Search settings</legend>
-      {disabled && <p role="alert" className="text-sm text-sev-major">To use search, choose axe or Both as the rule check tool, and turn off Fast scan.</p>}
+      {disabled && <p role="alert" className="text-sm text-sev-major">{disabledReason}</p>}
       <p className="text-sm text-fg-muted">Use only harmless example words. Axcess saves these settings with the report on this computer. Never enter passwords, verification codes, or personal records.</p>
       <Text label="Search page address (leave blank to use the start page)" type="url" hint="Leave this blank to search on the start page. Or enter a full address that starts with http:// or https:// and is inside the scan. Put the words to search for in the field value below." value={value.page_url} maxLength={2048} onChange={page_url => update({ page_url })} />
       {value.fields.map((item, index) => <fieldset key={index} className="space-y-2 border-t border-border pt-3">

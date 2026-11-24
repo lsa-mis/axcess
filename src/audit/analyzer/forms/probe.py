@@ -42,6 +42,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlsplit
 
+from audit import check_log
 from audit.analyzer.forms.base import (
     Attempt,
     FieldState,
@@ -697,6 +698,16 @@ class ErrorIdentificationProbe:
     _seen: set[str] = field(default_factory=set)
     _sent: int = 0
 
+    def _not_run(self, page: Any, what: str, exc: BaseException) -> None:
+        """Log, as ``check.not_run``, a step that left forms unchecked, and why."""
+        check_log.not_run(
+            "forms",
+            scope="page",
+            url=None if self.private else check_log.url_of(page),
+            protected=self.private,
+            reason=check_log.failure(what, exc, protected=self.private),
+        )
+
     async def run(self, page: Page, *, capture: Capture | None = None) -> list[FormResult]:
         """Check the page's forms. ``capture``, when given, photographs each
         form pressed, before and after the press (``FormResult.before_png``,
@@ -727,7 +738,7 @@ class ErrorIdentificationProbe:
             try:
                 await page.goto(pinned, wait_until="load", timeout=15000)
             except Exception as exc:
-                log.debug("forms.reload_failed", error_type=type(exc).__name__)
+                self._not_run(page, "Reloading the page before the next form", exc)
                 return
             # The forms just planned are this page's own: plan them again,
             # once the page has built them again.
@@ -756,7 +767,7 @@ class ErrorIdentificationProbe:
                 try:
                     await page.goto(pinned, wait_until="load", timeout=15000)
                 except Exception as exc:
-                    log.debug("forms.reload_failed", error_type=type(exc).__name__)
+                    self._not_run(page, "Reloading the page before the next form", exc)
                     return
                 await self._wait_for_forms(page, {self._key(info)})
             attempted += 1
@@ -766,7 +777,7 @@ class ErrorIdentificationProbe:
             try:
                 outcome = await self._attempt(page, frame, form_index, info, capture)
             except Exception as exc:
-                log.debug("forms.attempt_failed", error_type=type(exc).__name__)
+                self._not_run(page, "Pressing one form's submit control", exc)
                 # Counted, not dropped: shoelace.style covers its forms with
                 # an announcement dialog, the press timed out, and the form
                 # vanished from the scan's counts.
@@ -843,7 +854,7 @@ class ErrorIdentificationProbe:
             try:
                 forms = await frame.evaluate(_COLLECT_JS)
             except Exception as exc:
-                log.debug("forms.collect_failed", error_type=type(exc).__name__)
+                self._not_run(page, f"Reading the forms in frame {frame_index}", exc)
                 continue
             for form_index, info in enumerate(forms):
                 key = self._key(info)

@@ -469,6 +469,14 @@ export const RAIL_LABELS = {
 export const CLICK_THROUGH_COPY = {
   /** Replaces the switch hint while the switch is disabled. */
   unavailableStatic: "Not available with Fast scan. Opening controls needs a browser.",
-  unavailableAlfa:
-    "Choose axe or Both as the rule check tool. Axcess checks the content that opens with Rule check (axe).",
+} as const;
+
+/**
+ * Search box wording: what it needs, and why it can be unavailable. Search
+ * results are checked with whichever rule check tool the scan runs (axe,
+ * Alfa or both), in public and sign-in scans alike (2026-11-23).
+ */
+export const SEARCH_COPY = {
+  needs: "Needs a browser.",
+  unavailableStatic: "To use search, turn off Fast scan.",
 } as const;

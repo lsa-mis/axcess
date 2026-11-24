@@ -34,6 +34,7 @@ from typing import TYPE_CHECKING, Any, Self
 from urllib.parse import urlsplit
 
 from audit.analyzer.alfa import AlfaAnalyzer, AlfaResult
+from audit.analyzer.alfa_worker import AlfaWorker
 from audit.analyzer.axe import AxeAnalyzer
 from audit.analyzer.axe import Level as AxeLevel
 from audit.analyzer.focus import FocusProbe
@@ -928,6 +929,7 @@ class ManualAuthenticationSession:
         max_rendered_html_chars: int | None = None,
         shared_pages: tuple[Page, ...] = (),
         search_explorer: SearchExplorer | None = None,
+        alfa_worker: AlfaWorker | None = None,
     ) -> JsFetcher:
         """Return a fetcher that reuses this in-memory authenticated context.
 
@@ -958,6 +960,9 @@ class ManualAuthenticationSession:
             private_context=True,
             max_rendered_html_chars=max_rendered_html_chars,
             search_explorer=search_explorer,
+            # Alfa snapshots this signed-in tab like axe, so no cookie or
+            # browser state is handed to another process for Alfa.
+            alfa_worker=alfa_worker,
         )
 
     def create_authenticated_static_fetcher(self) -> AuthenticatedStaticFetcher:

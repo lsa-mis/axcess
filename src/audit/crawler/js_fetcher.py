@@ -15,6 +15,7 @@ between ``page.goto`` and ``ctx.close``.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import io
 import math
@@ -23,7 +24,11 @@ from typing import TYPE_CHECKING, Any, Self
 
 from PIL import Image, ImageDraw
 
-from audit.analyzer.axe import AxeAnalyzer, AxeViolation, Level
+from audit import check_log
+from audit.analyzer.alfa import AlfaError
+from audit.analyzer.alfa_states import AlfaPageChecks, alfa_xpath
+from audit.analyzer.alfa_worker import AlfaWorker
+from audit.analyzer.axe import AxeAnalyzer, AxeError, AxeViolation, Level
 from audit.analyzer.focus import FocusFinding, FocusProbe
 from audit.analyzer.forms import ErrorIdentificationProbe, FormFinding
 from audit.analyzer.interaction import (
@@ -116,6 +121,11 @@ async def settle_dom(
 # hundred covers the ordinary "one image per issue instance" case while
 # retaining a hard safety bound for generated or broken DOMs.
 MAX_SHOTS_PER_PAGE = 100
+# How long the screenshot pass waits for Alfa's background checks of this
+# page to finish before photographing their occurrences. The tab is held
+# meanwhile; a check not done by then leaves its occurrences without a
+# screenshot (logged), never without a result.
+ALFA_SHOT_WAIT_S = 30.0
 
 
 # Location marker geometry, in image pixels. The outline sits _MARKER_GAP_PX
@@ -243,6 +253,7 @@ class JsFetcher:
         max_rendered_html_chars: int | None = None,
         headless: bool = True,
         search_explorer: SearchExplorer | None = None,
+        alfa_worker: AlfaWorker | None = None,
     ) -> None:
         self._user_agent = user_agent
         self._viewport = viewport or _DEFAULT_VIEWPORT
@@ -251,6 +262,10 @@ class JsFetcher:
         # crawl's configured budget through unconditionally.
         self._idle_timeout_ms = _IDLE_TIMEOUT_MS if idle_timeout_ms is None else idle_timeout_ms
         self._axe_analyzer = axe_analyzer
+        # Alfa, checked like axe: a snapshot of this tab right after axe,
+        # on the same quiet page, and (through the interaction probe) in
+        # each state a click opens. Same level and WCAG version as axe.
+        self._alfa_worker = alfa_worker
         self._axe_level: Level = axe_level
         self._wcag_version: WcagVersion = wcag_version
         # SC 2.1.2 keyboard probe. When set, runs *after* the axe scan
@@ -398,6 +413,8 @@ class JsFetcher:
             owns_context = True
         page: Page | None = None
         pooled_page = False
+        alfa_checks = AlfaPageChecks() if self._alfa_worker is not None else None
+        alfa_handed_over = False
         try:
             if self.tab_pool is not None:
                 page = await self.tab_pool.acquire(primary=primary)
@@ -482,6 +499,10 @@ class JsFetcher:
             # On any axe failure the analyzer logs + returns []; one bad
             # page must never tank a 1000-page crawl.
             axe_violations: list[AxeViolation] = []
+            # None: this fetch had no axe to run. False: axe was asked and
+            # failed (logged with the reason), so the page is not counted as
+            # checked and nothing compares page states with an empty result.
+            axe_checked: bool | None = None
             if (
                 self._axe_analyzer is not None
                 and 200 <= status < 300
@@ -491,12 +512,39 @@ class JsFetcher:
                     # "Needs review" results too (axe's incomplete), stored
                     # as cant_tell and shown as Not sure: dropping them hid
                     # every element axe could not decide on.
-                    axe_violations = await self._axe_analyzer.run(
-                        page,
-                        level=self._axe_level,
-                        version=self._wcag_version,
-                        include_incomplete=True,
-                    )
+                    try:
+                        axe_violations = await self._axe_analyzer.run(
+                            page,
+                            level=self._axe_level,
+                            version=self._wcag_version,
+                            include_incomplete=True,
+                        )
+                        axe_checked = True
+                    except AxeError as exc:
+                        axe_checked = False
+                        check_log.not_run(
+                            "axe",
+                            scope="page",
+                            url=None if self._private_context else final_url,
+                            protected=self._private_context,
+                            reason=str(exc),
+                        )
+            # Alfa's snapshot of the loaded page, right after axe and on the
+            # same quiet page, so both engines judge one page state. Only the
+            # snapshot holds the tab; the rules run in the background.
+            if alfa_checks is not None and self._alfa_worker is not None:
+                if 200 <= status < 300 and "text/html" in headers.get("content-type", "text/html"):
+                    try:
+                        with live_progress.check("alfa"):
+                            alfa_checks.load = await self._alfa_worker.submit(
+                                page, level=self._axe_level, version=self._wcag_version
+                            )
+                    except AlfaError as exc:
+                        alfa_checks.load_error = str(exc)
+                else:
+                    # Not a page the checks run on; the orchestrator logs why
+                    # (``_not_checked_reason``) for every check at once.
+                    alfa_checks = None
             # Page code check, right after axe and on the same quiet page.
             # It only reads, and never raises (each rule is isolated).
             markup_findings: list[MarkupFinding] = []
@@ -570,6 +618,8 @@ class JsFetcher:
                             self._capture_element if self._capture_screenshots else None
                         ),
                         capture_styles=self._snapshot_styles,
+                        alfa_checks=alfa_checks,
+                        use_axe=axe_checked is not False,
                     )
                 interaction_evaluated = interaction.evaluated
 
@@ -636,6 +686,8 @@ class JsFetcher:
                         png = await self._capture_element(page, selector, center=True)
                         if png:
                             screenshots[th] = png
+                    if alfa_checks is not None:
+                        await self._capture_alfa(page, alfa_checks, screenshots)
                 except Exception as exc:
                     if self._private_context:
                         log.warning("screenshot.capture_failed", protected_context=True)
@@ -650,6 +702,8 @@ class JsFetcher:
                 search_result = await self._search_explorer.run(
                     page,
                     baseline=(*axe_violations, *(item.violation for item in interaction.findings)),
+                    alfa_checks=alfa_checks,
+                    use_axe=axe_checked is not False,
                 )
 
             form_findings: tuple[FormFinding, ...] = ()
@@ -689,13 +743,14 @@ class JsFetcher:
                     if r.before_png or r.after_png
                 }
 
-            return FetchResult(
+            fetched = FetchResult(
                 url=final_url,
                 status_code=status,
                 content_type=headers.get("content-type", "text/html"),
                 body=html.encode("utf-8", errors="replace"),
                 retry_after=None,
                 axe_violations=tuple(axe_violations),
+                axe_checked=axe_checked,
                 keyboard_traps=tuple(keyboard_traps),
                 responsive_findings=tuple(responsive_findings),
                 focus_findings=tuple(focus_findings),
@@ -705,6 +760,7 @@ class JsFetcher:
                 interaction_findings=interaction.findings,
                 interaction_states=interaction.states,
                 interaction_captures=interaction.captures,
+                interaction_tentative_captures=interaction.tentative_captures,
                 interaction_evaluated=interaction_evaluated,
                 interaction_controls=interaction.controls_discovered,
                 interaction_clicks_attempted=interaction.clicks_attempted,
@@ -715,6 +771,7 @@ class JsFetcher:
                 interaction_dialogs_opened=interaction.dialogs_opened,
                 interaction_dialogs_stuck=interaction.dialogs_stuck,
                 interaction_detail=interaction.detail,
+                interaction_stopped_by=interaction.stopped_by,
                 discovered_urls=tuple(
                     sorted(set(interaction.urls) | set(search_result.urls if search_result else ()))
                 ),
@@ -727,8 +784,16 @@ class JsFetcher:
                 form_screenshots=form_screenshots,
                 form_check_ran=form_check_ran,
                 form_outcomes=form_outcomes,
+                alfa_checks=alfa_checks,
             )
+            alfa_handed_over = True
+            return fetched
         finally:
+            # A fetch that failed after Alfa snapshots were taken returns no
+            # result to await them, so stop them here rather than leave them
+            # running for a page that will not be saved.
+            if alfa_checks is not None and not alfa_handed_over:
+                alfa_checks.cancel()
             # A shared authenticated context belongs to the companion, which
             # wipes it only when the scan reaches a terminal state.  Close the
             # per-page tab, never the session itself.  Public scans retain the
@@ -740,6 +805,43 @@ class JsFetcher:
             elif page is not None:
                 with contextlib.suppress(Exception):
                     await page.close()
+
+    async def _capture_alfa(
+        self, page: Page, checks: AlfaPageChecks, screenshots: dict[str, bytes]
+    ) -> None:
+        """Photograph Alfa's occurrences, as the pass above does axe's.
+
+        Alfa checks in the background, so this waits (up to
+        ``ALFA_SHOT_WAIT_S``) for this page's checks, then outlines each
+        occurrence's element, found by the XPath Alfa reports. Like axe's,
+        an element no longer shown (inside a menu the sweep closed again)
+        gets no picture.
+        """
+        tasks = checks.tasks()
+        if not tasks:
+            return
+        done, pending = await asyncio.wait(tasks, timeout=ALFA_SHOT_WAIT_S)
+        if pending:
+            log.info(
+                "alfa.screenshots_partial",
+                waited_s=ALFA_SHOT_WAIT_S,
+                checks_not_finished=len(pending),
+                **({"protected_context": True} if self._private_context else {"url": page.url}),
+            )
+        for task in tasks:
+            if task not in done or task.cancelled() or task.exception() is not None:
+                continue
+            for finding in task.result().findings:
+                if len(screenshots) >= MAX_SHOTS_PER_PAGE:
+                    return
+                if finding.target_hash in screenshots:
+                    continue
+                path = alfa_xpath(finding.target_hint)
+                if path is None:
+                    continue
+                png = await self._capture_element(page, f"xpath={path}", center=True)
+                if png:
+                    screenshots[finding.target_hash] = png
 
     async def _snapshot_styles(self, page: Page) -> StyleSnapshot | None:
         """The live page's CSS and fingerprint, sharing this crawl's sheet cache."""
@@ -811,3 +913,17 @@ class JsFetcher:
             )
         except Exception:
             return None
+
+
+def _not_checked_reason(status: int, headers: dict[str, str]) -> str | None:
+    """Why the page checks did not run on a fetched page, or ``None`` if they could.
+
+    Every browser check runs only on a successful HTML page. This is the one
+    place that says so in words, for the log and the report.
+    """
+    content_type = headers.get("content-type", "text/html")
+    if not 200 <= status < 300:
+        return f"The page answered with HTTP status {status}, not a success (200-299)."
+    if "text/html" not in content_type:
+        return f"The page is not HTML (its content type is {content_type[:80]})."
+    return None

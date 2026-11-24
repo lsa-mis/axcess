@@ -23,6 +23,7 @@ import hashlib
 import sqlite3
 from dataclasses import dataclass
 
+from audit import check_log
 from audit.analyzer.ocr.pool import OcrPool
 from audit.analyzer.vlm.base import Classification, ClassifyContext, VlmProvider
 from audit.analyzer.vlm.ollama import VlmError
@@ -93,7 +94,13 @@ async def process_page(
         try:
             downloaded = await downloader.download(ref.url)
         except ImageDownloadError as exc:
-            log.warning("extractor.download_failed", url=ref.url, error=str(exc))
+            check_log.not_run(
+                "image",
+                scope="image",
+                url=ref.url,
+                page_url=page_url,
+                reason=check_log.failure("Downloading the image", exc),
+            )
             result.errors += 1
             continue
 
@@ -189,7 +196,14 @@ async def process_page(
         try:
             classification = await task
         except VlmError as exc:
-            log.warning("vlm.classify_failed", image_id=outcome.image_id, error=str(exc))
+            check_log.not_run(
+                "vision",
+                scope="image",
+                image_id=outcome.image_id,
+                reason=check_log.failure(
+                    "The vision model's review of the image (its OCR result is kept)", exc
+                ),
+            )
             result.vlm_errors += 1
             # Fall back to the OCR-only row so we still have evidence.
             repo.upsert_analysis(
@@ -266,7 +280,12 @@ async def _ocr_image(cfg: OcrConfig, image_id: int, downloaded: DownloadedImage)
         image_bytes = cfg.blob_store.path_for(downloaded.blob_path).read_bytes()
         result = await cfg.pool.run(image_bytes)
     except Exception as exc:
-        log.warning("ocr.failed", url=downloaded.url, error=str(exc))
+        check_log.not_run(
+            "ocr",
+            scope="image",
+            url=downloaded.url,
+            reason=check_log.failure("Reading text in the image (OCR)", exc),
+        )
         return _OcrOutcome(image_id=image_id, succeeded=False)
 
     has_text = result.is_text_candidate(

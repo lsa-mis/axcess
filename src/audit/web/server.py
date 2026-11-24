@@ -65,6 +65,7 @@ from audit.ai.state import load_config as load_ai_config
 from audit.ai.state import semantic_model as ai_semantic_model
 from audit.analyzer.alfa import AlfaAnalyzer, AlfaResult, chromium_executable_path
 from audit.analyzer.alfa import availability as alfa_availability
+from audit.analyzer.alfa_worker import AlfaWorker
 from audit.analyzer.axe import AxeAnalyzer
 from audit.analyzer.focus import FocusProbe
 from audit.analyzer.forms import ErrorIdentificationProbe
@@ -352,7 +353,6 @@ class LocalLoginScanRequest(BaseModel):
                 self.search,
                 seed_url=self.seed_url,
                 whole_host=self.whole_host,
-                engine=self.scan_engine,
             )
             if refusal:
                 raise ValueError(refusal)
@@ -747,25 +747,20 @@ def _search_setup_refusal(
     *,
     seed_url: str,
     whole_host: bool,
-    engine: str,
     static_only: bool = False,
 ) -> str:
     """Return the one setting that makes a configured search unusable.
 
     Each cause has its own fix, and they are not interchangeable: an
-    out-of-scope page URL is corrected in a different box from an engine
-    choice. Returns an empty string when the setup is usable.
+    out-of-scope page URL is corrected in a different box from Fast scan.
+    Returns an empty string when the setup is usable. Alfa alone may search
+    in either scan type since 2026-11-23: it checks the crawler's own tab.
     """
 
     if static_only:
         return (
             "Search-driven pages: unavailable in static-only mode, "
             "because searching needs Axcess' browser."
-        )
-    if engine == "alfa":
-        return (
-            "Search-driven pages: needs axe-core. "
-            "Choose axe-core or both engines, or turn the search off."
         )
     if not search_url_allowed(search, seed_url, whole_host=whole_host):
         return (
@@ -1893,9 +1888,9 @@ def create_app(
             axe_level=body.axe_level,
             wcag_version=body.wcag_version,
             alfa_enabled=body.scan_engine in {"alfa", "both"},
-            interaction_checks_enabled=(
-                not body.skip_interaction and body.scan_engine in {"axe", "both"}
-            ),
+            # Click-Through runs whichever rule check tools the scan uses;
+            # both check the signed-in tab (2026-11-23).
+            interaction_checks_enabled=not body.skip_interaction,
             keyboard_probe_enabled=not body.skip_keyboard,
             responsive_checks_enabled=not body.skip_responsive,
             focus_checks_enabled=not body.skip_focus,
@@ -2185,7 +2180,6 @@ def create_app(
                 search,
                 seed_url=url,
                 whole_host=bool(body.get("whole_host")),
-                engine=requested_engine,
                 static_only=static_only,
             )
             if refusal:
@@ -4525,12 +4519,11 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
         wcag_version=form.get("wcag_version", DEFAULT_WCAG_VERSION),
         alfa_enabled=scan_engine in {"alfa", "both"},
         # DOM-state discovery operates controls in Axcess' browser and
-        # re-runs axe-core after a control reveals new content. Keep the
-        # stored config honest when either prerequisite is unavailable.
+        # re-runs the rule check tools (axe, Alfa, or both, each in the
+        # crawler's own tab) after a control reveals new content. Keep the
+        # stored config honest when the browser is unavailable.
         interaction_checks_enabled=(
-            not bool(form.get("skip_interaction"))
-            and not bool(form.get("static_only"))
-            and scan_engine in {"axe", "both"}
+            not bool(form.get("skip_interaction")) and not bool(form.get("static_only"))
         ),
         # Per-criterion semantic analyzers (Phase 9+). Opt-out like axe;
         # the wiring to the runner lands in Phase 9.1, for now this
@@ -4692,6 +4685,7 @@ async def _run_local_login_background(
 
     conn: sqlite3.Connection | None = None
     tab_pool: TabPool | None = None
+    login_alfa: AlfaWorker | None = None
     # Used only for the optional loopback model provider (the AI review and
     # the visual check's vision model); browser_only or the authenticated
     # static fetcher keeps it from fetching protected documents.
@@ -4741,21 +4735,35 @@ async def _run_local_login_background(
         login_axe = (
             AxeAnalyzer.from_bundled(suppress_diagnostics=True) if config.axe_enabled else None
         )
+        # Alfa checks the signed-in tab, as in a public scan: a snapshot at
+        # load and in each state Click-Through or site search opens, checked
+        # by one local worker. Pages read without scripts keep the signed-in
+        # separate capture (authenticated_alfa below).
+        login_alfa = (
+            AlfaWorker(
+                evaluate_timeout_s=config.alfa_timeout_s,
+                chromium_path=await chromium_executable_path(),
+                private=True,
+            )
+            if config.alfa_enabled
+            else None
+        )
         login_interaction: InteractionProbe | None = None
         if config.interaction_checks_enabled:
-            if login_axe is None:
+            if login_axe is None and login_alfa is None:
                 get_logger(__name__).info(
                     "interaction.unavailable",
-                    reason="axe_engine_not_selected",
+                    reason="no_rule_check_tool",
                     hint=(
-                        f"{CLICK_THROUGH} re-runs axe on each state a control "
-                        "reveals. Choose an engine that includes axe-core to "
-                        f"test {CLICK_THROUGH_STATES}."
+                        f"{CLICK_THROUGH} runs the rule check tools on each state a "
+                        f"control reveals. Choose axe, Alfa or both to test "
+                        f"{CLICK_THROUGH_STATES}."
                     ),
                 )
             else:
                 login_interaction = InteractionProbe(
                     axe=login_axe,
+                    alfa=login_alfa,
                     level=config.axe_level,  # type: ignore[arg-type]
                     version=config.wcag_version,
                     max_clicks=config.interaction_max_clicks,
@@ -4817,7 +4825,8 @@ async def _run_local_login_background(
             # does and has to be handed the value explicitly.
             capture_screenshots=config.capture_screenshots,
             shared_pages=scan_pages,
-            search_explorer=build_search_explorer(config, login_axe),
+            search_explorer=build_search_explorer(config, login_axe, login_alfa),
+            alfa_worker=login_alfa,
         )
         tab_pool = fetcher.tab_pool
         run.status = "scanning"
@@ -4887,6 +4896,9 @@ async def _run_local_login_background(
             conn.close()
         if tab_pool is not None and tab_pool.fell_back:
             _record_scan_note(db_path, run.scan_id, tab_fallback_note(tab_pool.size))
+        if login_alfa is not None:
+            with contextlib.suppress(Exception):
+                await login_alfa.close()
         await run.session.close()
 
 
@@ -5384,6 +5396,21 @@ def _detect_blocked_scan(
     }
 
 
+def _state_rule_checks(cfg: Mapping[str, Any]) -> str:
+    """Which rule check tools Click-Through ran on each page state, in words.
+
+    Alfa checks page states only when it took its snapshots in the
+    crawler's own tab (``alfa_capture``); before 2026-11-23 it never did.
+    """
+    axe = cfg.get("axe_enabled", True) is not False
+    alfa = bool(cfg.get("alfa_enabled")) and cfg.get("alfa_capture") == "crawler_tab"
+    if axe and alfa:
+        return "the rule checks (axe and Alfa)"
+    if alfa:
+        return "the rule check (Alfa)"
+    return "the rule check (axe)"
+
+
 def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[str, Any]]:
     """Describe configured methods and the evidence that they actually ran.
 
@@ -5556,8 +5583,8 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
             "coverage_known": interaction_pages > 0
             or int(cfg.get("interaction_coverage_version") or 0) >= 1,
             "description": (
-                "Opens menus, tabs and dialogs, then runs the rule check (axe) "
-                f"on each {CLICK_THROUGH_STATE}."
+                "Opens menus, tabs and dialogs, then runs "
+                f"{_state_rule_checks(cfg)} on each {CLICK_THROUGH_STATE}."
             ),
             # One sentence, as every limit in the report's "What was checked"
             # table; the website's card for this check has the rest (safety

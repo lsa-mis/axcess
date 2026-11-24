@@ -27,6 +27,7 @@ import httpx
 import structlog
 from selectolax.parser import HTMLParser
 
+from audit import check_log
 from audit.ai.model_client import Backend, ModelEndpoint, open_model_http_client
 from audit.analyzer.alfa import (
     AlfaAnalyzer,
@@ -36,6 +37,9 @@ from audit.analyzer.alfa import (
     chromium_executable_path,
 )
 from audit.analyzer.alfa import availability as alfa_availability
+from audit.analyzer.alfa_states import AlfaPageOutcome
+from audit.analyzer.alfa_states import settle as settle_alfa
+from audit.analyzer.alfa_worker import AlfaWorker
 from audit.analyzer.axe import AxeAnalyzer, AxeViolation, bundled_axe_version
 from audit.analyzer.axe import Level as AxeLevel
 from audit.analyzer.focus import FocusFinding, FocusProbe
@@ -425,6 +429,8 @@ class CrawlSummary:
     alfa_pages_scanned: int = 0
     alfa_failed_total: int = 0
     alfa_cant_tell_total: int = 0
+    # Page states a click opened that Alfa checked in the crawler's tab.
+    alfa_states_checked: int = 0
     keyboard_pages_probed: int = 0
     keyboard_traps_total: int = 0
     responsive_pages_probed: int = 0
@@ -595,17 +601,32 @@ async def run_crawl(
             log.warning("crawl.axe_disabled_missing_bundle", error=str(exc))
             summary.notes.append("Axe scan disabled: bundle missing.")
             axe_analyzer = None
+    alfa_worker: AlfaWorker | None = None
     if config.alfa_enabled:
         state = alfa_availability()
         if not state.available:
             # A selected engine must never quietly become a clean result.
             raise RuntimeError(state.reason or "Siteimprove Alfa is unavailable.")
+        chromium_path = await chromium_executable_path()
+        # Pages opened in the crawler's browser: Alfa checks the crawler's
+        # own tab, at load and in each state Click-Through opens, like axe
+        # (alfa_worker). A caller that injects its own JsFetcher brings its
+        # own worker (the sign-in scan does, in server.py) or none (a test);
+        # without one its pages keep the separate capture below.
+        if config.js_enabled and js_fetcher is None:
+            alfa_worker = AlfaWorker(
+                evaluate_timeout_s=config.alfa_timeout_s,
+                chromium_path=chromium_path,
+            )
+        # Pages read without a browser (Fast scan, or a page whose browser
+        # load fell back): Alfa still needs one, so it opens its own and
+        # checks the page as it loads.
         if alfa_analyzer is None:
             alfa_analyzer = AlfaAnalyzer(
                 user_agent=config.user_agent,
                 timeout_s=config.alfa_timeout_s,
                 concurrency=config.alfa_concurrency,
-                chromium_path=await chromium_executable_path(),
+                chromium_path=chromium_path,
             )
     else:
         alfa_analyzer = None
@@ -648,9 +669,12 @@ async def run_crawl(
     # Interaction probe, opt-in. Shares the crawl's single AxeAnalyzer so
     # axe is injected once per page whether or not this probe runs.
     interaction_probe: InteractionProbe | None = None
-    if config.interaction_checks_enabled and axe_analyzer is not None:
+    # Runs with axe, with Alfa in the crawler's tab, or both: each state a
+    # click opens is checked by whichever rule check tools the scan runs.
+    if config.interaction_checks_enabled and (axe_analyzer is not None or alfa_worker is not None):
         interaction_probe = InteractionProbe(
             axe=axe_analyzer,
+            alfa=alfa_worker,
             level=axe_level,
             version=wcag_version,
             max_clicks=config.interaction_max_clicks,
@@ -686,8 +710,9 @@ async def run_crawl(
             form_error_probe=form_error_probe,
             capture_screenshots=config.capture_screenshots,
             headless=config.browser_headless,
-            search_explorer=build_search_explorer(config, axe_analyzer),
+            search_explorer=build_search_explorer(config, axe_analyzer, alfa_worker),
             idle_timeout_ms=config.js_idle_timeout_ms,
+            alfa_worker=alfa_worker,
         )
     # Phase 9+: build the semantic analyzer list once per crawl. The
     # provider holds the shared Ollama semaphore so per-page analyzers
@@ -718,11 +743,26 @@ async def run_crawl(
         semantic_analyzers=semantic_analyzers,
         linked_files=(
             LinkedFileTracker(
-                conn, scan_id=scan_id, scope=scope, allow_subdomains=config.allow_subdomains
+                conn,
+                scan_id=scan_id,
+                scope=scope,
+                allow_subdomains=config.allow_subdomains,
+                protected=config.browser_only,
             )
             if _linked_files_on(config)
             else None
         ),
+    )
+    _log_check_plan(
+        config,
+        axe=axe_analyzer is not None,
+        alfa_in_tab=alfa_worker is not None,
+        interaction=interaction_probe is not None,
+        ocr=ocr_config is not None,
+        vlm=vlm_config is not None,
+        reading_order=visual_probe is not None and visual_probe.provider is not None,
+        semantic=bool(semantic_analyzers),
+        documents=ctx.linked_files is not None,
     )
 
     interrupted = False
@@ -806,6 +846,9 @@ async def run_crawl(
         if js_holder is not None:
             with contextlib.suppress(Exception):
                 await js_holder.shutdown()
+        if alfa_worker is not None:
+            with contextlib.suppress(Exception):
+                await alfa_worker.close()
         if owned_client:
             with contextlib.suppress(Exception):
                 await client.aclose()
@@ -1020,6 +1063,14 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             "alfa_enabled": config.alfa_enabled,
             "alfa_timeout_s": config.alfa_timeout_s,
             "alfa_concurrency": config.alfa_concurrency,
+            # Where Alfa took its snapshots. "crawler_tab": in the crawler's
+            # own tab, right after axe, and in the page states Click-Through
+            # opened (public scans and sign-in scans alike since 2026-11-23).
+            # "separate_browser": its own browser, at page load only (every
+            # scan before then, and any page read without the browser).
+            "alfa_capture": (
+                "crawler_tab" if config.alfa_enabled and config.js_enabled else "separate_browser"
+            ),
             "semantic_enabled": config.semantic_enabled,
             "keyboard_probe_enabled": config.keyboard_probe_enabled,
             "responsive_checks_enabled": config.responsive_checks_enabled,
@@ -1185,8 +1236,10 @@ class _LazyJs:
         headless: bool = True,
         search_explorer: SearchExplorer | None = None,
         idle_timeout_ms: int | None = None,
+        alfa_worker: AlfaWorker | None = None,
     ) -> None:
         self._user_agent = user_agent
+        self._alfa_worker = alfa_worker
         self._fetcher: JsFetcher | None = injected
         self._owned = injected is None
         self._axe_analyzer = axe_analyzer
@@ -1222,6 +1275,7 @@ class _LazyJs:
                 headless=self._headless,
                 search_explorer=self._search_explorer,
                 idle_timeout_ms=self._idle_timeout_ms,
+                alfa_worker=self._alfa_worker,
             )
             await fetcher.__aenter__()
             self._fetcher = fetcher
@@ -1244,11 +1298,16 @@ class _LazyJs:
             self._fetcher = None
 
 
-def build_search_explorer(config: CrawlConfig, axe: AxeAnalyzer | None) -> SearchExplorer | None:
+def build_search_explorer(
+    config: CrawlConfig, axe: AxeAnalyzer | None, alfa: AlfaWorker | None = None
+) -> SearchExplorer | None:
     if config.search is None:
         return None
-    if axe is None or not config.js_enabled or not config.js_eager:
-        raise ValueError("Configured searches require browser rendering and axe-core.")
+    if (axe is None and alfa is None) or not config.js_enabled or not config.js_eager:
+        raise ValueError(
+            "Configured searches require browser rendering and a rule check tool "
+            "(axe or Alfa) that checks the crawler's own tab."
+        )
     if not search_url_allowed(config.search, config.seed_url, whole_host=config.whole_host):
         raise ValueError("Search page must be inside the scan scope.")
     scope = url_policy.build_scope(config.seed_url, whole_host=config.whole_host)
@@ -1274,6 +1333,7 @@ def build_search_explorer(config: CrawlConfig, axe: AxeAnalyzer | None) -> Searc
         axe=axe,
         level=config.axe_level,  # type: ignore[arg-type]
         version=config.wcag_version,
+        alfa=alfa,
     )
 
 
@@ -1511,7 +1571,7 @@ def _tracked_checks(ctx: _WorkerContext) -> list[str]:
             checks.append("keyboard")
         if config.responsive_checks_enabled:
             checks.append("responsive")
-        if config.interaction_checks_enabled and config.axe_enabled:
+        if config.interaction_checks_enabled and (config.axe_enabled or config.alfa_enabled):
             checks.append("interaction")
     if ctx.alfa is not None:
         checks.append("alfa")
@@ -1524,6 +1584,245 @@ def _tracked_checks(ctx: _WorkerContext) -> list[str]:
     if ctx.linked_files is not None:
         checks.append("documents")
     return checks
+
+
+def _log_check_plan(
+    config: CrawlConfig,
+    *,
+    axe: bool,
+    alfa_in_tab: bool,
+    interaction: bool,
+    ocr: bool,
+    vlm: bool,
+    reading_order: bool,
+    semantic: bool,
+    documents: bool,
+) -> None:
+    """At scan start, log each check that will not run in this scan, and why.
+
+    One ``check.not_run`` line with ``scope=scan`` per check: ``info`` when
+    the person turned it off, ``warning`` when it was chosen but cannot run
+    (a missing model, a missing file). Then one ``check.plan`` line naming
+    what will run. Page-level reasons are logged as each page is saved.
+    """
+    protected = config.browser_only
+    browser = config.js_enabled
+
+    def off(check: str, reason: str = "Turned off in this scan's settings.") -> None:
+        check_log.not_run(check, scope="scan", reason=reason, protected=protected, chosen=True)
+
+    def broken(check: str, reason: str, **extra: Any) -> None:
+        check_log.not_run(check, scope="scan", reason=reason, protected=protected, **extra)
+
+    no_browser = "Needs the browser, and this scan does not open pages in one."
+    runs: list[str] = []
+    if not config.axe_enabled:
+        off("axe", "Not chosen as the rule check tool.")
+    elif not browser:
+        broken("axe", no_browser)
+    elif not axe:
+        broken("axe", "The bundled axe-core script is missing, so axe cannot run.")
+    else:
+        runs.append("axe")
+    if not config.alfa_enabled:
+        off("alfa", "Not chosen as the rule check tool.")
+    else:
+        runs.append("alfa")
+        log.info(
+            "check.plan_alfa",
+            capture="crawler_tab" if alfa_in_tab else "separate_browser",
+            reason=(
+                "Alfa checks the crawler's own tab, at load and in each page state "
+                "Click-Through or site search opens."
+                if alfa_in_tab
+                else "Alfa opens its own browser and checks each page as it loads only, "
+                "so it checks no page state a click opens."
+            ),
+        )
+    for check, enabled in (
+        ("markup", config.markup_checks_enabled),
+        ("keyboard", config.keyboard_probe_enabled),
+        ("focus", config.focus_checks_enabled),
+        ("responsive", config.responsive_checks_enabled),
+        ("forms", config.form_error_checks_enabled),
+    ):
+        if not enabled:
+            off(check)
+        elif not browser:
+            broken(check, no_browser)
+        else:
+            runs.append(check)
+    if not config.interaction_checks_enabled:
+        off("interaction")
+    elif not browser:
+        broken("interaction", no_browser)
+    elif not interaction:
+        broken(
+            "interaction",
+            "Click-Through needs a rule check tool (axe or Alfa), and this scan has none.",
+        )
+    else:
+        runs.append("interaction")
+    if not config.visual_checks_enabled:
+        off("visual")
+    elif not browser:
+        broken("visual", no_browser)
+    else:
+        runs.append("visual")
+        if not reading_order:
+            broken(
+                "visual",
+                "The visual reading order part needs the vision model, which is turned off "
+                "or not reachable; the motion part still runs.",
+                part="reading_order",
+            )
+    if not config.image_extraction_enabled:
+        off("image")
+    else:
+        runs.append("image")
+        if not config.ocr_enabled:
+            off("ocr")
+        elif not ocr:
+            broken("ocr", "The text-in-images reader (OCR) could not be set up.")
+        if not config.vlm_enabled:
+            off("vision", "The vision model check is turned off.")
+        elif not vlm:
+            broken(
+                "vision",
+                "The vision model is not reachable, or its model is not installed, so images "
+                "are not compared with their alt text by the model.",
+            )
+    if not config.semantic_enabled:
+        off("semantic")
+    elif not semantic:
+        broken(
+            "semantic",
+            "The AI wording review's model service is not reachable or its model is not installed.",
+        )
+    else:
+        runs.append("semantic")
+    if not config.linked_files_enabled:
+        off("documents")
+    elif not documents:
+        broken("documents", "The document check is not available for this kind of scan.")
+    else:
+        runs.append("documents")
+    log.info("check.plan", runs=runs, protected_context=protected or None)
+
+
+# Checks that need the page open in the crawler's browser, by report key.
+_BROWSER_CHECKS = (
+    "axe",
+    "markup",
+    "keyboard",
+    "focus",
+    "responsive",
+    "visual",
+    "forms",
+    "interaction",
+)
+
+
+def _browser_checks_on(ctx: _WorkerContext) -> list[str]:
+    """The browser checks this scan runs, by report key."""
+    config = ctx.config
+    on = {
+        "axe": config.axe_enabled,
+        "markup": config.markup_checks_enabled,
+        "keyboard": config.keyboard_probe_enabled,
+        "focus": config.focus_checks_enabled,
+        "responsive": config.responsive_checks_enabled,
+        "visual": config.visual_checks_enabled,
+        "forms": config.form_error_checks_enabled,
+        "interaction": config.interaction_checks_enabled
+        and (config.axe_enabled or config.alfa_enabled),
+    }
+    return [check for check in _BROWSER_CHECKS if on[check]]
+
+
+def _log_page_checks_not_run(
+    ctx: _WorkerContext,
+    url: str,
+    result: FetchResult,
+    *,
+    render_mode: str,
+    browser_failure: str | None,
+) -> None:
+    """Log each check that will not run on this saved page, and why.
+
+    Three page-level causes, each one line per check so the log can be
+    searched by check: the page did not answer with a success; it is HTML
+    but was read without the browser, so no browser check ran; or Click-
+    Through started but could not finish. A non-HTML answer (a PDF, an
+    image) is a linked file, not a page, and is left to the document check.
+    """
+    if not result.is_html:
+        return
+    if not result.is_ok:
+        log_check_not_run(
+            ctx,
+            "page_checks",
+            url=url,
+            scope="page",
+            reason=(
+                f"The page answered with HTTP status {result.status_code}, not a "
+                "success, so no check ran on it."
+            ),
+        )
+        return
+    if ctx.js is None:
+        return
+    if render_mode != "js":
+        checks = _browser_checks_on(ctx)
+        if not checks:
+            return
+        if browser_failure:
+            reason = (
+                "The page could not be opened in the browser, so it was read as plain HTML "
+                f"and no browser check ran on it. Browser error: {browser_failure}"
+            )
+        else:
+            reason = (
+                "Fast scan read this page as plain HTML without the browser (it did not need "
+                "scripts), so no browser check ran on it."
+                if not ctx.config.js_eager
+                else "The page was read as plain HTML without the browser, so no browser "
+                "check ran on it."
+            )
+        # One line for the page, naming every browser check it did not get.
+        log_check_not_run(
+            ctx,
+            "browser_checks",
+            url=url,
+            scope="page",
+            reason=reason,
+            checks=checks,
+            chosen=not browser_failure and not ctx.config.js_eager,
+        )
+        return
+    if "interaction" in _browser_checks_on(ctx):
+        if not result.interaction_evaluated:
+            log_check_not_run(
+                ctx,
+                "interaction",
+                url=url,
+                scope="page",
+                reason=(
+                    "Click-Through could not start its safety guard (the part that stops "
+                    "it sending forms or leaving the site), so it pressed nothing on this page."
+                ),
+            )
+        elif result.interaction_stopped_by:
+            log_check_not_run(
+                ctx,
+                "interaction",
+                url=url,
+                scope="page",
+                reason=(
+                    "Click-Through stopped early on this page because of an error "
+                    f"({result.interaction_stopped_by}). What it opened before then is kept."
+                ),
+            )
 
 
 def _page_limit_reached(ctx: _WorkerContext, *, taken: int = 0) -> bool:
@@ -1562,6 +1861,9 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
     # Logged before the fetch, not after, so the order pages are *visited* is
     # recoverable even when a later one fails or the process dies.
     log.info("crawl.navigating", url=url, depth=depth)
+    # Why the browser could not open this page, for the log line that says
+    # which browser checks did not run on it.
+    browser_failure: str | None = None
 
     if ctx.js is not None and _renders_without_static_fetch(ctx, url):
         # One fetch, in the browser. The escalation below would otherwise
@@ -1584,6 +1886,7 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
             # always had a static result to keep when the browser failed,
             # and a degraded page beats no page at all.
             log.warning("crawl.js_fetch_failed", url=url, error=str(exc))
+            browser_failure = str(exc)
             async with ctx.limiter.throttle(url):
                 try:
                     result = await ctx.static.fetch(url)
@@ -1645,12 +1948,16 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
             if ctx.js.browser_closed:
                 raise
             log.warning("crawl.js_fetch_failed", url=url, error=str(exc))
+            browser_failure = str(exc)
 
     page_id = _record_page(
         ctx, url, status_code=result.status_code, result=result, render_mode=render_mode
     )
     ctx.summary.pages_fetched += 1
     ctx.unfetched.discard(job.id)
+    _log_page_checks_not_run(
+        ctx, url, result, render_mode=render_mode, browser_failure=browser_failure
+    )
     if result.search_result is not None and page_id is not None:
         repo.record_search_run(
             ctx.conn, scan_id=ctx.scan_id, page_id=page_id, outcome=result.search_result.outcome
@@ -1738,7 +2045,10 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
         # never scanned this page." JsFetcher always returns a tuple after
         # a successful axe run, so the proxy here is `render_mode == "js"`
         # AND axe was on.
-        if render_mode == "js" and ctx.config.axe_enabled:
+        # A page axe failed on (result.axe_checked is False) is not counted
+        # as checked: an empty result there is not "nothing found". The
+        # fetcher logged the reason.
+        if render_mode == "js" and ctx.config.axe_enabled and result.axe_checked is not False:
             _persist_axe(
                 ctx,
                 page_id=page_id,
@@ -1746,11 +2056,27 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
                 screenshots=result.screenshots,
             )
 
-        # Alfa is a distinct ACT-rule engine, not an axe wrapper. It makes
-        # its own local browser capture of this already in-scope URL; capture
-        # details and outcome type are retained on each row so the report can
-        # never suggest both engines observed one identical DOM snapshot.
-        if ctx.alfa is not None:
+        # Alfa is a distinct ACT-rule engine, not an axe wrapper. A page
+        # opened in the crawler's browser was snapshotted in that tab, at
+        # load and in each state Click-Through opened, like axe
+        # (``result.alfa_checks``); those checks finish here. A page read
+        # without a browser gets Alfa's own capture of the URL instead.
+        # States Alfa first saw an occurrence in: their tentative captures
+        # are kept with the page's states below, so the inspector can show
+        # an occurrence only Alfa found in the state it exists in.
+        alfa_state_keys: set[str] = set()
+        if result.alfa_checks is not None:
+            with live_progress.check("alfa"):
+                alfa_outcome = await settle_alfa(result.alfa_checks)
+            alfa_state_keys = {item.state_key for item in alfa_outcome.revealed if item.state_key}
+            _persist_alfa_outcome(
+                ctx,
+                page_id=page_id,
+                url=result.url,
+                outcome=alfa_outcome,
+                screenshots=result.screenshots,
+            )
+        elif ctx.alfa is not None:
             try:
                 with live_progress.check("alfa"):
                     alfa_result = await ctx.alfa.run(
@@ -1770,7 +2096,7 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
                         "see source rule links for follow-up.",
                     )
             except AlfaError as exc:
-                log.warning("alfa.page_failed", url=result.url, error=str(exc))
+                log_check_not_run(ctx, "alfa", url=result.url, reason=str(exc), scope="page")
                 _add_note_once(
                     ctx.summary,
                     "Alfa could not evaluate one or more pages; its coverage counts "
@@ -1859,7 +2185,11 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
                 screenshots=result.screenshots,
                 # A tuple, never None: this pass owns the page's states, and an
                 # empty one legitimately means it captured none this time.
-                captures=result.interaction_captures,
+                captures=_states_to_keep(
+                    result.interaction_captures,
+                    result.interaction_tentative_captures,
+                    alfa_state_keys,
+                ),
             )
             # The per-page ledger is written even when the sweep produced no
             # findings: "37 of 52 controls operated, stopped by the click
@@ -2457,6 +2787,7 @@ def _persist_alfa(
     findings: tuple[AlfaFinding, ...],
     failed_total: int,
     cant_tell_total: int,
+    screenshots: Mapping[str, bytes] | None = None,
 ) -> None:
     """Write retained Alfa evidence and record the engine's true outcome totals.
 
@@ -2482,6 +2813,7 @@ def _persist_alfa(
                 target_hash=finding.target_hash,
                 engine_outcome=finding.outcome,
                 engine_evidence_json=finding.evidence_json,
+                screenshot_hash=_store_screenshot(ctx, finding.target_hash, screenshots or {}),
             )
         except sqlite3.Error as exc:
             log.warning(
@@ -2500,6 +2832,158 @@ def _persist_alfa(
     ctx.summary.alfa_pages_scanned += 1
     ctx.summary.alfa_failed_total += failed_total
     ctx.summary.alfa_cant_tell_total += cant_tell_total
+
+
+def _states_to_keep(
+    captures: tuple[StateCapture, ...],
+    tentative: tuple[StateCapture, ...],
+    alfa_state_keys: set[str],
+) -> tuple[StateCapture, ...]:
+    """The page states to save: axe's, plus the tentative ones Alfa needs.
+
+    A tentative capture was taken because Alfa was checking that state in
+    the background; it is kept only when Alfa first saw an occurrence there.
+    The rest are dropped, unsaved, so a state nothing points to is never
+    stored. Axe's own capture wins when both exist for one state.
+    """
+    kept = {capture.state_key for capture in captures}
+    extra = tuple(
+        capture
+        for capture in tentative
+        if capture.state_key in alfa_state_keys and capture.state_key not in kept
+    )
+    return (*captures, *extra)
+
+
+def _persist_alfa_outcome(
+    ctx: _WorkerContext,
+    *,
+    page_id: int,
+    url: str,
+    outcome: AlfaPageOutcome,
+    screenshots: Mapping[str, bytes] | None = None,
+) -> None:
+    """Save one page's Alfa checks from the crawler's tab, and say what did not run.
+
+    The load result counts the page as checked, as before. Occurrences first
+    seen in a page state a click opened are saved with that control, as
+    Click-Through saves axe's (``revealed_by``), and added to the Alfa
+    totals without counting the page again.
+    """
+    if outcome.load is None:
+        log_check_not_run(
+            ctx,
+            "alfa",
+            url=url,
+            reason=outcome.load_error or "Alfa returned no result.",
+            scope="page",
+        )
+        _add_note_once(
+            ctx.summary,
+            "Alfa could not evaluate one or more pages; its coverage counts "
+            "show only completed Alfa captures.",
+        )
+    else:
+        _persist_alfa(
+            ctx,
+            page_id=page_id,
+            findings=outcome.load.findings,
+            failed_total=outcome.load.failed_total,
+            cant_tell_total=outcome.load.cant_tell_total,
+            screenshots=screenshots,
+        )
+        if outcome.load.truncated:
+            _add_note_once(
+                ctx.summary,
+                "Alfa capped page-level evidence at 200 actionable outcomes; "
+                "see source rule links for follow-up.",
+            )
+    for revealed in outcome.revealed:
+        finding = revealed.finding
+        try:
+            repo.upsert_alfa_finding(
+                ctx.conn,
+                page_id=page_id,
+                scan_id=ctx.scan_id,
+                rule_id=finding.rule_id,
+                wcag_sc=finding.wcag_sc,
+                wcag_scs=finding.wcag_scs,
+                wcag_level=finding.wcag_level,
+                help=finding.help,
+                help_url=finding.rule_uri,
+                target_selector=finding.target_hint,
+                failure_summary=finding.failure_summary,
+                html_snippet=finding.target_hint,
+                target_hash=finding.target_hash,
+                engine_outcome=finding.outcome,
+                engine_evidence_json=finding.evidence_json,
+                revealed_by=revealed.revealed_by,
+                revealed_state_key=revealed.state_key or None,
+                screenshot_hash=_store_screenshot(ctx, finding.target_hash, screenshots or {}),
+            )
+        except sqlite3.Error as exc:
+            log.warning(
+                "alfa.persist_failed", rule_id=finding.rule_id, page_id=page_id, error=str(exc)
+            )
+    if outcome.revealed:
+        repo.increment_scan_alfa_counters(
+            ctx.conn,
+            scan_id=ctx.scan_id,
+            pages_delta=0,
+            failed_delta=outcome.revealed_failed,
+            cant_tell_delta=outcome.revealed_cant_tell,
+        )
+        ctx.summary.alfa_failed_total += outcome.revealed_failed
+        ctx.summary.alfa_cant_tell_total += outcome.revealed_cant_tell
+    ctx.summary.alfa_states_checked += outcome.states_checked
+    if outcome.states_checked or outcome.revealed:
+        log.info(
+            "alfa.page_states",
+            **_page_fields(ctx, url),
+            states_checked=outcome.states_checked,
+            states_not_checked=len(outcome.state_errors),
+            revealed=len(outcome.revealed),
+        )
+    for reason in dict.fromkeys(outcome.state_errors):
+        log_check_not_run(
+            ctx,
+            "alfa",
+            url=url,
+            reason=reason,
+            scope="page_state",
+            count=outcome.state_errors.count(reason),
+        )
+    if outcome.state_errors:
+        _add_note_once(
+            ctx.summary,
+            "Alfa could not check some page states that Click-Through opened; "
+            "the log says why for each page.",
+        )
+
+
+def log_check_not_run(
+    ctx: _WorkerContext,
+    check: str,
+    *,
+    reason: str,
+    scope: check_log.Scope,
+    url: str | None = None,
+    **extra: Any,
+) -> None:
+    """``check_log.not_run`` with this scan's privacy setting."""
+    check_log.not_run(
+        check,
+        reason=reason,
+        scope=scope,
+        url=url,
+        protected=ctx.config.browser_only,
+        **extra,
+    )
+
+
+def _page_fields(ctx: _WorkerContext, url: str) -> dict[str, Any]:
+    """The page's address for a log line, or the sign-in marker instead."""
+    return {"protected_context": True} if ctx.config.browser_only else {"url": url}
 
 
 def _add_note_once(summary: CrawlSummary, note: str) -> None:
