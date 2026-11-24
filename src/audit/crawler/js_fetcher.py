@@ -15,6 +15,7 @@ between ``page.goto`` and ``ctx.close``.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import io
 import math
@@ -25,7 +26,7 @@ from PIL import Image, ImageDraw
 
 from audit import check_log
 from audit.analyzer.alfa import AlfaError
-from audit.analyzer.alfa_states import AlfaPageChecks
+from audit.analyzer.alfa_states import AlfaPageChecks, alfa_xpath
 from audit.analyzer.alfa_worker import AlfaWorker
 from audit.analyzer.axe import AxeAnalyzer, AxeError, AxeViolation, Level
 from audit.analyzer.focus import FocusFinding, FocusProbe
@@ -120,6 +121,11 @@ async def settle_dom(
 # hundred covers the ordinary "one image per issue instance" case while
 # retaining a hard safety bound for generated or broken DOMs.
 MAX_SHOTS_PER_PAGE = 100
+# How long the screenshot pass waits for Alfa's background checks of this
+# page to finish before photographing their occurrences. The tab is held
+# meanwhile; a check not done by then leaves its occurrences without a
+# screenshot (logged), never without a result.
+ALFA_SHOT_WAIT_S = 30.0
 
 
 # Location marker geometry, in image pixels. The outline sits _MARKER_GAP_PX
@@ -680,6 +686,8 @@ class JsFetcher:
                         png = await self._capture_element(page, selector, center=True)
                         if png:
                             screenshots[th] = png
+                    if alfa_checks is not None:
+                        await self._capture_alfa(page, alfa_checks, screenshots)
                 except Exception as exc:
                     if self._private_context:
                         log.warning("screenshot.capture_failed", protected_context=True)
@@ -796,6 +804,43 @@ class JsFetcher:
             elif page is not None:
                 with contextlib.suppress(Exception):
                     await page.close()
+
+    async def _capture_alfa(
+        self, page: Page, checks: AlfaPageChecks, screenshots: dict[str, bytes]
+    ) -> None:
+        """Photograph Alfa's occurrences, as the pass above does axe's.
+
+        Alfa checks in the background, so this waits (up to
+        ``ALFA_SHOT_WAIT_S``) for this page's checks, then outlines each
+        occurrence's element, found by the XPath Alfa reports. Like axe's,
+        an element no longer shown (inside a menu the sweep closed again)
+        gets no picture.
+        """
+        tasks = checks.tasks()
+        if not tasks:
+            return
+        done, pending = await asyncio.wait(tasks, timeout=ALFA_SHOT_WAIT_S)
+        if pending:
+            log.info(
+                "alfa.screenshots_partial",
+                waited_s=ALFA_SHOT_WAIT_S,
+                checks_not_finished=len(pending),
+                **({"protected_context": True} if self._private_context else {"url": page.url}),
+            )
+        for task in tasks:
+            if task not in done or task.cancelled() or task.exception() is not None:
+                continue
+            for finding in task.result().findings:
+                if len(screenshots) >= MAX_SHOTS_PER_PAGE:
+                    return
+                if finding.target_hash in screenshots:
+                    continue
+                path = alfa_xpath(finding.target_hint)
+                if path is None:
+                    continue
+                png = await self._capture_element(page, f"xpath={path}", center=True)
+                if png:
+                    screenshots[finding.target_hash] = png
 
     async def _snapshot_styles(self, page: Page) -> StyleSnapshot | None:
         """The live page's CSS and fingerprint, sharing this crawl's sheet cache."""

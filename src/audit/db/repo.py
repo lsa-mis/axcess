@@ -1339,6 +1339,7 @@ def upsert_alfa_finding(
     engine_evidence_json: str,
     revealed_by: str | None = None,
     revealed_state_key: str | None = None,
+    screenshot_hash: str | None = None,
 ) -> int:
     """Idempotently persist a Siteimprove Alfa actionable ACT outcome.
 
@@ -1358,9 +1359,10 @@ def upsert_alfa_finding(
             page_id, scan_id, rule_id, wcag_sc, wcag_scs, wcag_level,
             impact, help, help_url, target_selector, failure_summary,
             html_snippet, target_hash, pipeline, criterion_sc,
-            engine_outcome, engine_evidence_json, revealed_by, revealed_state_key
+            engine_outcome, engine_evidence_json, revealed_by, revealed_state_key,
+            screenshot_hash
         )
-        VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, 'alfa', ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, 'alfa', ?, ?, ?, ?, ?, ?)
         ON CONFLICT(page_id, rule_id, target_hash) DO UPDATE SET
             scan_id = excluded.scan_id,
             wcag_sc = excluded.wcag_sc,
@@ -1374,6 +1376,7 @@ def upsert_alfa_finding(
             criterion_sc = excluded.criterion_sc,
             engine_outcome = excluded.engine_outcome,
             engine_evidence_json = excluded.engine_evidence_json,
+            screenshot_hash = excluded.screenshot_hash,
             updated_at = CURRENT_TIMESTAMP
         """,
         (
@@ -1394,6 +1397,7 @@ def upsert_alfa_finding(
             engine_evidence_json,
             revealed_by,
             revealed_state_key,
+            screenshot_hash,
         ),
     )
     row = conn.execute(

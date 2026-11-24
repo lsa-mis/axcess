@@ -17,6 +17,8 @@ can say why rather than show a gap.
 from __future__ import annotations
 
 import asyncio
+import json
+import re
 from dataclasses import dataclass, field
 
 from audit.analyzer.alfa import AlfaError, AlfaFinding, AlfaResult
@@ -130,6 +132,28 @@ async def settle(checks: AlfaPageChecks) -> AlfaPageOutcome:
         revealed_failed=sum(1 for item in revealed if item.finding.outcome == "failed"),
         revealed_cant_tell=sum(1 for item in revealed if item.finding.outcome == "cant_tell"),
     )
+
+
+# A plain XPath to an element of the top document, as Alfa reports one:
+# "/html[1]/body[1]/main[1]/button[2]". Paths through a shadow root or a
+# frame are not plain steps and are left out.
+_XPATH = re.compile(r"(?:/[A-Za-z][A-Za-z0-9_.:-]*\[\d+\])+")
+
+
+def alfa_xpath(target_hint: str) -> str | None:
+    """The element's XPath from an Alfa finding's target, or ``None``.
+
+    ``target_hint`` is the bounded JSON summary ``evidence.mjs`` writes
+    (``{"type": "element", "path": "/html[1]/...", ...}``).
+    """
+    try:
+        target = json.loads(target_hint)
+    except (TypeError, ValueError):
+        return None
+    path = target.get("path") if isinstance(target, dict) else None
+    if not isinstance(path, str) or len(path) > 2000 or not _XPATH.fullmatch(path):
+        return None
+    return path
 
 
 def _result(task: asyncio.Task[AlfaResult]) -> tuple[AlfaResult | None, str | None]:

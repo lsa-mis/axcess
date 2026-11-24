@@ -2070,7 +2070,13 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
         if result.alfa_checks is not None:
             with live_progress.check("alfa"):
                 alfa_outcome = await settle_alfa(result.alfa_checks)
-            _persist_alfa_outcome(ctx, page_id=page_id, url=result.url, outcome=alfa_outcome)
+            _persist_alfa_outcome(
+                ctx,
+                page_id=page_id,
+                url=result.url,
+                outcome=alfa_outcome,
+                screenshots=result.screenshots,
+            )
         elif ctx.alfa is not None:
             try:
                 with live_progress.check("alfa"):
@@ -2778,6 +2784,7 @@ def _persist_alfa(
     findings: tuple[AlfaFinding, ...],
     failed_total: int,
     cant_tell_total: int,
+    screenshots: Mapping[str, bytes] | None = None,
 ) -> None:
     """Write retained Alfa evidence and record the engine's true outcome totals.
 
@@ -2803,6 +2810,7 @@ def _persist_alfa(
                 target_hash=finding.target_hash,
                 engine_outcome=finding.outcome,
                 engine_evidence_json=finding.evidence_json,
+                screenshot_hash=_store_screenshot(ctx, finding.target_hash, screenshots or {}),
             )
         except sqlite3.Error as exc:
             log.warning(
@@ -2824,7 +2832,12 @@ def _persist_alfa(
 
 
 def _persist_alfa_outcome(
-    ctx: _WorkerContext, *, page_id: int, url: str, outcome: AlfaPageOutcome
+    ctx: _WorkerContext,
+    *,
+    page_id: int,
+    url: str,
+    outcome: AlfaPageOutcome,
+    screenshots: Mapping[str, bytes] | None = None,
 ) -> None:
     """Save one page's Alfa checks from the crawler's tab, and say what did not run.
 
@@ -2853,6 +2866,7 @@ def _persist_alfa_outcome(
             findings=outcome.load.findings,
             failed_total=outcome.load.failed_total,
             cant_tell_total=outcome.load.cant_tell_total,
+            screenshots=screenshots,
         )
         if outcome.load.truncated:
             _add_note_once(
@@ -2881,6 +2895,7 @@ def _persist_alfa_outcome(
                 engine_evidence_json=finding.evidence_json,
                 revealed_by=revealed.revealed_by,
                 revealed_state_key=revealed.state_key or None,
+                screenshot_hash=_store_screenshot(ctx, finding.target_hash, screenshots or {}),
             )
         except sqlite3.Error as exc:
             log.warning(

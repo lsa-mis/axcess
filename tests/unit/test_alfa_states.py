@@ -7,7 +7,7 @@ import asyncio
 import pytest
 
 from audit.analyzer.alfa import AlfaError, AlfaFinding, AlfaResult
-from audit.analyzer.alfa_states import AlfaPageChecks, AlfaStateCheck, settle
+from audit.analyzer.alfa_states import AlfaPageChecks, AlfaStateCheck, alfa_xpath, settle
 
 
 def _finding(target: str, outcome: str = "failed") -> AlfaFinding:
@@ -104,3 +104,20 @@ async def test_an_unexpected_error_is_a_reason_not_a_clean_result() -> None:
     assert outcome.load is None
     assert outcome.load_error is not None
     assert "RuntimeError: boom" in outcome.load_error
+
+
+@pytest.mark.parametrize(
+    ("target_hint", "expected"),
+    [
+        (
+            '{"type":"element","path":"/html[1]/body[1]/main[1]/button[2]"}',
+            "/html[1]/body[1]/main[1]/button[2]",
+        ),
+        # Through a shadow root or a frame: not a plain path the page can resolve.
+        ('{"type":"element","path":"/html[1]/body[1]/x-app[1]/#shadow-root/button[1]"}', None),
+        ('{"type":"element","path":"/html[1]/body[1]\\"]|//*["}', None),
+        ("Alfa target unavailable; see the stored evidence.", None),
+    ],
+)
+def test_alfa_xpath_reads_only_a_plain_element_path(target_hint: str, expected: str | None) -> None:
+    assert alfa_xpath(target_hint) == expected
