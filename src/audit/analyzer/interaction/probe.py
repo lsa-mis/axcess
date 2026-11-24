@@ -374,6 +374,14 @@ DEFAULT_TIMEOUT_S = 120.0
 DEFAULT_MAX_STATE_CAPTURES = 25
 _MAX_CAPTURE_BYTES = 2_000_000
 _MAX_CAPTURE_TOTAL_BYTES = 8_000_000
+# Tentative captures: states axe found nothing new in, kept in case Alfa's
+# background check of the same state does. Alfa's results arrive after the
+# state is closed, so the markup has to be taken while it is open, before
+# anyone knows whether it is needed. The orchestrator keeps only the ones an
+# Alfa occurrence points to and drops the rest. Their own count and byte
+# budget, so they can never crowd out a state axe needs.
+DEFAULT_MAX_TENTATIVE_CAPTURES = 25
+_MAX_TENTATIVE_TOTAL_BYTES = 8_000_000
 _CAPTURE_TIMEOUT_S = 3.0
 # Reading a state's CSS. Usually quick: a site's cross-origin sheets were
 # already fetched for the page as it loaded and are cached for the scan.
@@ -488,6 +496,10 @@ class _Budget:
     captures: dict[str, StateCapture] = field(default_factory=dict)
     #: Running total of compressed capture bytes held for this page.
     capture_bytes: int = 0
+    #: States taken in case Alfa finds something new there (see
+    #: ``DEFAULT_MAX_TENTATIVE_CAPTURES``), and their compressed bytes.
+    tentative: dict[str, StateCapture] = field(default_factory=dict)
+    tentative_bytes: int = 0
     #: ``target_hash`` -> element PNG, taken while the state is still open.
     screenshots: dict[str, bytes] = field(default_factory=dict)
     shot_bytes: int = 0
@@ -592,6 +604,7 @@ class InteractionProbe:
     # behaviour exactly as it was.
     capture_states: bool = True
     max_state_captures: int = DEFAULT_MAX_STATE_CAPTURES
+    max_tentative_captures: int = DEFAULT_MAX_TENTATIVE_CAPTURES
     # How many same-shaped controls may change nothing before the rest of that
     # shape is left alone. Far below ``max_repeated``: proving a date grid
     # inert takes three clicks, not twenty.
@@ -688,6 +701,7 @@ class InteractionProbe:
             states=budget.states_found,
             screenshots=dict(budget.screenshots),
             captures=tuple(budget.captures.values()),
+            tentative_captures=tuple(budget.tentative.values()),
             urls=tuple(sorted(budget.urls)),
             revealed_links=tuple(budget.revealed_links.values()),
             evaluated=evaluated,
@@ -1088,6 +1102,21 @@ class InteractionProbe:
                         label=label,
                         path_labels=tuple(_control_label(item) for item in (*path, control)),
                     )
+            elif budget.alfa_checks is not None and any(
+                check.state_key == state_key for check in budget.alfa_checks.states
+            ):
+                # Alfa is checking this state in the background and may find
+                # something new in it after it closes: keep its markup now,
+                # tentatively. The orchestrator keeps it only if Alfa does.
+                with _timed(budget, "save_state"):
+                    await self._capture_state(
+                        page,
+                        budget,
+                        state_key=state_key,
+                        label=label,
+                        path_labels=tuple(_control_label(item) for item in (*path, control)),
+                        tentative=True,
+                    )
             log.info(
                 "interaction.clicked",
                 control=label[:60],
@@ -1324,8 +1353,12 @@ class InteractionProbe:
         state_key: str,
         label: str,
         path_labels: tuple[str, ...],
+        tentative: bool = False,
     ) -> None:
         """Store this state's markup, or store nothing. Never raises.
+
+        ``tentative`` stores it in ``budget.tentative`` instead, under its own
+        limits, for a state only Alfa may turn out to need.
 
         The caller sits inside ``_operate``'s ``try``, whose ``except`` covers
         the nested sweep, the dialog-dismissal loop and the Escape unwind. A
@@ -1346,7 +1379,13 @@ class InteractionProbe:
         # inspector, and a frame's document is not the page.
         if not self.capture_states or state_key in budget.captures or page.parent_frame:
             return
-        if len(budget.captures) >= self.max_state_captures:
+        if tentative:
+            if (
+                state_key in budget.tentative
+                or len(budget.tentative) >= self.max_tentative_captures
+            ):
+                return
+        elif len(budget.captures) >= self.max_state_captures:
             budget.limits.add("state_captures")
             return
         try:
@@ -1365,7 +1404,10 @@ class InteractionProbe:
                 error_type=type(exc).__name__,
             )
             return
-        if budget.capture_bytes + len(blob) > _MAX_CAPTURE_TOTAL_BYTES:
+        if tentative:
+            if budget.tentative_bytes + len(blob) > _MAX_TENTATIVE_TOTAL_BYTES:
+                return
+        elif budget.capture_bytes + len(blob) > _MAX_CAPTURE_TOTAL_BYTES:
             budget.limits.add("state_captures")
             return
         # The state's CSS, read while it is still open. Its own timeout, and
@@ -1378,14 +1420,19 @@ class InteractionProbe:
                     styles = await budget.capture_styles(page.page)
             except Exception as exc:
                 log.debug("interaction.styles_failed", error_type=type(exc).__name__)
-        budget.capture_bytes += len(blob)
-        budget.captures[state_key] = StateCapture(
+        capture = StateCapture(
             state_key=state_key,
             revealed_by=label,
             path_labels=path_labels,
             html=blob,
             styles=styles,
         )
+        if tentative:
+            budget.tentative_bytes += len(blob)
+            budget.tentative[state_key] = capture
+        else:
+            budget.capture_bytes += len(blob)
+            budget.captures[state_key] = capture
 
     async def _restore(self, page: Frame, pinned: str) -> None:
         """Return the browser to the page we are probing.

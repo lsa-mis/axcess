@@ -96,6 +96,9 @@ class FetchResult:
     # ``interaction_states`` and not a substitute for it -- a state nothing was
     # found in is still coverage, it just has nothing to show.
     interaction_captures: tuple[StateCapture, ...] = field(default=())
+    # States taken in case Alfa finds something new there; the orchestrator
+    # keeps the ones an Alfa occurrence points to (InteractionResult).
+    interaction_tentative_captures: tuple[StateCapture, ...] = field(default=())
     # target_hash -> highlighted element PNG bytes, captured at scan time
     # (empty for static fetches / when capture is disabled).
     screenshots: dict[str, bytes] = field(default_factory=dict)

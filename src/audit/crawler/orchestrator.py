@@ -2057,9 +2057,14 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
         # load and in each state Click-Through opened, like axe
         # (``result.alfa_checks``); those checks finish here. A page read
         # without a browser gets Alfa's own capture of the URL instead.
+        # States Alfa first saw an occurrence in: their tentative captures
+        # are kept with the page's states below, so the inspector can show
+        # an occurrence only Alfa found in the state it exists in.
+        alfa_state_keys: set[str] = set()
         if result.alfa_checks is not None:
             with live_progress.check("alfa"):
                 alfa_outcome = await settle_alfa(result.alfa_checks)
+            alfa_state_keys = {item.state_key for item in alfa_outcome.revealed if item.state_key}
             _persist_alfa_outcome(
                 ctx,
                 page_id=page_id,
@@ -2176,7 +2181,11 @@ async def _process_job(ctx: _WorkerContext, job: queue.Job) -> None:
                 screenshots=result.screenshots,
                 # A tuple, never None: this pass owns the page's states, and an
                 # empty one legitimately means it captured none this time.
-                captures=result.interaction_captures,
+                captures=_states_to_keep(
+                    result.interaction_captures,
+                    result.interaction_tentative_captures,
+                    alfa_state_keys,
+                ),
             )
             # The per-page ledger is written even when the sweep produced no
             # findings: "37 of 52 controls operated, stopped by the click
@@ -2819,6 +2828,27 @@ def _persist_alfa(
     ctx.summary.alfa_pages_scanned += 1
     ctx.summary.alfa_failed_total += failed_total
     ctx.summary.alfa_cant_tell_total += cant_tell_total
+
+
+def _states_to_keep(
+    captures: tuple[StateCapture, ...],
+    tentative: tuple[StateCapture, ...],
+    alfa_state_keys: set[str],
+) -> tuple[StateCapture, ...]:
+    """The page states to save: axe's, plus the tentative ones Alfa needs.
+
+    A tentative capture was taken because Alfa was checking that state in
+    the background; it is kept only when Alfa first saw an occurrence there.
+    The rest are dropped, unsaved, so a state nothing points to is never
+    stored. Axe's own capture wins when both exist for one state.
+    """
+    kept = {capture.state_key for capture in captures}
+    extra = tuple(
+        capture
+        for capture in tentative
+        if capture.state_key in alfa_state_keys and capture.state_key not in kept
+    )
+    return (*captures, *extra)
 
 
 def _persist_alfa_outcome(

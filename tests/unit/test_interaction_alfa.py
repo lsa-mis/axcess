@@ -66,3 +66,24 @@ async def test_a_snapshot_that_fails_keeps_its_reason() -> None:
 
     assert checks.states == []
     assert checks.state_errors == ["The page is too large for Alfa"]
+
+
+def _capture(key: str, html: bytes = b"x") -> Any:
+    from audit.analyzer.interaction import StateCapture
+
+    return StateCapture(state_key=key, revealed_by=key, path_labels=(key,), html=html)
+
+
+def test_only_tentative_states_alfa_points_to_are_kept() -> None:
+    from audit.crawler.orchestrator import _states_to_keep
+
+    axe_state = _capture("menu")
+    kept = _states_to_keep(
+        (axe_state,),
+        (_capture("menu", b"tentative"), _capture("dialog"), _capture("tabs")),
+        {"menu", "dialog"},
+    )
+
+    # Axe's own capture wins for "menu"; "dialog" is kept for Alfa; "tabs",
+    # which nothing points to, is dropped.
+    assert [(c.state_key, c.html) for c in kept] == [("menu", b"x"), ("dialog", b"x")]
