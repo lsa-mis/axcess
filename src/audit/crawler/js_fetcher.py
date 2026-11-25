@@ -17,8 +17,11 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import gzip
 import io
 import math
+import re
+from collections.abc import Mapping
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, Self
 
@@ -34,6 +37,7 @@ from audit.analyzer.forms import ErrorIdentificationProbe, FormFinding
 from audit.analyzer.interaction import (
     InteractionProbe,
     InteractionResult,
+    StateCapture,
 )
 from audit.analyzer.keyboard import KeyboardProbe, KeyboardTrap
 from audit.analyzer.markup import MarkupFinding, MarkupProbe
@@ -44,7 +48,7 @@ from audit.crawler.fetcher import FetchError, FetchResult
 from audit.crawler.frame_snapshot import SavedFrame, capture_frames
 from audit.crawler.render_detect import looks_like_authentication_page
 from audit.crawler.search import SearchExplorer
-from audit.crawler.style_snapshot import SheetCache, StyleSnapshot, capture_styles
+from audit.crawler.style_snapshot import SheetCache, StyleSnapshot, capture_styles, concatenate
 from audit.crawler.tab_pool import TabPool
 from audit.crawler.url_policy import normalize
 from audit.logging import get_logger
@@ -704,7 +708,18 @@ class JsFetcher:
                         if png:
                             screenshots[th] = png
                     if alfa_checks is not None:
-                        await self._capture_alfa(page, alfa_checks, screenshots)
+                        # The page states Click-Through saved, so an
+                        # occurrence found after a click is photographed in
+                        # its state. Axe's own copy of a state wins over the
+                        # copy kept for Alfa, as when the states are saved.
+                        saved_states = {
+                            capture.state_key: capture
+                            for capture in (
+                                *interaction.tentative_captures,
+                                *interaction.captures,
+                            )
+                        }
+                        await self._capture_alfa(page, alfa_checks, screenshots, saved_states)
                     if len(screenshots) >= MAX_SHOTS_PER_PAGE:
                         # Says why later occurrences on this page have no
                         # picture: the cap, not a failure.
@@ -836,7 +851,11 @@ class JsFetcher:
                     await page.close()
 
     async def _capture_alfa(
-        self, page: Page, checks: AlfaPageChecks, screenshots: dict[str, bytes]
+        self,
+        page: Page,
+        checks: AlfaPageChecks,
+        screenshots: dict[str, bytes],
+        saved_states: Mapping[str, StateCapture] | None = None,
     ) -> None:
         """Photograph Alfa's occurrences, as the pass above does axe's.
 
@@ -860,18 +879,32 @@ class JsFetcher:
                 **({"protected_context": True} if self._private_context else {"url": page.url}),
             )
         # What the loaded page itself showed. An occurrence found only in a
-        # page state a click opened is photographed here, on the loaded
-        # page, only if its element is really in view: most sit in a menu
-        # the sweep closed again (a 10-page scan, 2026-11-24: 5 of 6 such
-        # screenshots showed a closed menu with no outline).
+        # page state a click opened is photographed in that state's saved
+        # copy (``_capture_in_saved_state``): by now the sweep has closed
+        # the menu or dialog again, and a screenshot of the loaded page
+        # showed a closed menu with no outline (5 of 6 sampled, 2026-11-24).
+        # Without a saved copy it is photographed on the loaded page only if
+        # its element is really in view.
         at_load: set[str] = set()
         load = checks.load
         if load is not None and load in done and not load.cancelled() and not load.exception():
             at_load = {finding.target_hash for finding in load.result().findings}
-        for task in tasks:
-            if task not in done or task.cancelled() or task.exception() is not None:
-                continue
-            for finding in task.result().findings:
+        state_of = {state.task: state.state_key for state in checks.states}
+        found = [
+            (task, finding)
+            for task in tasks
+            if task in done and not task.cancelled() and task.exception() is None
+            for finding in task.result().findings
+        ]
+        # Definite failures first, then "a person must decide", each round
+        # on the loaded page and then in saved states: the page's screenshot
+        # cap is shared, and hundreds of Focus Visible leads used it up
+        # before a link with no name got its picture (2026-11-25).
+        for failures in (True, False):
+            in_states: dict[str, list[tuple[str, str]]] = {}
+            for task, finding in found:
+                if (finding.outcome == "failed") is not failures:
+                    continue
                 if len(screenshots) >= MAX_SHOTS_PER_PAGE:
                     return
                 if finding.target_hash in screenshots:
@@ -879,14 +912,93 @@ class JsFetcher:
                 path = alfa_xpath(finding.target_hint)
                 if path is None:
                     continue
+                after_click = task is not load and finding.target_hash not in at_load
+                state_key = state_of.get(task, "")
+                if after_click and saved_states and state_key in saved_states:
+                    in_states.setdefault(state_key, []).append((finding.target_hash, path))
+                    continue
                 png = await self._capture_element(
-                    page,
-                    f"xpath={path}",
-                    center=True,
-                    must_be_seen=task is not load and finding.target_hash not in at_load,
+                    page, f"xpath={path}", center=True, must_be_seen=after_click
                 )
                 if png:
                     screenshots[finding.target_hash] = png
+            for state_key, targets in in_states.items():
+                if len(screenshots) >= MAX_SHOTS_PER_PAGE:
+                    return
+                await self._capture_in_saved_state(
+                    page, (saved_states or {})[state_key], targets, screenshots
+                )
+
+    async def _capture_in_saved_state(
+        self,
+        page: Page,
+        capture: StateCapture,
+        targets: list[tuple[str, str]],
+        screenshots: dict[str, bytes],
+    ) -> None:
+        """Photograph ``targets`` (target hash, XPath) in a saved page state.
+
+        Opens a scratch tab and serves it the state's saved copy at the
+        page's own address, so the page's relative addresses load from the
+        site as they did. It is the copy the Inspector shows for the state,
+        prepared the same way: scripts blocked (a ``script-src 'none'``
+        policy, so a script cannot change the copy or act on the site), the
+        saved CSS in place of the page's stylesheets, and the copy's own
+        security policy tag removed so the saved CSS applies. Other frames
+        are not loaded. A target not visible in the copy gets no screenshot
+        (``must_be_seen``), as on the loaded page.
+        """
+        scratch: Page | None = None
+        try:
+            document = _saved_state_document(
+                gzip.decompress(capture.html).decode("utf-8", errors="replace"), capture.styles
+            )
+            scratch = await page.context.new_page()
+            if page.viewport_size:
+                await scratch.set_viewport_size(page.viewport_size)
+            main = scratch.main_frame
+            served = False
+
+            async def serve(route: Any) -> None:
+                nonlocal served
+                request = route.request
+                if request.is_navigation_request():
+                    if request.frame == main and not served:
+                        served = True
+                        await route.fulfill(
+                            status=200,
+                            content_type="text/html; charset=utf-8",
+                            body=document,
+                            headers={"Content-Security-Policy": "script-src 'none'"},
+                        )
+                    else:
+                        await route.abort()
+                    return
+                # Stylesheets, images and fonts as the page loads them; a
+                # guard the context still has decides as usual.
+                await route.fallback()
+
+            await scratch.route("**/*", serve)
+            with contextlib.suppress(Exception):
+                await scratch.goto(page.url, wait_until="load", timeout=15_000)
+            for target_hash, path in targets:
+                if len(screenshots) >= MAX_SHOTS_PER_PAGE:
+                    return
+                png = await self._capture_element(
+                    scratch, f"xpath={path}", center=True, must_be_seen=True
+                )
+                if png:
+                    screenshots[target_hash] = png
+        except Exception as exc:
+            log.info(
+                "alfa.state_screenshots_failed",
+                error_type=type(exc).__name__,
+                **({"protected_context": True} if self._private_context else {"url": page.url}),
+            )
+        finally:
+            if scratch is not None:
+                with contextlib.suppress(Exception):
+                    await scratch.close()
 
     async def _snapshot_styles(self, page: Page) -> StyleSnapshot | None:
         """The live page's CSS and fingerprint, sharing this crawl's sheet cache."""
@@ -966,6 +1078,42 @@ class JsFetcher:
             )
         except Exception:
             return None
+
+
+_CSP_META = re.compile(r"<meta\b[^>]*http-equiv\s*=\s*[\"']?content-security-policy[^>]*>", re.I)
+_STYLE_BLOCK = re.compile(r"<style\b[^>]*>[\s\S]*?</style>", re.I)
+_LINK_TAG = re.compile(r"<link\b[^>]*>", re.I)
+_REL = re.compile(r"\brel\s*=\s*(\"([^\"]*)\"|'([^']*)'|([^\s>]+))", re.I)
+
+
+def _saved_state_document(html: str, styles: StyleSnapshot | None) -> str:
+    """A saved page state, ready to render as the Inspector renders it.
+
+    Mirrors the Inspector's ``prepareDocument`` (routes/Inspector.tsx) for
+    the parts a tab at the page's own address needs: without the copy's
+    security policy tag, and, when the scan saved the state's CSS, with that
+    CSS in place of the page's stylesheets and style blocks, last in
+    ``<head>`` where the page's own CSS ended.
+    """
+    html = _CSP_META.sub("", html)
+    if styles is None or not styles.sheets:
+        return html
+
+    def keep_link(match: re.Match[str]) -> str:
+        rel = _REL.search(match.group(0))
+        value = (rel.group(2) or rel.group(3) or rel.group(4) or "") if rel else ""
+        return "" if "stylesheet" in value.lower().split() else match.group(0)
+
+    html = _STYLE_BLOCK.sub("", _LINK_TAG.sub(keep_link, html))
+    css = concatenate([(sheet.css, sheet.media) for sheet in styles.sheets])
+    tag = "<style data-axcess-saved-styles>" + css.replace("</style", "<\\/style") + "</style>"
+    close = re.search(r"</head>", html, re.I)
+    if close:
+        return html[: close.start()] + tag + html[close.start() :]
+    body = re.search(r"<body\b", html, re.I)
+    if body:
+        return html[: body.start()] + tag + html[body.start() :]
+    return tag + html
 
 
 def _not_checked_reason(status: int, headers: dict[str, str]) -> str | None:

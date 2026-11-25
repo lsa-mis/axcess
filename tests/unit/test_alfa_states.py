@@ -130,3 +130,26 @@ def test_alfa_xpath_reads_only_a_plain_path_to_an_element(
     target_hint: str, expected: str | None
 ) -> None:
     assert alfa_xpath(target_hint) == expected
+
+
+def test_a_saved_state_document_uses_its_saved_css_like_the_inspector() -> None:
+    from audit.crawler.js_fetcher import _saved_state_document
+    from audit.crawler.style_snapshot import CapturedSheet, StyleSnapshot
+
+    html = (
+        '<html><head><meta http-equiv="Content-Security-Policy" content="style-src \'self\'">'
+        '<link rel="stylesheet" href="/site.css"><link rel="icon" href="/i.png">'
+        "<style>p{color:blue}</style></head><body><p>x</p></body></html>"
+    )
+    styles = StyleSnapshot(
+        sheets=(CapturedSheet(css="p{color:red}", media="", source_url=None),), complete=True
+    )
+
+    document = _saved_state_document(html, styles)
+
+    assert "Content-Security-Policy" not in document
+    assert "/site.css" not in document and "color:blue" not in document
+    assert '<link rel="icon" href="/i.png">' in document
+    assert document.index("p{color:red}") < document.index("</head>")
+    # Without saved CSS the page's own stylesheets stay.
+    assert "/site.css" in _saved_state_document(html, None)

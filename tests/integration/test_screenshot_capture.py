@@ -121,3 +121,42 @@ async def test_an_element_that_must_be_seen_in_a_closed_menu_gets_no_screenshot(
     assert await fetcher._capture_element(page, "#hidden", must_be_seen=True) is None
     shown = await fetcher._capture_element(page, "#shown", must_be_seen=True)
     assert shown is not None and len(_marker_xs(shown)) > 20
+
+
+# The same menu open, as Click-Through saved the state its "Students"
+# button opened. Its link has a script that would hide it again if scripts
+# ran in the saved copy.
+_OPEN_MENU = _CLOSED_MENU.replace("max-height:0;overflow:hidden", "max-height:none").replace(
+    "</body>", "<script>document.getElementById('menu').style.display='none'</script></body>"
+)
+
+
+async def test_an_occurrence_found_after_a_click_is_photographed_in_its_saved_state(page) -> None:  # type: ignore[no-untyped-def]
+    """The loaded page has the menu closed again; the saved state has it open."""
+    import gzip
+
+    from audit.analyzer.interaction import StateCapture
+
+    async def site(route):  # type: ignore[no-untyped-def]
+        await route.fulfill(status=200, content_type="text/html", body=_CLOSED_MENU)
+
+    await page.route("https://site.test/**", site)
+    await page.goto("https://site.test/")
+    capture = StateCapture(
+        state_key="students",
+        revealed_by="Students",
+        path_labels=("Students",),
+        html=gzip.compress(_OPEN_MENU.encode()),
+    )
+    screenshots: dict[str, bytes] = {}
+
+    await _fetcher()._capture_in_saved_state(
+        page, capture, [("hidden-link", "//a[@id='hidden']")], screenshots
+    )
+
+    # Photographed open, with its outline, and the saved copy's script did
+    # not run (it would have hidden the menu).
+    assert len(_marker_xs(screenshots["hidden-link"])) > 20
+    # The scratch tab is closed again; the crawler's own tab is untouched.
+    assert page.context.pages == [page]
+    assert await page.locator("#hidden").evaluate("e => e.closest('ul').style.maxHeight") == "0px"
