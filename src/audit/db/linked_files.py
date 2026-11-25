@@ -56,6 +56,10 @@ class CheckResult:
     # Which check read the file: "pdf", "docx" or "pptx" (migration 0045).
     # The bytes decide, not the link: a Google Doc is checked as "docx".
     checked_as: CheckedAs | None = None
+    # When the file says it was created and last changed, ISO 8601, read
+    # from its own properties (migration 0050; linked_files/file_dates.py).
+    file_created_at: str | None = None
+    file_modified_at: str | None = None
 
 
 def file_count(conn: sqlite3.Connection, scan_id: int) -> int:
@@ -144,7 +148,7 @@ def set_result(
         "UPDATE linked_files SET status = ?, reason = ?, failed_checks = ?, checks_run = ?, "
         "http_status = ?, content_type = ?, byte_size = ?, sha256 = ?, is_form = ?, "
         "page_count = ?, thumbnail_hash = ?, thumbnail_small_hash = ?, checked_as = ?, "
-        "checked_at = CURRENT_TIMESTAMP "
+        "file_created_at = ?, file_modified_at = ?, checked_at = CURRENT_TIMESTAMP "
         "WHERE id = ? AND scan_id = ?",
         (
             result.status,
@@ -160,6 +164,8 @@ def set_result(
             result.thumbnail_hash,
             result.thumbnail_small_hash,
             result.checked_as,
+            result.file_created_at,
+            result.file_modified_at,
             file_id,
             scan_id,
         ),
@@ -179,7 +185,8 @@ def checked_copy(
     """
     row = conn.execute(
         "SELECT status, failed_checks, is_form, page_count, thumbnail_hash, "
-        "thumbnail_small_hash, checked_as, checks_run FROM linked_files "
+        "thumbnail_small_hash, checked_as, checks_run, file_created_at, file_modified_at "
+        "FROM linked_files "
         "WHERE scan_id = ? AND sha256 = ? AND id != ? "
         "AND status IN ('mostly_sure', 'not_sure') ORDER BY id LIMIT 1",
         (scan_id, sha256, file_id),
@@ -195,6 +202,8 @@ def checked_copy(
         thumbnail_small_hash=row[5],
         checked_as=row[6],
         checks_run=None if row[7] is None else tuple(json.loads(row[7])),
+        file_created_at=row[8],
+        file_modified_at=row[9],
     )
 
 

@@ -195,6 +195,56 @@ now share an almost full rate limit. The per-host connection limit is not
 the bottleneck: the app sets it to the worker count (8 by default), and at
 most 4 downloads run at once. The rate limit is the floor.
 
+## Creation and modified dates (2026-11-25)
+
+Asked for to tell current documents from old ones that may be archived (the
+developer's request). Measured on files already on this computer, the
+labelled sets: 412 Word and PowerPoint files (office-real-files,
+office-fresh, office-fresh2) and 54 real PDFs (the veraPDF experiment's
+real-pdfs). No new downloads.
+
+| Type | Files | Creation date | Modified date |
+| --- | --- | --- | --- |
+| Word (.docx) | 325 | 321 (`dcterms:created`) | 317 (`dcterms:modified`) |
+| PowerPoint (.pptx) | 45 | 35 | 45 |
+| Google Docs exports | 37 | 0 | 0 |
+| Google Slides exports | 5 | 0 | 0 |
+| PDF | 54 | 45 in /Info `CreationDate`, 52 in XMP `xmp:CreateDate`, 54 in one or the other | 45 /Info `ModDate` |
+
+Every date present parsed, and none was before 1990 or in the future. One
+PDF says it was modified before it was created.
+
+What a date means, checked against finance.umich.edu, whose Drupal upload
+folders are named for the month a file was uploaded (`/files/2025-11/…`),
+33 Word files:
+
+- No file was created after its upload month: the dates are believable.
+- 16 of 33 were created more than a year before they were uploaded (median
+  356 days, at most about 11 years). A form copied from an older one keeps
+  the older creation date.
+- The modified date does not say when a file was posted either: 17 were last
+  changed within 2 months before the upload month, 14 earlier, and 2 after it
+  (the file was replaced at the same address, which keeps its first folder).
+- 138 of 325 Word files have the same creation and modified time, nearly all
+  saved by Word itself: a file made in one go, or a "Save As" copy.
+
+So a file's own dates say when it was first made and last edited, by the
+clock of the computer that did it. None of them says when a file was
+posted, or whether it is archived. Google keeps a Doc's dates in Drive
+(`createdTime`, `modifiedTime`), readable only through the Drive API with a
+key or a sign-in; its exports carry none. Not measured: the server's
+`Last-Modified` header, which would say when the copy on the site last
+changed (a request to every real site, not yet approved).
+
+Built: `linked_files/file_dates.py` reads both dates when a check opens a
+file; migration 0050 stores them (`file_created_at`, `file_modified_at`;
+the table's own `created_at` is when Axcess recorded the row); the Documents
+table shows the creation date, sortable, with "Not known" when there is
+none. A date before 1980 or more than a day in the future is dropped. Run on
+the research files through the real checks: 319 of 325 Word files (one the
+Word check cannot open), 35 of 45 PowerPoint files and 54 of 54 PDFs got a
+creation date, and no Google export did.
+
 ## Why it is built this way
 
 - Checking PDFs only after the last page (the first version) left every PDF

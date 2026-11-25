@@ -1522,6 +1522,11 @@ export interface LinkedFileRow {
   same_as?: { file_id: number; name: string } | null;
   /** A picture of the first page is stored (PDFs the check could read). */
   has_thumbnail?: boolean;
+  /** When the file says it was created and last changed (ISO 8601), from its
+   *  own properties; null when it does not say, was not read, or was checked
+   *  before 2026-11-25. Not when it was posted. */
+  created_at?: string | null;
+  modified_at?: string | null;
 }
 
 /** One way a page reaches a file (`linked_files_queries.DocumentRefWay`). */

@@ -569,6 +569,8 @@ class LinkedFileTracker:
                     thumbnail_hash=copy.thumbnail_hash,
                     thumbnail_small_hash=copy.thumbnail_small_hash,
                     checked_as=copy.checked_as,
+                    file_created_at=copy.file_created_at,
+                    file_modified_at=copy.file_modified_at,
                 ),
             )
             return
@@ -611,6 +613,8 @@ class LinkedFileTracker:
                 thumbnail_hash=large,
                 thumbnail_small_hash=small,
                 checked_as="pdf",
+                file_created_at=result.dates.created,
+                file_modified_at=result.dates.modified,
             ),
         )
 
@@ -642,6 +646,8 @@ class LinkedFileTracker:
                 failed_checks=result.failed,
                 page_count=result.page_count,
                 checked_as=kind,
+                file_created_at=result.dates.created,
+                file_modified_at=result.dates.modified,
             ),
         )
 

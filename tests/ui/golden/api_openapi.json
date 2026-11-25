@@ -3312,7 +3312,9 @@
           "page_count": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "Page Count"},
           "referring_page_count": {"type": "integer", "title": "Referring Page Count"},
           "same_as": {"anyOf": [{"$ref": "#/components/schemas/SameFile"}, {"type": "null"}]},
-          "has_thumbnail": {"type": "boolean", "title": "Has Thumbnail", "default": false}
+          "has_thumbnail": {"type": "boolean", "title": "Has Thumbnail", "default": false},
+          "created_at": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Created At"},
+          "modified_at": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Modified At"}
         },
         "type": "object",
         "required": [
