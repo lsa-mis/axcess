@@ -29,7 +29,7 @@ from PIL import Image, ImageDraw
 
 from audit import check_log
 from audit.analyzer.alfa import AlfaError
-from audit.analyzer.alfa_states import AlfaPageChecks, alfa_xpath
+from audit.analyzer.alfa_states import FOCUS_SCREENSHOT_RULES, AlfaPageChecks, alfa_xpath
 from audit.analyzer.alfa_worker import AlfaWorker
 from audit.analyzer.axe import AxeAnalyzer, AxeError, AxeViolation, Level
 from audit.analyzer.focus import FocusFinding, FocusProbe
@@ -144,16 +144,15 @@ ALFA_SHOT_WAIT_S = 600.0
 # red stroke between two white halos, which keeps it visible on light, dark,
 # and red content alike.
 _MARKER_GAP_PX = 2
+# For a screenshot taken with focus on the element (Focus Visible): far
+# enough out that the outline does not cover a focus ring, which sites draw
+# from 1 to about 8 px outside the element.
+_FOCUS_MARKER_GAP_PX = 10
 _MARKER_HALO_PX = 2
 _MARKER_STROKE_PX = 3
 _MARKER_RED = (190, 0, 30, 255)
 _MARKER_WHITE = (255, 255, 255, 255)
 
-# Viewport box of an element's rendered content, or null to use its own box.
-# A block element spans its whole row even when its text is one short word,
-# so outlining the block would frame mostly blank space. The range around its
-# contents, clipped to the element, is what a reviewer needs to find. Controls
-# and replaced elements keep their own box: the control is what is reported.
 # True when the element is the topmost thing at the centre of its box: not
 # clipped away by a closed menu, nor covered by another element.
 _ON_TOP_JS = """
@@ -164,6 +163,11 @@ el => {
 }
 """
 
+# Viewport box of an element's rendered content, or null to use its own box.
+# A block element spans its whole row even when its text is one short word,
+# so outlining the block would frame mostly blank space. The range around its
+# contents, clipped to the element, is what a reviewer needs to find. Controls
+# and replaced elements keep their own box: the control is what is reported.
 _CONTENT_BOX_JS = """
 (el) => {
   const ownBox = 'img, svg, video, canvas, iframe, object, embed, '
@@ -191,6 +195,7 @@ def _draw_issue_outline(
     top: float,
     width: float,
     height: float,
+    gap: int = _MARKER_GAP_PX,
 ) -> bytes:
     """Outline the reported element on screenshot bytes.
 
@@ -208,7 +213,7 @@ def _draw_issue_outline(
     if left >= image.width or top >= image.height or left + width <= 0 or top + height <= 0:
         return png
     band = 2 * _MARKER_HALO_PX + _MARKER_STROKE_PX
-    reach = _MARKER_GAP_PX + band
+    reach = gap + band
     x0, y0 = math.floor(left) - reach, math.floor(top) - reach
     x1, y1 = math.ceil(left + width) + reach, math.ceil(top + height) + reach
 
@@ -901,7 +906,7 @@ class JsFetcher:
         # cap is shared, and hundreds of Focus Visible leads used it up
         # before a link with no name got its picture (2026-11-25).
         for failures in (True, False):
-            in_states: dict[str, list[tuple[str, str]]] = {}
+            in_states: dict[str, list[tuple[str, str, bool]]] = {}
             for task, finding in found:
                 if (finding.outcome == "failed") is not failures:
                     continue
@@ -914,11 +919,12 @@ class JsFetcher:
                     continue
                 after_click = task is not load and finding.target_hash not in at_load
                 state_key = state_of.get(task, "")
+                focus = finding.rule_id in FOCUS_SCREENSHOT_RULES
                 if after_click and saved_states and state_key in saved_states:
-                    in_states.setdefault(state_key, []).append((finding.target_hash, path))
+                    in_states.setdefault(state_key, []).append((finding.target_hash, path, focus))
                     continue
                 png = await self._capture_element(
-                    page, f"xpath={path}", center=True, must_be_seen=after_click
+                    page, f"xpath={path}", center=True, must_be_seen=after_click, focus=focus
                 )
                 if png:
                     screenshots[finding.target_hash] = png
@@ -933,10 +939,10 @@ class JsFetcher:
         self,
         page: Page,
         capture: StateCapture,
-        targets: list[tuple[str, str]],
+        targets: list[tuple[str, str, bool]],
         screenshots: dict[str, bytes],
     ) -> None:
-        """Photograph ``targets`` (target hash, XPath) in a saved page state.
+        """Photograph ``targets`` (target hash, XPath, with focus) in a saved page state.
 
         Opens a scratch tab and serves it the state's saved copy at the
         page's own address, so the page's relative addresses load from the
@@ -981,11 +987,11 @@ class JsFetcher:
             await scratch.route("**/*", serve)
             with contextlib.suppress(Exception):
                 await scratch.goto(page.url, wait_until="load", timeout=15_000)
-            for target_hash, path in targets:
+            for target_hash, path, focus in targets:
                 if len(screenshots) >= MAX_SHOTS_PER_PAGE:
                     return
                 png = await self._capture_element(
-                    scratch, f"xpath={path}", center=True, must_be_seen=True
+                    scratch, f"xpath={path}", center=True, must_be_seen=True, focus=focus
                 )
                 if png:
                     screenshots[target_hash] = png
@@ -1008,7 +1014,13 @@ class JsFetcher:
         return snapshot
 
     async def _capture_element(
-        self, page: Page, selector: str, *, center: bool = False, must_be_seen: bool = False
+        self,
+        page: Page,
+        selector: str,
+        *,
+        center: bool = False,
+        must_be_seen: bool = False,
+        focus: bool = False,
     ) -> bytes | None:
         """Screenshot the element at ``selector`` with its location outlined.
 
@@ -1030,6 +1042,18 @@ class JsFetcher:
         that is closed again keeps a box but is clipped or covered; its
         screenshot would show the page with no outline, which misleads more
         than no screenshot does.
+
+        ``focus`` takes the picture with keyboard focus on the element, for
+        Focus Visible (``FOCUS_SCREENSHOT_RULES``): the reviewer decides
+        whether a focus indicator shows, which a picture without focus
+        cannot answer. A key press first (Shift, which does nothing on its
+        own) tells the browser the keyboard is in use, so the site's
+        ``:focus-visible`` styles apply as they would for a keyboard user;
+        Click-Through's mouse clicks had told it otherwise. Focus is removed
+        again afterwards. An element that does not take focus gets no
+        picture, so a picture never shows an unfocused element as focused.
+        The outline sits further out (``_FOCUS_MARKER_GAP_PX``) so it does
+        not cover the focus ring.
         """
         try:
             loc = page.locator(selector).first
@@ -1057,9 +1081,23 @@ class JsFetcher:
                 return None
             if must_be_seen and not await loc.evaluate(_ON_TOP_JS):
                 return None
+            if focus:
+                await page.keyboard.press("Shift")
+                await loc.focus(timeout=1500)
+                if not await loc.evaluate("el => el === document.activeElement"):
+                    return None
+                # A focus ring may fade in; give it a moment, then measure
+                # again, since focus can change the element's size.
+                await page.wait_for_timeout(150)
+                box = await loc.bounding_box()
+                if box is None:
+                    return None
             mark: Any = None
-            with contextlib.suppress(Exception):
-                mark = await loc.evaluate(_CONTENT_BOX_JS)
+            if not focus:
+                # The control itself is what a focus ring surrounds, so a
+                # focused picture outlines the element's own box.
+                with contextlib.suppress(Exception):
+                    mark = await loc.evaluate(_CONTENT_BOX_JS)
             if not mark:
                 mark = box
             x = max(0, box["x"] - pad)
@@ -1075,9 +1113,16 @@ class JsFetcher:
                 top=mark["y"] - y,
                 width=mark["width"],
                 height=mark["height"],
+                gap=_FOCUS_MARKER_GAP_PX if focus else _MARKER_GAP_PX,
             )
         except Exception:
             return None
+        finally:
+            if focus:
+                with contextlib.suppress(Exception):
+                    await page.evaluate(
+                        "() => document.activeElement && document.activeElement.blur()"
+                    )
 
 
 _CSP_META = re.compile(r"<meta\b[^>]*http-equiv\s*=\s*[\"']?content-security-policy[^>]*>", re.I)

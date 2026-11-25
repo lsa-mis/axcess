@@ -1071,6 +1071,13 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             "alfa_capture": (
                 "crawler_tab" if config.alfa_enabled and config.js_enabled else "separate_browser"
             ),
+            # Focus Visible screenshots are taken with keyboard focus on the
+            # element (since 2026-11-25, js_fetcher._capture_element), and
+            # the report says so beside them (alfa_states.screenshot_focused).
+            # Older reports' were taken without focus.
+            "alfa_focus_screenshots": (
+                config.alfa_enabled and config.js_enabled and config.capture_screenshots
+            ),
             "semantic_enabled": config.semantic_enabled,
             "keyboard_probe_enabled": config.keyboard_probe_enabled,
             "responsive_checks_enabled": config.responsive_checks_enabled,

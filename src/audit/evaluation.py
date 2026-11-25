@@ -9,12 +9,14 @@ read-only MCP tools use the same scope and manual-test record.
 from __future__ import annotations
 
 import gzip
+import json
 import sqlite3
 from collections import defaultdict
 from typing import Any
 
 from audit import coverage_matrix, occurrence_reviews
 from audit.analyzer.alfa_evidence import normalize_finding
+from audit.analyzer.alfa_states import screenshot_focused
 from audit.analyzer.semantic.extractor import locate_ordinals
 from audit.extractor.html_images import locate_image_refs
 from audit.extractor.svg_text import locate_inline_svg_text
@@ -483,6 +485,13 @@ def get_page_evidence(
             (page_id, scan_id),
         ).fetchall()
     ]
+    # Whether each screenshot was taken with focus on the element, so the
+    # page can say so beside it (alfa_states.screenshot_focused).
+    config = _scan_config(conn, scan_id)
+    for finding in findings:
+        finding["screenshot_focused"] = bool(finding.get("screenshot_hash")) and (
+            screenshot_focused(config, str(finding["pipeline"]), str(finding["rule_id"]))
+        )
     images = [
         dict(row)
         for row in conn.execute(
@@ -642,3 +651,13 @@ def _add_image_locators(body: bytes, base_url: str, images: list[dict[str, Any]]
                     "candidate": None,
                     "text": svg.visible_text,
                 }
+
+
+def _scan_config(conn: sqlite3.Connection, scan_id: int) -> dict[str, Any]:
+    """A scan's stored settings, or an empty dict when unreadable."""
+    row = conn.execute("SELECT config_json FROM scans WHERE id = ?", (scan_id,)).fetchone()
+    try:
+        config = json.loads(row[0]) if row is not None and row[0] else {}
+    except (TypeError, ValueError):
+        return {}
+    return config if isinstance(config, dict) else {}

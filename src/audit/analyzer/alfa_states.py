@@ -19,12 +19,31 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass, field
+from typing import Any
 
 from audit.analyzer.alfa import AlfaError, AlfaFinding, AlfaResult
 from audit.logging import get_logger
 
 log = get_logger(__name__)
+
+
+#: Alfa rules whose occurrences are photographed with keyboard focus on the
+#: element: Focus Visible (sia-r65, WCAG 2.4.7), where the question a person
+#: decides is whether a focus indicator shows. A scan that takes them so
+#: records ``alfa_focus_screenshots`` in its settings, which tells the report
+#: to say so beside the picture (``screenshot_focused``).
+FOCUS_SCREENSHOT_RULES = frozenset({"sia-r65"})
+
+
+def screenshot_focused(config: Mapping[str, Any], pipeline: str, rule_id: str) -> bool:
+    """Whether this occurrence's screenshot was taken with focus on the element."""
+    return (
+        bool(config.get("alfa_focus_screenshots"))
+        and pipeline == "alfa"
+        and rule_id in FOCUS_SCREENSHOT_RULES
+    )
 
 
 @dataclass(frozen=True, slots=True)

@@ -978,6 +978,9 @@ export interface IssuePage {
    *  before the problem showed, or null. Only the form error check has one:
    *  the form before its submit press (the screenshot is after it). */
   before_screenshot_hashes: (string | null)[];
+  /** The screenshots were taken with keyboard focus on the element (Focus
+   *  Visible, in reports made since 2026-11-25), so the caption says so. */
+  screenshots_focused: boolean;
   /** How many of `occurrence_count` a person has checked in the page
    *  inspector (a problem to report, or a repeat). */
   checked_count: number;
@@ -1622,6 +1625,9 @@ export interface PageEvidence {
     html_snippet: string | null;
     status: FindingStatus;
     screenshot_hash: string | null;
+    /** The screenshot was taken with keyboard focus on the element (Focus
+     *  Visible, in reports made since 2026-11-25), so the caption says so. */
+    screenshot_focused: boolean;
     engine_outcome: "failed" | "cant_tell";
     engine_evidence_json: string | null;
     target_display?: string;

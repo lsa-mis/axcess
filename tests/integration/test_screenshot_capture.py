@@ -151,7 +151,7 @@ async def test_an_occurrence_found_after_a_click_is_photographed_in_its_saved_st
     screenshots: dict[str, bytes] = {}
 
     await _fetcher()._capture_in_saved_state(
-        page, capture, [("hidden-link", "//a[@id='hidden']")], screenshots
+        page, capture, [("hidden-link", "//a[@id='hidden']", False)], screenshots
     )
 
     # Photographed open, with its outline, and the saved copy's script did
@@ -160,3 +160,39 @@ async def test_an_occurrence_found_after_a_click_is_photographed_in_its_saved_st
     # The scratch tab is closed again; the crawler's own tab is untouched.
     assert page.context.pages == [page]
     assert await page.locator("#hidden").evaluate("e => e.closest('ul').style.maxHeight") == "0px"
+
+
+async def test_a_focus_visible_screenshot_shows_the_focus_indicator(page) -> None:  # type: ignore[no-untyped-def]
+    """Taken with keyboard focus, after a mouse click as Click-Through leaves it."""
+    await page.set_content(
+        "<style>a:focus-visible{outline:4px solid rgb(0,0,255);outline-offset:3px}</style>"
+        "<p style='margin:80px'>Some text <a id='x' href='#'>A link</a></p>"
+    )
+    # A mouse click tells the browser the keyboard is not in use, so a plain
+    # focus() would not show the :focus-visible ring.
+    await page.mouse.click(5, 5)
+    fetcher = _fetcher()
+
+    plain = await fetcher._capture_element(page, "#x")
+    focused = await fetcher._capture_element(page, "#x", focus=True)
+
+    assert plain is not None and focused is not None
+    assert _ring_pixels(focused) > 3 * _ring_pixels(plain)
+    # Focus is removed again, so later pictures and checks are unaffected.
+    assert await page.evaluate("document.activeElement === document.body")
+
+
+async def test_an_element_that_takes_no_focus_gets_no_focused_screenshot(page) -> None:  # type: ignore[no-untyped-def]
+    await page.set_content("<p id='x' style='margin:80px'>Not focusable</p>")
+
+    assert await _fetcher()._capture_element(page, "#x", focus=True) is None
+
+
+def _ring_pixels(png: bytes) -> int:
+    """Pixels of the test page's pure blue focus ring."""
+    image = Image.open(io.BytesIO(png)).convert("RGB")
+    return sum(
+        1
+        for red, green, blue in image.get_flattened_data()
+        if blue > 200 and red < 60 and green < 60
+    )

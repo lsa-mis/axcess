@@ -437,6 +437,7 @@
           "page_url": "string",
           "reported_count": "integer",
           "screenshot_hashes": ["string"],
+          "screenshots_focused": "boolean",
           "status_summary": {"new": "integer"}
         }
       ],
@@ -517,6 +518,7 @@
           "page_url": "string",
           "reported_count": "integer",
           "screenshot_hashes": [],
+          "screenshots_focused": "boolean",
           "status_summary": {"new": "integer"}
         }
       ],
@@ -590,6 +592,7 @@
           "page_url": "string",
           "reported_count": "integer",
           "screenshot_hashes": [],
+          "screenshots_focused": "boolean",
           "status_summary": {"new": "integer"}
         }
       ],
@@ -670,6 +673,7 @@
           "page_url": "string",
           "reported_count": "integer",
           "screenshot_hashes": [],
+          "screenshots_focused": "boolean",
           "status_summary": {"new": "integer"}
         }
       ],
@@ -763,6 +767,7 @@
           "page_url": "string",
           "reported_count": "integer",
           "screenshot_hashes": ["string"],
+          "screenshots_focused": "boolean",
           "status_summary": {"new": "integer"}
         }
       ],
@@ -1127,6 +1132,7 @@
           "revealed_state_key": "null|string",
           "review": {"decision": "string", "notes": "string", "updated_at": "string"},
           "rule_id": "string",
+          "screenshot_focused": "boolean",
           "screenshot_hash": "null|string",
           "status": "string",
           "target_display": "absent|string",

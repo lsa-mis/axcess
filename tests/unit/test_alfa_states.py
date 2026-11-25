@@ -153,3 +153,14 @@ def test_a_saved_state_document_uses_its_saved_css_like_the_inspector() -> None:
     assert document.index("p{color:red}") < document.index("</head>")
     # Without saved CSS the page's own stylesheets stay.
     assert "/site.css" in _saved_state_document(html, None)
+
+
+def test_only_focus_visible_screenshots_from_a_scan_that_took_them_focused_say_so() -> None:
+    from audit.analyzer.alfa_states import screenshot_focused
+
+    focused_scan = {"alfa_focus_screenshots": True}
+    assert screenshot_focused(focused_scan, "alfa", "sia-r65")
+    assert not screenshot_focused(focused_scan, "alfa", "sia-r69")
+    assert not screenshot_focused(focused_scan, "axe", "sia-r65")
+    # A report made before 2026-11-25: its pictures were not focused.
+    assert not screenshot_focused({}, "alfa", "sia-r65")

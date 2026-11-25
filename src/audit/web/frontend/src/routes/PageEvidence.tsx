@@ -374,16 +374,20 @@ function FindingCard({
       )}
 
       {finding.screenshot_hash ? (
+        // A Focus Visible picture says it was taken with keyboard focus on
+        // the element, as on the issue's screenshots page
+        // (IssuePageScreenshots.tsx gives the reason).
         <figure className="mt-3">
           <img
             className="max-h-72 rounded-xs border border-border"
             src={blobUrl(finding.screenshot_hash)}
-            alt="Screenshot of the occurrence. An outline marks where it was found."
+            alt={`Screenshot of the occurrence${finding.screenshot_focused ? " with keyboard focus on it" : ""}. An outline marks where it was found.`}
             loading="lazy"
           />
           <figcaption className="mt-1 flex items-center gap-1.5 text-xs text-fg-muted">
             <ScanEye className="h-3.5 w-3.5" aria-hidden />
-            Taken during the scan. The outline marks where it was found.
+            Taken during the scan{finding.screenshot_focused ? ", with keyboard focus on it" : ""}. The outline marks
+            where it was found.
           </figcaption>
         </figure>
       ) : (

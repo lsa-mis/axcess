@@ -171,6 +171,10 @@ class IssuePage:
     # one (its form before the submit press; the after picture is the
     # screenshot). Same length as ``screenshot_hashes``.
     before_screenshot_hashes: tuple[str | None, ...] = ()
+    # The screenshots were taken with keyboard focus on the element (Focus
+    # Visible, in a scan that takes them so: alfa_states.screenshot_focused),
+    # so the report says so beside them.
+    screenshots_focused: bool = False
     # How many of ``occurrence_count`` a person has checked in the page
     # inspector: decided "a problem to report" or "a repeat of one already
     # reported" (``audit.occurrence_reviews``). Counted over the same
@@ -795,6 +799,7 @@ def _pages_for_issue(
         ).fetchall()
 
     checked = _checked_counts(conn, scan_id, row)
+    focused = _screenshots_focused(conn, scan_id, row)
     out: list[IssuePage] = []
     for r in rows:
         statuses = (r["statuses"] or "").split(",")
@@ -822,6 +827,7 @@ def _pages_for_issue(
                 status_summary=counts,
                 screenshot_hashes=shots,
                 before_screenshot_hashes=befores,
+                screenshots_focused=focused and bool(shots),
                 checked_count=checked.get(int(r["page_id"]), (0, 0))[0],
                 reported_count=checked.get(int(r["page_id"]), (0, 0))[1],
             )
@@ -871,6 +877,23 @@ def _checked_counts(
     except sqlite3.OperationalError as exc:
         log.warning("issues.checked_counts_unreadable", error=str(exc))
         return {}
+
+
+def _screenshots_focused(conn: sqlite3.Connection, scan_id: int, row: IssueRow) -> bool:
+    """Whether this issue's screenshots were taken with focus on the element."""
+    from audit.analyzer.alfa_states import screenshot_focused
+
+    if row.pipeline != "alfa":
+        return False
+    parts = row.issue_key.split(":")
+    if len(parts) < 2:
+        return False
+    found = conn.execute("SELECT config_json FROM scans WHERE id = ?", (scan_id,)).fetchone()
+    try:
+        config = json.loads(found[0]) if found is not None and found[0] else {}
+    except (TypeError, ValueError):
+        return False
+    return isinstance(config, dict) and screenshot_focused(config, row.pipeline, parts[1])
 
 
 def _sort_pages(pages: list[IssuePage], sort: str) -> list[IssuePage]:

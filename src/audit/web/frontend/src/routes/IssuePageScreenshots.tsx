@@ -190,15 +190,27 @@ export default function IssuePageScreenshotsRoute() {
                       </figcaption>
                     </figure>
                   ) : (
+                    // A Focus Visible picture was taken with keyboard focus
+                    // on the element: what a person decides is whether a
+                    // focus indicator shows, and without saying so a picture
+                    // with no ring reads as "focus not shown" when it may
+                    // only mean "not focused". Said in the caption and the
+                    // alt text, not by the wider outline alone (SC 1.1.1
+                    // Non-text Content, Level A; repo plain-language rule 4:
+                    // keep the fact that decides how evidence is read).
+                    // Older reports' pictures were not focused and keep the
+                    // plain words (`screenshots_focused` is false).
                     <figure className="rounded-xs border border-border bg-surface p-2">
                       <img
                         src={blobUrl(hash)}
-                        alt={`Occurrence ${index + 1} on ${label}. An outline marks where it was found.`}
+                        alt={`Occurrence ${index + 1} on ${label}${found.screenshots_focused ? ", with keyboard focus on it" : ""}. An outline marks where it was found.`}
                         className="max-h-80 w-full rounded-xs object-contain"
                         loading="lazy"
                       />
                       <figcaption className="mt-2 text-xs text-fg-muted">
-                        Occurrence {index + 1} of {found.occurrence_count}. The outline marks where it was found.
+                        Occurrence {index + 1} of {found.occurrence_count}
+                        {found.screenshots_focused ? ", with keyboard focus on it" : ""}. The outline marks where it
+                        was found.
                       </figcaption>
                     </figure>
                   )}
