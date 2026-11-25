@@ -276,6 +276,15 @@ Each row shows:
 - **Hosted on**: the site the file itself is kept on, such as
   "docs.google.com", and whether that is "This site" or "Another site". Not
   the pages that link to it, which are in "Pages it appears on".
+- **Creation date**: the day the file says it was first created, read from
+  the file itself (a Word or PowerPoint file's document properties, a PDF's
+  document information). It is not the day the file was posted on the site:
+  a file copied from an older one keeps the older date, and on one site we
+  measured, half the files were created more than a year before they were
+  posted. It can also be wrong if the computer that made the file had the
+  wrong date. **Not known** means the file does not say (Google Docs and
+  Slides never do), Axcess could not open it, or the report was made before
+  Axcess version 0.2.12. Sorting by this column puts files with no date last.
 - **Accessibility problems?**: how sure Axcess is that the file has
   accessibility problems. The values are the same words as the Issues table's
   How sure column.
@@ -311,10 +320,19 @@ no single score.
 
 As on the Issues tab, every column header sorts the table (What Axcess found
 sorts by how many problems the checks found), and **Back to recommended
-order** above the table undoes it. **Filter documents** narrows the list by
+order** above the table undoes it. The **Search documents** box finds a file
+by its name or its URL (for example, `annual report` or `docs.google.com`).
+**Filter documents** narrows the list by
 Accessibility problems?, Type (PDF, Word, Excel and so on) and Hosted on (this
-site or another site), with how many documents have each value. What is
-filtered is written under the bar, with **Clear filters**. The numbers above
+site or another site), with how many documents have each value. To narrow the
+list by when files were made, type a **From** day, a **To** day or both
+under **Creation date** (Month, Day and Year; the month can be a number or a
+name, such as 4 or April) and press **Apply dates**. From alone keeps files
+made on or after that day, To alone on or before it, and both keep the files
+between them. Both days are included. **Clear dates** removes them. Files whose creation date is Not
+known always stay in the list, because Axcess cannot tell how old they are. Your
+search and filters are written under the bar, with **Clear filters**, which
+clears them all. The numbers above
 the table always count the whole report.
 
 A document's own page works like an issue type's page. At the top right,

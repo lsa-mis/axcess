@@ -1,5 +1,6 @@
 import { Fragment } from "react";
 import { FileSpreadsheet, FileText, Presentation } from "lucide-react";
+import { dayKey, formatDay } from "../lib/days";
 import { documentThumbnailUrl } from "../api/client";
 import type { DocumentRefWay, LinkedFileRow, LinkedFileType } from "../api/types";
 import BreakableUrl from "./BreakableUrl";
@@ -66,6 +67,69 @@ export const PAGES_COLUMN = "Pages it appears on";
  * "What hosts it", a question where the other headers are names.
  */
 export const HOSTED_COLUMN = "Hosted on";
+
+/**
+ * The "Creation date" column (the developer's request, 2026-11-25, to tell
+ * current documents from old ones that may be archived): the day the file
+ * says it was first created, from its own properties (a Word or PowerPoint
+ * file's core properties, a PDF's document information or XMP metadata;
+ * audit/linked_files/file_dates.py). Named as the developer asked.
+ *
+ * Its limits are said where the date is read, in the column's "?" and in
+ * "What the labels mean" (CREATED_HELP), never left out to keep it short
+ * (AGENTS.md, Interface language rule 4): a creation date is not the day a
+ * file was posted (on finance.umich.edu, 16 of 33 files were created more
+ * than a year before their upload month), Google Docs and Slides exports
+ * never carry one, and it is only as right as the clock of the computer
+ * that made the file.
+ *
+ * The day is shown as the file records it, not moved into the reader's
+ * time zone: a file made at midnight UTC on 17 July is a 17 July file
+ * everywhere. Written out in the reader's own way ("July 17, 2018" or "17
+ * July 2018"), as the report's other dates are (CompareReports), not as
+ * 2018-07-17, which readers in different countries read differently; the
+ * ISO date goes in the `<time>` element's dateTime, for software (HTML's
+ * own element for a date; no ARIA needed).
+ *
+ * Known cost: the column makes the Documents table wider than 1280px with
+ * the sidebar open, so "Pages it appears on" now scrolls into view in the
+ * table's own region (TableRegion; SC 1.4.10 Reflow, Level AA, allows this
+ * for a data table). The developer accepted this, 2026-11-25.
+ */
+export const CREATED_COLUMN = "Creation date";
+
+/** The two things the column can say, for its "?" and the labels note. */
+export const CREATED_HELP = {
+  date: "The day the file says it was first created, read from the file itself. It is not the day the file was posted on the site: a file copied from an older one keeps the older date. It can also be wrong if the computer that made the file had the wrong date.",
+  unknown:
+    "The file does not say when it was created (Google Docs and Slides never do), Axcess could not open the file, or the report was made before Axcess version 0.2.12.",
+} as const;
+
+/** A file's creation date for its cell, or "Not known" (CREATED_HELP). */
+export function CreatedDate({ iso }: { iso: string | null | undefined }) {
+  const key = dayKey(iso);
+  if (!key) return <span className="text-fg-muted">Not known</span>;
+  return <time dateTime={key}>{formatDay(key)}</time>;
+}
+
+/**
+ * The "?" on the "Creation date" header: what a date and "Not known" mean,
+ * in the words "What the labels mean" uses (CREATED_HELP). A "?" because
+ * the date's limits change how it can be used (ColumnHelp: a "?" where a
+ * word needs explaining).
+ */
+export function CreatedColumnHelp() {
+  return (
+    <ColumnHelp
+      question={`What does \u201c${CREATED_COLUMN}\u201d mean`}
+      answers="when the file says it was first created"
+      items={[
+        { key: "date", term: <span className="font-semibold text-fg">A date</span>, help: CREATED_HELP.date },
+        { key: "unknown", term: <span className="text-fg-muted">Not known</span>, help: CREATED_HELP.unknown },
+      ]}
+    />
+  );
+}
 
 /** One document's own page, where its facts and every page it appears on are listed. */
 export function documentPath(scanId: number, fileId: number): string {

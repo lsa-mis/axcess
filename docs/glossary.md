@@ -524,6 +524,17 @@ It looks for:
   is a guess from the text's style, so it is marked [Not sure](#not-sure),
   and at most 20 are reported a page.
 
+### Creation date
+
+The day a document says it was first created, in the Documents table. Axcess
+reads it from the file itself: a Word or PowerPoint file's document
+properties, or a PDF's document information or XMP metadata. It is not the
+day the file was posted on the site, because a file copied from an older one
+keeps the older date, and it is only as right as the clock of the computer
+that made the file. Google Docs and Slides never carry one, so their date is
+**Not known**, as it is for a file Axcess could not open and for a report
+made before Axcess version 0.2.12.
+
 ### Document check
 
 The check behind the report's **Documents** tab. While the scan runs, Axcess
