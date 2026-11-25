@@ -113,11 +113,20 @@ async def test_an_unexpected_error_is_a_reason_not_a_clean_result() -> None:
             '{"type":"element","path":"/html[1]/body[1]/main[1]/button[2]"}',
             "/html[1]/body[1]/main[1]/button[2]",
         ),
+        # A text target (sia-r69, contrast): the element holding the text.
+        # Report 79's Qualtrics page, 2026-11-25.
+        (
+            '{"type":"text","path":"/html[1]/body[1]/div[1]/main[1]/p[3]/a[1]/text()[1]",'
+            '"data":"4HELP@umich.edu"}',
+            "/html[1]/body[1]/div[1]/main[1]/p[3]/a[1]",
+        ),
         # Through a shadow root or a frame: not a plain path the page can resolve.
         ('{"type":"element","path":"/html[1]/body[1]/x-app[1]/#shadow-root/button[1]"}', None),
         ('{"type":"element","path":"/html[1]/body[1]\\"]|//*["}', None),
         ("Alfa target unavailable; see the stored evidence.", None),
     ],
 )
-def test_alfa_xpath_reads_only_a_plain_element_path(target_hint: str, expected: str | None) -> None:
+def test_alfa_xpath_reads_only_a_plain_path_to_an_element(
+    target_hint: str, expected: str | None
+) -> None:
     assert alfa_xpath(target_hint) == expected

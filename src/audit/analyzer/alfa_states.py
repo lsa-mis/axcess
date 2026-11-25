@@ -138,20 +138,30 @@ async def settle(checks: AlfaPageChecks) -> AlfaPageOutcome:
 # "/html[1]/body[1]/main[1]/button[2]". Paths through a shadow root or a
 # frame are not plain steps and are left out.
 _XPATH = re.compile(r"(?:/[A-Za-z][A-Za-z0-9_.:-]*\[\d+\])+")
+# A text node's last step, as Alfa reports the target of a text rule such
+# as sia-r69 (contrast): ".../p[1]/a[1]/text()[1]".
+_TEXT_STEP = re.compile(r"/text\(\)\[\d+\]$")
 
 
 def alfa_xpath(target_hint: str) -> str | None:
-    """The element's XPath from an Alfa finding's target, or ``None``.
+    """The XPath of the element to photograph for an Alfa finding, or ``None``.
 
     ``target_hint`` is the bounded JSON summary ``evidence.mjs`` writes
-    (``{"type": "element", "path": "/html[1]/...", ...}``).
+    (``{"type": "element", "path": "/html[1]/...", ...}``). A text target
+    (``"type": "text"``) gives the element that holds the text: a text node
+    has no box of its own to outline, and without this every contrast
+    occurrence went without a screenshot (report 79: 29 of 29).
     """
     try:
         target = json.loads(target_hint)
     except (TypeError, ValueError):
         return None
     path = target.get("path") if isinstance(target, dict) else None
-    if not isinstance(path, str) or len(path) > 2000 or not _XPATH.fullmatch(path):
+    if not isinstance(path, str) or len(path) > 2000:
+        return None
+    if target.get("type") == "text":
+        path = _TEXT_STEP.sub("", path)
+    if not _XPATH.fullmatch(path):
         return None
     return path
 
