@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { checkedPercent } from "../lib/scanProgress";
+import { checkedCountText, checkedShare } from "../lib/scanProgress";
 import type { ScanSummary, SiteGroup } from "../api/types";
 import { siteLabel } from "./ReportCrumb";
 import { Card } from "./ui";
@@ -32,9 +32,10 @@ export default function RunningScanNotice({ sites }: { sites: SiteGroup[] }) {
 function RunningScanBanner({ scan }: { scan: ScanSummary }) {
   const { data } = useScanQuery(scan.id, { refetchInterval: PROGRESS_REFRESH_MS });
   const progress = data?.progress;
-  const checked = progress?.completed ?? 0;
-  const found = progress?.discovered ?? 0;
-  const percent = checkedPercent(progress);
+  // Out of the page limit when that is smaller than the pages found, as on
+  // the scan's own page (checkedShare).
+  const share = checkedShare(progress, data?.coverage.page_limit);
+  const { found, percent } = share;
   return (
     <Card className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-umich-blue/30 bg-umich-blue/5 p-4">
       <div className="min-w-0 flex-1 basis-72">
@@ -49,10 +50,7 @@ function RunningScanBanner({ scan }: { scan: ScanSummary }) {
               <>
                 {" · "}
                 <strong className="tabular-nums">{percent}%</strong> checked
-                <span className="text-fg-muted">
-                  {" "}
-                  ({checked.toLocaleString()} of {found.toLocaleString()} pages found so far)
-                </span>
+                <span className="text-fg-muted"> ({checkedCountText(share)})</span>
               </>
             )}
           </span>

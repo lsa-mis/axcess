@@ -32,14 +32,53 @@ function unit(count: number, name: string): string {
 }
 
 /**
- * How much of the scan is done, as a whole percent: the pages checked out of
- * the pages found so far, and 100 once only the report is left to prepare.
- * The scan finds more links as it goes, so the total can grow and the
- * percent step back; the words beside it always say "found so far".
+ * How far a running scan has got: pages checked out of the pages it will
+ * check, as a whole percent, with the words that say what the total is.
+ *
+ * The total is the pages found so far, or the page limit when that is
+ * smaller: a 5-page scan that has found 76 pages checks 5 of them, so
+ * "1 of 76" read as 1% while a fifth of the scan was done (2026-11-25). The
+ * scan finds more links as it goes, so without a limit the total can grow
+ * and the percent step back; the words then say "found so far".
+ *
+ * 100 is kept for when only the report is left to prepare: a page skipped
+ * as out of scope also counts as done, so the count can reach the limit a
+ * moment before the scan does.
  */
-export function checkedPercent(progress: ScanProgress | null | undefined): number {
-  if (!progress) return 0;
-  if (progress.stage === "preparing_report") return 100;
-  if (progress.discovered <= 0) return 0;
-  return Math.min(100, Math.floor((progress.completed / progress.discovered) * 100));
+export interface CheckedShare {
+  percent: number;
+  checked: number;
+  /** What the percent is out of: the pages found, or the page limit. */
+  total: number;
+  found: number;
+  /** The page limit is the total: it is smaller than the pages found. */
+  limited: boolean;
+}
+
+export function checkedShare(
+  progress: ScanProgress | null | undefined,
+  pageLimit: number | null | undefined,
+): CheckedShare {
+  const found = progress?.discovered ?? 0;
+  const limited = pageLimit != null && pageLimit > 0 && pageLimit < found;
+  const total = limited ? pageLimit : found;
+  const checked = Math.min(progress?.completed ?? 0, total);
+  let percent = 0;
+  if (progress?.stage === "preparing_report") percent = 100;
+  else if (total > 0) percent = Math.min(99, Math.floor((checked / total) * 100));
+  return { percent, checked, total, found, limited };
+}
+
+/**
+ * The counts a percent comes from, in words: "1 of 76 pages found so far",
+ * or with a smaller page limit "1 of 5 pages (the page limit), 76 found so
+ * far". One wording for the progress card, its announcement and the Reports
+ * page's notice (SC 3.2.4 Consistent Identification, Level AA).
+ */
+export function checkedCountText(share: CheckedShare): string {
+  const checked = share.checked.toLocaleString();
+  if (share.limited) {
+    return `${checked} of ${share.total.toLocaleString()} pages (the page limit), ${share.found.toLocaleString()} found so far`;
+  }
+  return `${checked} of ${share.found.toLocaleString()} pages found so far`;
 }

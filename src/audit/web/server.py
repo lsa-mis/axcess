@@ -1453,9 +1453,18 @@ def create_app(
             prev = previous_scan_id(conn, scan)
             other_reports = prev is not None or has_other_report(conn, scan)
             blocked = _detect_blocked_scan(conn, scan_id, scan)
-            progress = _scan_progress(conn, scan_id) if scan["status"] == "running" else None
-            method_coverage = _scan_method_coverage(conn, scan_id)
             coverage = scan_coverage(conn, scan, page_count=int(scan.get("page_count") or 0))
+            progress = (
+                _scan_progress(
+                    conn,
+                    scan_id,
+                    page_limit=coverage.page_limit,
+                    pages_saved=coverage.pages_visited,
+                )
+                if scan["status"] == "running"
+                else None
+            )
+            method_coverage = _scan_method_coverage(conn, scan_id)
             unfinished = can_continue(conn, scan_id)
         payload: dict[str, Any] = {
             **_scan_row_to_summary(scan, can_continue=unfinished),
@@ -5129,13 +5138,25 @@ def _is_loopback_host(host: str) -> bool:
         return False
 
 
-def _scan_progress(conn: sqlite3.Connection, scan_id: int) -> dict[str, Any]:
+def _scan_progress(
+    conn: sqlite3.Connection,
+    scan_id: int,
+    *,
+    page_limit: int | None = None,
+    pages_saved: int = 0,
+) -> dict[str, Any]:
     """Live, factual snapshot for the Scan -> Progress experience.
 
     The crawler cannot know its final page total while it is still following
     links, so this deliberately exposes queue/state counts instead of a made-up
     percentage.  ``stage`` is derived from durable work state: it is safe to
     announce to assistive technology and remains truthful after a page reload.
+
+    ``page_limit`` and ``pages_saved`` let a scan that has reached its page
+    limit count as preparing its report. The crawler stops taking pages at
+    the limit and leaves the rest of the pages it found waiting in the
+    queue (report 78: 5 visited, 71 still waiting), so "nothing waiting"
+    alone never came true for it.
     """
     jobs = conn.execute(
         "SELECT state, COUNT(*) AS n FROM jobs "
@@ -5204,9 +5225,10 @@ def _scan_progress(conn: sqlite3.Connection, scan_id: int) -> dict[str, Any]:
 
     if discovered == 0:
         stage = "starting"
-    elif pending == 0 and leased == 0:
-        # The crawl queue is settled but the scan row is still running: final
-        # synthesis and report materialization are the only remaining work.
+    elif leased == 0 and (pending == 0 or (page_limit is not None and pages_saved >= page_limit)):
+        # The crawl queue is settled, or the page limit is reached, but the
+        # scan row is still running: final synthesis and report
+        # materialization are the only remaining work.
         stage = "preparing_report"
     else:
         stage = "scanning"

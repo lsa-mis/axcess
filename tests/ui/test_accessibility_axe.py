@@ -852,6 +852,9 @@ async def test_running_scan_shows_factual_pipeline_progress(
             "page_count": 7,
             "axe_pages_scanned": 6,
             "alfa_pages_scanned": 5,
+            # No page limit: the total is the pages found. The page-limit
+            # case is checked at the end.
+            "coverage": {**payload["coverage"], "page_limit": None},
             "progress": {
                 "stage": "scanning",
                 "discovered": 12,
@@ -1039,6 +1042,17 @@ async def test_running_scan_shows_factual_pipeline_progress(
             page.get_by_text(
                 "Live updates paused. The scan continues in the background.",
                 exact=True,
+            )
+        ).to_be_visible()
+
+        # A page limit smaller than the pages found is the total: 7 of a
+        # 10-page limit is 70%, not 7 of 12 found (58%) (2026-11-25).
+        payload["coverage"]["page_limit"] = 10
+        await page.reload(wait_until="networkidle")
+        await playwright_async.expect(page.get_by_text("70%", exact=True)).to_be_visible()
+        await playwright_async.expect(
+            page.get_by_text(
+                "checked · 7 of 10 pages (the page limit), 12 found so far", exact=True
             )
         ).to_be_visible()
     finally:

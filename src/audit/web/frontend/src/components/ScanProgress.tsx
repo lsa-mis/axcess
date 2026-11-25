@@ -29,7 +29,7 @@ import { Cell, ColumnHeader, Row, RowHeader, Table, TableHead, TableRegion } fro
 import { Button, Card, relativeTime } from "./ui";
 import { cn } from "../lib/cn";
 import { CLICK_THROUGH } from "../lib/labels";
-import { checkedPercent, formatScanEta } from "../lib/scanProgress";
+import { checkedCountText, checkedShare, formatScanEta, type CheckedShare } from "../lib/scanProgress";
 import { CHECK_LABEL } from "../lib/terms";
 
 /**
@@ -82,7 +82,8 @@ export default function ScanProgressView({
   const preparing = stage === "preparing_report";
   const discovered = progress?.discovered ?? 0;
   const completed = progress?.completed ?? 0;
-  const percent = checkedPercent(progress);
+  const share = checkedShare(progress, scan.coverage.page_limit);
+  const percent = share.percent;
   const checks = scan.methods_used.filter((method) => method.enabled && method.key in CHECK_NAME);
   // The pages table's columns: those checks, then the document check. It is
   // not one of the report's methods (it fills the Documents tab, not
@@ -118,7 +119,7 @@ export default function ScanProgressView({
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {preparing
           ? "All pages are checked. Preparing the report."
-          : `${percent}% checked: ${completed} of ${discovered} pages found so far. ${progress?.leased ?? 0} being checked now.`}
+          : `${percent}% checked: ${checkedCountText(share)}. ${progress?.leased ?? 0} being checked now.`}
       </p>
 
       <ProgressCard
@@ -127,7 +128,7 @@ export default function ScanProgressView({
         stage={stage}
         discovered={discovered}
         completed={completed}
-        percent={percent}
+        share={share}
         cancel={cancel}
         details={
           <ProgressDetails
@@ -156,7 +157,7 @@ function ProgressCard({
   stage,
   discovered,
   completed,
-  percent,
+  share,
   cancel,
   details,
 }: {
@@ -165,7 +166,7 @@ function ProgressCard({
   stage: ScanProgress["stage"];
   discovered: number;
   completed: number;
-  percent: number;
+  share: CheckedShare;
   cancel: { mutate: () => void; isPending: boolean };
   details: ReactNode;
 }) {
@@ -200,12 +201,15 @@ function ProgressCard({
             {preparing ? "Preparing your report" : "Finding and checking pages"}
           </h2>
           {/* The percent leads; the counts it comes from follow, since the
-              total grows as the scan finds links. */}
+              total grows as the scan finds links. The total is the page
+              limit when that is smaller than the pages found, and the words
+              say so (checkedShare). */}
           <p className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <span className="text-4xl font-semibold leading-none tabular-nums text-umich-blue">{percent}%</span>
+            <span className="text-4xl font-semibold leading-none tabular-nums text-umich-blue">
+              {share.percent}%
+            </span>
             <span className="text-sm text-fg-muted">
-              <span className="font-semibold text-fg">checked</span> · {completed.toLocaleString()} of{" "}
-              {discovered.toLocaleString()} pages found so far
+              <span className="font-semibold text-fg">checked</span> · {checkedCountText(share)}
             </span>
           </p>
         </div>
@@ -226,7 +230,7 @@ function ProgressCard({
       <div aria-hidden className="mt-4 h-3 overflow-hidden rounded-full bg-surface-muted ring-1 ring-inset ring-border">
         <div
           className="h-full rounded-full bg-umich-blue transition-[width] duration-500 motion-reduce:transition-none"
-          style={{ width: `${percent}%` }}
+          style={{ width: `${share.percent}%` }}
         />
       </div>
       <p className="mt-2 flex items-center gap-1.5 text-sm text-fg-muted">
