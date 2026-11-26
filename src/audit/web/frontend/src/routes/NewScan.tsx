@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import type { NewScanPayload } from "../api/types";
 import { Checkbox, PageHeader } from "../components/ui";
-import { LocalLoginHandoff, LocalSignInCard, type SignInEnd } from "../components/LocalLoginScan";
+import { LocalSignInCard, type SignInEnd } from "../components/LocalLoginScan";
 import { GoogleSignInCard } from "../components/GoogleSignInCard";
 import { AUTHORIZATION, GOOGLE_SIGN_IN, IMAGE_ACK, RECOVERY, SIGN_IN } from "../components/newScan/copy";
 import ScanForm, { SCAN_FORM_ID } from "../components/newScan/ScanForm";
@@ -435,9 +435,13 @@ export default function NewScanRoute() {
     );
   };
 
+  // The sign-in scan started: its own progress page, as a public scan's
+  // (the developer's request, 2026-11-26; see SignInScanNote for what the
+  // in-between panel said and where it went). Replacing this history entry,
+  // so Back does not return to a sign-in card for a sign-in already used.
   const onScanStarted = (scanId: number) => {
     void queryClient.invalidateQueries({ queryKey: ["scans"] });
-    navigate(`/scans/new?mode=login&scan=${scanId}`, { replace: true });
+    navigate(`/scans/${scanId}`, { replace: true });
   };
   // Back to the form, with the reader's entries as they left them
   // (SC 3.3.7 Redundant Entry, Level A). This route kept them while the
@@ -594,7 +598,9 @@ export default function NewScanRoute() {
         // an invalid aria-controls (axe: aria-valid-attr-value).
         <div id={SCAN_PANEL_ID} role="tabpanel" aria-labelledby={scanTabId("login")}>
           {inHandoff ? (
-            <LocalLoginHandoff scanId={handoffScanId} />
+            // An address from before 2026-11-26 (`?mode=login&scan=`): the
+            // scan's own page, where a started sign-in scan now opens.
+            <Navigate replace to={`/scans/${handoffScanId}`} />
           ) : (
             <LocalSignInCard
               key={signInId}

@@ -26,6 +26,7 @@ import { api } from "../api/client";
 import { RETRY } from "../components/newScan/copy";
 import { PUBLIC_DEFAULTS, quickRetrySettings } from "../components/newScan/scanPolicy";
 import { BlockedScanNotice } from "../components/ReportSummary";
+import { SignInScanNote } from "../components/LocalLoginScan";
 import ScanProgressView from "../components/ScanProgress";
 import {
   Button,
@@ -112,14 +113,19 @@ export default function ScanDetailRoute() {
   if (isLoading || !data) return <div className="text-fg-muted">Loading the scan…</div>;
 
   if (data.status === "running") {
+    // A sign-in scan's note sits above its progress (SignInScanNote): where
+    // its browser is and what keeps it going. Nothing for any other scan.
     return (
-      <ScanProgressView
+      <>
+        <SignInScanNote scanId={data.id} />
+        <ScanProgressView
         scan={data}
         cancel={cancel}
         liveUpdates={liveUpdates}
         isFetching={isFetching}
         onToggleLiveUpdates={() => setLiveUpdates((current) => !current)}
-      />
+        />
+      </>
     );
   }
 

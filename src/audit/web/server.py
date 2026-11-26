@@ -5422,7 +5422,7 @@ async def _run_local_login_background(
         # Override the row so the UI explains the failure instead of opening a
         # misleading empty report.
         if run.status != summary.status:
-            _finish_local_login_scan(db_path, run.scan_id, run.status)
+            _finish_local_login_scan(db_path, run.scan_id, run.status, run.error)
     except asyncio.CancelledError:
         run.status = "interrupted"
         _finish_local_login_scan(db_path, run.scan_id, "interrupted")
@@ -5435,7 +5435,7 @@ async def _run_local_login_background(
             "The local login scan could not continue. Check the approved sign-in "
             "origins and make sure Playwright Chromium is installed."
         )
-        _finish_local_login_scan(db_path, run.scan_id, "failed")
+        _finish_local_login_scan(db_path, run.scan_id, "failed", run.error)
         log.warning("web.local_login_scan_failed", scan_id=run.scan_id)
     finally:
         # The Google sign-in, if any, however the scan ended: signed out at
@@ -5611,15 +5611,33 @@ def _local_login_ollama_url(value: str) -> str | None:
     return parsed._replace(netloc=authority, path="").geturl()
 
 
-def _finish_local_login_scan(db_path: Path, scan_id: int, status: str) -> None:
-    """Finish a local-login row without retaining target/browser diagnostics."""
+def _finish_local_login_scan(
+    db_path: Path, scan_id: int, status: str, reason: str | None = None
+) -> None:
+    """Finish a local-login row without retaining target/browser diagnostics.
+
+    ``reason`` is one of Axcess's own sentences for why the scan failed
+    (``_local_login_completion``, or the fixed text when the browser could
+    not continue), never site content, an address or an exception. Saved as
+    the scan's ``failure_reason`` so the scan's own page says it, as for any
+    scan, now that New scan opens that page as soon as a sign-in scan starts
+    (2026-11-26). Until then it lived only in memory, for New scan's
+    in-between panel, and was lost when Axcess restarted.
+    """
 
     conn = connect(db_path)
     try:
-        conn.execute(
-            "UPDATE scans SET status = ?, finished_at = CURRENT_TIMESTAMP WHERE id = ?",
-            (status, scan_id),
-        )
+        if reason:
+            conn.execute(
+                "UPDATE scans SET status = ?, failure_reason = ?, "
+                "finished_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (status, reason, scan_id),
+            )
+        else:
+            conn.execute(
+                "UPDATE scans SET status = ?, finished_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (status, scan_id),
+            )
     finally:
         conn.close()
 

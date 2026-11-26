@@ -363,11 +363,18 @@ async def test_start_turns_the_sign_in_into_a_numbered_sign_in_scan(
 
     await page.get_by_role("button", name=START).click()
 
-    await expect(page).to_have_url(re.compile(r"mode=login&scan=\d+"))
-    scan_id = int(re.search(r"scan=(\d+)", page.url).group(1))  # type: ignore[union-attr]
-    await expect(page.get_by_text(f"Sign-in scan #{scan_id}", exact=True)).to_be_visible()
-    title = "Preparing the signed-in session"
-    await expect(page.get_by_role("heading", name=title)).to_be_visible()
-    assert await _heading_has_focus(page, title)
+    # Straight to the scan's own progress page, as a public scan (2026-11-26),
+    # with the sign-in note above the progress while the session is set up.
+    await expect(page).to_have_url(re.compile(r"/app/scans/\d+$"))
+    scan_id = int(re.search(r"/scans/(\d+)$", page.url).group(1))  # type: ignore[union-attr]
+    note = page.get_by_role("heading", name=f"Sign-in scan #{scan_id}", exact=True)
+    await expect(note).to_be_visible()
+    await expect(
+        page.get_by_role("status").filter(has_text="setting up your signed-in session")
+    ).to_be_visible()
+    await expect(page.get_by_role("heading", name="Finding and checking pages")).to_be_visible()
+    # An address from before then opens the same page.
+    await page.goto(f"{base}/app/scans/new?mode=login&scan={scan_id}", wait_until="networkidle")
+    await expect(page).to_have_url(re.compile(rf"/app/scans/{scan_id}$"))
     scans = await (await page.request.get(f"{base}/api/scans")).json()
     assert scan_id in {scan["id"] for scan in scans}

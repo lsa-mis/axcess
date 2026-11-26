@@ -444,7 +444,7 @@ async def test_a_sign_in_scan_with_google_is_axe_clean_and_works_by_keyboard(
             break
     await expect(start).to_be_focused()
     await page.keyboard.press("Enter")
-    await expect(page).to_have_url(re.compile(r"mode=login&scan=\d+"))
+    await expect(page).to_have_url(re.compile(r"/app/scans/\d+$"))
     assert runs and runs[0].google is fake_google.instances[0]
     assert runs[0].session is fake_sign_in.instances[0]
     assert fake_google.instances[0].scanning
