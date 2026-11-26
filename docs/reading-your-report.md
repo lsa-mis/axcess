@@ -282,8 +282,11 @@ Each row shows:
   a file copied from an older one keeps the older date, and on one site we
   measured, half the files were created more than a year before they were
   posted. It can also be wrong if the computer that made the file had the
-  wrong date. **Not known** means the file does not say (Google Docs and
-  Slides never do), Axcess could not open it, or the report was made before
+  wrong date. For a Google Doc, Sheet or Slides file it is the day Google's
+  File, Details says it was created; a Google file has a date only when the
+  scan was signed in to Google (the **Sign in to Google for Google files**
+  setting) with an account that can open it. **Not known** means the file
+  does not say, Axcess could not open it, or the report was made before
   Axcess version 0.2.12. Sorting by this column puts files with no date last.
 - **Accessibility problems?**: how sure Axcess is that the file has
   accessibility problems. The values are the same words as the Issues table's

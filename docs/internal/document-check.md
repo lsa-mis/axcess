@@ -245,6 +245,103 @@ the research files through the real checks: 319 of 325 Word files (one the
 Word check cannot open), 35 of 45 PowerPoint files and 54 of 54 PDFs got a
 creation date, and no Google export did.
 
+## Google files: dates and sign-in (2026-11-26)
+
+Asked for so a Google Doc, Sheet or Slides file has a creation date like any
+other file, and so Google files shared only with signed-in accounts can be
+checked (the developer's request, 2026-11-26).
+
+What was tried first, with no key and no sign-in, on report #71's Google
+files. None gave a date:
+
+- Google's .docx and .pptx exports: 0 of 42 carry a creation or modified
+  date (see "Creation and modified dates" above). The PDF export: 0 of 7.
+- The export's reply headers: none says when the file was made or changed.
+- The file's public pages (`/edit`, `/mobilebasic`, `/htmlview`): no date in
+  the HTML.
+- Signed out, the editor's File, Details is turned off (`aria-disabled`).
+
+The Drive API with a key gave dates, but for public files only: 16 of report
+#71's 65 Google files. Rejected: a key cannot ship in open-source code
+(Google APIs Terms of Service, section 4b, "Developer credentials may not be
+embedded in open source projects"), and each person would have to make
+their own. OAuth (a Google app that asks for access to the person's Drive)
+was declined by the developer.
+
+Signed in, File, Details read 30 of 30 sign-in-only Docs on report #71, and
+for the 2 public Docs used as a control it gave the same days as the Drive
+API. `docs.google.com/robots.txt` allows `/document`, `/presentation` and
+`/spreadsheet` with `Crawl-delay: 1` (as read for this request; the earlier
+research, `google-files-research.md`, found `/spreadsheets` not allowed, so
+the code asks robots.txt about each page address and follows its answer).
+Google's Terms of Service forbid automated access only against robots.txt
+(paraphrase).
+
+Correction: report #71's Docs were "Could not check" because the report
+started on 2026-11-17, before Docs were checked. 30 of its 46 Docs do need
+a sign-in.
+
+What was built (`linked_files/google_session.py`, used only by the tracker):
+
+- New scan: "Sign in to Google for Google files", off by default, under the
+  document check and shown while it is on; in a sign-in scan shown but
+  disabled ("Works only in a scan of a public website."). Kept in the
+  scan's settings (`google_sign_in`), never the sign-in itself.
+- Starting a public scan with it on opens a visible Chromium window (a
+  temporary profile) on Google's sign-in page, and New scan shows a card
+  with "I'm signed in to Google, start scan" and "Cancel Google sign-in". No
+  scan exists until start (`POST /api/scans` answers with the sign-in;
+  `/api/google-sign-ins/{id}`, `/start`, `/cancel`; this computer only). A
+  closed window is forgotten after 30 minutes, as a site sign-in is.
+- Start checks that Google says the browser is signed in, then closes the
+  window and opens the same profile headless for the scan.
+- During the scan: a Doc or Slides export, and a Drive file when robots.txt
+  allows its download address, is downloaded through the sign-in. After the
+  last download, each Google Doc, Sheet and Slides file with no date is
+  opened (one read per Google file ID, at most 500 a scan) and only its
+  created and modified days are kept (`set_file_dates`: a date the file gave
+  is never replaced). A day written as a time only ("Modified at 3:15 PM")
+  is the browser's today. If no file opened gives a date, the log warns that
+  Google's screen may have changed.
+- Drive files get their dates from the file itself, as before.
+
+The safeguards (the developer chose all five):
+
+1. Allow-list: in the scan, a page or frame loads only a Google file page
+   this scan found, or `accounts.google.com`; any other request only Google's
+   own hosts (`google.com`, `gstatic.com`, `googleusercontent.com`,
+   `googleapis.com`, `ggpht.com`). A download checks every address and
+   redirect (`docs.google.com`, `drive.google.com`,
+   `drive.usercontent.google.com`, `*.googleusercontent.com`); a redirect to
+   Google's sign-in is HTTP 401, as without the sign-in.
+2. Nobody uses the window after sign-in: it is closed at start, the profile
+   reopened headless with the window's own browser name. A file page sent
+   to Google's sign-in means the sign-in was lost: Google is not used again
+   in that scan, and one warning is logged.
+3. Read-only: open a file page, click File, click Details, read, press
+   Escape. Nothing is typed; the browser accepts no download.
+4. Sign out, then delete: at the end of the scan however it ends, on cancel,
+   on expiry and when Axcess quits, Axcess opens Google's sign-out page,
+   closes the browser and deletes the profile.
+5. Never kept: a mode-0700 profile under `axcess-google-browser/`, stale ones
+   swept when a new sign-in starts. No cookie or token is read, logged or
+   stored; the log has counts only.
+
+Pacing: one Google page or download at a time, at most one a second.
+
+Isolation (the developer's rule, 2026-11-26): the Google browser is a
+Playwright instance of its own. The crawl hands the session to the document
+check's tracker and closes it at the end, nothing more; the page checks
+(Click-Through, the form check, keyboard, zoom, focus, page code, axe, Alfa)
+and their browser are unchanged. `tests/unit/test_google_session_isolation.py`
+checks that no crawler, analyzer or protected-scan module imports the
+session, and that a crawl uses it only through the tracker.
+
+Not verified by the code's author (no visit to Google was allowed): Google's
+real details popup in Sheets and Slides, how Google answers the signed-in
+check, whether the session survives the move to the headless browser, and
+what sign-out does. The developer tests those by hand.
+
 ## Why it is built this way
 
 - Checking PDFs only after the last page (the first version) left every PDF
