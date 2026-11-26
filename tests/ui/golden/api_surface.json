@@ -362,6 +362,16 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/local-sign-ins/{sign_in_id}/google/reopen",
+        "methods": ["POST"],
+        "name": "api_reopen_local_sign_in_google",
+        "async": true,
+        "params": {"path": ["sign_in_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/local-sign-ins/{sign_in_id}/cancel",
         "methods": ["POST"],
         "name": "api_cancel_local_sign_in",
@@ -405,6 +415,16 @@
         "path": "/api/google-sign-ins/{sign_in_id}/start",
         "methods": ["POST"],
         "name": "api_start_google_sign_in_scan",
+        "async": true,
+        "params": {"path": ["sign_in_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/google-sign-ins/{sign_in_id}/reopen",
+        "methods": ["POST"],
+        "name": "api_reopen_google_sign_in",
         "async": true,
         "params": {"path": ["sign_in_id"]},
         "request_param": "request",
@@ -1383,6 +1403,16 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/local-sign-ins/{sign_in_id}/google/reopen",
+        "methods": ["POST"],
+        "name": "api_reopen_local_sign_in_google",
+        "async": true,
+        "params": {"path": ["sign_in_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/local-sign-ins/{sign_in_id}/cancel",
         "methods": ["POST"],
         "name": "api_cancel_local_sign_in",
@@ -1426,6 +1456,16 @@
         "path": "/api/google-sign-ins/{sign_in_id}/start",
         "methods": ["POST"],
         "name": "api_start_google_sign_in_scan",
+        "async": true,
+        "params": {"path": ["sign_in_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/google-sign-ins/{sign_in_id}/reopen",
+        "methods": ["POST"],
+        "name": "api_reopen_google_sign_in",
         "async": true,
         "params": {"path": ["sign_in_id"]},
         "request_param": "request",
@@ -2390,6 +2430,16 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/local-sign-ins/{sign_in_id}/google/reopen",
+        "methods": ["POST"],
+        "name": "api_reopen_local_sign_in_google",
+        "async": true,
+        "params": {"path": ["sign_in_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/local-sign-ins/{sign_in_id}/cancel",
         "methods": ["POST"],
         "name": "api_cancel_local_sign_in",
@@ -2433,6 +2483,16 @@
         "path": "/api/google-sign-ins/{sign_in_id}/start",
         "methods": ["POST"],
         "name": "api_start_google_sign_in_scan",
+        "async": true,
+        "params": {"path": ["sign_in_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/google-sign-ins/{sign_in_id}/reopen",
+        "methods": ["POST"],
+        "name": "api_reopen_google_sign_in",
         "async": true,
         "params": {"path": ["sign_in_id"]},
         "request_param": "request",
@@ -3410,6 +3470,16 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/local-sign-ins/{sign_in_id}/google/reopen",
+        "methods": ["POST"],
+        "name": "api_reopen_local_sign_in_google",
+        "async": true,
+        "params": {"path": ["sign_in_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/local-sign-ins/{sign_in_id}/cancel",
         "methods": ["POST"],
         "name": "api_cancel_local_sign_in",
@@ -3453,6 +3523,16 @@
         "path": "/api/google-sign-ins/{sign_in_id}/start",
         "methods": ["POST"],
         "name": "api_start_google_sign_in_scan",
+        "async": true,
+        "params": {"path": ["sign_in_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/google-sign-ins/{sign_in_id}/reopen",
+        "methods": ["POST"],
+        "name": "api_reopen_google_sign_in",
         "async": true,
         "params": {"path": ["sign_in_id"]},
         "request_param": "request",

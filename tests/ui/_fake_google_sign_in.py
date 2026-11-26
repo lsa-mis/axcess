@@ -4,7 +4,10 @@
 the server's flow and the New scan card, so the session is swapped for this
 fake (``app.state.google_session_factory``, or ``server.GoogleBrowserSession``
 for an app a fixture builds). ``signed_in`` is what Google would answer;
-``close_window`` flips ``window_open`` as a person closing it would.
+``close_window`` flips ``window_open`` as a person closing it would;
+``reopen_window`` opens it again (or fails, with ``fail_reopen``), and a
+signed-in check with the window closed is counted in ``hidden_checks``, as
+the real session asks through a hidden browser then.
 """
 
 from __future__ import annotations
@@ -18,6 +21,7 @@ class FakeGoogleSession:
     signed_in: ClassVar[bool] = False
     fail_start: ClassVar[bool] = False
     fail_handover: ClassVar[bool] = False
+    fail_reopen: ClassVar[bool] = False
 
     site = "accounts.google.com"
 
@@ -27,6 +31,8 @@ class FakeGoogleSession:
         self.scanning = False
         self.closed = 0
         self.signed_in_checks = 0
+        self.hidden_checks = 0
+        self.reopens = 0
         self._listeners: list[Callable[[bool], None]] = []
         FakeGoogleSession.instances.append(self)
 
@@ -41,6 +47,8 @@ class FakeGoogleSession:
 
     async def is_signed_in(self) -> bool:
         self.signed_in_checks += 1
+        if not self.window_open:
+            self.hidden_checks += 1
         return FakeGoogleSession.signed_in
 
     async def enter_scan_mode(self) -> None:
@@ -51,6 +59,12 @@ class FakeGoogleSession:
 
     def close_window(self) -> None:
         self.window_open = False
+
+    async def reopen_window(self) -> None:
+        self.reopens += 1
+        if FakeGoogleSession.fail_reopen:
+            raise RuntimeError("could not reopen")
+        self._set(True)
 
     async def close(self) -> None:
         self.closed += 1

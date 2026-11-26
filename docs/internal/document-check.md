@@ -292,10 +292,20 @@ What was built (`linked_files/google_session.py`, used only by the tracker):
   temporary profile) on Google's sign-in page, and New scan shows a card
   with "I'm signed in to Google, start scan" and "Cancel Google sign-in". No
   scan exists until start (`POST /api/scans` answers with the sign-in;
-  `/api/google-sign-ins/{id}`, `/start`, `/cancel`; this computer only). A
-  closed window is forgotten after 30 minutes, as a site sign-in is.
+  `/api/google-sign-ins/{id}`, `/start`, `/reopen`, `/cancel`; this
+  computer only). A closed window is forgotten after 30 minutes, as a site
+  sign-in is.
+- A closed window works like a closed site sign-in window (the developer's
+  request, 2026-11-26): the card offers start, "Reopen Google window" and
+  cancel. Reopen opens a new visible window from the same profile, where
+  the sign-in is kept, on Google's sign-in page; the clock stops while it
+  opens and restarts from zero if it fails (503, sign-in kept).
 - Start checks that Google says the browser is signed in, then closes the
-  window and opens the same profile headless for the scan.
+  window and opens the same profile headless for the scan. With the window
+  closed, the check runs in a hidden browser on the same profile (headless,
+  the browser name remembered from the window, no page loaded), and the
+  scan uses that same hidden browser, with the route guard put on it: one
+  browser per profile folder at a time (a reopen closes it first).
 - During the scan: a Doc or Slides export, and a Drive file when robots.txt
   allows its download address, is downloaded through the sign-in. After the
   last download, each Google Doc, Sheet and Slides file with no date is
@@ -363,9 +373,12 @@ The flow, on New scan's sign-in card (`LocalSignInCard`):
 3. The card says "Step 2 of 2: sign in to Google", "Now sign in to Google",
    with "I'm signed in to Google, start scan" (the same `/start`) and
    "Cancel sign-in". Start is refused, with both sign-ins kept, until the
-   Google window is open and Google says it is signed in (the public card's
-   message). Then the Google window is closed and its profile reopened
-   headless (`enter_scan_mode`), and the scan starts as before: the site
+   Google window has opened and Google says it is signed in (the public
+   card's message). A closed Google window offers start, "Reopen Google
+   window" (`POST /api/local-sign-ins/{id}/google/reopen`) and "Cancel
+   sign-in", as the public card does; the start asks Google in a hidden
+   browser then. Then the Google window, if open, is closed and its profile
+   reopened headless (`enter_scan_mode`), and the scan starts as before: the site
    session to the scan, the Google session to `run_crawl(google_files=...)`
    only (`_LocalLoginRun.google`). If that move fails, the Google sign-in is
    closed and the card goes back to step 1 with the reason; the site

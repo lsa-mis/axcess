@@ -304,10 +304,12 @@ export const GOOGLE_SIGN_IN = {
     detail:
       "A browser window opened. Sign in to Google there, with the account that can open the site’s Google files. Then come back and start the scan.",
   },
+  // A closed Google window works like a closed site sign-in window
+  // (SIGN_IN.closed, the developer's request, 2026-11-26): the same words,
+  // for Google, so the same situation reads the same way.
   closed: {
     title: "The Google window is closed",
-    detail:
-      "Axcess cannot start the scan without it. Cancel Google sign-in to go back to the form. Your settings stay filled in.",
+    detail: "Axcess has kept your Google sign-in, so you can start the scan or reopen the window.",
   },
   forget: (minutes: number) =>
     `If you do nothing, Axcess signs out of Google and deletes that browser’s data after ${minutes} minutes.`,
@@ -321,6 +323,8 @@ export const GOOGLE_SIGN_IN = {
     "Axcess keeps one Google sign-in at a time, so it shows the one in progress instead of opening another window.",
   start: "I’m signed in to Google, start scan",
   starting: "Starting the scan…",
+  reopen: "Reopen Google window",
+  reopening: "Reopening the Google window…",
   cancel: "Cancel Google sign-in",
   cancelling: "Cancelling…",
   ended: {
@@ -443,11 +447,7 @@ export const SIGN_IN = {
       title: "Now sign in to Google",
       detail: GOOGLE_SIGN_IN.open.detail,
     },
-    closed: {
-      title: "The Google window is closed",
-      detail:
-        "Axcess cannot start the scan without it. Cancel sign-in to go back to the form. Your settings stay filled in.",
-    },
+    closed: GOOGLE_SIGN_IN.closed,
     forget: (minutes: number) =>
       `No sign-in window is open. If you do nothing for ${minutes} minutes, Axcess ends this sign-in: it signs out of Google and deletes both browsers’ data.`,
     steps: [
@@ -460,6 +460,8 @@ export const SIGN_IN = {
       "When the scan ends, Axcess signs out of Google and deletes both browsers’ data.",
     ],
     start: GOOGLE_SIGN_IN.start,
+    reopen: GOOGLE_SIGN_IN.reopen,
+    reopening: GOOGLE_SIGN_IN.reopening,
   },
   // Added to the ended notice when the sign-in had a Google window: rule 12
   // in docs/plain-language.md, never drop a privacy fact.

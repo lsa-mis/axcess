@@ -37,6 +37,7 @@ def fake_google(monkeypatch: pytest.MonkeyPatch) -> type[FakeGoogleSession]:
     monkeypatch.setattr(FakeGoogleSession, "signed_in", False)
     monkeypatch.setattr(FakeGoogleSession, "fail_start", False)
     monkeypatch.setattr(FakeGoogleSession, "fail_handover", False)
+    monkeypatch.setattr(FakeGoogleSession, "fail_reopen", False)
     return FakeGoogleSession
 
 
@@ -203,12 +204,15 @@ def test_start_is_refused_until_google_says_signed_in(
     assert '"google_sign_in": true' in stored[0]
 
 
-def test_start_is_refused_while_the_window_is_closed(
+def test_start_with_the_window_closed_asks_google_and_starts_when_signed_in(
     seeded_db: tuple[Path, Path, int],
     fake_google: type[FakeGoogleSession],
     started_crawls: list[dict[str, Any]],
 ) -> None:
+    """A closed window no longer refuses the start (2026-11-26): the session
+    asks Google through a hidden browser on the same profile."""
     fake_google.signed_in = True
+    before = _scan_count(seeded_db)
     with _local(_app(seeded_db)) as client:
         sign_in_id = client.post("/api/scans", headers=ORIGIN, json=SCAN_BODY).json()[
             "google_sign_in"
@@ -217,10 +221,134 @@ def test_start_is_refused_while_the_window_is_closed(
         fake_google.instances[0].close_window()
         state = client.get(f"/api/google-sign-ins/{sign_in_id}").json()
         assert state["window_open"] is False
+        started = client.post(f"/api/google-sign-ins/{sign_in_id}/start", headers=ORIGIN)
+        assert started.status_code == 201, started.text
+        deadline = time.monotonic() + 5
+        while not started_crawls and time.monotonic() < deadline:
+            time.sleep(0.02)
+    session = fake_google.instances[0]
+    assert session.hidden_checks == 1
+    assert session.scanning
+    assert session.reopens == 0, "no window opens for the start"
+    assert started_crawls[0]["google_files"] is session
+    assert _scan_count(seeded_db) == before + 1
+
+
+def test_start_with_the_window_closed_and_signed_out_is_refused_and_kept(
+    seeded_db: tuple[Path, Path, int],
+    fake_google: type[FakeGoogleSession],
+    started_crawls: list[dict[str, Any]],
+) -> None:
+    before = _scan_count(seeded_db)
+    with _local(_app(seeded_db)) as client:
+        sign_in_id = client.post("/api/scans", headers=ORIGIN, json=SCAN_BODY).json()[
+            "google_sign_in"
+        ]["sign_in_id"]
+        _wait(client, sign_in_id)
+        fake_google.instances[0].close_window()
+        client.get(f"/api/google-sign-ins/{sign_in_id}")
         refused = client.post(f"/api/google-sign-ins/{sign_in_id}/start", headers=ORIGIN)
         assert refused.status_code == 409
-        assert "The Google window is closed" in refused.json()["error"]
+        assert refused.json()["error"] == (
+            "Google says you are not signed in yet. Finish signing in in the Google "
+            "window, then try again."
+        )
+        kept = client.get(f"/api/google-sign-ins/{sign_in_id}").json()
+        assert kept["status"] == "awaiting_authentication"
+        assert kept["window_open"] is False
+    session = fake_google.instances[0]
+    assert session.hidden_checks == 1
+    assert not session.scanning
     assert started_crawls == []
+    assert _scan_count(seeded_db) == before
+
+
+def test_reopen_opens_the_window_again_and_the_clock_stops(
+    seeded_db: tuple[Path, Path, int],
+    fake_google: type[FakeGoogleSession],
+    started_crawls: list[dict[str, Any]],
+) -> None:
+    """As a closed site sign-in window (2026-11-26): reopen keeps the
+    sign-in, stops the clock, restarts it from zero if the reopen fails,
+    and is refused while the window is open."""
+    app = _app(seeded_db)
+    with _local(app) as client:
+        sign_in_id = client.post("/api/scans", headers=ORIGIN, json=SCAN_BODY).json()[
+            "google_sign_in"
+        ]["sign_in_id"]
+        _wait(client, sign_in_id)
+        registry = app.state.google_sign_ins
+        now = [10_000.0]
+        registry.clock = lambda: now[0]
+
+        open_now = client.post(f"/api/google-sign-ins/{sign_in_id}/reopen", headers=ORIGIN)
+        assert open_now.status_code == 409
+        assert open_now.json()["error"] == "The Google window is already open."
+
+        fake_google.instances[0].close_window()
+        client.get(f"/api/google-sign-ins/{sign_in_id}")
+        now[0] += 100
+        assert registry.seconds_left(sign_in_id) == 1700
+
+        fake_google.fail_reopen = True
+        failed = client.post(f"/api/google-sign-ins/{sign_in_id}/reopen", headers=ORIGIN)
+        assert failed.status_code == 503
+        assert failed.json()["error"] == (
+            "Axcess could not reopen the Google window. Your Google sign-in is still kept. "
+            "Try again, or start the scan."
+        )
+        kept = client.get(f"/api/google-sign-ins/{sign_in_id}").json()
+        assert kept["status"] == "awaiting_authentication"
+        assert kept["window_open"] is False
+        # Restarted from zero.
+        assert registry.seconds_left(sign_in_id) == 1800
+
+        fake_google.fail_reopen = False
+        reopened = client.post(f"/api/google-sign-ins/{sign_in_id}/reopen", headers=ORIGIN)
+        assert reopened.status_code == 200, reopened.text
+        assert reopened.headers["cache-control"] == "no-store"
+        assert reopened.json()["status"] == "awaiting_authentication"
+        assert reopened.json()["window_open"] is True
+        assert registry.seconds_left(sign_in_id) is None
+        now[0] += 10_000
+        assert client.get(f"/api/google-sign-ins/{sign_in_id}").json()["window_open"] is True
+    session = fake_google.instances[0]
+    assert session.reopens == 2
+    assert len(fake_google.instances) == 1, "the same session, the same profile"
+    assert started_crawls == []
+
+
+def test_reopen_is_for_this_computer_only_and_for_a_waiting_sign_in(
+    seeded_db: tuple[Path, Path, int],
+    fake_google: type[FakeGoogleSession],
+    started_crawls: list[dict[str, Any]],
+) -> None:
+    app = _app(seeded_db)
+    with _local(app) as client:
+        sign_in_id = client.post("/api/scans", headers=ORIGIN, json=SCAN_BODY).json()[
+            "google_sign_in"
+        ]["sign_in_id"]
+        _wait(client, sign_in_id)
+        fake_google.instances[0].close_window()
+        client.get(f"/api/google-sign-ins/{sign_in_id}")
+        no_origin = client.post(f"/api/google-sign-ins/{sign_in_id}/reopen")
+        foreign = client.post(
+            f"/api/google-sign-ins/{sign_in_id}/reopen", headers={"origin": "https://evil.example"}
+        )
+        # Not entered: entering would run the app's shutdown, ending the sign-in.
+        lan = TestClient(app, base_url="http://192.168.1.20:8765", client=("192.168.1.30", 4000))
+        remote = lan.post(
+            f"/api/google-sign-ins/{sign_in_id}/reopen",
+            headers={"origin": "http://192.168.1.20:8765"},
+        )
+        for refused in (no_origin, foreign, remote):
+            assert refused.status_code == 403
+            assert "only on the computer that runs Axcess" in refused.json()["error"]
+        assert fake_google.instances[0].reopens == 0
+        client.post(f"/api/google-sign-ins/{sign_in_id}/cancel", headers=ORIGIN)
+        ended = client.post(f"/api/google-sign-ins/{sign_in_id}/reopen", headers=ORIGIN)
+        assert ended.status_code == 404
+    assert fake_google.instances[0].reopens == 0
 
 
 def test_start_respects_the_crawl_lock(

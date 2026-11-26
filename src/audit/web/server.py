@@ -461,9 +461,12 @@ class LocalSignInResponse(BaseModel):
 _GOOGLE_NOT_SIGNED_IN = (
     "Google says you are not signed in yet. Finish signing in in the Google window, then try again."
 )
-_GOOGLE_WINDOW_CLOSED = (
-    "The Google window is closed, so Axcess cannot start the scan with it. "
-    "Cancel Google sign-in, then start the scan again."
+# A closed Google window is reopened like a closed site sign-in window
+# (2026-11-26): the same answers as ``api_reopen_local_sign_in``, for Google.
+_GOOGLE_ALREADY_OPEN = "The Google window is already open."
+_GOOGLE_REOPEN_FAILED = (
+    "Axcess could not reopen the Google window. Your Google sign-in is still kept. "
+    "Try again, or start the scan."
 )
 _GOOGLE_OPEN_FAILED = (
     "Axcess could not open the Google window. Check that Chromium for Playwright is "
@@ -476,10 +479,6 @@ _GOOGLE_LOCAL_ONLY = (
 # button is "Cancel sign-in": it ends the site sign-in and the Google one.
 _SIGN_IN_GOOGLE_FIRST = "Sign in to Google first."
 _SIGN_IN_GOOGLE_OPENING = "Wait for the Google window to open, then sign in to Google."
-_SIGN_IN_GOOGLE_WINDOW_CLOSED = (
-    "The Google window is closed, so Axcess cannot start the scan with it. "
-    "Cancel sign-in, then start again."
-)
 _SIGN_IN_GOOGLE_HANDOVER_FAILED = (
     "Axcess could not move your Google sign-in to the scan. It signed out of Google and "
     "deleted that browser's data. Your sign-in to the site is still kept. Sign in to "
@@ -2160,16 +2159,16 @@ def create_app(
         """The Google step's checks before a start (2026-11-26); None when ready.
 
         Refused with the sign-in kept: no Google window yet, still opening,
-        closed, or Google says it is not signed in. Asks Google nothing about
-        the site sign-in, and the site session nothing about Google.
+        or Google says it is not signed in. A closed Google window is not
+        refused (2026-11-26): the session asks Google through a hidden
+        browser on the same profile. Asks Google nothing about the site
+        sign-in, and the site session nothing about Google.
         """
         second = pending.second
         if second is None or second.status == "failed":
             return _google_error(_SIGN_IN_GOOGLE_FIRST, 409)
         if second.status != "awaiting_authentication":
             return _google_error(_SIGN_IN_GOOGLE_OPENING, 409)
-        if not second.window_open:
-            return _google_error(_SIGN_IN_GOOGLE_WINDOW_CLOSED, 409)
         session = cast(GoogleBrowserSession, second.session)
         try:
             signed_in = await session.is_signed_in()
@@ -2189,8 +2188,9 @@ def create_app(
 
         With "Sign in to Google for Google files" (2026-11-26) this is "I'm
         signed in to Google, start scan": refused, with the sign-in kept,
-        until the Google window is open and Google says it is signed in.
-        Then the Google window is closed and its profile reopened headless
+        until the Google window has opened and Google says it is signed in
+        (asked in a hidden browser when the window is closed). Then the
+        Google window, if open, is closed and its profile reopened headless
         (``enter_scan_mode``), and the scan starts with the site session as
         before and the Google session for the document check only.
         """
@@ -2338,6 +2338,39 @@ def create_app(
                 )
         if sign_ins.get(pending.id) is not None:
             sign_ins.window_opened(pending.id)
+        return _sign_in_json(_sign_in_or_ended(pending.id))
+
+    @app.post("/api/local-sign-ins/{sign_in_id}/google/reopen", response_model=LocalSignInResponse)
+    async def api_reopen_local_sign_in_google(request: Request, sign_in_id: str) -> JSONResponse:
+        """Reopen a closed Google window of a sign-in scan (2026-11-26).
+
+        As ``api_reopen_local_sign_in`` does for the site's window: a new
+        visible Google window from the same profile, where the Google
+        sign-in is kept. The sign-in's one clock stops while it opens and
+        restarts if it fails; the site's window is left as it is.
+        """
+
+        _require_local_login_request(request, mutation=True)
+        await _refresh_sign_in()
+        pending = _waiting_sign_in_or_error(sign_in_id)
+        second = pending.second
+        if second is None or second.status == "failed":
+            return _google_error(_SIGN_IN_GOOGLE_FIRST, 409)
+        if second.status != "awaiting_authentication":
+            return _google_error(_SIGN_IN_GOOGLE_OPENING, 409)
+        if second.window_open:
+            return _google_error(_GOOGLE_ALREADY_OPEN, 409)
+        session = cast(GoogleBrowserSession, second.session)
+        sign_ins.reopening(pending.id)
+        try:
+            await session.reopen_window()
+        except Exception:
+            log.warning("web.local_sign_in_google_reopen_failed")
+            if sign_ins.get(pending.id) is not None and pending.second is second:
+                sign_ins.second_reopen_failed(pending.id)
+                return _google_error(_GOOGLE_REOPEN_FAILED, 503)
+        if sign_ins.get(pending.id) is not None and pending.second is second:
+            sign_ins.second_window_changed(pending.id, True)
         return _sign_in_json(_sign_in_or_ended(pending.id))
 
     @app.post("/api/local-sign-ins/{sign_in_id}/cancel", response_model=LocalSignInResponse)
@@ -2562,10 +2595,13 @@ def create_app(
     async def api_start_google_sign_in_scan(request: Request, sign_in_id: str) -> JSONResponse:
         """ "I'm signed in to Google, start scan": check, hand over, start.
 
-        Refused, with the sign-in kept, while another scan runs, while the
-        window is closed, and while Google says the browser is not signed in.
-        Then the window is closed and the profile reopened headless
-        (``enter_scan_mode``), and the crawl starts with the session.
+        Refused, with the sign-in kept, while the window is still opening,
+        while another scan runs, and while Google says the browser is not
+        signed in. A closed window is not refused (2026-11-26): Google is
+        asked through a hidden browser on the same profile. Then the window,
+        if open, is closed and the profile reopened headless
+        (``enter_scan_mode``; with the window closed, that hidden browser),
+        and the crawl starts with the session.
         """
         refused = _local_only(request)
         if refused is not None:
@@ -2576,8 +2612,6 @@ def create_app(
             raise HTTPException(status_code=404, detail="This Google sign-in has ended.")
         if pending.status != "awaiting_authentication":
             return _google_error("Wait for the Google window to open, then sign in.", 409)
-        if not pending.window_open:
-            return _google_error(_GOOGLE_WINDOW_CLOSED, 409)
 
         def busy() -> JSONResponse | None:
             task = crawl_state.get("task")
@@ -2625,6 +2659,35 @@ def create_app(
         return JSONResponse(
             {"scan_id": scan_id}, status_code=201, headers={"Cache-Control": "no-store"}
         )
+
+    @app.post("/api/google-sign-ins/{sign_in_id}/reopen", response_model=GoogleSignInResponse)
+    async def api_reopen_google_sign_in(request: Request, sign_in_id: str) -> JSONResponse:
+        """Reopen a closed Google window, as ``api_reopen_local_sign_in`` does
+        for a site's (2026-11-26): the same profile, where the sign-in is
+        kept, on Google's sign-in page. The clock stops while it opens and
+        restarts from zero if that fails; the sign-in is kept either way."""
+        refused = _local_only(request)
+        if refused is not None:
+            return refused
+        await _refresh_google_sign_in()
+        pending = google_sign_ins.get(sign_in_id) if _SIGN_IN_ID_RE.fullmatch(sign_in_id) else None
+        if pending is None:
+            raise HTTPException(status_code=404, detail="This Google sign-in has ended.")
+        if pending.status != "awaiting_authentication":
+            return _google_error("Wait for the Google window to open.", 409)
+        if pending.window_open:
+            return _google_error(_GOOGLE_ALREADY_OPEN, 409)
+        google_sign_ins.reopening(pending.id)
+        try:
+            await pending.session.reopen_window()
+        except Exception:
+            log.warning("web.google_sign_in_reopen_failed")
+            if google_sign_ins.get(pending.id) is not None:
+                google_sign_ins.window_closed(pending.id)
+                return _google_error(_GOOGLE_REOPEN_FAILED, 503)
+        if google_sign_ins.get(pending.id) is not None:
+            google_sign_ins.window_opened(pending.id)
+        return _google_json(_google_or_ended(pending.id))
 
     @app.post("/api/google-sign-ins/{sign_in_id}/cancel", response_model=GoogleSignInResponse)
     async def api_cancel_google_sign_in(request: Request, sign_in_id: str) -> JSONResponse:

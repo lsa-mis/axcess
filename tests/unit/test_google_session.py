@@ -293,6 +293,206 @@ async def test_enter_scan_mode_closes_the_window_and_reopens_the_same_profile_he
     await session.close()
 
 
+# -- a closed window: reopen, and a hidden browser (2026-11-26) --------------------
+
+
+async def _closed(tmp_path: Path) -> tuple[GoogleBrowserSession, FakePlaywright, list[bool]]:
+    """Signed in in the window, then the person closed it."""
+    session, playwright = await _session(tmp_path)
+    playwright.chromium.user_agent = "Mozilla/5.0 (X11) HeadlessChrome/140.0 Safari/537.36"
+    changes: list[bool] = []
+    session.on_window_change(changes.append)
+    await session.start()
+    playwright.chromium.contexts[0].close_now()
+    assert changes == [True, False] and not session.window_open
+    return session, playwright, changes
+
+
+async def test_reopen_opens_a_visible_window_on_the_same_profile(tmp_path: Path) -> None:
+    session, playwright, changes = await _closed(tmp_path)
+    profile = session.profile_dir
+    await session.reopen_window()
+    assert session.window_open and changes == [True, False, True]
+    (first, _), (second, options) = playwright.chromium.launches
+    assert first == second == profile
+    assert options["headless"] is False
+    assert options["locale"] == "en-US" and options["accept_downloads"] is False
+    assert playwright.chromium.visits == [gs.SIGN_IN_URL, gs.SIGN_IN_URL]
+    window = playwright.chromium.contexts[1]
+    assert window.routes == [], "no route guard while the person signs in"
+    # Closing the reopened window is seen too.
+    window.close_now()
+    assert changes == [True, False, True, False]
+    await session.close()
+
+
+async def test_reopen_while_the_window_is_open_does_nothing(tmp_path: Path) -> None:
+    session, playwright = await _session(tmp_path)
+    await session.start()
+    await session.reopen_window()
+    assert len(playwright.chromium.launches) == 1
+    assert playwright.chromium.visits == [gs.SIGN_IN_URL]
+    assert session.window_open
+    await session.close()
+
+
+async def test_reopen_is_refused_once_scanning_or_closed(tmp_path: Path) -> None:
+    session, playwright = await _scanning(tmp_path)
+    with pytest.raises(gs.GoogleSessionError):
+        await session.reopen_window()
+    assert len(playwright.chromium.launches) == 2
+    await session.close()
+    with pytest.raises(gs.GoogleSessionError):
+        await session.reopen_window()
+    never, _ = await _session(tmp_path)
+    with pytest.raises(gs.GoogleSessionError):
+        await never.reopen_window()
+
+
+async def test_a_failed_reopen_keeps_the_sign_in(tmp_path: Path) -> None:
+    session, playwright, changes = await _closed(tmp_path)
+    profile = session.profile_dir
+    playwright.chromium.fail_launch_after = 1
+    with pytest.raises(gs.GoogleSessionError):
+        await session.reopen_window()
+    assert not session.window_open and changes == [True, False]
+    assert profile is not None and Path(profile).exists()
+    playwright.chromium.fail_launch_after = -1
+    await session.reopen_window()
+    assert session.window_open
+    await session.close()
+
+
+async def test_a_closed_window_is_asked_about_in_a_hidden_browser(tmp_path: Path) -> None:
+    session, playwright, changes = await _closed(tmp_path)
+    playwright.chromium.requests[gs.SIGNED_IN_PROBE] = FakeAPIResponse(200)
+    assert await session.is_signed_in() is True
+    (first, _), (second, options) = playwright.chromium.launches
+    assert first == second
+    assert options["headless"] is True
+    assert options["channel"] == "chromium"
+    # The window's own name, remembered when it loaded.
+    assert options["user_agent"] == "Mozilla/5.0 (X11) Chrome/140.0 Safari/537.36"
+    assert options["locale"] == "en-US" and options["accept_downloads"] is False
+    hidden = playwright.chromium.contexts[1]
+    assert hidden.routes == [], "the guard goes on in scan mode"
+    assert playwright.chromium.visits == [gs.SIGN_IN_URL], "no page is loaded"
+    assert ("GET", gs.SIGNED_IN_PROBE) in playwright.chromium.request_log
+    # Asked again: the same hidden browser, not another.
+    assert await session.is_signed_in() is True
+    assert len(playwright.chromium.launches) == 2
+    assert not session.window_open and changes == [True, False]
+    await session.close()
+
+
+async def test_a_signed_out_answer_in_the_hidden_browser_is_false(tmp_path: Path) -> None:
+    session, playwright, _changes = await _closed(tmp_path)
+    playwright.chromium.requests[gs.SIGNED_IN_PROBE] = FakeAPIResponse(
+        302, {"location": "https://myaccount.google.com/intro"}
+    )
+    assert await session.is_signed_in() is False
+    assert not session.active
+    await session.close()
+
+
+async def test_enter_scan_mode_from_a_closed_window_reuses_the_hidden_browser(
+    tmp_path: Path,
+) -> None:
+    session, playwright, _changes = await _closed(tmp_path)
+    playwright.chromium.requests[gs.SIGNED_IN_PROBE] = FakeAPIResponse(200)
+    assert await session.is_signed_in()
+    hidden = playwright.chromium.contexts[1]
+    await session.enter_scan_mode()
+    assert len(playwright.chromium.launches) == 2, "no relaunch"
+    assert [pattern for pattern, _ in hidden.routes] == ["**/*"]
+    assert all(page.closed for page in hidden.pages)
+    assert session.active and not session.window_open
+    # The scan uses that browser, guarded.
+    session.allow_file(DOC_PAGE)
+    assert (await session.read_dates(DOC_PAGE)).outcome == "dates"
+    assert hidden.pages[-1].url == gs.file_page_url("document", DOC_ID)
+    await session.close()
+
+
+async def test_enter_scan_mode_from_a_closed_window_without_a_check_launches_hidden(
+    tmp_path: Path,
+) -> None:
+    session, playwright, _changes = await _closed(tmp_path)
+    await session.enter_scan_mode()
+    _, options = playwright.chromium.launches[-1]
+    assert len(playwright.chromium.launches) == 2
+    assert options["headless"] is True and options["channel"] == "chromium"
+    assert options["user_agent"] == "Mozilla/5.0 (X11) Chrome/140.0 Safari/537.36"
+    assert [pattern for pattern, _ in playwright.chromium.contexts[1].routes] == ["**/*"]
+    assert session.active
+    await session.close()
+
+
+async def test_reopen_after_a_hidden_check_closes_the_hidden_browser_first(
+    tmp_path: Path,
+) -> None:
+    session, playwright, changes = await _closed(tmp_path)
+    assert await session.is_signed_in() is False  # the fake answers 404
+    hidden = playwright.chromium.contexts[1]
+    await session.reopen_window()
+    assert hidden.closed, "one browser per profile folder"
+    window = playwright.chromium.contexts[2]
+    assert playwright.chromium.launches[2][1]["headless"] is False
+    # The hidden browser closing was not "the person closed the window".
+    assert session.window_open and changes == [True, False, True]
+    assert not window.closed
+    # With the window open again, the check asks through it.
+    playwright.chromium.requests[gs.SIGNED_IN_PROBE] = FakeAPIResponse(200)
+    assert await session.is_signed_in() is True
+    assert len(playwright.chromium.launches) == 3
+    await session.close()
+
+
+async def test_a_hidden_browser_closing_never_marks_the_window_closed(tmp_path: Path) -> None:
+    session, playwright, changes = await _closed(tmp_path)
+    await session.is_signed_in()
+    # The hidden browser ends by itself (a crash): the window stays closed,
+    # and the next check opens a new hidden browser rather than a dead one.
+    playwright.chromium.contexts[1].close_now()
+    assert changes == [True, False] and not session.window_open
+    await session.is_signed_in()
+    assert len(playwright.chromium.launches) == 3
+    # Closed by the reopen: the reopened window stays open.
+    await session.reopen_window()
+    assert playwright.chromium.contexts[2].closed
+    assert session.window_open and changes == [True, False, True]
+    await session.close()
+
+
+@pytest.mark.parametrize("state", ["window", "closed", "hidden", "reopened", "scanning"])
+async def test_close_signs_out_and_deletes_from_every_state(tmp_path: Path, state: str) -> None:
+    if state == "window":
+        session, playwright = await _session(tmp_path)
+        await session.start()
+    else:
+        session, playwright, _changes = await _closed(tmp_path)
+    if state == "hidden":
+        await session.is_signed_in()
+    elif state == "reopened":
+        await session.is_signed_in()
+        await session.reopen_window()
+    elif state == "scanning":
+        await session.is_signed_in()
+        await session.enter_scan_mode()
+    launches = len(playwright.chromium.launches)
+    profile = session.profile_dir
+    assert profile is not None and Path(profile).exists()
+    await session.close()
+    assert playwright.chromium.visits[-1] == gs.LOGOUT_URL
+    assert playwright.chromium.visits.count(gs.LOGOUT_URL) == 1
+    assert all(context.closed for context in playwright.chromium.contexts)
+    assert playwright.stopped
+    assert not Path(profile).exists()
+    assert not session.window_open and not session.active
+    # A browser is opened only to sign out when none was open.
+    assert len(playwright.chromium.launches) == launches + (1 if state == "closed" else 0)
+
+
 async def _scanning(tmp_path: Path) -> tuple[GoogleBrowserSession, FakePlaywright]:
     session, playwright = await _session(tmp_path)
     await session.start()

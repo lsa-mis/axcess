@@ -803,7 +803,7 @@
     "/api/local-sign-ins/{sign_in_id}/start": {
       "post": {
         "summary": "Api Start Local Sign In Scan",
-        "description": "\"I'm signed in, start scan\": create the scan row and start the crawl.\n\nThe crawl lock is taken here and only here. If another scan is\nrunning, the start is refused and the sign-in stays waiting, so the\nperson can start once that scan finishes.\n\nWith \"Sign in to Google for Google files\" (2026-11-26) this is \"I'm\nsigned in to Google, start scan\": refused, with the sign-in kept,\nuntil the Google window is open and Google says it is signed in.\nThen the Google window is closed and its profile reopened headless\n(``enter_scan_mode``), and the scan starts with the site session as\nbefore and the Google session for the document check only.",
+        "description": "\"I'm signed in, start scan\": create the scan row and start the crawl.\n\nThe crawl lock is taken here and only here. If another scan is\nrunning, the start is refused and the sign-in stays waiting, so the\nperson can start once that scan finishes.\n\nWith \"Sign in to Google for Google files\" (2026-11-26) this is \"I'm\nsigned in to Google, start scan\": refused, with the sign-in kept,\nuntil the Google window has opened and Google says it is signed in\n(asked in a hidden browser when the window is closed). Then the\nGoogle window, if open, is closed and its profile reopened headless\n(``enter_scan_mode``), and the scan starts with the site session as\nbefore and the Google session for the document check only.",
         "operationId": "api_start_local_sign_in_scan_api_local_sign_ins__sign_in_id__start_post",
         "parameters": [
           {
@@ -827,6 +827,31 @@
         "summary": "Api Reopen Local Sign In",
         "description": "Open a new sign-in window from the kept sign-in, on the last page.",
         "operationId": "api_reopen_local_sign_in_api_local_sign_ins__sign_in_id__reopen_post",
+        "parameters": [
+          {
+            "name": "sign_in_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string", "title": "Sign In Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LocalSignInResponse"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/local-sign-ins/{sign_in_id}/google/reopen": {
+      "post": {
+        "summary": "Api Reopen Local Sign In Google",
+        "description": "Reopen a closed Google window of a sign-in scan (2026-11-26).\n\nAs ``api_reopen_local_sign_in`` does for the site's window: a new\nvisible Google window from the same profile, where the Google\nsign-in is kept. The sign-in's one clock stops while it opens and\nrestarts if it fails; the site's window is left as it is.",
+        "operationId": "api_reopen_local_sign_in_google_api_local_sign_ins__sign_in_id__google_reopen_post",
         "parameters": [
           {
             "name": "sign_in_id",
@@ -937,7 +962,7 @@
     "/api/google-sign-ins/{sign_in_id}/start": {
       "post": {
         "summary": "Api Start Google Sign In Scan",
-        "description": "\"I'm signed in to Google, start scan\": check, hand over, start.\n\nRefused, with the sign-in kept, while another scan runs, while the\nwindow is closed, and while Google says the browser is not signed in.\nThen the window is closed and the profile reopened headless\n(``enter_scan_mode``), and the crawl starts with the session.",
+        "description": "\"I'm signed in to Google, start scan\": check, hand over, start.\n\nRefused, with the sign-in kept, while the window is still opening,\nwhile another scan runs, and while Google says the browser is not\nsigned in. A closed window is not refused (2026-11-26): Google is\nasked through a hidden browser on the same profile. Then the window,\nif open, is closed and the profile reopened headless\n(``enter_scan_mode``; with the window closed, that hidden browser),\nand the crawl starts with the session.",
         "operationId": "api_start_google_sign_in_scan_api_google_sign_ins__sign_in_id__start_post",
         "parameters": [
           {
@@ -949,6 +974,31 @@
         ],
         "responses": {
           "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/google-sign-ins/{sign_in_id}/reopen": {
+      "post": {
+        "summary": "Api Reopen Google Sign In",
+        "description": "Reopen a closed Google window, as ``api_reopen_local_sign_in`` does\nfor a site's (2026-11-26): the same profile, where the sign-in is\nkept, on Google's sign-in page. The clock stops while it opens and\nrestarts from zero if that fails; the sign-in is kept either way.",
+        "operationId": "api_reopen_google_sign_in_api_google_sign_ins__sign_in_id__reopen_post",
+        "parameters": [
+          {
+            "name": "sign_in_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string", "title": "Sign In Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/GoogleSignInResponse"}}}
+          },
           "422": {
             "description": "Validation Error",
             "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}

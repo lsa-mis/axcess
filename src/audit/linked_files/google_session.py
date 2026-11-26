@@ -36,6 +36,20 @@ The safeguards, all required (the developer chose "build 1-5"):
    Google sees one browser. A file page that sends the browser to Google's
    sign-in page means the sign-in was lost: Google is not used again in that
    scan (``lost``), and one warning is logged.
+
+A closed window works like a closed site sign-in window (the developer's
+request, 2026-11-26: "a button to open the window again, just exactly like
+how sign in scan handles this situation"). The Google sign-in is on disk in
+the profile folder, so:
+
+- ``reopen_window`` opens a new visible window from the same profile, on
+  Google's sign-in page (which goes on to the account page when signed in);
+- with the window closed, ``is_signed_in`` asks through a hidden browser on
+  the same profile (headless, the remembered user agent, no page loaded),
+  and ``enter_scan_mode`` puts the route guard on that same hidden browser
+  instead of launching another. One browser per profile folder at a time:
+  a reopen closes the hidden one first. The hidden browser closing is never
+  "the person closed the window".
 3. Read-only. The only actions are opening a registered file page, clicking
    the "File" menu, clicking "Details" and pressing Escape. Nothing is typed.
    Downloads go through ``context.request``; the browser accepts none.
@@ -396,9 +410,11 @@ class GoogleBrowserSession:
     """One Google sign-in: a visible window, then a headless scan browser.
 
     Lifecycle: ``start`` (visible window on Google's sign-in page),
-    ``is_signed_in``, ``enter_scan_mode`` (window closed, same profile
-    headless, route guard on), then ``fetch_export``, ``fetch_drive`` and
-    ``read_dates`` during the scan, and ``close`` at the end, always.
+    ``reopen_window`` any number of times after the person closed it,
+    ``is_signed_in`` (through a hidden browser while the window is closed),
+    ``enter_scan_mode`` (window closed, same profile headless, route guard
+    on), then ``fetch_export``, ``fetch_drive`` and ``read_dates`` during the
+    scan, and ``close`` at the end, always.
     """
 
     site = "accounts.google.com"
@@ -435,6 +451,16 @@ class GoogleBrowserSession:
         self._lock = asyncio.Lock()
         self._next_at = 0.0
         self._ignore_close = False
+        #: The visible browser's own name, "HeadlessChrome" put back to
+        #: "Chrome": read when a window loads, used by a hidden browser when
+        #: there is no window to read it from.
+        self._user_agent: str | None = None
+        #: A hidden browser on the profile while the window is closed (the
+        #: signed-in check), handed to the scan by ``enter_scan_mode``.
+        self._hidden: BrowserContext | None = None
+        #: One launch at a time: reopen, the hidden check and the hand-over
+        #: never open two browsers on one profile folder.
+        self._launch_lock = asyncio.Lock()
 
     # -- state ---------------------------------------------------------------
 
@@ -487,23 +513,132 @@ class GoogleBrowserSession:
         try:
             self._playwright = await self._playwright_start()
             self._profile_dir = create_profile_dir(self._profile_base)
-            context = await self._playwright.chromium.launch_persistent_context(
-                self._profile_dir, headless=False, **self._context_options()
-            )
-            self._context = context
-            context.on("close", lambda _ctx: self._context_closed(context))
-            page = context.pages[0] if context.pages else await context.new_page()
-            for extra in list(context.pages):
-                if extra is not page:
-                    with contextlib.suppress(Exception):
-                        await extra.close()
-            self._set_window_open(True)
+            page = await self._open_window(self._playwright, self._profile_dir)
             await page.goto(
                 SIGN_IN_URL, wait_until="domcontentloaded", timeout=self._nav_timeout_ms
             )
         except Exception as exc:
             await self.close()
             raise GoogleSessionError("Could not open the Google sign-in window.") from exc
+
+    async def _open_window(self, playwright: Playwright, profile: str) -> Page:
+        """Launch the visible window on ``profile``; its page, before any load."""
+        context = await playwright.chromium.launch_persistent_context(
+            profile, headless=False, **self._context_options()
+        )
+        self._context = context
+        context.on("close", lambda _ctx: self._context_closed(context))
+        page = context.pages[0] if context.pages else await context.new_page()
+        for extra in list(context.pages):
+            if extra is not page:
+                with contextlib.suppress(Exception):
+                    await extra.close()
+        self._set_window_open(True)
+        await self._remember_user_agent(page)
+        return page
+
+    async def _remember_user_agent(self, page: Page) -> None:
+        with contextlib.suppress(Exception):
+            agent = str(await page.evaluate("() => navigator.userAgent"))
+            if agent:
+                self._user_agent = agent.replace("HeadlessChrome", "Chrome")
+
+    async def reopen_window(self) -> None:
+        """Open a new visible window from the same profile (the kept sign-in).
+
+        Refused once the session is closed or scanning; nothing happens if
+        the window is open. A hidden browser left by a closed-window check
+        is closed first: one browser per profile folder. On failure the
+        session stays as it was, window closed, and its sign-in is kept.
+        """
+        async with self._launch_lock:
+            playwright = self._playwright
+            profile = self._profile_dir
+            if self._closed or self._scanning or playwright is None or profile is None:
+                raise GoogleSessionError("The Google sign-in has ended.")
+            if self._window_open and self._context is not None:
+                return
+            await self._close_hidden()
+            try:
+                page = await self._open_window(playwright, profile)
+            except Exception as exc:
+                await self._drop_window()
+                raise GoogleSessionError("Could not reopen the Google window.") from exc
+            if self._ended_meanwhile():
+                # Ended (cancel, expiry) while the window opened.
+                await self._drop_window()
+                raise GoogleSessionError("The Google sign-in has ended.")
+        # The window is open and usable even if Google does not answer; the
+        # person can retry in it, as in any browser (as the site's reopen).
+        with contextlib.suppress(Exception):
+            await page.goto(
+                SIGN_IN_URL, wait_until="domcontentloaded", timeout=self._nav_timeout_ms
+            )
+
+    def _ended_meanwhile(self) -> bool:
+        """Whether ``close`` ran during an await (a method, so a check made
+        before the await does not narrow it away)."""
+        return self._closed
+
+    async def _drop_window(self) -> None:
+        """Close a window Axcess itself is giving up on, quietly."""
+        context, self._context = self._context, None
+        self._set_window_open(False)
+        if context is not None:
+            self._ignore_close = True
+            try:
+                with contextlib.suppress(Exception):
+                    await context.close()
+            finally:
+                self._ignore_close = False
+
+    async def _launch_hidden(self, playwright: Playwright, profile: str) -> BrowserContext:
+        """The profile in a hidden browser, as Google saw it in the window."""
+        if self._user_agent is None:
+            # Without the window's own name the hidden browser would call
+            # itself HeadlessChrome: not the browser the person signed in with.
+            raise GoogleSessionError("The Google browser's name is not known.")
+        return await playwright.chromium.launch_persistent_context(
+            profile,
+            headless=True,
+            # The full Chromium in its new headless mode, so the browser
+            # Google sees is the one the person signed in with.
+            channel="chromium",
+            user_agent=self._user_agent,
+            **self._context_options(),
+        )
+
+    async def _hidden_context(self) -> BrowserContext:
+        """The hidden browser for a closed window, launched once and kept."""
+        async with self._launch_lock:
+            playwright = self._playwright
+            profile = self._profile_dir
+            if self._closed or playwright is None or profile is None:
+                raise GoogleSessionError("The Google sign-in has ended.")
+            if self._context is not None:
+                # The window opened (or the scan began) meanwhile.
+                return self._context
+            if self._hidden is None:
+                hidden = await self._launch_hidden(playwright, profile)
+                if self._ended_meanwhile():
+                    with contextlib.suppress(Exception):
+                        await hidden.close()
+                    raise GoogleSessionError("The Google sign-in has ended.")
+                # Gone by itself (a crash): forgotten, so the next check opens
+                # another. Never the window's close handler: no window closed.
+                hidden.on("close", lambda _ctx: self._hidden_closed(hidden))
+                self._hidden = hidden
+            return self._hidden
+
+    def _hidden_closed(self, context: BrowserContext) -> None:
+        if context is self._hidden:
+            self._hidden = None
+
+    async def _close_hidden(self) -> None:
+        hidden, self._hidden = self._hidden, None
+        if hidden is not None:
+            with contextlib.suppress(Exception):
+                await hidden.close()
 
     async def is_signed_in(self) -> bool:
         """Whether Google treats this browser as signed in.
@@ -512,9 +647,16 @@ class GoogleBrowserSession:
         redirect to the sign-in host means signed out. The answer's body is
         never read.
         """
-        context = self._context
-        if context is None or self._closed:
+        if self._closed:
             return False
+        context = self._context
+        if context is None:
+            # The window is closed: ask through a hidden browser on the same
+            # profile, where the sign-in is kept.
+            try:
+                context = await self._hidden_context()
+            except Exception:
+                return False
         try:
             response = await context.request.get(
                 SIGNED_IN_PROBE,
@@ -537,39 +679,41 @@ class GoogleBrowserSession:
         return status < 300
 
     async def enter_scan_mode(self) -> None:
-        """Safeguard 2: close the visible window, reopen the profile headless."""
-        context = self._context
-        playwright = self._playwright
-        if context is None or playwright is None or self._profile_dir is None or self._closed:
-            raise GoogleSessionError("The Google window is not open.")
-        pages = [page for page in context.pages if not page.is_closed()]
-        if not pages:
-            raise GoogleSessionError("The Google window is not open.")
-        user_agent = str(await pages[0].evaluate("() => navigator.userAgent"))
-        user_agent = user_agent.replace("HeadlessChrome", "Chrome")
-        self._ignore_close = True
-        try:
-            with contextlib.suppress(Exception):
-                await context.close()
-            self._context = None
-            self._set_window_open(False)
-            headless = await playwright.chromium.launch_persistent_context(
-                self._profile_dir,
-                headless=True,
-                # The full Chromium in its new headless mode, so the browser
-                # Google sees is the one the person signed in with.
-                channel="chromium",
-                user_agent=user_agent,
-                **self._context_options(),
-            )
-            await headless.route("**/*", self._guard)
-            for extra in list(headless.pages):
-                with contextlib.suppress(Exception):
-                    await extra.close(run_before_unload=False)
-            self._context = headless
-        finally:
-            self._ignore_close = False
-        self._scanning = True
+        """Safeguard 2: close the visible window, reopen the profile headless.
+
+        With the window already closed, the hidden browser of the signed-in
+        check is used (launched now if there is none), not a second one.
+        """
+        async with self._launch_lock:
+            playwright = self._playwright
+            profile = self._profile_dir
+            if playwright is None or profile is None or self._closed or self._scanning:
+                raise GoogleSessionError("The Google sign-in has ended.")
+            context = self._context
+            if context is not None:
+                pages = [page for page in context.pages if not page.is_closed()]
+                if not pages:
+                    raise GoogleSessionError("The Google window is not open.")
+                user_agent = str(await pages[0].evaluate("() => navigator.userAgent"))
+                self._user_agent = user_agent.replace("HeadlessChrome", "Chrome")
+            self._ignore_close = True
+            try:
+                if context is not None:
+                    with contextlib.suppress(Exception):
+                        await context.close()
+                    self._context = None
+                    self._set_window_open(False)
+                headless, self._hidden = self._hidden, None
+                if headless is None:
+                    headless = await self._launch_hidden(playwright, profile)
+                self._context = headless
+                await headless.route("**/*", self._guard)
+                for extra in list(headless.pages):
+                    with contextlib.suppress(Exception):
+                        await extra.close(run_before_unload=False)
+            finally:
+                self._ignore_close = False
+            self._scanning = True
 
     # -- safeguard 1: the route guard -----------------------------------------
 
@@ -836,7 +980,10 @@ class GoogleBrowserSession:
             )
         self._scanning = False
         self._set_window_open(False)
-        context = self._context
+        # The window, the scan's browser, or the hidden one of a closed
+        # window: whichever is open signs out. Never two at once.
+        context = self._context or self._hidden
+        self._hidden = None
         playwright = self._playwright
         profile = self._profile_dir
         self._ignore_close = True

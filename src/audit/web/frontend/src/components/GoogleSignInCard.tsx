@@ -19,26 +19,34 @@ function errorText(error: unknown): string {
  * A Google sign-in in progress, before a public scan with "Sign in to
  * Google for Google files" starts (the developer's request, 2026-11-26).
  *
- * A sibling of `LocalSignInCard`, not a mode of it. That card reopens a
- * closed window, keeps a copy of a site's sign-in, and lists what happens
- * to the scan's browser; this one has none of those, talks to other
- * endpoints, and starts a public scan. A `kind` prop would have branched
- * every part of it. What carries over is kept the same, so the two read as
- * one pattern (SC 3.2.4 Consistent Identification, Level AA): the `Card`,
- * the three faces (opening, window open, window closed), focus moving to
- * the heading when the face changes (SC 2.4.3 Focus Order, Level A), the
- * face's explanation in a polite live region (SC 4.1.3 Status Messages,
- * Level AA), errors as text in an alert, and one primary button beside a
- * secondary Cancel.
+ * A sibling of `LocalSignInCard`, not a mode of it. That card keeps a copy
+ * of a site's sign-in, states the limits of a kept site sign-in, and lists
+ * what happens to the scan's browser; this one has none of those, talks to
+ * other endpoints, and starts a public scan. A `kind` prop would have
+ * branched every part of it. What carries over is kept the same, so the
+ * two read as one pattern (SC 3.2.4 Consistent Identification, Level AA):
+ * the `Card`, the three faces (opening, window open, window closed), focus
+ * moving to the heading when the face changes (SC 2.4.3 Focus Order, Level
+ * A), the face's explanation in a polite live region (SC 4.1.3 Status
+ * Messages, Level AA), errors as text in an alert, and one primary button
+ * beside the secondary ones.
  *
- * No Reopen: with the window closed, the card says so and offers Cancel
- * only (the developer's request, 2026-11-26). The start reads the browser
- * name from the open window, so it needs the window. A closed window's
- * sign-in is signed out and deleted after the stated minutes, which the
- * card says rather than leaving it to be discovered
- * (docs/plain-language.md: never drop a limit). The window's state is said
- * in the heading and the text, never by colour alone (SC 1.4.1 Use of
- * Color, Level A).
+ * A closed window works like a closed site sign-in window (the developer's
+ * request, 2026-11-26: "There should be a button to open the window again,
+ * just exactly like how sign in scan handles this situation"). It offers,
+ * in the site card's order and roles: start (primary), "Reopen Google
+ * window", and Cancel. The Google sign-in is kept in the browser's profile
+ * on this computer, so the start checks it in a hidden browser and the
+ * reopen opens a new window from it. This replaces an earlier closed face
+ * with Cancel only, whose comment said the developer had asked for that;
+ * they had not. Reopen exists only in this face: with the window open it
+ * would be a second control for a window already in front of the person
+ * (W3C COGA, "Making Content Usable": one way to do one thing,
+ * https://www.w3.org/TR/coga-usable/). A closed window's sign-in is signed
+ * out and deleted after the stated minutes, which the card says rather
+ * than leaving it to be discovered (docs/plain-language.md: never drop a
+ * limit). The window's state is said in the heading and the text, never by
+ * colour alone (SC 1.4.1 Use of Color, Level A).
  */
 export function GoogleSignInCard({
   signInId,
@@ -90,11 +98,15 @@ export function GoogleSignInCard({
     mutationFn: () => api.startGoogleSignInScan(signInId),
     onSuccess: ({ scan_id }) => onStarted(scan_id),
   });
+  const reopen = useMutation({
+    mutationFn: () => api.reopenGoogleSignIn(signInId),
+    onSettled: () => void status.refetch(),
+  });
   const cancel = useMutation({
     mutationFn: () => api.cancelGoogleSignIn(signInId),
     onSuccess: () => end("cancelled"),
   });
-  const busy = start.isPending || cancel.isPending;
+  const busy = start.isPending || reopen.isPending || cancel.isPending;
 
   const data = status.data;
   const face: "opening" | "open" | "closed" =
@@ -105,12 +117,14 @@ export function GoogleSignInCard({
   useEffect(() => {
     heading.current?.focus();
   }, [face]);
-  // A refusal ("not signed in yet", "a scan is already running") belongs to
-  // the face it was given in.
+  // A refusal ("not signed in yet", "a scan is already running", "could not
+  // reopen") belongs to the face it was given in.
   const { reset: resetStart } = start;
+  const { reset: resetReopen } = reopen;
   useEffect(() => {
     resetStart();
-  }, [face, resetStart]);
+    resetReopen();
+  }, [face, resetStart, resetReopen]);
 
   return (
     <Card className="max-w-3xl p-6 [overflow-anchor:none]">
@@ -155,6 +169,11 @@ export function GoogleSignInCard({
           {errorText(start.error)}
         </p>
       )}
+      {reopen.error && (
+        <p className={ERROR_BOX} role="alert">
+          {errorText(reopen.error)}
+        </p>
+      )}
       {cancel.error && (
         <p className={ERROR_BOX} role="alert">
           {errorText(cancel.error)}
@@ -162,14 +181,21 @@ export function GoogleSignInCard({
       )}
 
       {/* Start, the likely next step, is the primary button, as on the
-          sign-in card; "Cancel Google sign-in" names what it cancels, since
-          no scan exists yet (repo rule: a verb and an object). Both keep
-          their place in each face (SC 3.2.3 Consistent Navigation, Level
-          AA, applied within the card). */}
+          sign-in card, in the open and the closed face; "Reopen Google
+          window" sits between it and Cancel in the closed face, as "Reopen
+          sign-in window" does on the sign-in card. "Cancel Google sign-in"
+          names what it cancels, since no scan exists yet (repo rule: a verb
+          and an object). Each keeps its place in each face (SC 3.2.3
+          Consistent Navigation, Level AA, applied within the card). */}
       <div className="mt-5 flex flex-wrap gap-3">
-        {face === "open" && (
+        {face !== "opening" && (
           <Button variant="primary" onClick={() => start.mutate()} disabled={busy}>
             {start.isPending ? GOOGLE_SIGN_IN.starting : GOOGLE_SIGN_IN.start}
+          </Button>
+        )}
+        {face === "closed" && (
+          <Button onClick={() => reopen.mutate()} disabled={busy}>
+            {reopen.isPending ? GOOGLE_SIGN_IN.reopening : GOOGLE_SIGN_IN.reopen}
           </Button>
         )}
         <Button onClick={() => cancel.mutate()} disabled={busy}>

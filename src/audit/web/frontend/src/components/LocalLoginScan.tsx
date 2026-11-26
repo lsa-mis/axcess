@@ -49,8 +49,13 @@ function errorText(error: unknown): string {
  * "I'm signed in to the site, next: sign in to Google": it opens a second,
  * separate Google window and starts nothing. Step 2 has the Google card's
  * faces (GoogleSignInCard): opening; open, with "I'm signed in to Google,
- * start scan"; and closed, with Cancel only, since the scan needs that
- * window open. One card, not the site card followed by the Google card:
+ * start scan"; and closed, with that start, "Reopen Google window" and
+ * Cancel, in the order and roles of step 1's closed face (the developer's
+ * request, 2026-11-26: a closed Google window behaves "just exactly like"
+ * a closed sign-in window). The Google sign-in is kept in its browser's
+ * profile, so the start checks it in a hidden browser and the reopen opens
+ * a new Google window from it; the site's window is left as it is. One
+ * card, not the site card followed by the Google card:
  * both windows belong to one sign-in, and "Cancel sign-in" ends both, so a
  * second card with its own cancel would be two controls for one job (one
  * control, one job). Not a shared sub-component with GoogleSignInCard
@@ -146,11 +151,20 @@ export function LocalSignInCard({
     mutationFn: () => api.openLocalSignInGoogle(signInId),
     onSettled: () => void status.refetch(),
   });
+  const reopenGoogle = useMutation({
+    mutationFn: () => api.reopenSignInGoogle(signInId),
+    onSettled: () => void status.refetch(),
+  });
   const cancel = useMutation({
     mutationFn: () => api.cancelLocalSignIn(signInId),
     onSuccess: () => end("cancelled"),
   });
-  const busy = start.isPending || reopen.isPending || openGoogle.isPending || cancel.isPending;
+  const busy =
+    start.isPending ||
+    reopen.isPending ||
+    openGoogle.isPending ||
+    reopenGoogle.isPending ||
+    cancel.isPending;
 
   const data = status.data;
   const face: "opening" | "open" | "closed" =
@@ -185,11 +199,13 @@ export function LocalSignInCard({
   const { reset: resetStart } = start;
   const { reset: resetReopen } = reopen;
   const { reset: resetOpenGoogle } = openGoogle;
+  const { reset: resetReopenGoogle } = reopenGoogle;
   useEffect(() => {
     resetStart();
     resetReopen();
     resetOpenGoogle();
-  }, [faceKey, resetStart, resetReopen, resetOpenGoogle]);
+    resetReopenGoogle();
+  }, [faceKey, resetStart, resetReopen, resetOpenGoogle, resetReopenGoogle]);
 
   return (
     <Card className="max-w-3xl p-6 [overflow-anchor:none]">
@@ -306,6 +322,11 @@ export function LocalSignInCard({
           {errorText(reopen.error)}
         </p>
       )}
+      {reopenGoogle.error && (
+        <p className={ERROR_BOX} role="alert">
+          {errorText(reopenGoogle.error)}
+        </p>
+      )}
       {openGoogle.error && (
         <p className={ERROR_BOX} role="alert">
           {errorText(openGoogle.error)}
@@ -326,9 +347,10 @@ export function LocalSignInCard({
           with every entry kept (SC 3.3.7 Redundant Entry, Level A). The
           buttons keep their place in each face, so a returning reader finds
           them where they were (SC 3.2.3 Consistent Navigation, Level AA,
-          applied within the card). In step 2 only an open Google window
-          offers start, as on the Google card: the start reads the Google
-          browser's name from that window. */}
+          applied within the card). Step 2 offers start with the Google
+          window open or closed, and "Reopen Google window" only while it
+          is closed, in the place "Reopen sign-in window" has in step 1, as
+          on the Google card. */}
       <div className="mt-5 flex flex-wrap gap-3">
         {step === "site" && face !== "opening" && withGoogle && (
           <Button variant="primary" onClick={() => openGoogle.mutate()} disabled={busy}>
@@ -336,7 +358,7 @@ export function LocalSignInCard({
           </Button>
         )}
         {((step === "site" && face !== "opening" && !withGoogle) ||
-          (step === "google" && googleFace === "open")) && (
+          (step === "google" && googleFace !== "opening")) && (
           <Button variant="primary" onClick={() => start.mutate()} disabled={busy}>
             {start.isPending
               ? SIGN_IN.starting
@@ -348,6 +370,11 @@ export function LocalSignInCard({
         {step === "site" && face === "closed" && (
           <Button onClick={() => reopen.mutate()} disabled={busy}>
             {reopen.isPending ? SIGN_IN.reopening : SIGN_IN.reopen}
+          </Button>
+        )}
+        {step === "google" && googleFace === "closed" && (
+          <Button onClick={() => reopenGoogle.mutate()} disabled={busy}>
+            {reopenGoogle.isPending ? SIGN_IN.google.reopening : SIGN_IN.google.reopen}
           </Button>
         )}
         <Button onClick={() => cancel.mutate()} disabled={busy}>

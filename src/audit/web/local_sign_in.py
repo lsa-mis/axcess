@@ -26,7 +26,9 @@ This registry holds those sign-ins. Its rules are the product's:
   window after the site sign-in (2026-11-26). It belongs to the same sign-in,
   so one sign-in is one card and one clock: the clock stops while either
   window is open, and ending the sign-in, however it ends, closes both
-  sessions.
+  sessions. A closed second window can be reopened, like the site's: the
+  clock stops while it reopens (``reopening``) and restarts if that fails
+  (``second_reopen_failed``).
 
 Nothing here touches FastAPI, SQLite or Playwright, so unit tests drive it
 with a fake session and a fake clock.
@@ -228,6 +230,22 @@ class SignInRegistry(Generic[SessionT]):
         was_open = second.window_open
         second.window_open = False
         if was_open and not pending.window_open:
+            pending.window_closed_at = self.clock()
+
+    def second_reopen_failed(self, sign_in_id: str) -> None:
+        """The second window could not be reopened; its sign-in is kept.
+
+        ``reopening`` stopped the clock; it restarts from now unless the
+        site's window is open (then it stays stopped, as always while a
+        window is open). ``second_window_changed`` would not restart it: the
+        second window was already closed.
+        """
+        pending = self.get(sign_in_id)
+        second = pending.second if pending is not None else None
+        if pending is None or second is None:
+            return
+        second.window_open = False
+        if not pending.window_open and pending.window_closed_at is None:
             pending.window_closed_at = self.clock()
 
     def second_failed(self, sign_in_id: str, error: str) -> None:

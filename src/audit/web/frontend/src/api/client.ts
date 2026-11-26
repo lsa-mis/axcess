@@ -323,6 +323,12 @@ export const api = {
     request<LocalSignInState>(`/api/local-sign-ins/${encodeURIComponent(signInId)}/reopen`, {
       method: "POST",
     }),
+  /** Reopens a sign-in scan's closed Google window, from the kept Google sign-in. */
+  reopenSignInGoogle: (signInId: string) =>
+    request<LocalSignInState>(
+      `/api/local-sign-ins/${encodeURIComponent(signInId)}/google/reopen`,
+      { method: "POST" },
+    ),
   cancelLocalSignIn: (signInId: string) =>
     request<LocalSignInState>(`/api/local-sign-ins/${encodeURIComponent(signInId)}/cancel`, {
       method: "POST",
@@ -336,6 +342,11 @@ export const api = {
   /** "I'm signed in to Google, start scan": checks the sign-in, then starts the scan. */
   startGoogleSignInScan: (signInId: string) =>
     request<{ scan_id: number }>(`/api/google-sign-ins/${encodeURIComponent(signInId)}/start`, {
+      method: "POST",
+    }),
+  /** Reopens a closed Google window, from the kept Google sign-in. */
+  reopenGoogleSignIn: (signInId: string) =>
+    request<GoogleSignInState>(`/api/google-sign-ins/${encodeURIComponent(signInId)}/reopen`, {
       method: "POST",
     }),
   /** Signs out of Google, closes the window and deletes its data. */
