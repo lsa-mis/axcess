@@ -637,15 +637,18 @@ in its own row.
 ### Google sign-in
 
 A New scan setting, "Sign in to Google for Google files", off unless you turn
-it on, for a scan of a public website with the document check on. Before the
-scan, a browser window opens on this computer for you to sign in to Google.
-The document check then downloads Google Docs and Slides through that
-sign-in, so files shared only with signed-in accounts can be checked, and
-reads each Google Doc, Sheet and Slides file's creation and last-changed days
-from Google's File, Details. It opens only the Google files the pages link
-to, as Google's robots.txt allows, one each second, and changes nothing. The
-page checks never use this sign-in. When the scan ends, Axcess signs out of
-Google and deletes that browser's data.
+it on, for a scan with the document check on: a scan of a public website or
+a scan of a site with a sign-in. Before the scan, a browser window opens on
+this computer for you to sign in to Google. In a scan of a site with a
+sign-in, it opens after you sign in to the site, as a second, separate
+browser window. The document check then downloads Google Docs and Slides
+through that sign-in, so files shared only with signed-in accounts can be
+checked, and reads each Google Doc, Sheet and Slides file's creation and
+last-changed days from Google's File, Details. It opens only the Google
+files the pages link to, as Google's robots.txt allows, one each second, and
+changes nothing. The page checks never use this sign-in: in a scan of a site
+with a sign-in, they use only your sign-in to the site. When the scan ends,
+Axcess signs out of Google and deletes that browser's data.
 
 ### Local AI model
 

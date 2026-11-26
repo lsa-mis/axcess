@@ -284,9 +284,10 @@ a sign-in.
 What was built (`linked_files/google_session.py`, used only by the tracker):
 
 - New scan: "Sign in to Google for Google files", off by default, under the
-  document check and shown while it is on; in a sign-in scan shown but
-  disabled ("Works only in a scan of a public website."). Kept in the
-  scan's settings (`google_sign_in`), never the sign-in itself.
+  document check and shown while it is on. At first, in a sign-in scan it
+  was shown but disabled ("Works only in a scan of a public website."); it
+  works there too since phase 2 (below). Kept in the scan's settings
+  (`google_sign_in`), never the sign-in itself.
 - Starting a public scan with it on opens a visible Chromium window (a
   temporary profile) on Google's sign-in page, and New scan shows a card
   with "I'm signed in to Google, start scan" and "Cancel Google sign-in". No
@@ -341,6 +342,63 @@ Not verified by the code's author (no visit to Google was allowed): Google's
 real details popup in Sheets and Slides, how Google answers the signed-in
 check, whether the session survives the move to the headless browser, and
 what sign-out does. The developer tests those by hand.
+
+### Phase 2: sign-in scans (2026-11-26)
+
+The developer's decision: "one flow, two separate browsers, one after
+another". The switch works on the sign-in tab too, in the same place.
+
+The flow, on New scan's sign-in card (`LocalSignInCard`):
+
+1. "Open browser to sign in" opens the site's window as before
+   (`POST /api/local-login-scans`, now with `google_sign_in`; refused, 422,
+   without the document check). The card says "Step 1 of 2: sign in to the
+   site".
+2. Its primary button is "I'm signed in to the site, next: sign in to
+   Google" (`POST /api/local-sign-ins/{id}/google`, this computer only). It
+   checks nothing, leaves the site's sign-in and window as they are, and
+   opens a second, separate Google window: a new `GoogleBrowserSession`,
+   its own Playwright and its own profile. A second press while that
+   window opens or waits gives back the same state.
+3. The card says "Step 2 of 2: sign in to Google", "Now sign in to Google",
+   with "I'm signed in to Google, start scan" (the same `/start`) and
+   "Cancel sign-in". Start is refused, with both sign-ins kept, until the
+   Google window is open and Google says it is signed in (the public card's
+   message). Then the Google window is closed and its profile reopened
+   headless (`enter_scan_mode`), and the scan starts as before: the site
+   session to the scan, the Google session to `run_crawl(google_files=...)`
+   only (`_LocalLoginRun.google`). If that move fails, the Google sign-in is
+   closed and the card goes back to step 1 with the reason; the site
+   sign-in is kept.
+4. In the scan, the tracker sends a Google Doc or Slides export, or a Drive
+   file, through the Google session while it is active; every other file
+   through the site's own signed-in fetcher as before; the crawl's
+   anonymous client downloads nothing. robots.txt is asked about the
+   address downloaded from, as in each kind of scan. The dates pass runs
+   too.
+5. The Google session is tied to the site sign-in (`PendingSignIn.second`
+   in `web/local_sign_in.py`), not a second registry entry: one sign-in,
+   one card, one clock (stopped while either window is open), and one end.
+   Cancel, expiry and quitting close both; the scan's end closes both
+   (the crawl, then `_run_local_login_background`'s `finally`).
+   `GET /api/local-sign-ins/{id}` and `/current` carry a `google` part
+   (status, window open, error), never session data, so returning to New
+   scan shows the step it was on.
+
+Without the switch a sign-in scan is unchanged: no Google session is made,
+and the tracker and `run_crawl` get exactly what they got before.
+
+Why two browsers, and never a Google tab in the site's browser: the site's
+browser runs Click-Through and the form check, which press things on the
+scanned pages. A Google sign-in in that browser would be live while they
+do, and its cookies would go with every page request. A browser of its
+own, used only by the document check and only for Google files, with the
+phase 1 safeguards (route guard, read-only, sign-out and delete) on that
+browser alone, keeps the site's checks exactly as they were. The two
+profiles are different folders with different prefixes
+(`axcess-protected-browser-*`, which the site browser's start sweeps, and
+`axcess-google-browser/axcess-google-browser-*`).
+`tests/unit/test_google_session_isolation.py` checks all of this.
 
 ## Why it is built this way
 
