@@ -100,9 +100,11 @@ export const CREATED_COLUMN = "Creation date";
 
 /** The two things the column can say, for its "?" and the labels note. */
 export const CREATED_HELP = {
-  date: "The day the file says it was first created, read from the file itself. It is not the day the file was posted on the site: a file copied from an older one keeps the older date. It can also be wrong if the computer that made the file had the wrong date.",
+  // Google files since 2026-11-26: a scan signed in to Google reads the
+  // day from Google's File, Details (linked_files/google_session.py).
+  date: "The day the file says it was first created, read from the file itself. For a Google Doc, Sheet or Slides file, it is the day Google’s File, Details says it was created. It is not the day the file was posted on the site: a file copied from an older one keeps the older date. It can also be wrong if the computer that made the file had the wrong date.",
   unknown:
-    "The file does not say when it was created (Google Docs and Slides never do), Axcess could not open the file, or the report was made before Axcess version 0.2.12.",
+    "The file does not say when it was created, Axcess could not open the file, or the report was made before Axcess version 0.2.12. A Google Doc, Sheet or Slides file has a date only when the scan was signed in to Google with an account that can open it.",
 } as const;
 
 /** A file's creation date for its cell, or "Not known" (CREATED_HELP). */

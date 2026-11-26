@@ -75,6 +75,7 @@ const SETTING_KEYS = [
   "skip_focus",
   "skip_markup",
   "skip_documents",
+  "google_sign_in",
   "skip_visual",
   "skip_forms",
   "send_empty_forms",
@@ -119,6 +120,10 @@ export const PUBLIC_DEFAULTS: ScanSettings = {
   // the pages link to and checks each PDF, downloading it once to this
   // computer and keeping the result, not the file.
   skip_documents: false,
+  // Off by default (the developer's request, 2026-11-26): it opens a Google
+  // window before the scan. Public scans only; in a sign-in scan the switch
+  // is shown but cannot be turned on (ChecksGroup).
+  google_sign_in: false,
   skip_visual: true,
   // On for public websites (2026-11-02, the developer's decision, after the
   // safety review): it presses submit buttons, with nothing typed, and
@@ -406,6 +411,7 @@ export type SwitchKey =
   | "focus"
   | "markup"
   | "documents"
+  | "google"
   | "forms"
   | "responsive"
   | "skip_rendered_storage"
@@ -425,6 +431,7 @@ const SWITCH_FIELDS: Record<SwitchKey, { field: keyof ScanSettings; inverted: bo
   focus: { field: "skip_focus", inverted: true },
   markup: { field: "skip_markup", inverted: true },
   documents: { field: "skip_documents", inverted: true },
+  google: { field: "google_sign_in", inverted: false },
   forms: { field: "skip_forms", inverted: true },
   responsive: { field: "skip_responsive", inverted: true },
   skip_rendered_storage: { field: "skip_rendered_storage", inverted: false },

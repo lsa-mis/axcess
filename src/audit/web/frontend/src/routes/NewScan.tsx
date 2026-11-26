@@ -5,7 +5,8 @@ import { api } from "../api/client";
 import type { NewScanPayload } from "../api/types";
 import { Checkbox, PageHeader } from "../components/ui";
 import { LocalLoginHandoff, LocalSignInCard, type SignInEnd } from "../components/LocalLoginScan";
-import { AUTHORIZATION, IMAGE_ACK, RECOVERY, SIGN_IN } from "../components/newScan/copy";
+import { GoogleSignInCard } from "../components/GoogleSignInCard";
+import { AUTHORIZATION, GOOGLE_SIGN_IN, IMAGE_ACK, RECOVERY, SIGN_IN } from "../components/newScan/copy";
 import ScanForm, { SCAN_FORM_ID } from "../components/newScan/ScanForm";
 import SubmitBar from "../components/newScan/SubmitBar";
 import ScanTypeTabs, { SCAN_PANEL_ID, scanTabId } from "../components/newScan/ScanTypeTabs";
@@ -54,7 +55,7 @@ function signInIdFrom(raw: string | null): string | null {
 }
 
 /** What the page says after a sign-in ended without a scan. */
-type EndNotice = { reason: SignInEnd; minutes: number };
+type EndNotice = { reason: SignInEnd; minutes: number; google?: boolean };
 
 /**
  * Start a scan: two tabs, one form.
@@ -77,6 +78,12 @@ type EndNotice = { reason: SignInEnd; minutes: number };
  * from the card shows the public form and stays there, so a waiting
  * sign-in never blocks a public scan.
  *
+ * `?google_sign_in=` (public tab) shows the Google sign-in card: a public
+ * scan with "Sign in to Google for Google files" on waits there, with no
+ * scan yet, until the person signs in to Google and starts it
+ * (GoogleSignInCard). The form's entries stay in this route while the card
+ * shows, so Cancel returns to them (SC 3.3.7 Redundant Entry, Level A).
+ *
  * `?from=<scan id>` starts again from a scan that failed or was stopped:
  * its settings are fetched from the server and laid over the tab's
  * defaults once. Only settings come back. Sign-in happens in the site's own
@@ -92,7 +99,9 @@ export default function NewScanRoute() {
   const handoffScanId = Number(searchParams.get("scan"));
   const inHandoff = mode === "login" && Number.isInteger(handoffScanId) && handoffScanId > 0;
   const signInId = mode === "login" && !inHandoff ? signInIdFrom(searchParams.get("sign_in")) : null;
+  const googleSignInId = mode === "public" ? signInIdFrom(searchParams.get("google_sign_in")) : null;
   const inCard = inHandoff || signInId !== null;
+  const inGoogleCard = googleSignInId !== null;
   const location = useLocation();
   const alreadyWaiting = Boolean((location.state as { alreadyWaiting?: boolean } | null)?.alreadyWaiting);
   const [endNotice, setEndNotice] = useState<EndNotice | null>(null);
@@ -101,6 +110,7 @@ export default function NewScanRoute() {
     const params = new URLSearchParams(searchParams);
     params.delete("scan");
     params.delete("sign_in");
+    params.delete("google_sign_in");
     setEndNotice(null);
     if (next === "login") {
       params.set("mode", "login");
@@ -144,7 +154,7 @@ export default function NewScanRoute() {
   const snapshot = previousSettings.data;
   useEffect(() => {
     // Not while a card is shown: switching tabs would leave the card.
-    if (!snapshot || appliedFrom.current === snapshot.scan_id || inCard) return;
+    if (!snapshot || appliedFrom.current === snapshot.scan_id || inCard || inGoogleCard) return;
     if (snapshot.mode !== mode) {
       // A link that named the wrong tab: move to the scan's own tab first.
       setSearchParams((previous) => {
@@ -160,7 +170,7 @@ export default function NewScanRoute() {
     appliedFrom.current = snapshot.scan_id;
     setSettings(settingsFromSnapshot(snapshot, policyFor(mode)));
     setErrors([]);
-  }, [snapshot, mode, setSearchParams, inCard]);
+  }, [snapshot, mode, setSearchParams, inCard, inGoogleCard]);
 
   const update = (patch: Partial<ScanSettings>) => {
     setSettings((previous) => applyPolicy({ ...previous, ...patch }, policy));
@@ -213,7 +223,11 @@ export default function NewScanRoute() {
   // and answers at once; an error (a browser that is not on this computer
   // cannot have a sign-in here) shows the form.
   const [checkSignIn, setCheckSignIn] = useState(
-    () => !searchParams.get("mode") && !searchParams.get("scan") && !searchParams.get("sign_in"),
+    () =>
+      !searchParams.get("mode") &&
+      !searchParams.get("scan") &&
+      !searchParams.get("sign_in") &&
+      !searchParams.get("google_sign_in"),
   );
   // When the current check was asked for. The query keeps its last answer
   // while the check is off, so returning to the sign-in tab found the answer
@@ -282,9 +296,25 @@ export default function NewScanRoute() {
   const queryClient = useQueryClient();
   const createPublic = useMutation({
     mutationFn: (payload: ScanSettings) => api.createScan(payload),
-    onSuccess: ({ scan_id }) => {
+    onSuccess: (result) => {
+      if (result.google_sign_in) {
+        // No scan yet: the Google window opens first. The card replaces the
+        // form in place; the entries stay in this route.
+        const googleSignIn = result.google_sign_in;
+        setEndNotice(null);
+        setGoogleAlreadyWaiting(googleSignIn.already_waiting);
+        setSearchParams(
+          (previous) => {
+            const params = new URLSearchParams(previous);
+            params.set("google_sign_in", googleSignIn.sign_in_id);
+            return params;
+          },
+          { replace: true },
+        );
+        return;
+      }
       void queryClient.invalidateQueries({ queryKey: ["scans"] });
-      navigate(`/scans/${scan_id}`);
+      navigate(`/scans/${result.scan_id}`);
     },
     onError: (reason: unknown) =>
       setErrors([{ field: "form", message: reason instanceof Error ? reason.message : String(reason) }]),
@@ -305,6 +335,34 @@ export default function NewScanRoute() {
       setErrors([{ field: "form", message: reason instanceof Error ? reason.message : String(reason) }]),
   });
   const pending = createPublic.isPending || createLogin.isPending;
+  const [googleAlreadyWaiting, setGoogleAlreadyWaiting] = useState(false);
+
+  // The Google sign-in started its scan: the report, as for any public scan.
+  const onGoogleScanStarted = (scanId: number) => {
+    void queryClient.invalidateQueries({ queryKey: ["scans"] });
+    navigate(`/scans/${scanId}`);
+  };
+  // Back to the public form with the entries as they were, or, on a page
+  // opened afresh on the card, refilled from the settings the server kept.
+  const onGoogleSignInEnded = (
+    reason: SignInEnd,
+    signInSettings: NewScanPayload | null,
+    minutes: number,
+  ) => {
+    if (signInSettings && !settings.url.trim()) {
+      setSettings(applyPolicy({ ...policyFor("public").defaults, ...signInSettings }, policyFor("public")));
+    }
+    setEndNotice({ reason, minutes, google: true });
+    setGoogleAlreadyWaiting(false);
+    setSearchParams(
+      (previous) => {
+        const params = new URLSearchParams(previous);
+        params.delete("google_sign_in");
+        return params;
+      },
+      { replace: true },
+    );
+  };
 
   const onScanStarted = (scanId: number) => {
     void queryClient.invalidateQueries({ queryKey: ["scans"] });
@@ -344,8 +402,8 @@ export default function NewScanRoute() {
   // notice is set. Runs after the form's own autofocus on its address field,
   // so the reader hears what happened first; the next Tab reaches that field.
   useEffect(() => {
-    if (endNotice && !inCard) endNoticeRef.current?.focus();
-  }, [endNotice, inCard]);
+    if (endNotice && !inCard && !inGoogleCard) endNoticeRef.current?.focus();
+  }, [endNotice, inCard, inGoogleCard]);
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -394,7 +452,7 @@ export default function NewScanRoute() {
         )}
       </div>
 
-      {fromScanId !== null && !inCard && (
+      {fromScanId !== null && !inCard && !inGoogleCard && (
         // Mounted before the fetch settles, so the result is announced.
         <p
           role="status"
@@ -416,20 +474,38 @@ export default function NewScanRoute() {
         </p>
       )}
 
-      {endNotice && !inCard && (
+      {endNotice && !inCard && !inGoogleCard && (
         <p
           ref={endNoticeRef}
           tabIndex={-1}
           role="status"
           className="mb-5 rounded-xs border border-umich-blue/30 bg-umich-blue/[0.04] px-4 py-3 text-sm text-fg focus:outline-none focus-visible:ring-2 focus-visible:ring-umich-blue"
         >
-          {endNotice.reason === "expired"
-            ? SIGN_IN.ended.expired(endNotice.minutes)
-            : SIGN_IN.ended[endNotice.reason]}
+          {endNotice.google
+            ? endNotice.reason === "expired"
+              ? GOOGLE_SIGN_IN.ended.expired(endNotice.minutes)
+              : GOOGLE_SIGN_IN.ended[endNotice.reason]
+            : endNotice.reason === "expired"
+              ? SIGN_IN.ended.expired(endNotice.minutes)
+              : SIGN_IN.ended[endNotice.reason]}
         </p>
       )}
 
-      {inCard ? (
+      {inGoogleCard ? (
+        // The Google sign-in card is what the "Public website" tab shows
+        // while a public scan waits for Google sign-in, so it is that tab's
+        // panel, as the sign-in card is the other tab's (WAI-ARIA Authoring
+        // Practices, Tabs pattern: https://www.w3.org/WAI/ARIA/apg/patterns/tabs/).
+        <div id={SCAN_PANEL_ID} role="tabpanel" aria-labelledby={scanTabId("public")}>
+          <GoogleSignInCard
+            key={googleSignInId}
+            signInId={googleSignInId ?? ""}
+            alreadyWaiting={googleAlreadyWaiting}
+            onEnded={onGoogleSignInEnded}
+            onStarted={onGoogleScanStarted}
+          />
+        </div>
+      ) : inCard ? (
         // The card is what the "Site with a sign-in" tab shows while a
         // sign-in or a sign-in scan is under way, so it is that tab's panel,
         // the element the tab's aria-controls names (WAI-ARIA Authoring

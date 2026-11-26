@@ -36,9 +36,11 @@ import type {
   FindingStatus,
   GroupedFindingsResponse,
   IssuesResponse,
+  CreateScanResult,
   CurrentLocalSignIn,
   LocalLoginScanPayload,
   LocalLoginScanState,
+  GoogleSignInState,
   LocalSignInState,
   LocalAnalysisCapability,
   NewScanPayload,
@@ -318,6 +320,20 @@ export const api = {
     request<LocalSignInState>(`/api/local-sign-ins/${encodeURIComponent(signInId)}/cancel`, {
       method: "POST",
     }),
+  getGoogleSignIn: (signInId: string) =>
+    request<GoogleSignInState>(`/api/google-sign-ins/${encodeURIComponent(signInId)}`, {
+      cache: "no-store",
+    }),
+  /** "I'm signed in to Google, start scan": checks the sign-in, then starts the scan. */
+  startGoogleSignInScan: (signInId: string) =>
+    request<{ scan_id: number }>(`/api/google-sign-ins/${encodeURIComponent(signInId)}/start`, {
+      method: "POST",
+    }),
+  /** Signs out of Google, closes the window and deletes its data. */
+  cancelGoogleSignIn: (signInId: string) =>
+    request<GoogleSignInState>(`/api/google-sign-ins/${encodeURIComponent(signInId)}/cancel`, {
+      method: "POST",
+    }),
   getLocalLoginScan: (scanId: number) =>
     request<LocalLoginScanState>(`/api/local-login-scans/${scanId}`, {
       cache: "no-store",
@@ -465,7 +481,7 @@ export const api = {
     return request<ScopePreview>(`/api/scope-preview?${params}`);
   },
   createScan: (payload: NewScanPayload) =>
-    request<{ scan_id: number }>("/api/scans", {
+    request<CreateScanResult>("/api/scans", {
       method: "POST",
       body: JSON.stringify(payload),
     }),

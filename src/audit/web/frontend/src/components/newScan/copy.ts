@@ -125,6 +125,17 @@ export const SWITCHES = {
     hintSignedIn:
       "Lists the PDF, Word, Excel and other files the pages link to, in the report’s list of documents. Checks each PDF, Word and PowerPoint file during the scan. Axcess downloads each of them on this website with your sign-in, as you (up to 200, each up to 10 MB). It lists files on other sites but does not download them. It keeps the result and a picture of a PDF’s first page, not the file.",
   },
+  // Under the document check, shown while it is on (the developer's
+  // request, 2026-11-26). Every privacy fact stays in the hint (AGENTS.md,
+  // Interface language rule 4): a window opens, what Axcess opens and how
+  // fast, that it changes nothing, and that the sign-in is ended and
+  // deleted. "as Google's robots.txt allows" keeps it true to the code:
+  // each page and download is asked of robots.txt (rule 5).
+  google_sign_in: {
+    label: "Sign in to Google for Google files",
+    hint: "Off by default. When on, a browser window opens before the scan for you to sign in to Google. Axcess then checks Google Docs and Slides that need a sign-in, and reads when each Google Doc, Sheet and Slides file was created and last changed (File, Details). Files kept in Google Drive download with this sign-in too, when robots.txt allows. It opens only the Google files the pages link to, as Google’s robots.txt allows, one each second, and changes nothing. When the scan ends, Axcess signs out and deletes that browser’s data.",
+    hintSignInScan: "Works only in a scan of a public website.",
+  },
   forms: {
     label: "Check that forms describe their errors",
     hint:
@@ -271,6 +282,53 @@ export const SIGN_IN_NOTES = {
   staticOnly:
     "In a sign-in scan, Axcess loads each page with your sign-in cookies. A site that keeps your sign-in only inside the page (session storage) shows its signed-out pages instead.",
   userAgent: "In a sign-in scan, the sign-in window sends this name too, so the site sees one browser throughout.",
+} as const;
+
+/**
+ * The Google sign-in card (GoogleSignInCard): before a public scan with
+ * "Sign in to Google for Google files" starts. Wording from the developer's
+ * request, 2026-11-26.
+ */
+export const GOOGLE_SIGN_IN = {
+  eyebrow: "Google sign-in",
+  opening: {
+    title: "Opening the Google window",
+    detail: "A Chromium browser window should open on this computer, on Google’s sign-in page.",
+  },
+  open: {
+    title: "Sign in to Google",
+    detail:
+      "A browser window opened. Sign in to Google there, with the account that can open the site’s Google files. Then come back and start the scan.",
+  },
+  closed: {
+    title: "The Google window is closed",
+    detail:
+      "Axcess cannot start the scan without it. Cancel Google sign-in to go back to the form. Your settings stay filled in.",
+  },
+  forget: (minutes: number) =>
+    `If you do nothing, Axcess signs out of Google and deletes that browser’s data after ${minutes} minutes.`,
+  whatHappens: "What happens when you start",
+  steps: [
+    "Axcess checks that Google says you are signed in.",
+    "It closes the Google window and uses your sign-in in a hidden browser, only for the Google files the pages link to.",
+    "When the scan ends, Axcess signs out of Google and deletes that browser’s data.",
+  ],
+  alreadyWaiting:
+    "Axcess keeps one Google sign-in at a time, so it shows the one in progress instead of opening another window.",
+  start: "I’m signed in to Google, start scan",
+  starting: "Starting the scan…",
+  cancel: "Cancel Google sign-in",
+  cancelling: "Cancelling…",
+  ended: {
+    cancelled:
+      "You cancelled the Google sign-in. Axcess signed out of Google, closed the window and deleted that browser’s data. Your settings are still filled in.",
+    expired: (minutes: number) =>
+      `The Google window was closed for ${minutes} minutes, so Axcess signed out of Google and deleted that browser’s data. Your settings are still filled in.`,
+    failed:
+      "Axcess could not open the Google window. Check that Chromium for Playwright is installed, then try again.",
+    gone:
+      "This Google sign-in has ended. Axcess keeps it only while Axcess runs. Start the scan again to sign in again.",
+  },
 } as const;
 
 export const AUTHORIZATION = {

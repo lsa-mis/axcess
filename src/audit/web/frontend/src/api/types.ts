@@ -407,6 +407,11 @@ export interface NewScanPayload {
    *  Documents tab) and checking each PDF. On unless chosen off; the server
    *  treats a missing value as on. Never in a sign-in scan. */
   skip_documents: boolean;
+  /** Sign in to Google for the Google files the pages link to (2026-11-26):
+   *  a Google window opens before the scan, and the document check uses
+   *  that sign-in only. Off unless chosen; public scans only, and only with
+   *  the document check on. */
+  google_sign_in: boolean;
   /** Skip motion and vision-assisted visual probes. */
   skip_visual: boolean;
   /** Skip the form error check (WCAG 3.3.1). Off unless chosen. */
@@ -562,6 +567,30 @@ export interface LocalSignInState {
   /** The settings this sign-in will scan with, to refill New scan. */
   settings: NewScanPayload | null;
 }
+
+/**
+ * A Google sign-in for a public scan's Google files, before the scan exists
+ * (`POST /api/scans` with `google_sign_in`, then `/api/google-sign-ins/{id}`).
+ * `cancelled`, `expired` and `failed` say why one ended. Never session data.
+ */
+export interface GoogleSignInState {
+  sign_in_id: string;
+  status: LocalSignInStatus;
+  /** Whether the Google window is open on this computer. */
+  window_open: boolean;
+  error: string | null;
+  /** How long Axcess keeps the sign-in after its window closes. */
+  keep_minutes: number;
+  /** True when the form was sent while this sign-in was already waiting. */
+  already_waiting: boolean;
+  /** The settings the scan will run with, to refill New scan. */
+  settings: NewScanPayload | null;
+}
+
+/** `POST /api/scans`: the new scan, or, with `google_sign_in`, the Google sign-in to finish first. */
+export type CreateScanResult =
+  | { scan_id: number; google_sign_in?: undefined }
+  | { scan_id?: undefined; google_sign_in: GoogleSignInState };
 
 /** `GET /api/local-sign-ins/current`. */
 export interface CurrentLocalSignIn {
