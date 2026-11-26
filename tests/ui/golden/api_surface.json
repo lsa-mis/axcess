@@ -372,6 +372,16 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/google-sign-ins/current",
+        "methods": ["GET"],
+        "name": "api_current_google_sign_in",
+        "async": true,
+        "params": {},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/google-sign-ins/{sign_in_id}",
         "methods": ["GET"],
         "name": "api_google_sign_in_status",
@@ -1373,6 +1383,16 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/google-sign-ins/current",
+        "methods": ["GET"],
+        "name": "api_current_google_sign_in",
+        "async": true,
+        "params": {},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/google-sign-ins/{sign_in_id}",
         "methods": ["GET"],
         "name": "api_google_sign_in_status",
@@ -2355,6 +2375,16 @@
         "name": "api_local_login_scan_status",
         "async": true,
         "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/google-sign-ins/current",
+        "methods": ["GET"],
+        "name": "api_current_google_sign_in",
+        "async": true,
+        "params": {},
         "request_param": "request",
         "background_tasks_param": null
       },
@@ -3355,6 +3385,16 @@
         "name": "api_local_login_scan_status",
         "async": true,
         "params": {"path": ["scan_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/google-sign-ins/current",
+        "methods": ["GET"],
+        "name": "api_current_google_sign_in",
+        "async": true,
+        "params": {},
         "request_param": "request",
         "background_tasks_param": null
       },

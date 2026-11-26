@@ -120,7 +120,13 @@ export default function NewScanRoute() {
       // Same check as a fresh visit (below), so there is one way it works.
       checkAskedAt.current = Date.now();
       setCheckSignIn(true);
-    } else params.delete("mode");
+    } else {
+      params.delete("mode");
+      // Back on the public tab, a Google sign-in still waiting comes back as
+      // its card, the same way a site sign-in does on the sign-in tab.
+      checkGoogleAskedAt.current = Date.now();
+      setCheckGoogleSignIn(true);
+    }
     setSearchParams(params);
   };
 
@@ -268,6 +274,65 @@ export default function NewScanRoute() {
     waitingSignIn.data,
     waitingSignIn.dataUpdatedAt,
     waitingSignIn.errorUpdatedAt,
+    setSearchParams,
+  ]);
+
+  // The same check for a Google sign-in still waiting (the developer's
+  // request, 2026-11-26: "copy the same UX and logic how authenticated scan
+  // is being conducted"). A public scan with "Sign in to Google for Google
+  // files" waits for the person in a Google window, as a sign-in scan waits
+  // in the site's window; leaving New scan and coming back returned to an
+  // empty form, though the Google window and its sign-in were still
+  // waiting (SC 3.3.7 Redundant Entry, Level A: nothing entered is asked
+  // for again). Asked on a fresh visit, as the site check is, and each time
+  // the reader returns to the public tab (selectMode); the form is held
+  // back until the answer, and an answer older than the question is not
+  // acted on, for the reasons given above. A waiting site sign-in comes
+  // first: the fresh visit then opens the sign-in tab, where this card is
+  // not shown.
+  const [checkGoogleSignIn, setCheckGoogleSignIn] = useState(
+    () =>
+      !searchParams.get("mode") &&
+      !searchParams.get("scan") &&
+      !searchParams.get("sign_in") &&
+      !searchParams.get("google_sign_in"),
+  );
+  const checkGoogleAskedAt = useRef(0);
+  const waitingGoogleSignIn = useQuery({
+    queryKey: ["google-sign-in", "current"],
+    queryFn: api.getCurrentGoogleSignIn,
+    enabled: checkGoogleSignIn,
+    retry: false,
+    staleTime: 0,
+    gcTime: 0,
+  });
+  useEffect(() => {
+    if (!checkGoogleSignIn || waitingGoogleSignIn.isPending || waitingGoogleSignIn.isFetching) return;
+    const answeredAt = Math.max(waitingGoogleSignIn.dataUpdatedAt, waitingGoogleSignIn.errorUpdatedAt);
+    if (answeredAt < checkGoogleAskedAt.current) return; // the last visit's answer; a fresh one is coming
+    setCheckGoogleSignIn(false);
+    const found = waitingGoogleSignIn.data?.sign_in;
+    if (!found || (found.status !== "opening_browser" && found.status !== "awaiting_authentication")) return;
+    setGoogleAlreadyWaiting(false);
+    setSearchParams(
+      (previous) => {
+        // The sign-in tab won (a site sign-in is waiting too): stay there.
+        if (previous.get("mode") === "login") return previous;
+        const params = new URLSearchParams(previous);
+        params.delete("scan");
+        params.delete("sign_in");
+        params.set("google_sign_in", found.sign_in_id);
+        return params;
+      },
+      { replace: true },
+    );
+  }, [
+    checkGoogleSignIn,
+    waitingGoogleSignIn.isPending,
+    waitingGoogleSignIn.isFetching,
+    waitingGoogleSignIn.data,
+    waitingGoogleSignIn.dataUpdatedAt,
+    waitingGoogleSignIn.errorUpdatedAt,
     setSearchParams,
   ]);
 
@@ -525,7 +590,7 @@ export default function NewScanRoute() {
             />
           )}
         </div>
-      ) : checkSignIn ? null : (
+      ) : checkSignIn || (mode === "public" && checkGoogleSignIn) ? null : (
         <ScanForm
           key={mode}
           policy={policy}

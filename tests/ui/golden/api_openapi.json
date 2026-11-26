@@ -869,6 +869,21 @@
         }
       }
     },
+    "/api/google-sign-ins/current": {
+      "get": {
+        "summary": "Api Current Google Sign In",
+        "description": "The Google sign-in waiting on this computer, so New scan can return\nto it, as ``/api/local-sign-ins/current`` does for a site sign-in.",
+        "operationId": "api_current_google_sign_in_api_google_sign_ins_current_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {"schema": {"$ref": "#/components/schemas/CurrentGoogleSignInResponse"}}
+            }
+          }
+        }
+      }
+    },
     "/api/google-sign-ins/{sign_in_id}": {
       "get": {
         "summary": "Api Google Sign In Status",
@@ -2881,6 +2896,15 @@
         "type": "object",
         "required": ["sc", "deque_share", "axe_rate", "axe_found", "found", "estimated_total", "method"],
         "title": "CriterionEstimate"
+      },
+      "CurrentGoogleSignInResponse": {
+        "properties": {
+          "sign_in": {"anyOf": [{"$ref": "#/components/schemas/GoogleSignInResponse"}, {"type": "null"}]}
+        },
+        "type": "object",
+        "required": ["sign_in"],
+        "title": "CurrentGoogleSignInResponse",
+        "description": "``GET /api/google-sign-ins/current``: the waiting Google sign-in, if any.\n\nThe same answer, for the same reason, as ``CurrentLocalSignInResponse``:\nNew scan returns to a sign-in still waiting after the person left it."
       },
       "CurrentLocalSignInResponse": {
         "properties": {

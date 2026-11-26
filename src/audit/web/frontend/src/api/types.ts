@@ -593,6 +593,13 @@ export type CreateScanResult =
   | { scan_id?: undefined; google_sign_in: GoogleSignInState };
 
 /** `GET /api/local-sign-ins/current`. */
+/** `GET /api/google-sign-ins/current`: the Google sign-in waiting on this
+ *  computer, if any (`server.CurrentGoogleSignInResponse`), as
+ *  `CurrentLocalSignIn` is for a site sign-in. */
+export interface CurrentGoogleSignIn {
+  sign_in: GoogleSignInState | null;
+}
+
 export interface CurrentLocalSignIn {
   sign_in: LocalSignInState | null;
 }

@@ -145,6 +145,42 @@ async def test_starting_shows_the_google_card_and_cancel_keeps_the_entries(
     assert fake_google.instances[0].closed == 1
 
 
+async def test_a_waiting_google_sign_in_comes_back_after_leaving_new_scan(
+    fake_google: type[FakeGoogleSession], live_server: tuple[str, int], new_page: Any
+) -> None:
+    """The same as a site sign-in (2026-11-26, "copy the same UX and logic"):
+    leaving New scan, or the public tab, and coming back shows the waiting
+    Google sign-in's card, not an empty form; cancelling it refills the form
+    from the settings the server kept."""
+    base, _ = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await _start_with_google(page, base)
+    heading = page.get_by_role("heading", name="Sign in to Google", exact=True)
+    await expect(heading).to_be_visible()
+    first = re.search(r"google_sign_in=([^&]+)", page.url)
+    assert first is not None
+
+    # Away to Reports, then New scan from a fresh address: the card is back.
+    await page.goto(f"{base}/app/scans", wait_until="networkidle")
+    await page.goto(f"{base}/app/scans/new", wait_until="networkidle")
+    await expect(heading).to_be_visible()
+    await expect(page).to_have_url(re.compile(rf"google_sign_in={re.escape(first.group(1))}"))
+    await expect(page.get_by_role("button", name=START)).to_be_visible()
+
+    # The sign-in tab, then the public tab again: the card again.
+    await page.get_by_role("tab", name=re.compile(r"^Site with a sign-in")).click()
+    await expect(heading).to_have_count(0)
+    await page.get_by_role("tab", name="Public website", exact=True).click()
+    await expect(heading).to_be_visible()
+
+    # Cancelled from a page opened afresh: the form is refilled.
+    await page.get_by_role("button", name=CANCEL).click()
+    await expect(page.get_by_role("textbox", name="Website address", exact=True)).to_have_value(
+        SITE
+    )
+    assert len(fake_google.instances) == 1
+
+
 async def test_the_google_card_is_axe_clean_and_works_by_keyboard(
     fake_google: type[FakeGoogleSession],
     live_server: tuple[str, int],

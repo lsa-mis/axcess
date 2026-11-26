@@ -37,6 +37,7 @@ import type {
   GroupedFindingsResponse,
   IssuesResponse,
   CreateScanResult,
+  CurrentGoogleSignIn,
   CurrentLocalSignIn,
   LocalLoginScanPayload,
   LocalLoginScanState,
@@ -320,6 +321,8 @@ export const api = {
     request<LocalSignInState>(`/api/local-sign-ins/${encodeURIComponent(signInId)}/cancel`, {
       method: "POST",
     }),
+  getCurrentGoogleSignIn: () =>
+    request<CurrentGoogleSignIn>("/api/google-sign-ins/current", { cache: "no-store" }),
   getGoogleSignIn: (signInId: string) =>
     request<GoogleSignInState>(`/api/google-sign-ins/${encodeURIComponent(signInId)}`, {
       cache: "no-store",

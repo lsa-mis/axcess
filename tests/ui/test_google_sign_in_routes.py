@@ -110,6 +110,33 @@ def test_starting_with_google_gives_a_sign_in_not_a_scan(
     assert started_crawls == []
 
 
+def test_the_waiting_google_sign_in_can_be_found_again(
+    seeded_db: tuple[Path, Path, int],
+    fake_google: type[FakeGoogleSession],
+    started_crawls: list[dict[str, Any]],
+) -> None:
+    """``/current``, as for a site sign-in: New scan returns to the Google
+    sign-in still waiting after the person left the page (2026-11-26)."""
+    with _local(_app(seeded_db)) as client:
+        assert client.get("/api/google-sign-ins/current", headers=ORIGIN).json() == {
+            "sign_in": None
+        }
+        sign_in = client.post("/api/scans", headers=ORIGIN, json=SCAN_BODY).json()["google_sign_in"]
+        _wait(client, sign_in["sign_in_id"])
+        current = client.get("/api/google-sign-ins/current", headers=ORIGIN)
+        assert current.headers["cache-control"] == "no-store"
+        found = current.json()["sign_in"]
+        assert found["sign_in_id"] == sign_in["sign_in_id"]
+        assert found["status"] == "awaiting_authentication"
+        # The form's entries, to refill the form if the person cancels.
+        assert found["settings"]["url"] == SCAN_BODY["url"]
+        client.post(f"/api/google-sign-ins/{sign_in['sign_in_id']}/cancel", headers=ORIGIN)
+        assert client.get("/api/google-sign-ins/current", headers=ORIGIN).json() == {
+            "sign_in": None
+        }
+    assert started_crawls == []
+
+
 def test_without_google_a_public_scan_starts_as_before(
     seeded_db: tuple[Path, Path, int],
     fake_google: type[FakeGoogleSession],

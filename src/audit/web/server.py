@@ -462,6 +462,16 @@ class GoogleSignInResponse(BaseModel):
     settings: ScanFormSettings | None = None
 
 
+class CurrentGoogleSignInResponse(BaseModel):
+    """``GET /api/google-sign-ins/current``: the waiting Google sign-in, if any.
+
+    The same answer, for the same reason, as ``CurrentLocalSignInResponse``:
+    New scan returns to a sign-in still waiting after the person left it.
+    """
+
+    sign_in: GoogleSignInResponse | None
+
+
 class CurrentLocalSignInResponse(BaseModel):
     """``GET /api/local-sign-ins/current``: the waiting sign-in, if any."""
 
@@ -2306,6 +2316,22 @@ def create_app(
             status_code=202,
             headers={"Cache-Control": "no-store"},
         )
+
+    # Before ``/{sign_in_id}``, which would otherwise take "current" for an id.
+    @app.get("/api/google-sign-ins/current", response_model=CurrentGoogleSignInResponse)
+    async def api_current_google_sign_in(request: Request) -> JSONResponse:
+        """The Google sign-in waiting on this computer, so New scan can return
+        to it, as ``/api/local-sign-ins/current`` does for a site sign-in."""
+        try:
+            _require_local_login_request(request, mutation=False)
+        except HTTPException:
+            return _google_error(_GOOGLE_LOCAL_ONLY, 403)
+        await _refresh_google_sign_in()
+        current = google_sign_ins.current()
+        payload = CurrentGoogleSignInResponse(
+            sign_in=_google_state(current) if current is not None else None
+        )
+        return JSONResponse(payload.model_dump(mode="json"), headers={"Cache-Control": "no-store"})
 
     @app.get("/api/google-sign-ins/{sign_in_id}", response_model=GoogleSignInResponse)
     async def api_google_sign_in_status(request: Request, sign_in_id: str) -> JSONResponse:
