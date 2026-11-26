@@ -54,6 +54,10 @@ _NAMES = {
     "Doc",
     "Docs",
     "Slides",
+    # Google Sheets, named beside Docs and Slides in "Sign in to Google for
+    # Google files" (2026-11-26): "each Google Doc, Sheet and Slides file".
+    "Sheet",
+    "Sheets",
     "Siteimprove",
     "XPath",
     "Level",
@@ -100,6 +104,10 @@ _PHRASES = (
     "University of Michigan Information and Technology Services",
     "Accessibility Team",
     "Claude Code",  # product name, in the fix brief's export hints, lib/terms.ts
+    # Google's own menu and item names, as Google writes them, in "Sign in to
+    # Google for Google files" ("File, Details"): matched whole, so a lone
+    # "File" or "Details" elsewhere still fails.
+    "File, Details",
 )
 
 _WORD = re.compile("[A-Za-z][A-Za-z'\u2019-]*")
@@ -134,6 +142,9 @@ def title_case_words(text: str) -> list[str]:
             match = _WORD.match(bare)
             if match and match.group(0) in _NAMES:
                 continue
+            # A name's possessive ("Google's") is still the name.
+            if re.sub("['\u2019]s$", "", bare) in _NAMES:
+                continue
             wrong.append(bare)
     return wrong
 
@@ -143,6 +154,10 @@ def test_the_check_catches_title_case() -> None:
     assert title_case_words("Delete Report #40") == ["Report"]
     assert title_case_words("Start a scan") == []
     assert title_case_words("Rule check (Alfa)") == []
+    # A name's possessive, and Google's menu names only as the whole phrase.
+    assert title_case_words("signs out of Google\u2019s browser") == []
+    assert title_case_words("read from Google (File, Details)") == []
+    assert title_case_words("Open the File menu") == ["File"]
     assert title_case_words("Export to Excel. Open the PDF") == []
     assert title_case_words("Open example.com") == []
     assert title_case_words("Open the Page inspector") == []
