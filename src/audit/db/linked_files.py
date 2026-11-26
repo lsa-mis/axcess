@@ -258,6 +258,45 @@ def content_type_files(conn: sqlite3.Connection, scan_id: int) -> dict[str, int]
     }
 
 
+def google_files_without_dates(conn: sqlite3.Connection, scan_id: int) -> list[tuple[int, str]]:
+    """``(id, url)`` of each Google Doc, Sheet and Slides file with no date, oldest first.
+
+    For a public scan signed in to Google (2026-11-26): the files whose
+    dates Google's File > Details can give. A Drive file is not one: it
+    gets its dates from its own properties, when it is checked.
+    """
+    return [
+        (int(row[0]), str(row[1]))
+        for row in conn.execute(
+            "SELECT id, url FROM linked_files WHERE scan_id = ? "
+            "AND file_type IN ('google_doc', 'google_sheet', 'google_slides') "
+            "AND file_created_at IS NULL AND file_modified_at IS NULL ORDER BY id LIMIT ?",
+            (scan_id, MAX_FILES_PER_SCAN),
+        )
+    ]
+
+
+def set_file_dates(
+    conn: sqlite3.Connection,
+    *,
+    scan_id: int,
+    file_id: int,
+    created: str | None,
+    modified: str | None,
+) -> bool:
+    """Fill in a file's created and modified dates where it has none.
+
+    A date the file itself gave is never replaced (COALESCE keeps it). The
+    file must belong to ``scan_id``. True when the row was found.
+    """
+    cur = conn.execute(
+        "UPDATE linked_files SET file_created_at = COALESCE(file_created_at, ?), "
+        "file_modified_at = COALESCE(file_modified_at, ?) WHERE id = ? AND scan_id = ?",
+        (created, modified, file_id, scan_id),
+    )
+    return cur.rowcount == 1
+
+
 def mark_unchecked(conn: sqlite3.Connection, scan_id: int) -> int:
     """Close every file still pending as "not checked". Returns how many."""
     cur = conn.execute(

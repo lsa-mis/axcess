@@ -81,7 +81,7 @@ from audit.extractor.pipeline import OcrConfig, VlmConfig, process_page
 from audit.linked_files import formats as linked_file_formats
 from audit.linked_files.fetch import FileFetcher
 from audit.linked_files.google import download_with_button
-from audit.linked_files.tracker import LinkedFileTracker
+from audit.linked_files.tracker import GoogleFiles, LinkedFileTracker
 from audit.logging import get_logger
 from audit.synthesizer.findings import synthesize_findings
 from audit.wcag_version import (
@@ -372,6 +372,11 @@ class CrawlConfig:
     # fetcher the check does not run at all, never with anonymous requests.
     # Other browser-only scans (the protected agent pipeline) never run it.
     documents_signed_in: bool = False
+    # A public scan's choice to sign in to Google for the Google files its
+    # pages link to (2026-11-26). Kept with the scan's settings; the session
+    # itself is ``run_crawl``'s ``google_files``, which only the document
+    # check uses.
+    google_sign_in: bool = False
     # The row this crawl must write into, when the caller already created it.
     # ``_prepare_scan_row`` and ``_ensure_scan`` each work out "which row is
     # this crawl" from the seed URL, and they do not work it out the same way.
@@ -469,6 +474,7 @@ async def run_crawl(
     alfa_analyzer: AlfaPageAnalyzer | None = None,
     static_fetcher: PageFetcher | None = None,
     file_fetcher: FileFetcher | None = None,
+    google_files: GoogleFiles | None = None,
 ) -> CrawlSummary:
     """Execute (or resume) a crawl for ``config.seed_url``.
 
@@ -478,7 +484,16 @@ async def run_crawl(
     does the same for the document check's downloads
     (``SignedInFileFetcher``); a scan with ``documents_signed_in`` must pass
     it.
+
+    ``google_files`` is a public scan's Google sign-in (2026-11-26). It is
+    handed to the document check's tracker and to nothing else: the page
+    checks and their browsers never see it. The crawl closes it when it
+    ends, however it ends (its ``close`` signs out and deletes its data).
     """
+    if google_files is not None and config.documents_signed_in:
+        with contextlib.suppress(Exception):
+            await google_files.close()
+        raise ValueError("A Google sign-in is for public scans only")
     if config.documents_signed_in and _linked_files_on(config) and file_fetcher is None:
         raise ValueError("A sign-in scan's document check needs the signed-in file fetcher")
     # Path-auto-slash first (``/bicentennial`` → ``/bicentennial/``), then
@@ -784,6 +799,8 @@ async def run_crawl(
             # press its download button in a browser of its own, with the
             # scan's browser name.
             drive_button=functools.partial(download_with_button, user_agent=config.user_agent),
+            # A public scan's Google sign-in: the document check only.
+            google=google_files,
         )
     try:
         try:
@@ -814,6 +831,12 @@ async def run_crawl(
         # not finished stay "not checked" in the report.
         if ctx.linked_files is not None:
             await ctx.linked_files.cancel_background()
+        # The document check is over: a Google sign-in signs out at Google
+        # and deletes that browser's data now, before the report is put
+        # together. Never raises.
+        if google_files is not None:
+            with contextlib.suppress(Exception):
+                await google_files.close()
         if interrupted:
             summary.status = "interrupted"
             summary.notes.append("crawl interrupted")
@@ -1101,6 +1124,9 @@ def config_json_for_scan(config: CrawlConfig) -> str:
             # reports omit it: their Documents tab says the scan predates it
             # rather than showing an empty list as "none found".
             "linked_files_enabled": _linked_files_on(config),
+            # Whether the document check was signed in to Google (2026-11-26),
+            # so "Edit settings and retry" can put the switch back.
+            "google_sign_in": config.google_sign_in,
             # Read back by the row-discovery predicate, not just by the UI.
             "resumable": config.resumable,
             "search": config.search.model_dump(mode="json") if config.search else None,
