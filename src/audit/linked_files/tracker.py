@@ -92,7 +92,7 @@ log = get_logger(__name__)
 
 
 class GoogleFiles(Protocol):
-    """A public scan's Google sign-in, as the tracker uses it (2026-11-26).
+    """A scan's Google sign-in, as the tracker uses it (2026-11-26).
 
     ``linked_files.google_session.GoogleBrowserSession`` is the real one.
     The crawl hands it to the tracker and closes it when it ends; nothing
@@ -134,8 +134,9 @@ class _Downloads:
     # A Drive file's fallback: press its download button in a browser
     # (``google.download_with_button``); None leaves the fallback out.
     drive_button: ButtonDownload | None = None
-    # A public scan's Google sign-in (``GoogleFiles``); None downloads
-    # Google files as everyone else's, with ``client``.
+    # The scan's Google sign-in (``GoogleFiles``), in a public or a sign-in
+    # scan; None downloads Google files as before: with ``client`` in a
+    # public scan, with ``fetch`` in a sign-in scan.
     google: GoogleFiles | None = None
 
 
@@ -209,12 +210,12 @@ class LinkedFileTracker:
 
         ``fetch`` replaces the download itself (a sign-in scan's signed-in
         browser); the rate limit, robots.txt and the scan-wide cap still apply.
-        ``google`` (a public scan only, never with ``fetch``) downloads Google
-        Docs, Slides and Drive files through the person's Google sign-in and
-        reads each Google file's dates after the checks (``check_pending``).
+        ``google`` downloads Google Docs, Slides and Drive files through the
+        person's Google sign-in and reads each Google file's dates after the
+        checks (``check_pending``). In a sign-in scan it sits beside ``fetch``
+        (2026-11-26): Google files go through ``google``, every other file
+        through ``fetch`` as before, and ``client`` downloads nothing.
         """
-        if google is not None and fetch is not None:
-            raise ValueError("A Google sign-in is for public scans only")
         self._downloads = _Downloads(
             client=client,
             limiter=limiter,
@@ -456,7 +457,8 @@ class LinkedFileTracker:
             await self._check_all(pending, downloads)
             # After every download, so a file the export already dated is
             # not opened again, and before anything is closed as not checked.
-            if downloads.google is not None and downloads.fetch is None:
+            # In public and sign-in scans alike (2026-11-26).
+            if downloads.google is not None:
                 await self._read_google_dates(downloads, downloads.google)
         finally:
             # A stop or a fault leaves nothing silently pending: the report
@@ -515,15 +517,14 @@ class LinkedFileTracker:
         # "Disallow: /" there (2026-11-16), so a scan that follows robots.txt
         # lists Drive files as not checked, and one set to ignore it
         # downloads them (the developer's decision, 2026-11-16). A sign-in
-        # scan keeps its own fetcher, whose egress policy refuses a file on
-        # another site.
+        # scan without a Google sign-in keeps its own fetcher, whose egress
+        # policy refuses a file on another site.
         # A Google Doc or Slides deck: the Word or PowerPoint file Google
         # exports (google.export_address), and robots.txt is asked about
         # that address; Google's allows /document and /presentation
         # (2026-11-16). One with no export address (a copy published to the
         # web) is not a file Axcess can download.
         file_type = formats.classify_url(url)
-        drive = downloads.fetch is None and file_type == "google_drive"
         export = None
         if file_type in {"google_doc", "google_slides"}:
             export = export_address(url)
@@ -531,15 +532,23 @@ class LinkedFileTracker:
                 self._store(file_id, store.CheckResult("could_not_check", "google_file"))
                 return
         self._started += 1
+        # A scan signed in to Google (2026-11-26; public scans, then sign-in
+        # scans too): a Doc, Slides deck or Drive file is downloaded through
+        # that sign-in instead, from the same address and under the same
+        # robots.txt answer as a public scan's. Every other file goes as
+        # before: ``client`` in a public scan, the site's own signed-in
+        # fetcher (``fetch``) in a sign-in scan. Once the sign-in is lost
+        # (``active`` false), Google files go as before too. The Google
+        # session paces itself, one download at a time, so it does not hold
+        # one of the shared download slots while it waits.
+        google = downloads.google
+        via_google = (
+            google is not None
+            and google.active
+            and (file_type == "google_drive" or export is not None)
+        )
+        drive = file_type == "google_drive" and (downloads.fetch is None or via_google)
         target = DRIVE_DOWNLOAD_URL if drive else export or url
-        # A public scan signed in to Google (2026-11-26): a Doc, Slides deck
-        # or Drive file is downloaded through that sign-in instead, from the
-        # same address and under the same robots.txt answer. Once the
-        # sign-in is lost (``active`` false), as everyone else's again. The
-        # Google session paces itself, one download at a time, so it does
-        # not hold one of the shared download slots while it waits.
-        google = downloads.google if downloads.fetch is None else None
-        via_google = google is not None and google.active and (drive or export is not None)
         gate: contextlib.AbstractAsyncContextManager[object] = (
             contextlib.nullcontext() if via_google else self._semaphore
         )
@@ -552,12 +561,15 @@ class LinkedFileTracker:
                     fetched = await (
                         google.fetch_drive(url) if drive else google.fetch_export(target)
                     )
+                elif downloads.fetch is not None:
+                    # A sign-in scan: the site's signed-in browser, never an
+                    # anonymous request, also for a Google file whose Google
+                    # sign-in was lost (a Drive file by its link, as before).
+                    fetched = await downloads.fetch(url if file_type == "google_drive" else target)
                 elif drive:
                     fetched = await fetch_drive_file(
                         downloads.client, url, button=downloads.drive_button
                     )
-                elif downloads.fetch is not None:
-                    fetched = await downloads.fetch(target)
                 elif export is not None:
                     fetched = await fetch_export(downloads.client, export)
                 else:

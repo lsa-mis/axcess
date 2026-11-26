@@ -102,8 +102,12 @@ async def _run(
     links: list[str],
     ignore_robots: bool = False,
     robots: dict[str, str] | None = None,
+    fetch: Any = None,
 ) -> tuple[int, list[str]]:
-    """Record one page linking ``links``, check them all, read the dates."""
+    """Record one page linking ``links``, check them all, read the dates.
+
+    ``fetch``: a sign-in scan's signed-in file fetcher (2026-11-26).
+    """
     scan_id = int(
         conn.execute(
             "INSERT INTO scans (seed_url, status, config_json) VALUES (?, 'running', '{}')", (SITE,)
@@ -139,6 +143,7 @@ async def _run(
             ignore_robots=ignore_robots,
             blocked_url_patterns=(),
             excluded_scopes=(),
+            fetch=fetch,
             google=google,
         )
         body = "".join(f'<a href="{link}">x</a>' for link in links).encode()
@@ -302,22 +307,141 @@ async def test_some_dates_found_is_no_warning(tmp_db: sqlite3.Connection) -> Non
     assert not [e for e in logs if e["event"] == "linked_files.google_dates_none_found"]
 
 
-def test_a_sign_in_scan_cannot_take_a_google_session(tmp_db: sqlite3.Connection) -> None:
-    import pytest
+# -- a sign-in scan with "Sign in to Google for Google files" (2026-11-26) -----
 
-    tracker = LinkedFileTracker(tmp_db, scan_id=1, scope=build_scope(SITE), allow_subdomains=False)
 
-    async def fetch(_url: str) -> FetchedFile:
-        return FetchedFile("broken_link")
+@dataclass
+class SiteFetcher:
+    """A sign-in scan's signed-in file fetcher (``SignedInFileFetcher``)."""
 
-    with pytest.raises(ValueError, match="public scans only"):
+    asked: list[str] = field(default_factory=list)
+
+    async def __call__(self, url: str) -> FetchedFile:
+        self.asked.append(url)
+        return FetchedFile("ok", 200, None, PDF)
+
+
+SITE_PDF = "https://site.test/files/report.pdf"
+
+
+async def test_a_sign_in_scan_routes_google_files_to_google_and_the_rest_to_the_site(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    """Google Docs, Slides and Drive files through the Google session; the
+    site's PDF and another site's PDF through the site's signed-in fetcher;
+    the crawl's anonymous client downloads nothing."""
+    google = FakeGoogle()
+    site = SiteFetcher()
+    scan_id, anonymous = await _run(
+        tmp_db,
+        google,
+        links=[DOC, SLIDES, DRIVE, SITE_PDF, PDF_URL],
+        ignore_robots=True,
+        fetch=site,
+    )
+    assert sorted(google.exports) == [
+        "https://docs.google.com/document/d/1docAAAAAAAAAAAAAAAAAA/export?format=docx",
+        "https://docs.google.com/presentation/d/1slideCCCCCCCCCCCCCCCC/export/pptx",
+    ]
+    assert google.drives == [DRIVE]
+    assert sorted(site.asked) == sorted([SITE_PDF, PDF_URL])
+    assert anonymous == []
+    rows = _rows(tmp_db, scan_id)
+    assert rows[DOC][0] == "mostly_sure"
+
+
+async def test_a_sign_in_scan_asks_robots_txt_about_the_google_download_address(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    """Followed, robots.txt is asked about the address downloaded from, as
+    in a public scan: Drive's download host says no, so neither Google nor
+    the site's fetcher is asked for the Drive file."""
+    google = FakeGoogle()
+    site = SiteFetcher()
+    rules = {"drive.usercontent.google.com": "/"}
+    scan_id, _ = await _run(tmp_db, google, links=[DRIVE, DOC], robots=rules, fetch=site)
+    assert google.drives == []
+    assert site.asked == []
+    assert len(google.exports) == 1
+    assert _rows(tmp_db, scan_id)[DRIVE][:2] == ("could_not_check", "robots")
+
+
+async def test_a_sign_in_scan_reads_google_dates(tmp_db: sqlite3.Connection) -> None:
+    google = FakeGoogle(dates={"1sheetBBBBBBBBBBBBBBBB": GoogleDates("2021-03-04", "2022-05-06")})
+    site = SiteFetcher()
+    scan_id, _ = await _run(tmp_db, google, links=[SHEET], ignore_robots=True, fetch=site)
+    assert google.reads == ["https://docs.google.com/spreadsheets/d/1sheetBBBBBBBBBBBBBBBB/edit"]
+    assert _rows(tmp_db, scan_id)[SHEET][2:] == ("2021-03-04", "2022-05-06")
+    assert site.asked == []
+
+
+async def test_a_sign_in_scan_whose_google_sign_in_was_lost_uses_the_site_fetcher(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    """Never the anonymous client: a Google file goes as before the Google
+    sign-in existed, through the site's fetcher (which refuses other sites)."""
+    google = FakeGoogle(active=False)
+    site = SiteFetcher()
+    _, anonymous = await _run(tmp_db, google, links=[DOC, DRIVE], ignore_robots=True, fetch=site)
+    assert google.exports == [] and google.drives == []
+    assert sorted(site.asked) == sorted(
+        ["https://docs.google.com/document/d/1docAAAAAAAAAAAAAAAAAA/export?format=docx", DRIVE]
+    )
+    assert anonymous == []
+
+
+async def test_a_sign_in_scan_without_google_downloads_as_before(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    """No Google session: the same addresses through the site's fetcher as
+    before 2026-11-26 (the Doc's export, the Drive link itself), no dates."""
+    site = SiteFetcher()
+    scan_id = int(
+        tmp_db.execute(
+            "INSERT INTO scans (seed_url, status, config_json) VALUES (?, 'running', '{}')", (SITE,)
+        ).lastrowid
+        or 0
+    )
+    page_id = int(
+        tmp_db.execute(
+            "INSERT INTO pages (scan_id, url_normalized, render_mode) VALUES (?, ?, 'js')",
+            (scan_id, SITE),
+        ).lastrowid
+        or 0
+    )
+    anonymous: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        anonymous.append(str(request.url))
+        return httpx.Response(404)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        tracker = LinkedFileTracker(
+            tmp_db, scan_id=scan_id, scope=build_scope(SITE), allow_subdomains=False
+        )
+        limiter = HostLimiter(rps=1000.0)
+        checker = RobotsChecker(client, user_agent="test")
         tracker.attach_downloads(
-            client=httpx.AsyncClient(),
-            limiter=HostLimiter(),
-            robots=RobotsChecker(httpx.AsyncClient(), user_agent="t"),
-            ignore_robots=False,
+            client=client,
+            limiter=limiter,
+            robots=checker,
+            ignore_robots=True,
             blocked_url_patterns=(),
             excluded_scopes=(),
-            fetch=fetch,
-            google=FakeGoogle(),
+            fetch=site,
         )
+        body = "".join(f'<a href="{link}">x</a>' for link in (DOC, DRIVE, SHEET)).encode()
+        tracker.record_page(page_id=page_id, base_url=SITE, body=body)
+        await tracker.check_pending(
+            client=client,
+            limiter=limiter,
+            robots=checker,
+            ignore_robots=True,
+            blocked_url_patterns=(),
+            excluded_scopes=(),
+        )
+    assert sorted(site.asked) == sorted(
+        ["https://docs.google.com/document/d/1docAAAAAAAAAAAAAAAAAA/export?format=docx", DRIVE]
+    )
+    assert anonymous == []
+    assert _rows(tmp_db, scan_id)[SHEET][2:] == (None, None)

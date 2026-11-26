@@ -775,10 +775,35 @@
         }
       }
     },
+    "/api/local-sign-ins/{sign_in_id}/google": {
+      "post": {
+        "summary": "Api Open Local Sign In Google",
+        "description": "\"I'm signed in to the site, next: sign in to Google\" (2026-11-26).\n\nOpens a second, separate Google window, a ``GoogleBrowserSession``\nwith its own Playwright and profile, never a tab of the site's\nbrowser, and ties it to this sign-in. Checks nothing about Google and\nleaves the site's sign-in and window as they are. Only for a sign-in\nwhose settings have \"Sign in to Google for Google files\". A second\npress while a Google window opens or waits gives back the same\nstate; after a failed one it opens a new window.",
+        "operationId": "api_open_local_sign_in_google_api_local_sign_ins__sign_in_id__google_post",
+        "parameters": [
+          {
+            "name": "sign_in_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string", "title": "Sign In Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LocalSignInResponse"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
     "/api/local-sign-ins/{sign_in_id}/start": {
       "post": {
         "summary": "Api Start Local Sign In Scan",
-        "description": "\"I'm signed in, start scan\": create the scan row and start the crawl.\n\nThe crawl lock is taken here and only here. If another scan is\nrunning, the start is refused and the sign-in stays waiting, so the\nperson can start once that scan finishes.",
+        "description": "\"I'm signed in, start scan\": create the scan row and start the crawl.\n\nThe crawl lock is taken here and only here. If another scan is\nrunning, the start is refused and the sign-in stays waiting, so the\nperson can start once that scan finishes.\n\nWith \"Sign in to Google for Google files\" (2026-11-26) this is \"I'm\nsigned in to Google, start scan\": refused, with the sign-in kept,\nuntil the Google window is open and Google says it is signed in.\nThen the Google window is closed and its profile reopened headless\n(``enter_scan_mode``), and the scan starts with the site session as\nbefore and the Google session for the document check only.",
         "operationId": "api_start_local_sign_in_scan_api_local_sign_ins__sign_in_id__start_post",
         "parameters": [
           {
@@ -3478,6 +3503,7 @@
           "skip_focus": {"type": "boolean", "title": "Skip Focus", "default": false},
           "skip_markup": {"type": "boolean", "title": "Skip Markup", "default": false},
           "skip_documents": {"type": "boolean", "title": "Skip Documents", "default": false},
+          "google_sign_in": {"type": "boolean", "title": "Google Sign In", "default": false},
           "skip_semantic": {"type": "boolean", "title": "Skip Semantic", "default": true},
           "skip_visual": {"type": "boolean", "title": "Skip Visual", "default": true},
           "skip_forms": {"type": "boolean", "title": "Skip Forms", "default": true},
@@ -3528,7 +3554,8 @@
           "keep_minutes": {"type": "integer", "title": "Keep Minutes", "default": 30},
           "forget_in_seconds": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "Forget In Seconds"},
           "already_waiting": {"type": "boolean", "title": "Already Waiting", "default": false},
-          "settings": {"anyOf": [{"$ref": "#/components/schemas/ScanFormSettings"}, {"type": "null"}]}
+          "settings": {"anyOf": [{"$ref": "#/components/schemas/ScanFormSettings"}, {"type": "null"}]},
+          "google": {"anyOf": [{"$ref": "#/components/schemas/SignInGoogleStep"}, {"type": "null"}]}
         },
         "type": "object",
         "required": ["sign_in_id", "status"],
@@ -4103,6 +4130,21 @@
         "type": "object",
         "required": ["target"],
         "title": "SearchTarget"
+      },
+      "SignInGoogleStep": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["opening_browser", "awaiting_authentication", "failed"],
+            "title": "Status"
+          },
+          "window_open": {"type": "boolean", "title": "Window Open", "default": false},
+          "error": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Error"}
+        },
+        "type": "object",
+        "required": ["status"],
+        "title": "SignInGoogleStep",
+        "description": "The Google window of a sign-in scan with \"Sign in to Google for Google\nfiles\" (2026-11-26): its state only. Never session data, no address the\nbrowser visited, no account name."
       },
       "SiteHistory": {
         "properties": {

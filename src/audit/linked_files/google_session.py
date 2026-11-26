@@ -1,10 +1,14 @@
-"""Sign in to Google for the Google files a public scan links to (2026-11-26).
+"""Sign in to Google for the Google files a scan's pages link to (2026-11-26).
 
 The developer's request: an opt-in New scan setting, "Sign in to Google for
-Google files", off by default and offered in public scans only. With it on,
-Axcess opens a visible Chromium window on Google's sign-in page before the
-scan; the person signs in there, comes back, and starts the scan. During the
-scan's document check:
+Google files", off by default, first in public scans and then in sign-in
+scans too. With it on, Axcess opens a visible Chromium window on Google's
+sign-in page before the scan; the person signs in there, comes back, and
+starts the scan. In a sign-in scan this window opens after the site
+sign-in, as a second, separate browser: its own Playwright, its own
+profile, never a tab of the site's browser, and never given the site's
+context or pages (the developer's rule: "one flow, two separate browsers,
+one after another"). During the scan's document check:
 
 - Google Docs and Slides are downloaded as Google's export (.docx, .pptx;
   ``google.export_address``) through the signed-in browser, so files shared

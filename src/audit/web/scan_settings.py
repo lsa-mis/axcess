@@ -82,8 +82,9 @@ class ScanFormSettings(BaseModel):
     # client that sends nothing gets it.
     skip_documents: bool = False
     # Sign in to Google for the Google files the pages link to (2026-11-26):
-    # off unless chosen, public scans only, and only with the document check.
-    # A choice, not a secret: the sign-in itself is never kept.
+    # off unless chosen, only with the document check; public scans, and
+    # sign-in scans too (a second, separate Google window after the site
+    # sign-in). A choice, not a secret: the sign-in itself is never kept.
     google_sign_in: bool = False
     skip_visual: bool
     # The form error check (WCAG 3.3.1) is off unless chosen: a missing value

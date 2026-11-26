@@ -201,3 +201,126 @@ def test_the_orchestrator_module_itself_has_no_google_behaviour() -> None:
     source = inspect.getsource(orchestrator)
     for word in ("accounts.google.com", "docs.google.com", "read_dates(", "fetch_export("):
         assert word not in source, word
+
+
+# -- sign-in scans with "Sign in to Google for Google files" (2026-11-26) ------
+# Two separate browsers, one after another: the site's own signed-in browser
+# runs every website check as before; the Google browser is the document
+# check's alone.
+
+
+def test_the_session_is_built_from_nothing_of_another_browser() -> None:
+    """Its constructor takes no context, page, request or session: only how
+    to start its own Playwright, where its profile goes, and its pacing."""
+    params = set(inspect.signature(GoogleBrowserSession.__init__).parameters) - {"self"}
+    assert params == {
+        "playwright_start",
+        "profile_base",
+        "pace_s",
+        "clock",
+        "sleep",
+        "nav_timeout_ms",
+    }
+
+
+def test_the_sign_in_scan_hands_the_google_session_only_to_the_crawl() -> None:
+    """In ``_run_local_login_background``, ``run.google`` is only checked,
+    passed to ``run_crawl(google_files=...)``, and closed: never handed to
+    the site session (``run.session``) or a page check."""
+    from audit.web import server
+
+    function = ast.parse(textwrap.dedent(inspect.getsource(server._run_local_login_background)))
+    parents: dict[ast.AST, ast.AST] = {}
+    for node in ast.walk(function):
+        for child in ast.iter_child_nodes(node):
+            parents[child] = node
+    uses: list[str] = []
+    for node in ast.walk(function):
+        if not (
+            isinstance(node, ast.Attribute)
+            and node.attr == "google"
+            and isinstance(node.value, ast.Name)
+            and node.value.id == "run"
+        ):
+            continue
+        parent = parents[node]
+        if isinstance(parent, ast.Compare):
+            uses.append("checked")
+        elif isinstance(parent, ast.Attribute) and parent.attr == "close":
+            uses.append("closed")
+        elif (
+            isinstance(parent, ast.keyword)
+            and parent.arg == "google_files"
+            and isinstance(call := parents[parent], ast.Call)
+            and isinstance(call.func, ast.Name)
+            and call.func.id == "run_crawl"
+        ):
+            uses.append("crawl")
+        else:
+            uses.append(f"other: {ast.dump(parent)[:80]}")
+    assert [use for use in uses if use.startswith("other")] == []
+    assert uses.count("crawl") == 1
+    assert "closed" in uses
+    # And nothing named "google" goes into a call on the site session.
+    for node in ast.walk(function):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Attribute)
+            and node.func.value.attr == "session"
+        ):
+            assert "google" not in ast.dump(node), ast.dump(node)[:120]
+
+
+def test_the_site_session_module_knows_nothing_of_google() -> None:
+    source = (SRC / "protected" / "session.py").read_text(encoding="utf-8")
+    assert "google" not in source.lower()
+
+
+def test_the_two_profiles_are_different_folders_with_different_prefixes(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    """The site browser's start deletes every ``axcess-protected-browser-*``
+    folder in its root; a Google profile is in another root, with another
+    prefix, so it survives that sweep, and the reverse."""
+    import tempfile
+
+    from audit.linked_files import google_session
+    from audit.protected import session as site_session
+
+    assert not google_session.PROFILE_PREFIX.startswith(site_session._EPHEMERAL_PROFILE_PREFIX)
+    assert not site_session._EPHEMERAL_PROFILE_PREFIX.startswith(google_session.PROFILE_PREFIX)
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
+    google_dir = google_session.create_profile_dir()
+    try:
+        site_dir = site_session._create_ephemeral_profile_dir()
+        assert Path(google_dir).parent != Path(site_dir).parent
+        assert Path(google_dir).parent.name == google_session.PROFILE_ROOT_NAME
+        assert Path(google_dir).is_dir(), "the site browser's sweep removed the Google profile"
+        # A second site browser start sweeps its own prefix only.
+        site_session._create_ephemeral_profile_dir()
+        assert Path(google_dir).is_dir()
+        # A second Google session keeps the live site profile too.
+        other_google = google_session.create_profile_dir()
+        google_session.remove_profile_dir(other_google)
+        assert not any(
+            entry.name.startswith(site_session._EPHEMERAL_PROFILE_PREFIX)
+            for entry in Path(google_dir).parent.iterdir()
+        )
+    finally:
+        google_session.remove_profile_dir(google_dir)
+
+
+async def test_a_sign_in_scan_with_google_needs_the_site_file_fetcher(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    """Every file that is not a Google file downloads through the site's
+    sign-in, never anonymously: without that fetcher the crawl refuses to
+    start, and the Google sign-in is closed (signed out, data deleted)."""
+    import pytest
+
+    recorder = _Recorder()
+    config = CrawlConfig(seed_url=SEED, documents_signed_in=True, google_sign_in=True)
+    with pytest.raises(ValueError, match="signed-in file fetcher"):
+        await run_crawl(tmp_db, config, google_files=recorder)
+    assert recorder.calls == ["close"]

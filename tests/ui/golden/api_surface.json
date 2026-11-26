@@ -332,6 +332,16 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/local-sign-ins/{sign_in_id}/google",
+        "methods": ["POST"],
+        "name": "api_open_local_sign_in_google",
+        "async": true,
+        "params": {"path": ["sign_in_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/local-sign-ins/{sign_in_id}/start",
         "methods": ["POST"],
         "name": "api_start_local_sign_in_scan",
@@ -1343,6 +1353,16 @@
       },
       {
         "type": "APIRoute",
+        "path": "/api/local-sign-ins/{sign_in_id}/google",
+        "methods": ["POST"],
+        "name": "api_open_local_sign_in_google",
+        "async": true,
+        "params": {"path": ["sign_in_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
         "path": "/api/local-sign-ins/{sign_in_id}/start",
         "methods": ["POST"],
         "name": "api_start_local_sign_in_scan",
@@ -2333,6 +2353,16 @@
         "path": "/api/local-sign-ins/{sign_in_id}",
         "methods": ["GET"],
         "name": "api_local_sign_in_status",
+        "async": true,
+        "params": {"path": ["sign_in_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/local-sign-ins/{sign_in_id}/google",
+        "methods": ["POST"],
+        "name": "api_open_local_sign_in_google",
         "async": true,
         "params": {"path": ["sign_in_id"]},
         "request_param": "request",
@@ -3343,6 +3373,16 @@
         "path": "/api/local-sign-ins/{sign_in_id}",
         "methods": ["GET"],
         "name": "api_local_sign_in_status",
+        "async": true,
+        "params": {"path": ["sign_in_id"]},
+        "request_param": "request",
+        "background_tasks_param": null
+      },
+      {
+        "type": "APIRoute",
+        "path": "/api/local-sign-ins/{sign_in_id}/google",
+        "methods": ["POST"],
+        "name": "api_open_local_sign_in_google",
         "async": true,
         "params": {"path": ["sign_in_id"]},
         "request_param": "request",

@@ -372,10 +372,10 @@ class CrawlConfig:
     # fetcher the check does not run at all, never with anonymous requests.
     # Other browser-only scans (the protected agent pipeline) never run it.
     documents_signed_in: bool = False
-    # A public scan's choice to sign in to Google for the Google files its
-    # pages link to (2026-11-26). Kept with the scan's settings; the session
-    # itself is ``run_crawl``'s ``google_files``, which only the document
-    # check uses.
+    # The scan's choice to sign in to Google for the Google files its pages
+    # link to (2026-11-26; public scans, then sign-in scans too). Kept with
+    # the scan's settings; the session itself is ``run_crawl``'s
+    # ``google_files``, which only the document check uses.
     google_sign_in: bool = False
     # The row this crawl must write into, when the caller already created it.
     # ``_prepare_scan_row`` and ``_ensure_scan`` each work out "which row is
@@ -485,15 +485,19 @@ async def run_crawl(
     (``SignedInFileFetcher``); a scan with ``documents_signed_in`` must pass
     it.
 
-    ``google_files`` is a public scan's Google sign-in (2026-11-26). It is
-    handed to the document check's tracker and to nothing else: the page
+    ``google_files`` is the scan's Google sign-in (2026-11-26), in a public
+    scan or, beside the site's own signed-in browser, in a sign-in scan. It
+    is handed to the document check's tracker and to nothing else: the page
     checks and their browsers never see it. The crawl closes it when it
     ends, however it ends (its ``close`` signs out and deletes its data).
+    In a sign-in scan it needs the site's ``file_fetcher`` too: every file
+    that is not a Google file still downloads through the site's sign-in,
+    never anonymously.
     """
-    if google_files is not None and config.documents_signed_in:
+    if google_files is not None and config.documents_signed_in and file_fetcher is None:
         with contextlib.suppress(Exception):
             await google_files.close()
-        raise ValueError("A Google sign-in is for public scans only")
+        raise ValueError("A sign-in scan's Google sign-in needs the signed-in file fetcher")
     if config.documents_signed_in and _linked_files_on(config) and file_fetcher is None:
         raise ValueError("A sign-in scan's document check needs the signed-in file fetcher")
     # Path-auto-slash first (``/bicentennial`` → ``/bicentennial/``), then
@@ -799,7 +803,7 @@ async def run_crawl(
             # press its download button in a browser of its own, with the
             # scan's browser name.
             drive_button=functools.partial(download_with_button, user_agent=config.user_agent),
-            # A public scan's Google sign-in: the document check only.
+            # The scan's Google sign-in: the document check only.
             google=google_files,
         )
     try:

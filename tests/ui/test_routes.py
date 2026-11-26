@@ -2559,7 +2559,11 @@ def test_a_sign_in_makes_no_scan_row_and_no_report(
         "forget_in_seconds",
         "already_waiting",
         "settings",
+        # The Google step's state, None without "Sign in to Google for
+        # Google files" (2026-11-26); never session data.
+        "google",
     }
+    assert state["google"] is None
 
 
 def test_starting_creates_the_scan_row_and_starts_the_crawl(

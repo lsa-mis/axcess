@@ -21,6 +21,12 @@ This registry holds those sign-ins. Its rules are the product's:
   page *why* its sign-in ended, the registry remembers the reason for the few
   most recent IDs: the ID and one word ("cancelled", "expired", "failed"), no
   site, no settings and no browser state.
+* A sign-in may have a second, separate window tied to it (``SecondSignIn``):
+  a sign-in scan with "Sign in to Google for Google files" opens a Google
+  window after the site sign-in (2026-11-26). It belongs to the same sign-in,
+  so one sign-in is one card and one clock: the clock stops while either
+  window is open, and ending the sign-in, however it ends, closes both
+  sessions.
 
 Nothing here touches FastAPI, SQLite or Playwright, so unit tests drive it
 with a fake session and a fake clock.
@@ -47,6 +53,7 @@ _ENDED_REMEMBERED = 16
 
 SignInStatus = Literal["opening_browser", "awaiting_authentication"]
 EndedReason = Literal["cancelled", "expired", "failed"]
+SecondStatus = Literal["opening_browser", "awaiting_authentication", "failed"]
 
 
 class KeptSignInSession(Protocol):
@@ -57,6 +64,25 @@ class KeptSignInSession(Protocol):
 
 
 SessionT = TypeVar("SessionT", bound=KeptSignInSession)
+
+
+@dataclass(eq=False)
+class SecondSignIn:
+    """A second, separate sign-in window tied to a sign-in (2026-11-26).
+
+    A sign-in scan with "Sign in to Google for Google files": after the site
+    sign-in, a Google window of its own (its own browser and profile, never
+    a tab of the site's browser). Kept on the site sign-in it belongs to,
+    not as a second registry entry, so the sign-in stays one thing: one
+    card, one clock, and one end that closes both sessions. ``session`` is
+    the caller's, opaque here like ``payload``. ``error`` is the caller's
+    fixed message for a ``failed`` window, never a browser's own text.
+    """
+
+    session: KeptSignInSession
+    status: SecondStatus = "opening_browser"
+    window_open: bool = False
+    error: str | None = None
 
 
 @dataclass(eq=False)
@@ -75,6 +101,8 @@ class PendingSignIn(Generic[SessionT]):
     # Background work the caller tied to this sign-in (opening the window),
     # cancelled if the sign-in ends first.
     tasks: list[Any] = field(default_factory=list)
+    # The second window's sign-in, if one was opened (``SecondSignIn``).
+    second: SecondSignIn | None = None
 
 
 class SignInInProgressError(Exception):
@@ -159,8 +187,69 @@ class SignInRegistry(Generic[SessionT]):
         if pending is not None:
             pending.window_closed_at = None
 
+    # -- the second window -------------------------------------------------
+
+    def attach_second(self, sign_in_id: str, session: KeptSignInSession) -> SecondSignIn | None:
+        """Tie a second window's session to the sign-in, replacing a failed one.
+
+        None if the sign-in is not waiting. The caller checks first that no
+        second window is opening or waiting: one replaced here is not closed.
+        """
+        pending = self.get(sign_in_id)
+        if pending is None:
+            return None
+        if pending.second is not None and pending.second.status != "failed":
+            raise ValueError("A second sign-in window is already open for this sign-in.")
+        pending.second = SecondSignIn(session=session)
+        return pending.second
+
+    def second_opened(self, sign_in_id: str) -> None:
+        """The second window is open and waiting: the clock stops."""
+        second = self._second(sign_in_id)
+        if second is None or second.status == "failed":
+            return
+        second.status = "awaiting_authentication"
+        self.second_window_changed(sign_in_id, True)
+
+    def second_window_changed(self, sign_in_id: str, is_open: bool) -> None:
+        """The second window opened or closed.
+
+        Open stops the clock. Closed restarts it from now when the site's
+        window is closed too: the clock measures time with no window open.
+        """
+        pending = self.get(sign_in_id)
+        second = pending.second if pending is not None else None
+        if pending is None or second is None:
+            return
+        if is_open:
+            second.window_open = True
+            pending.window_closed_at = None
+            return
+        was_open = second.window_open
+        second.window_open = False
+        if was_open and not pending.window_open:
+            pending.window_closed_at = self.clock()
+
+    def second_failed(self, sign_in_id: str, error: str) -> None:
+        """The second window could not open, or its sign-in could not be used.
+
+        The site sign-in keeps waiting. The caller has closed the session.
+        """
+        second = self._second(sign_in_id)
+        if second is None:
+            return
+        self.second_window_changed(sign_in_id, False)
+        second.status = "failed"
+        second.error = error
+
+    def _second(self, sign_in_id: str) -> SecondSignIn | None:
+        pending = self.get(sign_in_id)
+        return pending.second if pending is not None else None
+
+    # ------------------------------------------------------------ handing over
+
     def take(self, sign_in_id: str) -> PendingSignIn[SessionT] | None:
-        """Hand the sign-in over to a scan. Its session stays open."""
+        """Hand the sign-in over to a scan. Its sessions stay open."""
         pending = self.get(sign_in_id)
         if pending is None:
             return None
@@ -199,6 +288,8 @@ class SignInRegistry(Generic[SessionT]):
         """When the clock started, or None while it is stopped."""
         if pending.status != "awaiting_authentication" or pending.window_open:
             return None
+        if pending.second is not None and pending.second.window_open:
+            return None
         return pending.window_closed_at
 
     async def _end(self, sign_in_id: str, reason: EndedReason) -> bool:
@@ -214,11 +305,17 @@ class SignInRegistry(Generic[SessionT]):
             if task is not this_task and not task.done():
                 task.cancel()
         session = pending.session
+        second, pending.second = pending.second, None
         # Drop every reference the registry held: the settings and the
         # session, which owns the only copy of the signed-in state.
         pending.payload = None
         with contextlib.suppress(Exception):
             await session.close()
+        # The second window's session too (a Google sign-in signs out and
+        # deletes its browser's data), whatever the first one's close did.
+        if second is not None:
+            with contextlib.suppress(Exception):
+                await second.session.close()
         return True
 
     def _remember(self, sign_in_id: str, reason: EndedReason) -> None:
