@@ -370,7 +370,10 @@ export function LocalSignInCard({
  * Content Usable", https://www.w3.org/TR/coga-usable/, paraphrased: one way
  * to do one thing). What only that panel said is kept here and on the
  * progress page itself, so nothing a reader needs is lost:
- * - where the browser is and what to leave alone (this note);
+ * - what to leave alone (this note): the signed-in window, while the scan
+ *   runs in it. Not said for a scan in a hidden browser: "Keep Axcess
+ *   running" is true of every scan and a public scan's page does not say
+ *   it either, so the note added nothing there (the developer, 2026-11-26);
  * - why a sign-in scan failed: now saved as the scan's own failure reason
  *   (server ``_finish_local_login_scan``), shown by the scan page's "Why it
  *   failed", and kept after Axcess restarts;
@@ -395,12 +398,11 @@ export function SignInScanNote({ scanId }: { scanId: number }) {
   });
   const state = status.data?.status;
   if (state !== "verifying_authentication" && state !== "scanning") return null;
+  if (state === "scanning" && status.data?.browser_backgrounded) return null;
   const text =
     state === "verifying_authentication"
       ? "Axcess is setting up your signed-in session for the scan. Pages appear below once it starts."
-      : status.data?.browser_backgrounded
-        ? "Axcess moved your sign-in to a hidden browser and is scanning there. Keep Axcess running until the scan finishes."
-        : "Axcess is scanning in your signed-in browser. Leave the browser window open until the scan finishes.";
+      : "Axcess is scanning in your signed-in browser. Leave the browser window open until the scan finishes.";
   return (
     <Card className="mb-4 p-4">
       <h2 className="font-semibold text-fg">{SIGN_IN.scanEyebrow(scanId)}</h2>

@@ -373,6 +373,31 @@ async def test_start_turns_the_sign_in_into_a_numbered_sign_in_scan(
         page.get_by_role("status").filter(has_text="setting up your signed-in session")
     ).to_be_visible()
     await expect(page.get_by_role("heading", name="Finding and checking pages")).to_be_visible()
+    # Scanning in a hidden browser: no note ("Keep Axcess running" is true of
+    # every scan); in the visible window: the one thing to leave alone.
+    for hidden, shown in ((True, 0), (False, 1)):
+        answer = {
+            "scan_id": scan_id,
+            "status": "scanning",
+            "error": None,
+            "browser_backgrounded": hidden,
+        }
+
+        def answering(body: dict[str, Any]) -> Any:
+            async def fulfil(route: Any) -> None:
+                await route.fulfill(json=body)
+
+            return fulfil
+
+        await page.route(f"**/api/local-login-scans/{scan_id}", answering(answer))
+        await page.reload(wait_until="domcontentloaded")
+        await expect(page.get_by_role("heading", name="Finding and checking pages")).to_be_visible()
+        await expect(note).to_have_count(shown)
+        await page.unroute(f"**/api/local-login-scans/{scan_id}")
+    await expect(
+        page.get_by_role("status").filter(has_text="Leave the browser window open")
+    ).to_be_visible()
+
     # An address from before then opens the same page.
     await page.goto(f"{base}/app/scans/new?mode=login&scan={scan_id}", wait_until="networkidle")
     await expect(page).to_have_url(re.compile(rf"/app/scans/{scan_id}$"))
