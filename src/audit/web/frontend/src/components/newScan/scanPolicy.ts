@@ -383,6 +383,10 @@ export function toLocalLoginPayload(
     skip_focus: settings.skip_focus,
     skip_markup: settings.skip_markup,
     skip_documents: settings.skip_documents,
+    // Only with the document check, which alone uses it: its switch is
+    // hidden while the check is off, so a hidden "on" is never sent (the
+    // server refuses the pair).
+    google_sign_in: !settings.skip_documents && settings.google_sign_in,
     skip_semantic: settings.skip_semantic,
     skip_visual: settings.skip_visual,
     skip_forms: settings.skip_forms,

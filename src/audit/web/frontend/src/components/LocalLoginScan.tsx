@@ -49,20 +49,43 @@ function errorText(error: unknown): string {
  *   already in front of them (W3C COGA, "Making Content Usable": one way to
  *   do one thing, https://www.w3.org/TR/coga-usable/).
  *
+ * With "Sign in to Google for Google files" on (2026-11-26, the developer's
+ * decision: "one flow, two separate browsers, one after another"), the
+ * same card has two steps, and says which in words in place of the
+ * "Sign-in" label: "Step 1 of 2: sign in to the site", then "Step 2 of 2:
+ * sign in to Google", so the two windows are never confused (W3C COGA,
+ * "Making Content Usable": help users know where they are in a process,
+ * paraphrased). Step 1 is the three faces above, with the primary button
+ * "I'm signed in to the site, next: sign in to Google": it opens a second,
+ * separate Google window and starts nothing. Step 2 has the Google card's
+ * faces (GoogleSignInCard): opening; open, with "I'm signed in to Google,
+ * start scan"; and closed, with Cancel only, since the scan needs that
+ * window open. One card, not the site card followed by the Google card:
+ * both windows belong to one sign-in, and "Cancel sign-in" ends both, so a
+ * second card with its own cancel would be two controls for one job (one
+ * control, one job). Not a shared sub-component with GoogleSignInCard
+ * either: what the two share is this file's pattern (the `Card`, one
+ * heading per face, focus on it, the polite live region, errors as text,
+ * one primary button beside Cancel), while their buttons, endpoints and
+ * faces differ; the Google wording is reused from `GOOGLE_SIGN_IN`, so the
+ * same thing has the same words (SC 3.2.4 Consistent Identification, Level
+ * AA). A Google window that could not open, or whose sign-in could not be
+ * moved to the scan, returns the card to step 1 with the reason as text.
+ *
  * The window's state is said in the heading and the text, never by colour
  * or an icon alone (SC 1.4.1 Use of Color, Level A).
  *
- * Focus moves to the card heading when the face changes, and when the card
- * first appears. The button the person pressed (the form's submit button,
- * Reopen) is gone after the change, and focus left on a removed element
- * falls back to the page top, so the next Tab would restart the page
- * (SC 2.4.3 Focus Order, Level A). Moving to the heading puts the reader
- * where the new content starts. A polite live region carries the face's
- * one-line explanation, so a change that happens while the person is in the
- * sign-in window, such as the window closing, is still announced
- * (SC 4.1.3 Status Messages, Level AA). Rejected: an assertive alert. A
- * closed window is news, not an error, and an alert would interrupt
- * whatever the reader was doing.
+ * Focus moves to the card heading when the face or the step changes, and
+ * when the card first appears. The button the person pressed (the form's
+ * submit button, Reopen, "next: sign in to Google") is gone after the
+ * change, and focus left on a removed element falls back to the page top,
+ * so the next Tab would restart the page (SC 2.4.3 Focus Order, Level A).
+ * Moving to the heading puts the reader where the new content starts. A
+ * polite live region carries the face's one-line explanation, so a change
+ * that happens while the person is in a sign-in window, such as the window
+ * closing, is still announced (SC 4.1.3 Status Messages, Level AA).
+ * Rejected: an assertive alert. A closed window is news, not an error, and
+ * an alert would interrupt whatever the reader was doing.
  */
 export function LocalSignInCard({
   signInId,
@@ -72,7 +95,12 @@ export function LocalSignInCard({
 }: {
   signInId: string;
   alreadyWaiting: boolean;
-  onEnded: (reason: SignInEnd, settings: NewScanPayload | null, keepMinutes: number) => void;
+  onEnded: (
+    reason: SignInEnd,
+    settings: NewScanPayload | null,
+    keepMinutes: number,
+    hadGoogle: boolean,
+  ) => void;
   onStarted: (scanId: number) => void;
 }) {
   const status = useQuery({
@@ -85,15 +113,19 @@ export function LocalSignInCard({
   });
   // The settings and limit from the last answer, so the form can be refilled
   // and the message worded even after the server has forgotten the sign-in.
-  const last = useRef<{ settings: NewScanPayload | null; minutes: number }>({
+  // `hadGoogle`: a Google window was opened, so the ended notice also says
+  // Axcess signed out of Google and deleted that browser's data.
+  const last = useRef<{ settings: NewScanPayload | null; minutes: number; hadGoogle: boolean }>({
     settings: null,
     minutes: 30,
+    hadGoogle: false,
   });
   useEffect(() => {
     if (!status.data) return;
     last.current = {
       settings: status.data.settings ?? last.current.settings,
       minutes: status.data.keep_minutes,
+      hadGoogle: last.current.hadGoogle || Boolean(status.data.google),
     };
   }, [status.data]);
 
@@ -101,7 +133,7 @@ export function LocalSignInCard({
   const end = (reason: SignInEnd) => {
     if (ended.current) return;
     ended.current = true;
-    onEnded(reason, last.current.settings, last.current.minutes);
+    onEnded(reason, last.current.settings, last.current.minutes, last.current.hadGoogle);
   };
   const serverStatus = status.data?.status;
   const gone = status.error instanceof ApiError && status.error.status === 404;
@@ -120,11 +152,15 @@ export function LocalSignInCard({
     mutationFn: () => api.reopenLocalSignIn(signInId),
     onSettled: () => void status.refetch(),
   });
+  const openGoogle = useMutation({
+    mutationFn: () => api.openLocalSignInGoogle(signInId),
+    onSettled: () => void status.refetch(),
+  });
   const cancel = useMutation({
     mutationFn: () => api.cancelLocalSignIn(signInId),
     onSuccess: () => end("cancelled"),
   });
-  const busy = start.isPending || reopen.isPending || cancel.isPending;
+  const busy = start.isPending || reopen.isPending || openGoogle.isPending || cancel.isPending;
 
   const data = status.data;
   const face: "opening" | "open" | "closed" =
@@ -133,26 +169,43 @@ export function LocalSignInCard({
       : data.window_open
         ? "open"
         : "closed";
-  const copy = SIGN_IN[face];
+  // "Sign in to Google for Google files": two steps. Step 2 once a Google
+  // window is opening or open; back to step 1 if it failed.
+  const withGoogle = data?.settings?.google_sign_in === true;
+  const google = data?.google ?? null;
+  const step: "site" | "google" = google && google.status !== "failed" ? "google" : "site";
+  const googleFace: "opening" | "open" | "closed" =
+    !google || google.status === "opening_browser"
+      ? "opening"
+      : google.window_open
+        ? "open"
+        : "closed";
+  const copy = step === "google" ? SIGN_IN.google[googleFace] : SIGN_IN[face];
+  const faceKey = step === "google" ? `google-${googleFace}` : face;
+  const keepMinutes = data?.keep_minutes ?? 30;
 
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     heading.current?.focus();
-  }, [face]);
+  }, [faceKey]);
 
   // A start refused because another scan is running leaves the sign-in
   // waiting; the message says so. Clear it once the face changes, so an old
   // refusal does not sit under a new state.
   const { reset: resetStart } = start;
   const { reset: resetReopen } = reopen;
+  const { reset: resetOpenGoogle } = openGoogle;
   useEffect(() => {
     resetStart();
     resetReopen();
-  }, [face, resetStart, resetReopen]);
+    resetOpenGoogle();
+  }, [faceKey, resetStart, resetReopen, resetOpenGoogle]);
 
   return (
     <Card className="max-w-3xl p-6 [overflow-anchor:none]">
-      <p className="text-xs font-semibold text-umich-blue">{SIGN_IN.eyebrow}</p>
+      <p className="text-xs font-semibold text-umich-blue">
+        {withGoogle ? SIGN_IN.steps[step] : SIGN_IN.eyebrow}
+      </p>
       <h2
         ref={heading}
         tabIndex={-1}
@@ -179,18 +232,25 @@ export function LocalSignInCard({
           {errorText(status.error)}
         </p>
       )}
+      {/* A Google window that failed: back on step 1, with why, so the
+          person can try "next: sign in to Google" again or cancel. */}
+      {step === "site" && google?.status === "failed" && google.error && (
+        <p className={ERROR_BOX} role="alert">
+          {google.error}
+        </p>
+      )}
 
-      {face === "closed" && (
+      {step === "site" && face === "closed" && (
         <div className="mt-4 rounded-xs border border-border bg-surface-subtle p-4 text-sm text-fg-muted">
           {/* The limit and the expiry are stated where the choice is made,
               not left for the person to discover after reopening (rule 12
               in docs/plain-language.md: never drop a limit to save space). */}
           <p>{SIGN_IN.limit}</p>
-          <p className="mt-2">{SIGN_IN.keep(data?.keep_minutes ?? 30)}</p>
+          <p className="mt-2">{SIGN_IN.keep(keepMinutes)}</p>
         </div>
       )}
 
-      {face === "open" && (
+      {step === "site" && face === "open" && (
         <div className="mt-6 rounded-xs border-2 border-umich-blue bg-umich-blue/5 p-5">
           <h3 className="font-semibold text-fg">Finished signing in?</h3>
           <p className="mt-1 text-sm text-fg-muted">
@@ -199,22 +259,50 @@ export function LocalSignInCard({
           </p>
           <div className="mt-4 rounded-xs border border-border bg-surface p-3">
             <h4 className="text-sm font-semibold text-fg">
-              What happens when you start
+              {withGoogle ? SIGN_IN.whatHappensNext : "What happens when you start"}
             </h4>
             <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-fg-muted">
-              <li>
-                If &ldquo;Show the scanning browser window&rdquo; is off,
-                Axcess moves your sign-in to a hidden browser and closes the
-                sign-in window.
-              </li>
-              <li>
-                If it is on, the scan runs in this signed-in window. Leave it
-                open. Closing it ends the scan.
-              </li>
-              <li>Keep Axcess running. Progress appears on this page.</li>
-              <li>{SIGN_IN.keepOpen(data?.keep_minutes ?? 30)}</li>
+              {withGoogle ? (
+                <>
+                  {SIGN_IN.nextSteps.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                  <li>{SIGN_IN.keepOpen(keepMinutes)}</li>
+                </>
+              ) : (
+                <>
+                  <li>
+                    If &ldquo;Show the scanning browser window&rdquo; is off,
+                    Axcess moves your sign-in to a hidden browser and closes the
+                    sign-in window.
+                  </li>
+                  <li>
+                    If it is on, the scan runs in this signed-in window. Leave it
+                    open. Closing it ends the scan.
+                  </li>
+                  <li>Keep Axcess running. Progress appears on this page.</li>
+                  <li>{SIGN_IN.keepOpen(keepMinutes)}</li>
+                </>
+              )}
             </ul>
           </div>
+        </div>
+      )}
+
+      {step === "google" && googleFace === "closed" && data?.forget_in_seconds != null && (
+        <p className="mt-4 rounded-xs border border-border bg-surface-subtle p-4 text-sm text-fg-muted">
+          {SIGN_IN.google.forget(keepMinutes)}
+        </p>
+      )}
+
+      {step === "google" && googleFace === "open" && (
+        <div className="mt-4 rounded-xs border border-border bg-surface p-3">
+          <h3 className="text-sm font-semibold text-fg">What happens when you start</h3>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-fg-muted">
+            {SIGN_IN.google.steps.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -228,6 +316,11 @@ export function LocalSignInCard({
           {errorText(reopen.error)}
         </p>
       )}
+      {openGoogle.error && (
+        <p className={ERROR_BOX} role="alert">
+          {errorText(openGoogle.error)}
+        </p>
+      )}
       {cancel.error && (
         <p className={ERROR_BOX} role="alert">
           {errorText(cancel.error)}
@@ -235,20 +328,34 @@ export function LocalSignInCard({
       )}
 
       {/* One primary button, the likeliest next step, as on the stopped-scan
-          card (ScanDetail): start. "Cancel sign-in" sits next to it as a
-          secondary button. It says "sign-in", not "scan", because no scan
-          exists yet; it closes the window, erases the kept sign-in and
-          returns to the form with every entry kept (SC 3.3.7 Redundant
-          Entry, Level A). The buttons keep their place in each face, so a
-          returning reader finds them where they were (SC 3.2.3 Consistent
-          Navigation, Level AA, applied within the card). */}
+          card (ScanDetail): start, or, in step 1 of a scan with the Google
+          sign-in, "next: sign in to Google". "Cancel sign-in" sits next to it
+          as a secondary button. It says "sign-in", not "scan", because no
+          scan exists yet; it closes the window (both windows, with the
+          Google sign-in), erases the kept sign-in and returns to the form
+          with every entry kept (SC 3.3.7 Redundant Entry, Level A). The
+          buttons keep their place in each face, so a returning reader finds
+          them where they were (SC 3.2.3 Consistent Navigation, Level AA,
+          applied within the card). In step 2 only an open Google window
+          offers start, as on the Google card: the start reads the Google
+          browser's name from that window. */}
       <div className="mt-5 flex flex-wrap gap-3">
-        {face !== "opening" && (
-          <Button variant="primary" onClick={() => start.mutate()} disabled={busy}>
-            {start.isPending ? SIGN_IN.starting : SIGN_IN.start}
+        {step === "site" && face !== "opening" && withGoogle && (
+          <Button variant="primary" onClick={() => openGoogle.mutate()} disabled={busy}>
+            {openGoogle.isPending ? SIGN_IN.openingGoogle : SIGN_IN.nextGoogle}
           </Button>
         )}
-        {face === "closed" && (
+        {((step === "site" && face !== "opening" && !withGoogle) ||
+          (step === "google" && googleFace === "open")) && (
+          <Button variant="primary" onClick={() => start.mutate()} disabled={busy}>
+            {start.isPending
+              ? SIGN_IN.starting
+              : step === "google"
+                ? SIGN_IN.google.start
+                : SIGN_IN.start}
+          </Button>
+        )}
+        {step === "site" && face === "closed" && (
           <Button onClick={() => reopen.mutate()} disabled={busy}>
             {reopen.isPending ? SIGN_IN.reopening : SIGN_IN.reopen}
           </Button>

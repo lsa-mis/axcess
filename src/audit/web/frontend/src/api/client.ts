@@ -313,6 +313,12 @@ export const api = {
     request<LocalLoginScanState>(`/api/local-sign-ins/${encodeURIComponent(signInId)}/start`, {
       method: "POST",
     }),
+  /** "I'm signed in to the site, next: sign in to Google": opens a second,
+   *  separate Google window for this sign-in. Checks nothing yet. */
+  openLocalSignInGoogle: (signInId: string) =>
+    request<LocalSignInState>(`/api/local-sign-ins/${encodeURIComponent(signInId)}/google`, {
+      method: "POST",
+    }),
   reopenLocalSignIn: (signInId: string) =>
     request<LocalSignInState>(`/api/local-sign-ins/${encodeURIComponent(signInId)}/reopen`, {
       method: "POST",

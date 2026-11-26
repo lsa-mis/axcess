@@ -134,7 +134,11 @@ export const SWITCHES = {
   google_sign_in: {
     label: "Sign in to Google for Google files",
     hint: "Off by default. When on, a browser window opens before the scan for you to sign in to Google. Axcess then checks Google Docs and Slides that need a sign-in, and reads when each Google Doc, Sheet and Slides file was created and last changed (File, Details). Files kept in Google Drive download with this sign-in too, when robots.txt allows. It opens only the Google files the pages link to, as Google’s robots.txt allows, one each second, and changes nothing. When the scan ends, Axcess signs out and deletes that browser’s data.",
-    hintSignInScan: "Works only in a scan of a public website.",
+    // The sign-in scan's own hint (2026-11-26): the same facts, plus the
+    // two windows, which one is for what, and that both browsers' data
+    // goes when the scan ends.
+    hintSignInScan:
+      "Off by default. When on, after you sign in to the site, a second, separate browser window opens for you to sign in to Google. Axcess then checks Google Docs and Slides that need a sign-in, and reads when each Google Doc, Sheet and Slides file was created and last changed (File, Details). Files kept in Google Drive download with this sign-in too, when robots.txt allows. It opens only the Google files the pages link to, as Google’s robots.txt allows, one each second, and changes nothing. Axcess uses the Google window only for these Google files. It checks the site’s pages in the site’s own browser, without your Google sign-in. When the scan ends, Axcess signs out of Google and deletes both browsers’ data.",
   },
   forms: {
     label: "Check that forms describe their errors",
@@ -416,6 +420,50 @@ export const SIGN_IN = {
   reopening: "Reopening the window…",
   cancel: "Cancel sign-in",
   cancelling: "Cancelling…",
+  // With "Sign in to Google for Google files" (2026-11-26): one card, two
+  // steps, two separate windows. Each step says which window it is about,
+  // so the two are never confused.
+  steps: {
+    site: "Step 1 of 2: sign in to the site",
+    google: "Step 2 of 2: sign in to Google",
+  },
+  nextGoogle: "I’m signed in to the site, next: sign in to Google",
+  openingGoogle: "Opening the Google window…",
+  whatHappensNext: "What happens next",
+  nextSteps: [
+    "A second, separate Chromium window opens on Google’s sign-in page. It does not share your sign-in with the site’s window.",
+    "Leave the site’s window as it is. You start the scan after you sign in to Google.",
+  ],
+  google: {
+    opening: {
+      title: "Opening the Google window",
+      detail: "A second, separate Chromium window should open on this computer, on Google’s sign-in page.",
+    },
+    open: {
+      title: "Now sign in to Google",
+      detail: GOOGLE_SIGN_IN.open.detail,
+    },
+    closed: {
+      title: "The Google window is closed",
+      detail:
+        "Axcess cannot start the scan without it. Cancel sign-in to go back to the form. Your settings stay filled in.",
+    },
+    forget: (minutes: number) =>
+      `No sign-in window is open. If you do nothing for ${minutes} minutes, Axcess ends this sign-in: it signs out of Google and deletes both browsers’ data.`,
+    steps: [
+      "Axcess checks that Google says you are signed in.",
+      "It closes the Google window and uses your Google sign-in in a hidden browser, only for the Google files the pages link to.",
+      "It checks the site’s pages with your sign-in to the site, never with your Google sign-in.",
+      "If “Show the scanning browser window” is off, Axcess moves your sign-in to the site to a hidden browser and closes the site’s window.",
+      "If it is on, the scan runs in the site’s window. Leave it open. Closing it ends the scan.",
+      "Keep Axcess running. Progress appears on this page.",
+      "When the scan ends, Axcess signs out of Google and deletes both browsers’ data.",
+    ],
+    start: GOOGLE_SIGN_IN.start,
+  },
+  // Added to the ended notice when the sign-in had a Google window: rule 12
+  // in docs/plain-language.md, never drop a privacy fact.
+  endedGoogle: "Axcess also signed out of Google and deleted the Google browser’s data.",
   ended: {
     expired: (minutes: number) =>
       `Your sign-in was kept for ${minutes} minutes without use, so Axcess forgot it. Select “${SUBMIT.login.label}” to sign in again.`,

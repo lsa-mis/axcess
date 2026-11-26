@@ -5,11 +5,17 @@ Google browser swapped for ``FakeGoogleSession``: no browser opens on
 Google and nothing contacts it.
 
 - The switch: off by default, under the document check and only while it
-  is on, with its description; disabled in a sign-in scan, saying why.
+  is on, with its description; in a sign-in scan too (2026-11-26), with
+  its own description.
 - Starting with it on shows the Google card instead of a scan, with its
   buttons; "start" before Google says signed in shows the error as text;
   Cancel returns to the form with the entries kept.
 - The card is axe-clean and works by keyboard alone.
+- A sign-in scan with it on (2026-11-26): the sign-in card's step 1 says
+  "next: sign in to Google"; step 2 is the Google window, with its own
+  start; Cancel ends both and refills the form; leaving New scan and coming
+  back shows the step it was on. The site's sign-in browser is
+  ``FakeSignInSession``.
 """
 
 from __future__ import annotations
@@ -86,17 +92,38 @@ async def test_the_switch_is_off_under_the_document_check(
     await expect(google).to_have_count(0)
 
 
-async def test_the_switch_is_shown_but_off_in_a_sign_in_scan(
+async def test_the_switch_works_in_a_sign_in_scan_with_its_own_hint(
     fake_google: type, live_server: tuple[str, int], new_page: Any
 ) -> None:
+    """Usable on the sign-in tab since 2026-11-26: off by default, in the
+    same place, saying the Google window is a second, separate one."""
     base, _ = live_server
     page = await new_page(viewport={"width": 1280, "height": 900})
     await page.goto(f"{base}/app/scans/new?mode=login", wait_until="networkidle")
     await _open_scan_groups(page)
     google = page.get_by_role("switch", name=SWITCH_NAME)
-    await expect(google).to_be_disabled()
+    await expect(google).to_be_enabled()
     await expect(google).not_to_be_checked()
-    await expect(google).to_have_accessible_description("Works only in a scan of a public website.")
+    await expect(google).to_have_accessible_description(
+        re.compile(
+            "^Off by default. When on, after you sign in to the site, a second, separate browser "
+            "window opens for you to sign in to Google.*"
+            "reads when each Google Doc, Sheet and Slides file was created and last changed.*"
+            "Axcess uses the Google window only for these Google files. It checks the site.s "
+            "pages in the site.s own browser, without your Google sign-in. When the scan ends, "
+            "Axcess signs out of Google and deletes both browsers. data.$"
+        )
+    )
+    names = (
+        await page.get_by_role("group", name="Checks", exact=True)
+        .get_by_role("switch")
+        .evaluate_all(_SWITCH_LABELS)
+    )
+    assert names[names.index(DOCUMENTS) + 1] == SWITCH
+    await google.check()
+    await expect(google).to_be_checked()
+    await page.get_by_role("switch", name=DOCUMENTS).click()
+    await expect(google).to_have_count(0)
 
 
 async def _start_with_google(page: Any, base: str) -> None:
@@ -235,3 +262,189 @@ async def test_a_closed_google_window_offers_cancel_only(
     ).to_be_visible()
     violations = await _run_axe(page)
     assert not violations, _render_violations(violations)
+
+
+# -- a sign-in scan with the Google sign-in (2026-11-26) ---------------------
+
+SIGN_IN_SEED = "https://app.example.test/secure/"
+NEXT = "I\u2019m signed in to the site, next: sign in to Google"
+SITE_START = "I\u2019m signed in, start scan"
+STEP_1 = "Step 1 of 2: sign in to the site"
+STEP_2 = "Step 2 of 2: sign in to Google"
+SITE_OPEN = "Sign in using the Chromium window"
+GOOGLE_OPEN = "Now sign in to Google"
+
+
+async def _start_sign_in_with_google(page: Any, base: str) -> None:
+    await page.goto(f"{base}/app/scans/new?mode=login", wait_until="networkidle")
+    await page.get_by_role("textbox", name=re.compile(r"^Website address to scan")).fill(
+        SIGN_IN_SEED
+    )
+    await page.get_by_role("checkbox", name=re.compile(r"^The site owner allows this scan")).check()
+    await _open_scan_groups(page)
+    await page.get_by_role("switch", name=SWITCH_NAME).check()
+    await page.get_by_role("button", name="Open browser to sign in").click()
+
+
+async def _focused_heading(page: Any) -> str:
+    return str(
+        await page.evaluate(
+            "() => document.activeElement?.tagName === 'H2'"
+            " ? document.activeElement.textContent.trim() : ''"
+        )
+    )
+
+
+async def test_a_sign_in_scan_goes_site_then_google_and_cancel_ends_both(
+    fake_sign_in: type,
+    fake_google: type[FakeGoogleSession],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    base, _ = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await _start_sign_in_with_google(page, base)
+
+    # Step 1: the site's window, as before, but "next", not "start".
+    site_heading = page.get_by_role("heading", name=SITE_OPEN, exact=True)
+    await expect(site_heading).to_be_visible()
+    await expect(page.get_by_text(STEP_1, exact=True)).to_be_visible()
+    await expect(page.get_by_role("button", name=SITE_START)).to_have_count(0)
+    next_button = page.get_by_role("button", name=NEXT)
+    await expect(next_button).to_be_visible()
+    await expect(page.get_by_role("button", name="Cancel sign-in")).to_be_visible()
+    await expect(page.get_by_role("heading", name="What happens next")).to_be_visible()
+    assert fake_google.instances == []
+
+    # Step 2: a second, separate Google window.
+    await next_button.click()
+    google_heading = page.get_by_role("heading", name=GOOGLE_OPEN, exact=True)
+    await expect(google_heading).to_be_visible()
+    await expect(google_heading).to_be_focused()
+    await expect(page.get_by_text(STEP_2, exact=True)).to_be_visible()
+    await expect(
+        page.get_by_role("status").filter(has_text="A browser window opened. Sign in to Google")
+    ).to_have_text(
+        "A browser window opened. Sign in to Google there, with the account that can "
+        "open the site\u2019s Google files. Then come back and start the scan."
+    )
+    assert len(fake_google.instances) == 1
+    assert fake_google.instances[0] is not fake_sign_in.instances[0]
+    assert fake_sign_in.instances[0].window_open, "the site's window stays as it was"
+    start = page.get_by_role("button", name=START)
+    for name in (START, "Cancel sign-in"):
+        box = await page.get_by_role("button", name=name).bounding_box()
+        assert box is not None and box["height"] >= 44, (name, box)
+
+    # Google says not signed in yet: the same words as the public card.
+    await start.click()
+    await expect(page.get_by_role("alert")).to_have_text(NOT_SIGNED_IN)
+    assert fake_google.instances[0].signed_in_checks == 1
+
+    # Cancel sign-in ends both and refills the form.
+    await page.get_by_role("button", name="Cancel sign-in").click()
+    notice = page.get_by_role("status").filter(has_text="You cancelled the sign-in.")
+    await expect(notice).to_have_text(
+        "You cancelled the sign-in. Axcess closed the sign-in window and forgot your sign-in. "
+        "Your settings are still filled in. Axcess also signed out of Google and deleted the "
+        "Google browser\u2019s data."
+    )
+    await expect(notice).to_be_focused()
+    await expect(page).not_to_have_url(re.compile(r"sign_in="))
+    await expect(
+        page.get_by_role("textbox", name=re.compile(r"^Website address to scan"))
+    ).to_have_value(SIGN_IN_SEED)
+    await _open_scan_groups(page)
+    await expect(page.get_by_role("switch", name=SWITCH_NAME)).to_be_checked()
+    assert fake_sign_in.instances[0].closed
+    assert fake_google.instances[0].closed == 1
+
+
+async def test_a_sign_in_scan_returns_to_the_step_it_was_on(
+    fake_sign_in: type,
+    fake_google: type[FakeGoogleSession],
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    base, _ = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await _start_sign_in_with_google(page, base)
+    await expect(page.get_by_role("heading", name=SITE_OPEN, exact=True)).to_be_visible()
+
+    # Left on step 1: back on step 1.
+    await page.goto(f"{base}/app/scans", wait_until="networkidle")
+    await page.goto(f"{base}/app/scans/new", wait_until="networkidle")
+    await expect(page.get_by_role("heading", name=SITE_OPEN, exact=True)).to_be_visible()
+    await expect(page.get_by_role("button", name=NEXT)).to_be_visible()
+
+    # Left on step 2: back on step 2, with the same Google window.
+    await page.get_by_role("button", name=NEXT).click()
+    await expect(page.get_by_role("heading", name=GOOGLE_OPEN, exact=True)).to_be_visible()
+    await page.goto(f"{base}/app/scans", wait_until="networkidle")
+    await page.goto(f"{base}/app/scans/new", wait_until="networkidle")
+    await expect(page.get_by_role("heading", name=GOOGLE_OPEN, exact=True)).to_be_visible()
+    await expect(page.get_by_text(STEP_2, exact=True)).to_be_visible()
+    await expect(page.get_by_role("button", name=START)).to_be_visible()
+    assert len(fake_google.instances) == 1
+
+    # A closed Google window: said in words, Cancel only.
+    fake_google.instances[0].close_window()
+    closed = page.get_by_role("heading", name="The Google window is closed", exact=True)
+    await expect(closed).to_be_visible()
+    await expect(closed).to_be_focused()
+    await expect(page.get_by_role("button", name=START)).to_have_count(0)
+    await expect(page.get_by_role("button", name="Cancel sign-in")).to_be_visible()
+    violations = await _run_axe(page)
+    assert not violations, _render_violations(violations)
+
+
+async def test_a_sign_in_scan_with_google_is_axe_clean_and_works_by_keyboard(
+    fake_sign_in: type,
+    fake_google: type[FakeGoogleSession],
+    monkeypatch: pytest.MonkeyPatch,
+    live_server: tuple[str, int],
+    new_page: Any,
+) -> None:
+    import asyncio
+
+    from audit.web import server
+
+    runs: list[Any] = []
+
+    async def _scan_that_keeps_preparing(_db: Any, _blobs: Any, _config: Any, run: Any) -> None:
+        runs.append(run)
+        await asyncio.sleep(3600)
+
+    monkeypatch.setattr(server, "_run_local_login_background", _scan_that_keeps_preparing)
+    base, _ = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await _start_sign_in_with_google(page, base)
+    await expect(page.get_by_role("heading", name=SITE_OPEN, exact=True)).to_be_visible()
+    assert await _focused_heading(page) == SITE_OPEN
+    violations = await _run_axe(page)
+    assert not violations, _render_violations(violations)
+
+    # Keyboard only: Tab from the heading to "next", Enter.
+    next_button = page.get_by_role("button", name=NEXT)
+    for _ in range(10):
+        await page.keyboard.press("Tab")
+        if await next_button.evaluate("el => el === document.activeElement"):
+            break
+    await expect(next_button).to_be_focused()
+    await page.keyboard.press("Enter")
+    await expect(page.get_by_role("heading", name=GOOGLE_OPEN, exact=True)).to_be_focused()
+    violations = await _run_axe(page)
+    assert not violations, _render_violations(violations)
+
+    fake_google.signed_in = True
+    start = page.get_by_role("button", name=START)
+    for _ in range(12):
+        await page.keyboard.press("Tab")
+        if await start.evaluate("el => el === document.activeElement"):
+            break
+    await expect(start).to_be_focused()
+    await page.keyboard.press("Enter")
+    await expect(page).to_have_url(re.compile(r"mode=login&scan=\d+"))
+    assert runs and runs[0].google is fake_google.instances[0]
+    assert runs[0].session is fake_sign_in.instances[0]
+    assert fake_google.instances[0].scanning

@@ -408,9 +408,9 @@ export interface NewScanPayload {
    *  treats a missing value as on. Never in a sign-in scan. */
   skip_documents: boolean;
   /** Sign in to Google for the Google files the pages link to (2026-11-26):
-   *  a Google window opens before the scan, and the document check uses
-   *  that sign-in only. Off unless chosen; public scans only, and only with
-   *  the document check on. */
+   *  a Google window opens before the scan (in a sign-in scan, after the
+   *  site sign-in), and the document check uses that sign-in only. Off
+   *  unless chosen, and only with the document check on. */
   google_sign_in: boolean;
   /** Skip motion and vision-assisted visual probes. */
   skip_visual: boolean;
@@ -521,6 +521,9 @@ export interface LocalLoginScanPayload {
   skip_focus: boolean;
   skip_markup: boolean;
   skip_documents: boolean;
+  /** "Sign in to Google for Google files": a second, separate Google window
+   *  after the site sign-in, for the document check only. Needs the document check. */
+  google_sign_in: boolean;
   skip_semantic: boolean;
   skip_visual: boolean;
   skip_forms: boolean;
@@ -566,6 +569,18 @@ export interface LocalSignInState {
   already_waiting: boolean;
   /** The settings this sign-in will scan with, to refill New scan. */
   settings: NewScanPayload | null;
+  /** The Google step of a sign-in with "Sign in to Google for Google files",
+   *  once "next: sign in to Google" was pressed; null before that. */
+  google: SignInGoogleStep | null;
+}
+
+/** The Google window of a sign-in scan (`server.SignInGoogleStep`). Never session data. */
+export interface SignInGoogleStep {
+  status: "opening_browser" | "awaiting_authentication" | "failed";
+  /** Whether the Google window is open on this computer. */
+  window_open: boolean;
+  /** Why the Google window failed, in words; null otherwise. */
+  error: string | null;
 }
 
 /**

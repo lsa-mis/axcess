@@ -54,8 +54,14 @@ function signInIdFrom(raw: string | null): string | null {
   return raw && /^[A-Za-z0-9_-]{16,64}$/.test(raw) ? raw : null;
 }
 
-/** What the page says after a sign-in ended without a scan. */
-type EndNotice = { reason: SignInEnd; minutes: number; google?: boolean };
+/**
+ * What the page says after a sign-in ended without a scan. `google`: the
+ * public scan's Google sign-in card ended. `withGoogle`: a sign-in scan's
+ * sign-in that had a Google window ended, so the notice also says Axcess
+ * signed out of Google (rule 12 in docs/plain-language.md: never drop a
+ * privacy fact).
+ */
+type EndNotice = { reason: SignInEnd; minutes: number; google?: boolean; withGoogle?: boolean };
 
 /**
  * Start a scan: two tabs, one form.
@@ -441,11 +447,16 @@ export default function NewScanRoute() {
   // the sign-in waited. A refilled form leaves the confirmations unticked:
   // as for `from=`, they are the person's to give for each run, and this
   // route no longer holds the ticks they gave.
-  const onSignInEnded = (reason: SignInEnd, signInSettings: NewScanPayload | null, minutes: number) => {
+  const onSignInEnded = (
+    reason: SignInEnd,
+    signInSettings: NewScanPayload | null,
+    minutes: number,
+    hadGoogle: boolean,
+  ) => {
     if (signInSettings && !settings.url.trim()) {
       setSettings(applyPolicy({ ...policyFor("login").defaults, ...signInSettings }, policyFor("login")));
     }
-    setEndNotice({ reason, minutes });
+    setEndNotice({ reason, minutes, withGoogle: hadGoogle });
     setSearchParams(
       (previous) => {
         const params = new URLSearchParams(previous);
@@ -553,6 +564,10 @@ export default function NewScanRoute() {
             : endNotice.reason === "expired"
               ? SIGN_IN.ended.expired(endNotice.minutes)
               : SIGN_IN.ended[endNotice.reason]}
+          {endNotice.withGoogle &&
+            (endNotice.reason === "cancelled" || endNotice.reason === "expired") && (
+              <> {SIGN_IN.endedGoogle}</>
+            )}
         </p>
       )}
 
