@@ -869,6 +869,78 @@
         }
       }
     },
+    "/api/google-sign-ins/{sign_in_id}": {
+      "get": {
+        "summary": "Api Google Sign In Status",
+        "description": "One Google sign-in's state, or the one word for why it ended.",
+        "operationId": "api_google_sign_in_status_api_google_sign_ins__sign_in_id__get",
+        "parameters": [
+          {
+            "name": "sign_in_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string", "title": "Sign In Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/GoogleSignInResponse"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/google-sign-ins/{sign_in_id}/start": {
+      "post": {
+        "summary": "Api Start Google Sign In Scan",
+        "description": "\"I'm signed in to Google, start scan\": check, hand over, start.\n\nRefused, with the sign-in kept, while another scan runs, while the\nwindow is closed, and while Google says the browser is not signed in.\nThen the window is closed and the profile reopened headless\n(``enter_scan_mode``), and the crawl starts with the session.",
+        "operationId": "api_start_google_sign_in_scan_api_google_sign_ins__sign_in_id__start_post",
+        "parameters": [
+          {
+            "name": "sign_in_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string", "title": "Sign In Id"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/google-sign-ins/{sign_in_id}/cancel": {
+      "post": {
+        "summary": "Api Cancel Google Sign In",
+        "description": "Sign out at Google, close the window, delete its data, record nothing.",
+        "operationId": "api_cancel_google_sign_in_api_google_sign_ins__sign_in_id__cancel_post",
+        "parameters": [
+          {
+            "name": "sign_in_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string", "title": "Sign In Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/GoogleSignInResponse"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
     "/api/scans/{scan_id}/continue": {
       "post": {
         "summary": "Api Continue Scan",
@@ -3040,6 +3112,25 @@
         "required": ["feedback"],
         "title": "FeedbackUpdate"
       },
+      "GoogleSignInResponse": {
+        "properties": {
+          "sign_in_id": {"type": "string", "title": "Sign In Id"},
+          "status": {
+            "type": "string",
+            "enum": ["opening_browser", "awaiting_authentication", "cancelled", "expired", "failed"],
+            "title": "Status"
+          },
+          "window_open": {"type": "boolean", "title": "Window Open", "default": false},
+          "error": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Error"},
+          "keep_minutes": {"type": "integer", "title": "Keep Minutes", "default": 30},
+          "already_waiting": {"type": "boolean", "title": "Already Waiting", "default": false},
+          "settings": {"anyOf": [{"$ref": "#/components/schemas/ScanFormSettings"}, {"type": "null"}]}
+        },
+        "type": "object",
+        "required": ["sign_in_id", "status"],
+        "title": "GoogleSignInResponse",
+        "description": "A Google sign-in in progress, before its public scan exists.\n\nNever session data: no cookie, no address the browser visited, no\naccount name. ``settings`` are the New scan form's own fields, so the\nform can be refilled."
+      },
       "GroupTotals": {
         "properties": {
           "groups": {"type": "integer", "title": "Groups"},
@@ -3801,6 +3892,7 @@
           "skip_focus": {"type": "boolean", "title": "Skip Focus"},
           "skip_markup": {"type": "boolean", "title": "Skip Markup", "default": false},
           "skip_documents": {"type": "boolean", "title": "Skip Documents", "default": false},
+          "google_sign_in": {"type": "boolean", "title": "Google Sign In", "default": false},
           "skip_visual": {"type": "boolean", "title": "Skip Visual"},
           "skip_forms": {"type": "boolean", "title": "Skip Forms", "default": true},
           "send_empty_forms": {"type": "boolean", "title": "Send Empty Forms", "default": false},

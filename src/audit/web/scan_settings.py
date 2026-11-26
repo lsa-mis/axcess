@@ -81,6 +81,10 @@ class ScanFormSettings(BaseModel):
     # The document check (the Documents tab) is on unless turned off; a
     # client that sends nothing gets it.
     skip_documents: bool = False
+    # Sign in to Google for the Google files the pages link to (2026-11-26):
+    # off unless chosen, public scans only, and only with the document check.
+    # A choice, not a secret: the sign-in itself is never kept.
+    google_sign_in: bool = False
     skip_visual: bool
     # The form error check (WCAG 3.3.1) is off unless chosen: a missing value
     # means skip it.
@@ -217,6 +221,7 @@ def snapshot_from_config(
         # Absent from scans made before the document check; running one of
         # them again turns it on, as a new scan would.
         skip_documents=not _flag(config, "linked_files_enabled", default=True),
+        google_sign_in=_flag(config, "google_sign_in", default=False),
         skip_visual=not _flag(config, "visual_checks_enabled", default=False),
         skip_forms=not _flag(config, "form_error_checks_enabled", default=False),
         send_empty_forms=_flag(config, "form_send_empty_forms", default=False),
