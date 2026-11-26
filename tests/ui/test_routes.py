@@ -817,7 +817,7 @@ def test_background_crawl_startup_failure_finishes_scan(
             (canonical_seed,),
         )
 
-    async def _fail_before_queue(_conn, _config):  # type: ignore[no-untyped-def]
+    async def _fail_before_queue(_conn, _config, **_kwargs):  # type: ignore[no-untyped-def]
         raise RuntimeError("browser could not start")
 
     monkeypatch.setattr(server, "run_crawl", _fail_before_queue)
