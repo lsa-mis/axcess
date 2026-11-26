@@ -8,6 +8,7 @@ browser or contacts Google.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -112,9 +113,22 @@ class FakePage:
             return list(self.browser.today)
         raise AssertionError(f"unexpected script: {script[:40]}")
 
-    def get_by_role(self, role: str, *, name: str, exact: bool = False) -> FakeLocator:
-        assert exact, "Google's menu items are matched by their exact name"
-        return FakeLocator(self, role, name)
+    def get_by_role(
+        self, role: str, *, name: str | re.Pattern[str], exact: bool = False
+    ) -> FakeLocator:
+        """Google's own accessible names (seen 2026-11-26): "File" for the
+        menu, "Details b" for the item, its menu letter included. A name
+        must match them as Playwright would: exactly, or by pattern."""
+        real = {"File": "File", "Details": "Details b"}
+        for short, accessible in real.items():
+            matched = (
+                name.search(accessible)
+                if isinstance(name, re.Pattern)
+                else (name == accessible if exact else name.lower() in accessible.lower())
+            )
+            if matched:
+                return FakeLocator(self, role, short)
+        raise AssertionError(f"no {role} named {name!r} on Google's page")
 
     async def wait_for_function(self, _script: str, **_: Any) -> FakeHandle:
         assert self.details_open, "the details are read only after Details is clicked"

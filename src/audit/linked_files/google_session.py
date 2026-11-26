@@ -53,6 +53,7 @@ browser are assumptions the developer tests by hand.
 from __future__ import annotations
 
 import asyncio
+import collections
 import contextlib
 import datetime as dt
 import os
@@ -100,7 +101,11 @@ PACE_S = 1.0
 #: Google files whose dates one scan reads, at most.
 MAX_DATE_FILES = 500
 #: Longest one date read may take, page load to Escape.
-READ_TIMEOUT_S = 45.0
+READ_TIMEOUT_S = 75.0
+#: The pause after the editor loads, and between tries of the File menu.
+EDITOR_SETTLE_S = 2.0
+#: Times the File menu is opened, at most, waiting for Details.
+MENU_TRIES = 3
 #: Longest ``close`` waits for Google's sign-out page.
 SIGN_OUT_TIMEOUT_S = 8.0
 #: Longest the whole of ``close`` may take, sign-out and browser included,
@@ -167,17 +172,31 @@ def _is_https(url: str) -> bool:
         return False
 
 
-def route_allowed(url: str, *, navigation: bool, allowed_ids: frozenset[str] | set[str]) -> bool:
+def route_allowed(
+    url: str,
+    *,
+    navigation: bool,
+    allowed_ids: frozenset[str] | set[str],
+    main_frame: bool = True,
+) -> bool:
     """Safeguard 1: may the scan's Google browser load ``url``?
 
-    A page or frame load (``navigation``) only to a registered file page or
-    to Google's sign-in host (a session refresh, the sign-out); anything
-    else only to the Google hosts the editor needs. Only https.
+    The page itself (a main-frame ``navigation``) may go only to a
+    registered file page or to Google's sign-in host (a session refresh, the
+    sign-out). What that page loads inside itself, its frames included, may
+    come only from Google's own hosts, or be built in memory (``blob:``,
+    ``data:``). The editor needs both: seen 2026-11-26 on scan 84, where
+    blocking its frames on docs.google.com, clients6.google.com and
+    contacts.google.com, and its ``blob:`` parts, left File > Details
+    unreadable on every file.
     """
+    scheme = urlsplit(url).scheme if url else ""
+    if scheme in ("blob", "data"):
+        return not (navigation and main_frame)
     if not _is_https(url):
         return False
     host = _host(url)
-    if navigation:
+    if navigation and main_frame:
         if host in SIGN_IN_HOSTS:
             return True
         key = google_file_key(url)
@@ -218,8 +237,11 @@ _MONTHS = {
 }
 _DAY = r"(?P<month>[A-Za-z]{3,9})\.?\s+(?P<day>\d{1,2}),\s+(?P<year>\d{4})"
 _TIME = r"(?P<time>\d{1,2}:\d{2}\s*(?:[AaPp]\.?[Mm]\.?)?)"
-_CREATED = re.compile(rf"Created\s+(?:on|at)\s+(?:{_DAY}|{_TIME})")
-_MODIFIED = re.compile(rf"Modified\s+(?:on|at)\s+(?:{_DAY}|{_TIME})")
+# Docs write "Created on Oct 17, 2024"; Slides and Sheets put "Created" and
+# "Sep 30, 2019" in two cells of a small table (seen 2026-11-26), so "on" or
+# "at" is optional.
+_CREATED = re.compile(rf"Created(?:\s+(?:on|at))?\s+(?:{_DAY}|{_TIME})")
+_MODIFIED = re.compile(rf"Modified(?:\s+(?:on|at))?\s+(?:{_DAY}|{_TIME})")
 _EARLIEST_YEAR = 1980
 
 
@@ -278,12 +300,15 @@ _DETAILS_TEXT_JS = r"""
     if (!heading.test((node.textContent || "").trim())) continue;
     for (let el = node.parentElement; el && el !== document.body; el = el.parentElement) {
       const text = el.innerText || "";
-      if (/Created\s+(on|at)/.test(text)) return text.slice(0, 2000);
+      if (/Created\s/.test(text)) return text.slice(0, 2000);
     }
   }
   return null;
 }
 """
+#: The File menu's Details item: "Details b" to programs, the letter being
+#: its keyboard shortcut in the menu.
+_DETAILS_ITEM = re.compile(r"^Details\b")
 _TODAY_JS = (
     "() => { const d = new Date(); return [d.getFullYear(), d.getMonth() + 1, d.getDate()]; }"
 )
@@ -387,6 +412,9 @@ class GoogleBrowserSession:
         self._playwright_start = playwright_start or _start_playwright
         self._profile_base = profile_base
         self._pace_s = pace_s
+        #: Date reads that stopped, by the step they stopped at.
+        self.read_failures: collections.Counter[str] = collections.Counter()
+        self._step = ""
         self._clock = clock
         self._sleep = sleep
         self._nav_timeout_ms = nav_timeout_ms
@@ -553,8 +581,15 @@ class GoogleBrowserSession:
         request = route.request
         try:
             navigation = request.is_navigation_request() or request.resource_type == "document"
+            main_frame = True
+            if navigation:
+                with contextlib.suppress(Exception):
+                    main_frame = request.frame.parent_frame is None
             allowed = route_allowed(
-                request.url, navigation=navigation, allowed_ids=self._allowed_ids
+                request.url,
+                navigation=navigation,
+                allowed_ids=self._allowed_ids,
+                main_frame=main_frame,
             )
         except Exception:
             allowed = False
@@ -615,12 +650,34 @@ class GoogleBrowserSession:
     async def _get(
         self, context: BrowserContext, url: str, *, head_first: bool
     ) -> tuple[FetchedFile, str]:
-        """One download, every hop checked; a sign-in page reads as HTTP 401."""
+        """One download, every hop checked; a sign-in page reads as HTTP 401.
+
+        Signed in, Google's first download passes once through
+        ``accounts.google.com`` to hand the sign-in to docs.google.com (seen
+        2026-11-26: export → accounts.google.com/ServiceLogin →
+        docs.google.com/accounts/SetOSID → export → the file). That hop is
+        followed, as a redirect, and never sent a body. Only a sign-in host
+        answering with a page of its own means the file needs a sign-in. Until
+        2026-11-26 any sign-in hop read as 401, so the hand-over never
+        happened and every Doc in scan 84 was "needs a sign-in".
+        """
         current = url
         timeout_ms = FETCH_TIMEOUT_S * 1000
-        for _ in range(8):
+        for _ in range(12):
             if _host(current) in SIGN_IN_HOSTS:
-                return FetchedFile("http_error", 401), current
+                if not _is_https(current):
+                    return FetchedFile("blocked"), current
+                hand_over = await context.request.get(
+                    current, max_redirects=0, fail_on_status_code=False, timeout=timeout_ms
+                )
+                where = hand_over.headers.get("location")
+                handed = hand_over.status in _REDIRECTS and bool(where)
+                with contextlib.suppress(Exception):
+                    await hand_over.dispose()
+                if not handed or where is None:
+                    return FetchedFile("http_error", 401), current
+                current = urljoin(current, where)
+                continue
             if not download_allowed(current):
                 return FetchedFile("blocked"), current
             if head_first:
@@ -673,6 +730,7 @@ class GoogleBrowserSession:
             return DatesRead("none")
         async with self._paced():
             page: Page | None = None
+            self._step = "open the page"
             try:
                 async with asyncio.timeout(READ_TIMEOUT_S):
                     page = await context.new_page()
@@ -685,9 +743,11 @@ class GoogleBrowserSession:
                         self._mark_lost()
                         return DatesRead("lost")
                     return await self._read_details(page)
-            except TimeoutError:
-                return DatesRead("none")
-            except Exception:  # Playwright raises its own errors
+            except Exception:  # A timeout, or Playwright's own errors.
+                # Which step stopped, counted for the scan log (step names
+                # only, never an address): the scan-84 log could say only
+                # that no file gave a date, not why.
+                self.read_failures[self._step] += 1
                 return DatesRead("none")
             finally:
                 if page is not None:
@@ -695,17 +755,51 @@ class GoogleBrowserSession:
                         await page.close(run_before_unload=False)
 
     async def _read_details(self, page: Page) -> DatesRead:
+        """File, then Details, then the box's text; nothing else is pressed.
+
+        Paced like a person (seen 2026-11-26): pressing File as soon as the
+        page's HTML arrived, before the editor had started, read the dates
+        of 1 file in 5; the others stopped at "find Details", at "read the
+        details box", or found Details greyed out while the file was still
+        loading. So it waits for the page to load and settle, and opens the
+        menu again (up to ``MENU_TRIES`` times) when Details is not there yet
+        or still greyed out.
+        """
+        self._step = "wait for the editor"
+        with contextlib.suppress(Exception):
+            await page.wait_for_load_state("load", timeout=20_000)
+        await self._sleep(EDITOR_SETTLE_S)
         year, month, day = await page.evaluate(_TODAY_JS)
         today = dt.date(int(year), int(month), int(day))
-        await page.get_by_role("menuitem", name="File", exact=True).click(timeout=15_000)
-        details = page.get_by_role("menuitem", name="Details", exact=True)
-        await details.wait_for(state="visible", timeout=5_000)
-        if (await details.get_attribute("aria-disabled")) == "true":
-            # Signed out, Details is turned off: nothing to read.
+        file_menu = page.get_by_role("menuitem", name="File", exact=True)
+        # Google names the item with its menu letter, "Details b" (seen
+        # 2026-11-26; an exact "Details" matched nothing, so scan 84 read no
+        # dates), so the name is matched by its first word.
+        details = page.get_by_role("menuitem", name=_DETAILS_ITEM)
+        for attempt in range(1, MENU_TRIES + 1):
+            self._step = "press File"
+            await file_menu.click(timeout=15_000)
+            self._step = "find Details"
+            try:
+                await details.wait_for(state="visible", timeout=8_000)
+            except Exception:
+                if attempt == MENU_TRIES:
+                    raise
+                await page.keyboard.press("Escape")
+                await self._sleep(EDITOR_SETTLE_S)
+                continue
+            if (await details.get_attribute("aria-disabled")) != "true":
+                break
+            # Greyed out: still loading, or not allowed (signed out).
             await page.keyboard.press("Escape")
-            return DatesRead("none")
+            if attempt == MENU_TRIES:
+                self.read_failures["Details greyed out"] += 1
+                return DatesRead("none")
+            await self._sleep(EDITOR_SETTLE_S)
+        self._step = "press Details"
         await details.click()
-        handle = await page.wait_for_function(_DETAILS_TEXT_JS, timeout=10_000)
+        self._step = "read the details box"
+        handle = await page.wait_for_function(_DETAILS_TEXT_JS, timeout=15_000)
         text = await handle.json_value()
         await page.keyboard.press("Escape")
         if not isinstance(text, str):
@@ -730,6 +824,12 @@ class GoogleBrowserSession:
         if self._closed:
             return
         self._closed = True
+        if self.read_failures:
+            log.warning(
+                "linked_files.google_dates_stopped",
+                steps=dict(self.read_failures),
+                message="Reading File, Details stopped at these steps (counts).",
+            )
         self._scanning = False
         self._set_window_open(False)
         context = self._context

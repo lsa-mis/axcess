@@ -62,11 +62,36 @@ TODAY = dt.date(2026, 11, 26)
         ("https://cdn.example.com/tracker.js", False, False),
         ("https://evilgoogle.com/x.js", False, False),
         ("https://google.com.evil.test/x.js", False, False),
-        ("data:text/plain,hello", False, False),
+        # Built in memory by the editor: allowed inside the page, never as the page.
+        ("data:text/plain,hello", False, True),
+        ("blob:https://docs.google.com/4f1c", False, True),
+        ("blob:https://docs.google.com/4f1c", True, False),
     ],
 )
 def test_the_route_guard(url: str, navigation: bool, allowed: bool) -> None:
     assert route_allowed(url, navigation=navigation, allowed_ids={DOC_ID}) is allowed
+
+
+@pytest.mark.parametrize(
+    ("url", "allowed"),
+    [
+        # The editor's own frames, blocked until 2026-11-26 (scan 84: no
+        # file's File > Details could be read).
+        ("https://docs.google.com/static/document/client/js/frame.html", True),
+        ("https://clients6.google.com/static/proxy.html", True),
+        ("https://contacts.google.com/widget/hovercard", True),
+        ("blob:https://docs.google.com/4f1c", True),
+        # Still never anything that is not Google's.
+        ("https://ads.example.com/frame.html", False),
+        ("https://evilgoogle.com/frame.html", False),
+    ],
+)
+def test_frames_inside_the_page_may_load_googles_own_parts(url: str, allowed: bool) -> None:
+    assert route_allowed(url, navigation=True, main_frame=False, allowed_ids={DOC_ID}) is allowed
+    # The same address as the page itself stays refused (Gmail, a Drive
+    # list, another file): only registered file pages and the sign-in host.
+    if not url.startswith("blob:") and "accounts.google.com" not in url:
+        assert route_allowed(url, navigation=True, allowed_ids={DOC_ID}) is False
 
 
 @pytest.mark.parametrize(
@@ -109,6 +134,18 @@ def test_a_published_copy_is_not_a_file_page() -> None:
         (
             "Document details\nCreated on Jan 2, 2020\nModified at 3:15 PM by A Person",
             GoogleDates("2020-01-02", "2026-11-26"),
+        ),
+        # Slides and Sheets: a small table, a label cell and a value cell
+        # (seen 2026-11-26; until then their dates were never read).
+        (
+            "Document details\nLocation\t—\n"
+            "Modified\tFeb 26, 2024 by A Person\nCreated\tSep 30, 2019",
+            GoogleDates("2019-09-30", "2024-02-26"),
+        ),
+        (
+            "Document details\nLocation\n—\nOwner\nA Person\nModified\nAug 27, 2021 by A Person\n"
+            "Created\nJul 7, 2020",
+            GoogleDates("2020-07-07", "2021-08-27"),
         ),
         ("Document details\nCreated on Feb 30, 2020", GoogleDates(None, None)),
         ("Document details\nCreated on Jan 2, 1901", GoogleDates(None, None)),
@@ -298,7 +335,27 @@ async def test_details_turned_off_reads_nothing(tmp_path: Path) -> None:
     assert read.outcome == "none"
     page = playwright.chromium.contexts[1].pages[-1]
     assert ("click", "menuitem", "Details") not in page.actions
+    # Tried again while it might still be loading, then counted.
+    assert page.actions.count(("click", "menuitem", "File")) == gs.MENU_TRIES
+    assert dict(session.read_failures) == {"Details greyed out": 1}
     await session.close()
+
+
+async def test_a_read_that_stops_says_at_which_step(tmp_path: Path) -> None:
+    """Scan 84 logged only that no file gave a date; the step is counted now,
+    and logged when the session closes (step names, never an address)."""
+    from structlog.testing import capture_logs
+
+    session, playwright = await _scanning(tmp_path)
+    playwright.chromium.fail_goto = True
+    session.allow_file(DOC_PAGE)
+    assert (await session.read_dates(DOC_PAGE)).outcome == "none"
+    assert dict(session.read_failures) == {"open the page": 1}
+    with capture_logs() as logs:
+        await session.close()
+    stopped = [entry for entry in logs if entry["event"] == "linked_files.google_dates_stopped"]
+    assert stopped and stopped[0]["steps"] == {"open the page": 1}
+    assert DOC_ID not in str(stopped)
 
 
 async def test_a_file_page_sent_to_sign_in_means_the_sign_in_is_lost(tmp_path: Path) -> None:
@@ -330,10 +387,40 @@ async def test_an_export_is_downloaded_with_every_hop_checked(tmp_path: Path) ->
     await session.close()
 
 
+async def test_googles_sign_in_hand_over_is_followed(tmp_path: Path) -> None:
+    """Signed in, the first download passes once through accounts.google.com
+    to hand the sign-in to docs.google.com (seen 2026-11-26). Until then it
+    read as "needs a sign-in", and every Doc in scan 84 failed."""
+    session, playwright = await _scanning(tmp_path)
+    sign_in = "https://accounts.google.com/ServiceLogin?continue=x"
+    set_osid = "https://docs.google.com/accounts/SetOSID?continue=y"
+    again = "https://docs.google.com/document/u/0/d/abc/export?format=docx"
+    final = "https://doc-14-9c-docstext.googleusercontent.com/export/abc"
+    routes = playwright.chromium.requests
+    routes[EXPORT] = FakeAPIResponse(302, {"location": sign_in})
+    routes[sign_in] = FakeAPIResponse(302, {"location": set_osid})
+    routes[set_osid] = FakeAPIResponse(302, {"location": again})
+    routes[again] = FakeAPIResponse(307, {"location": final})
+    routes[final] = FakeAPIResponse(200, {"content-type": "application/zip"}, b"PK\x03\x04docx")
+    got = await session.fetch_export(EXPORT)
+    assert (got.outcome, got.body) == ("ok", b"PK\x03\x04docx")
+    await session.close()
+
+
+async def test_a_sign_in_page_means_the_file_needs_a_sign_in(tmp_path: Path) -> None:
+    session, playwright = await _scanning(tmp_path)
+    sign_in = "https://accounts.google.com/ServiceLogin?x"
+    playwright.chromium.requests[EXPORT] = FakeAPIResponse(302, {"location": sign_in})
+    # Google answers with its sign-in page, not a hand-over.
+    playwright.chromium.requests[sign_in] = FakeAPIResponse(200, {"content-type": "text/html"})
+    got = await session.fetch_export(EXPORT)
+    assert (got.outcome, got.http_status) == ("http_error", 401)
+    await session.close()
+
+
 @pytest.mark.parametrize(
     ("location", "outcome", "status"),
     [
-        ("https://accounts.google.com/ServiceLogin?x", "http_error", 401),
         ("https://evil.example.com/steal", "blocked", None),
     ],
 )
