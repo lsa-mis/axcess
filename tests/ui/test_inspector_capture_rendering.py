@@ -259,12 +259,13 @@ async def test_a_copy_with_saved_styles_uses_them_instead_of_the_sites(
     state = await frame.locator("html").evaluate(
         """el => ({
             sheets: Array.from(el.querySelectorAll('link[rel~="stylesheet"]')).map(l => l.href),
-            styles: el.querySelectorAll('style').length,
+            styles: el.querySelectorAll('style:not([data-axcess-scrollbar])').length,
             preload: el.querySelectorAll('link[rel="preload"]').length,
             policy: el.querySelectorAll('meta[http-equiv]').length,
             base: el.querySelector('base')?.getAttribute('href'),
-            lastInHead: el.querySelector('head').lastElementChild?.hasAttribute(
-                'data-axcess-saved-styles'),
+            lastInHead: Array.from(el.querySelector('head').children)
+                .filter(c => !c.hasAttribute('data-axcess-scrollbar'))
+                .pop()?.hasAttribute('data-axcess-saved-styles'),
             color: getComputedStyle(el.querySelector('#app')).color,
         })"""
     )
@@ -402,7 +403,7 @@ async def test_a_copy_whose_styles_did_not_load_says_so(
     note = await _style_note(page, live_server[0], scan_id, page_id)
     assert "This saved copy may look different from the page Axcess checked." in note
     assert "Some of its styles may not have loaded." in note
-    assert "Use Open live page to compare." in note
+    assert "Open the link after Page URL at the top to compare." in note
     # The note meets the same bar as the rest of the inspector (WCAG 2.2 AAA
     # pack, including 7:1 contrast), in the light theme it was drawn in.
     from .test_accessibility_axe import _render_violations, _run_axe

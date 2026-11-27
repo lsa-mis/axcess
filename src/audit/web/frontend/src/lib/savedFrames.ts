@@ -98,8 +98,9 @@ function webUrl(value: string | null | undefined): string | null {
  * ("comes from youtube.com"), because that is what tells the reader whether
  * it is the site's own content or another service's. A frame with no address
  * was filled in by the page's own code, so it says that instead. It points to
- * the Inspector's own "Open live page" button by its exact words, as the
- * Inspector's other messages do, rather than holding a link of its own: a
+ * the Inspector's own link to the live page by the words beside it ("Page
+ * URL", since 2026-11-27, when that link replaced the "Open live page"
+ * button), as the Inspector's other messages do, rather than holding a link of its own: a
  * link inside the copy would navigate the sandboxed frame, not open the site.
  *
  * Fixed colours, not the app's theme: the note sits inside the site's page,
@@ -128,7 +129,7 @@ function frameNote(src: string | null, baseUrl: string | null): string {
     "justify-content:center;padding:12px;background:#f3f4f6;color:#1f2937;border:2px dashed #6b7280;" +
     'font:16px/1.5 system-ui,sans-serif;text-align:center">' +
     `<p style="margin:0;max-width:35em">${where} The saved copy does not include it. ` +
-    "Use “Open live page” to see it.</p></body></html>"
+    "To see it, open the link after “Page URL” at the top.</p></body></html>"
   );
 }
 

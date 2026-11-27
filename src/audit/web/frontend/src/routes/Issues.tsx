@@ -404,9 +404,9 @@ export default function IssuesRoute() {
         <ReportCoverageNote scan={scan} rows={summaryRows} />
         <ReportScanNote scan={scan} />
         <IssueGlossary />
+        {/* Last, after everything a reviewer reads: see ReportDangerZone. */}
+        <ReportDangerZone scan={scan} />
       </ReportNotes>
-
-      <ReportDangerZone scan={scan} />
     </>
   );
 }
@@ -501,9 +501,14 @@ function IssueToolbar({
   if (q) active.push(`Search: “${q}”`);
   return (
     <TableBar pager={pager} footer={<ActiveFilters items={active} onClear={onClearFilters} />}>
+      {/* "Search by issue type or WCAG number": the developer's words
+          (2026-11-27), in the same "Search by …" shape as the pages tables'
+          "Search by page title or URL". The example "(1.4.3)" went with
+          the old words: at the box's narrowest the longer text would be cut
+          off. */}
       <TableSearch
         label="Search issues"
-        placeholder="Issue type or WCAG number (1.4.3)"
+        placeholder="Search by issue type or WCAG number"
         value={q}
         onChange={(value) => onParam("q", value)}
       />

@@ -1,6 +1,7 @@
 """Deleting a report from the end of its own page.
 
-The delete section asks before it acts. Cancelling the prompt keeps the report;
+The delete section, the last closed row under the Issues table, asks before
+it acts. Cancelling the prompt keeps the report;
 accepting it deletes the scan and lands on Reports, where the report is gone.
 """
 
@@ -27,6 +28,11 @@ async def test_delete_report_asks_first_and_then_deletes(
     page = await new_page(viewport={"width": 1280, "height": 900})
     try:
         await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+        # The last row of the notes under the table, closed until opened
+        # (2026-11-27); its panel is named by the row's button.
+        row = page.get_by_role("button", name="Delete this report", exact=True)
+        await playwright_async.expect(row).to_have_attribute("aria-expanded", "false")
+        await row.click()
         zone = page.get_by_role("region", name="Delete this report")
         await zone.scroll_into_view_if_needed()
         await playwright_async.expect(zone).to_contain_text(
@@ -91,6 +97,7 @@ async def test_no_screen_or_prompt_shows_the_start_address_password(
         assert "hunter2" not in await page.content()
 
         await page.goto(f"{base}/app/scans/{scan_id}/issues", wait_until="networkidle")
+        await page.get_by_role("button", name="Delete this report", exact=True).click()
         zone = page.get_by_role("region", name="Delete this report")
         await zone.get_by_role("button", name="Delete report").click()
         # Dismissed, so the report stays open.

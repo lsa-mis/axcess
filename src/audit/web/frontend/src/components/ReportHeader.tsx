@@ -26,8 +26,10 @@ export default function ReportHeader({
   scanId,
   canCompare,
   title,
+  kicker,
   help,
   meta,
+  below,
   actions,
   tabs = false,
 }: {
@@ -37,12 +39,26 @@ export default function ReportHeader({
   canCompare: boolean;
   title: ReactNode;
   /**
+   * A line above the heading that says what the page sits inside, such as
+   * the issue type an inspected page is opened for ("Issue type: Some
+   * content sits outside any page region"). Above, not in the heading, so
+   * a screen reader's list of headings hears the page's own name.
+   */
+  kicker?: ReactNode;
+  /**
    * A ``HelpTip`` ("?") that explains the view, right after the heading
    * (Images). After it, not inside it: inside, its words would join the
    * heading's name in a screen reader's list of headings.
    */
   help?: ReactNode;
   meta?: ReactNode;
+  /**
+   * Lines under the meta line, in the title's column: more facts about the
+   * page, or an action that belongs to the title. Each child is its own
+   * line. The issue type page puts "Issue guidance" here, on the left
+   * under the facts, rather than in ``actions`` at the far right.
+   */
+  below?: ReactNode;
   actions?: ReactNode;
   /** Show the report's view tabs. Only the report's own views (see above). */
   tabs?: boolean;
@@ -63,6 +79,7 @@ export default function ReportHeader({
       )}
       <div className="mt-5 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
+          {kicker && <p className="mb-1 text-sm leading-6 text-fg-muted">{kicker}</p>}
           {help ? (
             <div className="flex items-center gap-1">
               {heading}
@@ -74,6 +91,7 @@ export default function ReportHeader({
           {meta && (
             <p className="mt-1 max-w-4xl text-sm leading-6 text-fg-muted">{meta}</p>
           )}
+          {below && <div className="mt-2 flex flex-col items-start gap-3">{below}</div>}
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>

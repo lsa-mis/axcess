@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -170,9 +171,14 @@ async def test_an_image_issue_outlines_its_images_and_says_what_it_leaves_out(
             "/sale.png",
             "/sale.png",
         ]
-        # The table of facts (place in the page code, image address) was
-        # removed (2026-11-10); the outlines above pin which images these are.
-        await playwright_async.expect(page.get_by_text("Image address")).to_have_count(0)
+        # The table of facts (place in the page code, image address) came
+        # back on 2026-11-27, inside the closed "Element information"
+        # section: hidden until opened, then it names the image.
+        facts = page.locator("#inspect-element-panel")
+        await playwright_async.expect(facts.get_by_text("Image address")).to_be_hidden()
+        await page.get_by_role("button", name="Element information", exact=True).click()
+        await playwright_async.expect(facts.get_by_text("Image address")).to_be_visible()
+        await playwright_async.expect(facts).to_contain_text("/sale.png")
         group = page.get_by_role("group", name="Flagged elements", exact=True)
         await group.get_by_role("button", name="Next element").click()
         await playwright_async.expect(page.get_by_text("Flagged element 2 of 2")).to_be_visible()
@@ -182,7 +188,7 @@ async def test_an_image_issue_outlines_its_images_and_says_what_it_leaves_out(
                 exact=False,
             )
         ).to_be_visible()
-        await page.get_by_role("button", name="Evidence from the scan").click()
+        await page.get_by_role("button", name=re.compile(r"^Scan evidence ")).click()
         await playwright_async.expect(
             page.get_by_text("Alt text (what a screen reader reads): “Sale ends Friday”").first
         ).to_be_visible()
@@ -206,11 +212,12 @@ async def test_an_ai_review_issue_outlines_the_exact_link(
         # Both links' kept code is the same; the second is the one reviewed.
         href = await marked.get_attribute("href")
         assert href is not None and href.startswith("/two?")
-        # Its place in the page code is no longer shown (the facts table was
-        # removed, 2026-11-10); the href above pins the exact link.
-        await playwright_async.expect(
-            page.get_by_text("Where it is in the page code")
-        ).to_have_count(0)
+        # Its place in the page code is in the closed "Element information"
+        # section (back on 2026-11-27): hidden until opened.
+        place = page.locator("#inspect-element-panel").get_by_text("Where it is in the page code")
+        await playwright_async.expect(place).to_be_hidden()
+        await page.get_by_role("button", name="Element information", exact=True).click()
+        await playwright_async.expect(place).to_be_visible()
     finally:
         await page.context.close()
 

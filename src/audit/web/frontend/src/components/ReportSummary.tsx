@@ -3,9 +3,9 @@ import { Link } from "react-router";
 import { AlertOctagon } from "lucide-react";
 import type { IssueRow, ScanDetail } from "../api/types";
 import MethodCoverageLedger, { methodsRan } from "./MethodCoverageLedger";
-import { Card, Disclosure, HelpTip } from "./ui";
+import { Card, Disclosure } from "./ui";
 import { cn } from "../lib/cn";
-import { CLICK_THROUGH_STATES, ISSUE_TYPE_HELP, OCCURRENCE_HELP, clickThroughStates } from "../lib/labels";
+import { CLICK_THROUGH_STATES_LABEL } from "../lib/labels";
 import { SCAN_END_LABEL } from "../lib/terms";
 import { NUMBERS } from "./newScan/copy";
 
@@ -48,7 +48,15 @@ function endText(coverage: ScanDetail["coverage"]): string {
  * name, before the number. Rejected: a longer label, which put the value's
  * own words (the ones the table's tags show) out of view; and one heading
  * over the three counts, which the grid would place over "Documents" too.
- * Not for facts about the number (those are ``outOf``, or ScanFacts).
+ * Not for facts about the number (those are ``outOf``).
+ *
+ * ``labelBeside`` puts the label on the number's line, after ``outOf``, so
+ * the three read as one phrase: "47 of 47 Pages visited" (the developer's
+ * layout, 2026-11-27). ``after`` is a second ``dd`` under that line, for a
+ * link or warning that belongs to the number ("List the pages visited"); it
+ * sits where the other numbers' labels sit, so the row's lines still align.
+ * A ``dd``, not a loose element, because a ``dl``'s group may hold only
+ * ``dt`` and ``dd`` (HTML, the dl element's content model).
  */
 export function SummaryStat({
   label,
@@ -56,6 +64,8 @@ export function SummaryStat({
   outOf,
   note,
   help,
+  labelBeside = false,
+  after,
   className,
 }: {
   label: string;
@@ -65,10 +75,20 @@ export function SummaryStat({
   note?: string;
   /** A ``HelpTip`` after the label, for a counting term that needs explaining. */
   help?: ReactNode;
+  /** The label after the number on its line, not under it. */
+  labelBeside?: boolean;
+  /** What belongs to the number, under it (a link to its list). */
+  after?: ReactNode;
   className?: string;
 }) {
   return (
-    <div className={cn("flex flex-col gap-1", className)}>
+    <div
+      className={cn(
+        "flex",
+        labelBeside ? "flex-wrap items-baseline gap-x-2 gap-y-1" : "flex-col gap-1",
+        className,
+      )}
+    >
       <dt className="order-2 text-sm font-semibold text-fg">
         {/* The label and its "?" on one line; a note, when there is one,
             on its own line under them. */}
@@ -82,82 +102,50 @@ export function SummaryStat({
         {value.toLocaleString()}
         {outOf && <span className="text-base font-semibold leading-none text-fg-muted"> {outOf}</span>}
       </dd>
+      {after && <dd className="order-3 basis-full text-sm">{after}</dd>}
     </div>
   );
 }
 
 /**
- * How the scan ran, as one line of short facts under the numbers: how it
- * ended, its page limit, the page states it opened, the pages it could not
- * load, and the link to the list of pages.
+ * What sits under "Pages visited": the pages that could not be loaded, when
+ * any failed, then the link to the list of pages.
  *
- * Why a line under the numbers (the developer chose it, 2026-11-14, over a
- * framed card beside "Pages visited" and over a fourth number for pages
- * found): these facts used to stack under "Pages visited", five lines tall
- * beside two numbers standing alone, and they are about the whole scan, not
- * only its page count. A card beside the number would break the no-frame rule
- * below (a frame competes with the number and looks clickable), and a fourth
- * number for pages found invites adding it to pages visited. A row of run
- * details under the results is how Lighthouse shows how its run was made
- * (paraphrased from memory, not checked against a current report).
+ * Until 2026-11-27 a line of facts ran under all three numbers: how the scan
+ * ended, its page limit, the page states it opened, the failed pages, then
+ * this link. The developer removed that line (2026-11-27) and moved the link
+ * under the number it lists. The facts it held are not dropped (Interface
+ * language rule 4): how the scan ended, the page limit, the page states and
+ * the failed pages are in "How this scan ran" in "About this report", and
+ * how it ended is on that group's closed row.
  *
- * A list (``ul``), so a screen reader hears how many facts there are and
- * each one alone. Space separates them, not drawn lines or dots: the strip's
- * rule is no dividers. Each fact shows only when it tells the reader
- * something, except the page states, which stay at zero because zero is a
- * limitation the reader needs (Interface language rule 4). "3 pages could
- * not be loaded" is coloured because it needs attention, and says so in
- * words too (SC 1.4.1 Use of Color, Level A).
+ * "3 pages could not be loaded" stays here, in view, because it needs
+ * attention and the reader should not have to open anything to learn that
+ * the count above includes failures. It is coloured and says so in words too
+ * (SC 1.4.1 Use of Color, Level A). It shows only when pages failed.
  *
- * "List the pages visited" is last, after the facts it is about, in reading
- * and keyboard order (SC 2.4.3 Focus Order, Level A). It is a text link with
- * a 44px target (SC 2.5.5 Target Size (Enhanced), Level AAA); a negative
- * margin as tall as the extra height keeps the line's spacing.
+ * The link follows the fact it is about, in reading and keyboard order (SC
+ * 2.4.3 Focus Order, Level A). It is a text link with a 44px target (SC
+ * 2.5.5 Target Size (Enhanced), Level AAA); a negative margin as tall as the
+ * extra height keeps it on the same line as the other numbers' labels.
  */
-function ScanFacts({ scan }: { scan: ScanDetail }) {
-  const { coverage } = scan;
-  const facts: { text: string; flag?: boolean }[] = [
-    { text: endText(coverage) },
-    // The limit is already in the words when the scan stopped at it.
-    ...(coverage.ended === "page_limit"
-      ? []
-      : [
-          {
-            text: `${NUMBERS.max_pages.label}: ${
-              coverage.page_limit != null ? coverage.page_limit.toLocaleString() : "no limit"
-            }`,
-          },
-        ]),
-    {
-      text:
-        (scan.dom_state_count ?? 0) > 0
-          ? `Plus ${clickThroughStates(scan.dom_state_count)}`
-          : `No ${CLICK_THROUGH_STATES}`,
-    },
-    ...(scan.error_count > 0
-      ? [{ text: `${pages(scan.error_count)} could not be loaded`, flag: true }]
-      : []),
-  ];
+function PagesVisitedAfter({ scan }: { scan: ScanDetail }) {
   return (
-    <ul className="mb-8 flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
-      {facts.map(({ text, flag = false }) => (
-        <li key={text} className={flag ? "text-sev-major" : "text-fg-muted"}>
-          {text}
-        </li>
-      ))}
-      {scan.page_count > 0 && (
-        <li>
-          <Link
-            to={`/scans/${scan.id}/pages`}
-            // The margin is half of (target height - line height), whatever
-            // Settings > Target size makes the target.
-            className="-my-[calc((var(--target,44px)_-_1.25rem)/2)] inline-flex min-h-target items-center font-semibold text-umich-blue underline underline-offset-2"
-          >
-            List the pages visited
-          </Link>
-        </li>
+    <>
+      {scan.error_count > 0 && (
+        <span className="block text-sev-major">{pages(scan.error_count)} could not be loaded</span>
       )}
-    </ul>
+      {scan.page_count > 0 && (
+        <Link
+          to={`/scans/${scan.id}/pages`}
+          // The margin is half of (target height - line height), whatever
+          // Settings > Target size makes the target.
+          className="-my-[calc((var(--target,44px)_-_1.25rem)/2)] inline-flex min-h-target items-center font-semibold text-umich-blue underline underline-offset-2"
+        >
+          List the pages visited
+        </Link>
+      )}
+    </>
   );
 }
 
@@ -219,8 +207,8 @@ export function ReportSummary({
           "What the labels mean" under the table defines an issue type and an
           occurrence, and the Issue occurrences column's hint does too (SC 3.1.3
           Unusual Words, Level AAA). How the scan ran is said in facts
-          (page states reached, pages that failed, how it ended) on the line
-          under the numbers (ScanFacts), not definitions.
+          (page states reached, pages that failed, how it ended) in "How
+          this scan ran", not definitions.
 
           On 2026-10-30 the developer renamed them again, everywhere: "issue
           type" for a row (it was "kind of issue") and "Issue occurrences" for
@@ -243,21 +231,22 @@ export function ReportSummary({
           since, and the Jira export's "Issue Type" is Jira's own field
           (always "Bug"), which a reader sees only inside Jira.
 
-          The page states opened by clicking are a fact on the line under the
-          numbers, not a fourth number: they say how much was scanned, like the pages, not
-          what was found, and a big number of their own read as a result. The
-          line stays, because pages alone understate a site whose content
-          mostly appears only after a control is used, and a limitation is
-          never dropped to save space (Interface language rule 4).
+          The page states opened by clicking are a fact in "How this scan
+          ran", not a fourth number: they say how much was scanned, like the
+          pages, not what was found, and a big number of their own read as a
+          result. The fact stays, even at zero, because pages alone
+          understate a site whose content mostly appears only after a
+          control is used, and a limitation is never dropped to save space
+          (Interface language rule 4). Until 2026-11-27 it was on a line of
+          facts under these numbers, which the developer removed.
 
-          A fact shows only when it tells the reader something: "3 pages
-          could not be loaded" when pages failed, and nothing when none did.
-          The developer's rule: hide what the reader does not need. An
-          "Every page loaded" line was dropped for that reason. The page
-          states fact stays even at zero ("No page states opened by
-          clicking"), because zero is a limitation the reader does need.
+          "3 pages could not be loaded" shows under "Pages visited" when
+          pages failed, and nothing when none did. The developer's rule:
+          hide what the reader does not need. An "Every page loaded" line was
+          dropped for that reason.
 
-          "Pages visited" says what it is out of: "7 of 60 found" (2026-11-14).
+          "Pages visited" says what it is out of: "7 of 60" (2026-11-14; the
+          word "found" went when the label moved beside it, 2026-11-27).
           A stopped scan used to be a "Partial report" while one that
           completed at a 10-page limit read as whole; the developer asked for
           coverage as facts instead. The found count is left out when it was
@@ -271,8 +260,8 @@ export function ReportSummary({
           coworker read as accessibility errors (glossary: "Pages not
           reached").
 
-          "List the pages visited" is the last item of the facts line
-          (2026-11-06, backlog: readers could not tell a clean result from
+          "List the pages visited" is under "Pages visited" (since
+          2026-11-27; first added 2026-11-06, backlog: readers could not tell a clean result from
           missing coverage, because the number did not say which pages it
           counted or which of them failed). It opens the list of every page
           (routes/PagesVisited.tsx), with the ones that could not be loaded
@@ -281,9 +270,9 @@ export function ReportSummary({
           number that can be clicked, and it would be read as "46, link"
           with no verb (docs/plain-language.md rule 8: a verb and an object;
           SC 2.4.4 Link Purpose (In Context), Level A). It shows only when
-          there is at least one page to list, by the same rule as the facts
-          before it. Keyboard order is the reading order: the link comes
-          after the facts it is about (SC 2.4.3 Focus Order, Level A).
+          there is at least one page to list. Keyboard order is the reading
+          order: the link comes after the number it is about (SC 2.4.3 Focus
+          Order, Level A).
 
           No panel, border, fill or dividers, the same rule as StatCard
           (ui.tsx): a frame around a number competes with the number, and a
@@ -301,9 +290,8 @@ export function ReportSummary({
           (proximity), so the space outside the group is clearly larger than
           the space inside it: 32px above (with the header's margin) and
           below it, 48px between columns on a wide screen (32px on a narrow
-          one) and 32px between rows, against 8px from a number to its name,
-          and 24px down to the facts line (ScanFacts), which belongs to the
-          numbers. Three
+          one) and 32px between rows, against 8px from a number to its name.
+          Three
           across from 640px; below that the two problem numbers (Issue types
           and Issue occurrences) share a row, as the pair they are, and the
           pages take the row under them, so nothing is squeezed at 320px (SC
@@ -318,46 +306,36 @@ export function ReportSummary({
           out again, say so here, because a limitation is never dropped to
           make a number look smaller, Interface language rule 4.) The
           Reports list counts the same way (routes/Scans.tsx). */}
-      {/* mb-6, not the shared row's mb-5: 24px down to the facts line
-          (ScanFacts), which belongs to the numbers. Views with no facts line
-          (Documents) keep the shared spacing to their table. */}
-      <SummaryNumbers className="mb-6">
-        {/* A "?" after each count's name, where the words "issue type" and
-            "occurrence" are first met (the developer's choice, 2026-11-16):
-            the same meanings as "What the labels mean" under the table
-            (ISSUE_TYPE_HELP, OCCURRENCE_HELP), which is why it may be 28px
-            wide (HelpTip, ``equivalent``). The negative margin keeps the
-            label's line its own height around the 44px-tall target. */}
-        <SummaryStat
-          label={issueGroups === 1 ? "Issue type" : "Issue types"}
-          value={issueGroups}
-          help={
-            <HelpTip question="What is an issue type" equivalent="report-labels-button" className="-my-3">
-              <p>{ISSUE_TYPE_HELP}</p>
-            </HelpTip>
-          }
-        />
+      {/* mb-8: the facts line that used to sit under the numbers is gone
+          (2026-11-27), so the numbers keep the 32px to the table it had. */}
+      <SummaryNumbers className="mb-8">
+        {/* No "?" after the two counts' names since 2026-11-27 (the
+            developer removed them; they had been added 2026-11-16). What an
+            issue type and an occurrence are is still in words everyone can
+            reach: "What the labels mean" in "About this report" under the
+            table, and the Issue occurrences column's hint (SC 3.1.3 Unusual
+            Words, Level AAA). */}
+        <SummaryStat label={issueGroups === 1 ? "Issue type" : "Issue types"} value={issueGroups} />
         <SummaryStat
           label={occurrences === 1 ? "Issue occurrence" : "Issue occurrences"}
           value={occurrences}
-          help={
-            <HelpTip question="What is an issue occurrence" equivalent="report-labels-button" className="-my-3">
-              <p>{OCCURRENCE_HELP}</p>
-            </HelpTip>
-          }
         />
+        {/* "47 of 47 Pages visited" on one line, with "List the pages
+            visited" under it where the other numbers' labels are (the
+            developer's layout, 2026-11-27). "of 47" no longer says "found":
+            the label beside it would have made "47 of 47 found Pages
+            visited". Pages found is named in "How this scan ran". */}
         <SummaryStat
           label="Pages visited"
           value={scan.page_count}
           outOf={
-            scan.coverage.pages_found != null
-              ? `of ${scan.coverage.pages_found.toLocaleString()} found`
-              : undefined
+            scan.coverage.pages_found != null ? `of ${scan.coverage.pages_found.toLocaleString()}` : undefined
           }
+          labelBeside
+          after={scan.page_count > 0 || scan.error_count > 0 ? <PagesVisitedAfter scan={scan} /> : undefined}
           className="col-span-2 sm:col-span-1"
         />
       </SummaryNumbers>
-      <ScanFacts scan={scan} />
     </>
   );
 }
@@ -445,6 +423,12 @@ export function ReportScanNote({ scan }: { scan: ScanDetail }) {
     ["How it ended", endText(coverage)],
     ["Pages found", coverage.pages_found != null ? coverage.pages_found.toLocaleString() : "Not recorded"],
     ["Pages visited", coverage.pages_visited.toLocaleString()],
+    // Both were on a line under the report's numbers until 2026-11-27,
+    // when the developer removed it; here so no limitation is dropped
+    // (Interface language rule 4). Page states stay at zero, because zero
+    // is a limitation the reader needs.
+    ["Pages that could not be loaded", scan.error_count.toLocaleString()],
+    [CLICK_THROUGH_STATES_LABEL, (scan.dom_state_count ?? 0).toLocaleString()],
     [NUMBERS.max_pages.label, coverage.page_limit != null ? coverage.page_limit.toLocaleString() : "No limit"],
     [NUMBERS.max_depth.label, coverage.depth_limit != null ? coverage.depth_limit.toLocaleString() : "Not recorded"],
     ...(scan.failure_reason ? [["Why it failed", scan.failure_reason] as [string, string]] : []),
@@ -473,6 +457,8 @@ export function ReportScanNote({ scan }: { scan: ScanDetail }) {
 /**
  * The report's closed explanations under the header, as one accordion: a
  * framed list of ``ReportNote`` rows, one per line, all closed on arrival.
+ * On Issues the last row is "Delete this report" (ReportDangerZone), the
+ * report's one action, in the same list since 2026-11-27.
  *
  * These used to be link-styled ``<details>`` summaries wrapped side by side,
  * which read as loose sentences and put the table's context in a different
@@ -493,12 +479,15 @@ export function ReportNote({
   id,
   title,
   meta,
+  icon,
   children,
 }: {
   id: string;
   title: string;
   /** The row's one fact, shown on the right while it is closed. */
   meta?: ReactNode;
+  /** An icon before the title, for a row that is not a note (Delete this report). */
+  icon?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -509,6 +498,7 @@ export function ReportNote({
       id={id}
       title={title}
       meta={meta}
+      icon={icon}
       headingLevel={2}
       className="rounded-none border-0 first:rounded-t-[7px] last:rounded-b-[7px]"
     >

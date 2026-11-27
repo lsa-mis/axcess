@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import asyncio
 import gzip
-import re
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -71,15 +70,28 @@ async def open_inspector(
 
 
 def box_note(page: Any) -> Any:
-    """The key under the saved copy, which says where the box is when it is
+    """The line under the saved copy that says where the box is when it is
     not simply around the element ("Where the box is: ...").
 
-    The table of facts under the toolbar used to say it; the developer
-    removed that table (2026-11-10), and its "Where the box is" moved here.
+    It followed the key to the marks until 2026-11-27, when the key moved
+    into the "?" beside Hide highlights (see ``highlight_key``).
     """
-    return page.locator("p").filter(
-        has_text=re.compile(r"marks the flagged element|flagged elements on this page")
-    )
+    return page.locator("#inspect-box-note")
+
+
+async def open_manual_review(page: Any) -> None:
+    """Open the inspector's "Manual review" section, which starts closed
+    (2026-11-27), so the review of the element you are on can be used."""
+    button = page.get_by_role("button", name="Manual review", exact=True)
+    await button.click()
+    await page.get_by_role("group", name="The flagged element you are on").wait_for()
+
+
+async def highlight_key(page: Any) -> Any:
+    """Open the "?" beside Hide highlights and return its panel: the key to
+    the marks ("A blue box with a yellow ring marks the flagged element.")."""
+    await page.get_by_role("button", name="What do the highlights mean?", exact=True).click()
+    return page.locator("[popover]:popover-open")
 
 
 def element_status(page: Any) -> Any:

@@ -195,12 +195,27 @@ async def _evidence_text(new_page: Any, base: str, scan_id: int, page_id: int, s
         await page.locator("#inspect-panel-page").wait_for(state="attached", timeout=30000)
         # The highlight pass runs in requestIdleCallback.
         await page.wait_for_timeout(1500)
-        # The evidence list sits closed below the page; open it so its
-        # occurrences are part of the text. A view with none of the issue's
-        # occurrences has no list to open.
-        evidence = page.get_by_role("button", name="Evidence from the scan", exact=True)
+        # The Scan evidence section sits closed above the page; open it so
+        # its occurrences are part of the text. A view with none of the
+        # issue's occurrences has no list to open. Its name ends with the
+        # count ("Scan evidence 2 occurrences").
+        evidence = page.get_by_role("button", name=re.compile(r"^Scan evidence \d+ occurrences?$"))
         if await evidence.count():
             await evidence.click()
+        # The key to the marks is in the "?" beside Hide highlights
+        # (2026-11-27): open it so its words are part of the text.
+        # It shows once highlighting has finished: wait for it, then for its
+        # panel, rather than reading the text before either is there.
+        from playwright.async_api import TimeoutError as PlaywrightTimeout
+
+        key = page.get_by_role("button", name="What do the highlights mean?", exact=True)
+        try:
+            await key.wait_for(timeout=5000)
+        except PlaywrightTimeout:
+            pass  # nothing outlined, so no key to open
+        else:
+            await key.click()
+            await page.locator("[popover]:popover-open").wait_for()
         return await page.locator("body").inner_text()
     finally:
         # One page at a time: close it now rather than at teardown.
@@ -423,9 +438,11 @@ async def test_an_issue_found_only_after_clicks_opens_where_it_can_be_seen(
         )
         picker = page.get_by_role("combobox", name="Page state")
         await playwright_async.expect(picker).to_have_attribute("data-value", kept, timeout=10000)
+        await page.get_by_role("button", name="What do the highlights mean?", exact=True).click()
         await playwright_async.expect(
             page.get_by_text("A blue box with a yellow ring marks the flagged element")
         ).to_be_visible()
+        await page.keyboard.press("Escape")
         await picker.click()
         load = page.locator('[role="option"][data-value=""]')
         await playwright_async.expect(load).to_have_accessible_name(
