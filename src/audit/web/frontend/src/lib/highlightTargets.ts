@@ -1656,6 +1656,25 @@ function nodeAt(doc: Document, path: string): Node | null {
   }
 }
 
+/**
+ * A locator as a reader can use it: the CSS selector, or a Rule check
+ * (Alfa) record's XPath. Null when there is none to show. Restored
+ * 2026-11-27 for the inspector's Element information (see
+ * components/ElementInformation.tsx); it was removed with the locators on
+ * 2026-11-10 (commit 5d03aa3).
+ */
+export function readableLocator(selector: string | null): string | null {
+  if (!selector) return null;
+  if (!isAlfaJsonSelector(selector)) return selector;
+  try {
+    const parsed = JSON.parse(selector) as unknown;
+    const first = (Array.isArray(parsed) ? parsed[0] : parsed) as { path?: unknown } | undefined;
+    return typeof first?.path === "string" ? first.path : null;
+  } catch {
+    return null;
+  }
+}
+
 function isAlfaJsonSelector(selector: string): boolean {
   const s = selector.trim();
   return (s.startsWith("{") || s.startsWith("[")) && s.includes('"path"');
