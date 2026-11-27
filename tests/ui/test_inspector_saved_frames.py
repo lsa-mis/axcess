@@ -90,7 +90,7 @@ async def test_saved_frames_are_shown_and_missing_ones_say_so(
     video = copy.frame_locator('iframe[title="Video"]')
     await playwright_async.expect(video.locator("p")).to_have_text(
         "This part of the page comes from youtube.com. The saved copy does not include it. "
-        "Use “Open live page” to see it."
+        "To see it, open the link after “Page URL” at the top."
     )
     await playwright_async.expect(video.locator("html")).to_have_attribute("lang", "en")
 

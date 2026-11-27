@@ -17,13 +17,12 @@ import type {
   SuggestionAvailability,
   SuggestionOccurrenceKind,
 } from "../api/types";
-import ReportHeader, { ReportMeta } from "../components/ReportHeader";
+import ReportHeader from "../components/ReportHeader";
 import Tabs from "../components/Tabs";
 import {
   Card,
   Disclosure,
   EmptyState,
-  ExternalLinkButton,
   LinkButton,
   pageEvidencePath,
   Select,
@@ -77,8 +76,8 @@ type TabId = "page" | "dom";
  * and (for older reports) stylesheets would resolve against the review UI
  * (see `withBaseHref`); the "Loaded DOM" tab
  * shows the same markup as escaped source with the element's markup
- * highlighted. No screenshot is captured or stored. An "Open live page"
- * action stays available in the header.
+ * highlighted. No screenshot is captured or stored. The page's address in
+ * the header is a link to the live page.
  *
  * The rendered HTML is untrusted scanned content: it is sandboxed with scripts
  * disabled, and in the DOM tab it is rendered as escaped text, never executed.
@@ -903,7 +902,9 @@ export default function InspectorRoute() {
   const { data: issueDetail } = useQuery({
     queryKey: ["issue-detail", scan, issueKey, "occurrences_desc"],
     queryFn: () => api.getIssueDetail(scan, issueKey ?? "", "occurrences_desc"),
-    enabled: canReview && Boolean(issueKey),
+    // Not only while reviewing: the header's "Issue type:" line and the
+    // Issue guidance caret use it too.
+    enabled: Boolean(issueKey),
     staleTime: 60_000,
   });
   // Issue notes suggested from the scan: page state, element, problem.
@@ -1226,36 +1227,65 @@ export default function InspectorRoute() {
       <ReportHeader
         scanId={scan}
         canCompare={scanData?.has_other_reports ?? false}
-        title={displayTitle}
+        // Three labelled lines (the developer's layout, 2026-11-27): the
+        // issue type the page is opened for, the page's title, and its
+        // address. Each value says what it is in words before it ("Issue
+        // type:", "Page title:", "Page URL:"), because the three are all
+        // plain text of similar length and a reader could not tell the
+        // page's title from the issue type's name (SC 1.3.1 Info and
+        // Relationships, Level A; SC 2.4.6 Headings and Labels, Level AA).
+        // The issue type line shows only when the page is opened for one.
+        kicker={
+          issueDetail ? (
+            <>
+              <span className="font-semibold text-fg">Issue type:</span> {issueDetail.row.title}
+            </>
+          ) : undefined
+        }
+        title={
+          <>
+            <span className="text-base font-semibold text-fg-muted sm:text-lg">Page title: </span>
+            {displayTitle}
+          </>
+        }
         meta={
-          // The URL is the part worth a line: an issue's pages often share a
-          // title ("Find a Room") and differ only in their query string. The
-          // render is only mentioned when it is not the stored evidence at
-          // its usual 200, which is what a reader assumes they are looking at.
-          renderNote ? (
-            <ReportMeta counts={renderNote} note={pageInfo.url} />
-          ) : (
-            <span
-              className="break-all text-fg-subtle"
-              title={
-                pageInfo.captured_at
-                  ? `Saved ${serverDate(pageInfo.captured_at).toLocaleString()}`
-                  : undefined
-              }
+          // The address is the way to the live page: a link, not an "Open
+          // live page" button at the far right of the header, which the
+          // developer removed (2026-11-27) because buttons at the far right
+          // get lost (NN/g, "F-Shaped Pattern of Reading on the Web",
+          // https://www.nngroup.com/articles/f-shaped-pattern-reading-web-content/,
+          // paraphrased: readers look least at the right). The link's words
+          // are the address, then "opens in a new tab" (or "opens in your
+          // web browser" in the desktop app) as screen-reader text, with a
+          // visible arrow-out icon, so the change of window is known before
+          // the link is pressed (SC 3.2.5 Change on Request, Level AAA;
+          // technique G201; NN/g, "Opening Links in New Browser Windows and
+          // Tabs", https://www.nngroup.com/articles/new-browser-windows-and-tabs/,
+          // paraphrased: warn people before a link opens a new window).
+          // The developer asked for an "aria-action" to announce that the
+          // page opened elsewhere and focus moved; no such attribute
+          // exists, and a page cannot tell a screen reader what happened in
+          // another window. The browser itself says a new tab opened, and
+          // the words in the link say so beforehand.
+          //
+          // The render is only mentioned when it is not the stored evidence
+          // at its usual 200, which is what a reader assumes they are
+          // looking at.
+          <>
+            <span className="font-semibold text-fg">Page URL: </span>
+            <a
+              href={liveUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={pageInfo.captured_at ? `Saved ${serverDate(pageInfo.captured_at).toLocaleString()}` : undefined}
+              className="break-all text-umich-blue underline underline-offset-2"
             >
               {pageInfo.url}
-            </span>
-          )
-        }
-        actions={
-          <ExternalLinkButton
-            href={liveUrl}
-            variant="secondary"
-            aria-label={`Open live page: ${displayTitle} (${OPENS_NEW_WINDOW})`}
-          >
-            <ExternalLink className="h-4 w-4" aria-hidden />
-            Open live page
-          </ExternalLinkButton>
+              <ExternalLink className="ml-1 inline h-3.5 w-3.5 align-[-0.15em]" aria-hidden />
+              <span className="sr-only"> ({OPENS_NEW_WINDOW})</span>
+            </a>
+            {renderNote && <span className="block font-semibold text-fg">{renderNote}</span>}
+          </>
         }
       />
 
@@ -1284,8 +1314,8 @@ export default function InspectorRoute() {
               <p className="mt-1 text-sm text-fg">{render.error}</p>
               <p className="mt-2 text-2xs text-fg-muted">
                 The evidence the scan saved for this page is still available. To
-                see the page yourself, use{" "}
-                <span className="font-semibold">Open live page</span>. Or go back
+                see the page yourself, open the link after{" "}
+                <span className="font-semibold">Page URL</span> at the top. Or go back
                 to the page evidence.
               </p>
             </>
@@ -1699,7 +1729,7 @@ export default function InspectorRoute() {
                 the sampled elements match the fonts and colours recorded
                 during the scan, see ``lib/styleFingerprint``). Without it a
                 copy that lost its styles looks like evidence of a broken
-                page. It names the way to check, the Open live page button.
+                page. It names the way to check, the Page URL link.
                 Above the frame, so it is read before the page, and in words,
                 not a colour or icon alone (SC 1.4.1 Use of Color, Level A).
                 The check finishes after the frame loads, so the note is a
@@ -1716,7 +1746,7 @@ export default function InspectorRoute() {
                   {savedStyles.complete
                     ? "Some of its styles may not have loaded."
                     : "Axcess could not save all of this page's styles."}{" "}
-                  Use <span className="font-semibold">Open live page</span> to compare.
+                  Open the link after <span className="font-semibold">Page URL</span> at the top to compare.
                 </p>
               )}
             </div>

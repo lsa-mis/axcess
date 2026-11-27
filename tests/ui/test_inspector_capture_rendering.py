@@ -402,7 +402,7 @@ async def test_a_copy_whose_styles_did_not_load_says_so(
     note = await _style_note(page, live_server[0], scan_id, page_id)
     assert "This saved copy may look different from the page Axcess checked." in note
     assert "Some of its styles may not have loaded." in note
-    assert "Use Open live page to compare." in note
+    assert "Open the link after Page URL at the top to compare." in note
     # The note meets the same bar as the rest of the inspector (WCAG 2.2 AAA
     # pack, including 7:1 contrast), in the light theme it was drawn in.
     from .test_accessibility_axe import _render_violations, _run_axe

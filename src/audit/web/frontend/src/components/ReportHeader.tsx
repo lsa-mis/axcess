@@ -26,6 +26,7 @@ export default function ReportHeader({
   scanId,
   canCompare,
   title,
+  kicker,
   help,
   meta,
   below,
@@ -37,6 +38,13 @@ export default function ReportHeader({
    *  include Compare reports (ScanDetail.has_other_reports). */
   canCompare: boolean;
   title: ReactNode;
+  /**
+   * A line above the heading that says what the page sits inside, such as
+   * the issue type an inspected page is opened for ("Issue type: Some
+   * content sits outside any page region"). Above, not in the heading, so
+   * a screen reader's list of headings hears the page's own name.
+   */
+  kicker?: ReactNode;
   /**
    * A ``HelpTip`` ("?") that explains the view, right after the heading
    * (Images). After it, not inside it: inside, its words would join the
@@ -71,6 +79,7 @@ export default function ReportHeader({
       )}
       <div className="mt-5 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
+          {kicker && <p className="mb-1 text-sm leading-6 text-fg-muted">{kicker}</p>}
           {help ? (
             <div className="flex items-center gap-1">
               {heading}
