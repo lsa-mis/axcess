@@ -240,3 +240,156 @@ async def test_only_a_few_reasons_are_remembered() -> None:
 
     assert registry.ended_reason(ids[0]) is None
     assert registry.ended_reason(ids[-1]) == "cancelled"
+
+
+# -- a second, separate window: the Google sign-in of a sign-in scan ----------
+# (2026-11-26). Tied to the site sign-in, so one sign-in is one clock and one
+# end, and ending it however it ends closes both sessions.
+
+
+class _CountingSession(_FakeSession):
+    def __init__(self) -> None:
+        super().__init__()
+        self.closes = 0
+
+    async def close(self) -> None:
+        self.closes += 1
+        await super().close()
+
+
+def _with_google(
+    registry: SignInRegistry[_FakeSession],
+) -> tuple[str, _FakeSession, _CountingSession]:
+    sign_in_id, site = _waiting(registry)
+    google = _CountingSession()
+    assert registry.attach_second(sign_in_id, google) is not None
+    registry.second_opened(sign_in_id)
+    return sign_in_id, site, google
+
+
+@pytest.mark.parametrize("how", ["cancel", "fail", "expire", "quit"])
+async def test_every_end_closes_both_sessions(how: str) -> None:
+    registry, clock = _registry()
+    sign_in_id, site, google = _with_google(registry)
+    if how == "cancel":
+        await registry.cancel(sign_in_id)
+    elif how == "fail":
+        await registry.fail(sign_in_id)
+    elif how == "expire":
+        registry.window_closed(sign_in_id)
+        registry.second_window_changed(sign_in_id, False)
+        clock.advance(SIGN_IN_KEEP_SECONDS)
+        assert await registry.expire_due() == [sign_in_id]
+    else:
+        await registry.close_all()
+
+    assert registry.current() is None
+    assert site.closed
+    assert google.closes == 1
+
+
+async def test_a_second_session_that_fails_to_close_still_lets_the_first_close() -> None:
+    registry, _ = _registry()
+    sign_in_id, site = _waiting(registry)
+
+    class _Broken(_FakeSession):
+        async def close(self) -> None:
+            raise RuntimeError("cannot close")
+
+    registry.attach_second(sign_in_id, _Broken())
+    assert await registry.cancel(sign_in_id) is True
+    assert site.closed
+
+
+async def test_the_clock_stops_while_the_google_window_is_open() -> None:
+    registry, clock = _registry()
+    sign_in_id, _site, _google = _with_google(registry)
+    registry.window_closed(sign_in_id)
+
+    clock.advance(SIGN_IN_KEEP_SECONDS * 2)
+    assert registry.seconds_left(sign_in_id) is None
+    assert await registry.expire_due() == []
+
+    # The Google window closes too: the clock starts from now, not from
+    # when the site's window closed.
+    registry.second_window_changed(sign_in_id, False)
+    assert registry.seconds_left(sign_in_id) == SIGN_IN_KEEP_SECONDS
+    clock.advance(SIGN_IN_KEEP_SECONDS - 1)
+    assert await registry.expire_due() == []
+    clock.advance(1)
+    assert await registry.expire_due() == [sign_in_id]
+
+
+async def test_a_closed_google_window_with_the_site_window_open_has_no_clock() -> None:
+    registry, clock = _registry()
+    sign_in_id, _site, _google = _with_google(registry)
+    registry.second_window_changed(sign_in_id, False)
+    clock.advance(SIGN_IN_KEEP_SECONDS * 2)
+    assert registry.seconds_left(sign_in_id) is None
+
+
+async def test_a_failed_google_window_keeps_the_site_sign_in_and_can_be_replaced() -> None:
+    registry, _ = _registry()
+    sign_in_id, site = _waiting(registry)
+    first = _CountingSession()
+    registry.attach_second(sign_in_id, first)
+    registry.second_failed(sign_in_id, "Could not open.")
+    pending = registry.get(sign_in_id)
+    assert pending is not None and pending.second is not None
+    assert pending.second.status == "failed"
+    assert pending.second.error == "Could not open."
+    assert not site.closed
+
+    second = _CountingSession()
+    assert registry.attach_second(sign_in_id, second) is not None
+    assert pending.second.session is second
+    assert pending.second.status == "opening_browser"
+
+
+async def test_a_waiting_google_window_is_not_replaced() -> None:
+    registry, _ = _registry()
+    sign_in_id, _site, _google = _with_google(registry)
+    with pytest.raises(ValueError):
+        registry.attach_second(sign_in_id, _CountingSession())
+
+
+async def test_taking_it_keeps_both_sessions_open() -> None:
+    registry, _ = _registry()
+    sign_in_id, site, google = _with_google(registry)
+    taken = registry.take(sign_in_id)
+    assert taken is not None and taken.second is not None
+    assert taken.second.session is google
+    assert not site.closed and google.closes == 0
+
+
+async def test_a_failed_google_reopen_restarts_the_clock_from_zero() -> None:
+    """``reopening`` stops the one clock; a Google reopen that fails starts it
+    again from now (2026-11-26), unless the site's window is open."""
+    registry, clock = _registry()
+    sign_in_id, _site, _google = _with_google(registry)
+    registry.window_closed(sign_in_id)
+    registry.second_window_changed(sign_in_id, False)
+    clock.advance(600)
+    assert registry.seconds_left(sign_in_id) == SIGN_IN_KEEP_SECONDS - 600
+
+    registry.reopening(sign_in_id)
+    assert registry.seconds_left(sign_in_id) is None
+    registry.second_reopen_failed(sign_in_id)
+    assert registry.seconds_left(sign_in_id) == SIGN_IN_KEEP_SECONDS
+    pending = registry.get(sign_in_id)
+    assert pending is not None and pending.second is not None
+    assert pending.second.status == "awaiting_authentication"
+    assert not pending.second.window_open
+
+
+async def test_a_failed_google_reopen_with_the_site_window_open_has_no_clock() -> None:
+    registry, clock = _registry()
+    sign_in_id, _site, _google = _with_google(registry)
+    registry.second_window_changed(sign_in_id, False)
+    registry.reopening(sign_in_id)
+    registry.second_reopen_failed(sign_in_id)
+    clock.advance(SIGN_IN_KEEP_SECONDS * 2)
+    assert registry.seconds_left(sign_in_id) is None
+    # The site's window closes later: the clock starts then.
+    registry.window_closed(sign_in_id)
+    assert registry.seconds_left(sign_in_id) == SIGN_IN_KEEP_SECONDS

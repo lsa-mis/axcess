@@ -213,6 +213,38 @@ export default function ChecksGroup({ settings, update, policy, capabilities }: 
             }
           />
         )}
+        {/* Sign in to Google for Google files (the developer's request,
+            2026-11-26): right under the document check, and only while it
+            is on, because it changes only how that check downloads Google
+            files and reads their dates; with the check off it would do
+            nothing (W3C COGA "Making Content Usable",
+            https://www.w3.org/TR/coga-usable/, paraphrased: group related
+            content). Not indented: the vision model switch under OCR is a
+            dependent switch at the same level, and one pattern is kept for
+            both (SC 3.2.4 Consistent Identification, Level AA). Its own
+            switch, not a choice inside the document switch: on/off of the
+            check and opening a Google window are two decisions, and
+            folding them into one control would make "check documents"
+            mean "and sign in" (one control, one job). In a sign-in scan it
+            works too since 2026-11-26 (the developer's decision: "one flow,
+            two separate browsers, one after another"), in the same place
+            and with the same behaviour, so the two forms offer the same
+            settings (the developer's rule, 2026-11-16; SC 3.2.4 Consistent
+            Identification, Level AA). Its sign-in hint says the Google
+            window is a second, separate one, opened after the site
+            sign-in, and that the site's pages are checked without it, so
+            the reader knows which window is for what before they start
+            (SC 3.3.2 Labels or Instructions, Level A). It changes nothing
+            about the page checks or their browser: the Google browser is
+            the document check's own (audit/linked_files/google_session.py). */}
+        {!isFixed(policy, "skip_documents") && switchOn(settings, "documents") && (
+          <SwitchRow
+            checked={switchOn(settings, "google")}
+            onChange={(on) => update(switchPatch(settings, "google", on))}
+            label={SWITCHES.google_sign_in.label}
+            hint={login ? SWITCHES.google_sign_in.hintSignInScan : SWITCHES.google_sign_in.hint}
+          />
+        )}
       </SwitchList>
     </SettingsGroup>
   );

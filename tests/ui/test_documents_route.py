@@ -132,7 +132,13 @@ def _seed_documents(db_path: Path, scan_id: int, blob_dir: Path | None = None) -
             scan_id,
             "http://example.com/files/no-title.pdf",
             "pdf",
-            store.CheckResult("mostly_sure", failed_checks=["no_title"], http_status=200),
+            store.CheckResult(
+                "mostly_sure",
+                failed_checks=["no_title"],
+                http_status=200,
+                # An old file, for the Creation date filter.
+                file_created_at="2010-11-17T08:00:00",
+            ),
             [(home, "link", "Price list (PDF)", None)],
         )
         _file(
@@ -179,6 +185,9 @@ def _seed_documents(db_path: Path, scan_id: int, blob_dir: Path | None = None) -
                 failed_checks=["no_alt_text", "table_no_header", "unclear_link_text", "no_title"],
                 http_status=200,
                 checked_as="docx",
+                # Its own creation date (migration 0050), shown in the table.
+                file_created_at="2018-07-17T09:30:00+00:00",
+                file_modified_at="2025-05-23T16:17:00+00:00",
             ),
             [(home, "link", "Welcome guide (Word)", None)],
         )
@@ -594,6 +603,7 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
         [
             "The numbers: what is counted",
             "Accessibility problems? How sure Axcess is that a file has them",
+            "Creation date: when the file says it was made",
             "The order: which files to look at first",
         ]
     )
@@ -603,6 +613,8 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
             "Mostly sure",
             "Not sure",
             "Could not check",
+            "A date",
+            "Not known",
             "1. Accessibility problems?",
             "2. Pages it appears on",
             "3. A form to fill in",
@@ -631,11 +643,11 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
     await expect(form).to_contain_text("This site")
     # Each problem by its short name, one a line; why it matters is on the
     # document's page. The form is a fact under the type, not a problem.
-    await expect(form.locator("td").nth(3).get_by_role("listitem")).to_have_text(
+    await expect(form.locator("td").nth(4).get_by_role("listitem")).to_have_text(
         ["Not tagged", "No language set"]
     )
     await expect(form.locator("td").nth(0)).to_contain_text("Has a form to fill in")
-    await expect(form.locator("td").nth(3)).not_to_contain_text("form")
+    await expect(form.locator("td").nth(4)).not_to_contain_text("form")
     # The pages are a count, as Issues' "Affected pages" is; the list is on
     # the document's own page. No page titles, addresses or link text here.
     await expect(form.locator("td").last).to_have_text("2")
@@ -644,7 +656,15 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
     await expect(form).not_to_contain_text("Appears only after pressing")
     # A Word file: its problem, then its possible problems under their own
     # words, so one is never read as the other.
-    guide = rows.nth(2).locator("td").nth(3)
+    # The Word file's own creation date, the day as the file recorded it,
+    # in the reader's way of writing dates, with the ISO day for software.
+    created = rows.nth(2).locator("td").nth(2).locator("time")
+    await expect(created).to_have_text(re.compile(r"^(July 17, 2018|17 July 2018)$"))
+    await expect(created).to_have_attribute("datetime", "2018-07-17")
+    # A Google export never carries one; nor does a file Axcess could not open.
+    await expect(rows.nth(4).locator("td").nth(2)).to_have_text("Not known")
+    await expect(rows.nth(6).locator("td").nth(2)).to_have_text("Not known")
+    guide = rows.nth(2).locator("td").nth(4)
     await expect(guide.get_by_role("list").first.get_by_role("listitem")).to_have_text(
         ["Images without alt text"]
     )
@@ -674,6 +694,7 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
             re.compile(r"^Document"),
             re.compile(r"^Type"),
             re.compile(r"^Hosted on"),
+            re.compile(r"^Creation date"),
             re.compile(r"^Accessibility problems\?"),
             re.compile(r"^What Axcess found"),
             re.compile(r"^Pages it appears on"),
@@ -696,11 +717,12 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
     await expect(link).not_to_have_attribute("target", "_blank")
     await expect(form.get_by_role("link")).to_have_count(1)
 
-    # Keyboard order follows the reading order: the tab, the Filter menu,
-    # the column headers, then each file in turn, each with a visible focus.
+    # Keyboard order follows the reading order: the tab, the search box, the
+    # Filter menu, the column headers, then each file in turn, each with a
+    # visible focus.
     await tab.focus()
     stops = []
-    for _ in range(12):
+    for _ in range(15):
         await page.keyboard.press("Tab")
         stops.append(
             await page.evaluate(
@@ -708,7 +730,8 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
                     const el = document.activeElement;
                     const s = getComputedStyle(el);
                     return {
-                        text: el.innerText.replace(/\\s+/g, ' ').trim(),
+                        text: el.innerText.replace(/\\s+/g, ' ').trim()
+                            || el.getAttribute('aria-label') || '',
                         ring: (s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0)
                             || s.boxShadow !== 'none',
                     };
@@ -716,11 +739,17 @@ async def test_the_tab_works_by_keyboard_and_lists_each_file(
             )
         )
     texts = [stop["text"] for stop in stops]
-    assert texts[0] == "Filter documents", texts
+    assert texts[:2] == ["Search documents", "Filter documents"], texts
     first_file = next(i for i, t in enumerate(texts) if t.startswith("permit-form.pdf"))
-    # The six sort buttons, with the "?" right after its own header's
-    # (Accessibility problems?), then the first file.
-    assert texts[1].startswith("Document") and first_file == 8, texts
+    # The table's region, a stop since the Creation date column made the
+    # table scroll sideways here (the developer accepted that, 2026-11-25;
+    # TableRegion lets a keyboard scroll it), then the seven sort buttons,
+    # each "?" right after its own header's, then the first file.
+    assert texts[2].startswith("Documents linked from report"), texts
+    assert texts[3].startswith("Document") and first_file == 12, texts
+    assert texts[texts.index("Creation date") + 1] == (
+        "What does \u201cCreation date\u201d mean?"
+    ), texts
     assert texts[texts.index("Accessibility problems?") + 1] == (
         "What does \u201cAccessibility problems?\u201d mean?"
     ), texts
@@ -1188,19 +1217,20 @@ async def test_a_long_list_has_the_pager_under_the_table_too(
 
 
 @on_module_loop
-async def test_a_wide_pager_shares_the_row_with_filter_documents(
+async def test_the_bar_holds_the_search_the_filter_and_a_wide_pager(
     documents: int,
     seeded_db: tuple[Path, Path, int],
     live_server: tuple[str, int],
     new_page: Any,
 ) -> None:
-    """With no search box in the bar, "Filter documents" takes only its own
-    width, so a long list's pager sits beside it rather than on a line of
-    its own (the developer's report, 2026-11-16: 909 documents, the pager
-    under a lone button). 1400px: wide enough for the button and a 30-page
-    pager side by side, too narrow for the 20rem a search box keeps, so
-    the old layout fails here. At 320px it still wraps, and nothing scrolls
-    sideways (SC 1.4.10 Reflow)."""
+    """The bar over a long list, as Issues' and Images' bars: the search box
+    and "Filter documents" side by side, and a 30-page pager on the right,
+    on its own line where the row is too narrow for all three (here at
+    1400px). Until the search box came (the developer's request,
+    2026-11-25) "Filter documents" was alone and the pager shared its row
+    (the developer's report, 2026-11-16); TableBar keeps that for a bar with
+    no search box. At 320px it all wraps, and nothing scrolls sideways (SC
+    1.4.10 Reflow)."""
     from playwright.async_api import expect
 
     with sqlite3.connect(seeded_db[0]) as conn:
@@ -1217,17 +1247,26 @@ async def test_a_wide_pager_shares_the_row_with_filter_documents(
     base, scan_id = live_server
     page = await new_page(viewport={"width": 1400, "height": 900})
     await page.goto(f"{base}/app/scans/{scan_id}/documents", wait_until="networkidle")
+    search = page.get_by_role("searchbox", name="Search documents")
     filter_button = page.get_by_role("button", name="Filter documents")
     pager = page.get_by_role("navigation", name="Documents: page controls", exact=True)
     await expect(pager.get_by_role("button", name="Page 5 of documents")).to_be_visible()
+    search_box = await search.bounding_box()
     button_box = await filter_button.bounding_box()
     pager_box = await pager.bounding_box()
-    assert button_box and pager_box
-    assert pager_box["y"] < button_box["y"] + button_box["height"], (button_box, pager_box)
-    assert pager_box["x"] > button_box["x"] + button_box["width"], (button_box, pager_box)
+    assert search_box and button_box and pager_box
+    # The search, then the Filter menu, on one line.
+    assert button_box["y"] == search_box["y"], (search_box, button_box)
+    assert button_box["x"] > search_box["x"] + search_box["width"], (search_box, button_box)
+    # The pager is never on top of either.
+    assert (
+        pager_box["y"] >= button_box["y"] + button_box["height"]
+        or pager_box["x"] >= button_box["x"] + button_box["width"]
+    ), (button_box, pager_box)
 
     await page.set_viewport_size({"width": 320, "height": 900})
     await expect(pager).to_be_visible()
+    await expect(search).to_be_visible()
     overflow = await page.evaluate(
         "document.documentElement.scrollWidth - document.documentElement.clientWidth"
     )
@@ -1273,17 +1312,21 @@ async def test_the_table_sorts_by_any_column_and_goes_back(
     # Pages it appears on opens with the most first: the form, on 2 pages.
     await table.get_by_role("button", name=re.compile(r"^Pages it appears on")).click()
     await expect(names.first).to_have_text(re.compile(r"^permit-form\.pdf"), use_inner_text=True)
-    # Sorted by any column, the table still fits a 1280px screen: the sort
-    # tag under a narrow header must not push it wider than its card.
+    # Every column sorts, Creation date included. Since that column
+    # (2026-11-25) the table is wider than 1280px, which the developer
+    # accepted: it scrolls sideways in its own region, never the page
+    # (SC 1.4.10 Reflow allows this for a data table).
     region = page.get_by_role("region", name="Documents table")
-    for key in ("name", "type", "host", "status", "found", "pages"):
+    for key in ("name", "type", "host", "created", "status", "found", "pages"):
         for direction in ("asc", "desc"):
             await page.goto(
                 f"{base}/app/scans/{scan_id}/documents?sort={key}_{direction}",
                 wait_until="networkidle",
             )
-            widths = await region.evaluate("el => [el.scrollWidth, el.clientWidth]")
-            assert widths[0] <= widths[1], (key, direction, widths)
+            await expect(region).to_be_visible()
+            assert await page.evaluate(
+                "document.documentElement.scrollWidth <= document.documentElement.clientWidth"
+            ), (key, direction)
     back = page.get_by_role("button", name="Back to recommended order")
     await back.click()
     await expect(back).to_have_count(0)
@@ -1343,6 +1386,207 @@ async def test_filter_documents_narrows_the_list_and_says_how(
     await expect(
         page.get_by_text("No documents match these filters. Clear a filter to see more results.")
     ).to_be_visible()
+
+
+@on_module_loop
+async def test_filter_by_creation_dates_keeps_files_with_no_date(
+    documents: int, live_server: tuple[str, int], new_page: Any
+) -> None:
+    """Creation date: From and To days in Month, Day and Year boxes, either
+    one optional, both days included, applied with a button; a file with no
+    date always kept; each mistake said in text on the box it is about; and
+    "Clear dates" (the developer's requests, 2026-11-25: "the specific month
+    and date matters", "you also need to allow inbetween"). The seed:
+    welcome-guide.docx made 2018-07-17, no-title.pdf 2010-11-17, the other
+    seven with no date."""
+    from playwright.async_api import expect
+
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(f"{base}/app/scans/{scan_id}/documents", wait_until="networkidle")
+    await page.get_by_role("button", name="Filter documents").click()
+    group = page.get_by_role("group", name="Creation date", exact=True)
+    await expect(group).to_contain_text(
+        "Files with no creation date (Not known) always stay in the list"
+    )
+    # One Creation date filter: no year checkboxes beside the boxes.
+    await expect(group.get_by_role("checkbox")).to_have_count(0)
+    start = group.get_by_role("group", name="From", exact=True)
+    end = group.get_by_role("group", name="To", exact=True)
+    month, day, year = (start.get_by_role("textbox", name=n) for n in ("Month", "Day", "Year"))
+    to_month, to_day, to_year = (
+        end.get_by_role("textbox", name=n) for n in ("Month", "Day", "Year")
+    )
+    # Month, Day, Year, the order the app writes dates in.
+    boxes = [await box.bounding_box() for box in (month, day, year)]
+    assert all(boxes) and boxes[0]["x"] < boxes[1]["x"] < boxes[2]["x"], boxes  # type: ignore[index]
+    await expect(day).to_have_attribute("inputmode", "numeric")
+    rows = page.get_by_role("table").get_by_role("rowheader")
+    apply = page.get_by_role("button", name="Apply dates")
+    status = page.get_by_role("status").filter(has_text="Applied:")
+
+    # From alone, typing alone changes nothing, a month name works, and the
+    # day itself is kept.
+    await month.fill("Jul")
+    await day.fill("17")
+    await year.fill("2018")
+    await expect(rows).to_have_count(9)
+    await apply.click()
+    await expect(page).to_have_url(re.compile(r"created=2018-07-17\.\.(&|$)"))
+    await expect(rows).to_have_count(8)
+    await expect(rows.filter(has_text="no-title.pdf")).to_have_count(0)
+    await expect(rows.filter(has_text="welcome-guide.docx")).to_have_count(1)
+    await expect(apply).to_be_focused()
+    await expect(status).to_have_text("Applied: creation date on or after July 17, 2018.")
+    await expect(
+        page.get_by_text(
+            re.compile(
+                r"Filtered by.*Creation date: on or after July 17, 2018, and files with no date"
+            )
+        )
+    ).to_be_visible()
+
+    # To alone: on or before. Enter applies too.
+    for box in (month, day, year):
+        await box.fill("")
+    await to_month.fill("12")
+    await to_day.fill("31")
+    await to_year.fill("2010")
+    await to_year.press("Enter")
+    await expect(rows).to_have_count(8)
+    await expect(rows.filter(has_text="welcome-guide.docx")).to_have_count(0)
+    await expect(rows.filter(has_text="no-title.pdf")).to_have_count(1)
+    await expect(status).to_have_text("Applied: creation date on or before December 31, 2010.")
+
+    # Between: both dated files out of a range that holds neither, both in
+    # one that holds both, ends included.
+    await month.fill("1")
+    await day.fill("1")
+    await year.fill("2011")
+    await to_month.fill("July")
+    await to_day.fill("16")
+    await to_year.fill("2018")
+    await apply.click()
+    await expect(rows).to_have_count(7)
+    await month.fill("11")
+    await day.fill("17")
+    await year.fill("2010")
+    await to_day.fill("17")
+    await apply.click()
+    await expect(rows).to_have_count(9)
+    await expect(page).to_have_url(re.compile(r"created=2010-11-17\.\.2018-07-17"))
+    await expect(status).to_have_text("Applied: creation date November 17, 2010 to July 17, 2018.")
+
+    # Mistakes: said in text, only the wrong boxes marked, focus on the
+    # first, and the list stays as it was.
+    await to_year.fill("")
+    await apply.click()
+    await expect(group).to_contain_text("Error: The To date must include a year.")
+    await expect(to_year).to_be_focused()
+    await expect(to_year).to_have_attribute("aria-invalid", "true")
+    await expect(year).not_to_have_attribute("aria-invalid", "true")
+    await expect(to_year).to_have_accessible_description(re.compile("must include a year"))
+    await expect(rows).to_have_count(9)
+    for tags in (_AXE_TAGS_AA, None):
+        violations = await _run_axe(page, tags)
+        assert not violations, _render_violations(violations)
+    await to_year.fill("2009")
+    await apply.click()
+    await expect(group).to_contain_text(
+        "Error: The From date must be the same as or before the To date, July 17, 2009."
+    )
+    await expect(month).to_be_focused()
+    await month.fill("2")
+    await day.fill("30")
+    await year.fill("2008")
+    await apply.click()
+    await expect(group).to_contain_text("Error: The From date must be a real date")
+    await month.fill("13")
+    await day.fill("1")
+    await apply.click()
+    await expect(group).to_contain_text("Error: The From date must have a month from 1 to 12")
+    await expect(month).to_be_focused()
+    for box in (month, day, year, to_month, to_day, to_year):
+        await box.fill("")
+    await apply.click()
+    await expect(group).to_contain_text("Error: Enter a From date, a To date or both")
+
+    # "Clear dates" brings every file back and puts focus in the From Month box.
+    await page.get_by_role("button", name="Clear dates").click()
+    await expect(rows).to_have_count(9)
+    await expect(month).to_be_focused()
+    await expect(page).not_to_have_url(re.compile(r"created="))
+
+    # A day that is not real, from a mistyped link, narrows nothing.
+    await page.goto(
+        f"{base}/app/scans/{scan_id}/documents?created=2024-02-30..", wait_until="networkidle"
+    )
+    await expect(rows).to_have_count(9)
+    # A real range fills the boxes.
+    await page.goto(
+        f"{base}/app/scans/{scan_id}/documents?created=..2018-07-17", wait_until="networkidle"
+    )
+    await page.get_by_role("button", name="Filter documents").click()
+    await expect(month).to_have_value("")
+    await expect(to_month).to_have_value("7")
+    await expect(to_day).to_have_value("17")
+    await expect(to_year).to_have_value("2018")
+
+
+@on_module_loop
+async def test_search_finds_a_file_by_name_or_url(
+    documents: int, live_server: tuple[str, int], new_page: Any
+) -> None:
+    """The search box, as on Issues and Images (the developer's request,
+    2026-11-25): it finds a file by its name or its URL, ignores case, keeps
+    the term in the address, says it under the bar, and "Clear filters"
+    clears it with the rest."""
+    from playwright.async_api import expect
+
+    base, scan_id = live_server
+    page = await new_page(viewport={"width": 1280, "height": 900})
+    await page.goto(f"{base}/app/scans/{scan_id}/documents", wait_until="networkidle")
+    search = page.get_by_role("searchbox", name="Search documents")
+    await expect(search).to_have_attribute("placeholder", "Document name or URL")
+    table = page.get_by_role("table")
+    rows = table.get_by_role("rowheader")
+    await expect(rows).to_have_count(9)
+
+    # By name, whatever the case.
+    await search.fill("PERMIT")
+    await expect(rows).to_have_count(1)
+    await expect(rows.first).to_contain_text("permit-form.pdf")
+    await expect(page).to_have_url(re.compile(r"q=PERMIT"))
+    await expect(page.get_by_text(re.compile(r"Filtered by.*Search: “PERMIT”"))).to_be_visible()
+    await expect(page.get_by_text("1 of 9 shown")).to_be_visible()
+    for tags in (_AXE_TAGS_AA, None):
+        violations = await _run_axe(page, tags)
+        assert not violations, _render_violations(violations)
+
+    # By URL: neither Google file has the host in its name.
+    await search.fill("docs.google.com")
+    await expect(rows).to_have_count(2)
+
+    # Nothing matches: the table says what to do.
+    await search.fill("nothing-is-called-this")
+    await expect(
+        page.get_by_text("No documents match. Clear a filter or shorten your search.")
+    ).to_be_visible()
+
+    # Escape clears the box at once.
+    await search.press("Escape")
+    await expect(search).to_have_value("")
+    await expect(rows).to_have_count(9)
+
+    # "Clear filters" clears the search with the filters, as on Issues.
+    await page.goto(
+        f"{base}/app/scans/{scan_id}/documents?q=pdf&hosted=this", wait_until="networkidle"
+    )
+    await expect(search).to_have_value("pdf")
+    await page.get_by_role("button", name="Clear filters").click()
+    await expect(search).to_have_value("")
+    await expect(rows).to_have_count(9)
+    await expect(page).not_to_have_url(re.compile(r"[?&]q="))
 
 
 @on_module_loop

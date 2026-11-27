@@ -52,6 +52,9 @@ _CUSTOM_FORM: dict[str, Any] = {
     "skip_focus": True,
     "skip_markup": True,
     "skip_documents": True,
+    # Only with the document check, which is off here, so it reads back off;
+    # test_google_sign_in_round_trips_with_the_document_check sets it.
+    "google_sign_in": False,
     "skip_visual": False,
     "skip_forms": False,
     "send_empty_forms": True,
@@ -118,6 +121,7 @@ def test_the_form_defaults_round_trip() -> None:
         "skip_focus": False,
         "skip_markup": False,
         "skip_documents": False,
+        "google_sign_in": False,
         "skip_visual": True,
         "skip_forms": True,
         "send_empty_forms": False,
@@ -175,6 +179,15 @@ def test_a_request_without_the_form_setting_never_presses_submit() -> None:
 def test_fast_crawl_with_alfa_round_trips() -> None:
     form = {**_CUSTOM_FORM, "static_only": True, "scan_engine": "alfa", "skip_interaction": True}
     assert _round_trip(form) == form
+
+
+def test_google_sign_in_round_trips_with_the_document_check() -> None:
+    """On, it is kept with the scan's settings (2026-11-26), so "Edit
+    settings and retry" puts the switch back; the sign-in itself never is."""
+    form = {**_CUSTOM_FORM, "skip_documents": False, "google_sign_in": True}
+    assert _round_trip(form) == form
+    # Without the document check it would do nothing, so it is off.
+    assert _round_trip({**form, "skip_documents": True})["google_sign_in"] is False
 
 
 def test_snapshot_fields_are_exactly_the_form_fields() -> None:

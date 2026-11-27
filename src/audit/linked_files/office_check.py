@@ -126,6 +126,7 @@ import zipfile
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+from audit.linked_files.file_dates import FileDates, office_dates
 from audit.linked_files.formats import CheckedAs, FailedCheck
 from audit.linked_files.pdf_check import BASE_CHECKS
 
@@ -208,6 +209,8 @@ class OfficeCheck:
     #: Slides in a PowerPoint file; None for a Word file (Word does not
     #: store a reliable page count) or when not read.
     page_count: int | None = None
+    #: When the file says it was created and last changed (file_dates).
+    dates: FileDates = field(default_factory=FileDates)
     detail: str = field(default="", compare=False)
 
     @property
@@ -415,7 +418,9 @@ def _check_word(data: bytes) -> OfficeCheck:
         failed.add("skipped_heading_level")
     if any(_unclear_link(_text(link)) for link in body.iter(_q(_W, "hyperlink"))):
         failed.add("unclear_link_text")
-    return OfficeCheck(outcome="checked", failed=_ordered(failed, WORD_CHECKS))
+    return OfficeCheck(
+        outcome="checked", failed=_ordered(failed, WORD_CHECKS), dates=office_dates(package)
+    )
 
 
 def _core_title(package: Any) -> str:
@@ -814,7 +819,10 @@ def _check_slides(data: bytes) -> OfficeCheck:
         if _slide_has_unclear_link(tree):
             failed.add("unclear_link_text")
     return OfficeCheck(
-        outcome="checked", failed=_ordered(failed, SLIDES_CHECKS), page_count=len(slides)
+        outcome="checked",
+        failed=_ordered(failed, SLIDES_CHECKS),
+        page_count=len(slides),
+        dates=office_dates(package),
     )
 
 

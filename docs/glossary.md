@@ -524,6 +524,19 @@ It looks for:
   is a guess from the text's style, so it is marked [Not sure](#not-sure),
   and at most 20 are reported a page.
 
+### Creation date
+
+The day a document says it was first created, in the Documents table. Axcess
+reads it from the file itself: a Word or PowerPoint file's document
+properties, or a PDF's document information or XMP metadata. It is not the
+day the file was posted on the site, because a file copied from an older one
+keeps the older date, and it is only as right as the clock of the computer
+that made the file. A Google Doc, Sheet or Slides file carries none, so its
+date is **Not known**, as it is for a file Axcess could not open and for a
+report made before Axcess version 0.2.12. The exception: a scan with
+**Google sign-in** on reads the day Google's File, Details says the Google
+file was created, when the account signed in can open that file.
+
 ### Document check
 
 The check behind the report's **Documents** tab. While the scan runs, Axcess
@@ -620,6 +633,22 @@ it. While a scan runs, the scanning page's **Document check** column shows it
 on each page: the page's document links are found and its files are
 checked, each file once; a file on this site that a page links to is checked
 in its own row.
+
+### Google sign-in
+
+A New scan setting, "Sign in to Google for Google files", off unless you turn
+it on, for a scan with the document check on: a scan of a public website or
+a scan of a site with a sign-in. Before the scan, a browser window opens on
+this computer for you to sign in to Google. In a scan of a site with a
+sign-in, it opens after you sign in to the site, as a second, separate
+browser window. The document check then downloads Google Docs and Slides
+through that sign-in, so files shared only with signed-in accounts can be
+checked, and reads each Google Doc, Sheet and Slides file's creation and
+last-changed days from Google's File, Details. It opens only the Google
+files the pages link to, as Google's robots.txt allows, one each second, and
+changes nothing. The page checks never use this sign-in: in a scan of a site
+with a sign-in, they use only your sign-in to the site. When the scan ends,
+Axcess signs out of Google and deletes that browser's data.
 
 ### Local AI model
 

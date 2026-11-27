@@ -817,7 +817,7 @@ def test_background_crawl_startup_failure_finishes_scan(
             (canonical_seed,),
         )
 
-    async def _fail_before_queue(_conn, _config):  # type: ignore[no-untyped-def]
+    async def _fail_before_queue(_conn, _config, **_kwargs):  # type: ignore[no-untyped-def]
         raise RuntimeError("browser could not start")
 
     monkeypatch.setattr(server, "run_crawl", _fail_before_queue)
@@ -2559,7 +2559,11 @@ def test_a_sign_in_makes_no_scan_row_and_no_report(
         "forget_in_seconds",
         "already_waiting",
         "settings",
+        # The Google step's state, None without "Sign in to Google for
+        # Google files" (2026-11-26); never session data.
+        "google",
     }
+    assert state["google"] is None
 
 
 def test_starting_creates_the_scan_row_and_starts_the_crawl(

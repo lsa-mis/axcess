@@ -56,6 +56,10 @@ class CheckResult:
     # Which check read the file: "pdf", "docx" or "pptx" (migration 0045).
     # The bytes decide, not the link: a Google Doc is checked as "docx".
     checked_as: CheckedAs | None = None
+    # When the file says it was created and last changed, ISO 8601, read
+    # from its own properties (migration 0050; linked_files/file_dates.py).
+    file_created_at: str | None = None
+    file_modified_at: str | None = None
 
 
 def file_count(conn: sqlite3.Connection, scan_id: int) -> int:
@@ -144,7 +148,7 @@ def set_result(
         "UPDATE linked_files SET status = ?, reason = ?, failed_checks = ?, checks_run = ?, "
         "http_status = ?, content_type = ?, byte_size = ?, sha256 = ?, is_form = ?, "
         "page_count = ?, thumbnail_hash = ?, thumbnail_small_hash = ?, checked_as = ?, "
-        "checked_at = CURRENT_TIMESTAMP "
+        "file_created_at = ?, file_modified_at = ?, checked_at = CURRENT_TIMESTAMP "
         "WHERE id = ? AND scan_id = ?",
         (
             result.status,
@@ -160,6 +164,8 @@ def set_result(
             result.thumbnail_hash,
             result.thumbnail_small_hash,
             result.checked_as,
+            result.file_created_at,
+            result.file_modified_at,
             file_id,
             scan_id,
         ),
@@ -179,7 +185,8 @@ def checked_copy(
     """
     row = conn.execute(
         "SELECT status, failed_checks, is_form, page_count, thumbnail_hash, "
-        "thumbnail_small_hash, checked_as, checks_run FROM linked_files "
+        "thumbnail_small_hash, checked_as, checks_run, file_created_at, file_modified_at "
+        "FROM linked_files "
         "WHERE scan_id = ? AND sha256 = ? AND id != ? "
         "AND status IN ('mostly_sure', 'not_sure') ORDER BY id LIMIT 1",
         (scan_id, sha256, file_id),
@@ -195,6 +202,8 @@ def checked_copy(
         thumbnail_small_hash=row[5],
         checked_as=row[6],
         checks_run=None if row[7] is None else tuple(json.loads(row[7])),
+        file_created_at=row[8],
+        file_modified_at=row[9],
     )
 
 
@@ -247,6 +256,45 @@ def content_type_files(conn: sqlite3.Connection, scan_id: int) -> dict[str, int]
             (scan_id,),
         )
     }
+
+
+def google_files_without_dates(conn: sqlite3.Connection, scan_id: int) -> list[tuple[int, str]]:
+    """``(id, url)`` of each Google Doc, Sheet and Slides file with no date, oldest first.
+
+    For a public scan signed in to Google (2026-11-26): the files whose
+    dates Google's File > Details can give. A Drive file is not one: it
+    gets its dates from its own properties, when it is checked.
+    """
+    return [
+        (int(row[0]), str(row[1]))
+        for row in conn.execute(
+            "SELECT id, url FROM linked_files WHERE scan_id = ? "
+            "AND file_type IN ('google_doc', 'google_sheet', 'google_slides') "
+            "AND file_created_at IS NULL AND file_modified_at IS NULL ORDER BY id LIMIT ?",
+            (scan_id, MAX_FILES_PER_SCAN),
+        )
+    ]
+
+
+def set_file_dates(
+    conn: sqlite3.Connection,
+    *,
+    scan_id: int,
+    file_id: int,
+    created: str | None,
+    modified: str | None,
+) -> bool:
+    """Fill in a file's created and modified dates where it has none.
+
+    A date the file itself gave is never replaced (COALESCE keeps it). The
+    file must belong to ``scan_id``. True when the row was found.
+    """
+    cur = conn.execute(
+        "UPDATE linked_files SET file_created_at = COALESCE(file_created_at, ?), "
+        "file_modified_at = COALESCE(file_modified_at, ?) WHERE id = ? AND scan_id = ?",
+        (created, modified, file_id, scan_id),
+    )
+    return cur.rowcount == 1
 
 
 def mark_unchecked(conn: sqlite3.Connection, scan_id: int) -> int:

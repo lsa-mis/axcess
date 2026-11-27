@@ -60,6 +60,12 @@ _RAIL_NAME = {
 }
 
 
+# Switches in the Checks group that are not checks, so not on the rail's
+# lists: "Sign in to Google for Google files" (2026-11-26) changes how the
+# document check downloads Google files, and the rail lists that check.
+_NOT_A_CHECK = {"Sign in to Google for Google files"}
+
+
 # Interactive elements in the form that are shorter than 44 px. Native
 # checkboxes are exempt: they are 22 px inside a 44 px label row, and the
 # row is the target.
@@ -664,7 +670,10 @@ async def test_rail_names_every_switch_on_the_side_its_state_says(
             switches = page.get_by_role("group", name=group, exact=True).get_by_role("switch")
             for index in range(await switches.count()):
                 switch = switches.nth(index)
-                label = _RAIL_NAME[await _switch_label(switch)]
+                name = await _switch_label(switch)
+                if name in _NOT_A_CHECK:
+                    continue
+                label = _RAIL_NAME[name]
                 runs = await switch.is_checked() and await switch.is_enabled()
                 assert (label in on, label in off) == (runs, not runs), (label, runs)
         # The form error check is a question with three answers, not a
