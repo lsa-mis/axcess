@@ -64,15 +64,17 @@ export default function IssueEvidence({
     // focus ring at its edge (SC 2.4.7); its bar rounds its own top corners
     // and the table region its bottom ones (CARD_EDGE, table/Table.tsx).
     <div className="space-y-4">
+      {/* No visible heading over the table since 2026-11-27: the developer
+          removed "Pages with this issue type · 1 page", which repeated what
+          the page heading and the table already say. It stays for screen
+          readers, so the table is still reachable by heading (SC 2.4.10
+          Section Headings, Level AAA; SC 1.3.1 Info and Relationships, Level
+          A). Outside the card, so the table's bar is still the card's first
+          child and rounds its top corners (CARD_EDGE, table/Table.tsx). */}
+      <h2 className="sr-only">
+        Pages with this issue type: {pages.length} page{pages.length !== 1 ? "s" : ""}
+      </h2>
       <Card>
-        <div className="flex flex-wrap items-baseline justify-between gap-3 rounded-t-[7px] border-b border-border bg-surface-muted px-4 py-3">
-          <h2 className="text-base font-semibold">
-            Pages with this issue type
-            <span className="ml-2 text-sm font-normal text-fg-muted">
-              {pages.length} page{pages.length !== 1 ? "s" : ""}
-            </span>
-          </h2>
-        </div>
         <IssuePagesTable
           scanId={scanId}
           issueKey={issueKey}

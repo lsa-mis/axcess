@@ -209,10 +209,21 @@ export default function IssuePagesTable({
           </TableBar>
         )}
       >
-        <TableStatus>
-          {needle ? `${visible.length} of ${pages.length} page${pages.length === 1 ? "" : "s"} match. ` : ""}
+        {/* No visible "Sorted by Issue occurrences, highest first." line
+            since 2026-11-27 (the developer removed it): the sorted column's
+            header already shows the order ("high → low") and carries
+            aria-sort. A change of order is still announced, by this live
+            region, which stays in the page (SC 4.1.3 Status Messages, Level
+            AA). A search's match count still shows, because nothing else
+            says how many rows a search left. */}
+        <p role="status" className="sr-only">
           Sorted by {describeSort(sort)}.
-        </TableStatus>
+        </p>
+        {needle && (
+          <TableStatus>
+            {visible.length} of {pages.length} page{pages.length === 1 ? "" : "s"} match.
+          </TableStatus>
+        )}
         {visible.length === 0 ? (
           <TableEmpty>
             {pages.length === 0
