@@ -636,7 +636,11 @@ export default function InspectorRoute() {
   }, [documentHtml, scopedTargets]);
 
   const pageDoc = showHighlights && highlight ? highlight.srcDoc : (documentHtml ?? "");
-  const srcDoc = layout?.css ? withStyle(pageDoc, layout.css) : pageDoc;
+  const srcDoc = layout?.css
+    ? withStyle(pageDoc, layout.css)
+    : layout
+      ? pageDoc
+      : withStyle(pageDoc, COPY_SCROLLBAR_CSS, "data-axcess-scrollbar");
   const highlightedCount = showHighlights && highlight ? highlight.found : 0;
   const unreachableCount = highlight ? highlight.unreachable.shadow + highlight.unreachable.frame : 0;
   // Only what this view can hold: a view whose targets are all in other
@@ -2618,8 +2622,43 @@ function layoutForIssue(issueKey: string | null): CheckLayout | null {
 }
 
 /** ``html`` with a stylesheet added at the end of its head, so it wins the cascade. */
-function withStyle(html: string, css: string): string {
-  const style = `<style data-axcess-check-layout>${css}</style>`;
+/**
+ * A scrollbar that is always there and easy to see, for the page copy's own
+ * window. The copy is a page inside a page, 75% of the screen tall, and
+ * nothing said it scrolls: macOS and many sites hide the scrollbar until
+ * the page moves, so a reviewer could take the first screen for the whole
+ * page (the developer's report, 2026-11-27). NN/g, "Scrolling and
+ * Scrollbars" (https://www.nngroup.com/articles/scrolling-and-scrollbars/):
+ * "Offer a scrollbar if an area has scrolling content", and, paraphrased,
+ * scrollbars that do not look like scrollbars go unnoticed.
+ *
+ * 16px wide, always shown (``overflow-y: scroll``), a dark grey thumb on a
+ * light grey track: #4b5563 on #e5e7eb is about 6.2:1, over the 3:1 of SC
+ * 1.4.11 Non-text Contrast (Level AA). Fixed colours, like the frame notes
+ * (lib/savedFrames.ts), because it is drawn in the site's page. Last in the
+ * copy's head and ``!important``, so a site that hides its scrollbar does
+ * not hide this one. In Chromium and Safari it is drawn with
+ * ``::-webkit-scrollbar``, which also turns off macOS's hide-until-scrolled
+ * scrollbars; Chromium ignores those rules when ``scrollbar-color`` or
+ * ``scrollbar-width`` is set, so both are reset to ``auto`` there. Firefox,
+ * which has no ``::-webkit-scrollbar``, gets ``scrollbar-color``.
+ *
+ * It changes only the copy's scrollbar, which is not evidence. It is left
+ * out when the copy is shown the way a zoom and layout check saw it
+ * (``layout``), where a 16px scrollbar would change the width being judged.
+ */
+const COPY_SCROLLBAR_CSS = `
+html { overflow-y: scroll !important; scrollbar-color: auto !important; scrollbar-width: auto !important; }
+::-webkit-scrollbar { display: block !important; width: 16px !important; height: 16px !important; }
+::-webkit-scrollbar-track { background: #e5e7eb !important; }
+::-webkit-scrollbar-thumb { background: #4b5563 !important; border: 3px solid #e5e7eb !important; border-radius: 8px !important; min-height: 48px; }
+::-webkit-scrollbar-thumb:hover { background: #1f2937 !important; }
+@supports not selector(::-webkit-scrollbar) {
+  html { scrollbar-color: #4b5563 #e5e7eb !important; }
+}`;
+
+function withStyle(html: string, css: string, marker = "data-axcess-check-layout"): string {
+  const style = `<style ${marker}>${css}</style>`;
   const head = html.search(/<\/head>/i);
   return head === -1 ? style + html : html.slice(0, head) + style + html.slice(head);
 }
