@@ -1187,15 +1187,20 @@ export default function InspectorRoute() {
   const displayTitle = pageInfo.title || pageInfo.url;
   const liveUrl = pageInfo.url;
   const status = render.status_code != null && render.status_code !== 200 ? ` (server code ${render.status_code})` : "";
+  // The line under the page address, only when the page on screen is not
+  // what a reader assumes: a saved copy the server answered normally. A page
+  // state is a saved copy too, so it says nothing more unless the server's
+  // answer was not the usual one ("Saved copy (server code 404)"). Until
+  // 2026-11-27 a page state always said "Saved page state" here; the
+  // developer removed it, since the Page state list above the page already
+  // says which state is shown.
   const renderNote = !render.ok
     ? "Could not load the live page"
-    : render.source === "stored"
+    : render.source === "stored" || render.source === "state"
       ? status
         ? `Saved copy${status}`
         : null
-      : render.source === "state"
-        ? `Saved page state${status}`
-        : `Live page${status}`;
+      : `Live page${status}`;
   // What the first tab holds: a copy the scan saved, or the live page
   // loaded just now because no copy was saved.
   const copyName =
