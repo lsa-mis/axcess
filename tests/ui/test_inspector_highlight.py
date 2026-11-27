@@ -67,6 +67,11 @@ async def _status(new_page: Any, base: str, scan_id: int, page_id: int, selector
         await page.goto(url, wait_until="networkidle")
         # The highlight pass runs in requestIdleCallback.
         await page.wait_for_timeout(1500)
+        # The key to the marks is in the "?" beside Hide highlights
+        # (2026-11-27): open it so its words are part of the text.
+        key = page.get_by_role("button", name="What do the highlights mean?", exact=True)
+        if await key.count():
+            await key.click()
         return await page.locator("body").inner_text()
     finally:
         # One page at a time: close it now rather than at teardown.

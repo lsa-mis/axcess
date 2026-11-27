@@ -7,6 +7,8 @@ import DomSource from "../components/DomSource";
 import FixSuggestion, { SuggestionsBlockedNote, useSavedSuggestion } from "../components/FixSuggestion";
 import FlaggedStepper from "../components/FlaggedStepper";
 import ElementReview, { type ReviewDraft } from "../components/ElementReview";
+import ElementInformation from "../components/ElementInformation";
+import { IssueGuidance } from "../components/IssueEvidence";
 import { ApiError, api } from "../api/client";
 import type {
   OccurrenceReview,
@@ -23,6 +25,7 @@ import {
   Card,
   Disclosure,
   EmptyState,
+  HelpTip,
   LinkButton,
   pageEvidencePath,
   Select,
@@ -738,7 +741,8 @@ export default function InspectorRoute() {
         const target =
           back?.isConnected && !back.matches(":disabled")
             ? back
-            : toolbarRef.current?.querySelector<HTMLElement>("button:not(:disabled), a[href]");
+            : (toolbarRef.current?.querySelector<HTMLElement>("[data-view-controls] button:not(:disabled)") ??
+              toolbarRef.current?.querySelector<HTMLElement>("button:not(:disabled), a[href]"));
         if (!target) return;
         event.preventDefault();
         target.focus();
@@ -826,6 +830,15 @@ export default function InspectorRoute() {
   const [currentElement, setCurrentElement] = useState<ElementDescription | null>(null);
   useEffect(() => setCurrentElement(null), [srcDoc]);
 
+  // Which Analysis sections are open (see the Analysis bar's comment). Here,
+  // not in each section, so a section that briefly has nothing to show while
+  // the reader steps comes back as they left it. Manual review starts open.
+  const [openCarets, setOpenCarets] = useState<Record<string, boolean>>({ review: true });
+  const caret = (key: string) => ({
+    open: openCarets[key] ?? false,
+    onOpenChange: (open: boolean) => setOpenCarets((current) => ({ ...current, [key]: open })),
+  });
+
   /**
    * Make outlined element ``index`` the current one: solid outline, the
    * numbered box over it, scrolled to the centre, and described. False when
@@ -851,7 +864,7 @@ export default function InspectorRoute() {
   }
 
   // Which outlined element the reader is on, for Previous / Next in the
-  // saved copy, as the Page code (DOM) tab has. Back to the first whenever the
+  // saved copy, as HTML view has. Back to the first whenever the
   // frame's document changes.
   const [pageMark, setPageMark] = useState(0);
   useEffect(() => setPageMark(0), [srcDoc]);
@@ -1400,97 +1413,164 @@ export default function InspectorRoute() {
         </p>
       )}
 
-      <Tabs
-        mode="nav"
-        label="How to view this page"
-        className="mb-4"
-        replace
-        value={tab}
-        items={[
-          {
-            key: "page",
-            label: render.ok ? copyName : "Page",
-            to: viewHref("page"),
-          },
-          // "Loaded DOM" was accurate while the only document was the page as
-          // it loaded. It can now be a state captured after a click, so the
-          // name says what it shows rather than when it was taken.
-          { key: "dom", label: "Page code (DOM)", to: viewHref("dom") },
-        ]}
-      />
+      {/* The View bar: how to view the page, then, in Page view, the tools
+          for finding the flagged element, all in one row from the left (the
+          developer's layout, 2026-11-27).
+
+          Order, left to right and in keyboard order (SC 2.4.3 Focus Order,
+          Level A): the two views and their "?"; the stepper (count,
+          Previous element, Next element; FlaggedStepper), the reader's main
+          task; Hide highlights and its "?"; Show at full width. Until
+          2026-11-27 the tabs were a row of their own and Hide highlights
+          and Show at full width sat at the far right of a toolbar under
+          them. The developer moved everything left because buttons at the
+          far right get lost: readers of a left-to-right page look least at
+          its right side (NN/g, "F-Shaped Pattern of Reading on the Web",
+          https://www.nngroup.com/articles/f-shaped-pattern-reading-web-content/,
+          paraphrased), and a control is found beside what it works with
+          (NN/g, "Proximity Principle in Visual Design",
+          https://www.nngroup.com/articles/gestalt-proximity/, paraphrased).
+          The row wraps, so nothing scrolls sideways at 320 px (SC 1.4.10
+          Reflow, Level AA).
+
+          The stepper and the highlight buttons show only in Page view: they
+          act on the page copy, and HTML view marks its elements on its own.
+          The views stay first, in the same place in both views, so the way
+          back to Page view never moves (SC 3.2.3 Consistent Navigation,
+          Level AA).
+
+          The tabs are named "Page view" and "HTML view" (the developer's
+          names, 2026-11-27, replacing "Saved copy" and "Page code (DOM)").
+          "HTML" is not spelled out, at the developer's choice after being
+          told the tradeoff: SC 3.1.4 Abbreviations (Level AAA) and the
+          repo's rule 3 (plain phrase first, technical term in brackets)
+          ask for its meaning to be given; "HTML view" stands without it.
+          "Page view" no longer says the page is a saved copy, so a line in
+          the panel says it, and the "?" beside the views says the rest
+          (the developer's choice, 2026-11-27, over moving all of it into
+          the "?": a limitation is never left only behind a button,
+          Interface language rule 4; NN/g, "Tooltip Guidelines",
+          https://www.nngroup.com/articles/tooltip-guidelines/, paraphrased:
+          important information stays on the page).
+
+          No "Go to element" button and no line explaining it: keyboard focus
+          entering the copy goes to the flagged element (``onFrameLoad``),
+          and the frame's name says so and says that Escape leaves it (the
+          developer's decision, 2026-11-14; see FlaggedStepper). Escape
+          returns to the stepper ([data-view-controls]), not to the views. */}
+      <div
+        ref={toolbarRef}
+        className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xs border border-border bg-surface-muted/40 px-3 py-2"
+      >
+        <span className="flex items-center gap-0.5">
+          <Tabs
+            mode="nav"
+            label="How to view this page"
+            replace
+            value={tab}
+            items={[
+              { key: "page", label: "Page view", to: viewHref("page") },
+              { key: "dom", label: "HTML view", to: viewHref("dom") },
+            ]}
+          />
+          {render.ok && render.dom_html && (
+            <HelpTip question="What do Page view and HTML view show">
+              <p>Both views show a copy of this page, not the live site.</p>
+              <p className="mt-2">
+                {savedStyles
+                  ? "Its styles are the ones the scan saved. Its fonts and images load from the live site now, so they can look different from how they looked during the scan."
+                  : "Its styles, fonts, and images load from the live site now, so the page can look different from how it looked during the scan."}
+              </p>
+              <p className="mt-2">
+                The page&rsquo;s own scripts never run here. So if the site would only show{" "}
+                {fileId != null ? "a link" : "a flagged element"} with JavaScript, Axcess makes it visible to
+                highlight it.
+              </p>
+            </HelpTip>
+          )}
+        </span>
+        {tab === "page" && render.ok && render.dom_html && (
+          <span data-view-controls className="flex flex-wrap items-center gap-2">
+            {stepping ? (
+              <FlaggedStepper
+                noun={stepperNoun}
+                count={highlightedCount}
+                index={pageMark}
+                onGo={goToPageMark}
+                detail={
+                  currentElement
+                    ? `${currentElement.kind}${currentElement.text ? `, “${currentElement.text}”` : ""}`
+                    : undefined
+                }
+              />
+            ) : (
+              <span className="text-xs font-semibold text-fg-subtle">
+                {highlightPending ? "Highlighting…" : copyName}
+              </span>
+            )}
+            {hasTarget && (
+              <span className="flex items-center gap-0.5">
+                {/* eslint-disable-next-line react/forbid-elements -- Convert: styled by hand like a secondary Button; use Button variant="secondary" size="sm" */}
+                <button
+                  type="button"
+                  onClick={toggleHighlights}
+                  className="inline-flex min-h-target items-center gap-1 rounded-xs border border-border-strong bg-surface px-3 text-xs font-semibold text-fg hover:bg-surface-muted"
+                >
+                  {showHighlights ? "Hide highlights" : "Show highlights"}
+                </button>
+                {/* The key to the marks, in a "?" beside the button that
+                    turns them on and off (the developer's request,
+                    2026-11-27). It was a line under the copy. It explains
+                    the outlines, which also show themselves; why a box is
+                    missing or elsewhere stays in view, under the copy
+                    (SC 1.3.3 Sensory Characteristics, Level A). */}
+                {stepping && (
+                  <HelpTip question="What do the highlights mean">
+                    <p>
+                      {highlightedCount > 1
+                        ? `Dashed red outlines mark the ${highlightedCount} ${fileId != null ? `links to ${documentQuote}` : "flagged elements"} on this page. The one you are on has a numbered blue box with a yellow ring, and the rest of the page is dimmed.`
+                        : // Never describe a box that is not drawn (see ``drawsNoBox``).
+                          drawsNoBox(currentElement?.where ?? null)
+                          ? `No box marks the ${fileId != null ? `link to ${documentQuote}` : "flagged element"}.`
+                          : `A blue box with a yellow ring marks the ${fileId != null ? `link to ${documentQuote}` : "flagged element"}.`}
+                    </p>
+                  </HelpTip>
+                )}
+              </span>
+            )}
+            {checkLayout && (
+              // eslint-disable-next-line react/forbid-elements -- Convert: styled by hand like a secondary Button; use Button variant="secondary" size="sm"
+              <button
+                type="button"
+                aria-pressed={!asChecked}
+                onClick={() => setAsChecked((value) => !value)}
+                className="inline-flex min-h-target items-center gap-1 rounded-xs border border-border-strong bg-surface px-3 text-xs font-semibold text-fg hover:bg-surface-muted"
+              >
+                Show at full width
+              </button>
+            )}
+          </span>
+        )}
+      </div>
 
       <div
         id="inspect-panel-page"
         role="region"
-        aria-label={render.ok ? copyName : "Page"}
+        aria-label={render.ok ? "Page view" : "Page"}
         className="rounded-xs border border-border bg-surface shadow-card"
         hidden={tab !== "page"}
       >
         {render.ok && render.dom_html ? (
           <div>
-            {/* Top corners as the panel's inner ones (8px less its 1px border),
-                so the bar's fill does not paint square corners over them. */}
-            {/* Two sides. Left, finding the element: the stepper (count,
-                Previous element, Next element; FlaggedStepper), the reader's
-                main task, where reading starts. Right, how the copy is
-                shown: Show at full width and Hide highlights, settings
-                rather than steps. No "Go to element" button and no line
-                explaining it: keyboard focus entering the copy goes to the
-                flagged element (``onFrameLoad``), and the frame's name says
-                so and says that Escape leaves it (the developer's decision,
-                2026-11-14; see FlaggedStepper). "5 places highlighted" is
-                not shown beside the stepper: "Flagged element 1 of 5"
-                already gives the number,
-                and saying it twice crowded the bar into a third line (W3C
-                COGA, "Making Content Usable",
-                https://www.w3.org/TR/coga-usable/: keep it simple, no
-                repeats). Without the stepper the label stays: it says the
-                copy's name, or that highlighting is under way. */}
-            <div
-              ref={toolbarRef}
-              className="flex flex-wrap items-center gap-2 rounded-t-[7px] border-b border-border bg-surface-muted/40 px-3 py-2"
-            >
-              {stepping ? (
-                <FlaggedStepper
-                  noun={stepperNoun}
-                  count={highlightedCount}
-                  index={pageMark}
-                  onGo={goToPageMark}
-                  detail={
-                    currentElement
-                      ? `${currentElement.kind}${currentElement.text ? `, “${currentElement.text}”` : ""}`
-                      : undefined
-                  }
-                />
-              ) : (
-                <span className="text-xs font-semibold text-fg-subtle">
-                  {highlightPending ? "Highlighting…" : copyName}
-                </span>
-              )}
-              <span className="ml-auto flex flex-wrap items-center gap-2">
-                {checkLayout && (
-                  // eslint-disable-next-line react/forbid-elements -- Convert: styled by hand like a secondary Button; use Button variant="secondary" size="sm"
-                  <button
-                    type="button"
-                    aria-pressed={!asChecked}
-                    onClick={() => setAsChecked((value) => !value)}
-                    className="inline-flex min-h-target items-center gap-1 rounded-xs border border-border-strong bg-surface px-3 text-xs font-semibold text-fg hover:bg-surface-muted"
-                  >
-                    Show at full width
-                  </button>
-                )}
-                {hasTarget && (
-                  // eslint-disable-next-line react/forbid-elements -- Convert: styled by hand like a secondary Button; use Button variant="secondary" size="sm"
-                  <button
-                    type="button"
-                    onClick={toggleHighlights}
-                    className="inline-flex min-h-target items-center gap-1 rounded-xs border border-border-strong bg-surface px-3 text-xs font-semibold text-fg hover:bg-surface-muted"
-                  >
-                    {showHighlights ? "Hide highlights" : "Show highlights"}
-                  </button>
-                )}
-              </span>
-            </div>
+            {/* What Page view shows, in one line that stays in view (see the
+                View bar's comment); the "?" beside the views says more. Top
+                corners as the panel's inner ones (8px less its 1px border),
+                so the fill does not paint square corners over them. */}
+            <p className="rounded-t-[7px] border-b border-border bg-surface-muted/40 px-3 py-2 text-xs text-fg-muted">
+              {copyName === "Saved copy"
+                ? "A copy the scan saved. It can look different from the live page."
+                : "A copy Axcess loaded from the live site just now. It can look different from how it looked during the scan."}
+            </p>
             {/* Why a highlight is missing or partial ("Axcess could not find
                 the flagged element in this copy", "found 3 of 5"), and
                 other limits of what the copy shows, directly under the
@@ -1503,10 +1583,10 @@ export default function InspectorRoute() {
                 Sequence, Level A; W3C COGA, "Making Content Usable",
                 https://www.w3.org/TR/coga-usable/: put what people need
                 where they look for it). The key to the marks ("Dashed red
-                outlines mark…") stays under the copy, beside the marks it
-                explains: on top it pushed the copy down until stepping put
-                the box below the screen, and the stepper's status already
-                says which element the reader is on. Still a
+                outlines mark…") is not here: on top it pushed the copy down
+                until stepping put the box below the screen. It was under the
+                copy until 2026-11-27 and is now in the "?" beside Hide
+                highlights. Still a
                 polite live region, always in the page and empty until there
                 is something to say (empty:sr-only). Each message stops at a
                 readable width (max-w-measure, SC 1.4.8 Visual Presentation,
@@ -1610,61 +1690,147 @@ export default function InspectorRoute() {
                 screenshot is captured or stored. `onLoad` is a document-load
                 lifecycle signal, not an interaction, so the a11y rule below is
                 a false positive for an iframe. */}
-            {/* The AI suggestion and the person's review of the flagged
-                element share one row under the toolbar: the suggestion on
-                the left, two thirds of the width, and the review on the
-                right, one third (the developer's layout, 2026-11-11). Both
-                are about the element the reader is on, so they sit together
-                and follow Previous / Next (W3C COGA "Making Content Usable",
-                paraphrased: keep related content together;
-                https://www.w3.org/TR/coga-usable/).
-                - The suggestion comes first in the page code too, not only on
-                  screen, so Tab and a screen reader meet them in the order
-                  they are seen, left then right (SC 2.4.3 Focus Order,
-                  Level A; SC 1.3.2 Meaningful Sequence, Level A). Rejected:
-                  keeping the review first in the code and moving it right
-                  with CSS, which would send focus right and then back left.
-                - Side by side from lg (1024 px). Narrower, they stack in the
-                  same order, so nothing needs scrolling sideways at 320 px
-                  (SC 1.4.10 Reflow, Level AA).
-                - When only one shows (no suggestion when AI suggestions are
-                  not set up, no review on a protected report), it keeps the
-                  width it had alone: the suggestion the full row, the review
-                  its 21rem column.
-                - The review keeps its 21rem column inside its third, so its
-                  buttons keep the rows ElementReview's layout is built for
-                  ("Mark ... as repeats" under "Review this element").
-                - The suggestion needs only the occurrence, so it must not
-                  wait for, or vanish with, the saved copy; the review needs
-                  the element described, so it waits. Keyed on the occurrence
-                  so stepping never shows the last element's suggestion.
-                  Heading level 2: this sits straight under the page's h1
-                  (SC 1.3.1 Info and Relationships, Level A). Rejected for
-                  the suggestion: a list under the page, a long scroll from
-                  the element, and a third tab beside "Saved copy", which
-                  would hide the outlined element while the fix is read.
+            {/* The Analysis bar: what is known about the issue type and the
+                flagged element the reader is on, as a stack of closed
+                sections (carets), each opened on its own (the developer's
+                layout, 2026-11-27). In order: Issue guidance, Scan
+                evidence, AI analysis assistant, Manual review, Element
+                information. A section shows only when it has something to
+                show.
 
-                There was a table of facts here too: What it is, Text or
-                label, Size, Where the box is, and an element's place in the
-                page code. The developer removed it (2026-11-10), against the
-                recommendation to keep it, as part of taking locators and
-                other page-code details off the screens. What it said is
-                still said elsewhere: the toolbar status names the element
-                ("Link, “Read the big story”"), and when no box is drawn the
-                line under the saved copy says why (BOX_NOTES), so a hidden
-                element is never left unexplained (SC 1.3.3 Sensory
-                Characteristics, Level A: the box's absence alone cannot say
-                why). Lost with it: the size in pixels, the image address,
-                and the count of occurrences on one element. */}
-            {(showSuggestion || showReview) && (
-              <div
-                className={cn(
-                  "border-b border-border bg-surface px-3 py-2 text-sm text-fg",
-                  showSuggestion && showReview && "lg:grid lg:grid-cols-3 lg:gap-6",
+                Why a stack of carets: the developer asked whether these
+                should be stacked carets or a row of buttons opening one
+                drawer below, and chose the stack. Each is the WAI-ARIA
+                disclosure pattern (https://www.w3.org/WAI/ARIA/apg/patterns/disclosure/):
+                a heading holding a button that says whether it is expanded,
+                so a screen reader user can move between them by heading and
+                hear each one's state. Several can be open at once, so a
+                reviewer can read the guidance while writing a review (NN/g,
+                "Accordions on Desktop", https://www.nngroup.com/articles/accordions-on-desktop/,
+                paraphrased: let people open several sections at a time).
+                Rejected: a row of buttons with one drawer, the tabs
+                pattern, which shows one section at a time and makes
+                comparing two a back-and-forth.
+
+                Manual review starts open, the others closed (the
+                developer's choice, 2026-11-27): reviewing the element is
+                the main task here, and the review was in view before. Each
+                stays as the reader left it while they step between
+                elements or a section briefly has nothing to show (the
+                state is the inspector's, not the section's).
+
+                Above the copy, under the View bar, so all of it is about
+                the element the stepper is on and follows Previous / Next
+                (W3C COGA, "Making Content Usable", paraphrased: keep related
+                content together; https://www.w3.org/TR/coga-usable/).
+                Heading level 2: this sits straight under the page's h1 (SC
+                1.3.1 Info and Relationships, Level A).
+
+                The section names are the developer's (2026-11-27), added to
+                docs/plain-language.md. "Scan evidence" was "Evidence from
+                the scan", a closed section under the copy, and its count
+                ("9 occurrences") follows its name rather than sitting at
+                the far end of the row, apart from it. Issue guidance is
+                the same guidance as the issue type page's dialog, here in
+                the page, not a dialog, so it can stay open beside the
+                copy. The AI suggestion and the review shared one row
+                (suggestion two thirds, review one third) from 2026-11-11
+                until this stack replaced it. Element information is the
+                facts table removed on 2026-11-10 and asked back on
+                2026-11-27 (see components/ElementInformation.tsx). */}
+            {(issueDetail ||
+              evidenceCount > 0 ||
+              (showSuggestion && currentOccurrence) ||
+              showReview ||
+              (showHighlights && highlightedCount > 0 && currentElement)) && (
+              <div className="divide-y divide-border border-b border-border">
+                {issueDetail && (
+                  <Disclosure
+                    id="inspect-guidance"
+                    title="Issue guidance"
+                    className="rounded-none border-0"
+                    {...caret("guidance")}
+                  >
+                    <IssueGuidance detail={issueDetail} />
+                  </Disclosure>
                 )}
-              >
+                {evidenceCount > 0 && (
+                  <Disclosure
+                    id="inspect-evidence"
+                    title="Scan evidence"
+                    meta={`${evidenceCount} occurrence${evidenceCount === 1 ? "" : "s"}`}
+                    metaInline
+                    className="rounded-none border-0"
+                    {...caret("evidence")}
+                  >
+                    <ul className="space-y-2">
+                      {scopedFindings.slice(0, 3).map((f) => (
+                        <li key={f.id} className="text-xs">
+                          {/* The issue type's own name, the words the
+                              Issues table and the header use, not the
+                              check's message (``help``), which named the
+                              same problem in other words ("All page content
+                              should be contained by landmarks" under "Some
+                              content sits outside any page region"; the
+                              developer's report, 2026-11-27). One thing, one
+                              name (W3C COGA, "Making Content Usable"; SC
+                              3.2.4 Consistent Identification, Level AA). The
+                              check's message is the fallback when the page
+                              is not opened for an issue type, and the rule's
+                              ID stays in brackets for developers. */}
+                          <p className="font-semibold text-fg">
+                            {issueDetail?.row.title ?? f.help}
+                            <span className="ml-1 font-normal text-fg-muted">({f.rule_id})</span>
+                          </p>
+                          {/* The code without the locator above it: why, ElementCode
+                              in components/ui.tsx. */}
+                          {f.html_snippet && (
+                            <pre className="mt-1 max-h-24 overflow-auto whitespace-pre-wrap break-all rounded-2xs border border-border bg-surface px-2 py-1 text-2xs leading-relaxed text-fg-muted">
+                              {f.html_snippet}
+                            </pre>
+                          )}
+                        </li>
+                      ))}
+                      {scopedImages.slice(0, Math.max(0, 3 - scopedFindings.length)).map((image) => (
+                        <li key={`image-${image.occurrence_id}`} className="text-xs">
+                          <p className="font-semibold text-fg">
+                            {issueDetail?.row.title ?? "Image with text"}
+                            {image.hidden_in_copy && (
+                              <span className="ml-1 font-normal text-fg-muted">(a backup copy not shown here)</span>
+                            )}
+                          </p>
+                          <p className="mt-0.5 text-fg-muted">{altTextLine(image.alt_text)}</p>
+                          {image.ocr_text && (
+                            <p className="mt-0.5 text-fg-muted">
+                              Text in the image: “{shorten(normalizeWhitespace(image.ocr_text), 160)}”
+                            </p>
+                          )}
+                          {image.locator?.kind !== "svg" && !image.src_url_canonical.startsWith("inline-svg:") && (
+                            <code className="mt-0.5 block overflow-x-auto whitespace-nowrap rounded-2xs border border-border bg-surface px-2 py-1 text-2xs text-fg">
+                              {image.locator?.candidate ?? image.src_url_canonical}
+                            </code>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                    {evidenceCount > 3 && (
+                      <p className="mt-1 text-2xs text-fg-muted">
+                        + {evidenceCount - 3} more occurrence{evidenceCount - 3 === 1 ? "" : "s"} in this page state.
+                      </p>
+                    )}
+                  </Disclosure>
+                )}
+                {/* The suggestion needs only the occurrence, so it must not
+                    wait for, or vanish with, the saved copy; keyed on the
+                    occurrence so stepping never shows the last element's
+                    suggestion. */}
                 {showSuggestion && currentOccurrence && (
-                  <div className="min-w-0 lg:col-span-2">
+                  <Disclosure
+                    id="inspect-ai"
+                    title="AI analysis assistant"
+                    className="rounded-none border-0"
+                    {...caret("ai")}
+                  >
                     {suggestions && (
                       <FixSuggestion
                         key={`${currentOccurrence.kind}-${currentOccurrence.id}`}
@@ -1672,25 +1838,27 @@ export default function InspectorRoute() {
                         kind={currentOccurrence.kind}
                         occurrenceId={currentOccurrence.id}
                         availability={suggestions}
-                        headingLevel={2}
+                        headingLevel={3}
                         standalone
                       />
                     )}
                     {suggestionsBlocked && (
                       <SuggestionsBlockedNote status={suggestionsBlocked} className={suggestions ? "mt-3" : ""} />
                     )}
-                  </div>
+                  </Disclosure>
                 )}
+                {/* The review needs the element described, so it waits for
+                    the copy. Its 21rem column keeps the rows ElementReview's
+                    layout is built for ("Mark ... as repeats" under "Review
+                    this element"). */}
                 {showReview && currentElement && (
-                  <div
-                    role="group"
-                    aria-label="The flagged element you are on"
-                    className={cn(
-                      showSuggestion &&
-                        "mt-3 border-t border-border pt-3 lg:mt-0 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0",
-                    )}
+                  <Disclosure
+                    id="inspect-review"
+                    title="Manual review"
+                    className="rounded-none border-0"
+                    {...caret("review")}
                   >
-                    <div className="max-w-[21rem]">
+                    <div role="group" aria-label="The flagged element you are on" className="max-w-[21rem]">
                       <ElementReview
                         key={`${scan}:${page}`}
                         scanId={scan}
@@ -1719,7 +1887,22 @@ export default function InspectorRoute() {
                         onSaved={reviewSaved}
                       />
                     </div>
-                  </div>
+                  </Disclosure>
+                )}
+                {showHighlights && highlightedCount > 0 && currentElement && (
+                  <Disclosure
+                    id="inspect-element"
+                    title="Element information"
+                    className="rounded-none border-0"
+                    {...caret("element")}
+                  >
+                    <ElementInformation
+                      element={currentElement}
+                      target={scopedTargets[highlight?.steps[pageMark]?.targets[0] ?? -1]}
+                      sharedCount={highlight?.steps[pageMark]?.targets.length ?? 0}
+                      boxNote={currentElement.where ? BOX_NOTES[currentElement.where] : null}
+                    />
+                  </Disclosure>
                 )}
               </div>
             )}
@@ -1787,100 +1970,24 @@ export default function InspectorRoute() {
                 style={layout?.width ? { width: layout.width, height: layout.height ?? undefined } : undefined}
               />
             </div>
-            {/* The key to the marks, under the copy it explains (see the
-                status band above the facts for why it is here). */}
-            {!highlightPending && showHighlights && highlightedCount > 0 && (
-              <p className="border-t border-border px-3 py-2 text-xs text-fg-muted">
-                <span className="block max-w-measure">
-                  {/* Where the box is, in words, follows the key whenever it is
-                      not simply around the element: a box that is not drawn,
-                      or one drawn on a list box or around what an element
-                      holds. The facts table used to say it; it was removed
-                      (see the comment above the review panel), and the box's
-                      place alone cannot say why (SC 1.3.3 Sensory
-                      Characteristics, Level A). */}
-                  {highlightedCount > 1
-                    ? `Dashed red outlines mark the ${highlightedCount} ${fileId != null ? `links to ${documentQuote}` : "flagged elements"} on this page. The one you are on has a numbered blue box with a yellow ring, and the rest of the page is dimmed.`
-                    : // Never describe a box that is not drawn (see ``drawsNoBox``).
-                      drawsNoBox(currentElement?.where ?? null)
-                      ? `No box marks the ${fileId != null ? `link to ${documentQuote}` : "flagged element"}.`
-                      : `A blue box with a yellow ring marks the ${fileId != null ? `link to ${documentQuote}` : "flagged element"}.`}
-                  {currentElement?.where && ` Where the box is: ${BOX_NOTES[currentElement.where]}`}
-                </span>
-              </p>
-            )}
-            {/* Outside the status band under the toolbar: this is standing context about
-                the capture, not a status that changes, so it should not be
-                re-announced every time the highlight count updates. It says
-                where the styles come from, because that differs: a copy with
-                saved styles uses them, an older copy loads the site's. The
-                band spans the panel and the text inside it stops at a
-                readable width (max-w-measure, SC 1.4.8 Visual Presentation,
-                Level AAA): capping the band itself cut its top border short. */}
-            <div className="border-t border-border px-3 py-2 text-2xs text-fg-muted">
-              <p className="max-w-measure">
-                {savedStyles
-                  ? "The page code shown here is a copy. Its styles are the ones the scan saved. Its fonts and images load from the live site now, so they can look different from how they looked during the scan."
-                  : "The page code shown here is a copy. Its styles, fonts, and images load from the live site now, so the page can look different from how it looked during the scan."}{" "}
-                The page&rsquo;s own scripts never run here. So if the site would
-                only show {fileId != null ? "a link" : "a flagged element"} with JavaScript, Axcess makes it
-                visible to highlight it.
-              </p>
+            {/* Where the box is, in words, whenever it is not simply around
+                the element: a box that is not drawn, or one drawn on a list
+                box or around what an element holds. The box's place alone
+                cannot say why (SC 1.3.3 Sensory Characteristics, Level A),
+                so this stays in view under the copy. The key to the marks
+                that used to lead this line is in the "?" beside Hide
+                highlights since 2026-11-27, and the note on what the copy
+                is moved to the line over it and the "?" beside the views;
+                "Evidence from the scan" is the Scan evidence section above. */}
+            {/* Always in the page, empty (and taking no room) when there is
+                nothing to say, so tests and a reader find it in one place. */}
+            <div id="inspect-box-note" className="empty:hidden">
+              {!highlightPending && showHighlights && highlightedCount > 0 && currentElement?.where && (
+                <p className="border-t border-border px-3 py-2 text-xs text-fg-muted">
+                  <span className="block max-w-measure">Where the box is: {BOX_NOTES[currentElement.where]}</span>
+                </p>
+              )}
             </div>
-            {/* Below the page and closed: above it, the list pushed the page
-                the reviewer came to see out of view. */}
-            {evidenceCount > 0 && (
-              <Disclosure
-                id="inspect-evidence"
-                title="Evidence from the scan"
-                meta={`${evidenceCount} occurrence${evidenceCount === 1 ? "" : "s"}`}
-                className="rounded-none border-0 border-t"
-              >
-                <ul className="space-y-2">
-                  {scopedFindings.slice(0, 3).map((f) => (
-                    <li key={f.id} className="text-xs">
-                      <p className="font-semibold text-fg">
-                        {f.help}
-                        <span className="ml-1 font-normal text-fg-muted">({f.rule_id})</span>
-                      </p>
-                      {/* The code without the locator above it: why, ElementCode
-                          in components/ui.tsx. */}
-                      {f.html_snippet && (
-                        <pre className="mt-1 max-h-24 overflow-auto whitespace-pre-wrap break-all rounded-2xs border border-border bg-surface px-2 py-1 text-2xs leading-relaxed text-fg-muted">
-                          {f.html_snippet}
-                        </pre>
-                      )}
-                    </li>
-                  ))}
-                  {scopedImages.slice(0, Math.max(0, 3 - scopedFindings.length)).map((image) => (
-                    <li key={`image-${image.occurrence_id}`} className="text-xs">
-                      <p className="font-semibold text-fg">
-                        Image with text
-                        {image.hidden_in_copy && (
-                          <span className="ml-1 font-normal text-fg-muted">(a backup copy not shown here)</span>
-                        )}
-                      </p>
-                      <p className="mt-0.5 text-fg-muted">{altTextLine(image.alt_text)}</p>
-                      {image.ocr_text && (
-                        <p className="mt-0.5 text-fg-muted">
-                          Text in the image: “{shorten(normalizeWhitespace(image.ocr_text), 160)}”
-                        </p>
-                      )}
-                      {image.locator?.kind !== "svg" && !image.src_url_canonical.startsWith("inline-svg:") && (
-                        <code className="mt-0.5 block overflow-x-auto whitespace-nowrap rounded-2xs border border-border bg-surface px-2 py-1 text-2xs text-fg">
-                          {image.locator?.candidate ?? image.src_url_canonical}
-                        </code>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-                {evidenceCount > 3 && (
-                  <p className="mt-1 text-2xs text-fg-muted">
-                    + {evidenceCount - 3} more occurrence{evidenceCount - 3 === 1 ? "" : "s"} in this page state.
-                  </p>
-                )}
-              </Disclosure>
-            )}
           </div>
         ) : (
           <div className="p-6 text-sm text-fg-muted">
@@ -1892,7 +1999,7 @@ export default function InspectorRoute() {
       <div
         id="inspect-panel-dom"
         role="region"
-        aria-label="Page code (DOM)"
+        aria-label="HTML view"
         className="rounded-xs border border-border bg-surface shadow-card"
         hidden={tab !== "dom"}
       >

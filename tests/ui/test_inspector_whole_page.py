@@ -14,7 +14,16 @@ from typing import Any
 
 import pytest
 
-from ._inspector_case import BOX_RECT, DOC, box_note, element_status, open_inspector, seed, settled
+from ._inspector_case import (
+    BOX_RECT,
+    DOC,
+    box_note,
+    element_status,
+    highlight_key,
+    open_inspector,
+    seed,
+    settled,
+)
 
 pytestmark = [pytest.mark.ui, pytest.mark.asyncio(loop_scope="module")]
 
@@ -66,15 +75,12 @@ async def test_the_whole_page_gets_no_box(
         await playwright_async.expect(box_note(page)).to_contain_text(
             "Where the box is: No box, because it is the whole page. Nothing is dimmed."
         )
-        # The line under the saved copy does not describe a box that is not there.
+        # The key to the marks (the "?" beside Hide highlights since
+        # 2026-11-27) does not describe a box that is not there.
         await playwright_async.expect(
             page.get_by_text("A blue box with a yellow ring marks the flagged element.")
         ).to_have_count(0)
-        await playwright_async.expect(
-            page.get_by_text(
-                "No box marks the flagged element. Where the box is: No box, because it "
-                "is the whole page. Nothing is dimmed."
-            )
-        ).to_be_visible()
+        key = await highlight_key(page)
+        await playwright_async.expect(key).to_have_text("No box marks the flagged element.")
     finally:
         await page.context.close()

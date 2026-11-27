@@ -82,6 +82,8 @@ Use the word in the first column, and never the words in the last.
 | check | One way Axcess tests pages. See the check names below. | engine, pipeline, probe, method, detector, source |
 | page state | How a page looked at one moment: "At page load" or "After clicking Menu". | DOM state, interaction state, captured state |
 | saved copy | The copy of a page the scan stored. | capture, stored capture, stored render, loaded DOM |
+| Page view, HTML view | The page inspector's two views of a page: the page as it looks, and its code (DOM). The developer's names (2026-11-27), replacing the tab names "Saved copy" and "Page code (DOM)"; "saved copy" and "page code" stay the general terms. "HTML" is not spelled out, at the developer's choice: an exception to rule 3 and WCAG 3.1.4. | Saved copy (as a tab name), Page code (DOM) (as a tab name), Loaded DOM, Rendered page |
+| Issue guidance, Scan evidence, AI analysis assistant, Manual review, Element information | The page inspector's five closed sections above the page (the developer's names, 2026-11-27). "AI analysis assistant" is the section that holds the AI suggestion; "Manual review" holds the "Checked by a person" choice and Issue notes. | Evidence from the scan (for Scan evidence), Element facts |
 | live page | The page on the real site, as it is now. | live render |
 | WCAG criterion | One numbered WCAG requirement: "WCAG 1.4.3 Contrast (Minimum)". | SC, success criterion (in the interface) |
 | Level A, AA, AAA, Best practice | How strict a requirement is. | BP, Lvl, criterion level |

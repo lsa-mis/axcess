@@ -59,11 +59,11 @@ On the **Issues** tab, select the name of a
 
 | You need | Where it is |
 | --- | --- |
-| The page URL | **Pages with this issue type** lists each page's title and URL. In the inspector, **Open live page** opens the page on the real site. |
-| The element code | In the inspector, **Evidence from the scan**, under the page, lists the first three occurrences with their element code (HTML). A page's **Page details**, linked from its screenshots view, lists every occurrence on that page with its **Element code (HTML)**. The app does not show element locators (CSS selectors); the CSV, JSON and Excel exports still have them, in `target_selector`. |
+| The page URL | **Pages with this issue type** lists each page's title and URL. In the inspector, the address after **Page URL**, under the page title, is a link that opens the page on the real site. |
+| The element code | In the inspector, **Scan evidence**, a closed section above the page, lists the first three occurrences with their element code (HTML). **Element information**, another closed section there, gives the element locator (CSS selector) of the element you are on, with **Copy element locator**. A page's **Page details**, linked from its screenshots view, lists every occurrence on that page with its **Element code (HTML)**. Apart from the inspector's **Element information**, the app does not show element locators (CSS selectors); the CSV, JSON and Excel exports have them, in `target_selector`. |
 | An image with text in it | For an [image of text](glossary.md#image-of-text), the page's **Page details** lists the image under **Images on this page**, with **Open the image** (the image's address), any alt text, and the text read from it. Search your code or content system for that image address. |
 | A screenshot | The **Screenshots** column in **Pages with this issue type** links to a screenshot of each occurrence, when the scan took one. An outline marks where the occurrence was found. For the [form error check](glossary.md#form-error-check), it shows the form twice, **Before** and **After** its button was pressed. If the scan let it send empty forms, **After** shows the page the site sent back. Rule check (Alfa) results in reports made before 23 November 2026 have no screenshots, because Alfa then ran in a separate browser. |
-| The page inspector | Select a page title in **Pages with this issue type**. The inspector opens the page's **Saved copy** (or the **Live page**, if the scan saved no copy) with scripts off, and red outlines mark the flagged elements. The arrow buttons beside the count, such as "Flagged element 2 of 5", step to the previous or next flagged element; the one you are on has a thicker blue outline on yellow. The **Page code (DOM)** tab shows the page code, with the same buttons. |
+| The page inspector | Select a page title in **Pages with this issue type**. The inspector opens the page in **Page view**: the copy the scan saved (or the live page, if the scan saved no copy), with scripts off, and red outlines mark the flagged elements. The arrow buttons beside the count, such as "Flagged element 2 of 5", step to the previous or next flagged element; the one you are on has a thicker blue outline on yellow. **HTML view** shows the page code (DOM), with the same buttons. Above the page, closed sections hold **Issue guidance**, **Scan evidence**, **AI analysis assistant**, **Manual review** (open from the start) and **Element information**. |
 
 **Issue guidance**, at the top right of the page for an issue type, opens
 its guidance in one dialog, with every section open: **What it is**, **How to fix
@@ -91,10 +91,10 @@ To reproduce a problem that appears only after a click:
 
 ### Record your review of an element
 
-Beside the element facts in the inspector, **Your review:** shows what you
+In **Manual review**, above the page in the inspector, **Your review:** shows what you
 decided about the element the arrow buttons are on, as a badge such as **Not
 checked yet**, and the first two lines of its **Issue notes**. It is there when the inspector was opened for one issue (from **Pages
-with this issue**), on the **Saved copy** tab.
+with this issue**), in **Page view**.
 
 1. Step to the element with the arrow buttons.
 2. Select **Review this element**.

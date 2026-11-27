@@ -1087,12 +1087,15 @@ async def test_the_inspector_marks_the_links_to_the_document(
         await expect(group.get_by_role("status")).to_have_text(
             re.compile(r"^Link to this document 1 of 2")
         )
+        # The key to the marks is in the "?" beside Hide highlights.
+        await page.get_by_role("button", name="What do the highlights mean?", exact=True).click()
         await expect(
             page.get_by_text(
                 "Dashed red outlines mark the 2 links to “permit-form.pdf” on this page.",
                 exact=False,
             )
         ).to_be_visible()
+        await page.keyboard.press("Escape")
         # No issue wording: a link to a document flags nothing.
         await expect(page.get_by_text("issue type has no element")).to_have_count(0)
         await expect(page.get_by_text("flagged element", exact=False)).to_have_count(0)

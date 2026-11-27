@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import threading
 import time
 from collections.abc import Iterator
@@ -291,8 +292,10 @@ async def test_page_inspector_suggests_a_fix_for_the_element_you_are_on(
         wait_until="networkidle",
     )
     # Not inside the facts box: that waits for the saved copy to load, and
-    # the suggestion must not wait for, or vanish with, the frame.
+    # the suggestion must not wait for, or vanish with, the frame. It is in
+    # the "AI analysis assistant" section, closed until opened (2026-11-27).
     box = page.locator("#inspect-panel-page")
+    await box.get_by_role("button", name="AI analysis assistant", exact=True).click()
     button = box.get_by_role("button", name="Suggest a fix (AI)")
     await button.wait_for()
     # Before anything is asked, the panel is already the AI suggestion card:
@@ -318,7 +321,7 @@ async def test_page_inspector_suggests_a_fix_for_the_element_you_are_on(
             const el = document.activeElement;
             const card = el && el.closest("section[aria-labelledby]");
             return !!card && el.tabIndex === -1
-              && card.querySelector("h2")?.textContent?.includes("AI suggestion");
+              && card.querySelector("h3")?.textContent?.includes("AI suggestion");
         }""",
         timeout=5000,
     )
@@ -328,44 +331,46 @@ async def test_page_inspector_suggests_a_fix_for_the_element_you_are_on(
     assert not violations, _render_violations(violations)
 
 
-@pytest.mark.parametrize("width", [1280, 400])
-async def test_suggestion_and_review_share_a_row_suggestion_first(
+@pytest.mark.parametrize("width", [1280, 320])
+async def test_analysis_sections_stack_in_order_with_the_review_open(
     suggest_server: tuple[str, int, int, int], new_page: Any, width: int
 ) -> None:
-    """The AI suggestion takes the left two thirds and the review the right
-    third on a wide screen; on a narrow one they stack. The suggestion comes
-    first in the page code too, so focus order follows what is seen
-    (SC 2.4.3, SC 1.3.2). The developer's layout, 2026-11-11."""
+    """The Analysis sections are a stack of closed carets, one under the
+    other in a set order, with Manual review open from the start (the
+    developer's layout, 2026-11-27, replacing the suggestion-and-review row
+    of 2026-11-11). Each says whether it is open (aria-expanded), several
+    can be open at once, and nothing is wider than the screen at 320 px."""
+    from playwright.async_api import expect
+
     base, scan_id, page_id, _ = suggest_server
     page = await new_page(viewport={"width": width, "height": 900})
     await page.goto(
         f"{base}/app/scans/{scan_id}/pages/{page_id}/inspect?issue=axe:aria-input-field-name",
         wait_until="networkidle",
     )
-    suggest = page.get_by_role("button", name="Suggest a fix (AI)")
-    review = page.get_by_role("group", name="The flagged element you are on")
-    await suggest.wait_for()
+    box = page.locator("#inspect-panel-page")
+    review = box.get_by_role("button", name="Manual review", exact=True)
     await review.wait_for()
-    assert await suggest.evaluate(
-        "(el, other) => Boolean("
-        "el.compareDocumentPosition(other) & Node.DOCUMENT_POSITION_FOLLOWING)",
-        await review.element_handle(),
-    )
-    column = suggest.locator("xpath=ancestor::div[contains(@class, 'lg:col-span-2')][1]")
-    left, right = await column.bounding_box(), await review.bounding_box()
-    assert left and right
-    if width >= 1024:
-        # Side by side, the suggestion on the left at about twice the width.
-        assert right["x"] >= left["x"] + left["width"], (left, right)
-        assert abs(right["y"] - left["y"]) < 2, (left, right)
-        assert 1.6 < left["width"] / right["width"] < 2.4, (left, right)
-        # The card starts on the same line as the review (2026-11-18).
-        card = await page.get_by_role("region", name="AI suggestion").bounding_box()
-        assert card and abs(card["y"] - right["y"]) < 2, (card, right)
-    else:
-        # Stacked, suggestion first, nothing wider than the screen.
-        assert right["y"] >= left["y"] + left["height"], (left, right)
-        assert right["x"] + right["width"] <= width and left["x"] + left["width"] <= width
+    names = [
+        "Issue guidance",
+        re.compile(r"^Scan evidence \d+ occurrences?$"),
+        "AI analysis assistant",
+        "Manual review",
+        "Element information",
+    ]
+    buttons = box.locator("h2 > button[aria-expanded]")
+    await expect(buttons).to_have_text(names)
+    await expect(review).to_have_attribute("aria-expanded", "true")
+    await expect(page.get_by_role("group", name="The flagged element you are on")).to_be_visible()
+    for name in ("Issue guidance", "AI analysis assistant", "Element information"):
+        await expect(box.get_by_role("button", name=name, exact=True)).to_have_attribute(
+            "aria-expanded", "false"
+        )
+    # Several open at once: opening the AI section leaves the review open.
+    await box.get_by_role("button", name="AI analysis assistant", exact=True).click()
+    await expect(review).to_have_attribute("aria-expanded", "true")
+    await page.get_by_role("button", name="Suggest a fix (AI)").wait_for()
+    assert await page.evaluate("document.documentElement.scrollWidth") <= width
 
 
 @pytest.mark.parametrize("suggest_server", ["guidance"], indirect=True)

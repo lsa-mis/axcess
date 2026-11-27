@@ -190,7 +190,7 @@ function DoneWhen({ text }: { text: string }) {
 }
 
 /** The guidance sections themselves, all expanded. */
-function IssueGuidance({ detail }: { detail: IssueDetail }) {
+export function IssueGuidance({ detail }: { detail: IssueDetail }) {
   const { row, description, why_matters, fix_steps, verify_manual,
     verify_automated, acceptance, help_url, screen_reader_check } = detail;
   const lane = LANES[row.review_lane] ?? LANES.informational;

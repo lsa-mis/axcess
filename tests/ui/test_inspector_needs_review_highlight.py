@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any
@@ -182,7 +183,7 @@ async def test_an_image_issue_outlines_its_images_and_says_what_it_leaves_out(
                 exact=False,
             )
         ).to_be_visible()
-        await page.get_by_role("button", name="Evidence from the scan").click()
+        await page.get_by_role("button", name=re.compile(r"^Scan evidence ")).click()
         await playwright_async.expect(
             page.get_by_text("Alt text (what a screen reader reads): “Sale ends Friday”").first
         ).to_be_visible()

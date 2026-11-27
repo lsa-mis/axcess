@@ -131,7 +131,7 @@ async def test_the_page_code_view_sets_the_current_element_apart(
     live_server: tuple[str, int],
     new_page: Any,
 ) -> None:
-    """In Page code (DOM), the element you are on reads differently from the rest.
+    """In HTML view, the element you are on reads differently from the rest.
 
     Every flagged block used to share one maize tint, the current one told
     apart only by the colour of a 3px edge.
@@ -145,7 +145,7 @@ async def test_the_page_code_view_sets_the_current_element_apart(
             f"{base}/app/scans/{scan_id}/pages/{page_id}/inspect?issue={ISSUE_KEY}",
             wait_until="networkidle",
         )
-        await page.get_by_role("link", name="Page code (DOM)", exact=True).click()
+        await page.get_by_role("link", name="HTML view", exact=True).click()
         group = page.get_by_role("group", name="Flagged elements", exact=True)
         status = group.get_by_role("status")
         await playwright_async.expect(status).to_have_text("Flagged element 1 of 3")
