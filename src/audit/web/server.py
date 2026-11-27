@@ -23,7 +23,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
 from time import perf_counter
-from typing import TYPE_CHECKING, Annotated, Any, Literal
+from typing import TYPE_CHECKING, Annotated, Any, Literal, cast
 from urllib.parse import urlencode, urlsplit
 
 import httpx
@@ -65,6 +65,7 @@ from audit.ai.state import load_config as load_ai_config
 from audit.ai.state import semantic_model as ai_semantic_model
 from audit.analyzer.alfa import AlfaAnalyzer, AlfaResult, chromium_executable_path
 from audit.analyzer.alfa import availability as alfa_availability
+from audit.analyzer.alfa_worker import AlfaWorker
 from audit.analyzer.axe import AxeAnalyzer
 from audit.analyzer.focus import FocusProbe
 from audit.analyzer.forms import ErrorIdentificationProbe
@@ -109,6 +110,7 @@ from audit.labels import (
     CLICK_THROUGH_STATES,
     click_through_states,
 )
+from audit.linked_files.google_session import GoogleBrowserSession
 from audit.logging import configure_logging, get_logger
 from audit.protected.crypto import DeterministicLocalKms, ProtectedVault
 from audit.protected.models import ProtectedScanStatus, normalize_exact_https_origin
@@ -285,6 +287,10 @@ class LocalLoginScanRequest(BaseModel):
     skip_markup: bool = False
     # The document check, through the signed-in browser (2026-11-16).
     skip_documents: bool = False
+    # "Sign in to Google for Google files" (2026-11-26): after the site
+    # sign-in, a second, separate Google window. Its session is used by the
+    # document check alone, for Google files; needs the document check.
+    google_sign_in: bool = False
     skip_semantic: bool = True
     skip_visual: bool = True
     # Off by default in a sign-in scan, unlike a public one: pressing a
@@ -335,6 +341,13 @@ class LocalLoginScanRequest(BaseModel):
             raise ValueError("seed URL must be HTTPS with no credentials, query, or fragment")
         if not self.skip_vlm and self.skip_ocr:
             raise ValueError("VLM classification requires OCR image analysis")
+        if self.google_sign_in and self.skip_documents:
+            # Only the document check uses the Google sign-in; without it a
+            # Google window would open for nothing.
+            raise ValueError(
+                "Sign in to Google for Google files needs the check of the documents "
+                "the pages link to. Turn that check on, or turn off the Google sign-in."
+            )
         from audit.web.scan_settings import user_agent_refusal
 
         refusal_ua = user_agent_refusal(
@@ -352,7 +365,6 @@ class LocalLoginScanRequest(BaseModel):
                 self.search,
                 seed_url=self.seed_url,
                 whole_host=self.whole_host,
-                engine=self.scan_engine,
             )
             if refusal:
                 raise ValueError(refusal)
@@ -385,6 +397,11 @@ class _LocalLoginRun:
     error: str | None = None
     browser_backgrounded: bool = False
     task: asyncio.Task[Any] | None = None
+    # "Sign in to Google for Google files" (2026-11-26): the Google
+    # sign-in, a browser of its own, handed to the document check only
+    # (``run_crawl(google_files=...)``), never to ``session`` or the page
+    # checks. None without the switch.
+    google: GoogleBrowserSession | None = None
 
 
 # A sign-in ID as ``SignInRegistry`` issues it (``secrets.token_urlsafe``).
@@ -406,6 +423,16 @@ _SIGN_IN_ENDED_MESSAGE: dict[str, str] = {
 }
 
 
+class SignInGoogleStep(BaseModel):
+    """The Google window of a sign-in scan with "Sign in to Google for Google
+    files" (2026-11-26): its state only. Never session data, no address the
+    browser visited, no account name."""
+
+    status: Literal["opening_browser", "awaiting_authentication", "failed"]
+    window_open: bool = False
+    error: str | None = None
+
+
 class LocalSignInResponse(BaseModel):
     """A sign-in in progress, before any scan exists. Never session data.
 
@@ -424,6 +451,70 @@ class LocalSignInResponse(BaseModel):
     forget_in_seconds: int | None = None
     already_waiting: bool = False
     settings: ScanFormSettings | None = None
+    # The Google step, once "next: sign in to Google" was pressed; None
+    # before that and in a scan without the Google sign-in.
+    google: SignInGoogleStep | None = None
+
+
+# Google sign-in for a public scan's Google files (2026-11-26), before the
+# scan exists. Its words, in one place so the tests can pin them.
+_GOOGLE_NOT_SIGNED_IN = (
+    "Google says you are not signed in yet. Finish signing in in the Google window, then try again."
+)
+# A closed Google window is reopened like a closed site sign-in window
+# (2026-11-26): the same answers as ``api_reopen_local_sign_in``, for Google.
+_GOOGLE_ALREADY_OPEN = "The Google window is already open."
+_GOOGLE_REOPEN_FAILED = (
+    "Axcess could not reopen the Google window. Your Google sign-in is still kept. "
+    "Try again, or start the scan."
+)
+_GOOGLE_OPEN_FAILED = (
+    "Axcess could not open the Google window. Check that Chromium for Playwright is "
+    "installed, then try again."
+)
+_GOOGLE_LOCAL_ONLY = (
+    "Google sign-in works only on the computer that runs Axcess: the Google window opens there."
+)
+# The same, for the Google step of a sign-in scan (2026-11-26), whose cancel
+# button is "Cancel sign-in": it ends the site sign-in and the Google one.
+_SIGN_IN_GOOGLE_FIRST = "Sign in to Google first."
+_SIGN_IN_GOOGLE_OPENING = "Wait for the Google window to open, then sign in to Google."
+_SIGN_IN_GOOGLE_HANDOVER_FAILED = (
+    "Axcess could not move your Google sign-in to the scan. It signed out of Google and "
+    "deleted that browser's data. Your sign-in to the site is still kept. Sign in to "
+    "Google again, then start the scan."
+)
+_SIGN_IN_GOOGLE_NOT_ASKED = (
+    "This scan does not sign in to Google. To check Google files with a Google sign-in, "
+    "cancel this sign-in and turn on Sign in to Google for Google files."
+)
+
+
+class GoogleSignInResponse(BaseModel):
+    """A Google sign-in in progress, before its public scan exists.
+
+    Never session data: no cookie, no address the browser visited, no
+    account name. ``settings`` are the New scan form's own fields, so the
+    form can be refilled.
+    """
+
+    sign_in_id: str
+    status: Literal["opening_browser", "awaiting_authentication", "cancelled", "expired", "failed"]
+    window_open: bool = False
+    error: str | None = None
+    keep_minutes: int = SIGN_IN_KEEP_MINUTES
+    already_waiting: bool = False
+    settings: ScanFormSettings | None = None
+
+
+class CurrentGoogleSignInResponse(BaseModel):
+    """``GET /api/google-sign-ins/current``: the waiting Google sign-in, if any.
+
+    The same answer, for the same reason, as ``CurrentLocalSignInResponse``:
+    New scan returns to a sign-in still waiting after the person left it.
+    """
+
+    sign_in: GoogleSignInResponse | None
 
 
 class CurrentLocalSignInResponse(BaseModel):
@@ -747,25 +838,20 @@ def _search_setup_refusal(
     *,
     seed_url: str,
     whole_host: bool,
-    engine: str,
     static_only: bool = False,
 ) -> str:
     """Return the one setting that makes a configured search unusable.
 
     Each cause has its own fix, and they are not interchangeable: an
-    out-of-scope page URL is corrected in a different box from an engine
-    choice. Returns an empty string when the setup is usable.
+    out-of-scope page URL is corrected in a different box from Fast scan.
+    Returns an empty string when the setup is usable. Alfa alone may search
+    in either scan type since 2026-11-23: it checks the crawler's own tab.
     """
 
     if static_only:
         return (
             "Search-driven pages: unavailable in static-only mode, "
             "because searching needs Axcess' browser."
-        )
-    if engine == "alfa":
-        return (
-            "Search-driven pages: needs axe-core. "
-            "Choose axe-core or both engines, or turn the search off."
         )
     if not search_url_allowed(search, seed_url, whole_host=whole_host):
         return (
@@ -964,6 +1050,16 @@ def create_app(
     )
     app.state.local_sign_ins = sign_ins
     sign_in_watch: dict[str, asyncio.Task[None] | None] = {"task": None}
+    # Google sign-ins for a public scan's Google files (2026-11-26): the same
+    # rules (memory only, one at a time, forgotten 30 minutes after the
+    # window closes), a registry of their own. ``google_session_factory``
+    # lets a test hand in a fake; None makes a real GoogleBrowserSession.
+    google_sign_ins: SignInRegistry[GoogleBrowserSession] = SignInRegistry(
+        keep_for_s=local_sign_in.SIGN_IN_KEEP_SECONDS
+    )
+    app.state.google_sign_ins = google_sign_ins
+    app.state.google_session_factory = None
+    google_watch: dict[str, asyncio.Task[None] | None] = {"task": None}
 
     # Startup sweep: any scan left in 'running' when the server boots is
     # stale by definition, its live asyncio task is gone. Flip those to
@@ -1074,6 +1170,12 @@ def create_app(
         if watcher is not None and not watcher.done():
             watcher.cancel()
         await sign_ins.close_all()
+        # A waiting Google sign-in: signed out, its browser data deleted. A
+        # running scan's is closed by the crawl (_stop_running_crawl).
+        google_watcher = google_watch.get("task")
+        if google_watcher is not None and not google_watcher.done():
+            google_watcher.cancel()
+        await google_sign_ins.close_all()
 
     @app.on_event("shutdown")
     async def _stop_protected_retention_worker() -> None:
@@ -1697,6 +1799,12 @@ def create_app(
             sign_ins.window_opened(pending.id)
         elif not open_now and pending.window_open:
             sign_ins.window_closed(pending.id)
+        # The Google window, when the sign-in has one (2026-11-26).
+        second = pending.second
+        if second is not None and second.status == "awaiting_authentication":
+            google_open = bool(getattr(second.session, "window_open", False))
+            if google_open != second.window_open:
+                sign_ins.second_window_changed(pending.id, google_open)
 
     async def _refresh_sign_in() -> None:
         current = sign_ins.current()
@@ -1716,6 +1824,18 @@ def create_app(
             forget_in_seconds=None if left is None else math.ceil(left),
             already_waiting=already_waiting,
             settings=_sign_in_form_settings(pending.payload),
+            google=_sign_in_google_step(pending),
+        )
+
+    def _sign_in_google_step(
+        pending: PendingSignIn[ManualAuthenticationSession],
+    ) -> SignInGoogleStep | None:
+        """The Google window's state, never its session (2026-11-26)."""
+        second = pending.second
+        if second is None:
+            return None
+        return SignInGoogleStep(
+            status=second.status, window_open=second.window_open, error=second.error
         )
 
     def _ended_sign_in_state(sign_in_id: str, reason: EndedReason) -> LocalSignInResponse:
@@ -1888,14 +2008,19 @@ def create_app(
             # not downloaded (the sign-in scan's egress policy).
             linked_files_enabled=not body.skip_documents,
             documents_signed_in=True,
+            # Google files through a second, separate Google sign-in
+            # (2026-11-26): the document check alone uses it
+            # (``_LocalLoginRun.google``). The request refuses it without
+            # the document check.
+            google_sign_in=body.google_sign_in,
             image_extraction_enabled=not body.skip_ocr,
             axe_enabled=body.scan_engine in {"axe", "both"},
             axe_level=body.axe_level,
             wcag_version=body.wcag_version,
             alfa_enabled=body.scan_engine in {"alfa", "both"},
-            interaction_checks_enabled=(
-                not body.skip_interaction and body.scan_engine in {"axe", "both"}
-            ),
+            # Click-Through runs whichever rule check tools the scan uses;
+            # both check the signed-in tab (2026-11-23).
+            interaction_checks_enabled=not body.skip_interaction,
             keyboard_probe_enabled=not body.skip_keyboard,
             responsive_checks_enabled=not body.skip_responsive,
             focus_checks_enabled=not body.skip_focus,
@@ -1972,6 +2097,87 @@ def create_app(
         await _refresh_sign_in()
         return _sign_in_json(_sign_in_or_ended(sign_in_id))
 
+    async def _open_sign_in_google(
+        pending: PendingSignIn[ManualAuthenticationSession], session: GoogleBrowserSession
+    ) -> None:
+        """Open the sign-in's Google window; a failure keeps the site sign-in."""
+        try:
+            await session.start()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            # The session closed itself (signed out, profile deleted); its
+            # exception is not logged, as for the public Google window.
+            log.warning("web.local_sign_in_google_open_failed")
+            this_task = asyncio.current_task()
+            if this_task in pending.tasks:
+                pending.tasks.remove(this_task)
+            with contextlib.suppress(Exception):
+                await session.close()
+            sign_ins.second_failed(pending.id, _GOOGLE_OPEN_FAILED)
+            return
+        sign_ins.second_opened(pending.id)
+
+    @app.post("/api/local-sign-ins/{sign_in_id}/google", response_model=LocalSignInResponse)
+    async def api_open_local_sign_in_google(request: Request, sign_in_id: str) -> JSONResponse:
+        """ "I'm signed in to the site, next: sign in to Google" (2026-11-26).
+
+        Opens a second, separate Google window, a ``GoogleBrowserSession``
+        with its own Playwright and profile, never a tab of the site's
+        browser, and ties it to this sign-in. Checks nothing about Google and
+        leaves the site's sign-in and window as they are. Only for a sign-in
+        whose settings have "Sign in to Google for Google files". A second
+        press while a Google window opens or waits gives back the same
+        state; after a failed one it opens a new window.
+        """
+
+        _require_local_login_request(request, mutation=True)
+        await _refresh_sign_in()
+        pending = _waiting_sign_in_or_error(sign_in_id)
+        config: CrawlConfig = pending.payload
+        if not config.google_sign_in:
+            raise HTTPException(status_code=409, detail=_SIGN_IN_GOOGLE_NOT_ASKED)
+        if pending.status != "awaiting_authentication":
+            raise HTTPException(
+                status_code=409,
+                detail="Wait for the sign-in window to open, and sign in to the site first.",
+            )
+        if pending.second is not None and pending.second.status != "failed":
+            return _sign_in_json(_sign_in_state(pending))
+        session = _google_session_factory()
+        sign_ins.attach_second(pending.id, session)
+        pending_id = pending.id
+        session.on_window_change(
+            lambda is_open: sign_ins.second_window_changed(pending_id, is_open)
+        )
+        pending.tasks.append(asyncio.create_task(_open_sign_in_google(pending, session)))
+        return _sign_in_json(_sign_in_state(pending))
+
+    async def _google_ready_for_scan(
+        pending: PendingSignIn[ManualAuthenticationSession],
+    ) -> JSONResponse | None:
+        """The Google step's checks before a start (2026-11-26); None when ready.
+
+        Refused with the sign-in kept: no Google window yet, still opening,
+        or Google says it is not signed in. A closed Google window is not
+        refused (2026-11-26): the session asks Google through a hidden
+        browser on the same profile. Asks Google nothing about the site
+        sign-in, and the site session nothing about Google.
+        """
+        second = pending.second
+        if second is None or second.status == "failed":
+            return _google_error(_SIGN_IN_GOOGLE_FIRST, 409)
+        if second.status != "awaiting_authentication":
+            return _google_error(_SIGN_IN_GOOGLE_OPENING, 409)
+        session = cast(GoogleBrowserSession, second.session)
+        try:
+            signed_in = await session.is_signed_in()
+        except Exception:
+            signed_in = False
+        if not signed_in:
+            return _google_error(_GOOGLE_NOT_SIGNED_IN, 409)
+        return None
+
     @app.post("/api/local-sign-ins/{sign_in_id}/start")
     async def api_start_local_sign_in_scan(request: Request, sign_in_id: str) -> JSONResponse:
         """ "I'm signed in, start scan": create the scan row and start the crawl.
@@ -1979,6 +2185,14 @@ def create_app(
         The crawl lock is taken here and only here. If another scan is
         running, the start is refused and the sign-in stays waiting, so the
         person can start once that scan finishes.
+
+        With "Sign in to Google for Google files" (2026-11-26) this is "I'm
+        signed in to Google, start scan": refused, with the sign-in kept,
+        until the Google window has opened and Google says it is signed in
+        (asked in a hidden browser when the window is closed). Then the
+        Google window, if open, is closed and its profile reopened headless
+        (``enter_scan_mode``), and the scan starts with the site session as
+        before and the Google session for the document check only.
         """
 
         _require_local_login_request(request, mutation=True)
@@ -1991,33 +2205,91 @@ def create_app(
                     "Wait for the sign-in window to open, and sign in, before you start the scan."
                 ),
             )
-        task = crawl_state.get("task")
-        if isinstance(task, asyncio.Task) and not task.done():
-            scan_id_val = crawl_state.get("scan_id")
-            return JSONResponse(
-                {
-                    "error": (
-                        "A scan is already running. Axcess has kept your sign-in, so you "
-                        "can start this scan when that scan finishes."
-                    ),
-                    "running_scan_id": (int(scan_id_val) if isinstance(scan_id_val, int) else None),
-                },
-                status_code=409,
-                headers={"Cache-Control": "no-store"},
-            )
+
+        def busy() -> JSONResponse | None:
+            task = crawl_state.get("task")
+            if isinstance(task, asyncio.Task) and not task.done():
+                scan_id_val = crawl_state.get("scan_id")
+                return JSONResponse(
+                    {
+                        "error": (
+                            "A scan is already running. Axcess has kept your sign-in, so you "
+                            "can start this scan when that scan finishes."
+                        ),
+                        "running_scan_id": (
+                            int(scan_id_val) if isinstance(scan_id_val, int) else None
+                        ),
+                    },
+                    status_code=409,
+                    headers={"Cache-Control": "no-store"},
+                )
+            return None
+
+        if (running := busy()) is not None:
+            return running
+        with_google = bool(getattr(pending.payload, "google_sign_in", False))
+        google: GoogleBrowserSession | None = None
+        if with_google:
+            if (refused := await _google_ready_for_scan(pending)) is not None:
+                return refused
+            # Asking Google took a moment: the sign-in may have ended, or
+            # another scan started, meanwhile.
+            pending = _waiting_sign_in_or_error(sign_in_id)
+            if (running := busy()) is not None:
+                return running
+            second = pending.second
+            if second is None or second.status != "awaiting_authentication":
+                return _google_error(_SIGN_IN_GOOGLE_FIRST, 409)
+            google = cast(GoogleBrowserSession, second.session)
+            # The Google window closes and its profile reopens headless,
+            # before the site sign-in is handed over: a failure here keeps
+            # the site sign-in waiting, with the Google one closed.
+            try:
+                await google.enter_scan_mode()
+            except Exception:
+                log.warning("web.local_sign_in_google_handover_failed")
+                with contextlib.suppress(Exception):
+                    await google.close()
+                sign_ins.second_failed(pending.id, _SIGN_IN_GOOGLE_HANDOVER_FAILED)
+                return _google_error(_SIGN_IN_GOOGLE_HANDOVER_FAILED, 503)
+            # Ended (cancel, expiry) or beaten to the crawl lock while the
+            # Google window moved: the Google sign-in is not kept.
+            if sign_ins.get(pending.id) is None:
+                with contextlib.suppress(Exception):
+                    await google.close()
+                raise HTTPException(status_code=404, detail="This sign-in has ended.")
+            if (running := busy()) is not None:
+                with contextlib.suppress(Exception):
+                    await google.close()
+                sign_ins.second_failed(pending.id, _SIGN_IN_GOOGLE_HANDOVER_FAILED)
+                return running
         taken = sign_ins.take(pending.id)
         if taken is None:  # pragma: no cover - checked just above, same event-loop turn
+            if google is not None:
+                with contextlib.suppress(Exception):
+                    await google.close()
             raise HTTPException(status_code=404, detail="This sign-in has ended.")
         config: CrawlConfig = taken.payload
-        # A manual-login session is deliberately memory-only and cannot be
-        # resumed after interruption. Always allocate a fresh report and job
-        # frontier even when the auditor scans the same URL again.
-        scan_id = _prepare_scan_row(resolved_db, config)
+        try:
+            # A manual-login session is deliberately memory-only and cannot be
+            # resumed after interruption. Always allocate a fresh report and job
+            # frontier even when the auditor scans the same URL again.
+            scan_id = _prepare_scan_row(resolved_db, config)
+        except BaseException:
+            # With the Google sign-in, a start that fails after the hand-over
+            # ends both sign-ins: nothing will run to close them (Google is
+            # signed out and its data deleted). Without it, as before.
+            if google is not None:
+                with contextlib.suppress(Exception):
+                    await google.close()
+                with contextlib.suppress(Exception):
+                    await taken.session.close()
+            raise
         # Hand the crawler the row rather than letting it search: an
         # unresumable row is invisible to seed-based discovery, including its
         # own run's.
         config = replace(config, scan_id=scan_id)
-        run = _LocalLoginRun(scan_id=scan_id, session=taken.session)
+        run = _LocalLoginRun(scan_id=scan_id, session=taken.session, google=google)
         local_login_runs[scan_id] = run
         crawl_state["scan_id"] = scan_id
         run.task = asyncio.create_task(
@@ -2068,6 +2340,39 @@ def create_app(
             sign_ins.window_opened(pending.id)
         return _sign_in_json(_sign_in_or_ended(pending.id))
 
+    @app.post("/api/local-sign-ins/{sign_in_id}/google/reopen", response_model=LocalSignInResponse)
+    async def api_reopen_local_sign_in_google(request: Request, sign_in_id: str) -> JSONResponse:
+        """Reopen a closed Google window of a sign-in scan (2026-11-26).
+
+        As ``api_reopen_local_sign_in`` does for the site's window: a new
+        visible Google window from the same profile, where the Google
+        sign-in is kept. The sign-in's one clock stops while it opens and
+        restarts if it fails; the site's window is left as it is.
+        """
+
+        _require_local_login_request(request, mutation=True)
+        await _refresh_sign_in()
+        pending = _waiting_sign_in_or_error(sign_in_id)
+        second = pending.second
+        if second is None or second.status == "failed":
+            return _google_error(_SIGN_IN_GOOGLE_FIRST, 409)
+        if second.status != "awaiting_authentication":
+            return _google_error(_SIGN_IN_GOOGLE_OPENING, 409)
+        if second.window_open:
+            return _google_error(_GOOGLE_ALREADY_OPEN, 409)
+        session = cast(GoogleBrowserSession, second.session)
+        sign_ins.reopening(pending.id)
+        try:
+            await session.reopen_window()
+        except Exception:
+            log.warning("web.local_sign_in_google_reopen_failed")
+            if sign_ins.get(pending.id) is not None and pending.second is second:
+                sign_ins.second_reopen_failed(pending.id)
+                return _google_error(_GOOGLE_REOPEN_FAILED, 503)
+        if sign_ins.get(pending.id) is not None and pending.second is second:
+            sign_ins.second_window_changed(pending.id, True)
+        return _sign_in_json(_sign_in_or_ended(pending.id))
+
     @app.post("/api/local-sign-ins/{sign_in_id}/cancel", response_model=LocalSignInResponse)
     async def api_cancel_local_sign_in(request: Request, sign_in_id: str) -> JSONResponse:
         """Close every sign-in window, erase the kept sign-in, record nothing."""
@@ -2116,6 +2421,283 @@ def create_app(
             },
             headers={"Cache-Control": "no-store"},
         )
+
+    # -- Google sign-in for a public scan's Google files (2026-11-26) ------
+    #
+    # Opened by ``POST /api/scans`` with ``google_sign_in`` on: no scan row
+    # until "I'm signed in to Google, start scan". The session and its
+    # safeguards live in audit.linked_files.google_session; these routes
+    # only open, start and end it, and hand it to the crawl, which gives it
+    # to the document check alone.
+
+    def _google_session_factory() -> GoogleBrowserSession:
+        factory = getattr(app.state, "google_session_factory", None)
+        return factory() if factory is not None else GoogleBrowserSession()
+
+    def _sync_google_window(pending: PendingSignIn[GoogleBrowserSession]) -> None:
+        if pending.status != "awaiting_authentication":
+            return
+        open_now = bool(pending.session.window_open)
+        if open_now and not pending.window_open:
+            google_sign_ins.window_opened(pending.id)
+        elif not open_now and pending.window_open:
+            google_sign_ins.window_closed(pending.id)
+
+    async def _refresh_google_sign_in() -> None:
+        current = google_sign_ins.current()
+        if current is not None:
+            _sync_google_window(current)
+        await google_sign_ins.expire_due()
+
+    def _google_state(
+        pending: PendingSignIn[GoogleBrowserSession], *, already_waiting: bool = False
+    ) -> GoogleSignInResponse:
+        return GoogleSignInResponse(
+            sign_in_id=pending.id,
+            status=pending.status,
+            window_open=pending.window_open,
+            already_waiting=already_waiting,
+            settings=_sign_in_form_settings(pending.payload),
+        )
+
+    def _google_json(state: GoogleSignInResponse, status_code: int = 200) -> JSONResponse:
+        return JSONResponse(
+            state.model_dump(mode="json"),
+            status_code=status_code,
+            headers={"Cache-Control": "no-store"},
+        )
+
+    def _google_error(message: str, status_code: int) -> JSONResponse:
+        return JSONResponse(
+            {"error": message}, status_code=status_code, headers={"Cache-Control": "no-store"}
+        )
+
+    def _google_or_ended(sign_in_id: str) -> GoogleSignInResponse:
+        pending = google_sign_ins.get(sign_in_id) if _SIGN_IN_ID_RE.fullmatch(sign_in_id) else None
+        if pending is not None:
+            return _google_state(pending)
+        reason = google_sign_ins.ended_reason(sign_in_id)
+        if reason is not None:
+            return GoogleSignInResponse(
+                sign_in_id=sign_in_id,
+                status=reason,
+                error=_GOOGLE_OPEN_FAILED if reason == "failed" else None,
+            )
+        raise HTTPException(status_code=404, detail="This Google sign-in has ended.")
+
+    def _local_only(request: Request) -> JSONResponse | None:
+        """The Google window opens on the Axcess computer: loopback only."""
+        try:
+            _require_local_login_request(request, mutation=True)
+        except HTTPException:
+            return _google_error(_GOOGLE_LOCAL_ONLY, 403)
+        return None
+
+    def _watch_google_expiry() -> None:
+        task = google_watch.get("task")
+        if task is not None and not task.done():
+            return
+        google_watch["task"] = asyncio.create_task(_google_expiry_loop())
+
+    async def _google_expiry_loop() -> None:
+        while (current := google_sign_ins.current()) is not None:
+            left = google_sign_ins.seconds_left(current.id)
+            await asyncio.sleep(
+                _SIGN_IN_WATCH_S if left is None else min(_SIGN_IN_WATCH_S, max(left, 0.05))
+            )
+            await _refresh_google_sign_in()
+
+    async def _open_google_window(pending: PendingSignIn[GoogleBrowserSession]) -> None:
+        try:
+            await pending.session.start()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            log.warning("web.google_sign_in_open_failed")
+            this_task = asyncio.current_task()
+            if this_task in pending.tasks:
+                pending.tasks.remove(this_task)
+            await google_sign_ins.fail(pending.id)
+            return
+        google_sign_ins.window_opened(pending.id)
+
+    async def _open_google_sign_in(request: Request, config: CrawlConfig) -> JSONResponse:
+        """Open the Google window for a public scan; the scan starts later."""
+        refused = _local_only(request)
+        if refused is not None:
+            return refused
+        await _refresh_google_sign_in()
+        existing = google_sign_ins.current()
+        if existing is not None:
+            _sync_google_window(existing)
+            return JSONResponse(
+                {
+                    "google_sign_in": _google_state(existing, already_waiting=True).model_dump(
+                        mode="json"
+                    )
+                },
+                headers={"Cache-Control": "no-store"},
+            )
+        session = _google_session_factory()
+        try:
+            pending = google_sign_ins.add(site=session.site, session=session, payload=config)
+        except SignInInProgressError as exc:  # pragma: no cover - checked just above
+            return JSONResponse(
+                {
+                    "google_sign_in": _google_state(exc.existing, already_waiting=True).model_dump(
+                        mode="json"
+                    )
+                }
+            )
+        sign_in_id = pending.id
+        session.on_window_change(
+            lambda is_open: (
+                google_sign_ins.window_opened(sign_in_id)
+                if is_open
+                else google_sign_ins.window_closed(sign_in_id)
+            )
+        )
+        pending.tasks.append(asyncio.create_task(_open_google_window(pending)))
+        _watch_google_expiry()
+        return JSONResponse(
+            {"google_sign_in": _google_state(pending).model_dump(mode="json")},
+            status_code=202,
+            headers={"Cache-Control": "no-store"},
+        )
+
+    # Before ``/{sign_in_id}``, which would otherwise take "current" for an id.
+    @app.get("/api/google-sign-ins/current", response_model=CurrentGoogleSignInResponse)
+    async def api_current_google_sign_in(request: Request) -> JSONResponse:
+        """The Google sign-in waiting on this computer, so New scan can return
+        to it, as ``/api/local-sign-ins/current`` does for a site sign-in."""
+        try:
+            _require_local_login_request(request, mutation=False)
+        except HTTPException:
+            return _google_error(_GOOGLE_LOCAL_ONLY, 403)
+        await _refresh_google_sign_in()
+        current = google_sign_ins.current()
+        payload = CurrentGoogleSignInResponse(
+            sign_in=_google_state(current) if current is not None else None
+        )
+        return JSONResponse(payload.model_dump(mode="json"), headers={"Cache-Control": "no-store"})
+
+    @app.get("/api/google-sign-ins/{sign_in_id}", response_model=GoogleSignInResponse)
+    async def api_google_sign_in_status(request: Request, sign_in_id: str) -> JSONResponse:
+        """One Google sign-in's state, or the one word for why it ended."""
+        try:
+            _require_local_login_request(request, mutation=False)
+        except HTTPException:
+            return _google_error(_GOOGLE_LOCAL_ONLY, 403)
+        await _refresh_google_sign_in()
+        return _google_json(_google_or_ended(sign_in_id))
+
+    @app.post("/api/google-sign-ins/{sign_in_id}/start")
+    async def api_start_google_sign_in_scan(request: Request, sign_in_id: str) -> JSONResponse:
+        """ "I'm signed in to Google, start scan": check, hand over, start.
+
+        Refused, with the sign-in kept, while the window is still opening,
+        while another scan runs, and while Google says the browser is not
+        signed in. A closed window is not refused (2026-11-26): Google is
+        asked through a hidden browser on the same profile. Then the window,
+        if open, is closed and the profile reopened headless
+        (``enter_scan_mode``; with the window closed, that hidden browser),
+        and the crawl starts with the session.
+        """
+        refused = _local_only(request)
+        if refused is not None:
+            return refused
+        await _refresh_google_sign_in()
+        pending = google_sign_ins.get(sign_in_id) if _SIGN_IN_ID_RE.fullmatch(sign_in_id) else None
+        if pending is None:
+            raise HTTPException(status_code=404, detail="This Google sign-in has ended.")
+        if pending.status != "awaiting_authentication":
+            return _google_error("Wait for the Google window to open, then sign in.", 409)
+
+        def busy() -> JSONResponse | None:
+            task = crawl_state.get("task")
+            if isinstance(task, asyncio.Task) and not task.done():
+                return _google_error(
+                    "A scan is already running. Axcess has kept your Google sign-in, so you "
+                    "can start this scan when that scan finishes.",
+                    409,
+                )
+            return None
+
+        if (running := busy()) is not None:
+            return running
+        try:
+            signed_in = await pending.session.is_signed_in()
+        except Exception:
+            signed_in = False
+        if not signed_in:
+            return _google_error(_GOOGLE_NOT_SIGNED_IN, 409)
+        if (running := busy()) is not None:
+            return running
+        taken = google_sign_ins.take(pending.id)
+        if taken is None:
+            raise HTTPException(status_code=404, detail="This Google sign-in has ended.")
+        session = taken.session
+        try:
+            await session.enter_scan_mode()
+        except Exception:
+            log.warning("web.google_sign_in_handover_failed")
+            await session.close()
+            return _google_error(
+                "Axcess could not move your Google sign-in to the scan. It signed out of "
+                "Google and deleted that browser's data. Start the scan again.",
+                503,
+            )
+        config: CrawlConfig = taken.payload
+        scan_id = _prepare_scan_row(resolved_db, config)
+        config = replace(config, scan_id=scan_id)
+        crawl_state["scan_id"] = scan_id
+
+        async def _runner() -> None:
+            await _run_background_crawl(resolved_db, config, google_files=session)
+
+        crawl_state["task"] = asyncio.create_task(_runner())
+        return JSONResponse(
+            {"scan_id": scan_id}, status_code=201, headers={"Cache-Control": "no-store"}
+        )
+
+    @app.post("/api/google-sign-ins/{sign_in_id}/reopen", response_model=GoogleSignInResponse)
+    async def api_reopen_google_sign_in(request: Request, sign_in_id: str) -> JSONResponse:
+        """Reopen a closed Google window, as ``api_reopen_local_sign_in`` does
+        for a site's (2026-11-26): the same profile, where the sign-in is
+        kept, on Google's sign-in page. The clock stops while it opens and
+        restarts from zero if that fails; the sign-in is kept either way."""
+        refused = _local_only(request)
+        if refused is not None:
+            return refused
+        await _refresh_google_sign_in()
+        pending = google_sign_ins.get(sign_in_id) if _SIGN_IN_ID_RE.fullmatch(sign_in_id) else None
+        if pending is None:
+            raise HTTPException(status_code=404, detail="This Google sign-in has ended.")
+        if pending.status != "awaiting_authentication":
+            return _google_error("Wait for the Google window to open.", 409)
+        if pending.window_open:
+            return _google_error(_GOOGLE_ALREADY_OPEN, 409)
+        google_sign_ins.reopening(pending.id)
+        try:
+            await pending.session.reopen_window()
+        except Exception:
+            log.warning("web.google_sign_in_reopen_failed")
+            if google_sign_ins.get(pending.id) is not None:
+                google_sign_ins.window_closed(pending.id)
+                return _google_error(_GOOGLE_REOPEN_FAILED, 503)
+        if google_sign_ins.get(pending.id) is not None:
+            google_sign_ins.window_opened(pending.id)
+        return _google_json(_google_or_ended(pending.id))
+
+    @app.post("/api/google-sign-ins/{sign_in_id}/cancel", response_model=GoogleSignInResponse)
+    async def api_cancel_google_sign_in(request: Request, sign_in_id: str) -> JSONResponse:
+        """Sign out at Google, close the window, delete its data, record nothing."""
+        refused = _local_only(request)
+        if refused is not None:
+            return refused
+        if _SIGN_IN_ID_RE.fullmatch(sign_in_id) and await google_sign_ins.cancel(sign_in_id):
+            return _google_json(GoogleSignInResponse(sign_in_id=sign_in_id, status="cancelled"))
+        return _google_json(_google_or_ended(sign_in_id))
 
     @app.post("/api/scans")
     async def api_create_scan(
@@ -2185,7 +2767,6 @@ def create_app(
                 search,
                 seed_url=url,
                 whole_host=bool(body.get("whole_host")),
-                engine=requested_engine,
                 static_only=static_only,
             )
             if refusal:
@@ -2252,6 +2833,8 @@ def create_app(
             # On unless asked off: the Documents tab lists the files the
             # pages link to and checks each PDF.
             "skip_documents": bool(body.get("skip_documents")),
+            # Off unless asked for (2026-11-26): it opens a Google window.
+            "google_sign_in": body.get("google_sign_in") is True,
             "skip_visual": bool(body.get("skip_visual")),
             # Off unless asked for: an older client that sends nothing never
             # starts the form error check, which presses submit buttons.
@@ -2269,6 +2852,10 @@ def create_app(
             "user_agent": body.get("user_agent"),
         }
         config = _build_crawl_config(form, settings)
+        if config.google_sign_in:
+            # No scan yet: the Google window opens first, and the scan starts
+            # from "I'm signed in to Google, start scan".
+            return await _open_google_sign_in(request, config)
         # Always a new report (audit.web.continuing), handed to the crawler
         # by ID so it never goes looking for an older one to continue.
         scan_id = _prepare_scan_row(resolved_db, config)
@@ -2325,6 +2912,9 @@ def create_app(
             # The stored seed, not the snapshot's copy with any user:password@
             # removed: the report goes on under its own address.
             form["url"] = str(scan["seed_url"])
+            # The Google sign-in ended (signed out, deleted) with the scan
+            # it was for; a continued scan checks Google files without it.
+            form["google_sign_in"] = False
             config = continuing.with_stored_user_agent(
                 _build_crawl_config(form, settings),
                 scan.get("config_json"),
@@ -4525,12 +5115,11 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
         wcag_version=form.get("wcag_version", DEFAULT_WCAG_VERSION),
         alfa_enabled=scan_engine in {"alfa", "both"},
         # DOM-state discovery operates controls in Axcess' browser and
-        # re-runs axe-core after a control reveals new content. Keep the
-        # stored config honest when either prerequisite is unavailable.
+        # re-runs the rule check tools (axe, Alfa, or both, each in the
+        # crawler's own tab) after a control reveals new content. Keep the
+        # stored config honest when the browser is unavailable.
         interaction_checks_enabled=(
-            not bool(form.get("skip_interaction"))
-            and not bool(form.get("static_only"))
-            and scan_engine in {"axe", "both"}
+            not bool(form.get("skip_interaction")) and not bool(form.get("static_only"))
         ),
         # Per-criterion semantic analyzers (Phase 9+). Opt-out like axe;
         # the wiring to the runner lands in Phase 9.1, for now this
@@ -4542,6 +5131,8 @@ def _build_crawl_config(form: dict[str, Any], settings: Settings) -> CrawlConfig
         focus_checks_enabled=not bool(form.get("skip_focus")),
         markup_checks_enabled=not bool(form.get("skip_markup")),
         linked_files_enabled=not bool(form.get("skip_documents")),
+        # Only with the document check, which alone uses it.
+        google_sign_in=bool(form.get("google_sign_in")) and not bool(form.get("skip_documents")),
         visual_checks_enabled=not bool(form.get("skip_visual")),
         form_error_checks_enabled=not bool(form.get("skip_forms", True)),
         form_send_empty_forms=not bool(form.get("skip_forms", True))
@@ -4579,12 +5170,19 @@ def _prepare_scan_row(db_path: Path, config: CrawlConfig) -> int:
         conn.close()
 
 
-async def _run_background_crawl(db_path: Path, config: CrawlConfig) -> None:
-    """Open a private DB connection and run the crawl. Never raises."""
+async def _run_background_crawl(
+    db_path: Path, config: CrawlConfig, *, google_files: GoogleBrowserSession | None = None
+) -> None:
+    """Open a private DB connection and run the crawl. Never raises.
+
+    ``google_files``: a public scan's Google sign-in, passed to the crawl for
+    the document check, and closed here too (signed out, data deleted) in
+    case the crawl failed before its own cleanup.
+    """
     log.info("web.crawl_start", seed=config.seed_url)
     conn = connect(db_path)
     try:
-        await run_crawl(conn, config)
+        await run_crawl(conn, config, google_files=google_files)
     except Exception as exc:
         # A failure can happen before the durable queue is seeded (for
         # example while starting Playwright or an optional analyzer).  Do not
@@ -4609,6 +5207,9 @@ async def _run_background_crawl(db_path: Path, config: CrawlConfig) -> None:
             record_pages_found(conn, int(row["id"]))
     finally:
         conn.close()
+        if google_files is not None:
+            with contextlib.suppress(Exception):
+                await google_files.close()
 
 
 def _canonical_scan_seed(seed_url: str) -> str:
@@ -4692,6 +5293,7 @@ async def _run_local_login_background(
 
     conn: sqlite3.Connection | None = None
     tab_pool: TabPool | None = None
+    login_alfa: AlfaWorker | None = None
     # Used only for the optional loopback model provider (the AI review and
     # the visual check's vision model); browser_only or the authenticated
     # static fetcher keeps it from fetching protected documents.
@@ -4741,21 +5343,35 @@ async def _run_local_login_background(
         login_axe = (
             AxeAnalyzer.from_bundled(suppress_diagnostics=True) if config.axe_enabled else None
         )
+        # Alfa checks the signed-in tab, as in a public scan: a snapshot at
+        # load and in each state Click-Through or site search opens, checked
+        # by one local worker. Pages read without scripts keep the signed-in
+        # separate capture (authenticated_alfa below).
+        login_alfa = (
+            AlfaWorker(
+                evaluate_timeout_s=config.alfa_timeout_s,
+                chromium_path=await chromium_executable_path(),
+                private=True,
+            )
+            if config.alfa_enabled
+            else None
+        )
         login_interaction: InteractionProbe | None = None
         if config.interaction_checks_enabled:
-            if login_axe is None:
+            if login_axe is None and login_alfa is None:
                 get_logger(__name__).info(
                     "interaction.unavailable",
-                    reason="axe_engine_not_selected",
+                    reason="no_rule_check_tool",
                     hint=(
-                        f"{CLICK_THROUGH} re-runs axe on each state a control "
-                        "reveals. Choose an engine that includes axe-core to "
-                        f"test {CLICK_THROUGH_STATES}."
+                        f"{CLICK_THROUGH} runs the rule check tools on each state a "
+                        f"control reveals. Choose axe, Alfa or both to test "
+                        f"{CLICK_THROUGH_STATES}."
                     ),
                 )
             else:
                 login_interaction = InteractionProbe(
                     axe=login_axe,
+                    alfa=login_alfa,
                     level=config.axe_level,  # type: ignore[arg-type]
                     version=config.wcag_version,
                     max_clicks=config.interaction_max_clicks,
@@ -4817,7 +5433,8 @@ async def _run_local_login_background(
             # does and has to be handed the value explicitly.
             capture_screenshots=config.capture_screenshots,
             shared_pages=scan_pages,
-            search_explorer=build_search_explorer(config, login_axe),
+            search_explorer=build_search_explorer(config, login_axe, login_alfa),
+            alfa_worker=login_alfa,
         )
         tab_pool = fetcher.tab_pool
         run.status = "scanning"
@@ -4856,6 +5473,10 @@ async def _run_local_login_background(
                 if config.linked_files_enabled
                 else None
             ),
+            # "Sign in to Google for Google files" (2026-11-26): the Google
+            # sign-in, a browser of its own, for the document check's Google
+            # files only. None without the switch. The crawl closes it.
+            google_files=run.google,
         )
         run.status, run.error = _local_login_completion(summary)
         # run_crawl historically records an exhausted queue as completed even
@@ -4864,7 +5485,7 @@ async def _run_local_login_background(
         # Override the row so the UI explains the failure instead of opening a
         # misleading empty report.
         if run.status != summary.status:
-            _finish_local_login_scan(db_path, run.scan_id, run.status)
+            _finish_local_login_scan(db_path, run.scan_id, run.status, run.error)
     except asyncio.CancelledError:
         run.status = "interrupted"
         _finish_local_login_scan(db_path, run.scan_id, "interrupted")
@@ -4877,9 +5498,16 @@ async def _run_local_login_background(
             "The local login scan could not continue. Check the approved sign-in "
             "origins and make sure Playwright Chromium is installed."
         )
-        _finish_local_login_scan(db_path, run.scan_id, "failed")
+        _finish_local_login_scan(db_path, run.scan_id, "failed", run.error)
         log.warning("web.local_login_scan_failed", scan_id=run.scan_id)
     finally:
+        # The Google sign-in, if any, however the scan ended: signed out at
+        # Google and its data deleted. First, so nothing below can skip it;
+        # the crawl has usually done it already (``close`` runs once and
+        # never raises).
+        if run.google is not None:
+            with contextlib.suppress(Exception):
+                await run.google.close()
         if vision_client is not None and vision_client is not local_client:
             await vision_client.aclose()
         await local_client.aclose()
@@ -4887,6 +5515,9 @@ async def _run_local_login_background(
             conn.close()
         if tab_pool is not None and tab_pool.fell_back:
             _record_scan_note(db_path, run.scan_id, tab_fallback_note(tab_pool.size))
+        if login_alfa is not None:
+            with contextlib.suppress(Exception):
+                await login_alfa.close()
         await run.session.close()
 
 
@@ -5043,15 +5674,33 @@ def _local_login_ollama_url(value: str) -> str | None:
     return parsed._replace(netloc=authority, path="").geturl()
 
 
-def _finish_local_login_scan(db_path: Path, scan_id: int, status: str) -> None:
-    """Finish a local-login row without retaining target/browser diagnostics."""
+def _finish_local_login_scan(
+    db_path: Path, scan_id: int, status: str, reason: str | None = None
+) -> None:
+    """Finish a local-login row without retaining target/browser diagnostics.
+
+    ``reason`` is one of Axcess's own sentences for why the scan failed
+    (``_local_login_completion``, or the fixed text when the browser could
+    not continue), never site content, an address or an exception. Saved as
+    the scan's ``failure_reason`` so the scan's own page says it, as for any
+    scan, now that New scan opens that page as soon as a sign-in scan starts
+    (2026-11-26). Until then it lived only in memory, for New scan's
+    in-between panel, and was lost when Axcess restarted.
+    """
 
     conn = connect(db_path)
     try:
-        conn.execute(
-            "UPDATE scans SET status = ?, finished_at = CURRENT_TIMESTAMP WHERE id = ?",
-            (status, scan_id),
-        )
+        if reason:
+            conn.execute(
+                "UPDATE scans SET status = ?, failure_reason = ?, "
+                "finished_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (status, reason, scan_id),
+            )
+        else:
+            conn.execute(
+                "UPDATE scans SET status = ?, finished_at = CURRENT_TIMESTAMP WHERE id = ?",
+                (status, scan_id),
+            )
     finally:
         conn.close()
 
@@ -5384,6 +6033,21 @@ def _detect_blocked_scan(
     }
 
 
+def _state_rule_checks(cfg: Mapping[str, Any]) -> str:
+    """Which rule check tools Click-Through ran on each page state, in words.
+
+    Alfa checks page states only when it took its snapshots in the
+    crawler's own tab (``alfa_capture``); before 2026-11-23 it never did.
+    """
+    axe = cfg.get("axe_enabled", True) is not False
+    alfa = bool(cfg.get("alfa_enabled")) and cfg.get("alfa_capture") == "crawler_tab"
+    if axe and alfa:
+        return "the rule checks (axe and Alfa)"
+    if alfa:
+        return "the rule check (Alfa)"
+    return "the rule check (axe)"
+
+
 def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[str, Any]]:
     """Describe configured methods and the evidence that they actually ran.
 
@@ -5556,8 +6220,8 @@ def _methods_used(scan: dict[str, Any], coverage: dict[str, int]) -> list[dict[s
             "coverage_known": interaction_pages > 0
             or int(cfg.get("interaction_coverage_version") or 0) >= 1,
             "description": (
-                "Opens menus, tabs and dialogs, then runs the rule check (axe) "
-                f"on each {CLICK_THROUGH_STATE}."
+                "Opens menus, tabs and dialogs, then runs "
+                f"{_state_rule_checks(cfg)} on each {CLICK_THROUGH_STATE}."
             ),
             # One sentence, as every limit in the report's "What was checked"
             # table; the website's card for this check has the rest (safety

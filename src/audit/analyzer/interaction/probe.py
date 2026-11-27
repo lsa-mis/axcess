@@ -33,7 +33,10 @@ from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from audit.analyzer.axe import AxeAnalyzer, AxeViolation, Level
+from audit import check_log
+from audit.analyzer.alfa import AlfaError
+from audit.analyzer.alfa_states import AlfaPageChecks, AlfaStateCheck
+from audit.analyzer.axe import AxeAnalyzer, AxeError, AxeViolation, Level
 from audit.analyzer.interaction.base import (
     InteractionResult,
     RevealedLink,
@@ -49,6 +52,7 @@ if TYPE_CHECKING:
 
     from playwright.async_api import Frame, Locator, Page
 
+    from audit.analyzer.alfa_worker import AlfaWorker
     from audit.crawler.style_snapshot import StyleSnapshot
 
     #: Takes an element screenshot for a CSS selector, or returns None. Supplied
@@ -370,6 +374,14 @@ DEFAULT_TIMEOUT_S = 120.0
 DEFAULT_MAX_STATE_CAPTURES = 25
 _MAX_CAPTURE_BYTES = 2_000_000
 _MAX_CAPTURE_TOTAL_BYTES = 8_000_000
+# Tentative captures: states axe found nothing new in, kept in case Alfa's
+# background check of the same state does. Alfa's results arrive after the
+# state is closed, so the markup has to be taken while it is open, before
+# anyone knows whether it is needed. The orchestrator keeps only the ones an
+# Alfa occurrence points to and drops the rest. Their own count and byte
+# budget, so they can never crowd out a state axe needs.
+DEFAULT_MAX_TENTATIVE_CAPTURES = 25
+_MAX_TENTATIVE_TOTAL_BYTES = 8_000_000
 _CAPTURE_TIMEOUT_S = 3.0
 # Reading a state's CSS. Usually quick: a site's cross-origin sheets were
 # already fetched for the page as it loaded and are cached for the scan.
@@ -484,6 +496,10 @@ class _Budget:
     captures: dict[str, StateCapture] = field(default_factory=dict)
     #: Running total of compressed capture bytes held for this page.
     capture_bytes: int = 0
+    #: States taken in case Alfa finds something new there (see
+    #: ``DEFAULT_MAX_TENTATIVE_CAPTURES``), and their compressed bytes.
+    tentative: dict[str, StateCapture] = field(default_factory=dict)
+    tentative_bytes: int = 0
     #: ``target_hash`` -> element PNG, taken while the state is still open.
     screenshots: dict[str, bytes] = field(default_factory=dict)
     shot_bytes: int = 0
@@ -491,6 +507,12 @@ class _Budget:
     #: save styles. Held here rather than on the probe: the probe is shared
     #: by every worker, and this belongs to one page's fetch.
     capture_styles: StylesFn | None = None
+    #: This page's pending Alfa checks; each new state adds one. ``None``
+    #: when the scan does not run Alfa in the crawler's tab.
+    alfa_checks: AlfaPageChecks | None = None
+    #: Run axe in each state. False when there is no axe, or when axe failed
+    #: on the loaded page and there is no baseline to compare states with.
+    use_axe: bool = True
     #: Consecutive clicks per shape that changed nothing. A date grid answers
     #: every cell the same way, so once a few have done nothing the rest will
     #: too, and the page's remaining budget is better spent elsewhere. Reset
@@ -530,14 +552,20 @@ def _timing_ms(budget: _Budget, total_s: float) -> dict[str, int]:
 
 @dataclass
 class InteractionProbe:
-    """Re-runs ``axe`` against DOM states reached by operating controls.
+    """Re-runs the rule checks against DOM states reached by operating controls.
 
     Construct one per crawl and reuse it across pages: it holds no per-page
     state, and the :class:`AxeAnalyzer` it wraps is the same instance the
     load-state pass uses, so axe is injected once per page either way.
+
+    ``axe`` and ``alfa`` are the two rule check tools; either may be absent
+    (the scan's choice), not both. Axe runs inline in each state. Alfa only
+    takes a snapshot of the state, and checks it in the background
+    (:meth:`AlfaWorker.submit`), so a state costs the tab about 0.1-0.6 s
+    more, not the 1.5 s Alfa's rules take.
     """
 
-    axe: AxeAnalyzer
+    axe: AxeAnalyzer | None
     level: Level = "AA"
     # The WCAG version ``level`` is read against; the scan's own choice.
     version: WcagVersion = LEGACY_WCAG_VERSION
@@ -576,12 +604,15 @@ class InteractionProbe:
     # behaviour exactly as it was.
     capture_states: bool = True
     max_state_captures: int = DEFAULT_MAX_STATE_CAPTURES
+    max_tentative_captures: int = DEFAULT_MAX_TENTATIVE_CAPTURES
     # How many same-shaped controls may change nothing before the rest of that
     # shape is left alone. Far below ``max_repeated``: proving a date grid
     # inert takes three clicks, not twenty.
     max_inert_repeats: int = DEFAULT_MAX_INERT_REPEATS
     min_inert_population: int = DEFAULT_MIN_INERT_POPULATION
     max_state_shots: int = DEFAULT_MAX_STATE_SHOTS
+    # The scan-long Alfa worker, when the scan runs Alfa in the crawler's tab.
+    alfa: AlfaWorker | None = None
 
     async def run(
         self,
@@ -590,6 +621,8 @@ class InteractionProbe:
         baseline: Sequence[AxeViolation] = (),
         capture_screenshot: ShotFn | None = None,
         capture_styles: StylesFn | None = None,
+        alfa_checks: AlfaPageChecks | None = None,
+        use_axe: bool = True,
     ) -> InteractionResult:
         """Return violations reachable only by operating the page.
 
@@ -598,14 +631,24 @@ class InteractionProbe:
         seen set and never reported again no matter how many states it
         survives into. Passing nothing is allowed but means the first
         revealed state re-reports the whole page.
+
+        ``alfa_checks`` is this page's pending Alfa checks, holding the load
+        check that is Alfa's baseline. Each new state adds an Alfa check to
+        it; ``alfa_states.settle`` later keeps what each state revealed.
+
+        ``use_axe`` is False when axe failed on the loaded page: without its
+        baseline every state would look new, so states get no axe check.
         """
         budget = _Budget(
             remaining=self.max_clicks,
             seen_hashes={v.target_hash for v in baseline},
             capture_styles=capture_styles,
+            alfa_checks=alfa_checks if self.alfa is not None else None,
+            use_axe=use_axe and self.axe is not None,
         )
         found: list[RevealedViolation] = []
         evaluated = False
+        stopped_by = ""
         started = time.perf_counter()
         try:
             async with exploration_guard(page, budget.urls, self.blocked_labels):
@@ -628,7 +671,10 @@ class InteractionProbe:
         except Exception as exc:
             # A probe is evidence-gathering, not a gate. Whatever we managed
             # to reach before something went wrong is still valid evidence.
-            log.warning("interaction.aborted", error_type=type(exc).__name__)
+            # The orchestrator logs why the page's sweep stopped early
+            # (``stopped_by``), with the page address the probe does not
+            # have and the scan's privacy setting.
+            stopped_by = type(exc).__name__
         if budget.remaining <= 0:
             budget.limits.add("clicks")
         log.info(
@@ -655,6 +701,7 @@ class InteractionProbe:
             states=budget.states_found,
             screenshots=dict(budget.screenshots),
             captures=tuple(budget.captures.values()),
+            tentative_captures=tuple(budget.tentative.values()),
             urls=tuple(sorted(budget.urls)),
             revealed_links=tuple(budget.revealed_links.values()),
             evaluated=evaluated,
@@ -667,6 +714,7 @@ class InteractionProbe:
             dialogs_opened=budget.dialogs_opened,
             dialogs_stuck=budget.dialogs_stuck,
             detail=budget.detail,
+            stopped_by=stopped_by,
         )
 
     async def _explore_frames(
@@ -703,12 +751,13 @@ class InteractionProbe:
                 # With "needs review" results, as every re-run below asks for
                 # them: a frame's load-time cant_tell rows would otherwise all
                 # look revealed by the first click inside it.
-                budget.seen_hashes.update(
-                    v.target_hash
-                    for v in await self.axe.run(
-                        frame, self.level, self.version, include_incomplete=True
+                if self.axe is not None and budget.use_axe:
+                    budget.seen_hashes.update(
+                        v.target_hash
+                        for v in await self.axe.run(
+                            frame, self.level, self.version, include_incomplete=True
+                        )
                     )
-                )
             except Exception as exc:
                 log.debug("interaction.frame_skipped", error_type=type(exc).__name__)
                 continue
@@ -1053,6 +1102,21 @@ class InteractionProbe:
                         label=label,
                         path_labels=tuple(_control_label(item) for item in (*path, control)),
                     )
+            elif budget.alfa_checks is not None and any(
+                check.state_key == state_key for check in budget.alfa_checks.states
+            ):
+                # Alfa is checking this state in the background and may find
+                # something new in it after it closes: keep its markup now,
+                # tentatively. The orchestrator keeps it only if Alfa does.
+                with _timed(budget, "save_state"):
+                    await self._capture_state(
+                        page,
+                        budget,
+                        state_key=state_key,
+                        label=label,
+                        path_labels=tuple(_control_label(item) for item in (*path, control)),
+                        tentative=True,
+                    )
             log.info(
                 "interaction.clicked",
                 control=label[:60],
@@ -1187,11 +1251,24 @@ class InteractionProbe:
         label: str,
         state_key: str = "",
     ) -> None:
-        """Run axe on the current state and keep only unseen violations."""
+        """Check the current state: axe keeps only unseen violations, Alfa
+        takes a snapshot to check in the background."""
+        await self._submit_alfa(page, budget, label, state_key)
+        if self.axe is None or not budget.use_axe:
+            return
         try:
             violations = await self.axe.run(page, self.level, self.version, include_incomplete=True)
+        except AxeError as exc:
+            # No address: the probe does not know whether this is a sign-in
+            # scan. The reason itself follows the analyzer's privacy setting.
+            check_log.not_run("axe", scope="page_state", part=label[:80], reason=str(exc))
+            return
         except Exception as exc:
-            log.debug("interaction.axe_failed", error_type=type(exc).__name__)
+            check_log.not_run(
+                "axe",
+                scope="page_state",
+                reason=f"Axe failed in a page state a click opened ({type(exc).__name__}).",
+            )
             return
         for violation in violations:
             digest = violation.target_hash
@@ -1201,6 +1278,23 @@ class InteractionProbe:
             found.append(
                 RevealedViolation(violation=violation, revealed_by=label, state_key=state_key)
             )
+
+    async def _submit_alfa(self, page: Frame, budget: _Budget, label: str, state_key: str) -> None:
+        """Snapshot the whole page in this state for Alfa, like the load check.
+
+        Always the top document, even for a state inside a frame: the load
+        check that serves as Alfa's baseline is of the top document too, so
+        the two compare like for like.
+        """
+        checks = budget.alfa_checks
+        if checks is None or self.alfa is None:
+            return
+        try:
+            task = await self.alfa.submit(page.page, level=self.level, version=self.version)
+        except AlfaError as exc:
+            checks.state_errors.append(str(exc))
+            return
+        checks.states.append(AlfaStateCheck(task=task, revealed_by=label, state_key=state_key))
 
     async def _capture_shots(
         self,
@@ -1259,8 +1353,12 @@ class InteractionProbe:
         state_key: str,
         label: str,
         path_labels: tuple[str, ...],
+        tentative: bool = False,
     ) -> None:
         """Store this state's markup, or store nothing. Never raises.
+
+        ``tentative`` stores it in ``budget.tentative`` instead, under its own
+        limits, for a state only Alfa may turn out to need.
 
         The caller sits inside ``_operate``'s ``try``, whose ``except`` covers
         the nested sweep, the dialog-dismissal loop and the Escape unwind. A
@@ -1281,7 +1379,13 @@ class InteractionProbe:
         # inspector, and a frame's document is not the page.
         if not self.capture_states or state_key in budget.captures or page.parent_frame:
             return
-        if len(budget.captures) >= self.max_state_captures:
+        if tentative:
+            if (
+                state_key in budget.tentative
+                or len(budget.tentative) >= self.max_tentative_captures
+            ):
+                return
+        elif len(budget.captures) >= self.max_state_captures:
             budget.limits.add("state_captures")
             return
         try:
@@ -1300,7 +1404,10 @@ class InteractionProbe:
                 error_type=type(exc).__name__,
             )
             return
-        if budget.capture_bytes + len(blob) > _MAX_CAPTURE_TOTAL_BYTES:
+        if tentative:
+            if budget.tentative_bytes + len(blob) > _MAX_TENTATIVE_TOTAL_BYTES:
+                return
+        elif budget.capture_bytes + len(blob) > _MAX_CAPTURE_TOTAL_BYTES:
             budget.limits.add("state_captures")
             return
         # The state's CSS, read while it is still open. Its own timeout, and
@@ -1313,14 +1420,19 @@ class InteractionProbe:
                     styles = await budget.capture_styles(page.page)
             except Exception as exc:
                 log.debug("interaction.styles_failed", error_type=type(exc).__name__)
-        budget.capture_bytes += len(blob)
-        budget.captures[state_key] = StateCapture(
+        capture = StateCapture(
             state_key=state_key,
             revealed_by=label,
             path_labels=path_labels,
             html=blob,
             styles=styles,
         )
+        if tentative:
+            budget.tentative_bytes += len(blob)
+            budget.tentative[state_key] = capture
+        else:
+            budget.capture_bytes += len(blob)
+            budget.captures[state_key] = capture
 
     async def _restore(self, page: Frame, pinned: str) -> None:
         """Return the browser to the page we are probing.

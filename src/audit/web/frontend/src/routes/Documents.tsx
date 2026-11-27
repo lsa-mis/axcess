@@ -12,6 +12,10 @@ import {
   ResultTag,
   SiteCell,
   StatusColumnHelp,
+  CREATED_COLUMN,
+  CREATED_HELP,
+  CreatedColumnHelp,
+  CreatedDate,
   TypeCell,
   documentPath,
   hostOf,
@@ -41,6 +45,7 @@ import {
   Table,
   TableBar,
   TableEmpty,
+  TableSearch,
   TableHead,
   TableRegion,
   TableStatus,
@@ -55,6 +60,8 @@ import {
 } from "../components/table/sort";
 import { Card, EmptyState, LinkButton, withReturnTrail } from "../components/ui";
 import { useScanQuery } from "../hooks/useScanQuery";
+import { dayKey } from "../lib/days";
+import { dateRangeValue, parseDateRange } from "../components/table/FilterDate";
 import { liveSearchParams } from "../lib/liveSearchParams";
 import {
   LINKED_FILE_KIND_LABEL,
@@ -122,32 +129,116 @@ function parseList(raw: string | null, allowed: readonly string[]): string {
   return allowed.filter((value) => on.has(value)).join(",");
 }
 
+/**
+ * The words a file is found by in the search box: its name as the Document
+ * column shows it and its address (URL), with ``%20`` and the like read as
+ * the characters they stand for, so "annual report" finds
+ * ``Annual%20Report.pdf``. Lower case, so the search ignores case.
+ */
+function searchText(row: LinkedFileRow): string {
+  let address = row.url;
+  try {
+    address = decodeURI(row.url);
+  } catch {
+    // A malformed escape: search the address as written.
+  }
+  return `${row.name}\n${row.url}\n${address}`.toLocaleLowerCase();
+}
+
 function filterFiles(
   files: readonly LinkedFileRow[],
-  { status, kind, hosted }: { status: string; kind: string; hosted: string },
+  {
+    status,
+    kind,
+    hosted,
+    created,
+    q,
+  }: { status: string; kind: string; hosted: string; created: string; q: string },
 ): LinkedFileRow[] {
+  const term = q.trim().toLocaleLowerCase();
   const statuses = new Set(splitFilter(status));
   const kinds = new Set(splitFilter(kind));
   const hosts = new Set(splitFilter(hosted));
+  const { from, to } = parseDateRange(created);
   return files.filter(
     (row) =>
       (!statuses.size || statuses.has(row.status)) &&
       (!kinds.size || kinds.has(kindOf(row))) &&
-      (!hosts.size || hosts.has(hostedOf(row))),
+      (!hosts.size || hosts.has(hostedOf(row))) &&
+      keptByDate(dayKey(row.created_at), from, to) &&
+      (!term || searchText(row).includes(term)),
   );
 }
+
+/**
+ * Whether a file's creation day is in the From and To days, both included.
+ * The day is as the column shows it ("YYYY-MM-DD", in the file's own time
+ * zone), so a file shown as April 24 is kept by a range that starts or ends
+ * on April 24. A file with no creation day always stays (CREATED_FILTER_HINT).
+ */
+function keptByDate(day: string | null, from: string, to: string): boolean {
+  if (!day) return true;
+  return (!from || day >= from) && (!to || day <= to);
+}
+
+/**
+ * The Creation date filter (the developer's request, 2026-11-25: narrow the
+ * list by when files were made, to leave out old ones that may be archived
+ * before a set day).
+ *
+ * From and To days, each typed in Month, Day and Year boxes, either one
+ * optional: a `dateRange` group in the same Filter menu as Type and Hosted
+ * on (FilterMenu, FilterDate, where the boxes' pattern and sources are).
+ * From alone keeps files made on or after it, To alone on or before it,
+ * both between them; both days are included. Named "Creation date", as its
+ * column is, like every group here.
+ *
+ * Researched 2026-11-25 (the developer: "look at how others design a
+ * comprehensive date filter"). From and To with either end open is what
+ * GOV.UK's site search does ("Updated after" and "Updated before", each in
+ * day, month and year boxes, https://www.gov.uk/search/all), what the U.S.
+ * Web Design System's date range picker does (a start and an end field,
+ * https://designsystem.digital.gov/components/date-range-picker/), and what
+ * GitHub's search syntax does (``2016-04-30..2016-07-04``, ``*`` for an open
+ * end). The URL keeps it the same way, ``?created=2018-07-17..``. Rejected:
+ * - a comparison menu with a date, as Airtable and Notion have ("is
+ *   before", "is on or after", "is within"): the same results as From and
+ *   To, behind one more control to understand;
+ * - ready-made ranges ("Last 7 days", "This year"), as analytics
+ *   dashboards have: they suit recent activity, and this filter is for a
+ *   fixed cut-off day, such as a policy date;
+ * - a calendar pop-up, including the browser's own (`<input type="date">`):
+ *   the GOV.UK Design System advises against date pickers for most dates
+ *   (https://design-system.service.gov.uk/components/date-input/,
+ *   paraphrased), and USWDS lists people typing dates wrongly into its
+ *   picker as a known issue.
+ * Replaced, the same day: one checkbox per year (a cut-off of a whole year;
+ * the developer: "the specific month and date matters"), then a From day
+ * alone (the developer: "you also need to allow inbetween").
+ *
+ * Files with no creation date ("Not known") are never filtered out (the
+ * developer's suggestion): Axcess cannot tell how old they are, so hiding
+ * them could hide a current file that needs fixing (Google Docs and Slides
+ * never carry a date). The group's hint says so, as real text read with the
+ * group, and the "Filtered by" line repeats it. The group is left out when
+ * no file has a date (a report made before the column existed): it could
+ * not change the list.
+ */
+const CREATED_FILTER_HINT =
+  "Files with no creation date (Not known) always stay in the list, because Axcess cannot tell how old they are.";
 
 /**
  * The columns, each sortable, in the table's order. The keys are what
  * ``?sort=`` keeps ("pages_desc"); the labels are what the headers say.
  */
-const SORT_COLUMNS = ["name", "type", "host", "status", "found", "pages"] as const;
+const SORT_COLUMNS = ["name", "type", "host", "created", "status", "found", "pages"] as const;
 type DocumentsColumn = (typeof SORT_COLUMNS)[number];
 type DocumentsSort = Sort<DocumentsColumn>;
 const COLUMN_LABEL: Record<DocumentsColumn, string> = {
   name: "Document",
   type: "Type",
   host: HOSTED_COLUMN,
+  created: CREATED_COLUMN,
   status: RESULT_COLUMN,
   found: "What Axcess found",
   pages: PAGES_COLUMN,
@@ -162,6 +253,7 @@ const SORT_KINDS: Record<DocumentsColumn, SortKind> = {
   name: "text",
   type: "text",
   host: "text",
+  created: "date",
   status: "text",
   found: "number",
   pages: "number",
@@ -176,6 +268,9 @@ function compareFiles(a: LinkedFileRow, b: LinkedFileRow, column: DocumentsColum
       return compareText(LINKED_FILE_TYPE_LABEL[a.file_type], LINKED_FILE_TYPE_LABEL[b.file_type]);
     case "host":
       return compareText(hostOf(a.url) ?? "", hostOf(b.url) ?? "");
+    case "created":
+      // ISO dates sort as text. Files with no date are put last by sortFiles.
+      return compareText(a.created_at ?? "", b.created_at ?? "");
     case "status":
       return STATUS_RANK[a.status] - STATUS_RANK[b.status];
     case "found":
@@ -189,9 +284,16 @@ function compareFiles(a: LinkedFileRow, b: LinkedFileRow, column: DocumentsColum
 function sortFiles(files: LinkedFileRow[], sort: DocumentsSort | null): LinkedFileRow[] {
   if (!sort) return files;
   const sign = sort.direction === "asc" ? 1 : -1;
+  // "Not known" comes last whichever way the dates are sorted: a file with no
+  // date is neither old nor new.
+  const unknownLast = (a: LinkedFileRow, b: LinkedFileRow) =>
+    sort.column === "created" ? Number(!a.created_at) - Number(!b.created_at) : 0;
   return files
     .map((row, index) => ({ row, index }))
-    .sort((a, b) => compareFiles(a.row, b.row, sort.column) * sign || a.index - b.index)
+    .sort(
+      (a, b) =>
+        unknownLast(a.row, b.row) || compareFiles(a.row, b.row, sort.column) * sign || a.index - b.index,
+    )
     .map(({ row }) => row);
 }
 
@@ -265,7 +367,8 @@ const ORDER_WORDS = "Mostly sure first, then Not sure, then Could not check";
  *
  * Every column sorts, and a Filter menu narrows the list by
  * "Accessibility problems?", Type and "Hosted on" (the developer's request,
- * 2026-11-14). Both are Issues', part for part: SortHeader on each column,
+ * 2026-11-14), and a search box finds a file by name or URL (2026-11-25;
+ * see DocumentsToolbar). Both are Issues', part for part: SortHeader on each column,
  * the order kept in ``?sort=`` and the filters in the URL so Back and a
  * shared link bring them back, FilterMenu and ActiveFilters in the bar over
  * the table, and the line over the table that, only while the table is
@@ -315,9 +418,12 @@ export default function DocumentsRoute() {
   const status = parseList(params.get("status"), STATUSES);
   const kind = parseList(params.get("kind"), KIND_GROUPS);
   const hosted = parseList(params.get("hosted"), HOSTED);
+  // A real day or nothing: a mistyped link narrows nothing.
+  const created = dateRangeValue(parseDateRange(params.get("created")));
+  const q = params.get("q") ?? "";
   const rawSort = params.get("sort");
   const sort = useMemo(() => parseSortParam(rawSort, SORT_COLUMNS), [rawSort]);
-  const hasFilter = Boolean(status || kind || hosted);
+  const hasFilter = Boolean(status || kind || hosted || created || q);
 
   const scanQuery = useScanQuery(id);
   // Every file at once (up to MAX_LIMIT on the server), sorted, filtered
@@ -342,11 +448,12 @@ export default function DocumentsRoute() {
   };
   // Every group back to "All" in one update, as on Issues (FilterMenu's
   // onReset): one setParam per group would put back what the first removed.
+  // The search stays, as on Issues: the menu's reset is for the menu.
   const resetFilters = () => {
     setParams(
       () => {
         const next = liveSearchParams();
-        for (const key of ["status", "kind", "hosted", "page"]) next.delete(key);
+        for (const key of ["status", "kind", "hosted", "created", "page"]) next.delete(key);
         return next;
       },
       { replace: true },
@@ -357,10 +464,11 @@ export default function DocumentsRoute() {
 
   const files = filesQuery.data?.files;
   const rows = useMemo(
-    () => sortFiles(filterFiles(files ?? [], { status, kind, hosted }), sort),
-    [files, status, kind, hosted, sort],
+    () => sortFiles(filterFiles(files ?? [], { status, kind, hosted, created, q }), sort),
+    [files, status, kind, hosted, created, q, sort],
   );
-  const paged = usePagedRows(rows, { resetKey: [status, kind, hosted, rawSort ?? ""].join("|") });
+  // A new filter, search or sort starts over at page 1, as on Issues.
+  const paged = usePagedRows(rows, { resetKey: [status, kind, hosted, created, q, rawSort ?? ""].join("|") });
 
   const error = scanQuery.error ?? filesQuery.error;
   if (error) {
@@ -463,13 +571,17 @@ export default function DocumentsRoute() {
                 status={status}
                 kind={kind}
                 hosted={hosted}
+                created={created}
+                q={q}
                 onParam={setParam}
                 onResetFilters={resetFilters}
+                // "Clear filters" under the bar clears everything it lists,
+                // the search included, as on Issues.
                 onClearFilters={() =>
                   setParams(
                     () => {
                       const next = liveSearchParams();
-                      for (const key of ["status", "kind", "hosted", "page"]) next.delete(key);
+                      for (const key of ["status", "kind", "hosted", "created", "q", "page"]) next.delete(key);
                       return next;
                     },
                     { replace: true },
@@ -527,7 +639,11 @@ export default function DocumentsRoute() {
               table.
             </TableEmpty>
           ) : rows.length === 0 ? (
-            <TableEmpty>No documents match these filters. Clear a filter to see more results.</TableEmpty>
+            <TableEmpty>
+              {q
+                ? "No documents match. Clear a filter or shorten your search."
+                : "No documents match these filters. Clear a filter to see more results."}
+            </TableEmpty>
           ) : (
             <TableRegion label="Documents table" regionRef={region}>
               <Table caption={`Documents linked from report #${scan.id}, ${describeSort(sort)}`}>
@@ -541,7 +657,13 @@ export default function DocumentsRoute() {
                         kind={SORT_KINDS[column]}
                         sort={sort}
                         onSort={onSort}
-                        help={column === "status" ? <StatusColumnHelp /> : undefined}
+                        help={
+                          column === "status" ? (
+                            <StatusColumnHelp />
+                          ) : column === "created" ? (
+                            <CreatedColumnHelp />
+                          ) : undefined
+                        }
                         // Sorted by how many problems, shown in words: its
                         // heading sits on the left with its cells
                         // (SortHeader ``align``; the table's side rule).
@@ -583,21 +705,37 @@ export default function DocumentsRoute() {
 }
 
 /**
- * The bar over the table, as Issues' (IssueToolbar): the Filter menu on the
- * left, the pager on the right, and what is filtered written out under both
- * (ActiveFilters). One Filter control for every way the list narrows, each
- * group named as its column is ("Accessibility problems?", "Type", "Hosted
- * on") so the filter and the column read as one thing, with how many files
- * each value has (FilterMenu, the Issues table's own; SC 3.2.4 Consistent
- * Identification, Level AA). No search box: the developer asked for the
- * filter; Issues' search is for long titles and WCAG numbers, and a file
- * name is easy to find on a sorted Document column.
+ * The bar over the table, as Issues' (IssueToolbar): the search and the
+ * Filter menu on the left, the pager on the right, and what narrows the
+ * list written out under both (ActiveFilters). One Filter control for
+ * every way the list narrows. Each group is named as its column is
+ * ("Accessibility problems?", "Type", "Hosted on", "Creation date"), so the
+ * filter and the column read as one thing, with how many files each value
+ * has (FilterMenu, the Issues table's own; SC 3.2.4 Consistent
+ * Identification, Level AA). Creation date is typed days, not counted values
+ * (see keptByDate and the comment after it).
+ *
+ * The search box (the developer's request, 2026-11-25, "like the images tab
+ * and issue tab") is the shared TableSearch, placed, named and worded as on
+ * Issues and Images: "Search documents", first in the bar, the term kept in
+ * ``?q=`` and listed under the bar as "Search: …" so "Clear filters" undoes
+ * it with the rest (SC 3.2.4 Consistent Identification, Level AA). It
+ * finds a file by its name or its address (URL), the two things a reader
+ * knows a file by; the placeholder says so, as the page tables' "Search by
+ * page title or URL" does. It does not overlap the Filter menu: the menu
+ * narrows by fixed values with counts, the search by words the reader
+ * types (one job each; W3C COGA, "Making Content Usable",
+ * https://www.w3.org/TR/coga-usable/). Until this request there was no
+ * search box, on the reasoning that a file name is easy to find on a sorted
+ * Document column; with hundreds of files over many pages it is not.
  */
 function DocumentsToolbar({
   files,
   status,
   kind,
   hosted,
+  created,
+  q,
   onParam,
   onResetFilters,
   onClearFilters,
@@ -607,6 +745,8 @@ function DocumentsToolbar({
   status: string;
   kind: string;
   hosted: string;
+  created: string;
+  q: string;
   onParam: (key: string, value: string) => void;
   onResetFilters: () => void;
   onClearFilters: () => void;
@@ -648,8 +788,29 @@ function DocumentsToolbar({
       })),
     },
   ];
+  if (files.some((row) => dayKey(row.created_at))) {
+    groups.push({
+      key: "created",
+      label: CREATED_COLUMN,
+      value: created,
+      dateRange: true,
+      hint: CREATED_FILTER_HINT,
+      options: [],
+    });
+  }
+  // The days chosen, then that files with no date are still listed.
+  const filtered = activeFilterItems(groups).map((item) =>
+    item.startsWith(`${CREATED_COLUMN}:`) ? `${item}, and files with no date` : item,
+  );
+  if (q) filtered.push(`Search: “${q}”`);
   return (
-    <TableBar pager={pager} footer={<ActiveFilters items={activeFilterItems(groups)} onClear={onClearFilters} />}>
+    <TableBar pager={pager} footer={<ActiveFilters items={filtered} onClear={onClearFilters} />}>
+      <TableSearch
+        label="Search documents"
+        placeholder="Document name or URL"
+        value={q}
+        onChange={(value) => onParam("q", value)}
+      />
       <FilterMenu label="Filter documents" groups={groups} onChange={onParam} onReset={onResetFilters} />
     </TableBar>
   );
@@ -789,6 +950,13 @@ function DocumentsGlossary() {
           }))}
         />
         <GlossaryList
+          heading={`${CREATED_COLUMN}: when the file says it was made`}
+          items={[
+            { key: "date", term: <span className="font-semibold text-fg">A date</span>, help: CREATED_HELP.date },
+            { key: "unknown", term: <span className="text-fg-muted">Not known</span>, help: CREATED_HELP.unknown },
+          ]}
+        />
+        <GlossaryList
           heading="The order: which files to look at first"
           items={[
             {
@@ -821,13 +989,11 @@ function DocumentsGlossary() {
 /**
  * One linked file.
  *
- * The widest columns' minimums (Document 11rem, What Axcess found 12rem)
- * leave room, at 1280px with the sidebar open, for the sort tag a sorted
- * header adds under its name ("high → low" under "Pages it appears on"), so
- * a sorted table still fits without sideways scrolling. At 14rem the table
- * was 30px too wide once sorted by that column. Narrower screens scroll the
- * table in its own region (TableRegion; SC 1.4.10 Reflow, Level AA, allows
- * it for a data table).
+ * The widest columns' minimums: Document 11rem, What Axcess found 12rem.
+ * Until the Creation date column (2026-11-25) they were chosen so a sorted
+ * table fit 1280px with the sidebar open; with it the table is wider there,
+ * and the developer accepted that it scrolls sideways in its own region
+ * (TableRegion; SC 1.4.10 Reflow, Level AA, allows it for a data table).
  */
 function DocumentRow({
   row,
@@ -863,6 +1029,9 @@ function DocumentRow({
       </Cell>
       <Cell className="min-w-[9rem] align-top">
         <SiteCell url={row.url} offSite={row.off_site} />
+      </Cell>
+      <Cell className="whitespace-nowrap align-top">
+        <CreatedDate iso={row.created_at} />
       </Cell>
       <Cell className="whitespace-nowrap align-top">
         <ResultTag status={row.status} />

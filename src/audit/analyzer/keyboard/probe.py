@@ -44,8 +44,9 @@ from __future__ import annotations
 import contextlib
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+from audit import check_log
 from audit.analyzer.keyboard.base import (
     RULE_IFRAME,
     RULE_NO_ESCAPE,
@@ -105,7 +106,7 @@ class KeyboardProbe:
         try:
             findings.extend(await self._probe_tab_walk(page))
         except Exception as exc:
-            self._log_failure("tab_walk", exc)
+            self._log_failure("tab_walk", exc, page=page)
         return findings
 
     # -----------------------------------------------------------------
@@ -146,7 +147,7 @@ class KeyboardProbe:
             try:
                 await page.keyboard.press("Tab")
             except Exception as exc:
-                self._log_failure("tab_press", exc)
+                self._log_failure("tab_press", exc, page=page)
                 break
             sig = await self._active_element_signature(page)
             if sig is None:
@@ -219,7 +220,7 @@ class KeyboardProbe:
             try:
                 await page.keyboard.press("Shift+Tab")
             except Exception as exc:
-                self._log_failure("reverse_tab_press", exc)
+                self._log_failure("reverse_tab_press", exc, page=page)
                 return False
             sig = await self._active_element_signature(page)
             if sig is None or sig.get("opaque") == "true":
@@ -273,7 +274,7 @@ class KeyboardProbe:
                 self.max_modals,
             )
         except Exception as exc:
-            self._log_failure("modal_enumerate", exc)
+            self._log_failure("modal_enumerate", exc, page=page)
             return []
 
         if not modals:
@@ -342,7 +343,7 @@ class KeyboardProbe:
                         )
                     )
             except Exception as exc:
-                self._log_failure("modal_escape_check", exc)
+                self._log_failure("modal_escape_check", exc, page=page)
                 continue
 
         # Clean up our markers so we don't leak DOM artifacts into the
@@ -411,7 +412,7 @@ class KeyboardProbe:
                 """
             )
         except Exception as exc:
-            self._log_failure("iframe_scan", exc)
+            self._log_failure("iframe_scan", exc, page=page)
             return []
 
         return [
@@ -503,7 +504,7 @@ class KeyboardProbe:
                 """
             )
         except Exception as exc:
-            self._log_failure("active_element", exc, debug=True)
+            self._log_failure("active_element", exc, page=page, debug=True)
             return None
         # `page.evaluate` is typed as Any in Playwright's stubs; we
         # know our JS returns either a 3-key object or undefined.
@@ -518,11 +519,24 @@ class KeyboardProbe:
             }
         return None
 
-    def _log_failure(self, check: str, exc: Exception, *, debug: bool = False) -> None:
-        """Log safely for public scans and without target data for protected ones."""
+    def _log_failure(
+        self, check: str, exc: Exception, *, page: Any = None, debug: bool = False
+    ) -> None:
+        """Log, as ``check.not_run``, which step of the check failed and why.
 
-        logger = log.debug if debug else log.warning
-        if self.suppress_diagnostics:
-            logger("keyboard.%s_failed_in_protected_context", check)
-        else:
-            logger("keyboard.%s_failed: %s", check, exc)
+        A sign-in scan's line carries no address and only the error's type.
+        """
+        protected = self.suppress_diagnostics
+        check_log.not_run(
+            "keyboard",
+            scope="page",
+            part=check,
+            url=None if protected else check_log.url_of(page),
+            protected=protected,
+            debug=debug,
+            reason=check_log.failure(
+                f"The keyboard trap check's {check.replace('_', ' ')} step",
+                exc,
+                protected=protected,
+            ),
+        )

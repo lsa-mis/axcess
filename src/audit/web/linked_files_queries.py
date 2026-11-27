@@ -115,6 +115,13 @@ class LinkedFileRow(BaseModel):
     #: A picture of the first page is stored (PDFs the check could read);
     #: served by ``/api/scans/{scan}/documents/{file}/thumbnail``.
     has_thumbnail: bool = False
+    #: When the file says it was created and last changed (ISO 8601), from
+    #: its own properties (migration 0050, ``linked_files.file_dates``).
+    #: None when it does not say (Google's exports never do), when no check
+    #: read it, or when it was checked before 2026-11-25. Not when the file
+    #: was posted: a copy of an older file keeps the older date.
+    created_at: str | None = None
+    modified_at: str | None = None
 
 
 class LinkedFileCounts(BaseModel):
@@ -235,7 +242,7 @@ def _file_rows(
                -- else was checked then.
                CASE WHEN f.status IN ('mostly_sure', 'not_sure')
                     THEN COALESCE(f.checked_as, 'pdf') END AS checked_as,
-               f.checks_run
+               f.checks_run, f.file_created_at, f.file_modified_at
           FROM linked_files f
          WHERE f.scan_id = ? AND (? IS NULL OR f.id = ?)
          ORDER BY CASE {_SHOWN_STATUS_SQL}
@@ -292,6 +299,8 @@ def _file_rows(
                 page_count=row[9],
                 referring_page_count=int(row[10]),
                 has_thumbnail=bool(row[11]),
+                created_at=row[14],
+                modified_at=row[15],
             )
         )
     return files

@@ -407,6 +407,11 @@ export interface NewScanPayload {
    *  Documents tab) and checking each PDF. On unless chosen off; the server
    *  treats a missing value as on. Never in a sign-in scan. */
   skip_documents: boolean;
+  /** Sign in to Google for the Google files the pages link to (2026-11-26):
+   *  a Google window opens before the scan (in a sign-in scan, after the
+   *  site sign-in), and the document check uses that sign-in only. Off
+   *  unless chosen, and only with the document check on. */
+  google_sign_in: boolean;
   /** Skip motion and vision-assisted visual probes. */
   skip_visual: boolean;
   /** Skip the form error check (WCAG 3.3.1). Off unless chosen. */
@@ -516,6 +521,9 @@ export interface LocalLoginScanPayload {
   skip_focus: boolean;
   skip_markup: boolean;
   skip_documents: boolean;
+  /** "Sign in to Google for Google files": a second, separate Google window
+   *  after the site sign-in, for the document check only. Needs the document check. */
+  google_sign_in: boolean;
   skip_semantic: boolean;
   skip_visual: boolean;
   skip_forms: boolean;
@@ -561,9 +569,52 @@ export interface LocalSignInState {
   already_waiting: boolean;
   /** The settings this sign-in will scan with, to refill New scan. */
   settings: NewScanPayload | null;
+  /** The Google step of a sign-in with "Sign in to Google for Google files",
+   *  once "next: sign in to Google" was pressed; null before that. */
+  google: SignInGoogleStep | null;
 }
 
+/** The Google window of a sign-in scan (`server.SignInGoogleStep`). Never session data. */
+export interface SignInGoogleStep {
+  status: "opening_browser" | "awaiting_authentication" | "failed";
+  /** Whether the Google window is open on this computer. */
+  window_open: boolean;
+  /** Why the Google window failed, in words; null otherwise. */
+  error: string | null;
+}
+
+/**
+ * A Google sign-in for a public scan's Google files, before the scan exists
+ * (`POST /api/scans` with `google_sign_in`, then `/api/google-sign-ins/{id}`).
+ * `cancelled`, `expired` and `failed` say why one ended. Never session data.
+ */
+export interface GoogleSignInState {
+  sign_in_id: string;
+  status: LocalSignInStatus;
+  /** Whether the Google window is open on this computer. */
+  window_open: boolean;
+  error: string | null;
+  /** How long Axcess keeps the sign-in after its window closes. */
+  keep_minutes: number;
+  /** True when the form was sent while this sign-in was already waiting. */
+  already_waiting: boolean;
+  /** The settings the scan will run with, to refill New scan. */
+  settings: NewScanPayload | null;
+}
+
+/** `POST /api/scans`: the new scan, or, with `google_sign_in`, the Google sign-in to finish first. */
+export type CreateScanResult =
+  | { scan_id: number; google_sign_in?: undefined }
+  | { scan_id?: undefined; google_sign_in: GoogleSignInState };
+
 /** `GET /api/local-sign-ins/current`. */
+/** `GET /api/google-sign-ins/current`: the Google sign-in waiting on this
+ *  computer, if any (`server.CurrentGoogleSignInResponse`), as
+ *  `CurrentLocalSignIn` is for a site sign-in. */
+export interface CurrentGoogleSignIn {
+  sign_in: GoogleSignInState | null;
+}
+
 export interface CurrentLocalSignIn {
   sign_in: LocalSignInState | null;
 }
@@ -1522,6 +1573,11 @@ export interface LinkedFileRow {
   same_as?: { file_id: number; name: string } | null;
   /** A picture of the first page is stored (PDFs the check could read). */
   has_thumbnail?: boolean;
+  /** When the file says it was created and last changed (ISO 8601), from its
+   *  own properties; null when it does not say, was not read, or was checked
+   *  before 2026-11-25. Not when it was posted. */
+  created_at?: string | null;
+  modified_at?: string | null;
 }
 
 /** One way a page reaches a file (`linked_files_queries.DocumentRefWay`). */

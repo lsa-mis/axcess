@@ -413,6 +413,16 @@ The review app is the React app; there are no server-rendered pages.
 - **"Where are the logs?"** The web server writes `data/logs/axcess.log`, and
   every line from a crawl carries its `scan_id`. The command line does not
   write that file.
+- **"Why did a check not run?"** Every check that does not run logs one
+  `check.not_run` line with a `reason` (`src/audit/check_log.py`):
+  `grep 'check.not_run' data/logs/axcess.log | grep 'scan_id=<id>'`. Its
+  `scope` says how much was missed: `scan` (logged at scan start, `info`
+  when the person turned the check off, `warning` when it was chosen but
+  cannot run), `page`, `page_state` (one state a click or a site search
+  opened), `image`, or `file` (one linked document, logged once with its
+  `reason_code`; `info` for what Axcess skips by design, such as a type it
+  does not check). `check.plan` at scan start lists what runs. Sign-in
+  scans leave out the page address and keep only the error's type.
 - **"The crawler followed too many links."** Check `allow_subdomains` in the
   scan's settings:
   `sqlite3 data/audit.db "SELECT config_json FROM scans WHERE id=<id>"`. The

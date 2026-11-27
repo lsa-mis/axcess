@@ -36,9 +36,12 @@ import type {
   FindingStatus,
   GroupedFindingsResponse,
   IssuesResponse,
+  CreateScanResult,
+  CurrentGoogleSignIn,
   CurrentLocalSignIn,
   LocalLoginScanPayload,
   LocalLoginScanState,
+  GoogleSignInState,
   LocalSignInState,
   LocalAnalysisCapability,
   NewScanPayload,
@@ -310,12 +313,45 @@ export const api = {
     request<LocalLoginScanState>(`/api/local-sign-ins/${encodeURIComponent(signInId)}/start`, {
       method: "POST",
     }),
+  /** "I'm signed in to the site, next: sign in to Google": opens a second,
+   *  separate Google window for this sign-in. Checks nothing yet. */
+  openLocalSignInGoogle: (signInId: string) =>
+    request<LocalSignInState>(`/api/local-sign-ins/${encodeURIComponent(signInId)}/google`, {
+      method: "POST",
+    }),
   reopenLocalSignIn: (signInId: string) =>
     request<LocalSignInState>(`/api/local-sign-ins/${encodeURIComponent(signInId)}/reopen`, {
       method: "POST",
     }),
+  /** Reopens a sign-in scan's closed Google window, from the kept Google sign-in. */
+  reopenSignInGoogle: (signInId: string) =>
+    request<LocalSignInState>(
+      `/api/local-sign-ins/${encodeURIComponent(signInId)}/google/reopen`,
+      { method: "POST" },
+    ),
   cancelLocalSignIn: (signInId: string) =>
     request<LocalSignInState>(`/api/local-sign-ins/${encodeURIComponent(signInId)}/cancel`, {
+      method: "POST",
+    }),
+  getCurrentGoogleSignIn: () =>
+    request<CurrentGoogleSignIn>("/api/google-sign-ins/current", { cache: "no-store" }),
+  getGoogleSignIn: (signInId: string) =>
+    request<GoogleSignInState>(`/api/google-sign-ins/${encodeURIComponent(signInId)}`, {
+      cache: "no-store",
+    }),
+  /** "I'm signed in to Google, start scan": checks the sign-in, then starts the scan. */
+  startGoogleSignInScan: (signInId: string) =>
+    request<{ scan_id: number }>(`/api/google-sign-ins/${encodeURIComponent(signInId)}/start`, {
+      method: "POST",
+    }),
+  /** Reopens a closed Google window, from the kept Google sign-in. */
+  reopenGoogleSignIn: (signInId: string) =>
+    request<GoogleSignInState>(`/api/google-sign-ins/${encodeURIComponent(signInId)}/reopen`, {
+      method: "POST",
+    }),
+  /** Signs out of Google, closes the window and deletes its data. */
+  cancelGoogleSignIn: (signInId: string) =>
+    request<GoogleSignInState>(`/api/google-sign-ins/${encodeURIComponent(signInId)}/cancel`, {
       method: "POST",
     }),
   getLocalLoginScan: (scanId: number) =>
@@ -465,7 +501,7 @@ export const api = {
     return request<ScopePreview>(`/api/scope-preview?${params}`);
   },
   createScan: (payload: NewScanPayload) =>
-    request<{ scan_id: number }>("/api/scans", {
+    request<CreateScanResult>("/api/scans", {
       method: "POST",
       body: JSON.stringify(payload),
     }),

@@ -48,6 +48,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
+from audit import check_log
 from audit.wcag_version import LEGACY_WCAG_VERSION, WcagVersion
 
 if TYPE_CHECKING:
@@ -271,6 +272,15 @@ class AxeViolation:
         return h.hexdigest()
 
 
+class AxeError(RuntimeError):
+    """axe-core could not check the page or page state; the message says why.
+
+    Raised rather than returning an empty list: an empty list means "axe
+    checked and found nothing", and a page axe never checked must not be
+    counted as checked.
+    """
+
+
 @dataclass(slots=True)
 class AxeAnalyzer:
     """Reusable axe-core runner. Construct once per crawl, reuse per page."""
@@ -317,6 +327,9 @@ class AxeAnalyzer:
         ``"AAA"`` adds the AAA rules; ``"A"`` narrows to Level A only.
         ``version`` picks the WCAG version those levels are read against:
         "2.1" drops the rules axe files under WCAG 2.2 only.
+
+        Raises :class:`AxeError`, with the reason, when axe could not check
+        the page: the caller must not count it as checked.
         """
         # Execute the bundled source through Playwright's evaluation channel
         # instead of appending an inline <script>.  Authenticated applications
@@ -350,11 +363,11 @@ class AxeAnalyzer:
             if not await page.evaluate(already_loaded):
                 await page.evaluate(self.axe_source)
         except Exception as exc:
-            if self.suppress_diagnostics:
-                log.warning("axe-core installation failed in protected context")
-            else:
-                log.warning("axe-core installation failed on page: %s", exc)
-            return []
+            raise AxeError(
+                check_log.failure(
+                    "Adding axe-core to the page", exc, protected=self.suppress_diagnostics
+                )
+            ) from exc
         tags = tags_for_level(level, version)
         # axe.run returns the full result object; we keep `violations`, and
         # `incomplete` when asked. `passes` and `inapplicable` stay in the
@@ -374,12 +387,13 @@ class AxeAnalyzer:
                 [tags, include_incomplete],
             )
         except Exception as exc:
-            # Don't kill the crawl on an axe failure, log and return empty.
-            if self.suppress_diagnostics:
-                log.warning("axe.run failed in protected context")
-            else:
-                log.warning("axe.run failed on page: %s", exc)
-            return []
+            # The caller logs it, with its own scope (page or page state),
+            # and does not count the page as checked.
+            raise AxeError(
+                check_log.failure(
+                    "Axe's check of the page", exc, protected=self.suppress_diagnostics
+                )
+            ) from exc
         found = list(_flatten(raw.get("violations") or []))
         found.extend(_flatten(raw.get("incomplete") or [], outcome="cant_tell"))
         return found

@@ -775,10 +775,35 @@
         }
       }
     },
+    "/api/local-sign-ins/{sign_in_id}/google": {
+      "post": {
+        "summary": "Api Open Local Sign In Google",
+        "description": "\"I'm signed in to the site, next: sign in to Google\" (2026-11-26).\n\nOpens a second, separate Google window, a ``GoogleBrowserSession``\nwith its own Playwright and profile, never a tab of the site's\nbrowser, and ties it to this sign-in. Checks nothing about Google and\nleaves the site's sign-in and window as they are. Only for a sign-in\nwhose settings have \"Sign in to Google for Google files\". A second\npress while a Google window opens or waits gives back the same\nstate; after a failed one it opens a new window.",
+        "operationId": "api_open_local_sign_in_google_api_local_sign_ins__sign_in_id__google_post",
+        "parameters": [
+          {
+            "name": "sign_in_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string", "title": "Sign In Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LocalSignInResponse"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
     "/api/local-sign-ins/{sign_in_id}/start": {
       "post": {
         "summary": "Api Start Local Sign In Scan",
-        "description": "\"I'm signed in, start scan\": create the scan row and start the crawl.\n\nThe crawl lock is taken here and only here. If another scan is\nrunning, the start is refused and the sign-in stays waiting, so the\nperson can start once that scan finishes.",
+        "description": "\"I'm signed in, start scan\": create the scan row and start the crawl.\n\nThe crawl lock is taken here and only here. If another scan is\nrunning, the start is refused and the sign-in stays waiting, so the\nperson can start once that scan finishes.\n\nWith \"Sign in to Google for Google files\" (2026-11-26) this is \"I'm\nsigned in to Google, start scan\": refused, with the sign-in kept,\nuntil the Google window has opened and Google says it is signed in\n(asked in a hidden browser when the window is closed). Then the\nGoogle window, if open, is closed and its profile reopened headless\n(``enter_scan_mode``), and the scan starts with the site session as\nbefore and the Google session for the document check only.",
         "operationId": "api_start_local_sign_in_scan_api_local_sign_ins__sign_in_id__start_post",
         "parameters": [
           {
@@ -802,6 +827,31 @@
         "summary": "Api Reopen Local Sign In",
         "description": "Open a new sign-in window from the kept sign-in, on the last page.",
         "operationId": "api_reopen_local_sign_in_api_local_sign_ins__sign_in_id__reopen_post",
+        "parameters": [
+          {
+            "name": "sign_in_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string", "title": "Sign In Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/LocalSignInResponse"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/local-sign-ins/{sign_in_id}/google/reopen": {
+      "post": {
+        "summary": "Api Reopen Local Sign In Google",
+        "description": "Reopen a closed Google window of a sign-in scan (2026-11-26).\n\nAs ``api_reopen_local_sign_in`` does for the site's window: a new\nvisible Google window from the same profile, where the Google\nsign-in is kept. The sign-in's one clock stops while it opens and\nrestarts if it fails; the site's window is left as it is.",
+        "operationId": "api_reopen_local_sign_in_google_api_local_sign_ins__sign_in_id__google_reopen_post",
         "parameters": [
           {
             "name": "sign_in_id",
@@ -862,6 +912,118 @@
         ],
         "responses": {
           "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/google-sign-ins/current": {
+      "get": {
+        "summary": "Api Current Google Sign In",
+        "description": "The Google sign-in waiting on this computer, so New scan can return\nto it, as ``/api/local-sign-ins/current`` does for a site sign-in.",
+        "operationId": "api_current_google_sign_in_api_google_sign_ins_current_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {"schema": {"$ref": "#/components/schemas/CurrentGoogleSignInResponse"}}
+            }
+          }
+        }
+      }
+    },
+    "/api/google-sign-ins/{sign_in_id}": {
+      "get": {
+        "summary": "Api Google Sign In Status",
+        "description": "One Google sign-in's state, or the one word for why it ended.",
+        "operationId": "api_google_sign_in_status_api_google_sign_ins__sign_in_id__get",
+        "parameters": [
+          {
+            "name": "sign_in_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string", "title": "Sign In Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/GoogleSignInResponse"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/google-sign-ins/{sign_in_id}/start": {
+      "post": {
+        "summary": "Api Start Google Sign In Scan",
+        "description": "\"I'm signed in to Google, start scan\": check, hand over, start.\n\nRefused, with the sign-in kept, while the window is still opening,\nwhile another scan runs, and while Google says the browser is not\nsigned in. A closed window is not refused (2026-11-26): Google is\nasked through a hidden browser on the same profile. Then the window,\nif open, is closed and the profile reopened headless\n(``enter_scan_mode``; with the window closed, that hidden browser),\nand the crawl starts with the session.",
+        "operationId": "api_start_google_sign_in_scan_api_google_sign_ins__sign_in_id__start_post",
+        "parameters": [
+          {
+            "name": "sign_in_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string", "title": "Sign In Id"}
+          }
+        ],
+        "responses": {
+          "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}},
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/google-sign-ins/{sign_in_id}/reopen": {
+      "post": {
+        "summary": "Api Reopen Google Sign In",
+        "description": "Reopen a closed Google window, as ``api_reopen_local_sign_in`` does\nfor a site's (2026-11-26): the same profile, where the sign-in is\nkept, on Google's sign-in page. The clock stops while it opens and\nrestarts from zero if that fails; the sign-in is kept either way.",
+        "operationId": "api_reopen_google_sign_in_api_google_sign_ins__sign_in_id__reopen_post",
+        "parameters": [
+          {
+            "name": "sign_in_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string", "title": "Sign In Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/GoogleSignInResponse"}}}
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
+          }
+        }
+      }
+    },
+    "/api/google-sign-ins/{sign_in_id}/cancel": {
+      "post": {
+        "summary": "Api Cancel Google Sign In",
+        "description": "Sign out at Google, close the window, delete its data, record nothing.",
+        "operationId": "api_cancel_google_sign_in_api_google_sign_ins__sign_in_id__cancel_post",
+        "parameters": [
+          {
+            "name": "sign_in_id",
+            "in": "path",
+            "required": true,
+            "schema": {"type": "string", "title": "Sign In Id"}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/GoogleSignInResponse"}}}
+          },
           "422": {
             "description": "Validation Error",
             "content": {"application/json": {"schema": {"$ref": "#/components/schemas/HTTPValidationError"}}}
@@ -2810,6 +2972,15 @@
         "required": ["sc", "deque_share", "axe_rate", "axe_found", "found", "estimated_total", "method"],
         "title": "CriterionEstimate"
       },
+      "CurrentGoogleSignInResponse": {
+        "properties": {
+          "sign_in": {"anyOf": [{"$ref": "#/components/schemas/GoogleSignInResponse"}, {"type": "null"}]}
+        },
+        "type": "object",
+        "required": ["sign_in"],
+        "title": "CurrentGoogleSignInResponse",
+        "description": "``GET /api/google-sign-ins/current``: the waiting Google sign-in, if any.\n\nThe same answer, for the same reason, as ``CurrentLocalSignInResponse``:\nNew scan returns to a sign-in still waiting after the person left it."
+      },
       "CurrentLocalSignInResponse": {
         "properties": {
           "sign_in": {"anyOf": [{"$ref": "#/components/schemas/LocalSignInResponse"}, {"type": "null"}]}
@@ -3039,6 +3210,25 @@
         "type": "object",
         "required": ["feedback"],
         "title": "FeedbackUpdate"
+      },
+      "GoogleSignInResponse": {
+        "properties": {
+          "sign_in_id": {"type": "string", "title": "Sign In Id"},
+          "status": {
+            "type": "string",
+            "enum": ["opening_browser", "awaiting_authentication", "cancelled", "expired", "failed"],
+            "title": "Status"
+          },
+          "window_open": {"type": "boolean", "title": "Window Open", "default": false},
+          "error": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Error"},
+          "keep_minutes": {"type": "integer", "title": "Keep Minutes", "default": 30},
+          "already_waiting": {"type": "boolean", "title": "Already Waiting", "default": false},
+          "settings": {"anyOf": [{"$ref": "#/components/schemas/ScanFormSettings"}, {"type": "null"}]}
+        },
+        "type": "object",
+        "required": ["sign_in_id", "status"],
+        "title": "GoogleSignInResponse",
+        "description": "A Google sign-in in progress, before its public scan exists.\n\nNever session data: no cookie, no address the browser visited, no\naccount name. ``settings`` are the New scan form's own fields, so the\nform can be refilled."
       },
       "GroupTotals": {
         "properties": {
@@ -3312,7 +3502,9 @@
           "page_count": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "Page Count"},
           "referring_page_count": {"type": "integer", "title": "Referring Page Count"},
           "same_as": {"anyOf": [{"$ref": "#/components/schemas/SameFile"}, {"type": "null"}]},
-          "has_thumbnail": {"type": "boolean", "title": "Has Thumbnail", "default": false}
+          "has_thumbnail": {"type": "boolean", "title": "Has Thumbnail", "default": false},
+          "created_at": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Created At"},
+          "modified_at": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Modified At"}
         },
         "type": "object",
         "required": [
@@ -3361,6 +3553,7 @@
           "skip_focus": {"type": "boolean", "title": "Skip Focus", "default": false},
           "skip_markup": {"type": "boolean", "title": "Skip Markup", "default": false},
           "skip_documents": {"type": "boolean", "title": "Skip Documents", "default": false},
+          "google_sign_in": {"type": "boolean", "title": "Google Sign In", "default": false},
           "skip_semantic": {"type": "boolean", "title": "Skip Semantic", "default": true},
           "skip_visual": {"type": "boolean", "title": "Skip Visual", "default": true},
           "skip_forms": {"type": "boolean", "title": "Skip Forms", "default": true},
@@ -3411,7 +3604,8 @@
           "keep_minutes": {"type": "integer", "title": "Keep Minutes", "default": 30},
           "forget_in_seconds": {"anyOf": [{"type": "integer"}, {"type": "null"}], "title": "Forget In Seconds"},
           "already_waiting": {"type": "boolean", "title": "Already Waiting", "default": false},
-          "settings": {"anyOf": [{"$ref": "#/components/schemas/ScanFormSettings"}, {"type": "null"}]}
+          "settings": {"anyOf": [{"$ref": "#/components/schemas/ScanFormSettings"}, {"type": "null"}]},
+          "google": {"anyOf": [{"$ref": "#/components/schemas/SignInGoogleStep"}, {"type": "null"}]}
         },
         "type": "object",
         "required": ["sign_in_id", "status"],
@@ -3799,6 +3993,7 @@
           "skip_focus": {"type": "boolean", "title": "Skip Focus"},
           "skip_markup": {"type": "boolean", "title": "Skip Markup", "default": false},
           "skip_documents": {"type": "boolean", "title": "Skip Documents", "default": false},
+          "google_sign_in": {"type": "boolean", "title": "Google Sign In", "default": false},
           "skip_visual": {"type": "boolean", "title": "Skip Visual"},
           "skip_forms": {"type": "boolean", "title": "Skip Forms", "default": true},
           "send_empty_forms": {"type": "boolean", "title": "Send Empty Forms", "default": false},
@@ -3985,6 +4180,21 @@
         "type": "object",
         "required": ["target"],
         "title": "SearchTarget"
+      },
+      "SignInGoogleStep": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["opening_browser", "awaiting_authentication", "failed"],
+            "title": "Status"
+          },
+          "window_open": {"type": "boolean", "title": "Window Open", "default": false},
+          "error": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Error"}
+        },
+        "type": "object",
+        "required": ["status"],
+        "title": "SignInGoogleStep",
+        "description": "The Google window of a sign-in scan with \"Sign in to Google for Google\nfiles\" (2026-11-26): its state only. Never session data, no address the\nbrowser visited, no account name."
       },
       "SiteHistory": {
         "properties": {

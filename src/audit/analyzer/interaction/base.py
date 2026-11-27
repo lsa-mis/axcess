@@ -141,6 +141,10 @@ class InteractionResult:
     #: so ``len(captures) <= states`` always. Empty when capture is disabled,
     #: bounded, or failed.
     captures: tuple[StateCapture, ...] = ()
+    #: Markup of states axe found nothing new in, taken while Alfa checked
+    #: them in the background. Kept only for the states an Alfa occurrence
+    #: was first seen in (the orchestrator decides, once Alfa is done).
+    tentative_captures: tuple[StateCapture, ...] = ()
     urls: tuple[str, ...] = ()
     #: Links seen after a click, each with the control that revealed it. The
     #: first click to show a link names it, as for findings. Includes links
@@ -176,6 +180,9 @@ class InteractionResult:
     #: clicking on regardless would record coverage that never happened.
     dialogs_opened: int = 0
     dialogs_stuck: int = 0
+    #: The error type that stopped the sweep early, or "" when nothing did.
+    #: What it reached before the error is still kept.
+    stopped_by: str = ""
     #: Bounded, reproducible note about the first stuck dialog: which dialog,
     #: which control opened it, and what dismissal was tried.
     detail: str = ""

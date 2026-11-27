@@ -57,10 +57,11 @@ import hashlib
 import sqlite3
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 import httpx
 
+from audit import check_log
 from audit.crawler import url_policy
 from audit.db import linked_files as store
 from audit.db.schema import write_batch
@@ -85,8 +86,32 @@ if TYPE_CHECKING:
     from audit.crawler.rate_limit import HostLimiter
     from audit.crawler.robots import RobotsChecker
     from audit.crawler.url_policy import HostScope
+    from audit.linked_files.google_session import DatesRead
 
 log = get_logger(__name__)
+
+
+class GoogleFiles(Protocol):
+    """A scan's Google sign-in, as the tracker uses it (2026-11-26).
+
+    ``linked_files.google_session.GoogleBrowserSession`` is the real one.
+    The crawl hands it to the tracker and closes it when it ends; nothing
+    else in the crawl touches it, and none of the page checks' browsers is
+    it or shares its context (the developer's rule, 2026-11-26).
+    """
+
+    @property
+    def active(self) -> bool: ...
+
+    def allow_file(self, url: str) -> bool: ...
+
+    async def fetch_export(self, address: str) -> FetchedFile: ...
+
+    async def fetch_drive(self, url: str) -> FetchedFile: ...
+
+    async def read_dates(self, url: str) -> DatesRead: ...
+
+    async def close(self) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -109,6 +134,10 @@ class _Downloads:
     # A Drive file's fallback: press its download button in a browser
     # (``google.download_with_button``); None leaves the fallback out.
     drive_button: ButtonDownload | None = None
+    # The scan's Google sign-in (``GoogleFiles``), in a public or a sign-in
+    # scan; None downloads Google files as before: with ``client`` in a
+    # public scan, with ``fetch`` in a sign-in scan.
+    google: GoogleFiles | None = None
 
 
 #: PDFs downloaded by ``check_pending`` per scan. The ones the crawler
@@ -135,8 +164,14 @@ class LinkedFileTracker:
         scan_id: int,
         scope: HostScope,
         allow_subdomains: bool,
+        protected: bool = False,
     ) -> None:
         self._conn = conn
+        #: A sign-in scan: the log leaves out file addresses (check_log).
+        self._protected = protected
+        #: Files whose "could not check" reason is already in the log, so a
+        #: file linked from many pages is logged once.
+        self._logged: set[int] = set()
         self._scan_id = scan_id
         self._scope = scope
         self._site = replace(scope, path_prefix="/")
@@ -169,11 +204,17 @@ class LinkedFileTracker:
         thumbnails: BlobStore | None = None,
         fetch: FileFetcher | None = None,
         drive_button: ButtonDownload | None = None,
+        google: GoogleFiles | None = None,
     ) -> None:
         """What ``check_page`` downloads with: the crawl's own client and limits.
 
         ``fetch`` replaces the download itself (a sign-in scan's signed-in
         browser); the rate limit, robots.txt and the scan-wide cap still apply.
+        ``google`` downloads Google Docs, Slides and Drive files through the
+        person's Google sign-in and reads each Google file's dates after the
+        checks (``check_pending``). In a sign-in scan it sits beside ``fetch``
+        (2026-11-26): Google files go through ``google``, every other file
+        through ``fetch`` as before, and ``client`` downloads nothing.
         """
         self._downloads = _Downloads(
             client=client,
@@ -185,6 +226,7 @@ class LinkedFileTracker:
             thumbnails=thumbnails,
             fetch=fetch,
             drive_button=drive_button,
+            google=google,
         )
 
     # -- while the crawl runs ---------------------------------------------
@@ -259,6 +301,10 @@ class LinkedFileTracker:
         if file_id is None and not self.full:
             self.full = True
             log.warning("linked_files.limit_reached", limit=store.MAX_FILES_PER_SCAN)
+        if file_id is not None and file_id not in self._logged:
+            status, reason = formats.initial_status(file_type)
+            if status == "could_not_check" and reason is not None:
+                self._log_not_checked(file_id, url, store.CheckResult(status, reason))
         return file_id
 
     def _add_ref(self, file_id: int, page_id: int, link: FoundLink) -> None:
@@ -409,10 +455,22 @@ class LinkedFileTracker:
             if pending:
                 log.info("linked_files.checking", files=len(pending))
             await self._check_all(pending, downloads)
+            # After every download, so a file the export already dated is
+            # not opened again, and before anything is closed as not checked.
+            # In public and sign-in scans alike (2026-11-26).
+            if downloads.google is not None:
+                await self._read_google_dates(downloads, downloads.google)
         finally:
             # A stop or a fault leaves nothing silently pending: the report
             # says the scan stopped before the file was checked.
-            store.mark_unchecked(self._conn, self._scan_id)
+            unchecked = store.mark_unchecked(self._conn, self._scan_id)
+            if unchecked:
+                check_log.not_run(
+                    "documents",
+                    scope="scan",
+                    reason=_REASON_LOG_TEXT["not_checked"],
+                    files=unchecked,
+                )
 
     async def _check_all(self, pending: Sequence[tuple[int, str]], downloads: _Downloads) -> None:
         tasks: list[asyncio.Task[None]] = []
@@ -459,15 +517,14 @@ class LinkedFileTracker:
         # "Disallow: /" there (2026-11-16), so a scan that follows robots.txt
         # lists Drive files as not checked, and one set to ignore it
         # downloads them (the developer's decision, 2026-11-16). A sign-in
-        # scan keeps its own fetcher, whose egress policy refuses a file on
-        # another site.
+        # scan without a Google sign-in keeps its own fetcher, whose egress
+        # policy refuses a file on another site.
         # A Google Doc or Slides deck: the Word or PowerPoint file Google
         # exports (google.export_address), and robots.txt is asked about
         # that address; Google's allows /document and /presentation
         # (2026-11-16). One with no export address (a copy published to the
         # web) is not a file Axcess can download.
         file_type = formats.classify_url(url)
-        drive = downloads.fetch is None and file_type == "google_drive"
         export = None
         if file_type in {"google_doc", "google_slides"}:
             export = export_address(url)
@@ -475,23 +532,124 @@ class LinkedFileTracker:
                 self._store(file_id, store.CheckResult("could_not_check", "google_file"))
                 return
         self._started += 1
+        # A scan signed in to Google (2026-11-26; public scans, then sign-in
+        # scans too): a Doc, Slides deck or Drive file is downloaded through
+        # that sign-in instead, from the same address and under the same
+        # robots.txt answer as a public scan's. Every other file goes as
+        # before: ``client`` in a public scan, the site's own signed-in
+        # fetcher (``fetch``) in a sign-in scan. Once the sign-in is lost
+        # (``active`` false), Google files go as before too. The Google
+        # session paces itself, one download at a time, so it does not hold
+        # one of the shared download slots while it waits.
+        google = downloads.google
+        via_google = (
+            google is not None
+            and google.active
+            and (file_type == "google_drive" or export is not None)
+        )
+        drive = file_type == "google_drive" and (downloads.fetch is None or via_google)
         target = DRIVE_DOWNLOAD_URL if drive else export or url
-        async with self._semaphore:
+        gate: contextlib.AbstractAsyncContextManager[object] = (
+            contextlib.nullcontext() if via_google else self._semaphore
+        )
+        async with gate:
             if not downloads.ignore_robots and not await downloads.robots.allowed(target):
                 self._store(file_id, store.CheckResult("could_not_check", "robots"))
                 return
             async with downloads.limiter.throttle(target):
-                if drive:
+                if via_google and google is not None and google.active:
+                    fetched = await (
+                        google.fetch_drive(url) if drive else google.fetch_export(target)
+                    )
+                elif downloads.fetch is not None:
+                    # A sign-in scan: the site's signed-in browser, never an
+                    # anonymous request, also for a Google file whose Google
+                    # sign-in was lost (a Drive file by its link, as before).
+                    fetched = await downloads.fetch(url if file_type == "google_drive" else target)
+                elif drive:
                     fetched = await fetch_drive_file(
                         downloads.client, url, button=downloads.drive_button
                     )
-                elif downloads.fetch is not None:
-                    fetched = await downloads.fetch(target)
                 elif export is not None:
                     fetched = await fetch_export(downloads.client, export)
                 else:
                     fetched = await fetch_file(downloads.client, url)
             await self._check_fetched(file_id, fetched)
+
+    async def _read_google_dates(self, downloads: _Downloads, google: GoogleFiles) -> None:
+        """Read each Google Doc, Sheet and Slides file's dates from Google's screen.
+
+        Only files with no date at all; the days Google's File > Details
+        shows go in only where the file gave none (``store.set_file_dates``).
+        One read per Google file ID, however many addresses link to it, and
+        each page address asked of robots.txt like any download. At most
+        ``MAX_DATE_FILES`` per scan. Logs counts only, never an address.
+        """
+        from audit.linked_files.google_session import (
+            MAX_DATE_FILES,
+            file_page_url,
+            google_file_key,
+        )
+
+        by_id: dict[str, tuple[str, list[int]]] = {}
+        for file_id, url in store.google_files_without_dates(self._conn, self._scan_id):
+            key = google_file_key(url)
+            if key is None:
+                continue
+            kind, google_id = key
+            if google_id in by_id:
+                by_id[google_id][1].append(file_id)
+            else:
+                by_id[google_id] = (file_page_url(kind, google_id), [file_id])
+        if not by_id:
+            return
+        opened = found = no_date = robots = 0
+        for page_url, file_ids in list(by_id.values())[:MAX_DATE_FILES]:
+            if not google.active:
+                break
+            if not downloads.ignore_robots and not await downloads.robots.allowed(page_url):
+                robots += 1
+                continue
+            google.allow_file(page_url)
+            async with downloads.limiter.throttle(page_url):
+                read = await google.read_dates(page_url)
+            if read.outcome == "lost":
+                break
+            if read.outcome != "dates":
+                no_date += 1
+                continue
+            opened += 1
+            if not read.dates.found:
+                no_date += 1
+                continue
+            found += 1
+            with write_batch(self._conn):
+                for file_id in file_ids:
+                    store.set_file_dates(
+                        self._conn,
+                        scan_id=self._scan_id,
+                        file_id=file_id,
+                        created=read.dates.created,
+                        modified=read.dates.modified,
+                    )
+        log.info(
+            "linked_files.google_dates",
+            files=len(by_id),
+            opened=opened,
+            dated=found,
+            no_date=no_date,
+            robots=robots,
+            capped=max(0, len(by_id) - MAX_DATE_FILES),
+        )
+        if opened and not found:
+            log.warning(
+                "linked_files.google_dates_none_found",
+                opened=opened,
+                message=(
+                    "No dates found in Google's File, Details for any file opened. "
+                    "Google's screen may have changed."
+                ),
+            )
 
     # -- shared -----------------------------------------------------------
 
@@ -551,6 +709,8 @@ class LinkedFileTracker:
                     thumbnail_hash=copy.thumbnail_hash,
                     thumbnail_small_hash=copy.thumbnail_small_hash,
                     checked_as=copy.checked_as,
+                    file_created_at=copy.file_created_at,
+                    file_modified_at=copy.file_modified_at,
                 ),
             )
             return
@@ -593,6 +753,8 @@ class LinkedFileTracker:
                 thumbnail_hash=large,
                 thumbnail_small_hash=small,
                 checked_as="pdf",
+                file_created_at=result.dates.created,
+                file_modified_at=result.dates.modified,
             ),
         )
 
@@ -624,6 +786,8 @@ class LinkedFileTracker:
                 failed_checks=result.failed,
                 page_count=result.page_count,
                 checked_as=kind,
+                file_created_at=result.dates.created,
+                file_modified_at=result.dates.modified,
             ),
         )
 
@@ -655,6 +819,33 @@ class LinkedFileTracker:
 
     def _store(self, file_id: int, result: store.CheckResult) -> None:
         store.set_result(self._conn, scan_id=self._scan_id, file_id=file_id, result=result)
+        if result.status == "could_not_check" and file_id not in self._logged:
+            self._log_not_checked(file_id, None, result)
+
+    def _log_not_checked(self, file_id: int, url: str | None, result: store.CheckResult) -> None:
+        """Log why one file could not be checked, once per file.
+
+        The report's Documents tab shows the same reason in its own words
+        (``linkedFileReasonText``). What the site or the file caused is a
+        warning; what Axcess does by design (a type it does not check, the
+        download cap, robots.txt) is ``info``.
+        """
+        self._logged.add(file_id)
+        reason = result.reason or "not_checked"
+        if url is None:
+            row = self._conn.execute(
+                "SELECT url FROM linked_files WHERE id = ?", (file_id,)
+            ).fetchone()
+            url = str(row[0]) if row else None
+        check_log.not_run(
+            "documents",
+            scope="file",
+            url=url,
+            protected=self._protected,
+            chosen=reason in _BY_DESIGN,
+            reason=_reason_log_text(reason, result.http_status),
+            reason_code=reason,
+        )
 
 
 #: Bytes no check reads, and the reason each gets. ``not_a_pdf`` is any
@@ -668,6 +859,45 @@ _NOT_READ: dict[str, formats.Reason] = {
     "old_office": "old_format",
     "unknown": "not_a_pdf",
 }
+
+
+#: Why a file could not be checked, for the log (``check.not_run``). The
+#: report words each one for its readers (``linkedFileReasonText``).
+_REASON_LOG_TEXT: dict[str, str] = {
+    "type_not_checked_yet": "Axcess does not check this file type yet.",
+    "old_format": "An old Office format, which Axcess does not check.",
+    "google_file": (
+        "Axcess cannot download this Google file (a Google Sheet, or a copy published to the web)."
+    ),
+    "broken_link": "The address could not be reached.",
+    "http_error": "The site answered with an error.",
+    "password": "The file needs a password to open.",
+    "too_large": (
+        f"The file is larger than {MAX_FILE_BYTES // (1024 * 1024)} MB, the most Axcess downloads."
+    ),
+    "timed_out": "The download took too long.",
+    "not_a_pdf": (
+        "The link did not lead to a file Axcess checks (the site sent a web page or other content)."
+    ),
+    "damaged": "The file is damaged and could not be read.",
+    "robots": "The site's robots.txt does not allow downloading it.",
+    "blocked": (
+        "The address is excluded from this scan, or a sign-in scan's download rules refused it."
+    ),
+    "limit": f"The scan already downloaded {MAX_DOWNLOADS} documents, the most it downloads.",
+    "not_checked": "The scan stopped before these documents were checked.",
+}
+
+#: Reasons Axcess chose by design, logged as ``info`` rather than a warning.
+_BY_DESIGN = frozenset({"type_not_checked_yet", "old_format", "google_file", "robots", "limit"})
+
+
+def _reason_log_text(reason: str, http_status: int | None) -> str:
+    if reason == "http_error" and http_status in {401, 403}:
+        return f"The file needs a sign-in (HTTP {http_status})."
+    if reason == "http_error" and http_status is not None:
+        return f"The site answered with an error (HTTP {http_status})."
+    return _REASON_LOG_TEXT.get(reason, f"Could not check it ({reason}).")
 
 
 _FETCH_REASON: dict[str, formats.Reason] = {

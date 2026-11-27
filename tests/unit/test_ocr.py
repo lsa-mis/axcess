@@ -105,3 +105,45 @@ async def test_pool_process_mode_runs_ocr() -> None:
     async with OcrPool(max_workers=1) as pool:
         result = await pool.run(_text_png("HELLO WORLD"))
     assert result.word_count >= 1
+
+
+def _stuck_helper(image_bytes: bytes, lang: str) -> OcrResult:
+    """Stands in for a helper that never finishes (report 77's stuck pool)."""
+    import time
+
+    time.sleep(60)
+    raise AssertionError("the pool should have stopped this helper")
+
+
+def test_pool_starts_fresh_helpers_not_copies_of_the_server() -> None:
+    """A copied ("forked") server can inherit a held lock and hang forever."""
+    pool = OcrPool(max_workers=1)
+    try:
+        assert pool._executor is not None
+        assert pool._executor._mp_context.get_start_method() == "spawn"
+    finally:
+        pool.shutdown()
+
+
+@pytest.mark.asyncio
+async def test_a_stuck_image_is_skipped_and_the_pool_replaced(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import time
+
+    from audit.analyzer.ocr import pool as pool_module
+
+    monkeypatch.setattr(pool_module, "run_tesseract", _stuck_helper)
+    pool = OcrPool(max_workers=1, timeout_s=10.0)
+    stuck = pool._executor
+    try:
+        started = time.monotonic()
+        with pytest.raises(pool_module.OcrTimeoutError, match="skipped this image"):
+            await pool.run(b"not read")
+        assert time.monotonic() - started < 30
+        # The next image gets a fresh pool, not the one with the stuck helper.
+        assert pool._executor is not None and pool._executor is not stuck
+    finally:
+        started = time.monotonic()
+        pool.shutdown()
+        assert time.monotonic() - started < 15

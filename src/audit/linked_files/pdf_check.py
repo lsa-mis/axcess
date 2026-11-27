@@ -54,6 +54,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+from audit.linked_files.file_dates import FileDates, pdf_dates
 from audit.linked_files.formats import FailedCheck
 from audit.linked_files.pdf_structure import read_structure
 
@@ -79,6 +80,8 @@ class PdfCheck:
     #: True when the file has fillable form fields; None when not read.
     is_form: bool | None = None
     page_count: int | None = None
+    #: When the file says it was created and last changed (file_dates).
+    dates: FileDates = field(default_factory=FileDates)
     #: Short technical note for the log only, never shown or stored.
     detail: str = field(default="", compare=False)
 
@@ -190,6 +193,7 @@ def _check(data: bytes) -> PdfCheck:
         checks_run=tuple(check for check in ALL_CHECKS if check in ran),
         is_form=_has_form_fields(catalog),
         page_count=page_count,
+        dates=pdf_dates(reader),
     )
 
 

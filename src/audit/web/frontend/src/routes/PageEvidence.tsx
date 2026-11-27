@@ -388,11 +388,16 @@ function FindingCard({
         </figure>
       ) : (
         // Saying why there is no picture is the difference between "the tool
-        // is broken" and "this check cannot produce one".
+        // is broken" and "this check cannot produce one". Since 2026-11-23
+        // Alfa checks the crawler's own tab and its occurrences get
+        // screenshots like axe's, so a missing one now has the same causes;
+        // the second sentence keeps the older reports' reason, when Alfa ran
+        // in a separate browser (repo plain-language rule 4: never drop a
+        // limitation to make text shorter).
         <p className="mt-3 flex items-center gap-1.5 text-xs text-fg-subtle">
           <ImageOff className="h-3.5 w-3.5 shrink-0" aria-hidden />
           {finding.pipeline === "alfa"
-            ? "No screenshot: the rule check (Alfa) runs in a separate browser that Axcess cannot take pictures of."
+            ? "Axcess did not take a screenshot of this occurrence. Older reports have none for the rule check (Alfa), which then ran in a separate browser."
             : "Axcess did not take a screenshot of this occurrence."}
         </p>
       )}

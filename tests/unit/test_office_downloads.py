@@ -217,3 +217,33 @@ async def test_a_word_file_kept_in_drive_is_checked(tmp_db: sqlite3.Connection) 
         tmp_db, {drive: "Form"}, {download: _ok(WORD_WITHOUT_ALT)}, ignore_robots=True
     )
     assert (rows[drive]["status"], rows[drive]["checked_as"]) == ("mostly_sure", "docx")
+
+
+async def test_each_document_that_could_not_be_checked_logs_its_reason_once(
+    tmp_db: sqlite3.Connection,
+) -> None:
+    """The log says why, like every other check that does not run."""
+    from structlog.testing import capture_logs
+
+    with capture_logs() as logs:
+        await _track(
+            tmp_db,
+            {PRIVATE: "Private", SHEET: "Budget"},
+            {str(export_address(PRIVATE)): httpx.Response(401, text="<html>Sign in</html>")},
+        )
+    not_run = {
+        entry["url"]: entry
+        for entry in logs
+        if entry["event"] == "check.not_run" and entry["check"] == "documents"
+    }
+    assert sorted(not_run) == sorted([PRIVATE, SHEET])
+    assert len([e for e in logs if e["event"] == "check.not_run"]) == 2
+    private = not_run[PRIVATE]
+    assert (private["scope"], private["log_level"], private["reason_code"]) == (
+        "file",
+        "warning",
+        "http_error",
+    )
+    assert "sign-in (HTTP 401)" in private["reason"]
+    # Axcess does not ask Google for a Sheet: by design, so not a warning.
+    assert (not_run[SHEET]["log_level"], not_run[SHEET]["reason_code"]) == ("info", "google_file")

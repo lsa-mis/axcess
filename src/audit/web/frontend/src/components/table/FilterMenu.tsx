@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { ChevronDown, ListFilter } from "lucide-react";
 import { cn } from "../../lib/cn";
+import FilterDate, { describeDateRange } from "./FilterDate";
 
 /*
  * One Filter control per table. Every way a table can be narrowed (Level,
@@ -12,7 +13,9 @@ import { cn } from "../../lib/cn";
  * fieldset names each group. A `multiple` group is a set of checkboxes, so
  * several values can be on at once (Level A and Level AA); a group whose
  * data can only take one value is a set of radios, and arrow keys move
- * within it as radios always do. A choice applies at once. Escape, Close
+ * within it as radios always do. A choice applies at once. A `dateRange`
+ * group is typed From and To days instead (FilterDate), applied with its
+ * own button. Escape, Close
  * filters, a press outside, or focus moving out closes the panel. Escape and
  * Close filters return focus to the button.
  *
@@ -55,6 +58,13 @@ export type FilterGroup = {
    * it is read with the group, not a tooltip.
    */
   hint?: string;
+  /**
+   * From and To days the reader types, each in Month, Day and Year boxes
+   * (FilterDate), instead of a list. `value` is "from..to" with either end
+   * empty ("2018-07-17..", "..2020-12-31"), "" when none; `options` is
+   * empty. Either end alone is "on or after" or "on or before".
+   */
+  dateRange?: boolean;
 };
 
 /** A group's value as a list: "A,AA" → ["A", "AA"]; "" → []. */
@@ -187,7 +197,16 @@ export function FilterMenu({
         hidden={!open}
         className="absolute left-0 top-full z-30 mt-1 max-h-[70vh] w-[min(22rem,calc(100vw-2rem))] overflow-y-auto rounded-xs border border-border-strong bg-surface-raised p-3 text-fg shadow-lg"
       >
-        {groups.map((group) => (
+        {groups.map((group) =>
+          group.dateRange ? (
+            <FilterDate
+              key={group.key}
+              label={group.label}
+              hint={group.hint}
+              value={valueOf(group)}
+              onApply={(value) => choose(group, value)}
+            />
+          ) : (
           <fieldset key={group.key} className="mb-3 border-b border-border pb-3 last-of-type:mb-0">
             <legend className="mb-1 px-2 text-xs font-semibold text-fg">{group.label}</legend>
             {group.hint && <p className="mb-1 px-2 text-xs text-fg-muted">{group.hint}</p>}
@@ -227,7 +246,8 @@ export function FilterMenu({
               );
             })}
           </fieldset>
-        ))}
+          ),
+        )}
         <div className="flex items-center justify-between gap-2 pt-1">
           <button
             type="button"
@@ -265,6 +285,7 @@ export function activeFilterItems(groups: readonly FilterGroup[]): string[] {
   return groups
     .filter((group) => group.value)
     .map((group) => {
+      if (group.dateRange) return `${group.label}: ${describeDateRange(group.value)}`;
       const labels = splitFilter(group.value).map(
         (value) => group.options.find((candidate) => candidate.value === value)?.label ?? value,
       );

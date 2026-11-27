@@ -24,8 +24,15 @@ import SwitchRow from "./SwitchRow";
  * rule check tool" (see ScanForm): which tool checks the pages is part of
  * what Axcess tests on each page, this group's own description. It sits
  * under the standard it checks against, before the switches that add
- * checks of their own, and it decides whether Click-Through can run (Alfa
- * alone cannot), so the switch it disables is right below it.
+ * checks of their own.
+ *
+ * Since 2026-11-23 (the developer's request, "make Alfa the same logic as
+ * axe"), Alfa checks the crawler's own browser tab, in public and sign-in
+ * scans alike, so it checks the page states Click-Through opens just as axe
+ * does: choosing Alfa no longer turns Click-Through off. Until then Alfa
+ * alone disabled the switch, because Alfa opened its own browser and saw
+ * each page only as it loaded. Only Fast scan disables it now, and its hint
+ * says why (SC 3.3.2 Labels or Instructions, Level A).
  */
 export default function ChecksGroup({ settings, update, policy, capabilities }: GroupProps) {
   const login = policy.mode === "login";
@@ -34,11 +41,7 @@ export default function ChecksGroup({ settings, update, policy, capabilities }: 
   const alfaReason = alfaOff
     ? `${CHECK_LABEL.alfa} is not available: ${capabilities.alfa?.reason ?? "not installed"}.`
     : undefined;
-  const clickThroughBlocked = settings.static_only
-    ? CLICK_THROUGH_COPY.unavailableStatic
-    : settings.scan_engine === "alfa"
-      ? CLICK_THROUGH_COPY.unavailableAlfa
-      : null;
+  const clickThroughBlocked = settings.static_only ? CLICK_THROUGH_COPY.unavailableStatic : null;
 
   return (
     <SettingsGroup variant="plain" id="checks" legend={GROUPS.checks.legend} description={GROUPS.checks.description}>
@@ -75,10 +78,8 @@ export default function ChecksGroup({ settings, update, policy, capabilities }: 
         value={settings.scan_engine}
         onChange={(scan_engine) => {
           const patch: Partial<ScanSettings> = { scan_engine };
-          // Alfa alone cannot re-check revealed content; axe or Both
-          // cannot run without a rendered page.
-          if (scan_engine === "alfa") patch.skip_interaction = true;
-          else if (settings.static_only) patch.static_only = false;
+          // Axe or Both cannot run without a rendered page.
+          if (scan_engine !== "alfa" && settings.static_only) patch.static_only = false;
           update(patch);
         }}
         options={[
@@ -210,6 +211,38 @@ export default function ChecksGroup({ settings, update, policy, capabilities }: 
                   ? SWITCHES.documents.hint
                   : `${SWITCHES.documents.hint} ${SWITCHES.documents.driveRobotsNote}`
             }
+          />
+        )}
+        {/* Sign in to Google for Google files (the developer's request,
+            2026-11-26): right under the document check, and only while it
+            is on, because it changes only how that check downloads Google
+            files and reads their dates; with the check off it would do
+            nothing (W3C COGA "Making Content Usable",
+            https://www.w3.org/TR/coga-usable/, paraphrased: group related
+            content). Not indented: the vision model switch under OCR is a
+            dependent switch at the same level, and one pattern is kept for
+            both (SC 3.2.4 Consistent Identification, Level AA). Its own
+            switch, not a choice inside the document switch: on/off of the
+            check and opening a Google window are two decisions, and
+            folding them into one control would make "check documents"
+            mean "and sign in" (one control, one job). In a sign-in scan it
+            works too since 2026-11-26 (the developer's decision: "one flow,
+            two separate browsers, one after another"), in the same place
+            and with the same behaviour, so the two forms offer the same
+            settings (the developer's rule, 2026-11-16; SC 3.2.4 Consistent
+            Identification, Level AA). Its sign-in hint says the Google
+            window is a second, separate one, opened after the site
+            sign-in, and that the site's pages are checked without it, so
+            the reader knows which window is for what before they start
+            (SC 3.3.2 Labels or Instructions, Level A). It changes nothing
+            about the page checks or their browser: the Google browser is
+            the document check's own (audit/linked_files/google_session.py). */}
+        {!isFixed(policy, "skip_documents") && switchOn(settings, "documents") && (
+          <SwitchRow
+            checked={switchOn(settings, "google")}
+            onChange={(on) => update(switchPatch(settings, "google", on))}
+            label={SWITCHES.google_sign_in.label}
+            hint={login ? SWITCHES.google_sign_in.hintSignInScan : SWITCHES.google_sign_in.hint}
           />
         )}
       </SwitchList>

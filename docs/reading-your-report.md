@@ -62,7 +62,7 @@ On the **Issues** tab, select the name of a
 | The page URL | **Pages with this issue type** lists each page's title and URL. In the inspector, **Open live page** opens the page on the real site. |
 | The element code | In the inspector, **Evidence from the scan**, under the page, lists the first three occurrences with their element code (HTML). A page's **Page details**, linked from its screenshots view, lists every occurrence on that page with its **Element code (HTML)**. The app does not show element locators (CSS selectors); the CSV, JSON and Excel exports still have them, in `target_selector`. |
 | An image with text in it | For an [image of text](glossary.md#image-of-text), the page's **Page details** lists the image under **Images on this page**, with **Open the image** (the image's address), any alt text, and the text read from it. Search your code or content system for that image address. |
-| A screenshot | The **Screenshots** column in **Pages with this issue type** links to a screenshot of each occurrence, when the scan took one. An outline marks where the occurrence was found. For the [form error check](glossary.md#form-error-check), it shows the form twice, **Before** and **After** its button was pressed. If the scan let it send empty forms, **After** shows the page the site sent back. Rule check (Alfa) results have no screenshots, because Alfa runs in a separate browser. |
+| A screenshot | The **Screenshots** column in **Pages with this issue type** links to a screenshot of each occurrence, when the scan took one. An outline marks where the occurrence was found. For the [form error check](glossary.md#form-error-check), it shows the form twice, **Before** and **After** its button was pressed. If the scan let it send empty forms, **After** shows the page the site sent back. Rule check (Alfa) results in reports made before 23 November 2026 have no screenshots, because Alfa then ran in a separate browser. |
 | The page inspector | Select a page title in **Pages with this issue type**. The inspector opens the page's **Saved copy** (or the **Live page**, if the scan saved no copy) with scripts off, and red outlines mark the flagged elements. The arrow buttons beside the count, such as "Flagged element 2 of 5", step to the previous or next flagged element; the one you are on has a thicker blue outline on yellow. The **Page code (DOM)** tab shows the page code, with the same buttons. |
 
 **Issue guidance**, at the top right of the page for an issue type, opens
@@ -276,6 +276,18 @@ Each row shows:
 - **Hosted on**: the site the file itself is kept on, such as
   "docs.google.com", and whether that is "This site" or "Another site". Not
   the pages that link to it, which are in "Pages it appears on".
+- **Creation date**: the day the file says it was first created, read from
+  the file itself (a Word or PowerPoint file's document properties, a PDF's
+  document information). It is not the day the file was posted on the site:
+  a file copied from an older one keeps the older date, and on one site we
+  measured, half the files were created more than a year before they were
+  posted. It can also be wrong if the computer that made the file had the
+  wrong date. For a Google Doc, Sheet or Slides file it is the day Google's
+  File, Details says it was created; a Google file has a date only when the
+  scan was signed in to Google (the **Sign in to Google for Google files**
+  setting) with an account that can open it. **Not known** means the file
+  does not say, Axcess could not open it, or the report was made before
+  Axcess version 0.2.12. Sorting by this column puts files with no date last.
 - **Accessibility problems?**: how sure Axcess is that the file has
   accessibility problems. The values are the same words as the Issues table's
   How sure column.
@@ -311,10 +323,19 @@ no single score.
 
 As on the Issues tab, every column header sorts the table (What Axcess found
 sorts by how many problems the checks found), and **Back to recommended
-order** above the table undoes it. **Filter documents** narrows the list by
+order** above the table undoes it. The **Search documents** box finds a file
+by its name or its URL (for example, `annual report` or `docs.google.com`).
+**Filter documents** narrows the list by
 Accessibility problems?, Type (PDF, Word, Excel and so on) and Hosted on (this
-site or another site), with how many documents have each value. What is
-filtered is written under the bar, with **Clear filters**. The numbers above
+site or another site), with how many documents have each value. To narrow the
+list by when files were made, type a **From** day, a **To** day or both
+under **Creation date** (Month, Day and Year; the month can be a number or a
+name, such as 4 or April) and press **Apply dates**. From alone keeps files
+made on or after that day, To alone on or before it, and both keep the files
+between them. Both days are included. **Clear dates** removes them. Files whose creation date is Not
+known always stay in the list, because Axcess cannot tell how old they are. Your
+search and filters are written under the bar, with **Clear filters**, which
+clears them all. The numbers above
 the table always count the whole report.
 
 A document's own page works like an issue type's page. At the top right,

@@ -1622,8 +1622,12 @@ async def test_login_scan_is_visible_and_explains_login_before_crawl(
     await playwright_async.expect(both_engines).to_be_checked()
     await alfa_only.check()
     await playwright_async.expect(alfa_only).to_be_checked()
-    await playwright_async.expect(dom_discovery).not_to_be_checked()
-    await playwright_async.expect(dom_discovery).to_be_disabled()
+    # Since 2026-11-23 Alfa checks the crawler's own tab, so it sees the page
+    # states Click-Through opens, and choosing it no longer turns
+    # Click-Through off (ChecksGroup's rationale; "make Alfa the same logic
+    # as axe"). This test still expected the old behaviour.
+    await playwright_async.expect(dom_discovery).to_be_checked()
+    await playwright_async.expect(dom_discovery).to_be_enabled()
 
     use_ocr = page.get_by_role("switch", name=re.compile(r"^Read text inside images"))
     use_vlm = page.get_by_role("switch", name=re.compile(r"^Compare image text with alt text"))

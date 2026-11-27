@@ -1,5 +1,5 @@
 import SearchSettings from "../SearchSettings";
-import { ALL_PAGES, GROUPS, NUMBERS, SWITCHES } from "./copy";
+import { ALL_PAGES, GROUPS, NUMBERS, SEARCH_COPY, SWITCHES } from "./copy";
 import type { GroupProps } from "./groupProps";
 import NumberField from "./NumberField";
 import { isFixed, LIMIT_MIN, switchOn, switchPatch } from "./scanPolicy";
@@ -68,12 +68,17 @@ export default function CoverageGroup({ settings, update, policy, errors, fieldI
           hint={settings.static_only ? "A fast scan has no saved copies to keep." : SWITCHES.skip_rendered_storage.hint}
         />
         {/* Search discovery reaches pages only a search box links to, so it
-            decides how much of the site is visited. */}
+            decides how much of the site is visited. It needs a browser; any
+            rule check tool checks the results (axe, or Alfa since
+            2026-11-23). The hint says what it needs and the alert names the
+            setting to change (SC 3.3.2 Labels or Instructions, Level A). */}
         <div className="px-2 py-2">
           <SearchSettings
             value={settings.search}
             onChange={(search) => update({ search })}
-            disabled={settings.static_only || settings.scan_engine === "alfa"}
+            disabled={settings.static_only}
+            needs={SEARCH_COPY.needs}
+            disabledReason={SEARCH_COPY.unavailableStatic}
           />
         </div>
         {offersAllPages && (

@@ -12,13 +12,18 @@ from urllib.parse import urljoin, urlsplit
 from playwright.async_api import TimeoutError as BrowserTimeout
 from pydantic import BaseModel, ConfigDict, Field
 
-from audit.analyzer.axe import AxeAnalyzer, AxeViolation, Level
+from audit import check_log
+from audit.analyzer.alfa import AlfaError
+from audit.analyzer.alfa_states import AlfaPageChecks, AlfaStateCheck
+from audit.analyzer.axe import AxeAnalyzer, AxeError, AxeViolation, Level
 from audit.analyzer.interaction import DEFAULT_BLOCKED_LABELS, RevealedViolation
 from audit.crawler import url_policy
 from audit.wcag_version import LEGACY_WCAG_VERSION, WcagVersion
 
 if TYPE_CHECKING:
     from playwright.async_api import Locator, Page, Route
+
+    from audit.analyzer.alfa_worker import AlfaWorker
 
 
 class SearchTarget(BaseModel):
@@ -106,18 +111,30 @@ class SearchExplorer:
         *,
         entry_url: str,
         can_visit: Callable[[str], bool],
-        axe: AxeAnalyzer,
+        axe: AxeAnalyzer | None,
         level: Level = "AA",
         version: WcagVersion = LEGACY_WCAG_VERSION,
+        alfa: AlfaWorker | None = None,
     ) -> None:
         self.config = config
         self.entry_url = url_policy.normalize(config.page_url or entry_url)
         self.can_visit = can_visit
+        # Either rule check tool may be absent (the scan's choice), as in
+        # Click-Through. Alfa snapshots each search state for the page's
+        # pending Alfa checks, compared later with the page's load check.
         self.axe = axe
+        self.alfa = alfa
         self.level = level
         self.version = version
 
-    async def run(self, page: Page, *, baseline: Sequence[AxeViolation]) -> SearchResult:
+    async def run(
+        self,
+        page: Page,
+        *,
+        baseline: Sequence[AxeViolation],
+        alfa_checks: AlfaPageChecks | None = None,
+        use_axe: bool = True,
+    ) -> SearchResult:
         urls: set[str] = set()
         findings: list[RevealedViolation] = []
         hashes = {finding.target_hash for finding in baseline}
@@ -152,7 +169,23 @@ class SearchExplorer:
             if links:
                 for url in await rendered_links(page):
                     remember(url)
-            for finding in await self.axe.run(page, self.level, self.version):
+            if self.alfa is not None and alfa_checks is not None:
+                try:
+                    task = await self.alfa.submit(page, level=self.level, version=self.version)
+                except AlfaError as exc:
+                    alfa_checks.state_errors.append(str(exc))
+                else:
+                    alfa_checks.states.append(AlfaStateCheck(task, "Configured search"))
+            # Without the page's load result (axe failed there) every search
+            # state would look new, so axe skips the search states too.
+            if self.axe is None or not use_axe:
+                return
+            try:
+                found = await self.axe.run(page, self.level, self.version)
+            except AxeError as exc:
+                check_log.not_run("axe", scope="page_state", part="search", reason=str(exc))
+                return
+            for finding in found:
                 if finding.target_hash not in hashes:
                     hashes.add(finding.target_hash)
                     findings.append(RevealedViolation(finding, "Configured search"))

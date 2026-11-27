@@ -18,6 +18,7 @@ import httpx
 if TYPE_CHECKING:
     from playwright.async_api import APIRequestContext
 
+    from audit.analyzer.alfa_states import AlfaPageChecks
     from audit.analyzer.axe import AxeViolation
     from audit.analyzer.focus import FocusFinding
     from audit.analyzer.forms import FormFinding
@@ -55,6 +56,10 @@ class FetchResult:
     body: bytes
     retry_after: float | None
     axe_violations: tuple[AxeViolation, ...] = field(default=())
+    # Whether axe checked this page: True, False when it was asked and failed
+    # (the log says why), None when the fetcher does not say (older fakes and
+    # fetchers without axe), which the orchestrator reads as before.
+    axe_checked: bool | None = None
     # SC 2.1.2 keyboard-trap probe results. Populated only by JsFetcher
     # when a KeyboardProbe is attached (default on; ``--skip-keyboard``
     # disables). Static fetches always leave it empty (probing requires
@@ -91,6 +96,9 @@ class FetchResult:
     # ``interaction_states`` and not a substitute for it -- a state nothing was
     # found in is still coverage, it just has nothing to show.
     interaction_captures: tuple[StateCapture, ...] = field(default=())
+    # States taken in case Alfa finds something new there; the orchestrator
+    # keeps the ones an Alfa occurrence points to (InteractionResult).
+    interaction_tentative_captures: tuple[StateCapture, ...] = field(default=())
     # target_hash -> highlighted element PNG bytes, captured at scan time
     # (empty for static fetches / when capture is disabled).
     screenshots: dict[str, bytes] = field(default_factory=dict)
@@ -108,6 +116,8 @@ class FetchResult:
     interaction_dialogs_opened: int = 0
     interaction_dialogs_stuck: int = 0
     interaction_detail: str = ""
+    # The error type that stopped Click-Through early on this page, or "".
+    interaction_stopped_by: str = ""
     discovered_urls: tuple[str, ...] = ()
     # Links that appeared after a click, with the control that revealed each,
     # for the Documents tab (``audit.linked_files``). JsFetcher only, when
@@ -135,6 +145,11 @@ class FetchResult:
     # report's "What was checked" counts.
     form_check_ran: bool = False
     form_outcomes: dict[str, int] = field(default_factory=dict)
+    # Alfa's checks of this page, at load and in each state Click-Through
+    # opened. They finish in the background (the tab only took snapshots),
+    # so the orchestrator awaits them with ``alfa_states.settle``. ``None``
+    # when Alfa did not check this page in the crawler's tab.
+    alfa_checks: AlfaPageChecks | None = None
 
     @property
     def is_html(self) -> bool:
