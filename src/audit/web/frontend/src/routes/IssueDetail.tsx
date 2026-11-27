@@ -71,34 +71,57 @@ export default function IssueDetailRoute() {
       <ReportHeader
         scanId={scan.id}
         canCompare={scan.has_other_reports}
-        title={
-          <span className="flex flex-wrap items-center gap-2">
-            {row && !isInformational && <ConformanceBadge level={row.conformance} />}
-            <span>{row?.title ?? key}</span>
-          </span>
-        }
-        // The type rides with the criterion, so a "Not sure" issue type reads
-        // as one even with the guidance closed. The word is the Issues
-        // table's (REVIEW_TYPE_LABEL), the same one the guidance dialog uses.
+        // The heading is the issue type's name alone. Its level (A, AA, AAA,
+        // Best practice) moved to the start of the WCAG line under it
+        // (the developer's layout, 2026-11-27): the level belongs to the
+        // criterion, so the badge sits beside the criterion it grades, and
+        // a screen reader's list of headings hears the name without "Level
+        // A" in front of it. At the start of the line, not the end, so it
+        // reads "Level A, WCAG 4.1.2 Name, Role, Value", the order the
+        // Issues table's Level filter and badge column use.
+        title={row?.title ?? key}
+        // Three lines under the heading, left-aligned with it (the
+        // developer's layout, 2026-11-27): the level and criterion, then
+        // How sure on its own line, then "Issue guidance".
+        //
+        // How sure has its own line so it is not read as part of the
+        // criterion's name. The word is the Issues table's
+        // (REVIEW_TYPE_LABEL), the same one the guidance dialog uses.
         meta={
           row ? (
             <>
-              {row.wcag_sc && (
-                <>
-                  <abbr title="Web Content Accessibility Guidelines">WCAG</abbr> {row.wcag_sc}
-                  {row.wcag_name ? ` ${row.wcag_name}` : ""}
-                  {row.also_wcag.length > 0 ? `, ${alsoWcagText(row.also_wcag, true)}` : ""}
-                  {" · "}
-                </>
+              {(!isInformational || row.wcag_sc) && (
+                <span className="flex flex-wrap items-center gap-x-2">
+                  {!isInformational && <ConformanceBadge level={row.conformance} />}
+                  {row.wcag_sc && (
+                    <span>
+                      <abbr title="Web Content Accessibility Guidelines">WCAG</abbr> {row.wcag_sc}
+                      {row.wcag_name ? ` ${row.wcag_name}` : ""}
+                      {row.also_wcag.length > 0 ? `, ${alsoWcagText(row.also_wcag, true)}` : ""}
+                    </span>
+                  )}
+                </span>
               )}
-              <span title={REVIEW_LANE_HELP[row.review_lane]}>{issuePageLaneLabel(row.review_lane)}</span>
+              <span className="block" title={REVIEW_LANE_HELP[row.review_lane]}>
+                {issuePageLaneLabel(row.review_lane)}
+              </span>
             </>
           ) : undefined
         }
-        // Top right, where Compare reports keeps its terms: one place on
-        // every report page for "explain this". A book, not Compare's
-        // question mark, so the two are not mistaken for each other.
-        actions={
+        // "Issue guidance" under the facts, on the left, not at the top
+        // right where it was until 2026-11-27. The developer moved it
+        // because buttons at the far right get lost. Readers of a page in a
+        // left-to-right language look most at its left side and least at
+        // its right (NN/g, "F-Shaped Pattern of Reading on the Web",
+        // https://www.nngroup.com/articles/f-shaped-pattern-reading-web-content/,
+        // paraphrased), and a control is found where it sits near what it
+        // acts on (NN/g, "Proximity Principle in Visual Design",
+        // https://www.nngroup.com/articles/gestalt-proximity/, paraphrased).
+        // Here it is next to the issue type it explains, and next in
+        // keyboard order after the heading (SC 2.4.3 Focus Order, Level A).
+        // A book, not Compare's question mark, so the two are not mistaken
+        // for each other.
+        below={
           detail && (
             <Button type="button" onClick={() => setGuidanceOpen(true)} className="rounded-full">
               <BookOpenText className="h-4 w-4" aria-hidden />

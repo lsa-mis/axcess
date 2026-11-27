@@ -28,6 +28,7 @@ export default function ReportHeader({
   title,
   help,
   meta,
+  below,
   actions,
   tabs = false,
 }: {
@@ -43,6 +44,13 @@ export default function ReportHeader({
    */
   help?: ReactNode;
   meta?: ReactNode;
+  /**
+   * Lines under the meta line, in the title's column: more facts about the
+   * page, or an action that belongs to the title. Each child is its own
+   * line. The issue type page puts "Issue guidance" here, on the left
+   * under the facts, rather than in ``actions`` at the far right.
+   */
+  below?: ReactNode;
   actions?: ReactNode;
   /** Show the report's view tabs. Only the report's own views (see above). */
   tabs?: boolean;
@@ -74,6 +82,7 @@ export default function ReportHeader({
           {meta && (
             <p className="mt-1 max-w-4xl text-sm leading-6 text-fg-muted">{meta}</p>
           )}
+          {below && <div className="mt-2 flex flex-col items-start gap-3">{below}</div>}
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>
