@@ -174,6 +174,7 @@ async def test_review_by_keyboard_alone(
 
     # Leaving the page discards the unsaved edit; the saved review stays.
     await page.reload(wait_until="networkidle")
+    await open_manual_review(page)
     await expect(opener).to_have_accessible_description("Your review: Checked: a problem to report")
     await page.get_by_role("button", name="Next element").click()
     await expect(opener).to_have_accessible_description("Your review: Not checked yet")

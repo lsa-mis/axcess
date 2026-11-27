@@ -69,9 +69,18 @@ async def _status(new_page: Any, base: str, scan_id: int, page_id: int, selector
         await page.wait_for_timeout(1500)
         # The key to the marks is in the "?" beside Hide highlights
         # (2026-11-27): open it so its words are part of the text.
+        # It shows once highlighting has finished: wait for it, then for its
+        # panel, rather than reading the text before either is there.
+        from playwright.async_api import TimeoutError as PlaywrightTimeout
+
         key = page.get_by_role("button", name="What do the highlights mean?", exact=True)
-        if await key.count():
+        try:
+            await key.wait_for(timeout=5000)
+        except PlaywrightTimeout:
+            pass  # nothing outlined, so no key to open
+        else:
             await key.click()
+            await page.locator("[popover]:popover-open").wait_for()
         return await page.locator("body").inner_text()
     finally:
         # One page at a time: close it now rather than at teardown.

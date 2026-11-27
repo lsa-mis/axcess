@@ -744,11 +744,16 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     )
     await playwright_async.expect(summary.get_by_text(re.compile(r"error", re.I))).to_have_count(0)
     # No line of facts under the numbers since 2026-11-27: how the scan
-    # ended is in "How this scan ran". "List the pages visited" sits under
-    # "Pages visited", in its dl.
+    # ended is on the closed "How this scan ran" row, and nowhere by the
+    # numbers. "List the pages visited" sits under "Pages visited", in its dl.
+    ended = re.compile(r"^Visited every page it found$")
+    await playwright_async.expect(summary.get_by_text(ended)).to_have_count(0)
+    await playwright_async.expect(page.get_by_text(ended)).to_have_count(1)
     await playwright_async.expect(
-        page.get_by_text(re.compile(r"^Visited every page it found$"))
-    ).to_have_count(0)
+        page.get_by_role("button", name="How this scan ran", exact=True)
+        .locator("xpath=ancestor::div[1]")
+        .get_by_text(ended)
+    ).to_be_visible()
     await playwright_async.expect(
         summary.get_by_role("link", name="List the pages visited", exact=True)
     ).to_be_visible()

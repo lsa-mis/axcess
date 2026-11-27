@@ -80,9 +80,10 @@ async def test_a_reflow_issue_is_shown_320_pixels_wide(
         await playwright_async.expect(
             page.get_by_text("As the zoom and layout check saw it:")
         ).to_be_visible()
-        await playwright_async.expect(
-            page.get_by_text("320 pixels wide", exact=False)
-        ).to_be_visible()
+        # The note itself: the closed Issue guidance section (2026-11-27)
+        # uses the same words, hidden until opened.
+        note = page.locator("p", has_text="As the zoom and layout check saw it:")
+        await playwright_async.expect(note).to_contain_text("320 pixels wide")
         frame_box = await page.locator("iframe[title^='Saved copy']").bounding_box()
         assert frame_box and round(frame_box["width"]) == 320
         # The flagged element is outlined, inside the narrow window.
@@ -113,7 +114,8 @@ async def test_a_zoom_issue_is_shown_in_the_checks_640_by_450_window(
     rule = "responsive-text-clipped"
     page = await _open(new_page, base, scan_id, _seed(db_path, scan_id, rule), rule)
     try:
-        await playwright_async.expect(page.get_by_text("200% zoom", exact=False)).to_be_visible()
+        note = page.locator("p", has_text="As the zoom and layout check saw it:")
+        await playwright_async.expect(note).to_contain_text("200% zoom")
         frame_box = await page.locator("iframe[title^='Saved copy']").bounding_box()
         assert frame_box and (round(frame_box["width"]), round(frame_box["height"])) == (640, 450)
     finally:
@@ -130,9 +132,8 @@ async def test_a_text_spacing_issue_is_shown_with_wcags_spacing(
     rule = "responsive-text-spacing-clipped"
     page = await _open(new_page, base, scan_id, _seed(db_path, scan_id, rule), rule)
     try:
-        await playwright_async.expect(
-            page.get_by_text("text spacing", exact=False).first
-        ).to_be_visible()
+        note = page.locator("p", has_text="As the zoom and layout check saw it:")
+        await playwright_async.expect(note).to_contain_text("text spacing")
         paragraph = page.frame_locator("iframe[title^='Saved copy']").locator("p")
         # 0.12em of the default 16px text.
         await playwright_async.expect(paragraph).to_have_css("letter-spacing", "1.92px")

@@ -259,12 +259,13 @@ async def test_a_copy_with_saved_styles_uses_them_instead_of_the_sites(
     state = await frame.locator("html").evaluate(
         """el => ({
             sheets: Array.from(el.querySelectorAll('link[rel~="stylesheet"]')).map(l => l.href),
-            styles: el.querySelectorAll('style').length,
+            styles: el.querySelectorAll('style:not([data-axcess-scrollbar])').length,
             preload: el.querySelectorAll('link[rel="preload"]').length,
             policy: el.querySelectorAll('meta[http-equiv]').length,
             base: el.querySelector('base')?.getAttribute('href'),
-            lastInHead: el.querySelector('head').lastElementChild?.hasAttribute(
-                'data-axcess-saved-styles'),
+            lastInHead: Array.from(el.querySelector('head').children)
+                .filter(c => !c.hasAttribute('data-axcess-scrollbar'))
+                .pop()?.hasAttribute('data-axcess-saved-styles'),
             color: getComputedStyle(el.querySelector('#app')).color,
         })"""
     )
