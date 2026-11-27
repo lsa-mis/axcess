@@ -139,14 +139,18 @@ async def test_the_current_element_gets_a_numbered_box_and_a_description(
         frame = page.frame_locator("iframe[title^='Saved copy']")
         box = frame.locator("#axcess-spotlight")
         await playwright_async.expect(box).to_have_text("1 of 3")
-        # No table of facts under the toolbar (What it is, Text or label,
-        # Size, the element locator and its Copy button): the developer
-        # removed it (2026-11-10). The toolbar status names the element.
+        # The table of facts (What it is, Text or label, Size, the element
+        # locator and its Copy button) is back since 2026-11-27, inside the
+        # closed "Element information" section: hidden until opened, then it
+        # describes the element the toolbar status names.
+        facts = page.locator("#inspect-element-panel")
+        copy = facts.get_by_role("button", name="Copy element locator", exact=True)
+        await playwright_async.expect(facts).to_be_hidden()
+        await page.get_by_role("button", name="Element information", exact=True).click()
         for term in ("What it is", "Text or label", "Size"):
-            await playwright_async.expect(page.locator("dt", has_text=term)).to_have_count(0)
-        await playwright_async.expect(
-            page.get_by_role("button", name="Copy element locator", exact=True)
-        ).to_have_count(0)
+            await playwright_async.expect(facts.locator("dt", has_text=term)).to_be_visible()
+        await playwright_async.expect(facts).to_contain_text("“Read the big story”")
+        await playwright_async.expect(copy).to_be_visible()
 
         # A tiny link: the box is still big enough to see, and labelled.
         await group.get_by_role("button", name="Next element").click()
@@ -206,8 +210,11 @@ async def test_alfa_records_are_matched_by_tag_attributes_and_text(
         await playwright_async.expect(
             frame.locator("footer span.axcess-inspect-highlight")
         ).to_have_count(1)
-        # An Alfa record's XPath is not shown: locators and the facts table
-        # left the screen (2026-11-10).
-        await playwright_async.expect(page.get_by_text("Element locator")).to_have_count(0)
+        # An Alfa record's XPath is shown in the closed "Element information"
+        # section (back since 2026-11-27), named as an XPath, not a selector.
+        locator = page.locator("#inspect-element-panel").get_by_text("Element locator (XPath)")
+        await playwright_async.expect(locator).to_be_hidden()
+        await page.get_by_role("button", name="Element information", exact=True).click()
+        await playwright_async.expect(locator).to_be_visible()
     finally:
         await page.context.close()
