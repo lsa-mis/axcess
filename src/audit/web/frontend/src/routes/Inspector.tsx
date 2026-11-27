@@ -1300,10 +1300,13 @@ export default function InspectorRoute() {
               target="_blank"
               rel="noopener noreferrer"
               title={pageInfo.captured_at ? `Saved ${serverDate(pageInfo.captured_at).toLocaleString()}` : undefined}
-              className="break-all text-umich-blue underline underline-offset-2"
+              // A 44 px tall target, as every control here (SC 2.5.5 Target
+              // Size (Enhanced), Level AAA); a negative margin keeps the
+              // line's own height. The address wraps anywhere inside it.
+              className="-my-[calc((var(--target,44px)_-_1.5rem)/2)] inline-flex min-h-target max-w-full items-center gap-1 text-umich-blue underline underline-offset-2"
             >
-              {pageInfo.url}
-              <ExternalLink className="ml-1 inline h-3.5 w-3.5 align-[-0.15em]" aria-hidden />
+              <span className="min-w-0 [overflow-wrap:anywhere]">{pageInfo.url}</span>
+              <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden />
               <span className="sr-only"> ({OPENS_NEW_WINDOW})</span>
             </a>
             {renderNote && <span className="block font-semibold text-fg">{renderNote}</span>}
