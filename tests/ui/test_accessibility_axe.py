@@ -734,23 +734,25 @@ async def test_completed_scan_opens_as_report_output_not_pipeline_dashboard(
     # be loaded are said in words, never as "errors", which readers took for
     # accessibility errors, and only when there are some.
     summary = page.locator("dl").filter(has_text="Pages visited").first
+    # No "?" after the counts' names since 2026-11-27: each term is its name.
     await playwright_async.expect(summary.get_by_role("term")).to_have_text(
         [
-            # Each count's term starts with its name; a "?" follows it
-            # (2026-11-16), whose words are part of the term's text.
-            re.compile(r"^Issue types?(What is|$)"),
-            re.compile(r"^Issue occurrences?(What is|$)"),
+            re.compile(r"^Issue types?$"),
+            re.compile(r"^Issue occurrences?$"),
             "Pages visited",
         ]
     )
     await playwright_async.expect(summary.get_by_text(re.compile(r"error", re.I))).to_have_count(0)
-    # On the facts line under the numbers (ScanFacts), with how the scan ended.
+    # No line of facts under the numbers since 2026-11-27: how the scan
+    # ended is in "How this scan ran". "List the pages visited" sits under
+    # "Pages visited", in its dl.
     await playwright_async.expect(
-        page.get_by_role("listitem").filter(has_text=re.compile(r"^Visited every page it found$"))
-    ).to_have_count(1)
-    failed = page.get_by_role("listitem").filter(
-        has_text=re.compile(r"pages? could not be loaded$")
-    )
+        page.get_by_text(re.compile(r"^Visited every page it found$"))
+    ).to_have_count(0)
+    await playwright_async.expect(
+        summary.get_by_role("link", name="List the pages visited", exact=True)
+    ).to_be_visible()
+    failed = summary.get_by_text(re.compile(r"pages? could not be loaded$"))
     await playwright_async.expect(failed).to_have_count(0)
     with sqlite3.connect(seeded_db[0]) as conn:
         conn.execute("UPDATE scans SET error_count = 3 WHERE id = ?", (scan_id,))
