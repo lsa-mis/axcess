@@ -336,10 +336,10 @@ async def test_analysis_sections_stack_in_order_with_the_review_open(
     suggest_server: tuple[str, int, int, int], new_page: Any, width: int
 ) -> None:
     """The Analysis sections are a stack of closed carets, one under the
-    other in a set order, with Manual review open from the start (the
-    developer's layout, 2026-11-27, replacing the suggestion-and-review row
-    of 2026-11-11). Each says whether it is open (aria-expanded), several
-    can be open at once, and nothing is wider than the screen at 320 px."""
+    other in a set order, all closed at first (the developer's layout,
+    2026-11-27, replacing the suggestion-and-review row of 2026-11-11). Each
+    says whether it is open (aria-expanded), several can be open at once,
+    and nothing is wider than the screen at 320 px."""
     from playwright.async_api import expect
 
     base, scan_id, page_id, _ = suggest_server
@@ -360,12 +360,13 @@ async def test_analysis_sections_stack_in_order_with_the_review_open(
     ]
     buttons = box.locator("h2 > button[aria-expanded]")
     await expect(buttons).to_have_text(names)
-    await expect(review).to_have_attribute("aria-expanded", "true")
-    await expect(page.get_by_role("group", name="The flagged element you are on")).to_be_visible()
-    for name in ("Issue guidance", "AI analysis assistant", "Element information"):
+    for name in ("Issue guidance", "AI analysis assistant", "Manual review", "Element information"):
         await expect(box.get_by_role("button", name=name, exact=True)).to_have_attribute(
             "aria-expanded", "false"
         )
+    await expect(page.get_by_role("group", name="The flagged element you are on")).to_be_hidden()
+    await review.click()
+    await expect(page.get_by_role("group", name="The flagged element you are on")).to_be_visible()
     # Several open at once: opening the AI section leaves the review open.
     await box.get_by_role("button", name="AI analysis assistant", exact=True).click()
     await expect(review).to_have_attribute("aria-expanded", "true")

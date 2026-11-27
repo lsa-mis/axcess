@@ -18,7 +18,7 @@ from typing import Any
 
 import pytest
 
-from ._inspector_case import open_inspector, seed
+from ._inspector_case import open_inspector, open_manual_review, seed
 from .test_accessibility_axe import _AXE_TAGS, _AXE_TEXT, _render_violations
 
 pytestmark = [pytest.mark.ui, pytest.mark.asyncio(loop_scope="module")]
@@ -74,6 +74,12 @@ async def test_review_by_keyboard_alone(
     db_path = seeded_db[0]
     page_id = seed(db_path, scan_id, CAPTURE, RULE, FINDINGS)
     page = await open_inspector(new_page, base, scan_id, page_id, RULE)
+    # The review is in "Manual review", closed until opened (2026-11-27):
+    # open it by keyboard too.
+    section = page.get_by_role("button", name="Manual review", exact=True)
+    await _tab_to(page, section)
+    await page.keyboard.press("Enter")
+    await expect(section).to_have_attribute("aria-expanded", "true")
 
     panel = page.get_by_role("group", name="The flagged element you are on")
     opener = panel.get_by_role("button", name="Review this element")
@@ -179,6 +185,7 @@ async def test_review_passes_axe_and_fits_narrow_screens(
     base, scan_id = live_server
     page_id = seed(seeded_db[0], scan_id, CAPTURE, RULE, FINDINGS)
     page = await open_inspector(new_page, base, scan_id, page_id, RULE)
+    await open_manual_review(page)
     opener = page.get_by_role("button", name="Review this element")
     await expect(opener).to_be_visible()
 
@@ -271,6 +278,7 @@ def _seed_finding(
 
 async def _suggestion(new_page: Any, base: str, scan_id: int, page_id: int, rule: str) -> str:
     page = await open_inspector(new_page, base, scan_id, page_id, rule)
+    await open_manual_review(page)
     await page.get_by_role("button", name="Review this element").click()
     notes = page.get_by_role("dialog").get_by_role("textbox", name="Issue notes")
     await expect(notes).not_to_have_value("")
@@ -376,6 +384,7 @@ async def test_mark_not_checked_as_repeats_in_one_press(
     findings = [*FINDINGS, ("#three", '<button id="three"></button>')]
     page_id = seed(db_path, scan_id, capture, RULE, findings)
     page = await open_inspector(new_page, base, scan_id, page_id, RULE)
+    await open_manual_review(page)
     panel = page.get_by_role("group", name="The flagged element you are on")
     opener = panel.get_by_role("button", name="Review this element")
     dialog = page.get_by_role("dialog", name="Review this element")

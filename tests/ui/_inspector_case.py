@@ -79,6 +79,14 @@ def box_note(page: Any) -> Any:
     return page.locator("#inspect-box-note")
 
 
+async def open_manual_review(page: Any) -> None:
+    """Open the inspector's "Manual review" section, which starts closed
+    (2026-11-27), so the review of the element you are on can be used."""
+    button = page.get_by_role("button", name="Manual review", exact=True)
+    await button.click()
+    await page.get_by_role("group", name="The flagged element you are on").wait_for()
+
+
 async def highlight_key(page: Any) -> Any:
     """Open the "?" beside Hide highlights and return its panel: the key to
     the marks ("A blue box with a yellow ring marks the flagged element.")."""

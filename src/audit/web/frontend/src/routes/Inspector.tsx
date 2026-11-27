@@ -836,8 +836,8 @@ export default function InspectorRoute() {
 
   // Which Analysis sections are open (see the Analysis bar's comment). Here,
   // not in each section, so a section that briefly has nothing to show while
-  // the reader steps comes back as they left it. Manual review starts open.
-  const [openCarets, setOpenCarets] = useState<Record<string, boolean>>({ review: true });
+  // the reader steps comes back as they left it. All start closed.
+  const [openCarets, setOpenCarets] = useState<Record<string, boolean>>({});
   const caret = (key: string) => ({
     open: openCarets[key] ?? false,
     onOpenChange: (open: boolean) => setOpenCarets((current) => ({ ...current, [key]: open })),
@@ -1716,12 +1716,16 @@ export default function InspectorRoute() {
                 pattern, which shows one section at a time and makes
                 comparing two a back-and-forth.
 
-                Manual review starts open, the others closed (the
-                developer's choice, 2026-11-27): reviewing the element is
-                the main task here, and the review was in view before. Each
-                stays as the reader left it while they step between
-                elements or a section briefly has nothing to show (the
-                state is the inspector's, not the section's).
+                All start closed (the developer's choice, 2026-11-27, after
+                first choosing Manual review open), so the page copy is
+                near the top and the stack is a short list of names to pick
+                from. The tradeoff: the review, the main task here, takes
+                one more press, and a closed section can be missed (NN/g,
+                "Accordions on Desktop"); its name is in view, and each
+                says it is closed (aria-expanded). Each stays as the reader
+                left it while they step between elements or a section
+                briefly has nothing to show (the state is the inspector's,
+                not the section's).
 
                 Above the copy, under the View bar, so all of it is about
                 the element the stepper is on and follows Previous / Next
