@@ -692,6 +692,7 @@ export function Disclosure({
   onOpenChange,
   icon,
   meta,
+  metaInline = false,
   className,
   children,
 }: {
@@ -714,6 +715,18 @@ export function Disclosure({
    * name stays the title alone; give it its own text for a screen reader.
    */
   meta?: ReactNode;
+  /**
+   * Show ``meta`` right after the title, inside the button, instead of at
+   * the row's far end. For a count that says how much the title holds
+   * ("Scan evidence 9 occurrences"): at the far end of a wide row it sat
+   * apart from the words it counts and was missed (the developer's
+   * request, 2026-11-27; NN/g, "Proximity Principle in Visual Design",
+   * https://www.nngroup.com/articles/gestalt-proximity/, paraphrased:
+   * people read things far apart as unrelated). Inside the button it is
+   * part of the button's name, so a screen reader hears the count with
+   * the title; give it plain words, no symbols.
+   */
+  metaInline?: boolean;
   className?: string;
   children: ReactNode;
 }) {
@@ -762,11 +775,20 @@ export function Disclosure({
           />
           {icon}
           {/* The title must be this button's only text node: the UI tests
-              address it both by exact text and by accessible name. */}
+              address it both by exact text and by accessible name. An
+              inline meta is a second span after it. */}
           <span>{title}</span>
+          {/* The space keeps the title and count apart in the button's
+              name ("Scan evidence 9 occurrences"); the gap does it on screen. */}
+          {meta && metaInline && (
+            <>
+              {" "}
+              <span className="text-xs font-semibold text-fg-subtle">{meta}</span>
+            </>
+          )}
         </button>,
       )}
-      {meta && <div className="shrink-0 pr-4 text-xs font-semibold text-fg-subtle">{meta}</div>}
+      {meta && !metaInline && <div className="shrink-0 pr-4 text-xs font-semibold text-fg-subtle">{meta}</div>}
       </div>
       <div
         id={panelId}
