@@ -404,9 +404,9 @@ export default function IssuesRoute() {
         <ReportCoverageNote scan={scan} rows={summaryRows} />
         <ReportScanNote scan={scan} />
         <IssueGlossary />
+        {/* Last, after everything a reviewer reads: see ReportDangerZone. */}
+        <ReportDangerZone scan={scan} />
       </ReportNotes>
-
-      <ReportDangerZone scan={scan} />
     </>
   );
 }

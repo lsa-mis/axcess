@@ -457,6 +457,8 @@ export function ReportScanNote({ scan }: { scan: ScanDetail }) {
 /**
  * The report's closed explanations under the header, as one accordion: a
  * framed list of ``ReportNote`` rows, one per line, all closed on arrival.
+ * On Issues the last row is "Delete this report" (ReportDangerZone), the
+ * report's one action, in the same list since 2026-11-27.
  *
  * These used to be link-styled ``<details>`` summaries wrapped side by side,
  * which read as loose sentences and put the table's context in a different
@@ -477,12 +479,15 @@ export function ReportNote({
   id,
   title,
   meta,
+  icon,
   children,
 }: {
   id: string;
   title: string;
   /** The row's one fact, shown on the right while it is closed. */
   meta?: ReactNode;
+  /** An icon before the title, for a row that is not a note (Delete this report). */
+  icon?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -493,6 +498,7 @@ export function ReportNote({
       id={id}
       title={title}
       meta={meta}
+      icon={icon}
       headingLevel={2}
       className="rounded-none border-0 first:rounded-t-[7px] last:rounded-b-[7px]"
     >
